@@ -18,6 +18,7 @@ mod init_item_kinds_golden;
 mod init_tests;
 mod integration_schema;
 mod integration_test;
+mod profile_acceptance_tests;
 mod profile_cli_tests;
 mod project_config_tests;
 mod repo_discovery_tests;

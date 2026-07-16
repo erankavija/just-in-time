@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "940fc646-e99a-472e-84ed-f12f9665e9ea",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "bcff56be-2e8f-44ae-9b3b-5739be414630",
+  "commit": "b669c280a34e44546220729b2c7c091f855c3ef0",
+  "branch": "worktree-agent-bcff56be",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-16T19:50:15.842945731Z",
+  "completed_at": "2026-07-16T19:54:36.143946505Z",
+  "duration_ms": 260301,
+  "exit_code": 1,
+  "stdout": "Attribution: b669c280 (implementation) and f80ee65d (claim metadata)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics and @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci, mcp-ci, docs-mechanical, and repo-validate passed (exit 0); doc-review pending\nTruncation recovery: re-read patches by commit/path; narrowed requirement, schema, MCP, policy, and current-file reads after broad-search truncation\n\n1. **F1 — blocking, issue-impact (high):** The claimed offline/jq-free journey inherits `PATH` in [profile_acceptance_tests.rs](/tmp/jit-agent-bcff56be/crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs:25); it only poisons network proxy variables. Because it invokes the installed planning checkers, an accidental `jq` dependency would still pass wherever `jq` is available, so the hard no-`jq` acceptance criterion is not proven.\n\n2. **F2 — blocking, issue-impact (high):** The lifecycle-surface assertion only exhaustively checks profile subcommand names and selected `profile show` definitions at [profile_acceptance_tests.rs](/tmp/jit-agent-bcff56be/crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs:435). It does not constrain `profile apply` request/result fields or MCP profile-tool input schemas; the MCP test merely verifies each input schema is an object at [test-integration.js](/tmp/jit-agent-bcff56be/mcp-server/test-integration.js:195). Deferred lifecycle fields could therefore leak through those public surfaces without failing this suite.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two hard acceptance criteria are not fully exercised.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The offline journey inherits PATH, so it cannot prove the portable checkers run without jq.\",\"file\":\"crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs\",\"line\":25},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The suite does not constrain deferred fields in profile apply or MCP tool schemas.\",\"file\":\"crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs\",\"line\":435}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4360 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /tmp/jit-agent-bcff56be\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6c7a-d11b-7c00-87a8-c44fed86ad96\n--------\nuser\n--- 4347 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two hard acceptance criteria are not fully exercised.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The offline journey inherits PATH, so it cannot prove the portable checkers run without jq.",
+        "file": "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs",
+        "line": 25
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The suite does not constrain deferred fields in profile apply or MCP tool schemas.",
+        "file": "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs",
+        "line": 435
+      }
+    ]
+  }
+}

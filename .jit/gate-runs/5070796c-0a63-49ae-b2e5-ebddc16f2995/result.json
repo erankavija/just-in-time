@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_id": "5070796c-0a63-49ae-b2e5-ebddc16f2995",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "bcff56be-2e8f-44ae-9b3b-5739be414630",
+  "commit": "e85eec8392fff13156eef0d1f1b45f7eaa4e9739",
+  "branch": "worktree-agent-bcff56be",
+  "tree_dirty": false,
+  "status": "passed",
+  "started_at": "2026-07-16T20:04:51.975404903Z",
+  "completed_at": "2026-07-16T20:17:40.621647774Z",
+  "duration_ms": 768646,
+  "exit_code": 0,
+  "stdout": "  ✓ fmt: ok\n  ✓ clippy: ok\n  ✓ test: 3579 passed, 0 failed, 14 ignored\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1130 bytes=18681307)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1044019336/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "stderr": "cargo-ci: cargo on PATH was a stub; using /home/vkaskivuo/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo\n",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
