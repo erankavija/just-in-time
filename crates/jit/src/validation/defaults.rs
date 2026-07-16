@@ -329,6 +329,149 @@ pub fn reconcile_default_rules_with_config(
     RuleSet { rules }
 }
 
+/// Rule-name prefix marking the per-namespace uniqueness family
+/// (`namespace-unique-<ns>`) — the only default-rule family whose FILE
+/// MEMBERSHIP (not just its assertion) is write-through synced to
+/// `rules.toml` by [`default_rule_membership_diff`], because it is the only
+/// family whose existence (not merely its schema content) varies with the
+/// registry.
+const NAMESPACE_UNIQUE_PREFIX: &str = "namespace-unique-";
+
+/// The `namespace-unique-*` file-membership delta between the rules currently
+/// authored on disk (`loaded`, i.e. `.jit/rules.toml` as parsed by
+/// [`RuleSet::load`](crate::validation::rules::RuleSet::load) — NOT the
+/// in-memory-reconciled set [`reconcile_default_rules_with_config`] produces)
+/// and the CURRENT `namespaces` registry.
+///
+/// Companion to [`reconcile_default_rules_with_config`], which folds this same
+/// family into the in-memory effective ruleset at every load with no disk
+/// write — the validation authority stays there (out of scope for this diff,
+/// jit:d74a9ed1). This diff instead reports what a caller must WRITE to
+/// `rules.toml` so the registry-first `rule` item kind — which resolves
+/// `@/rule/<name>` straight from the file, not the reconciled ruleset — never
+/// dangles behind a registry edit the in-memory path already honors.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct DefaultRuleMembershipDiff {
+    /// `origin = "default"` rules, in [`default_ruleset`]'s emission order, for
+    /// a namespace the registry newly declares unique — absent from `loaded`.
+    pub to_add: Vec<Rule>,
+    /// Names of `loaded`'s `origin = "default"` `namespace-unique-<ns>` rows
+    /// whose namespace is no longer unique, or no longer declared at all.
+    pub to_drop: Vec<String>,
+}
+
+impl DefaultRuleMembershipDiff {
+    /// Whether applying this diff would change anything.
+    pub fn is_empty(&self) -> bool {
+        self.to_add.is_empty() && self.to_drop.is_empty()
+    }
+}
+
+/// Compute the `namespace-unique-*` [`DefaultRuleMembershipDiff`] between
+/// `loaded` (the rules as currently authored in `rules.toml`) and `namespaces`
+/// (the current registry).
+///
+/// Mirrors [`reconcile_default_rules_with_config`]'s opt-out and matching
+/// rules exactly, restricted to this one family:
+///
+/// - `loaded` carrying NO `origin = "default"` rule at all has deliberately
+///   opted out of the defaults; the diff is empty (nothing to add or drop).
+/// - Otherwise, a `namespace-unique-<ns>` rule [`default_ruleset`] would emit
+///   for `namespaces` that has no `origin = "default"` counterpart already in
+///   `loaded` is in `to_add`.
+/// - An `origin = "default"` `namespace-unique-<ns>` row in `loaded` that
+///   [`default_ruleset`] no longer emits for `namespaces` is in `to_drop`.
+///
+/// A rule sharing a `namespace-unique-<ns>` NAME but a different `origin`
+/// (a custom rule shadowing the default name) is never counted as "existing"
+/// here and never targeted for drop, matching how
+/// [`reconcile_default_rules_with_config`] only ever touches `origin =
+/// "default"` rows.
+///
+/// Pure: no I/O, deterministic, total.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{LabelNamespace, LabelNamespaces};
+/// use jit::validation::defaults::{default_ruleset, default_rule_membership_diff};
+/// use std::collections::HashMap;
+///
+/// let mut ns = HashMap::new();
+/// ns.insert("type".to_string(), LabelNamespace::new("Type", true));
+/// let scaffolded_registry = LabelNamespaces {
+///     schema_version: 2,
+///     namespaces: ns,
+///     type_hierarchy: None,
+///     label_associations: None,
+///     strategic_types: None,
+/// };
+/// let loaded = default_ruleset(&scaffolded_registry);
+///
+/// // `team` becomes unique later (e.g. a hand edit of config.toml).
+/// let mut now = HashMap::new();
+/// now.insert("type".to_string(), LabelNamespace::new("Type", true));
+/// now.insert("team".to_string(), LabelNamespace::new("Team", true));
+/// let current_registry = LabelNamespaces {
+///     schema_version: 2,
+///     namespaces: now,
+///     type_hierarchy: None,
+///     label_associations: None,
+///     strategic_types: None,
+/// };
+///
+/// let diff = default_rule_membership_diff(&loaded, &current_registry);
+/// assert_eq!(diff.to_add.len(), 1);
+/// assert_eq!(diff.to_add[0].name, "namespace-unique-team");
+/// assert!(diff.to_drop.is_empty());
+/// ```
+pub fn default_rule_membership_diff(
+    loaded: &RuleSet,
+    namespaces: &LabelNamespaces,
+) -> DefaultRuleMembershipDiff {
+    // A file with no default-origin rule has deliberately opted out of the
+    // fixed defaults, mirroring `reconcile_default_rules_with_config`: nothing
+    // to add or drop.
+    if !loaded
+        .rules
+        .iter()
+        .any(|r| r.origin.as_deref() == Some(DEFAULT_ORIGIN))
+    {
+        return DefaultRuleMembershipDiff::default();
+    }
+
+    let existing: HashSet<&str> = loaded
+        .rules
+        .iter()
+        .filter(|r| {
+            r.origin.as_deref() == Some(DEFAULT_ORIGIN)
+                && r.name.starts_with(NAMESPACE_UNIQUE_PREFIX)
+        })
+        .map(|r| r.name.as_str())
+        .collect();
+
+    let derived = default_ruleset(namespaces);
+    let desired: Vec<&Rule> = derived
+        .rules
+        .iter()
+        .filter(|r| r.name.starts_with(NAMESPACE_UNIQUE_PREFIX))
+        .collect();
+    let desired_names: HashSet<&str> = desired.iter().map(|r| r.name.as_str()).collect();
+
+    let to_add = desired
+        .into_iter()
+        .filter(|r| !existing.contains(r.name.as_str()))
+        .cloned()
+        .collect();
+    let to_drop = existing
+        .into_iter()
+        .filter(|name| !desired_names.contains(name))
+        .map(|s| s.to_string())
+        .collect();
+
+    DefaultRuleMembershipDiff { to_add, to_drop }
+}
+
 /// The stable schema file name the `type-hierarchy-known` rule (`origin =
 /// "default"`) references once serialized to `.jit/rules.toml` (the sanitized
 /// `<origin>:<name>` identity + `.json`, matching [`serialize`](crate::validation::serialize)'s
@@ -1026,5 +1169,115 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "default rule names must be unique");
+    }
+
+    // -- default_rule_membership_diff (jit:d74a9ed1) -------------------------
+
+    #[test]
+    fn test_membership_diff_adds_newly_unique_namespace() {
+        // `team` was not unique when `loaded` was scaffolded; the registry now
+        // declares it unique. The diff must add exactly its uniqueness rule.
+        let loaded = default_ruleset(&registry(vec![("type", LabelNamespace::new("Type", true))]));
+        let now = registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("team", LabelNamespace::new("Team", true)),
+        ]);
+        let diff = default_rule_membership_diff(&loaded, &now);
+        assert_eq!(diff.to_add.len(), 1);
+        assert_eq!(diff.to_add[0].name, "namespace-unique-team");
+        assert_eq!(diff.to_add[0].origin.as_deref(), Some("default"));
+        assert!(diff.to_drop.is_empty());
+        assert!(!diff.is_empty());
+    }
+
+    #[test]
+    fn test_membership_diff_drops_no_longer_unique_namespace() {
+        // `team` was unique when `loaded` was scaffolded; the registry drops it
+        // (namespace removed entirely). The diff must drop its uniqueness rule.
+        let loaded = default_ruleset(&registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("team", LabelNamespace::new("Team", true)),
+        ]));
+        let now = registry(vec![("type", LabelNamespace::new("Type", true))]);
+        let diff = default_rule_membership_diff(&loaded, &now);
+        assert!(diff.to_add.is_empty());
+        assert_eq!(diff.to_drop, vec!["namespace-unique-team".to_string()]);
+    }
+
+    #[test]
+    fn test_membership_diff_drops_namespace_demoted_to_non_unique() {
+        // `team` stays declared but is no longer `unique = true`: same drop path
+        // as outright removal.
+        let loaded = default_ruleset(&registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("team", LabelNamespace::new("Team", true)),
+        ]));
+        let now = registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("team", LabelNamespace::new("Team", false)),
+        ]);
+        let diff = default_rule_membership_diff(&loaded, &now);
+        assert!(diff.to_add.is_empty());
+        assert_eq!(diff.to_drop, vec!["namespace-unique-team".to_string()]);
+    }
+
+    #[test]
+    fn test_membership_diff_empty_when_registry_unchanged() {
+        let reg = registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("team", LabelNamespace::new("Team", true)),
+        ]);
+        let loaded = default_ruleset(&reg);
+        let diff = default_rule_membership_diff(&loaded, &reg);
+        assert!(
+            diff.is_empty(),
+            "unchanged registry yields no delta: {diff:?}"
+        );
+    }
+
+    #[test]
+    fn test_membership_diff_ignores_custom_rule_with_colliding_name() {
+        // A CUSTOM rule (non-default origin) happens to be named
+        // `namespace-unique-team`. It is never counted as "existing" for this
+        // family (mirroring `reconcile_default_rules_with_config`), so a
+        // registry that still declares `team` unique still ADDS the default
+        // row rather than treating the custom row as satisfying it, and the
+        // custom row is never a drop target.
+        let loaded = RuleSet {
+            rules: vec![custom_json_rule("namespace-unique-team")],
+        };
+        let reg = registry(vec![("team", LabelNamespace::new("Team", true))]);
+        // `loaded` carries NO default-origin rule at all here, so the opt-out
+        // path applies and the diff is empty regardless of the name collision.
+        let diff = default_rule_membership_diff(&loaded, &reg);
+        assert!(
+            diff.is_empty(),
+            "an opted-out file yields no delta: {diff:?}"
+        );
+
+        // With at least one default-origin rule present (not opted out), the
+        // custom-origin `namespace-unique-team` row still does not block the
+        // default row from being added.
+        let mut loaded_with_default = default_ruleset(&registry(vec![]));
+        loaded_with_default
+            .rules
+            .push(custom_json_rule("namespace-unique-team"));
+        let diff = default_rule_membership_diff(&loaded_with_default, &reg);
+        assert_eq!(diff.to_add.len(), 1);
+        assert_eq!(diff.to_add[0].name, "namespace-unique-team");
+        assert_eq!(diff.to_add[0].origin.as_deref(), Some("default"));
+    }
+
+    #[test]
+    fn test_membership_diff_opted_out_file_is_untouched() {
+        // A `rules.toml` with zero default-origin rules has opted out; the diff
+        // stays empty even when the registry declares a unique namespace the
+        // defaults would otherwise emit a rule for.
+        let loaded = RuleSet {
+            rules: vec![custom_json_rule("only-custom-rule")],
+        };
+        let reg = registry(vec![("team", LabelNamespace::new("Team", true))]);
+        let diff = default_rule_membership_diff(&loaded, &reg);
+        assert!(diff.is_empty());
     }
 }

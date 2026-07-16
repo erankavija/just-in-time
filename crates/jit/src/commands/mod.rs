@@ -300,6 +300,20 @@ pub struct WriteValidation {
     pub bypassed_rules: Vec<String>,
 }
 
+/// Outcome of [`CommandExecutor::sync_default_rule_membership`]: the
+/// `namespace-unique-*` default-rule NAMES appended to `.jit/rules.toml` and
+/// those dropped from it. Both empty means the file already matched the
+/// `[namespaces]` registry (a no-op write).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RuleMembershipSync {
+    /// Names of the `origin = "default"` `namespace-unique-<ns>` rows
+    /// appended, in [`default_ruleset`](crate::validation::defaults::default_ruleset)'s
+    /// emission order.
+    pub added: Vec<String>,
+    /// Names of the `origin = "default"` `namespace-unique-<ns>` rows dropped.
+    pub dropped: Vec<String>,
+}
+
 /// Executes CLI commands with business logic and validation.
 ///
 /// Generic over storage backend to support different implementations
@@ -1061,9 +1075,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Idempotent: a no-op when `.jit/rules.toml` already exists (the present file
     /// is left untouched, so re-init never clobbers user edits) beyond republishing
-    /// its projections (the header comment and `schemas/default-*.json`). Returns
-    /// `true` when it wrote a fresh file, `false` when it was a projection-only
-    /// refresh.
+    /// its projections (the header comment and `schemas/default-*.json`) and
+    /// write-through syncing `namespace-unique-*` MEMBERSHIP
+    /// ([`sync_default_rule_membership`](Self::sync_default_rule_membership)).
+    /// Returns `true` when it wrote a fresh file, `false` when it was a
+    /// projection-and-membership-only refresh.
     pub fn scaffold_default_rules(&self) -> Result<bool> {
         let jit_root = self.storage.root();
 
@@ -1081,10 +1097,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             // rules validate against the config registry derived in memory, but the
             // `schemas/default-*.json` files and the file's header comment are
             // projections; republish both from the current registry / contract so a
-            // re-init refreshes them. The header rewrite preserves every rule body
-            // (including custom-rule comments). Idempotent and atomic; a no-op when
-            // already current.
+            // re-init refreshes them. The `namespace-unique-*` MEMBERSHIP is
+            // additionally write-through synced into the file itself (not just
+            // projected) so `@/rule/<name>` addressability tracks the registry too.
+            // The header rewrite preserves every rule body (including custom-rule
+            // comments). Idempotent and atomic; a no-op when already current.
             self.refresh_default_schema_projections()?;
+            self.sync_default_rule_membership()?;
             crate::storage::ruleset_store::rewrite_rules_header(
                 jit_root,
                 crate::validation::serialize::rules_file_header(),
@@ -1145,6 +1164,62 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
         Ok(written)
+    }
+
+    /// Write-through the `namespace-unique-*` DEFAULT-rule file MEMBERSHIP into
+    /// `.jit/rules.toml` itself (not just its `schemas/*.json` projections), so
+    /// the registry-first `rule` item kind — which resolves `@/rule/<name>`
+    /// straight from the file, not the in-memory-reconciled ruleset (`jit item
+    /// show`/`list`, docs-mechanical citation checking) — never dangles behind
+    /// [`reconcile_default_rules_with_config`](crate::validation::defaults::reconcile_default_rules_with_config)'s
+    /// load-time-only reconciliation.
+    ///
+    /// Computes [`default_rule_membership_diff`](crate::validation::defaults::default_rule_membership_diff)
+    /// between the CURRENT on-disk `rules.toml` and the CURRENT `[namespaces]`
+    /// registry, then appends the row for each newly-unique namespace and drops
+    /// the row for each namespace no longer unique or no longer declared —
+    /// `origin = "default"` rows ONLY. Every other byte of the file (custom
+    /// rules, hand-edited policy fields on surviving default rules, comments,
+    /// formatting) is untouched (REQ-01, jit:d74a9ed1).
+    ///
+    /// Called from the same jit-driven-write triggers as
+    /// [`refresh_default_schema_projections`](Self::refresh_default_schema_projections)
+    /// (init/re-init, `config set`), so a registry edit that changes derived
+    /// membership propagates to the file on the next jit write, not only in
+    /// memory. A no-op when `rules.toml` is absent or the diff is empty.
+    ///
+    /// In-memory reconciliation stays the validation authority (out of scope
+    /// for this write-through) — this exists only so the file cannot lag it
+    /// for addressability.
+    pub fn sync_default_rule_membership(&self) -> Result<RuleMembershipSync> {
+        let jit_root = self.storage.root();
+        if !jit_root.join("rules.toml").exists() {
+            return Ok(RuleMembershipSync::default());
+        }
+
+        let loaded = RuleSet::load(jit_root)?;
+        let config = self.config_manager.load()?;
+        let namespaces = self.config_manager.namespaces_from_config(&config);
+        let diff = crate::validation::defaults::default_rule_membership_diff(&loaded, &namespaces);
+        if diff.is_empty() {
+            return Ok(RuleMembershipSync::default());
+        }
+
+        let to_add_blocks: Vec<String> = diff
+            .to_add
+            .iter()
+            .map(crate::validation::serialize::render_rule_block)
+            .collect();
+        crate::storage::ruleset_store::sync_namespace_unique_rules(
+            jit_root,
+            &to_add_blocks,
+            &diff.to_drop,
+        )?;
+
+        Ok(RuleMembershipSync {
+            added: diff.to_add.into_iter().map(|r| r.name).collect(),
+            dropped: diff.to_drop,
+        })
     }
 
     /// Acquire the control-plane lock named `lock_file`, held until the returned

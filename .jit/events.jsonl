@@ -8023,3 +8023,4 @@
 {"type":"issue_state_changed","id":"670cf36a-9193-41be-9f69-7b0b50a13620","issue_id":"0283ce74-95ee-49dc-95f6-8f2c17c57c5d","timestamp":"2026-07-16T14:22:33.410576519Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"032f825e-bfdf-4442-bd1d-9af40a7aafb3","issue_id":"0283ce74-95ee-49dc-95f6-8f2c17c57c5d","timestamp":"2026-07-16T14:22:33.410771879Z","assignee":"agent:worker"}
 {"type":"gate_passed","id":"847ffa0e-8f3e-4cd3-80e3-e16541a2fa01","issue_id":"16402e14-d7cc-4f40-b4a3-1b372979be67","timestamp":"2026-07-16T14:24:51.195472483Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"issue_updated","id":"f61e25eb-5ade-4b87-835c-eb76e55af4e0","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-16T09:16:08.777712553Z","updated_by":"doc-add","fields":["documents"]}

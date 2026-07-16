@@ -256,11 +256,15 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // A repo `config.toml` write republishes the default-schema projections
         // from the (possibly changed) registry, keeping `schemas/default-*.json`
-        // current for external consumers. The user-global config carries no repo
-        // registry, so it never touches these files. A no-op when the repo has no
-        // materialized `schemas/` layout.
+        // current for external consumers, and write-through syncs the
+        // `namespace-unique-*` default-rule MEMBERSHIP into `rules.toml` itself so
+        // `@/rule/<name>` addressability never lags a registry edit (REQ-01/REQ-02,
+        // jit:d74a9ed1). The user-global config carries no repo registry, so
+        // neither touches these files. Both are no-ops when the repo has no
+        // materialized `rules.toml`/`schemas/` layout.
         if !global {
             self.refresh_default_schema_projections()?;
+            self.sync_default_rule_membership()?;
         }
 
         Ok(ConfigSetOutcome {

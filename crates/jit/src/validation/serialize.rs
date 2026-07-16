@@ -98,6 +98,34 @@ pub fn type_hierarchy_schema_content(namespaces: &crate::domain::LabelNamespaces
     ))
 }
 
+/// Render a single rule as a standalone, reloadable `[[rules]]` block (with
+/// the same trailing blank line [`serialize_ruleset`] puts between rules) —
+/// the single-rule analogue used to APPEND one newly-derived default rule
+/// (e.g. a `namespace-unique-<ns>` membership row —
+/// [`crate::storage::ruleset_store::sync_namespace_unique_rules`]) without
+/// re-serializing the rest of the file.
+///
+/// `rule.assert` must not be an [`Assertion::JsonSchema`] variant: that kind
+/// needs a companion `schemas/<name>.json` file, and this function renders
+/// text only (no I/O) so it has no way to persist one. Every
+/// `namespace-unique-<ns>` default rule — the only family this is used for —
+/// asserts [`Assertion::RequireLabel`], never `JsonSchema`, so callers
+/// restricted to that family are safe. Debug-asserts the invariant so a future
+/// misuse fails loudly instead of silently dropping a schema.
+pub fn render_rule_block(rule: &Rule) -> String {
+    let mut out = String::new();
+    let mut schema_files: Vec<SchemaFile> = Vec::new();
+    let mut used_stems: HashSet<String> = HashSet::new();
+    render_rule(rule, &mut out, &mut schema_files, &mut used_stems);
+    debug_assert!(
+        schema_files.is_empty(),
+        "render_rule_block renders text only; rule '{}' needs a schema file it cannot persist",
+        rule.name
+    );
+    out.push('\n');
+    out
+}
+
 /// Pick a schema-file stem for `identity` (a rule's schema identity — see
 /// [`render_rule`]) that is unique within `used_stems`, inserting the chosen
 /// stem. Starts from the sanitized identity; on collision appends `-2`, `-3`,
@@ -870,6 +898,52 @@ assert = { json-schema = "schemas/second.json" }
         let first = serialize_ruleset(&set).rules_toml;
         let second = serialize_ruleset(&reloaded).rules_toml;
         assert_eq!(first, second, "serialization must be canonical/stable");
+    }
+
+    #[test]
+    fn test_render_rule_block_matches_full_serialization() {
+        // Rendering ONE rule standalone must produce byte-identical text to that
+        // same rule's block inside a full `serialize_ruleset` output, so the
+        // membership write-through (jit:d74a9ed1) never diverges from what
+        // `jit init` would have scaffolded.
+        let reg = registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("team", LabelNamespace::new("Team", true)),
+        ]);
+        let set = default_ruleset(&reg);
+        let rule = set
+            .rules
+            .iter()
+            .find(|r| r.name == "namespace-unique-team")
+            .unwrap();
+
+        let standalone = render_rule_block(rule);
+        let full = serialize_ruleset(&set).rules_toml;
+        assert!(
+            full.contains(&standalone),
+            "standalone block must appear verbatim in the full serialization:\n\
+             standalone:\n{standalone}\nfull:\n{full}"
+        );
+        assert!(standalone.starts_with("[[rules]]\n"));
+        assert!(standalone.ends_with("\n\n"), "block ends with a blank line");
+    }
+
+    #[test]
+    fn test_render_rule_block_reloads_to_the_same_rule() {
+        let reg = registry(vec![("priority", LabelNamespace::new("Priority", true))]);
+        let set = default_ruleset(&reg);
+        let rule = set
+            .rules
+            .iter()
+            .find(|r| r.name == "namespace-unique-priority")
+            .unwrap();
+        let block = render_rule_block(rule);
+
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("rules.toml"), &block).unwrap();
+        let reloaded = RuleSet::load(dir.path()).unwrap();
+        assert_eq!(reloaded.rules.len(), 1);
+        assert_rules_equivalent(rule, &reloaded.rules[0]);
     }
 
     #[test]
