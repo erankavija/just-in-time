@@ -1,24 +1,16 @@
 //! Built-in runtime coordination and recovery defaults.
 //!
 //! These constants are the single source of truth for the operational defaults
-//! that govern multi-agent lease coordination and recovery cleanup: the lease
-//! heartbeat cadence, the file-lock acquisition timeout and poll interval, the
-//! orphaned temp-file cleanup threshold, and the default claim lease TTL. Call
-//! sites reference the constants here instead of inline literals, so each
-//! default value has one definition.
+//! that govern multi-agent lease coordination and recovery cleanup: the
+//! file-lock acquisition timeout and poll interval, the orphaned temp-file
+//! cleanup threshold, and the default claim lease TTL. Call sites reference the
+//! constants here instead of inline literals, so each default value has one
+//! definition.
 //!
 //! [`render_reference_markdown`] projects these constants into the committed
 //! reference `docs/reference/runtime-defaults.md`; a conformance test asserts the
 //! committed copy matches the projection, so changing a default without
 //! refreshing the reference fails the test suite (`@/inv/single-source-prose`).
-
-/// Default value, in seconds, of the agent `heartbeat_interval` configuration
-/// setting — the recommended cadence at which an agent sends `jit claim
-/// heartbeat` to keep an indefinite (TTL=0) lease alive. jit does not itself run
-/// a heartbeat loop: `jit claim heartbeat` records a single beat on demand.
-/// Lease staleness is governed separately — an indefinite lease is marked stale
-/// only after the claim staleness threshold (1 hour) without a beat.
-pub const HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
 /// Maximum time, in seconds, a lock holder waits to acquire a file lock before
 /// failing. `JsonFileStorage` resolves one timeout from the `JIT_LOCK_TIMEOUT`
@@ -55,11 +47,6 @@ pub fn render_reference_markdown() -> String {
     // (label, value-with-unit, operational scope). Values format the constants
     // so the table is a pure projection of the source of truth above.
     let rows = [
-        (
-            "Heartbeat interval",
-            format!("{HEARTBEAT_INTERVAL_SECS} seconds"),
-            "Default value of the agent `heartbeat_interval` setting — the recommended cadence at which an agent sends `jit claim heartbeat` to keep an indefinite (TTL=0) lease alive. jit does not run a heartbeat loop itself; the command records a single beat on demand. Lease staleness is governed separately: an indefinite lease is marked stale only after the claim staleness threshold (1 hour) without a beat, not after this interval. Finite leases expire on their own TTL instead (see Claim lease TTL).",
-        ),
         (
             "Lock acquisition timeout",
             format!("{LOCK_TIMEOUT_SECS} seconds"),
@@ -151,7 +138,6 @@ mod tests {
     fn test_render_lists_every_default_value() {
         let doc = render_reference_markdown();
         for expected in [
-            format!("{HEARTBEAT_INTERVAL_SECS} seconds"),
             format!("{LOCK_TIMEOUT_SECS} seconds"),
             format!("{LOCK_POLL_INTERVAL_MS} milliseconds"),
             format!("{TEMP_CLEANUP_THRESHOLD_SECS} seconds"),

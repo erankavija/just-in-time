@@ -312,8 +312,6 @@ impl ClaimCoordinator {
     pub fn init(&self) -> Result<()> {
         fs::create_dir_all(self.paths.shared_jit.join("locks"))
             .context("Failed to create locks directory")?;
-        fs::create_dir_all(self.paths.shared_jit.join("heartbeat"))
-            .context("Failed to create heartbeat directory")?;
         Ok(())
     }
 

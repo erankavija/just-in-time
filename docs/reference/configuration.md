@@ -317,19 +317,18 @@ Maximum indefinite (TTL=0) leases per agent. Default: `2`.
 
 Maximum indefinite leases across entire repository. Default: `10`.
 
-`default_ttl_secs`, `heartbeat_interval_secs`,
-`lease_renewal_threshold_pct`, `stale_threshold_secs`, and
-`auto_renew_leases` are accepted and shown by config commands, but currently
-do not alter claim timing or start a renewal runner. Timed claims therefore
-use `jit claim acquire --ttl` (defaulting to the built-in claim lease TTL —
-see [Runtime coordination defaults](#runtime-coordination-defaults)), and an
+`default_ttl_secs`, `lease_renewal_threshold_pct`, and `stale_threshold_secs`
+are accepted and shown by config commands, but currently do not alter claim
+timing. Timed claims therefore use `jit claim acquire --ttl` (defaulting to the
+built-in claim lease TTL — see
+[Runtime coordination defaults](#runtime-coordination-defaults)), and an
 indefinite lease needs explicit `jit claim heartbeat` calls.
 
 ### Runtime coordination defaults
 
-The built-in heartbeat cadence, lock acquisition timeout and poll interval,
-orphaned temp-file cleanup threshold, and claim lease TTL — each with its unit
-and operational scope — are listed in
+The built-in lock acquisition timeout and poll interval, orphaned temp-file
+cleanup threshold, and claim lease TTL — each with its unit and operational
+scope — are listed in
 [Runtime Coordination Defaults](runtime-defaults.md). That reference is
 projected from `crates/jit/src/runtime_defaults.rs`, the single source those
 defaults are read from, so the values there never drift from the code.
@@ -372,9 +371,8 @@ ISO 8601 timestamp when this agent config was created.
 Human-readable description of this agent.
 
 `[agent].id` is the active persistent identity source (after an explicit CLI
-identity and `JIT_AGENT_ID`). The optional `default_ttl_secs` and `[behavior]`
-fields are parsed metadata only: they do not select a claim TTL or start a
-heartbeat runner. In particular, `auto_heartbeat` defaults to `false`.
+identity and `JIT_AGENT_ID`). The optional `default_ttl_secs` field is parsed
+metadata only: it does not select a claim TTL.
 
 ## Environment Variables
 

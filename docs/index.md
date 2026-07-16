@@ -50,7 +50,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Storage Record Layout](reference/storage-records.md) - Generated projection of issue identifiers, event-log serialization, and the gate-run record
 - [Event Log Tags](reference/events.md) - Generated catalog of event tags, scopes, and `issue_id` presence
 - [Configuration](reference/configuration.md) - config.toml and settings
-- [Runtime Coordination Defaults](reference/runtime-defaults.md) - Built-in heartbeat, lock, cleanup, and claim-TTL defaults
+- [Runtime Coordination Defaults](reference/runtime-defaults.md) - Built-in lock, cleanup, and claim-TTL defaults
 - [Item Addresses](reference/item-addresses.md) - Address grammar for addressable structured items
 - [Glossary](reference/glossary.md) - Term definitions
 - [Claim System](reference/claim.md) - Leases and coordination

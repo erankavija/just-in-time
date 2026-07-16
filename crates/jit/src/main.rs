@@ -5593,12 +5593,10 @@ fn run() -> Result<()> {
                         },
                         "coordination": {
                             "default_ttl_secs": config.coordination().default_ttl_secs(),
-                            "heartbeat_interval_secs": config.coordination().heartbeat_interval_secs(),
                             "lease_renewal_threshold_pct": config.coordination().lease_renewal_threshold_pct(),
                             "stale_threshold_secs": config.coordination().stale_threshold_secs(),
                             "max_indefinite_leases_per_agent": config.coordination().max_indefinite_leases_per_agent(),
                             "max_indefinite_leases_per_repo": config.coordination().max_indefinite_leases_per_repo(),
-                            "auto_renew_leases": config.coordination().auto_renew_leases(),
                         },
                         "global_operations": {
                             "require_main_history": config.global_operations().require_main_history(),
@@ -5643,10 +5641,6 @@ fn run() -> Result<()> {
                         config.coordination().default_ttl_secs()
                     );
                     println!(
-                        "  heartbeat_interval_secs = {}",
-                        config.coordination().heartbeat_interval_secs()
-                    );
-                    println!(
                         "  lease_renewal_threshold_pct = {}",
                         config.coordination().lease_renewal_threshold_pct()
                     );
@@ -5661,10 +5655,6 @@ fn run() -> Result<()> {
                     println!(
                         "  max_indefinite_leases_per_repo = {}",
                         config.coordination().max_indefinite_leases_per_repo()
-                    );
-                    println!(
-                        "  auto_renew_leases = {}",
-                        config.coordination().auto_renew_leases()
                     );
                     println!();
                     println!("[global_operations]");
