@@ -122,8 +122,8 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
 3. **Descriptions must stand alone.** The person reading the issue in JIT will not
    have access to the spec document. Include enough context — motivation, acceptance
    criteria, and constraints — that the issue is self-contained.
-   Follow the jit content standards (`.jit/reference/content-standards.md`
-   relative to this prompt file) for formatting:
+   Follow the jit content standards (`.jit/reference/content-standards.md`,
+   resolved from the repository root) for formatting:
    use Mermaid for diagrams, LaTeX (`$...$` / `$$...$$`) for mathematical notation,
    and structure the description as a small standalone markdown document with
    `## Success Criteria` as a required section.

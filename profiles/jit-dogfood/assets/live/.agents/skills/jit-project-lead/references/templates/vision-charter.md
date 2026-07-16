@@ -30,9 +30,8 @@ escalations. Keep it short and load-bearing.
 
 <!--
 One summary bullet per consequential decision, ascending id order, append-only.
-Each `- D-N: <one-liner>` row is the addressable anchor
-(`@/charter/<decision-id>`); the
-full entry goes under ## Decision Details below, sharing the same D-N id. A
+Refer to each `- D-N: <one-liner>` row as `D-N` in this linked charter. The full
+entry goes under ## Decision Details below, sharing the same D-N id. A
 decision with no considered alternative is not consequential — leave it out. To
 overturn a landed decision, add a NEW D-N (row + entry) that cites and supersedes
 it; never edit the old entry's outcome or renumber the log. Delete this comment

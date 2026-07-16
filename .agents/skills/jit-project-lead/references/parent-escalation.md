@@ -117,7 +117,7 @@ chosen, the option(s) rejected, and the reasoning:
 - **Date:** <ISO-8601 date>
 ```
 
-The summary row is the addressable anchor (`@/charter/<decision-id>`); add it together with
+Refer to the summary row as `D-N` in the linked charter; add it together with
 the full entry. Follow `vision-charter.md`'s rules verbatim: continue the
 numbering from the highest existing `D-N`; ids are append-only and never reused;
 `Rejected` is never empty. The lead escalated because a real alternative existed,

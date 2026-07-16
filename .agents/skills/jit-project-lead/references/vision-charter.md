@@ -35,11 +35,12 @@ A standalone markdown document. As a rendered-standalone doc it carries one `#`
 title; every other heading is `##`/`###` per the content standards.
 
 Each decision appears in two places: a one-line summary **row** under
-`## Decision Log`, and the full **entry** under `## Decision Details`. The row is
-the addressable anchor — the `charter` item kind indexes the `- D-N: <one-liner>`
-bullets under `## Decision Log`, so `@/charter/<decision-id>` resolves to the row, and
-`jit item list --kind charter` enumerates every logged decision. The `### D-N`
-entries under `## Decision Details` hold the full record and are not indexed.
+`## Decision Log`, and the full **entry** under `## Decision Details`. Refer to a
+decision as `D-N` in the linked charter. A repository may additionally declare a
+project-scoped item kind whose source is this exact charter path; when it does,
+use that repository's configured qualified address. The portable workflow does
+not assume such a kind because the charter path is derived per strategic
+container. The `### D-N` entries under `## Decision Details` hold the full record.
 
 ```markdown
 # Charter: <strategic-container title>
@@ -97,7 +98,7 @@ Each `D-N` id is stable and ascending.
 Rules:
 
 - The summary row and its full entry share one `D-N` id and are added together.
-  The row is the addressable anchor (`@/charter/<decision-id>`); keep it a single line.
+  Refer to the row as `D-N` in the linked charter; keep it a single line.
 - `Rejected` is never empty for a consequential decision. A decision with no
   considered alternative was not consequential; leave it out. If a real
   alternative existed, name it and say why it lost — that is what stops the

@@ -17,7 +17,23 @@
     "doc-review",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:57:53.736188803Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:59:16.280090787Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:57:42.589276778Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -30,7 +46,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.042256597Z",
-  "updated_at": "2026-07-16T14:32:44.886452050Z",
+  "updated_at": "2026-07-16T16:02:50.733536513Z",
   "first_ready_at": "2026-07-14T22:28:46.042256807Z",
   "claimed_at": "2026-07-16T14:32:44.503322741Z"
 }

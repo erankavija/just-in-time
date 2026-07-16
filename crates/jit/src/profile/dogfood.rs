@@ -194,7 +194,7 @@ mod tests {
     use crate::commands::CommandExecutor;
     use crate::config::ProjectionStyle;
     use crate::hierarchy_templates::HierarchyTemplate;
-    use crate::profile::{Contribution, KeyedArrayTarget};
+    use crate::profile::{Contribution, KeyedArrayTarget, MapEntryTarget};
     use crate::storage::{GateRegistry, IssueStore, JsonFileStorage};
     use crate::validation::rules::RuleSet;
     use crate::validation::rules_gates_projection::render_rules_and_gates_markdown;
@@ -306,6 +306,49 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_packaged_skills_only_require_declared_project_item_kinds() {
+        let package = jit_dogfood_package().unwrap();
+        let declares_charter = package.manifest().contributions.iter().any(|contribution| {
+            matches!(
+                contribution,
+                Contribution::MapEntry {
+                    target: MapEntryTarget::ItemKinds,
+                    identity,
+                    ..
+                } if identity == "charter"
+            )
+        });
+        let requires_charter_address = package
+            .manifest()
+            .assets
+            .iter()
+            .filter(|asset| asset.target.starts_with(".agents/skills/jit-project-lead/"))
+            .any(|asset| {
+                package.source_bytes(&asset.source).is_some_and(|bytes| {
+                    bytes
+                        .windows(b"@/charter/".len())
+                        .any(|w| w == b"@/charter/")
+                })
+            });
+
+        assert!(
+            declares_charter || !requires_charter_address,
+            "the project-lead skill must not require an undeclared charter item kind"
+        );
+    }
+
+    #[test]
+    fn test_packaged_content_standard_paths_are_repository_root_relative() {
+        let package = jit_dogfood_package().unwrap();
+        let prompt = package
+            .source_bytes("assets/live/.agents/skills/jit-breakdown/references/analysis-prompt.md")
+            .unwrap();
+        let prompt = std::str::from_utf8(prompt).unwrap();
+        assert!(prompt.contains("resolved from the repository root"));
+        assert!(!prompt.contains("relative to this prompt file"));
     }
 
     #[test]
