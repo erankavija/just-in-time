@@ -112,6 +112,21 @@ sequenceDiagram
 - **No partial replacement:** Readers do not observe a partially written target file.
 - **Coordinated operations:** Cooperating JIT processes use advisory locks where shared access must be serialized.
 
+### Recoverable Profile Publication
+
+Applying an embedded repository profile is a coordinated multi-file operation,
+which is a stronger problem than one atomic replacement. JIT validates the
+complete planned repository image before publication and uses a durable
+transaction journal so handled failures roll back exactly and interrupted work
+is recovered before any later mutation. A prepared journal converges to the old
+state; a committed journal verifies the new state and finishes cleanup.
+
+This guarantee is bounded to JIT-managed publication under its locks and
+recovery protocol; it does not make unrelated external filesystem writes
+transactional. The canonical command, conflict, journal-location, provenance,
+and lifecycle contract is in
+[Repository Profiles](../reference/profiles.md#publication-rollback-and-recovery).
+
 ### Event Logging
 
 **Guarantee:** Every issue state change appends an event to `.jit/events.jsonl`.

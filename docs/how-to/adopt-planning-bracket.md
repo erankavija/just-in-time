@@ -1,4 +1,4 @@
-# How-To: Adopt the Planning Bracket
+# How-To: Manually Adopt the Planning Bracket
 
 > **Diátaxis Type:** How-To Guide
 > **Audience:** Ruleset authors who want plan review and a coverage check sequenced *before* work fans out
@@ -9,6 +9,13 @@ three gates, adding the preview and closure coverage rules, then scaffolding a
 container and breaking it down. For the *why* — the spine, the three gates, and the
 preview-vs-closure split — read
 [The Plan-Before-Fan-Out Bracket](../concepts/planning-bracket.md) first.
+
+For JIT's portable recommended workflow, use
+`jit init --profile jit-dogfood` instead. The
+[Repository Profiles reference](../reference/profiles.md) owns that package's
+commands, inventory, and guarantees. Continue with this guide when you need an
+alternative container type, taxonomy, coverage convention, template, or gate
+integration.
 
 The bracket is **configuration**, not engine behaviour. Two complete, copy-ready
 rulesets ship it; this guide points you at the exact blocks to lift:
@@ -314,6 +321,7 @@ breakdown gate (plan time), *mapping done* at the container's done transition
 
 ## See Also
 
+- [Repository Profiles](../reference/profiles.md) — preferred embedded workflow setup
 - [The Plan-Before-Fan-Out Bracket](../concepts/planning-bracket.md) — the spine, the three gates, and the preview-vs-closure split
 - [How-To: Author Validation Rules](validation-rules.md) — the `label-coverage` rule kind and selectors
 - [How-To: Custom Gates](custom-gates.md) — the agent-gate mechanism and gate presets

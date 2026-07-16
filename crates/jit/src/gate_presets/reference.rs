@@ -253,11 +253,13 @@ pub fn render_reference_markdown() -> Result<String> {
          This page is generated from the binary's package-derived preset projection. The\n\
          embedded `jit-dogfood` profile's plan template selects the built-in names, and its\n\
          matching gate contributions provide their definitions. The page lists what the\n\
-         binary carries — not what any repository has configured. `jit init` writes an empty\n\
-         gate registry, so nothing below reaches a project until `jit gate preset apply`\n\
-         runs. The gates a project actually enforces live in its own `.jit/gates.toml`, its\n\
-         settings in `.jit/config.toml`; render those with `jit reference render` (see\n\
-         [Rules and Gates](rules-and-gates.md)).\n\
+         binary carries — not what any repository has configured. Plain `jit init` writes an\n\
+         empty gate registry; `jit init --profile jit-dogfood` installs the package's matching\n\
+         definitions directly, while manual adopters can use `jit gate preset apply`. See\n\
+         [Repository Profiles](profiles.md) for the profile contract. The gates a project\n\
+         actually enforces live in its own `.jit/gates.toml`, its settings in\n\
+         `.jit/config.toml`; render those with `jit reference render` (see [Rules and\n\
+         Gates](rules-and-gates.md)).\n\
          \n\
          ## Portable checker types\n\
          \n\

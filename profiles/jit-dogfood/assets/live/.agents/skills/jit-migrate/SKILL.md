@@ -23,7 +23,7 @@ the result with `jit validate`.
 
    | Situation | Action |
    |---|---|
-   | No `.jit/` | Run `jit init` (ask which `--hierarchy-template` to use, or leave blank for the default). |
+   | No `.jit/` | Prefer `jit init --profile jit-dogfood` for JIT's portable workflow; use plain `jit init` or `--hierarchy-template` only for custom methodology. See [Repository Profiles](https://github.com/erankavija/just-in-time/blob/main/docs/reference/profiles.md). |
    | `.jit/` exists, index empty | Proceed. |
    | `.jit/` exists and already has issues | Warn: "Migration will **add** issues; existing issues are untouched." Ask the user to confirm before continuing. |
 

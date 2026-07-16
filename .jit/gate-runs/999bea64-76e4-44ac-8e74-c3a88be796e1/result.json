@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "999bea64-76e4-44ac-8e74-c3a88be796e1",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "c533ac18-88dc-42b6-a773-18228a5d2320",
+  "commit": "b6c1f2611cde9a8b9a1023a2f2ca8872571a46a3",
+  "branch": "worktree-agent-c533ac18",
+  "status": "failed",
+  "started_at": "2026-07-16T19:17:38.005540578Z",
+  "completed_at": "2026-07-16T19:20:15.756670321Z",
+  "duration_ms": 157751,
+  "exit_code": 1,
+  "stdout": "Attribution: `c533ac18` is a leaf task with no resolved children. I inspected both tagged commits individually; only `b6c1f2…` changes adopter documentation. The full mechanical documentation check passes, but the new canonical reference overstates `profile show` verification.\n\n1. **F1 — blocking, issue-impact (medium):** The profile reference and CLI reference claim that `jit profile show` returns an applied record only when the repository exactly matches it. In current code, `profile show` returns any parseable provenance record at `.jit/profiles/<id>.json`; it does not compare it with the embedded package or current targets. Update [profiles.md](/tmp/jit-agent-c533ac18/docs/reference/profiles.md:39) and [cli-commands.md](/tmp/jit-agent-c533ac18/docs/reference/cli-commands.md:560) to describe it as a present provenance record, and point users to `jit profile apply … --dry-run` for exact current-state verification.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Profile documentation incorrectly presents `jit profile show` provenance as exact current-state verification.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"`jit profile show` returns any parseable provenance record, not only one whose profile and targets exactly match the current repository.\",\"file\":\"docs/reference/profiles.md\",\"line\":39}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10912 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /tmp/jit-agent-c533ac18\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6c5c-f135-7242-a947-d5cd42e5dbdb\n--------\nuser\n--- 10899 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Profile documentation incorrectly presents `jit profile show` provenance as exact current-state verification.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "`jit profile show` returns any parseable provenance record, not only one whose profile and targets exactly match the current repository.",
+        "file": "docs/reference/profiles.md",
+        "line": 39
+      }
+    ]
+  }
+}

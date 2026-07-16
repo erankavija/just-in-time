@@ -33,7 +33,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Research Projects](how-to/research-projects.md) - Research questions, experiments
 - [Knowledge Work](how-to/knowledge-work.md) - Personal projects, learning goals
 - [Validation Rules](how-to/validation-rules.md) - Author `.jit/rules.toml` rules and schemas
-- [Adopt the Planning Bracket](how-to/adopt-planning-bracket.md) - Wire gated planning before the fan-out
+- [Manually Adopt the Planning Bracket](how-to/adopt-planning-bracket.md) - Advanced configuration for gated planning before the fan-out
 - [Custom Gates](how-to/custom-gates.md) - Define and use quality gates
 - [Dependency Management](how-to/dependency-management.md) - Graph strategies
 - [Multi-Agent Coordination](how-to/multi-agent-coordination.md) - Team and parallel work
@@ -44,6 +44,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 *Technical specifications and API documentation*
 
 - [CLI Commands](reference/cli-commands.md) - Complete command reference
+- [Repository Profiles](reference/profiles.md) - Preferred embedded workflow setup, package contract, and recovery boundary
 - [Exit Codes](reference/exit-codes.md) - Process exit-code taxonomy and per-command mappings
 - [CLI Command-Grammar Standard](reference/cli-command-grammar.md) - Canonical command grammar (nouns/verbs, positionals, id acceptance, gate grouping)
 - [Storage Format](reference/storage-format.md) - On-disk format specification
@@ -62,6 +63,10 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 
 ### 🧪 [Examples](examples/) - Sample Configurations and Rulesets
 *Ready-to-copy configuration and ruleset examples for common domains, referenced throughout [Validation Rules](how-to/validation-rules.md)*
+
+These are advanced customization examples. For the portable recommended
+workflow, start with the
+[embedded `jit-dogfood` profile](reference/profiles.md).
 
 - [sdd](examples/sdd/) - Spec-Driven Development
 - [bug-repro](examples/bug-repro/) - bug triage
