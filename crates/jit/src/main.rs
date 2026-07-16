@@ -993,6 +993,7 @@ mod gate_findings_text_tests {
             issue_id: "issue-1".to_string(),
             commit: None,
             branch: None,
+            tree_dirty: None,
             status: GateRunStatus::Failed,
             started_at: Utc::now(),
             completed_at: None,
@@ -1083,6 +1084,9 @@ fn print_gate_run_details(result: &GateRunResult) {
     }
     if let Some(commit) = &result.commit {
         println!("  Commit: {}", commit);
+    }
+    if let Some(dirty) = result.tree_dirty {
+        println!("  Tree: {}", if dirty { "dirty" } else { "clean" });
     }
     if let Some(f) = &result.findings {
         println!(
@@ -7831,6 +7835,7 @@ mod exit_code_projection_tests {
             issue_id: "abc123".to_string(),
             commit: None,
             branch: None,
+            tree_dirty: None,
             status,
             started_at: chrono::Utc::now(),
             completed_at: None,

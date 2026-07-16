@@ -520,6 +520,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue_id: issue_id.to_string(),
             commit: None,
             branch: None,
+            // In-process built-in checker: it stamps no commit, so there is no
+            // named commit for the tree to match.
+            tree_dirty: None,
             status,
             started_at,
             completed_at: Some(chrono::Utc::now()),
@@ -918,6 +921,7 @@ enforce_leases = "off"
             issue_id: "issue-1".to_string(),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
+            tree_dirty: None,
             status: GateRunStatus::Failed,
             started_at: Utc.timestamp_opt(started_at, 0).unwrap(),
             completed_at: Some(Utc.timestamp_opt(started_at + 1, 0).unwrap()),
