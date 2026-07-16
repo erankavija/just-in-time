@@ -317,7 +317,6 @@ than falling back to a per-worktree lease store.
 .git/jit/
 ├── claims.jsonl         # Append-only audit log of claim operations
 ├── claims.index.json    # Derived cache of currently active leases
-├── heartbeat/           # Initialized control-plane directory
 └── locks/               # Advisory lock files guarding claim-log operations
     └── claims.lock
 ```

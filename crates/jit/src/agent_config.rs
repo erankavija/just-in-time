@@ -17,13 +17,13 @@ use std::env;
 use std::path::PathBuf;
 
 /// Agent configuration from `~/.config/jit/agent.toml`.
+///
+/// Unknown sections (e.g. a legacy `[behavior]` block) are ignored on load, so
+/// an older config file remains parseable.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AgentConfig {
     /// Agent configuration section
     pub agent: AgentSection,
-    /// Behavioral preferences (optional)
-    #[serde(default)]
-    pub behavior: BehaviorSection,
 }
 
 /// Agent identity section
@@ -38,31 +38,6 @@ pub struct AgentSection {
     /// Optional default TTL preference (in seconds)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_ttl_secs: Option<u64>,
-}
-
-/// Behavioral preferences section
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BehaviorSection {
-    /// Auto-start heartbeat daemon for lease renewal
-    #[serde(default)]
-    pub auto_heartbeat: bool,
-    /// Heartbeat interval in seconds (default:
-    /// [`crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS`])
-    #[serde(default = "default_heartbeat_interval")]
-    pub heartbeat_interval: u64,
-}
-
-impl Default for BehaviorSection {
-    fn default() -> Self {
-        Self {
-            auto_heartbeat: false,
-            heartbeat_interval: default_heartbeat_interval(),
-        }
-    }
-}
-
-fn default_heartbeat_interval() -> u64 {
-    crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS
 }
 
 impl AgentConfig {
@@ -267,10 +242,6 @@ id = "agent:copilot-1"
 created_at = "2026-01-03T12:00:00Z"
 description = "GitHub Copilot Workspace Session 1"
 default_ttl_secs = 900
-
-[behavior]
-auto_heartbeat = false
-heartbeat_interval = 30
 "#;
 
         let config: AgentConfig = toml::from_str(toml).unwrap();
@@ -281,8 +252,6 @@ heartbeat_interval = 30
             "GitHub Copilot Workspace Session 1"
         );
         assert_eq!(config.agent.default_ttl_secs, Some(900));
-        assert!(!config.behavior.auto_heartbeat);
-        assert_eq!(config.behavior.heartbeat_interval, 30);
     }
 
     #[test]
@@ -297,8 +266,26 @@ description = "Alice's development machine"
         let config: AgentConfig = toml::from_str(toml).unwrap();
         assert_eq!(config.agent.id, "human:alice");
         assert_eq!(config.agent.default_ttl_secs, None);
-        assert!(!config.behavior.auto_heartbeat);
-        assert_eq!(config.behavior.heartbeat_interval, 30); // default
+    }
+
+    /// A config file carrying a legacy `[behavior]` section (the removed
+    /// auto-heartbeat daemon settings) still parses: the unknown section is
+    /// ignored rather than rejected, so an older agent.toml keeps working.
+    #[test]
+    fn test_parse_agent_config_ignores_legacy_behavior_section() {
+        let toml = r#"
+[agent]
+id = "agent:copilot-1"
+created_at = "2026-01-03T12:00:00Z"
+description = "Legacy config"
+
+[behavior]
+auto_heartbeat = true
+heartbeat_interval = 30
+"#;
+
+        let config: AgentConfig = toml::from_str(toml).unwrap();
+        assert_eq!(config.agent.id, "agent:copilot-1");
     }
 
     #[test]
@@ -364,19 +351,5 @@ description = "Alice's development machine"
         assert!(err.contains("--agent-id"));
         assert!(err.contains("JIT_AGENT_ID"));
         assert!(err.contains("agent.toml"));
-    }
-
-    #[test]
-    fn test_behavior_section_defaults() {
-        let toml = r#"
-[agent]
-id = "agent:test"
-created_at = "2026-01-06T00:00:00Z"
-description = "Test"
-"#;
-
-        let config: AgentConfig = toml::from_str(toml).unwrap();
-        assert!(!config.behavior.auto_heartbeat);
-        assert_eq!(config.behavior.heartbeat_interval, 30);
     }
 }

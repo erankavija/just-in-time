@@ -222,11 +222,10 @@ finite lease duration on each claim with `--ttl`; for an indefinite lease, run
 `--ttl` falls back to the built-in claim lease TTL listed in
 [Runtime Coordination Defaults](../reference/runtime-defaults.md).
 
-`worktree.mode`, `default_ttl_secs`, `heartbeat_interval_secs`,
-`stale_threshold_secs`, and automatic-renewal settings are parsed and shown by
-configuration commands but do not control the current claim runtime. Indefinite
-leases are currently marked stale after a hardcoded hour without an explicit
-heartbeat; changing `stale_threshold_secs` does not alter that behavior.
+`worktree.mode`, `default_ttl_secs`, and `stale_threshold_secs` are parsed and
+shown by configuration commands but do not control the current claim runtime.
+Indefinite leases are currently marked stale after a hardcoded hour without an
+explicit heartbeat; changing `stale_threshold_secs` does not alter that behavior.
 
 ### Agent Config (`~/.config/jit/agent.toml`)
 
@@ -236,9 +235,8 @@ id = "agent:my-agent"
 description = "My development agent"
 ```
 
-`[agent].id` is the active persistent identity source. Agent TTL and behavior
-fields are parsed metadata; they do not override `jit claim acquire --ttl` or
-start a heartbeat runner.
+`[agent].id` is the active persistent identity source. The agent TTL field is
+parsed metadata; it does not override `jit claim acquire --ttl`.
 
 ### Environment Overrides
 

@@ -42,8 +42,7 @@ mod test_support {
     /// Test-only clock whose "now" is set explicitly and can be advanced.
     ///
     /// Backed by an atomic millisecond counter so it can be shared across
-    /// threads (e.g. a background heartbeat thread) while a test moves time
-    /// forward deterministically.
+    /// threads while a test moves time forward deterministically.
     #[derive(Debug)]
     pub(crate) struct FixedClock {
         millis: AtomicI64,

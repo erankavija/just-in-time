@@ -13,11 +13,9 @@
 //!   are impractical to provoke through the binary (a mid-batch write failure) and
 //!   the gate-evaluation verdict rows.
 //!
-//! Two rows have no fixed code to observe: `serve --fg` is a pass-through, so it
+//! One row has no fixed code to observe: `serve --fg` is a pass-through, so it
 //! is verified against the production function its dispatch calls
-//! (`serve::foreground_exit_code`); the reserved `config validate` `2` is
-//! unreachable by construction (the handler defines no warning condition) and is
-//! asserted to be documented as reserved.
+//! (`serve::foreground_exit_code`).
 //!
 //! `test_command_exit_codes_every_row_is_verified` keeps the set complete: adding
 //! a row without a binding fails the build.
@@ -197,11 +195,9 @@ fn test_command_exit_codes_invariant_check_emits_4() {
     documented_row("invariant check", Some(4), true);
 }
 
-/// `jit config validate` emits only {0, 1} in practice: 0 on a valid config, 1
-/// when a source carries an invalid value. The projection documents `2` as
-/// RESERVED — the handler has an `exit(2)` warnings branch, but no warning
-/// condition is defined, so `2` is never produced. This test drives both live
-/// outcomes, asserts neither is `2`, and asserts the reserved row is documented.
+/// `jit config validate` emits only {0, 1}: 0 on a valid config, 1 when a source
+/// carries an invalid value. There is no warning outcome. This test drives both
+/// live outcomes and asserts neither is `2`.
 #[test]
 fn test_command_exit_codes_config_validate_emits_only_0_and_1() {
     let temp = setup();
@@ -237,13 +233,8 @@ fn test_command_exit_codes_config_validate_emits_only_0_and_1() {
     assert_ne!(valid.status.code(), Some(2));
     assert_ne!(invalid.status.code(), Some(2));
 
-    // 1 is emitted; 2 is documented as reserved (present, exception-flagged).
+    // 1 is the only documented config-validate failure code.
     documented_row("config validate", Some(1), true);
-    let reserved = documented_row("config validate", Some(2), true);
-    assert!(
-        reserved.to_lowercase().contains("reserved"),
-        "config validate 2 must be documented as reserved, got: {reserved}"
-    );
 }
 
 /// `jit doc check-links` exits 1 on a broken link and 2 on a risky-link warning
@@ -748,8 +739,7 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("doc check-links", Some(2)),
         ("gate preset apply", Some(1)),
         ("serve, serve --stop, serve --status", Some(1)),
-        // Reserved / pass-through: asserted against the production sites they cite.
-        ("config validate", Some(2)),
+        // Pass-through: asserted against the production site it cites.
         ("serve --fg", None),
     ]
     .into_iter()

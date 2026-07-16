@@ -425,6 +425,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// - **Acyclicity.** The commit phase adds edges one at a time, so a cycle
     ///   formed by a LATER edge would surface after earlier writes landed;
     ///   [`validate_delta_acyclic`] simulates the whole prospective graph instead.
+    ///   Reachable for templates whose anchor edges and `move-upstream-to-role`
+    ///   transform can close a loop through existing issues; a rejection carries
+    ///   the typed [`GraphError::CycleDetected`](crate::graph::GraphError) so it
+    ///   classifies as a validation failure (exit 4).
     fn prevalidate_delta(
         &self,
         template: &GraphTemplate,
@@ -449,12 +453,15 @@ impl<S: IssueStore> CommandExecutor<S> {
             .iter()
             .map(|i| (i.id.clone(), i.dependencies.clone()))
             .collect();
-        validate_delta_acyclic(delta, store_deps).map_err(|_| {
-            anyhow!(
+        validate_delta_acyclic(delta, store_deps).map_err(|e| {
+            // Keep the typed `GraphError::CycleDetected` in the chain so the
+            // failure classifies as a validation error (exit 4); add the
+            // template-specific context for the user-facing message.
+            e.context(format!(
                 "applying template '{}' would create a dependency cycle; \
                  no nodes were created",
                 template.name
-            )
+            ))
         })
     }
 

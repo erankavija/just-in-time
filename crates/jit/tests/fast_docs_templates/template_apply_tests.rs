@@ -1139,6 +1139,24 @@ applies_to  = ["epic"]
         .apply_template_with(&template, &epic, &bindings, false)
         .unwrap_err();
     assert!(err.to_string().contains("cycle"), "{err}");
+    // The guard (not the commit-phase per-edge check) produced this: its message
+    // states nothing was created. If the prevalidate guard is removed, the cycle
+    // instead surfaces mid-commit with a different phrasing, so this assertion
+    // fails — binding the test to the guard's presence (REQ-03).
+    assert!(
+        err.to_string().contains("no nodes were created"),
+        "expected the prevalidate guard's message, got: {err}"
+    );
+    // The rejection carries the typed `GraphError::CycleDetected`, so it
+    // classifies as a validation failure (exit 4) rather than a generic error
+    // (exit 1). This binds the test to the exit-code fix, not just the guard.
+    assert!(
+        matches!(
+            err.downcast_ref::<jit::GraphError>(),
+            Some(jit::GraphError::CycleDetected)
+        ),
+        "prospective-cycle rejection must be a typed CycleDetected (exit 4), got: {err}"
+    );
     // APPLY-04: the prospective cycle is caught before mutation — ZERO new issues.
     assert_eq!(h.all_issues().len(), before);
 }
