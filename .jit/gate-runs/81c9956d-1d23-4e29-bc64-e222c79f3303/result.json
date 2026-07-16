@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_id": "81c9956d-1d23-4e29-bc64-e222c79f3303",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "commit": "af6d581ade5cc3bd0bbb77c565d6f06d73931177",
+  "branch": "worktree-agent-7ad4019b",
+  "status": "failed",
+  "started_at": "2026-07-16T16:33:25.985246104Z",
+  "completed_at": "2026-07-16T16:36:03.336124576Z",
+  "duration_ms": 157350,
+  "exit_code": 1,
+  "stdout": "Attribution: leaf issue (`task`, maximum hierarchy level); reviewed five individually tagged `jit:7ad4019b` commits. Uncommitted JIT gate metadata was excluded. No prior review findings.\n\nThe package makes the profile manifest the authoritative preset inventory, but one affected reference still names the old code location as its source.\n\n1. **F1 — blocking, issue-impact, medium:** [docs/reference/gate-presets.md:16](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b/docs/reference/gate-presets.md:16) inaccurately says preset definitions live in `crates/jit/src/gate_presets/`. Current code derives them from the embedded `profiles/jit-dogfood` package. Reword this as a projection of the binary’s package-derived built-in presets, without presenting the code directory as the canonical inventory. (`@/inv/single-source-prose`)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The preset reference retains an obsolete source-of-truth claim after presets became package-derived.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The built-in preset reference names the code directory as canonical although current presets are derived from the embedded jit-dogfood package.\",\"file\":\"docs/reference/gate-presets.md\",\"line\":16,\"references\":[\"@/inv/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "grep: /tmp/tmp.2AqLOgKAGP: binary file matches\n--- agent stderr (first 12 of 37216 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6bc6-9c7d-7ce1-ab60-864986b6a2a1\n--------\n--- 37204 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The preset reference retains an obsolete source-of-truth claim after presets became package-derived.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The built-in preset reference names the code directory as canonical although current presets are derived from the embedded jit-dogfood package.",
+        "file": "docs/reference/gate-presets.md",
+        "line": 16,
+        "references": [
+          "@/inv/single-source-prose"
+        ]
+      }
+    ]
+  }
+}
