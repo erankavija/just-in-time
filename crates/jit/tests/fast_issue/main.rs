@@ -6,6 +6,7 @@
 #[path = "../common/harness.rs"]
 mod harness;
 
+mod archived_semantics_tests;
 mod bulk_operations_tests;
 mod dep_add_atomic_tests;
 mod dependency_met_tests;
