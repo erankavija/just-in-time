@@ -43,10 +43,13 @@ where the title is fully self-explanatory.]
   `.agents/skills/jit-manage/references/issue-extraction-prompt.md`), prefix **every**
   criterion with `[hard]` or `[aspirational]` and a stable zero-padded `REQ-NN` id.
   A marked criterion is a plain bullet whose text opens with the marker — that exact
-  shape is what registers the row as an addressable requirement item:
+  shape is what registers the row as an addressable requirement item. A leading
+  GitHub-style task-list checkbox (`- [ ]` / `- [x]`) ahead of the marker is
+  tolerated the same way:
 
   ```markdown
   - [hard] REQ-01: Returns the resolved address for every configured kind
+  - [ ] [hard] REQ-02: Also registers as a requirement item, checkbox and all
   ```
 
   **Default to `[hard]`.** Never leave a criterion unmarked or mix marked and unmarked
