@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_id": "a964a523-ac80-47d7-9f1a-0f8628da359d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "bcff56be-2e8f-44ae-9b3b-5739be414630",
+  "commit": "83fb0c6b1fce9452113f4975633cadde02840e4e",
+  "branch": "worktree-agent-bcff56be",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-16T20:21:25.536749587Z",
+  "completed_at": "2026-07-16T20:21:25.689597088Z",
+  "duration_ms": 152,
+  "exit_code": 1,
+  "stdout": "",
+  "stderr": "---\nERROR: Agent produced no output.\n--- agent stderr (first 12 of 1 lines; the session id below points to the full agent transcript) ---\n./scripts/ai-review.sh: line 134: codex: command not found\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
