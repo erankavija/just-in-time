@@ -8156,3 +8156,4 @@
 {"type":"gate_failed","id":"e8d34bae-b7d7-4e59-8dd0-6ce31a5fb5ed","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T20:21:25.690988359Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"8f792fac-69d1-44ee-bf5f-9030e1c782fc","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T20:25:42.208982703Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"fbcf5b05-e4b8-4eb2-add5-b31d12456327","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T20:31:28.446350729Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"73039eda-00df-4a75-b70a-b86c89b2b26e","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T20:34:21.026793785Z","gate_key":"doc-review","updated_by":"auto:executor"}
