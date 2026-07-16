@@ -125,6 +125,7 @@ struct DirectOwner {
     issue: String,
     document_index: usize,
     state: State,
+    archived_from: Option<State>,
     inside_subtree: bool,
 }
 
@@ -211,6 +212,7 @@ pub fn inventory_explicit_roots<R: PinnedRootResolver>(
                 issue: issue.id.clone(),
                 document_index,
                 state: issue.state,
+                archived_from: issue.archived_from,
                 inside_subtree: member_ids.contains(&issue.id),
             };
 
@@ -258,6 +260,7 @@ pub fn inventory_explicit_roots<R: PinnedRootResolver>(
                     issue: owner.issue,
                     document_index: owner.document_index,
                     state: owner.state,
+                    archived_from: owner.archived_from,
                     inside_subtree: owner.inside_subtree,
                     pinned: version.is_pinned(),
                     selected_for_relink: false,

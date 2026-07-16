@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "5c85c91a-6092-48cc-8723-11df5396d1ad",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "eceffc17-98ce-4e7d-8fe1-cbb539a078a2",
+  "commit": "a8662427836bb662664caf216ef3d0ee5c450bc5",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T10:41:30.265115986Z",
+  "completed_at": "2026-07-16T10:46:55.020594501Z",
+  "duration_ms": 324755,
+  "exit_code": 1,
+  "stdout": "Attribution: b89f414f, ec8e6ebe, 6ddf4fe3, e1860b05, a15a3d9e, 674fb7c3, c5457adf, a8662427 (`jit:eceffc17`; merge patches duplicate their second parents)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, @/charter/D-4 (`dev/vision/9db27a3a-charter.md`); @/invariant/atomic-writes (`.jit/invariants.toml`); @/gate/cargo-ci, @/gate/repo-validate (`.jit/gates.toml`)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T10:39:10Z); repo-validate passed (exit 0, 2026-07-16T10:41:15Z)\nTruncation recovery: reread bounded per-commit and per-path patches, then current CLI, coordinator, lock, server, storage, test, and policy sections\n\n1. **F1 — blocking, issue-impact:** The universal guard was not mechanically adopted by every `JsonFileStorage` writer. `save_gate_run_result`, `write_repo_file`, and `save_gate_preset` mutate files without acquiring `repo_lock`; their correctness depends on the CLI’s retained session, while direct `IssueStore` callers can write after recovery with no bootstrap→repository serialization. This leaves the hard REQ-02 “every later storage mutation” guarantee unverified and false for those writer families. [crates/jit/src/storage/json.rs:1030] [crates/jit/src/storage/json.rs:1129] [crates/jit/src/storage/json.rs:1194]\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three JsonFileStorage writer families bypass the universal recovery and serialization guard.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"save_gate_run_result, write_repo_file, and save_gate_preset mutate without acquiring the repository guard, leaving direct storage callers outside the universal recovery boundary.\",\"file\":\"crates/jit/src/storage/json.rs\",\"line\":1030,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 14867 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6a84-694f-79e0-92a6-ee23c06faa2d\n--------\nuser\n--- 14854 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Three JsonFileStorage writer families bypass the universal recovery and serialization guard.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "save_gate_run_result, write_repo_file, and save_gate_preset mutate without acquiring the repository guard, leaving direct storage callers outside the universal recovery boundary.",
+        "file": "crates/jit/src/storage/json.rs",
+        "line": 1030
+      }
+    ]
+  }
+}

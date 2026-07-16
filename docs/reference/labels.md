@@ -50,7 +50,7 @@ flowchart LR
 ```
 
 The label makes the task a member of the Auth epic. The dependency stops the task from
-starting until "Setup DB" reaches a terminal state (done or rejected).
+starting until "Setup DB" reaches an effective terminal state (done, rejected, or archived from one).
 
 Both can flow the same direction (task → epic → milestone) but serve different purposes and can be used independently.
 
@@ -209,7 +209,8 @@ enforce several items.
 > `[namespaces]` / `[type_hierarchy]` registry in `config.toml` at load, so a
 > `[namespaces.<name>]` table's `unique` flag and its membership drive them
 > directly (declaring a namespace enforces it on the next command, no
-> regeneration). To add constraints the defaults do not cover — allowed values,
+> regeneration; the next jit-driven config write also syncs the matching
+> `namespace-unique-*` row into `rules.toml` for addressability). To add constraints the defaults do not cover — allowed values,
 > value patterns, required namespaces — author a custom rule in `rules.toml`,
 > e.g.:
 

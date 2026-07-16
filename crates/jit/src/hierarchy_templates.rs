@@ -268,11 +268,9 @@ source-of-truth = "registry-first"
 # Multi-agent lease coordination.
 # [coordination]
 # default_ttl_secs = {coord_ttl_secs}              # claim TTL before expiry
-# heartbeat_interval_secs = {coord_heartbeat_secs}        # renewal interval for indefinite leases
 # stale_threshold_secs = {coord_stale_secs}         # age at which a TTL=0 lease is considered stale
 # max_indefinite_leases_per_agent = 2
 # max_indefinite_leases_per_repo = 10
-# auto_renew_leases = false
 
 # Development document lifecycle (design docs, session notes, etc.).
 # [documentation]
@@ -298,7 +296,6 @@ source-of-truth = "registry-first"
             strategic_array = strategic_array,
             label_assoc_lines = label_assoc_lines,
             coord_ttl_secs = crate::runtime_defaults::CLAIM_TTL_SECS,
-            coord_heartbeat_secs = crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS,
             coord_stale_secs = crate::storage::lease::DEFAULT_STALE_THRESHOLD_SECS,
         )
     }

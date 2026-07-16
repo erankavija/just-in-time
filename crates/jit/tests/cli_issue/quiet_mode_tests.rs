@@ -284,7 +284,15 @@ fn test_quiet_with_gate_commands() {
     // Pass gate in quiet mode
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp_dir.path())
-        .args(["gate", "pass", &issue_id, "test-gate", "--quiet"])
+        .args([
+            "gate",
+            "pass",
+            &issue_id,
+            "test-gate",
+            "--by",
+            "human:reviewer",
+            "--quiet",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("Passed").not());

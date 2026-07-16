@@ -172,6 +172,7 @@ pub fn execute_gate_checker_with_context(
         issue_id: issue_id.to_string(),
         commit: git_context.commit,
         branch: git_context.branch,
+        tree_dirty: git_context.tree_dirty,
         status,
         started_at,
         completed_at: Some(completed_at),
@@ -357,14 +358,28 @@ fn kill_process_group(child: &mut std::process::Child) {
 struct GitContext {
     commit: Option<String>,
     branch: Option<String>,
+    /// Whether the working tree differed from `commit` at capture time. `None`
+    /// whenever `commit` is `None`: with no named commit there is nothing for
+    /// the tree to match, so no cleanliness is claimed.
+    tree_dirty: Option<bool>,
 }
 
 /// Get git context, gracefully degrading if not in a git repo
 fn get_git_context(working_dir: &Path) -> GitContext {
     let commit = get_git_commit(working_dir);
     let branch = get_git_branch(working_dir);
+    // Tree cleanliness is meaningful only relative to a resolved commit; skip the
+    // probe (and record `None`) when HEAD does not resolve, so a repo with no
+    // commits never reports a fabricated clean tree.
+    let tree_dirty = commit
+        .as_ref()
+        .and_then(|_| get_git_tree_dirty(working_dir));
 
-    GitContext { commit, branch }
+    GitContext {
+        commit,
+        branch,
+        tree_dirty,
+    }
 }
 
 /// Resolve the current `HEAD` commit hash for `working_dir`.
@@ -405,6 +420,27 @@ fn get_git_branch(working_dir: &Path) -> Option<String> {
                 None
             }
         })
+}
+
+/// Report whether `working_dir`'s tree differs from `HEAD`.
+///
+/// Returns `Some(true)` when `git status --porcelain` reports any change —
+/// staged, unstaged, or untracked (`--untracked-files=normal`, the same probe
+/// `scripts/install-jit.sh` uses to stamp build provenance) — `Some(false)` when
+/// the tree is clean, and `None` when git is unavailable or `working_dir` is not
+/// inside a git repository. Recorded into
+/// [`GateRunResult::tree_dirty`](crate::domain::GateRunResult), so a pass
+/// produced against a modified tree is distinguishable from one evidencing the
+/// commit itself.
+pub(crate) fn get_git_tree_dirty(working_dir: &Path) -> Option<bool> {
+    Command::new("git")
+        .arg("status")
+        .arg("--porcelain")
+        .arg("--untracked-files=normal")
+        .current_dir(working_dir)
+        .output()
+        .ok()
+        .and_then(|output| output.status.success().then_some(!output.stdout.is_empty()))
 }
 
 #[cfg(test)]
@@ -546,6 +582,123 @@ mod tests {
         // Should not panic, just return None values
         assert!(context.commit.is_none() || !context.commit.unwrap().is_empty());
         assert!(context.branch.is_none() || !context.branch.unwrap().is_empty());
+    }
+
+    /// Initialize a git repo at `dir` with one commit; returns nothing but leaves
+    /// a committed `seed.txt`. Panics on any git failure so a broken environment
+    /// surfaces loudly rather than as a misleading assertion.
+    fn init_committed_repo(dir: &Path) {
+        let git = |args: &[&str]| {
+            let status = Command::new("git")
+                .args(args)
+                .current_dir(dir)
+                .status()
+                .expect("git runs");
+            assert!(status.success(), "git {args:?} failed");
+        };
+        git(&["init", "-q"]);
+        git(&["config", "user.name", "Test"]);
+        git(&["config", "user.email", "test@example.com"]);
+        std::fs::write(dir.join("seed.txt"), "seed\n").expect("write seed");
+        git(&["add", "."]);
+        git(&["commit", "-q", "-m", "seed"]);
+    }
+
+    /// REQ-01: the tree probe reports a committed tree clean and a modified tree
+    /// dirty, and counts an untracked file as dirty.
+    #[test]
+    fn test_get_git_tree_dirty_reports_clean_then_dirty() {
+        let temp = tempfile::TempDir::new().unwrap();
+        init_committed_repo(temp.path());
+
+        assert_eq!(get_git_tree_dirty(temp.path()), Some(false));
+
+        std::fs::write(temp.path().join("seed.txt"), "changed\n").unwrap();
+        assert_eq!(get_git_tree_dirty(temp.path()), Some(true));
+
+        // Restore, then an untracked file alone still reads dirty.
+        std::fs::write(temp.path().join("seed.txt"), "seed\n").unwrap();
+        assert_eq!(get_git_tree_dirty(temp.path()), Some(false));
+        std::fs::write(temp.path().join("untracked.txt"), "new\n").unwrap();
+        assert_eq!(get_git_tree_dirty(temp.path()), Some(true));
+    }
+
+    /// git is optional (@/charter/D-4): outside a git repository the probe yields
+    /// `None` rather than a fabricated clean tree.
+    #[test]
+    fn test_get_git_tree_dirty_is_none_without_git() {
+        let temp = tempfile::TempDir::new().unwrap();
+        assert_eq!(get_git_tree_dirty(temp.path()), None);
+    }
+
+    /// Tree cleanliness is only recorded relative to a resolved commit: a repo
+    /// with no commits yet has no `commit`, so `tree_dirty` stays `None` even
+    /// though `git status` would succeed.
+    #[test]
+    fn test_get_git_context_ties_tree_dirty_to_commit() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let git = |args: &[&str]| {
+            Command::new("git")
+                .args(args)
+                .current_dir(temp.path())
+                .status()
+                .expect("git runs")
+        };
+        assert!(git(&["init", "-q"]).success());
+        std::fs::write(temp.path().join("untracked.txt"), "x\n").unwrap();
+
+        let context = get_git_context(temp.path());
+        assert!(context.commit.is_none());
+        assert_eq!(context.tree_dirty, None);
+    }
+
+    /// REQ-01/REQ-04: a recorded gate run stamps `tree_dirty == Some(false)` when
+    /// the checker starts against a clean committed tree.
+    #[test]
+    fn test_execute_gate_checker_records_clean_tree() {
+        let temp = tempfile::TempDir::new().unwrap();
+        init_committed_repo(temp.path());
+
+        let checker = GateChecker::Exec {
+            command: "true".to_string(),
+            timeout_seconds: 10,
+            working_dir: None,
+            env: HashMap::new(),
+            pass_context: false,
+            prompt: None,
+            prompt_file: None,
+        };
+        let result =
+            execute_gate_checker("g", "issue-1", GateStage::Postcheck, &checker, temp.path())
+                .unwrap();
+
+        assert!(result.commit.is_some());
+        assert_eq!(result.tree_dirty, Some(false));
+    }
+
+    /// REQ-01/REQ-04: a recorded gate run stamps `tree_dirty == Some(true)` when
+    /// the working tree carries an uncommitted change at checker start.
+    #[test]
+    fn test_execute_gate_checker_records_dirty_tree() {
+        let temp = tempfile::TempDir::new().unwrap();
+        init_committed_repo(temp.path());
+        std::fs::write(temp.path().join("seed.txt"), "dirtied\n").unwrap();
+
+        let checker = GateChecker::Exec {
+            command: "true".to_string(),
+            timeout_seconds: 10,
+            working_dir: None,
+            env: HashMap::new(),
+            pass_context: false,
+            prompt: None,
+            prompt_file: None,
+        };
+        let result =
+            execute_gate_checker("g", "issue-1", GateStage::Postcheck, &checker, temp.path())
+                .unwrap();
+
+        assert!(result.commit.is_some());
+        assert_eq!(result.tree_dirty, Some(true));
     }
 
     #[test]
@@ -854,6 +1007,7 @@ mod tests {
             issue_id: "issue-123".to_string(),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
+            tree_dirty: None,
             status: RS::Failed,
             started_at: chrono::Utc::now(),
             completed_at: Some(chrono::Utc::now()),

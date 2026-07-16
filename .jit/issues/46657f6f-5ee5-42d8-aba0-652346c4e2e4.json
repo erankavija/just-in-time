@@ -1,0 +1,38 @@
+{
+  "id": "46657f6f-5ee5-42d8-aba0-652346c4e2e4",
+  "title": "Gate checkers cannot invoke mutating jit: recovery session lock is not cross-process reentrant",
+  "description": "`jit gate evaluate` self-deadlocks any gate checker that invokes a mutating jit command against the same repository: the checker's nested jit process times out after 5s on `.jit-bootstrap.lock` and the gate fails. Live impact: the `docs-mechanical` gate (whose M5 step runs `jit invariant render`) is unpassable via `jit gate evaluate` in this repository — verified failing 3/3 while the same checker script passes standalone.\n\n## Background\n\nThe universal mutation recovery boundary (`jit:eceffc17`, merge ec8e6ebe) makes every mutating CLI command acquire a `RecoverySession` at dispatch and retain it \"until their last write\": the session holds `_bootstrap_guard: RepoWriteGuard` (and for repository-backed commands `_repository_guard`) for the whole command execution (crates/jit/src/storage/recovery_coordinator.rs). The guard's reentrancy is in-process only (\"Nested storage writes re-enter the same repository lock\"). A gate checker is a child *process*: `jit gate evaluate` (mutating — it records gate runs) holds the exclusive bootstrap lock while the checker runs, so a nested mutating jit invocation inside the checker can never acquire it and dies at the 5s timeout. Checkers that spawn jit are a first-class pattern (this repo's docs-mechanical; adopter checkers generally), so the recovery boundary must recognize descendants of the process that already ran recovery.\n\nCross-process contention with the same signature also produced flaky parallel-test failures (schema_v2 tests timing out on the shared `jit-cargo-ci-tmp/.jit-bootstrap.lock`); a fix should keep the parallel-test story in view but the checker deadlock is the defect to close.\n\n## Success Criteria\n\n- [hard] REQ-01: A gate checker spawned by `jit gate evaluate`/`evaluate-all` can run mutating jit commands against the same repository without lock timeout; a regression test covers a checker that performs a nested mutating jit invocation and the gate records a pass.\n- [hard] REQ-02: The bypass is scoped to descendants of the session holder: an unrelated concurrent jit process still serializes on the bootstrap/repository locks, covered by a test.\n- [hard] REQ-03: The recovery boundary's guarantee is preserved and documented for the nested case: the ancestor already performed recovery for the repository, and the nested process's writes remain protected by the pre-existing fine-grained file locking.\n- [hard] REQ-04: In this repository, `jit gate evaluate <id> docs-mechanical` passes end to end (the M5 `jit invariant render` step included) — live-verified, not only unit-tested.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:worker",
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T10:16:21.871543278Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T10:21:00.980579790Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:core-maintenance",
+    "component:storage",
+    "component:gates",
+    "type:bug"
+  ],
+  "created_at": "2026-07-16T09:36:00.549797661Z",
+  "updated_at": "2026-07-16T10:25:12.376913869Z",
+  "first_ready_at": "2026-07-16T09:36:00.549800591Z",
+  "claimed_at": "2026-07-16T09:36:15.748933903Z",
+  "done_at": "2026-07-16T10:25:12.376911929Z"
+}

@@ -148,8 +148,9 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockingReason {
     /// An unmet dependency: the issue waits on `id` (titled `title`), which is in
-    /// `state`, a state that [`is_dependency_met`] rejects (anything short of the
-    /// terminal `Done` or `Rejected`).
+    /// `state`, a state that [`is_dependency_met`] rejects (anything short of an
+    /// effective terminal state — `Done`, `Rejected`, or `Archived` retired from
+    /// one of those).
     Dependency {
         /// Id of the depended-on issue.
         id: String,
@@ -197,10 +198,12 @@ pub fn query_blocked(issues: &[Issue]) -> Vec<(Issue, Vec<BlockingReason>)> {
             // Unmet dependencies, by the one predicate every surface shares.
             let dep_reasons = issue.dependencies.iter().filter_map(|dep_id| {
                 resolved.get(dep_id).and_then(|dep| {
-                    (!is_dependency_met(dep.state)).then(|| BlockingReason::Dependency {
-                        id: dep_id.clone(),
-                        title: dep.title.clone(),
-                        state: dep.state,
+                    (!is_dependency_met(dep.state, dep.archived_from)).then(|| {
+                        BlockingReason::Dependency {
+                            id: dep_id.clone(),
+                            title: dep.title.clone(),
+                            state: dep.state,
+                        }
                     })
                 })
             });
@@ -331,11 +334,12 @@ pub fn query_strategic(issues: &[Issue], strategic_types: &[String]) -> Vec<Issu
         .collect()
 }
 
-/// Query closed issues (Done or Rejected states).
+/// Query closed issues (effectively terminal: `Done`, `Rejected`, or `Archived`
+/// retired from one of those — [`Issue::is_effectively_terminal`]).
 pub fn query_closed(issues: &[Issue]) -> Vec<Issue> {
     issues
         .iter()
-        .filter(|i| i.state.is_closed())
+        .filter(|i| i.is_effectively_terminal())
         .cloned()
         .collect()
 }

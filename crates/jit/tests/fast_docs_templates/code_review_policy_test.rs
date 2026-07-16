@@ -206,13 +206,18 @@ fn test_code_review_prompt_uses_recorded_gates_and_structured_references() {
         "valid resolved qualified IDs",
         "`references`",
         "empty array",
-        "@/inv/pid-safety",
+        "repository's configured registries",
+        "do not invent, hardcode, or emit unresolved references",
     ] {
         assert!(
             prompt.contains(required),
             "missing policy phrase: {required}"
         );
     }
+    assert!(
+        !prompt.contains("@/inv/pid-safety"),
+        "portable review policy must not require a repository-local invariant"
+    );
 }
 
 #[test]

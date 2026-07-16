@@ -265,6 +265,30 @@ impl HierarchyResolution {
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }
+
+    /// The DAG-authoritative containment membership of `root`: `root` itself
+    /// plus every node reachable by descending resolved [`children`](Self::children)
+    /// edges (its whole subtree, at any depth).
+    ///
+    /// This is containment membership, not the raw dependency closure: it
+    /// follows the resolved parent/child relation, so a dependency that points
+    /// into another container's subtree is *not* pulled in (that edge crosses
+    /// the membership boundary). An unknown `root` yields just `{root}`.
+    pub fn membership_closure(&self, root: &str) -> HashSet<String> {
+        let mut included: HashSet<String> = HashSet::new();
+        included.insert(root.to_string());
+
+        let mut queue: VecDeque<String> = VecDeque::new();
+        queue.push_back(root.to_string());
+        while let Some(current) = queue.pop_front() {
+            for child in self.children(&current) {
+                if included.insert(child.clone()) {
+                    queue.push_back(child.clone());
+                }
+            }
+        }
+        included
+    }
 }
 
 /// Resolve the canonical hierarchy for `nodes` using the dependency DAG.
@@ -736,6 +760,48 @@ mod tests {
 
         assert_eq!(r.children("e"), ["t1".to_string(), "t2".to_string()]);
         assert!(r.children("t1").is_empty());
+    }
+
+    #[test]
+    fn test_membership_closure_descends_whole_subtree() {
+        // milestone → epic → story → task
+        let m = TestNode::new("m", Some("milestone"), &["e"]);
+        let e = TestNode::new("e", Some("epic"), &["s"]);
+        let s = TestNode::new("s", Some("story"), &["t"]);
+        let t = TestNode::new("t", Some("task"), &[]);
+        let r = resolve_hierarchy(&[&m, &e, &s, &t], &default_config());
+
+        let from_epic = r.membership_closure("e");
+        assert_eq!(
+            from_epic,
+            ["e", "s", "t"].iter().map(|s| s.to_string()).collect()
+        );
+
+        let from_milestone = r.membership_closure("m");
+        assert_eq!(
+            from_milestone,
+            ["m", "e", "s", "t"].iter().map(|s| s.to_string()).collect()
+        );
+
+        // A leaf's closure is just itself.
+        assert_eq!(
+            r.membership_closure("t"),
+            ["t"].iter().map(|s| s.to_string()).collect()
+        );
+    }
+
+    #[test]
+    fn test_membership_closure_stops_at_container_boundary() {
+        // Two epics; the shared task resolves to exactly one container (the
+        // smaller id wins the tie), so it is a member of `e1` only. The other
+        // epic's closure must not reach across the boundary into it.
+        let e1 = TestNode::new("e1", Some("epic"), &["t"]);
+        let e2 = TestNode::new("e2", Some("epic"), &["t"]);
+        let t = TestNode::new("t", Some("task"), &[]);
+        let r = resolve_hierarchy(&[&e1, &e2, &t], &default_config());
+
+        assert!(r.membership_closure("e1").contains("t"));
+        assert!(!r.membership_closure("e2").contains("t"));
     }
 
     #[test]

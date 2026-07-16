@@ -41,15 +41,15 @@ experiment = "experiment"
 # `jit apply plan <goal>`. A breakable container `C` is bracketed by two
 # function-typed children: `P` (type:planning, carries the plan-review gate)
 # sequenced first, then `B` (type:breakdown, carries the deterministic
-# coverage-preview gate AND the agent breakdown-review gate). The container C
+# coverage-preview gate AND the breakdown-review checkpoint). The container C
 # depends on the impl subgraph, which depends on B, which depends on P. Here the
 # breakable container is the research
 # `goal` — NOT a software container; the engine reads the breakable type from the
 # template and bakes in nothing. coverage-preview's checker runs
 # `jit validate --scope <C>` (resolving C from B's `brackets:<C-short-id>` label, so the
 # preview coverage rule fires and blocks when a [hard] criterion is uncovered);
-# breakdown-review is the AI review of the decomposition itself, judging the same
-# structure for a research goal as for a software epic.
+# plan-review and breakdown-review ship as warning-only review placeholders;
+# replace their checkers before treating either pass as review evidence.
 
 [validation]
 default_type = "experiment"

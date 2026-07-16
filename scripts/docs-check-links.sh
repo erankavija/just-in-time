@@ -83,7 +83,14 @@ for r in roots:
     if os.path.isfile(r):
         files.append(r)
     elif os.path.isdir(r):
-        for dp, _, fns in os.walk(r, onerror=_walk_error):
+        for dp, dns, fns in os.walk(r, onerror=_walk_error):
+            # Skill eval transcripts are historical generated evidence, not
+            # maintained workflow documentation. Narrow the skip to the skill
+            # layout so an ordinary documentation directory named "evals"
+            # remains checked.
+            here = '/' + dp.replace(os.sep, '/').strip('/') + '/'
+            if '/.agents/skills/' in here:
+                dns[:] = [dn for dn in dns if dn != 'evals']
             files += [os.path.join(dp, f) for f in fns if f.endswith('.md')]
 
 INLINE_CODE = re.compile(r'`[^`]*`')

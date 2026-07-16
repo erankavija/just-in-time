@@ -24,13 +24,13 @@ pub mod gate_runs;
 pub mod gate_store;
 pub mod git_revision;
 pub mod gitattributes;
-pub mod heartbeat;
 pub mod json;
 pub mod lease;
 pub mod lock;
 pub mod lock_cleanup;
 pub mod memory;
 pub mod path_errors;
+pub mod recovery_coordinator;
 pub mod reference;
 pub mod repo_lock;
 pub mod ruleset_store;
@@ -60,11 +60,14 @@ pub use errors::{
     InvalidIdPrefixError, IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError,
     RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
-pub use file_transaction::{FileTransactionKernel, FileTransactionOutcome, FileTransactionPlan};
+pub use file_transaction::{
+    FileTransactionKernel, FileTransactionOutcome, FileTransactionPlan, TransactionControlLocation,
+};
 pub use git_revision::{GitRevisionError, GitRevisionResolver, PinnedArtifactRead};
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
 pub use path_errors::{validate_repo_relative_path, PathReadError};
+pub use recovery_coordinator::{RecoveryCoordinator, RecoveryDispatchReport, RecoverySession};
 pub use reference::{render_reference_markdown, GateRunField, REFERENCE_PATH};
 pub use repo_lock::{RepoWriteGuard, RepoWriteLock};
 pub use transaction_action::TransactionAction;
@@ -99,23 +102,41 @@ pub trait IssueStore: Clone {
     /// Acquire this backend's repository-wide write lock, held until the returned
     /// guard drops.
     ///
-    /// Every mutating method of this trait takes it as its OUTERMOST lock, so a
-    /// caller that holds one guard across a multi-write sequence (`jit apply`)
+    /// Every mutating method of this trait takes it as its outer serialization
+    /// guard, so a caller that holds one guard across a multi-write sequence
+    /// (`jit apply`)
     /// excludes every ordinary writer for the whole sequence: the reads its
     /// validation depends on, its writes, and its compensating rollback all see
     /// one store nobody else is touching. The lock is
     /// [reentrant](repo_lock::RepoWriteLock#reentrancy), so the nested writes of
     /// such a sequence do not self-deadlock.
     ///
-    /// The lock lives with the data (`.jit/.repo-write.lock` for file storage),
-    /// never in the git control plane, so it guards the store with or without git
-    /// (`@/charter/D-4`).
+    /// File storage acquires a repository-sibling bootstrap lock followed by
+    /// `.jit/.repo-write.lock`; neither lives in the git control plane, so the
+    /// chain guards the store with or without git (`@/charter/D-4`).
     ///
     /// # Errors
     ///
     /// Returns an error when the lock cannot be acquired within the backend's
     /// timeout.
     fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard>;
+
+    /// Run an external process outside any startup recovery session retained by
+    /// this backend, then restore recovery serialization before returning.
+    ///
+    /// File-backed CLI storage overrides this to release the bootstrap and
+    /// repository locks while a checker subprocess runs. The locks are
+    /// reacquired and pending journals are recovered before the caller can
+    /// persist the subprocess result. Backends without a retained startup
+    /// session execute `operation` directly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error from `operation`, or from restoring the recovery
+    /// boundary after the external process exits.
+    fn run_external_process<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
+        operation()
+    }
 
     /// Save an issue (create or update).
     ///

@@ -11,7 +11,7 @@ import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
 import { CURATION, curationCoverage, generateTools, generateDefaultTools, parseToolName, getCommandByPath } from './lib/tool-generator.js';
 import { validateArguments, createValidator } from './lib/validator.js';
-import { buildCliArgs } from './lib/cli-executor.js';
+import { buildCliArgs, getTimeoutForCommand } from './lib/cli-executor.js';
 import { ConcurrencyLimiter } from './lib/concurrency.js';
 
 // Load the real schema from the CLI (single source of truth)
@@ -611,6 +611,47 @@ await runTest('array positional arg expands to multiple CLI args (e.g. dep add t
     cmdDef
   );
   assert.deepStrictEqual(result, ['dep', 'add', '350bff7f', 'bfe0ba7b', '2248b17d', '--json']);
+});
+
+// ---------------------------------------------------------------------------
+// cli-executor getTimeoutForCommand tests
+// ---------------------------------------------------------------------------
+
+console.log('\ncli-executor.js (getTimeoutForCommand)');
+
+const LONG_TIMEOUT = 600000;
+const DEFAULT_TIMEOUT = 30000;
+
+await runTest('gate evaluate gets the long timeout', () => {
+  assert.strictEqual(getTimeoutForCommand(['gate', 'evaluate']), LONG_TIMEOUT);
+});
+
+await runTest('gate evaluate-all gets the long timeout', () => {
+  assert.strictEqual(getTimeoutForCommand(['gate', 'evaluate-all']), LONG_TIMEOUT);
+});
+
+await runTest('gate status stays on the default timeout (inspection only)', () => {
+  assert.strictEqual(getTimeoutForCommand(['gate', 'status']), DEFAULT_TIMEOUT);
+});
+
+await runTest('gate status-all stays on the default timeout (inspection only)', () => {
+  assert.strictEqual(getTimeoutForCommand(['gate', 'status-all']), DEFAULT_TIMEOUT);
+});
+
+await runTest('gate fail stays on the default timeout (no checker execution)', () => {
+  assert.strictEqual(getTimeoutForCommand(['gate', 'fail']), DEFAULT_TIMEOUT);
+});
+
+await runTest('a non-gate command gets the default timeout', () => {
+  assert.strictEqual(getTimeoutForCommand(['issue', 'create']), DEFAULT_TIMEOUT);
+});
+
+await runTest('adding an unrelated gate verb does not disable the branch for existing verbs', () => {
+  // Regression guard for the historical bug where only the first `||`
+  // operand was a real comparison: a verb not in the long-timeout set
+  // (e.g. 'list') must not affect the verdict for verbs that are.
+  assert.strictEqual(getTimeoutForCommand(['gate', 'list']), DEFAULT_TIMEOUT);
+  assert.strictEqual(getTimeoutForCommand(['gate', 'evaluate']), LONG_TIMEOUT);
 });
 
 // ---------------------------------------------------------------------------

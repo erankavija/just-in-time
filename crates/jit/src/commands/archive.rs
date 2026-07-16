@@ -203,10 +203,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         );
 
         if let Some(container_id) = root_container_id.as_deref() {
+            // Coupled retirement (`jit:45a140ae`): artifact archival requires an
+            // effectively terminal container (Done/Rejected, or already Archived
+            // from one of those for an idempotent rerun). An Archived container
+            // retired from a non-terminal state, or any active state, is blocked.
             if issues
                 .iter()
                 .find(|issue| issue.id == container_id)
-                .is_some_and(|issue| !issue.state.is_terminal())
+                .is_some_and(|issue| !issue.is_effectively_terminal())
             {
                 blockers.push(PlanBlocker::new(
                     BlockerCode::NonTerminalTarget,
@@ -391,6 +395,31 @@ impl CommandExecutor<JsonFileStorage> {
         // through the final deletion attempt.
         let _repo_write_guard = self.storage.acquire_repo_write_lock()?;
         let plan = self.plan_archive_target(target)?;
+        // REQ-05 (`jit:45a140ae`): when a blocker is caused by lifecycle state,
+        // refuse with a diagnostic that names the permitted next action instead of
+        // the generic ineligibility from `executable_artifacts` below. The same
+        // guidance is carried in the plan JSON a preview emits.
+        if let Some((code, guidance)) = plan
+            .blockers()
+            .iter()
+            .chain(
+                plan.artifacts()
+                    .iter()
+                    .flat_map(|artifact| artifact.blockers()),
+            )
+            .find_map(|blocker| {
+                blocker
+                    .code
+                    .guidance()
+                    .map(|guidance| (blocker.code, guidance))
+            })
+        {
+            let target = match plan.target() {
+                PlanTarget::Container { id } => format!("container {}", &id[..id.len().min(8)]),
+                PlanTarget::Document { path } => format!("document {path}"),
+            };
+            bail!("cannot archive {target}: {} — {guidance}", code.as_str());
+        }
         let artifacts = plan.executable_artifacts()?;
 
         let prior_events = self.storage.read_artifact_archive_events()?;
@@ -605,6 +634,26 @@ impl CommandExecutor<JsonFileStorage> {
             }
         }
         canonicalize_warnings(&mut warnings);
+
+        // Coupled retirement (`jit:45a140ae`): a successful container archival
+        // retires the container into Archived as its final durable step, recording
+        // its pre-archive terminal state. Idempotent — a reconciling rerun finds it
+        // already Archived and the transition chokepoint's no-op guard does
+        // nothing. Document archival has no container to retire. This runs after
+        // the artifact commit point, so a rerun after a mid-flight failure (which
+        // left the container Done/Rejected) still reaches Archived.
+        if let PlanTarget::Container { id } = plan.target() {
+            let mut container = self.storage.load_issue(id)?;
+            if container.state != crate::domain::State::Archived {
+                self.apply_state_transition(
+                    &mut container,
+                    crate::domain::State::Archived,
+                    false,
+                    true,
+                    |_| {},
+                )?;
+            }
+        }
 
         Ok(ArchiveExecutionResult {
             schema_version: 1,
@@ -2371,5 +2420,137 @@ epic = "epic"
             crate::domain::artifact_plan::EvidenceCode::OutsideOwner
                 | crate::domain::artifact_plan::EvidenceCode::ActiveOwner
         )));
+    }
+
+    // === Coupled retirement workflow (jit:45a140ae) ===
+
+    /// A repo with one container issue in `state` owning `fixtures/root.md`.
+    /// Returns the repo, executor, and the container's full id.
+    fn executable_container_repo(
+        state: State,
+        content: &str,
+    ) -> (TempDir, CommandExecutor<JsonFileStorage>, String) {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        storage.init().unwrap();
+        fs::write(
+            storage.root().join("config.toml"),
+            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+        )
+        .unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), content).unwrap();
+        let mut container = Issue::new("Container".into(), String::new());
+        container.state = state;
+        container.labels = vec!["type:epic".to_string()];
+        container.documents = vec![DocumentReference::new("fixtures/root.md".into())];
+        let id = container.id.clone();
+        storage.save_issue(container).unwrap();
+        (repo, CommandExecutor::new(storage), id)
+    }
+
+    fn state_change_count(executor: &CommandExecutor<JsonFileStorage>, id: &str) -> usize {
+        executor
+            .storage
+            .read_events()
+            .unwrap()
+            .iter()
+            .filter(|event| matches!(event, Event::IssueStateChanged { issue_id, to: State::Archived, .. } if issue_id == id))
+            .count()
+    }
+
+    #[test]
+    fn test_container_archival_retires_container_to_archived() {
+        let (repo, executor, id) = executable_container_repo(State::Done, "# Root\n");
+        let result = executor.execute_archive_container(&id).unwrap();
+        assert!(result.event_appended);
+        // The document was relocated out of its source into the archive mirror
+        // (a container uses its own destination subtree, so assert on the source).
+        assert!(!repo.path().join("fixtures/root.md").exists());
+        assert!(!result.publications.is_empty());
+        // The container is retired into Archived, recording its terminal origin.
+        let container = executor.storage.load_issue(&id).unwrap();
+        assert_eq!(container.state, State::Archived);
+        assert_eq!(container.archived_from, Some(State::Done));
+        // The retirement appended an issue_state_changed into Archived.
+        assert_eq!(state_change_count(&executor, &id), 1);
+    }
+
+    #[test]
+    fn test_rejected_container_archival_retires_from_rejected() {
+        let (_repo, executor, id) = executable_container_repo(State::Rejected, "# Root\n");
+        executor.execute_archive_container(&id).unwrap();
+        let container = executor.storage.load_issue(&id).unwrap();
+        assert_eq!(container.state, State::Archived);
+        assert_eq!(container.archived_from, Some(State::Rejected));
+    }
+
+    #[test]
+    fn test_non_terminal_container_archival_refused_with_guidance() {
+        let (repo, executor, id) = executable_container_repo(State::InProgress, "# Root\n");
+        let error = executor
+            .execute_archive_container(&id)
+            .expect_err("archiving a non-terminal container must be refused");
+        let rendered = format!("{error:#}");
+        assert!(
+            rendered.contains("non-terminal-target") && rendered.contains("terminal container"),
+            "diagnostic must explain the permitted next action: {rendered}"
+        );
+        // Nothing moved and the container is unchanged.
+        assert!(repo.path().join("fixtures/root.md").exists());
+        assert!(!repo.path().join("archive/fixtures/root.md").exists());
+        let container = executor.storage.load_issue(&id).unwrap();
+        assert_eq!(container.state, State::InProgress);
+        assert_eq!(container.archived_from, None);
+    }
+
+    #[test]
+    fn test_container_archival_rerun_is_idempotent_noop() {
+        let (_repo, executor, id) = executable_container_repo(State::Done, "# Root\n");
+        executor.execute_archive_container(&id).unwrap();
+        // The container is now Archived-from-Done, still effectively terminal, so a
+        // rerun is eligible and reconciles to a no-op rather than erroring.
+        let rerun = executor.execute_archive_container(&id).unwrap();
+        assert!(!rerun.event_appended, "a fully-archived rerun is a no-op");
+        let container = executor.storage.load_issue(&id).unwrap();
+        assert_eq!(container.state, State::Archived);
+        assert_eq!(container.archived_from, Some(State::Done));
+        // The retirement transition is not re-emitted on the no-op rerun.
+        assert_eq!(state_change_count(&executor, &id), 1);
+    }
+
+    #[test]
+    fn test_independently_archived_terminal_owner_does_not_block_shared_document() {
+        // A document shared by a Done owner and a descendant independently
+        // archived FROM a terminal state: the archived owner is effectively
+        // terminal, so it is not an active owner and the document still moves.
+        let (_repo, executor, _) = executable_document_repo(1, "shared doc");
+        let mut archived_owner = Issue::new("Independently archived".into(), String::new());
+        archived_owner.state = State::Archived;
+        archived_owner.archived_from = Some(State::Done);
+        archived_owner.documents = vec![DocumentReference::new("fixtures/root.md".into())];
+        executor.storage.save_issue(archived_owner.clone()).unwrap();
+
+        let plan = executor
+            .preview_archive_document("fixtures/root.md")
+            .unwrap();
+        let artifact = &plan.artifacts()[0];
+        assert_eq!(artifact.action(), ArtifactAction::Move);
+        assert!(!artifact
+            .evidence()
+            .contains(&crate::domain::artifact_plan::EvidenceCode::ActiveOwner));
+
+        // Contrast: the same descendant archived from a NON-terminal state is an
+        // active owner, so the shared source is retained instead of moved.
+        let mut parked = executor.storage.load_issue(&archived_owner.id).unwrap();
+        parked.archived_from = Some(State::InProgress);
+        executor.storage.save_issue(parked).unwrap();
+        let plan = executor
+            .preview_archive_document("fixtures/root.md")
+            .unwrap();
+        let artifact = &plan.artifacts()[0];
+        assert!(artifact
+            .evidence()
+            .contains(&crate::domain::artifact_plan::EvidenceCode::ActiveOwner));
     }
 }

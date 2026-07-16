@@ -24,22 +24,22 @@
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T15:13:23.737138209Z"
+      "updated_at": "2026-07-16T10:13:12.739441806Z"
     },
     "doc-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-15T15:17:39.451909888Z"
     },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T15:04:20.624640340Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-15T15:13:46.749245323Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T15:04:20.624640340Z"
     }
   },
   "context": {},
@@ -52,7 +52,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.041332657Z",
-  "updated_at": "2026-07-16T08:31:23.772348111Z",
+  "updated_at": "2026-07-16T10:13:13.943382941Z",
   "first_ready_at": "2026-07-14T22:28:46.041332877Z",
   "claimed_at": "2026-07-15T12:21:49.064498278Z",
   "done_at": "2026-07-16T08:31:23.772347501Z"

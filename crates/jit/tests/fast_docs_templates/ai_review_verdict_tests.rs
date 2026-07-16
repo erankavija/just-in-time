@@ -69,24 +69,10 @@ fn run_script_output(
         .unwrap_or_else(|error| panic!("failed to run {}: {error}", script.display()))
 }
 
-/// Skips the test if jq is not on PATH (required by the ai-review.sh scripts).
-fn require_jq() -> bool {
-    Command::new("jq")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
-
 // REQ-11: VERDICT: PASS followed by trailing prose must still record PASS.
 // Covered for scripts/ai-review.sh.
 #[test]
 fn test_verdict_pass_with_trailing_prose_scripts_copy() {
-    if !require_jq() {
-        eprintln!("SKIP: jq not found on PATH");
-        return;
-    }
-
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     // Reviewer emits: a finding, the verdict, then trailing prose.
@@ -110,11 +96,6 @@ fn test_verdict_pass_with_trailing_prose_scripts_copy() {
 // Covered for contrib/gates/ai-review.sh.
 #[test]
 fn test_verdict_pass_with_trailing_prose_contrib_copy() {
-    if !require_jq() {
-        eprintln!("SKIP: jq not found on PATH");
-        return;
-    }
-
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     let agent = write_fake_agent(
@@ -139,11 +120,6 @@ fn test_verdict_pass_with_trailing_prose_contrib_copy() {
 // Sanity: VERDICT: FAIL is still recorded as failure (scripts copy).
 #[test]
 fn test_verdict_fail_scripts_copy() {
-    if !require_jq() {
-        eprintln!("SKIP: jq not found on PATH");
-        return;
-    }
-
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     let agent = write_fake_agent(&temp, "1. Bug found.\nTotal findings: 1\nVERDICT: FAIL\n");
@@ -156,11 +132,6 @@ fn test_verdict_fail_scripts_copy() {
 // Sanity: no verdict line at all → failure (scripts copy).
 #[test]
 fn test_verdict_unparseable_scripts_copy() {
-    if !require_jq() {
-        eprintln!("SKIP: jq not found on PATH");
-        return;
-    }
-
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     let agent = write_fake_agent(&temp, "Some prose with no verdict line.\n");
@@ -174,12 +145,32 @@ fn test_verdict_unparseable_scripts_copy() {
 }
 
 #[test]
-fn test_classified_advisory_finding_passes_in_both_wrapper_copies() {
-    if !require_jq() {
-        eprintln!("SKIP: jq not found on PATH");
-        return;
-    }
+fn test_missing_prompt_fails_in_both_wrapper_copies() {
+    let temp = TempDir::new().unwrap();
+    let context = temp.path().join("context-without-prompt.json");
+    fs::write(&context, r#"{"prompt":null}"#).unwrap();
+    let agent = write_fake_agent(&temp, "Total findings: 0\nVERDICT: PASS\n");
 
+    for relative in ["scripts/ai-review.sh", "contrib/gates/ai-review.sh"] {
+        let output = run_script_output(
+            &repo_root().join(relative),
+            &context,
+            agent.to_str().unwrap(),
+        );
+        assert_eq!(
+            output.status.code(),
+            Some(1),
+            "missing prompt passed in {relative}"
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("No prompt defined"),
+            "missing-prompt diagnostic absent in {relative}"
+        );
+    }
+}
+
+#[test]
+fn test_classified_advisory_finding_passes_in_both_wrapper_copies() {
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     let agent = write_fake_agent(
@@ -199,11 +190,6 @@ fn test_classified_advisory_finding_passes_in_both_wrapper_copies() {
 
 #[test]
 fn test_classified_referenced_finding_passes_in_both_wrapper_copies() {
-    if !require_jq() {
-        eprintln!("SKIP: jq not found on PATH");
-        return;
-    }
-
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     let agent = write_fake_agent(
@@ -246,6 +232,10 @@ fn test_ai_review_wrapper_copies_remain_identical() {
 
     assert_eq!(canonical, contributed);
     assert!(
+        !String::from_utf8_lossy(&canonical).contains("jq"),
+        "portable wrapper must not require jq"
+    );
+    assert!(
         !String::from_utf8(canonical).unwrap().contains("codex"),
         "generic wrapper must not prescribe a reviewer tool"
     );
@@ -253,11 +243,6 @@ fn test_ai_review_wrapper_copies_remain_identical() {
 
 #[test]
 fn test_prompt_contract_does_not_execute_markdown_as_shell_commands() {
-    if !require_jq() {
-        eprintln!("SKIP: jq not found on PATH");
-        return;
-    }
-
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     let agent = write_fake_agent(

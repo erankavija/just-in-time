@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "3eeb6529-7a82-42c5-98c6-46c52b5dfd80",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "16402e14-d7cc-4f40-b4a3-1b372979be67",
+  "commit": "b2767edaf8b55466352a53719d24cfae50998fa2",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-16T14:17:14.497719453Z",
+  "completed_at": "2026-07-16T14:21:05.729800070Z",
+  "duration_ms": 231232,
+  "exit_code": 0,
+  "stdout": "Attribution: 8901b649, 35e13e21, 4e7dc03e (`jit:16402e14`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6,D-7 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics,@/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-07-16T14:10:45Z); code-review pending; doc-review pending; docs-mechanical failed (exit 1, 2026-07-16T14:16:48Z)\nTruncation recovery: Re-read affected patches, issue metadata, gate results, and current source ranges narrowly; excluded the merge’s unrelated second-parent delta.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Checkbox-prefixed hard criteria are normalized for item projection and coverage extraction, with validation-layer regression coverage for unchecked and checked forms.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Checkbox-prefixed hard criteria are normalized for item projection and coverage extraction, with validation-layer regression coverage for unchecked and checked forms.",
+    "findings": []
+  }
+}

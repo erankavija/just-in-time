@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "751c13b5-4e64-43f9-8c46-ce7ce27f35bf",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "45a140ae-1baa-4f32-96e2-b4dcf21d6694",
+  "commit": "4e6dadbbd92797171f3a53dc41b9ad649c542145",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T15:42:21.375782173Z",
+  "completed_at": "2026-07-16T15:46:41.162954834Z",
+  "duration_ms": 259787,
+  "exit_code": 1,
+  "stdout": "Attribution: `jit:45a140ae` commits db0fe018, b020f788, f280f8b6, 2fd8a8ff, 0e330d21, 30a39aac, c15b26eb, 8a02869e, ffde113d, c03d1ba9\nPolicy sources: AGENTS.md\nResolved items: @/invariant/dag-acyclic, @/invariant/gate-semantics, @/invariant/event-log, @/invariant/atomic-writes, @/invariant/domain-agnostic, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T15:37:20Z); docs-mechanical passed (exit 0, 2026-07-16T15:42:20Z); doc-review pending\nTruncation recovery: re-read focused transition/archive sections, individual commit patches, merge resolution, tests, and affected documentation after broad search output truncated\n\n1. F1 — blocking, issue-impact, high: `jit graph deps` drops `archived_from` when building `DependencyTreeNode`, then renders `Archived` as `○` unless its literal state is `Done`/`Rejected`. Thus an issue archived from `Done` is shown as non-terminal despite satisfying dependencies, violating the chosen status-projection semantics. Add origin/effective-terminality to this projection and cover it with a graph-deps test. [crates/jit/src/output.rs:1124](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/output.rs:1124)\n\n2. F2 — blocking, issue-impact, high: Canonical lifecycle and CLI references still state that only `done`/`rejected` dependencies are terminal/met, contradicting the newly documented terminality-preserving `Archived` behavior. This gives users incorrect readiness and `unmet_dependencies` guidance. Update the stale passages and keep them aligned with the canonical effective-terminal definition. [docs/concepts/core-model.md:231](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:231), [docs/reference/cli-commands.md:858](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:858) (`@/invariant/single-source-prose`).\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Archived effective-terminal semantics remain inconsistent in graph-dependency output and canonical readiness documentation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Graph dependency output cannot represent or render effective terminality for Archived-from-terminal issues.\",\"file\":\"crates/jit/src/output.rs\",\"line\":1124,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Canonical lifecycle and CLI readiness prose still defines met dependencies as only done or rejected.\",\"file\":\"docs/concepts/core-model.md\",\"line\":231,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 7068 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6b97-d97d-70b0-b801-2f28fab0fc8b\n--------\nuser\n--- 7055 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Archived effective-terminal semantics remain inconsistent in graph-dependency output and canonical readiness documentation.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Graph dependency output cannot represent or render effective terminality for Archived-from-terminal issues.",
+        "file": "crates/jit/src/output.rs",
+        "line": 1124
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Canonical lifecycle and CLI readiness prose still defines met dependencies as only done or rejected.",
+        "file": "docs/concepts/core-model.md",
+        "line": 231,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

@@ -1,11 +1,15 @@
 //! Gate preset management system
 //!
 //! This module provides functionality for managing gate presets - pre-configured
-//! bundles of quality gates that can be applied to issues. Presets encode best
-//! practices for common workflows (e.g., rust-tdd, minimal) and reduce setup time.
+//! bundles of quality gates that can be applied to issues. A preset captures a
+//! repeated gate set (a project's CI bundle, a review workflow) so it attaches in
+//! one command instead of gate-by-gate.
 //!
-//! [`BuiltinPresets`] carries the presets the binary ships; [`PresetManager`]
-//! loads those plus a project's own presets from `.jit/config/gate-presets/`.
+//! [`BuiltinPresets`] carries the presets the binary ships — only the
+//! planning-bracket trio, which is workflow infrastructure of the plan bracket
+//! rather than domain vocabulary. [`PresetManager`] loads those plus a project's
+//! own presets from `.jit/config/gate-presets/`, where domain-specific bundles
+//! belong (`@/inv/domain-agnostic`, `@/charter/D-2`).
 //! The [`reference`] submodule projects the built-in definitions into the
 //! committed markdown reference [`REFERENCE_PATH`].
 

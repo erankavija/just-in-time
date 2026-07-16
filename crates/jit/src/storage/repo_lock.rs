@@ -1,12 +1,13 @@
-//! The repository-wide write lock: the OUTERMOST lock on every mutating storage
-//! path.
+//! The repository-wide write lock, acquired behind the bootstrap lock on every
+//! mutating file-backed storage path.
 //!
-//! [`RepoWriteLock`] lives next to the data it guards — `.jit/.repo-write.lock`
-//! in the storage root — so it is present whether or not the working tree is a
-//! git repository (`@/charter/D-4`). Every write path in
-//! [`IssueStore`](crate::storage::IssueStore) takes it before any finer lock
-//! (`.index.lock`, the per-issue lock, `.gates.lock`, `.events.lock`), and a
-//! multi-write sequence such as `jit apply` holds ONE guard across its whole
+//! The repository lock lives next to the data it guards at
+//! `.jit/.repo-write.lock`, while its repository-sibling bootstrap predecessor
+//! remains available when `.jit/` does not yet exist. Neither requires git
+//! (`@/charter/D-4`). Every write path in
+//! [`IssueStore`](crate::storage::IssueStore) takes this chain before any finer
+//! lock (`.index.lock`, the per-issue lock, `.gates.lock`, `.events.lock`), and
+//! a multi-write sequence such as `jit apply` holds ONE guard across its whole
 //! read-validate-write-rollback window. A concurrent writer therefore observes
 //! the sequence's start or its end, never a midpoint, and a compensating
 //! rollback can only undo writes the sequence itself made.
@@ -25,9 +26,9 @@
 //!
 //! # Lock order
 //!
-//! `repo-write` → (`.index.lock` → per-issue `.lock`) | `.gates.lock` |
-//! `.events.lock`. No path acquires the repo-write lock while holding an inner
-//! lock, and read paths never take it, so no cycle exists.
+//! `bootstrap` → `repo-write` → (`.index.lock` → per-issue `.lock`) |
+//! `.gates.lock` | `.events.lock`. No path acquires an outer lock while holding
+//! an inner lock, and read paths never take this chain, so no cycle exists.
 
 use super::lock::{FileLocker, LockGuard};
 use anyhow::{Context, Result};
@@ -66,6 +67,10 @@ struct LockState {
 pub struct RepoWriteLock {
     /// Lock file and its acquisition timeout; `None` for a process-local lock.
     backing: Option<(PathBuf, FileLocker)>,
+    /// Lock that must be acquired before this one. File-backed repository locks
+    /// use the bootstrap lock as their predecessor, fixing the cross-process
+    /// order at bootstrap → repository → finer storage locks.
+    predecessor: Option<Arc<RepoWriteLock>>,
     state: Mutex<LockState>,
     /// Signalled when the outermost guard drops and `owner` becomes `None`.
     released: Condvar,
@@ -78,11 +83,38 @@ impl RepoWriteLock {
     /// `timeout` bounds how long an acquisition waits for the file lock. The lock
     /// file (and the storage root) are created on first acquisition, not here.
     pub fn for_storage_root<P: AsRef<Path>>(storage_root: P, timeout: Duration) -> Arc<Self> {
+        Self::for_storage_root_after(storage_root, timeout, None)
+    }
+
+    /// A file-backed lock acquired after `predecessor`.
+    ///
+    /// The returned guard retains the predecessor guard for its whole lifetime,
+    /// so callers cannot accidentally release the outer lock while the
+    /// repository lock remains held.
+    pub fn for_storage_root_after<P: AsRef<Path>>(
+        storage_root: P,
+        timeout: Duration,
+        predecessor: Option<Arc<RepoWriteLock>>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             backing: Some((
                 storage_root.as_ref().join(REPO_WRITE_LOCK_FILE),
                 FileLocker::new(timeout),
             )),
+            predecessor,
+            state: Mutex::new(LockState::default()),
+            released: Condvar::new(),
+        })
+    }
+
+    /// A file-backed lock at one exact path.
+    ///
+    /// Used for the repository-sibling bootstrap lock, whose parent must remain
+    /// available even when recovery restores the absence of `.jit/`.
+    pub fn for_lock_path<P: AsRef<Path>>(path: P, timeout: Duration) -> Arc<Self> {
+        Arc::new(Self {
+            backing: Some((path.as_ref().to_path_buf(), FileLocker::new(timeout))),
+            predecessor: None,
             state: Mutex::new(LockState::default()),
             released: Condvar::new(),
         })
@@ -96,6 +128,7 @@ impl RepoWriteLock {
     pub fn in_process() -> Arc<Self> {
         Arc::new(Self {
             backing: None,
+            predecessor: None,
             state: Mutex::new(LockState::default()),
             released: Condvar::new(),
         })
@@ -118,6 +151,12 @@ impl RepoWriteLock {
     /// Returns an error when the storage root cannot be created or the file lock
     /// cannot be acquired within the configured timeout.
     pub fn acquire(self: &Arc<Self>) -> Result<RepoWriteGuard> {
+        let predecessor_guard = self
+            .predecessor
+            .as_ref()
+            .map(|predecessor| predecessor.acquire())
+            .transpose()?
+            .map(Box::new);
         let me = std::thread::current().id();
         let mut state = self.lock_state();
 
@@ -126,6 +165,8 @@ impl RepoWriteLock {
             drop(state);
             return Ok(RepoWriteGuard {
                 lock: Arc::clone(self),
+                predecessor_guard,
+                outermost: false,
             });
         }
 
@@ -154,6 +195,8 @@ impl RepoWriteLock {
 
         Ok(RepoWriteGuard {
             lock: Arc::clone(self),
+            predecessor_guard,
+            outermost: true,
         })
     }
 
@@ -186,11 +229,24 @@ impl RepoWriteLock {
 #[must_use = "the repository write lock is released as soon as the guard drops"]
 pub struct RepoWriteGuard {
     lock: Arc<RepoWriteLock>,
+    predecessor_guard: Option<Box<RepoWriteGuard>>,
+    outermost: bool,
+}
+
+impl RepoWriteGuard {
+    /// Whether this acquisition took the underlying file lock rather than
+    /// re-entering a lock already held by this thread.
+    pub fn is_outermost(&self) -> bool {
+        self.outermost
+    }
 }
 
 impl Drop for RepoWriteGuard {
     fn drop(&mut self) {
         self.lock.release();
+        // The predecessor guard is a field, so Rust drops it after this method
+        // returns: repository first, bootstrap second.
+        let _ = &self.predecessor_guard;
     }
 }
 
@@ -280,6 +336,33 @@ mod tests {
         drop(inner);
         drop(outer);
         let _again = lock.acquire().unwrap();
+    }
+
+    #[test]
+    fn test_predecessor_is_held_until_dependent_guard_drops() {
+        let temp = TempDir::new().unwrap();
+        let predecessor = RepoWriteLock::for_lock_path(
+            temp.path().join("bootstrap.lock"),
+            Duration::from_millis(100),
+        );
+        let dependent = RepoWriteLock::for_storage_root_after(
+            temp.path().join(".jit"),
+            Duration::from_millis(100),
+            Some(Arc::clone(&predecessor)),
+        );
+        let competing_predecessor = RepoWriteLock::for_lock_path(
+            temp.path().join("bootstrap.lock"),
+            Duration::from_millis(100),
+        );
+
+        let guard = dependent.acquire().unwrap();
+        assert!(guard.is_outermost());
+        assert!(
+            competing_predecessor.acquire().is_err(),
+            "dependent guard must retain its predecessor"
+        );
+        drop(guard);
+        assert!(competing_predecessor.acquire().is_ok());
     }
 
     #[test]

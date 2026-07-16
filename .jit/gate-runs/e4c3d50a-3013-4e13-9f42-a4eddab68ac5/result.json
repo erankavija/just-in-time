@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "e4c3d50a-3013-4e13-9f42-a4eddab68ac5",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "eceffc17-98ce-4e7d-8fe1-cbb539a078a2",
+  "commit": "1289768403afc7886cd2336f58e2c5398b23c650",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-16T10:53:04.335533768Z",
+  "completed_at": "2026-07-16T10:57:59.377887075Z",
+  "duration_ms": 295042,
+  "exit_code": 0,
+  "stdout": "Attribution: 11 tagged commits: b89f414f, ec8e6ebe, 6ddf4fe3, e1860b05, a15a3d9e, 674fb7c3, c5457adf, a8662427, 81a6c2e2, de5427a4, 12897684\nPolicy sources: AGENTS.md\nResolved items: @/issue/9b7b5f9c/requirement/REQ-04 and REQ-12 (markdown-first issue source, read directly after lock-file creation was denied); @/inv/atomic-writes (.jit/invariants.toml); @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); repo-validate passed (exit 0); prior code-review failed (exit 1) with F1, now addressed\nTruncation recovery: re-read individual first-parent merge deltas and bounded current source/test ranges for recovery, locking, writers, CLI, and server startup\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed recovery boundary and follow-up writer guards satisfy the issue criteria; prior finding F1 is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The attributed recovery boundary and follow-up writer guards satisfy the issue criteria; prior finding F1 is resolved.",
+    "findings": []
+  }
+}

@@ -1,10 +1,21 @@
-//! Built-in gate presets
+//! Built-in gate presets.
+//!
+//! The binary ships exactly the three [planning-bracket](planning) presets —
+//! `plan-review`, `coverage-preview`, and `breakdown-review`. They are workflow
+//! infrastructure of the plan-before-fan-out bracket (`@/charter/D-3`): the plan
+//! template resolves them by name to gate the planning and breakdown nodes, so
+//! the bracket is self-contained without any per-project gate authoring.
+//!
+//! No language- or content-flavored bundles are built in. Gate keys, titles,
+//! and checkers (a test runner, a linter, a formatter, a security audit) are
+//! domain vocabulary; per `@/inv/domain-agnostic` and `@/charter/D-2` they come
+//! from repository configuration (`.jit/gates.toml` and project-defined presets
+//! under `.jit/config/gate-presets/`), never from hardcoded assumptions in the
+//! engine. [`super::PresetManager`] loads a project's own presets alongside
+//! these built-ins.
 
-use super::{
-    breakdown_review_preset, coverage_preview_preset, plan_review_preset, GatePresetDefinition,
-    GateTemplate, BREAKDOWN_REVIEW_PRESET, COVERAGE_PREVIEW_PRESET, PLAN_REVIEW_PRESET,
-};
-use crate::domain::{GateChecker, GateMode, GateStage};
+use super::{planning::package_gate_preset, GatePresetDefinition};
+use crate::profile::jit_dogfood_planning_gate_keys;
 use anyhow::Result;
 use std::collections::HashMap;
 
@@ -13,345 +24,71 @@ pub struct BuiltinPresets;
 
 impl BuiltinPresets {
     /// Load all built-in presets.
+    ///
+    /// The set is the planning-bracket trio and nothing else: the agent
+    /// plan-quality gate on the planning node, and the deterministic
+    /// coverage-preview plus agent breakdown-review gates on the breakdown node.
+    /// They are defined in [`super::planning`] so the gate shapes live next to
+    /// the preview-rule constructor.
     pub fn load() -> Result<HashMap<String, GatePresetDefinition>> {
         let mut presets = HashMap::new();
-
-        // rust-tdd preset
-        let rust_tdd = GatePresetDefinition {
-            name: "rust-tdd".to_string(),
-            description: "Test-driven development workflow for Rust projects".to_string(),
-            gates: vec![
-                GateTemplate {
-                    key: "tdd-reminder".to_string(),
-                    title: "Write tests first (TDD)".to_string(),
-                    description: "Reminder to write failing tests before implementation"
-                        .to_string(),
-                    stage: GateStage::Precheck,
-                    mode: GateMode::Manual,
-                    checker: None,
-                },
-                GateTemplate {
-                    key: "tests".to_string(),
-                    title: "All tests pass".to_string(),
-                    description: "cargo test must pass".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Auto,
-                    checker: Some(GateChecker::Exec {
-                        command: "cargo test".to_string(),
-                        timeout_seconds: 300,
-                        working_dir: None,
-                        env: HashMap::new(),
-                        pass_context: false,
-                        prompt: None,
-                        prompt_file: None,
-                    }),
-                },
-                GateTemplate {
-                    key: "clippy".to_string(),
-                    title: "Clippy lints pass".to_string(),
-                    description: "No clippy warnings allowed".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Auto,
-                    checker: Some(GateChecker::Exec {
-                        command: "cargo clippy --all-targets -- -D warnings".to_string(),
-                        timeout_seconds: 120,
-                        working_dir: None,
-                        env: HashMap::new(),
-                        pass_context: false,
-                        prompt: None,
-                        prompt_file: None,
-                    }),
-                },
-                GateTemplate {
-                    key: "fmt".to_string(),
-                    title: "Code formatted".to_string(),
-                    description: "Code must be formatted with cargo fmt".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Auto,
-                    checker: Some(GateChecker::Exec {
-                        command: "cargo fmt --check".to_string(),
-                        timeout_seconds: 30,
-                        working_dir: None,
-                        env: HashMap::new(),
-                        pass_context: false,
-                        prompt: None,
-                        prompt_file: None,
-                    }),
-                },
-                GateTemplate {
-                    key: "code-review".to_string(),
-                    title: "Code review completed".to_string(),
-                    description: "Another developer reviewed the code".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Manual,
-                    checker: None,
-                },
-            ],
-        };
-
-        // minimal preset
-        let minimal = GatePresetDefinition {
-            name: "minimal".to_string(),
-            description: "Minimal workflow with just code review".to_string(),
-            gates: vec![GateTemplate {
-                key: "code-review".to_string(),
-                title: "Code review completed".to_string(),
-                description: "Code has been reviewed".to_string(),
-                stage: GateStage::Postcheck,
-                mode: GateMode::Manual,
-                checker: None,
-            }],
-        };
-
-        // python-tdd preset
-        let python_tdd = GatePresetDefinition {
-            name: "python-tdd".to_string(),
-            description: "Test-driven development workflow for Python projects".to_string(),
-            gates: vec![
-                GateTemplate {
-                    key: "tdd-reminder".to_string(),
-                    title: "Write tests first (TDD)".to_string(),
-                    description: "Reminder to write failing tests before implementation"
-                        .to_string(),
-                    stage: GateStage::Precheck,
-                    mode: GateMode::Manual,
-                    checker: None,
-                },
-                GateTemplate {
-                    key: "pytest".to_string(),
-                    title: "All tests pass".to_string(),
-                    description: "pytest must pass".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Auto,
-                    checker: Some(GateChecker::Exec {
-                        command: "pytest".to_string(),
-                        timeout_seconds: 300,
-                        working_dir: None,
-                        env: HashMap::new(),
-                        pass_context: false,
-                        prompt: None,
-                        prompt_file: None,
-                    }),
-                },
-                GateTemplate {
-                    key: "black".to_string(),
-                    title: "Code formatted (Black)".to_string(),
-                    description: "Code must be formatted with Black".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Auto,
-                    checker: Some(GateChecker::Exec {
-                        command: "black --check .".to_string(),
-                        timeout_seconds: 30,
-                        working_dir: None,
-                        env: HashMap::new(),
-                        pass_context: false,
-                        prompt: None,
-                        prompt_file: None,
-                    }),
-                },
-                GateTemplate {
-                    key: "mypy".to_string(),
-                    title: "Type checking passes".to_string(),
-                    description: "mypy type checking must pass".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Auto,
-                    checker: Some(GateChecker::Exec {
-                        command: "mypy .".to_string(),
-                        timeout_seconds: 120,
-                        working_dir: None,
-                        env: HashMap::new(),
-                        pass_context: false,
-                        prompt: None,
-                        prompt_file: None,
-                    }),
-                },
-                GateTemplate {
-                    key: "code-review".to_string(),
-                    title: "Code review completed".to_string(),
-                    description: "Another developer reviewed the code".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Manual,
-                    checker: None,
-                },
-            ],
-        };
-
-        // js-tdd preset
-        let js_tdd = GatePresetDefinition {
-            name: "js-tdd".to_string(),
-            description: "Test-driven development workflow for JavaScript/TypeScript".to_string(),
-            gates: vec![
-                GateTemplate {
-                    key: "tdd-reminder".to_string(),
-                    title: "Write tests first (TDD)".to_string(),
-                    description: "Reminder to write failing tests before implementation"
-                        .to_string(),
-                    stage: GateStage::Precheck,
-                    mode: GateMode::Manual,
-                    checker: None,
-                },
-                GateTemplate {
-                    key: "jest".to_string(),
-                    title: "All tests pass".to_string(),
-                    description: "npm test must pass".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Auto,
-                    checker: Some(GateChecker::Exec {
-                        command: "npm test".to_string(),
-                        timeout_seconds: 300,
-                        working_dir: None,
-                        env: HashMap::new(),
-                        pass_context: false,
-                        prompt: None,
-                        prompt_file: None,
-                    }),
-                },
-                GateTemplate {
-                    key: "eslint".to_string(),
-                    title: "ESLint passes".to_string(),
-                    description: "ESLint must pass with no errors".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Auto,
-                    checker: Some(GateChecker::Exec {
-                        command: "npm run lint".to_string(),
-                        timeout_seconds: 120,
-                        working_dir: None,
-                        env: HashMap::new(),
-                        pass_context: false,
-                        prompt: None,
-                        prompt_file: None,
-                    }),
-                },
-                GateTemplate {
-                    key: "code-review".to_string(),
-                    title: "Code review completed".to_string(),
-                    description: "Another developer reviewed the code".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Manual,
-                    checker: None,
-                },
-            ],
-        };
-
-        // security-audit preset
-        let security_audit = GatePresetDefinition {
-            name: "security-audit".to_string(),
-            description: "Security review workflow".to_string(),
-            gates: vec![
-                GateTemplate {
-                    key: "security-review".to_string(),
-                    title: "Security review completed".to_string(),
-                    description:
-                        "Review code for security vulnerabilities: injection, auth, crypto, secrets"
-                            .to_string(),
-                    stage: GateStage::Precheck,
-                    mode: GateMode::Manual,
-                    checker: None,
-                },
-                GateTemplate {
-                    key: "secret-detection".to_string(),
-                    title: "No secrets in code".to_string(),
-                    description: "Detect hardcoded secrets and credentials".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Auto,
-                    checker: Some(GateChecker::Exec {
-                        command: "gitleaks detect --no-git".to_string(),
-                        timeout_seconds: 20,
-                        working_dir: None,
-                        env: HashMap::new(),
-                        pass_context: false,
-                        prompt: None,
-                        prompt_file: None,
-                    }),
-                },
-                GateTemplate {
-                    key: "dependency-audit".to_string(),
-                    title: "Dependency vulnerabilities checked".to_string(),
-                    description: "Audit dependencies for known vulnerabilities".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Auto,
-                    checker: Some(GateChecker::Exec {
-                        command: "cargo audit".to_string(),
-                        timeout_seconds: 60,
-                        working_dir: None,
-                        env: HashMap::new(),
-                        pass_context: false,
-                        prompt: None,
-                        prompt_file: None,
-                    }),
-                },
-            ],
-        };
-
-        // Planning-bracket presets (T6): the agent plan-quality gate on the
-        // planning node and the deterministic coverage-preview gate on the
-        // breakdown node. Defined in `planning.rs` so the gate shapes live next
-        // to the preview-rule constructor.
-        let plan_review = plan_review_preset();
-        let coverage_preview = coverage_preview_preset();
-        // The agent quality review on the breakdown node `B`, the front-end
-        // counterpart to the deterministic coverage-preview gate (quality vs
-        // coverage split on `B`).
-        let breakdown_review = breakdown_review_preset();
-
-        // Validate all presets
-        let all_presets = [
-            &rust_tdd,
-            &minimal,
-            &python_tdd,
-            &js_tdd,
-            &security_audit,
-            &plan_review,
-            &coverage_preview,
-            &breakdown_review,
-        ];
-        for preset in &all_presets {
+        for name in jit_dogfood_planning_gate_keys()? {
+            let preset = package_gate_preset(&name)?;
             preset.validate()?;
+            presets.insert(name, preset);
         }
-
-        presets.insert(rust_tdd.name.clone(), rust_tdd);
-        presets.insert(minimal.name.clone(), minimal);
-        presets.insert(python_tdd.name.clone(), python_tdd);
-        presets.insert(js_tdd.name.clone(), js_tdd);
-        presets.insert(security_audit.name.clone(), security_audit);
-        presets.insert(plan_review.name.clone(), plan_review);
-        presets.insert(coverage_preview.name.clone(), coverage_preview);
-        presets.insert(breakdown_review.name.clone(), breakdown_review);
 
         Ok(presets)
     }
 
-    /// Get list of builtin preset names.
-    pub fn names() -> Vec<String> {
-        vec![
-            "rust-tdd".to_string(),
-            "minimal".to_string(),
-            "python-tdd".to_string(),
-            "js-tdd".to_string(),
-            "security-audit".to_string(),
-            PLAN_REVIEW_PRESET.to_string(),
-            COVERAGE_PREVIEW_PRESET.to_string(),
-            BREAKDOWN_REVIEW_PRESET.to_string(),
-        ]
+    /// Get the package-derived list of built-in preset names.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded dogfood package or its planning
+    /// template is invalid.
+    pub fn names() -> Result<Vec<String>> {
+        jit_dogfood_planning_gate_keys().map_err(Into::into)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::GateMode;
 
     #[test]
     fn test_load_builtin_presets() {
         let presets = BuiltinPresets::load().unwrap();
-        assert_eq!(presets.len(), 8);
-        assert!(presets.contains_key("rust-tdd"));
-        assert!(presets.contains_key("minimal"));
-        assert!(presets.contains_key("python-tdd"));
-        assert!(presets.contains_key("js-tdd"));
-        assert!(presets.contains_key("security-audit"));
+        assert_eq!(presets.len(), 3);
         assert!(presets.contains_key("plan-review"));
         assert!(presets.contains_key("coverage-preview"));
         assert!(presets.contains_key("breakdown-review"));
+    }
+
+    /// The removed language- and content-flavored bundles are not built in
+    /// (REQ-01): only the planning-bracket trio ships.
+    #[test]
+    fn test_language_and_content_bundles_not_builtin() {
+        let presets = BuiltinPresets::load().unwrap();
+        for removed in [
+            "rust-tdd",
+            "python-tdd",
+            "js-tdd",
+            "minimal",
+            "security-audit",
+        ] {
+            assert!(
+                !presets.contains_key(removed),
+                "{removed} must not be a built-in preset"
+            );
+            assert!(
+                !BuiltinPresets::names()
+                    .unwrap()
+                    .contains(&removed.to_string()),
+                "{removed} must not be in the built-in name list"
+            );
+        }
     }
 
     #[test]
@@ -373,46 +110,16 @@ mod tests {
         assert_eq!(breakdown_review.gates[0].key, "breakdown-review");
         assert_eq!(breakdown_review.gates[0].mode, GateMode::Auto);
 
-        assert!(BuiltinPresets::names().contains(&"plan-review".to_string()));
-        assert!(BuiltinPresets::names().contains(&"coverage-preview".to_string()));
-        assert!(BuiltinPresets::names().contains(&"breakdown-review".to_string()));
+        let names = BuiltinPresets::names().unwrap();
+        assert!(names.contains(&"plan-review".to_string()));
+        assert!(names.contains(&"coverage-preview".to_string()));
+        assert!(names.contains(&"breakdown-review".to_string()));
     }
 
     #[test]
-    fn test_rust_tdd_preset_structure() {
-        let presets = BuiltinPresets::load().unwrap();
-        let rust_tdd = presets.get("rust-tdd").unwrap();
-
-        assert_eq!(rust_tdd.name, "rust-tdd");
-        assert_eq!(rust_tdd.gates.len(), 5);
-
-        // Verify gate keys
-        let keys: Vec<_> = rust_tdd.gates.iter().map(|g| g.key.as_str()).collect();
-        assert_eq!(
-            keys,
-            vec!["tdd-reminder", "tests", "clippy", "fmt", "code-review"]
-        );
-
-        // Verify tdd-reminder is precheck
-        assert_eq!(rust_tdd.gates[0].stage, GateStage::Precheck);
-
-        // Verify auto gates have checkers
-        for gate in &rust_tdd.gates {
-            if gate.mode == GateMode::Auto {
-                assert!(gate.checker.is_some(), "Gate {} missing checker", gate.key);
-            }
-        }
-    }
-
-    #[test]
-    fn test_minimal_preset_structure() {
-        let presets = BuiltinPresets::load().unwrap();
-        let minimal = presets.get("minimal").unwrap();
-
-        assert_eq!(minimal.name, "minimal");
-        assert_eq!(minimal.gates.len(), 1);
-        assert_eq!(minimal.gates[0].key, "code-review");
-        assert_eq!(minimal.gates[0].mode, GateMode::Manual);
+    fn test_compatibility_names_equal_package_template_node_gates() {
+        let derived = jit_dogfood_planning_gate_keys().unwrap();
+        assert_eq!(BuiltinPresets::names().unwrap(), derived);
     }
 
     #[test]

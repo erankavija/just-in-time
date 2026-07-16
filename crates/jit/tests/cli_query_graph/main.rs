@@ -2,6 +2,7 @@
 //! integration targets as modules under one Cargo test target so Cargo links
 //! and runs them as a single executable (jit:8d4f7084).
 
+mod batch_export_cli_tests;
 mod check_links_tests;
 mod dep_add_redundancy_cli_tests;
 mod dependency_display_tests;

@@ -20,7 +20,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 
 use jit::commands::CommandExecutor;
-use jit::storage::JsonFileStorage;
+use jit_server::{prepare_server_storage, resolve_listener, ListenerSource};
 use routes::AppState;
 
 /// JIT REST API Server
@@ -58,21 +58,21 @@ async fn main() -> Result<()> {
 
     info!("Starting JIT API Server...");
 
-    // Initialize storage and command executor
-    let storage = JsonFileStorage::new(&args.data_dir);
-
-    // Validate repository exists
-    storage.validate().map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to initialize storage: {}\n\n\
-             The server requires a JIT repository to be initialized.\n\
-             Run 'jit init' in the repository directory, or use --data-dir to point to an existing repository.",
-            e
-        )
-    })?;
+    // Recover before validation or command-service construction.
+    let (storage, recovery_session) = prepare_server_storage(&args.data_dir)?;
 
     info!("Using JIT repository at: {}", args.data_dir);
     let executor = Arc::new(CommandExecutor::new(storage));
+    if recovery_session.report().recovered_count() > 0 {
+        info!(
+            "Recovered {} pending transaction(s) before server startup",
+            recovery_session.report().recovered_count()
+        );
+    }
+    // The current HTTP surface is read-only. Release startup serialization
+    // after validation and executor construction; any future mutation route
+    // must enter through the same repository mutation boundary as the CLI.
+    drop(recovery_session);
 
     // Start file watcher for live updates
     let (tracker, _watcher) = watcher::start_watching(&args.data_dir)?;
@@ -128,9 +128,16 @@ async fn main() -> Result<()> {
         }
     }
 
-    // Start server
-    let listener = tokio::net::TcpListener::bind(&args.bind).await?;
-    info!("Server listening on http://{}", args.bind);
+    // Start server. Prefer a socket inherited from the launching `jit`
+    // process (listenfd); only bind `--bind` when none was handed down. This
+    // keeps the port bound continuously across the jit→jit-server handoff.
+    let (std_listener, source) = resolve_listener(&args.bind)?;
+    let listener = tokio::net::TcpListener::from_std(std_listener)?;
+    let local_addr = listener.local_addr()?;
+    match source {
+        ListenerSource::Inherited => info!("Server listening on http://{local_addr} (inherited)"),
+        ListenerSource::Bound => info!("Server listening on http://{local_addr}"),
+    }
 
     axum::serve(listener, app).await?;
 

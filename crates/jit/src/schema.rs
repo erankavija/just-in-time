@@ -473,6 +473,28 @@ impl CommandSchema {
             // Status command
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
 
+            // Embedded profile commands.
+            "profile_list" => (
+                Some(schema_to_value::<crate::profile::ProfileListResult>()),
+                "ProfileListResult",
+            ),
+            "profile_show" => (
+                Some(schema_to_value::<crate::profile::ProfileShowResult>()),
+                "ProfileShowResult",
+            ),
+            "profile_apply" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<crate::profile::ProfileApplyResult>(),
+                        schema_to_value::<crate::profile::ProfilePlanResult>(),
+                    ],
+                    "description": "Normal execution returns ProfileApplyResult. \
+                        With --dry-run, returns the exact non-mutating \
+                        ProfilePlanResult."
+                });
+                (Some(union), "ProfileApplyResult")
+            }
+
             // Issue commands
             //
             // `issue show --json` returns `IssueShowResponse` by default and
@@ -711,6 +733,10 @@ impl CommandSchema {
             "GateChecker".to_string(),
             serde_json::to_value(schema_for!(GateChecker)).unwrap_or(json!({})),
         );
+        types.insert(
+            "ProfileManifest".to_string(),
+            serde_json::to_value(crate::profile::profile_manifest_schema()).unwrap_or(json!({})),
+        );
 
         types.insert(
             "Issue".to_string(),
@@ -874,6 +900,13 @@ impl CommandSchema {
                 false,
             ),
             row(
+                "issue delete",
+                2,
+                "Deletion was refused for missing operator confirmation \
+                 (JIT_ALLOW_DELETION=1 not set in the process environment).",
+                false,
+            ),
+            row(
                 "issue batch-create",
                 2,
                 "The batch file failed pre-validation; no issues were created.",
@@ -961,14 +994,6 @@ impl CommandSchema {
                 true,
             ),
             row(
-                "config validate",
-                2,
-                "Reserved: the handler has an exit(2) branch for configuration \
-                 warnings, but no warning condition is defined today, so 2 is \
-                 never emitted.",
-                true,
-            ),
-            row(
                 "doc check-links",
                 1,
                 "One or more documents have broken links.",
@@ -1040,10 +1065,7 @@ pub fn render_exit_code_reference() -> String {
          that produces it: the shared classifier (`error_to_exit_code` in \
          `crates/jit/src/main.rs`) for codes raised as typed errors, and the \
          command's own `std::process::exit` site for codes a completed run emits \
-         directly (the findings signals and the `serve --fg` pass-through). One \
-         row is documented as *reserved* rather than bound: `config validate` `2` \
-         names a branch the handler carries but no condition reaches, so nothing \
-         emits it.\n\n",
+         directly (the findings signals and the `serve --fg` pass-through).\n\n",
     );
 
     out.push_str("## Global taxonomy\n\n");
@@ -1278,6 +1300,20 @@ mod tests {
             );
         }
         assert!(encoded.contains("label_namespace"));
+    }
+
+    #[test]
+    fn test_schema_publishes_profile_manifest_runtime_contract() {
+        let schema = CommandSchema::generate();
+        let profile = schema
+            .types
+            .get("ProfileManifest")
+            .expect("ProfileManifest schema");
+        let text = profile.to_string();
+        assert!(text.contains("manifest-version"));
+        assert!(text.contains("map-entry"));
+        assert!(text.contains("singleton-table"));
+        assert!(text.contains("rules-gates-projection"));
     }
 
     /// REQ-02/REQ-03: every global flag accepted at the top level — `quiet`,

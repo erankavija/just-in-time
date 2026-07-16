@@ -1958,7 +1958,7 @@ fn validate_claims_index_with_paths(
     }
 
     // Note: Expired leases are NOT considered corruption - they are normal state
-    // handled by startup_recovery's evict_expired(). Use validate_leases() to check expiration.
+    // evicted by `jit recover`. Use validate_leases() to check expiration.
 
     // Report sequence gaps (if any were detected during rebuild)
     if !index.sequence_gaps.is_empty() {

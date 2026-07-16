@@ -199,7 +199,14 @@ fn test_status_all_all_passed_exits_0() {
         .success();
     jit()
         .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "manual-ok"])
+        .args([
+            "gate",
+            "evaluate",
+            &id,
+            "manual-ok",
+            "--by",
+            "human:reviewer",
+        ])
         .assert()
         .success();
 

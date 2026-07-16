@@ -8,7 +8,9 @@
 //! preserving the temp-file + rename invariant.
 
 use crate::storage::atomic_write::write_file_atomic;
+use crate::validation::rules::DEFAULT_ORIGIN;
 use anyhow::{Context, Result};
+use serde::Deserialize;
 use std::path::Path;
 
 /// The operative validation ruleset file, relative to the `.jit` root.
@@ -102,6 +104,155 @@ pub fn rewrite_rules_header(jit_root: &Path, header: &str) -> Result<bool> {
         Some(idx) => format!("{header}{}", &content[idx..]),
         None => header.to_string(),
     };
+    if rebuilt == content {
+        return Ok(false);
+    }
+    write_file_atomic(&path, &rebuilt)?;
+    Ok(true)
+}
+
+/// Minimal per-rule identity read off a `[[rules]]` block: just enough
+/// (`name`, `origin`) to drive [`sync_namespace_unique_rules`]'s structural
+/// add/drop, without pulling in the full `assert`-table deserialization
+/// [`crate::validation::rules::RuleSet`] performs (which resolves schema
+/// files and is unnecessary — and unnecessarily fragile — for a membership
+/// sync that never inspects a rule's assertion).
+#[derive(Debug, Deserialize)]
+struct RuleIdentity {
+    name: String,
+    #[serde(default)]
+    origin: Option<String>,
+}
+
+/// Top-level shape of `rules.toml` for [`RuleIdentity`] extraction.
+#[derive(Debug, Default, Deserialize)]
+struct RuleIdentitiesFile {
+    #[serde(default)]
+    rules: Vec<RuleIdentity>,
+}
+
+/// Read every rule's `(name, origin)` identity from `<jit_root>/rules.toml`.
+///
+/// Identity-only parsing: assertion tables are never deserialized and schema
+/// references never resolved, so this succeeds on a file whose full
+/// [`RuleSet`](crate::validation::rules::RuleSet) load would fail on a custom
+/// rule — the membership write-through must not be strandable by an unrelated
+/// rule's defect (jit:d74a9ed1 review F1). Returns an empty list when the file
+/// is absent.
+pub fn read_rule_identities(jit_root: &Path) -> Result<Vec<(String, Option<String>)>> {
+    let path = jit_root.join(RULES_FILE);
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let identities: RuleIdentitiesFile = toml::from_str(&content)
+        .with_context(|| format!("Failed to parse rule identities from {}", path.display()))?;
+    Ok(identities
+        .rules
+        .into_iter()
+        .map(|r| (r.name, r.origin))
+        .collect())
+}
+
+/// Split `rules.toml` content into its leading header (everything before the
+/// first `[[rules]]` table) and the raw text of each `[[rules]]` block, in
+/// file order.
+///
+/// A block's text runs from its `[[rules]]` line up to (but not including) the
+/// next `[[rules]]` line, or EOF — so it carries every line that belongs to
+/// it: its fields AND any comments/blank lines authored inside or immediately
+/// after it. Mirrors [`rewrite_rules_header`]'s start-of-line-only match, so a
+/// `[[rules]]`-looking string inside a description or comment is never
+/// mistaken for a table boundary.
+fn split_rule_blocks(content: &str) -> (&str, Vec<&str>) {
+    let mut starts: Vec<usize> = Vec::new();
+    if content.starts_with("[[rules]]") {
+        starts.push(0);
+    }
+    let mut search_from = 0;
+    while let Some(idx) = content[search_from..].find("\n[[rules]]") {
+        let start = search_from + idx + 1; // just past the '\n'
+        starts.push(start);
+        search_from = start + 1;
+    }
+
+    let header = match starts.first() {
+        Some(&first) => &content[..first],
+        None => content,
+    };
+    let blocks = starts
+        .iter()
+        .enumerate()
+        .map(|(i, &start)| {
+            let end = starts.get(i + 1).copied().unwrap_or(content.len());
+            &content[start..end]
+        })
+        .collect();
+    (header, blocks)
+}
+
+/// Apply a `namespace-unique-*` DEFAULT-rule membership delta to
+/// `<jit_root>/rules.toml`: append each pre-rendered `[[rules]]` block in
+/// `to_add` at the END of the file, and remove the `origin = "default"` block
+/// for each name in `to_drop` — identified STRUCTURALLY (by parsing each
+/// block's own `name`/`origin`, never by content-diffing), so every OTHER
+/// byte of the file — every other rule's fields, hand-edited policy fields on
+/// surviving default rules, custom rules, comments, and blank-line formatting
+/// — survives untouched (REQ-01, jit:d74a9ed1).
+///
+/// `to_add` entries are typically rendered via
+/// [`crate::validation::serialize::render_rule_block`]. A name in `to_drop`
+/// that does not match an `origin = "default"` block (already absent, or
+/// present only under a different origin) is silently skipped — dropping
+/// something not there is a no-op, not an error.
+///
+/// A no-op (`Ok(false)`) when `rules.toml` is absent (nothing to sync), or
+/// when neither list changes the file. Atomic (temp + rename). Returns an
+/// error if the file's `[[rules]]` blocks cannot be parsed to identity, or if
+/// the parsed rule count does not match the number of `[[rules]]` blocks found
+/// (a malformed or unexpectedly-shaped file this function cannot safely edit
+/// structurally).
+pub fn sync_namespace_unique_rules(
+    jit_root: &Path,
+    to_add: &[String],
+    to_drop: &[String],
+) -> Result<bool> {
+    let path = jit_root.join(RULES_FILE);
+    if !path.exists() {
+        return Ok(false);
+    }
+    if to_add.is_empty() && to_drop.is_empty() {
+        return Ok(false);
+    }
+
+    let content =
+        std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+    let (header, blocks) = split_rule_blocks(&content);
+
+    let identities: RuleIdentitiesFile = toml::from_str(&content)
+        .with_context(|| format!("parsing {} to locate rule identities", path.display()))?;
+    if identities.rules.len() != blocks.len() {
+        anyhow::bail!(
+            "cannot structurally sync {}: parsed {} rule(s) but found {} `[[rules]]` block(s)",
+            path.display(),
+            identities.rules.len(),
+            blocks.len()
+        );
+    }
+
+    let mut rebuilt = header.to_string();
+    for (identity, block) in identities.rules.iter().zip(blocks.iter()) {
+        let drop = identity.origin.as_deref() == Some(DEFAULT_ORIGIN)
+            && to_drop.iter().any(|name| name == &identity.name);
+        if !drop {
+            rebuilt.push_str(block);
+        }
+    }
+    for block in to_add {
+        rebuilt.push_str(block);
+    }
+
     if rebuilt == content {
         return Ok(false);
     }
@@ -296,5 +447,184 @@ mod tests {
             "absent rules.toml => nothing to rewrite"
         );
         assert!(!dir.path().join(RULES_FILE).exists());
+    }
+
+    // -- sync_namespace_unique_rules (jit:d74a9ed1) ---------------------------
+
+    /// A minimal, hand-authored `rules.toml`: one default rule, one custom rule
+    /// carrying its own comment, used to exercise byte-exact preservation.
+    const HAND_AUTHORED_RULES: &str = "\
+# a hand-authored header, left untouched by membership sync\n\
+\n\
+[[rules]]\n\
+name = \"label-format\"\n\
+origin = \"default\"\n\
+severity = \"error\"\n\
+enforce = true\n\
+assert = { require-section = { heading = \"unused-in-this-test\" } }\n\
+\n\
+[[rules]]\n\
+name = \"namespace-unique-team\"\n\
+origin = \"default\"\n\
+severity = \"warn\"\n\
+enforce = false\n\
+assert = { require-label = { label = \"team:*\", min = 0, max = 1 } }\n\
+\n\
+[[rules]]\n\
+name = \"custom-shape\"\n\
+# a hand-authored comment on a custom rule\n\
+severity = \"warn\"\n\
+assert = { require-section = { heading = \"Goals\" } }\n\
+";
+
+    fn write_rules(dir: &Path, content: &str) {
+        std::fs::write(dir.join(RULES_FILE), content).unwrap();
+    }
+
+    fn read_rules(dir: &Path) -> String {
+        std::fs::read_to_string(dir.join(RULES_FILE)).unwrap()
+    }
+
+    #[test]
+    fn test_sync_appends_new_block_preserving_rest_byte_exact() {
+        let dir = tempfile::tempdir().unwrap();
+        write_rules(dir.path(), HAND_AUTHORED_RULES);
+
+        let new_block = "[[rules]]\nname = \"namespace-unique-squad\"\norigin = \"default\"\nseverity = \"error\"\nenforce = true\nassert = { require-label = { label = \"squad:*\", min = 0, max = 1 } }\n\n";
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[new_block.to_string()], &[]).unwrap();
+        assert!(changed);
+
+        let updated = read_rules(dir.path());
+        assert!(
+            updated.starts_with(HAND_AUTHORED_RULES),
+            "every original byte survives as a prefix, new block appended after:\n{updated}"
+        );
+        assert_eq!(updated, format!("{HAND_AUTHORED_RULES}{new_block}"));
+    }
+
+    #[test]
+    fn test_sync_drops_default_block_preserving_rest_byte_exact() {
+        let dir = tempfile::tempdir().unwrap();
+        write_rules(dir.path(), HAND_AUTHORED_RULES);
+
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[], &["namespace-unique-team".to_string()])
+                .unwrap();
+        assert!(changed);
+
+        let updated = read_rules(dir.path());
+        assert!(!updated.contains("namespace-unique-team"));
+        // Every other rule survives verbatim, including the custom rule's
+        // hand-authored comment and the header.
+        assert!(updated.contains("# a hand-authored header, left untouched by membership sync"));
+        assert!(updated.contains("name = \"label-format\""));
+        assert!(updated.contains("name = \"custom-shape\""));
+        assert!(updated.contains("# a hand-authored comment on a custom rule"));
+        // Reconstructed from the surviving blocks: removing the middle block
+        // leaves the first and third concatenated after the header.
+        let expected = HAND_AUTHORED_RULES.replacen(
+            "[[rules]]\nname = \"namespace-unique-team\"\norigin = \"default\"\nseverity = \"warn\"\nenforce = false\nassert = { require-label = { label = \"team:*\", min = 0, max = 1 } }\n\n",
+            "",
+            1,
+        );
+        assert_eq!(updated, expected);
+    }
+
+    #[test]
+    fn test_sync_ignores_drop_name_under_non_default_origin() {
+        // A custom rule happens to be NAMED like a namespace-unique row (no
+        // `origin = "default"`). It must never be dropped by this function, even
+        // if its name appears in `to_drop`.
+        let dir = tempfile::tempdir().unwrap();
+        let content = "\
+[[rules]]\n\
+name = \"namespace-unique-team\"\n\
+severity = \"warn\"\n\
+assert = { require-section = { heading = \"Goals\" } }\n\
+";
+        write_rules(dir.path(), content);
+
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[], &["namespace-unique-team".to_string()])
+                .unwrap();
+        assert!(!changed, "a non-default row is never dropped");
+        assert_eq!(read_rules(dir.path()), content);
+    }
+
+    #[test]
+    fn test_sync_add_and_drop_together() {
+        let dir = tempfile::tempdir().unwrap();
+        write_rules(dir.path(), HAND_AUTHORED_RULES);
+
+        let new_block = "[[rules]]\nname = \"namespace-unique-squad\"\norigin = \"default\"\nseverity = \"error\"\nenforce = true\nassert = { require-label = { label = \"squad:*\", min = 0, max = 1 } }\n\n";
+        let changed = sync_namespace_unique_rules(
+            dir.path(),
+            &[new_block.to_string()],
+            &["namespace-unique-team".to_string()],
+        )
+        .unwrap();
+        assert!(changed);
+
+        let updated = read_rules(dir.path());
+        assert!(!updated.contains("namespace-unique-team"));
+        assert!(updated.contains("namespace-unique-squad"));
+        assert!(updated.contains("name = \"custom-shape\""));
+    }
+
+    #[test]
+    fn test_sync_is_noop_without_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let changed = sync_namespace_unique_rules(
+            dir.path(),
+            &[
+                "[[rules]]\nname = \"x\"\nassert = { require-section = { heading = \"H\" } }\n\n"
+                    .to_string(),
+            ],
+            &[],
+        )
+        .unwrap();
+        assert!(!changed);
+        assert!(!dir.path().join(RULES_FILE).exists());
+    }
+
+    #[test]
+    fn test_sync_is_noop_with_empty_diff() {
+        let dir = tempfile::tempdir().unwrap();
+        write_rules(dir.path(), HAND_AUTHORED_RULES);
+        let changed = sync_namespace_unique_rules(dir.path(), &[], &[]).unwrap();
+        assert!(!changed);
+        assert_eq!(read_rules(dir.path()), HAND_AUTHORED_RULES);
+    }
+
+    #[test]
+    fn test_sync_drop_of_absent_name_is_noop() {
+        let dir = tempfile::tempdir().unwrap();
+        write_rules(dir.path(), HAND_AUTHORED_RULES);
+        let changed = sync_namespace_unique_rules(
+            dir.path(),
+            &[],
+            &["namespace-unique-nonexistent".to_string()],
+        )
+        .unwrap();
+        assert!(!changed);
+        assert_eq!(read_rules(dir.path()), HAND_AUTHORED_RULES);
+    }
+
+    #[test]
+    fn test_sync_is_idempotent() {
+        let dir = tempfile::tempdir().unwrap();
+        write_rules(dir.path(), HAND_AUTHORED_RULES);
+        let new_block = "[[rules]]\nname = \"namespace-unique-squad\"\norigin = \"default\"\nseverity = \"error\"\nenforce = true\nassert = { require-label = { label = \"squad:*\", min = 0, max = 1 } }\n\n";
+
+        sync_namespace_unique_rules(dir.path(), &[new_block.to_string()], &[]).unwrap();
+        let once = read_rules(dir.path());
+
+        // Re-applying the SAME add against the now-updated file would duplicate
+        // the block (the caller is responsible for only passing a fresh diff);
+        // this test instead confirms a truly empty second diff changes nothing.
+        let changed = sync_namespace_unique_rules(dir.path(), &[], &[]).unwrap();
+        assert!(!changed);
+        assert_eq!(read_rules(dir.path()), once);
     }
 }

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_id": "27db4933-fc28-4123-a78d-14dd7be4f7b8",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
+  "commit": "7e35e8684ba8545b8290f2db40ff40e3c3e7a84c",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T11:08:18.970171748Z",
+  "completed_at": "2026-07-16T11:12:27.609719093Z",
+  "duration_ms": 248639,
+  "exit_code": 1,
+  "stdout": "Attribution: 9a072149, 3e02db29, f2df3982, af432931, 2d935a6b, bdc0cdb9, 7e35e868 (all reachable `jit:d3709cc6`)\nPolicy sources: AGENTS.md\nResolved items: @/gate/cargo-ci, @/gate/cargo-ci-features, @/gate/jit-validate, @/gate/dependency-audit (.jit/gates.toml); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed/0 (2026-07-16T07:33Z); jit-validate passed/0 (2026-07-16T07:36Z); cargo-ci-features passed/0 (2026-07-16T11:08Z); prior code-review failed/1, with its feature-validation finding addressed\nTruncation recovery: re-read feature-gate metadata without its full log; inspected current manifests, consumers, parser tests, lock entries, and the merge’s first-parent patch separately\n\n1. **[blocking][issue-impact] F1 — REQ-01 remains materially unverified.** The issue requires `cargo audit -D warnings` to exit zero against the committed lockfile, but its recorded runs contain only cargo-ci, jit-validate, feature CI, and the prior review; no current successful audit exists. The located audit result is a pre-remediation failure for another issue, so it cannot prove this lockfile. I did not rerun audit because it refreshes advisory/index state, outside this read-only review. See [.jit/issues/d3709cc6-0366-4e85-961b-b47f20cfdfb7.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/d3709cc6-0366-4e85-961b-b47f20cfdfb7.json:4). `@/gate/dependency-audit`\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-01 lacks current successful cargo-audit evidence for the remediated lockfile.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-01 remains materially unverified because no cargo audit -D warnings success is recorded for the current Cargo.lock.\",\"file\":\".jit/issues/d3709cc6-0366-4e85-961b-b47f20cfdfb7.json\",\"line\":4,\"references\":[\"@/gate/dependency-audit\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4678 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6a9c-f53e-71d3-afae-75151446c4b4\n--------\nuser\n--- 4665 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-01 lacks current successful cargo-audit evidence for the remediated lockfile.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "REQ-01 remains materially unverified because no cargo audit -D warnings success is recorded for the current Cargo.lock.",
+        "file": ".jit/issues/d3709cc6-0366-4e85-961b-b47f20cfdfb7.json",
+        "line": 4,
+        "references": [
+          "@/gate/dependency-audit"
+        ]
+      }
+    ]
+  }
+}

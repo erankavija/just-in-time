@@ -68,15 +68,31 @@ pub struct GraphExportFullResponse {
 /// Build the shared edge list from a node set: one [`GraphExportEdge`] per
 /// stored dependency, so both export shapes derive edges identically.
 fn build_export_edges(all_nodes: &[&Issue]) -> Vec<GraphExportEdge> {
+    let node_ids = exported_node_ids(all_nodes);
     all_nodes
         .iter()
         .flat_map(|issue| {
-            issue.dependencies.iter().map(|dep_id| GraphExportEdge {
-                from: issue.id.clone(),
-                to: dep_id.clone(),
-            })
+            issue
+                .dependencies
+                .iter()
+                .filter(|dep_id| node_ids.contains(dep_id.as_str()))
+                .map(|dep_id| GraphExportEdge {
+                    from: issue.id.clone(),
+                    to: dep_id.clone(),
+                })
         })
         .collect()
+}
+
+/// The id set of the nodes actually in the export.
+///
+/// Every exporter emits only edges whose BOTH endpoints are exported nodes
+/// (jit:3e12ffbd REQ-01): a scoped export must not leak references to
+/// out-of-scope issues as dangling edges. Unscoped exports are unaffected —
+/// repository validation keeps every dependency resolvable, so the filter
+/// passes every edge through.
+fn exported_node_ids<'a>(all_nodes: &'a [&Issue]) -> std::collections::HashSet<&'a str> {
+    all_nodes.iter().map(|issue| issue.id.as_str()).collect()
 }
 
 /// Export Issue dependency graph as DOT format for Graphviz
@@ -132,10 +148,13 @@ pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
 
     output.push('\n');
 
-    // Add edges
+    // Add edges between exported nodes only (no dangling references under scope).
+    let node_ids = exported_node_ids(&all_nodes);
     for issue in &all_nodes {
         for dep in &issue.dependencies {
-            output.push_str(&format!("  \"{}\" -> \"{}\";\n", issue.id, dep));
+            if node_ids.contains(dep.as_str()) {
+                output.push_str(&format!("  \"{}\" -> \"{}\";\n", issue.id, dep));
+            }
         }
     }
 
@@ -191,10 +210,13 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
 
     output.push('\n');
 
-    // Add edges
+    // Add edges between exported nodes only (no dangling references under scope).
+    let node_ids = exported_node_ids(&all_nodes);
     for issue in &all_nodes {
         for dep in &issue.dependencies {
-            output.push_str(&format!("  {} --> {}\n", issue.id, dep));
+            if node_ids.contains(dep.as_str()) {
+                output.push_str(&format!("  {} --> {}\n", issue.id, dep));
+            }
         }
     }
 

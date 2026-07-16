@@ -24,8 +24,8 @@ The command line is `jit <noun> <verb> [arguments] [flags]`. The read-only
 - A **noun** is a subcommand group naming a domain entity or subsystem: `issue`,
   `gate`, `gate preset`, `dep`, `doc`, `graph`, `query`, `claim`, `config`,
   `label`, `events`, `archive`, `snapshot`, `worktree`, `hooks`, `item`,
-  `invariant`, `reference`, `migrate`, and `apply`'s target. Nouns are singular
-  (`issue`, not `issues`).
+  `invariant`, `reference`, `migrate`, `profile`, and `apply`'s target. Nouns
+  are singular (`issue`, not `issues`).
 - A **verb** is the action on that noun: `create`, `show`, `list`, `update`,
   `add`, `remove`, `pass`, `define`, `acquire`. Verbs are imperative and shared
   across nouns where the action is the same (`list`, `show`, `add`, `remove`
@@ -77,11 +77,12 @@ verb acts.
 Canonical rules:
 
 - **The subject is positional.** The issue id, gate key, document path, assignee,
-  dependency endpoints, template name, preset name, and qualified item id are
-  positional because the verb cannot run without them. Examples:
+  dependency endpoints, template name, preset name, profile id, and qualified
+  item id are positional because the verb cannot run without them. Examples:
   `jit issue show <id>`, `jit gate evaluate <id> <gate-key>`,
   `jit dep add <from> <to>...`, `jit doc add <id> <path>`,
-  `jit archive document <path>`, `jit archive container <id>`.
+  `jit archive document <path>`, `jit archive container <id>`,
+  `jit profile show <profile-id>`.
 - **Modifiers are flags.** Anything that tunes, filters, scopes, or formats is a
   flag: `--priority`, `--state`, `--label`, `--force`, `--depth`, `--json`,
   `--quiet`.

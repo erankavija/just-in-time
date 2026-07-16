@@ -143,14 +143,23 @@ export function buildCliArgs(cmdPath, args, cmdDef) {
   return cliArgs;
 }
 
+// Gate verbs that run an external checker process and need the long timeout.
+// `evaluate`/`evaluate-all` execute a gate's checker command (or record a
+// manual attestation); `fail` only writes gate state with no subprocess, and
+// `status`/`status-all` only read recorded results — both stay on the
+// default timeout. Legacy aliases (`eval`, `pass`, `pass-all`, `check`,
+// `check-all`) never reach this function: the MCP server builds cmdPath from
+// the CLI's `--schema` output, which lists canonical verbs only.
+const LONG_TIMEOUT_GATE_VERBS = new Set(['evaluate', 'evaluate-all']);
+
 /**
  * Get appropriate timeout for a command based on its path.
- * Gate check/pass commands may run external processes and need longer timeouts.
- * @param {string[]} cmdPath - Command path (e.g., ['gate', 'check'])
+ * Gate evaluate/evaluate-all commands may run external processes and need longer timeouts.
+ * @param {string[]} cmdPath - Command path (e.g., ['gate', 'evaluate'])
  * @returns {number} Timeout in milliseconds
  */
 export function getTimeoutForCommand(cmdPath) {
-  if (cmdPath[0] === 'gate' && (cmdPath[1] === 'check' || cmdPath[1] === 'check-all' || cmdPath[1] === 'pass')) {
+  if (cmdPath[0] === 'gate' && LONG_TIMEOUT_GATE_VERBS.has(cmdPath[1])) {
     return LONG_TIMEOUT;
   }
   return DEFAULT_TIMEOUT;

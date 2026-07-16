@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "0214ecda-7437-4fb2-a76a-e2838cc33915",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "16402e14-d7cc-4f40-b4a3-1b372979be67",
+  "commit": "24178661c745d8054494e56945fe5655e43efc02",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-16T14:31:51.209576107Z",
+  "completed_at": "2026-07-16T14:33:02.696490241Z",
+  "duration_ms": 71486,
+  "exit_code": 0,
+  "stdout": "Attribution: `bug` is a leaf type (level 4), with no resolved descendants. I inspected all current-branch `jit:16402e14` commits individually: the implementation patch and its merge, plus the claim-only metadata patch. No fallback attribution was needed.\n\nThe implementation recognizes checkbox-prefixed markers in both item projection and coverage validation. The corresponding canonical guidance at `docs/reference/jit-content-standards.md:43-52` accurately documents the supported syntax with a concise example. No additional adopter-facing documentation is required.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Checkbox-prefixed [hard] criteria are accurately and concisely documented in the canonical content standard.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Checkbox-prefixed [hard] criteria are accurately and concisely documented in the canonical content standard.",
+    "findings": []
+  }
+}

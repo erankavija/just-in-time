@@ -44,9 +44,17 @@ pub enum Commands {
         #[arg(long)]
         hierarchy_template: Option<String>,
 
+        /// Apply an embedded profile during initialization
+        #[arg(long)]
+        profile: Option<String>,
+
         #[arg(long)]
         json: bool,
     },
+
+    /// Inspect and apply embedded repository profiles
+    #[command(subcommand)]
+    Profile(ProfileCommands),
 
     /// Issue management commands
     #[command(subcommand)]
@@ -429,7 +437,8 @@ pub enum Commands {
     ///   jit serve --fg             # Run in foreground (for debugging)
     ///   jit serve --json           # Machine-readable output
     Serve {
-        /// Preferred port to listen on (auto-selects from 3000–3099 if taken)
+        /// Preferred port to listen on (auto-selects from 3000–3099 if
+        /// taken; pass 0 for any OS-assigned free port)
         #[arg(long, default_value = "3000")]
         port: u16,
 
@@ -1272,7 +1281,7 @@ pub enum DepCommands {
 /// # Configuration
 /// jit gate define code-review --title "Code Review" --description "Human review"
 /// jit gate add abc123 code-review            # attach a registered gate to an issue
-/// jit gate preset apply rust-tdd abc123      # attach a preset bundle
+/// jit gate preset apply ci abc123            # attach a project-defined preset bundle
 ///
 /// # Execution (mutating — produces a verdict)
 /// jit gate evaluate abc123 code-review       # run/attest, record a verdict
@@ -1286,6 +1295,12 @@ pub enum DepCommands {
 pub enum GateCommands {
     // ===== Configuration: define what gates exist and which issues require them =====
     /// Define a new gate in the registry
+    ///
+    /// Mode resolution when `--mode` is not given: a gate defined with
+    /// `--checker-command` becomes automated; otherwise it defaults to manual.
+    /// An explicit `--mode manual` combined with `--checker-command` is a
+    /// usage error (exit 2) — a manual gate cannot carry a checker, so the
+    /// conflict is rejected rather than silently dropping the checker.
     Define {
         /// Unique gate key
         key: String,
@@ -1302,9 +1317,11 @@ pub enum GateCommands {
         #[arg(long, value_enum, default_value_t = crate::domain::GateStage::Postcheck)]
         stage: crate::domain::GateStage,
 
-        /// Gate mode: manual or auto
-        #[arg(short, long, value_enum, default_value_t = crate::domain::GateMode::Manual)]
-        mode: crate::domain::GateMode,
+        /// Gate mode: manual or auto. Defaults to auto when --checker-command
+        /// is given, manual otherwise. Explicit `--mode manual` with
+        /// --checker-command is a usage error (exit 2).
+        #[arg(short, long, value_enum)]
+        mode: Option<crate::domain::GateMode>,
 
         /// Convenience flag for `--mode auto`: define the gate as automated.
         /// When set it overrides `--mode`.
@@ -1507,9 +1524,15 @@ pub enum GateCommands {
     /// Exactly one of the two forms must be used; supplying both or neither is
     /// an error.
     ///
+    /// A manual gate has no checker to run, so `--by <attestor>` is required:
+    /// bare evaluate on a manual gate is a usage error rather than a silent,
+    /// unattributed pass. An automated gate ignores `--by`; its verdict comes
+    /// from the checker.
+    ///
     /// Exit codes:
     ///   0  - pass (checker passed or manual attestation recorded)
-    ///   2  - bad arguments (gate not required for this issue)
+    ///   2  - bad arguments (gate not required for this issue; a manual gate
+    ///        evaluated without --by)
     ///   3  - issue not found
     ///   4  - checker failure (the checker ran and the verdict was fail)
     ///   10 - runner error (timeout, command-not-found, crash; infra failure)
@@ -1533,7 +1556,9 @@ pub enum GateCommands {
         #[arg(long = "gate")]
         gate_flag: Option<String>,
 
-        /// Who passed the gate (optional)
+        /// Who is passing the gate. Required for a manual gate (bare evaluate
+        /// on a manual gate is a usage error); ignored for an automated gate,
+        /// whose verdict comes from the checker.
         #[arg(short, long)]
         by: Option<String>,
 
@@ -1553,6 +1578,14 @@ pub enum GateCommands {
     /// checker-failed / 10 runner-error). Later gates are not attempted once one
     /// fails. The legacy verb `pass-all` is a silent alias.
     ///
+    /// Each required gate is passed via the same `gate evaluate` semantics: a
+    /// manual gate requires `--by <attestor>`, applied to every manual gate in
+    /// the set. If the set mixes manual and automated gates and `--by` is
+    /// omitted, evaluation fails fast at the first manual gate reached in
+    /// priority order (auto gates before it still run and record their
+    /// verdict; later gates are not attempted) — it never silently passes a
+    /// manual gate.
+    ///
     /// Each gate inherits the skip-if-passed-at-HEAD behaviour: a gate already
     /// passed at the current HEAD commit is not re-run. Use --force to re-run
     /// every gate's checker unconditionally. An issue with no required gates
@@ -1562,7 +1595,8 @@ pub enum GateCommands {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
 
-        /// Who passed the gates (optional)
+        /// Who is passing the gates. Required for every manual gate in the
+        /// required set (applied uniformly); ignored for automated gates.
         #[arg(short, long)]
         by: Option<String>,
 
@@ -1755,10 +1789,10 @@ pub enum PresetCommands {
     /// required gates. Use 'jit gate preset list' to see available presets.
     ///
     /// Examples:
-    ///   jit gate preset apply rust-tdd abc123           # Single issue
-    ///   jit gate preset apply minimal abc123 def456     # Multiple issues  
-    ///   jit query all | xargs jit gate preset apply rust-tdd  # From query
-    ///   jit gate preset apply rust-tdd abc123 --except clippy # Skip specific gates
+    ///   jit gate preset apply ci abc123                 # Single issue
+    ///   jit gate preset apply ci abc123 def456          # Multiple issues
+    ///   jit query all | xargs jit gate preset apply ci  # From query
+    ///   jit gate preset apply ci abc123 --except lint   # Skip specific gates
     Apply {
         /// Preset name
         name: String,
@@ -1811,6 +1845,14 @@ pub enum PresetCommands {
 pub enum DocCommands {
     /// Add a document reference to an issue
     ///
+    /// Idempotent on path: re-running this for a path already linked to the
+    /// issue updates that reference in place instead of appending a
+    /// duplicate. The commit pin always reflects this invocation — supplied
+    /// `--commit` pins, omitted `--commit` records the reference unpinned
+    /// (current version), re-pointing a stale pin. Omitted `--label`/
+    /// `--doc-type` flags leave the existing value untouched; supplied ones
+    /// overwrite it.
+    ///
     /// To verify what was recorded, see `jit events query --issue-id <id>` or
     /// `jit events tail`.
     Add {
@@ -1820,7 +1862,8 @@ pub enum DocCommands {
         /// Path to document relative to repository root
         path: String,
 
-        /// Git commit hash (optional, defaults to HEAD)
+        /// Git commit to pin the reference to; omitted, the reference is
+        /// stored unpinned (reads as the current version)
         #[arg(short, long)]
         commit: Option<String>,
 
@@ -2100,25 +2143,41 @@ pub enum GraphCommands {
 
     /// Export dependency graph in various formats
     Export {
-        /// Output format (dot, mermaid, json)
+        /// Output format (dot, mermaid, json, batch)
+        ///
+        /// `batch` emits the `jit issue batch-create` input schema (a JSON
+        /// array of issue definitions) — the structural inverse of batch
+        /// creation. It strips lifecycle fields and identity-bound labels and
+        /// excludes template bracket nodes; see `--scope` for capturing one
+        /// container's subtree.
         #[arg(short, long, value_enum)]
         format: Option<crate::commands::GraphExportFormat>,
 
         /// Emit JSON to stdout — sugar for `--format json`.
         ///
         /// Equivalent to `--format json`; combining it with an explicit
-        /// `--format dot`/`--format mermaid` is a usage error. Composes with
-        /// `--full`.
+        /// `--format dot`/`--format mermaid`/`--format batch` is a usage error.
+        /// Composes with `--full`.
         #[arg(long)]
         json: bool,
 
         /// Emit complete issue records for each node (JSON only).
         ///
         /// Only valid with `--format json` (or `--json`); combining it with
-        /// `dot`/`mermaid` is a usage error. Without this flag the JSON
+        /// `dot`/`mermaid`/`batch` is a usage error. Without this flag the JSON
         /// output keeps the lean summary node shape.
         #[arg(long)]
         full: bool,
+
+        /// Restrict the export to a container's DAG-authoritative containment
+        /// membership (the container and its subtree).
+        ///
+        /// Composes with every format: `dot`/`mermaid`/`json` list only the
+        /// in-scope nodes; `batch` additionally excludes bracket nodes and
+        /// reports edges that cross the scope boundary. Omitted, the whole graph
+        /// is exported.
+        #[arg(long)]
+        scope: Option<String>,
 
         /// Output file (optional - prints to stdout if omitted)
         #[arg(short, long)]
@@ -2769,4 +2828,455 @@ pub enum HooksCommands {
         #[arg(long)]
         json: bool,
     },
+}
+
+/// Embedded repository profile commands.
+#[derive(Debug, Subcommand)]
+pub enum ProfileCommands {
+    /// List profiles embedded in this JIT binary
+    List {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show one embedded profile manifest and package identity
+    Show {
+        /// Stable embedded profile ID
+        id: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Apply an embedded profile to the current repository
+    Apply {
+        /// Stable embedded profile ID
+        id: String,
+
+        /// Build and validate the exact application plan without writing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+impl Commands {
+    /// Whether this invocation must run transaction recovery before repository
+    /// validation or command-service construction.
+    ///
+    /// These matches are deliberately exhaustive. Adding any CLI enum variant
+    /// fails compilation until its mutation classification is chosen, providing
+    /// the generated-command guard required by the universal recovery boundary.
+    pub fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Init { .. } | Self::Apply { .. } | Self::Recover { .. } | Self::Migrate(_) => {
+                true
+            }
+            Self::Profile(command) => command.requires_recovery_dispatch(),
+            Self::Issue(command) => command.requires_recovery_dispatch(),
+            Self::Dep(command) => command.requires_recovery_dispatch(),
+            Self::Gate(command) => command.requires_recovery_dispatch(),
+            Self::Doc(command) => command.requires_recovery_dispatch(),
+            Self::Archive(command) => command.requires_recovery_dispatch(),
+            Self::Config(command) => command.requires_recovery_dispatch(),
+            Self::Claim(command) => command.requires_recovery_dispatch(),
+            Self::Hooks(command) => command.requires_recovery_dispatch(),
+            Self::Invariant(command) => command.requires_recovery_dispatch(),
+            Self::Reference(command) => command.requires_recovery_dispatch(),
+            Self::Snapshot(command) => command.requires_recovery_dispatch(),
+            Self::Validate { fix, dry_run, .. } => *fix && !*dry_run,
+            Self::Serve { status, .. } => !*status,
+            Self::List { .. }
+            | Self::Events(_)
+            | Self::Graph(_)
+            | Self::Rdeps { .. }
+            | Self::Query { .. }
+            | Self::Label(_)
+            | Self::Worktree(_)
+            | Self::Item(_)
+            | Self::Search { .. }
+            | Self::Version { .. }
+            | Self::Status { .. } => false,
+        }
+    }
+}
+
+impl ProfileCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Apply { dry_run, .. } => !*dry_run,
+            Self::List { .. } | Self::Show { .. } => false,
+        }
+    }
+}
+
+impl IssueCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Create { .. }
+            | Self::BatchCreate { .. }
+            | Self::Update { .. }
+            | Self::Delete { .. }
+            | Self::Assign { .. }
+            | Self::Claim { .. }
+            | Self::Unassign { .. }
+            | Self::Reject { .. }
+            | Self::Release { .. }
+            | Self::ClaimNext { .. } => true,
+            Self::Search { .. }
+            | Self::Show { .. }
+            | Self::Status { .. }
+            | Self::Children { .. }
+            | Self::Progress { .. }
+            | Self::List { .. }
+            | Self::Rm { .. }
+            | Self::Remove { .. }
+            | Self::Complete { .. }
+            | Self::Edit { .. } => false,
+        }
+    }
+}
+
+impl DepCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Add { .. } | Self::Rm { .. } => true,
+            Self::Remove { .. } | Self::Delete { .. } => false,
+        }
+    }
+}
+
+impl GateCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Define { .. }
+            | Self::Update { .. }
+            | Self::Remove { .. }
+            | Self::Add { .. }
+            | Self::Evaluate { .. }
+            | Self::EvaluateAll { .. }
+            | Self::Fail { .. } => true,
+            Self::Preset(command) => command.requires_recovery_dispatch(),
+            Self::Rm { .. }
+            | Self::Delete { .. }
+            | Self::List { .. }
+            | Self::Show { .. }
+            | Self::Status { .. }
+            | Self::StatusAll { .. } => false,
+        }
+    }
+}
+
+impl PresetCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Apply { .. } | Self::Create { .. } => true,
+            Self::List { .. } | Self::Show { .. } => false,
+        }
+    }
+}
+
+impl DocCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Add { .. } | Self::Remove { .. } => true,
+            Self::Assets { command } => command.requires_recovery_dispatch(),
+            Self::List { .. }
+            | Self::Rm { .. }
+            | Self::Delete { .. }
+            | Self::Show { .. }
+            | Self::History { .. }
+            | Self::Diff { .. }
+            | Self::CheckLinks { .. } => false,
+        }
+    }
+}
+
+impl AssetCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::List { rescan, .. } => *rescan,
+        }
+    }
+}
+
+impl ArchiveCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Document { execute, .. } | Self::Container { execute, .. } => *execute,
+            Self::Candidates { .. } => false,
+        }
+    }
+}
+
+impl ConfigCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Set { .. } => true,
+            Self::Show { .. }
+            | Self::Get { .. }
+            | Self::Validate { .. }
+            | Self::ShowHierarchy { .. }
+            | Self::ListTemplates { .. } => false,
+        }
+    }
+}
+
+impl ClaimCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Acquire { .. }
+            | Self::Release { .. }
+            | Self::Renew { .. }
+            | Self::Heartbeat { .. }
+            | Self::ForceEvict { .. } => true,
+            Self::Status { .. } | Self::List { .. } => false,
+        }
+    }
+}
+
+impl HooksCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Install { .. } => true,
+        }
+    }
+}
+
+impl InvariantCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Render { .. } => true,
+            Self::Check { .. } => false,
+        }
+    }
+}
+
+impl ReferenceCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Render { .. } => true,
+        }
+    }
+}
+
+impl SnapshotCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Export { .. } => true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod recovery_dispatch_tests {
+    use super::*;
+    use clap::CommandFactory;
+    use std::collections::BTreeSet;
+
+    const CLI_LEAF_COMMANDS: &[&str] = &[
+        "apply",
+        "archive candidates",
+        "archive container",
+        "archive document",
+        "claim acquire",
+        "claim force-evict",
+        "claim heartbeat",
+        "claim list",
+        "claim release",
+        "claim renew",
+        "claim status",
+        "config get",
+        "config list-templates",
+        "config set",
+        "config show",
+        "config show-hierarchy",
+        "config validate",
+        "dep add",
+        "dep delete",
+        "dep remove",
+        "dep rm",
+        "doc add",
+        "doc assets list",
+        "doc check-links",
+        "doc delete",
+        "doc diff",
+        "doc history",
+        "doc list",
+        "doc remove",
+        "doc rm",
+        "doc show",
+        "events query",
+        "events tail",
+        "gate add",
+        "gate define",
+        "gate delete",
+        "gate evaluate",
+        "gate evaluate-all",
+        "gate fail",
+        "gate list",
+        "gate preset apply",
+        "gate preset create",
+        "gate preset list",
+        "gate preset show",
+        "gate remove",
+        "gate rm",
+        "gate show",
+        "gate status",
+        "gate status-all",
+        "gate update",
+        "graph deps",
+        "graph export",
+        "graph rdeps",
+        "graph roots",
+        "graph tree",
+        "hooks install",
+        "init",
+        "invariant check",
+        "invariant render",
+        "issue assign",
+        "issue batch-create",
+        "issue children",
+        "issue claim",
+        "issue claim-next",
+        "issue complete",
+        "issue create",
+        "issue delete",
+        "issue edit",
+        "issue list",
+        "issue progress",
+        "issue reject",
+        "issue release",
+        "issue remove",
+        "issue rm",
+        "issue search",
+        "issue show",
+        "issue status",
+        "issue unassign",
+        "issue update",
+        "item list",
+        "item resolve",
+        "item search",
+        "item show",
+        "label add",
+        "label namespaces",
+        "label remove",
+        "label rm",
+        "label values",
+        "list",
+        "migrate lifecycle-timestamps",
+        "query all",
+        "query available",
+        "query blocked",
+        "query closed",
+        "query count",
+        "query divergence",
+        "query strategic",
+        "rdeps",
+        "recover",
+        "reference render",
+        "profile apply",
+        "profile list",
+        "profile show",
+        "search",
+        "serve",
+        "snapshot export",
+        "status",
+        "validate",
+        "version",
+        "worktree info",
+        "worktree list",
+    ];
+
+    fn collect_leaf_commands(
+        command: &clap::Command,
+        path: Vec<String>,
+        leaves: &mut BTreeSet<String>,
+    ) {
+        let subcommands = command
+            .get_subcommands()
+            .filter(|subcommand| subcommand.get_name() != "help")
+            .collect::<Vec<_>>();
+        if subcommands.is_empty() {
+            leaves.insert(path.join(" "));
+            return;
+        }
+        for subcommand in subcommands {
+            let mut subcommand_path = path.clone();
+            subcommand_path.push(subcommand.get_name().to_string());
+            collect_leaf_commands(subcommand, subcommand_path, leaves);
+        }
+    }
+
+    #[test]
+    fn test_recovery_dispatch_inventory_covers_every_generated_cli_leaf() {
+        let mut actual = BTreeSet::new();
+        for command in Cli::command()
+            .get_subcommands()
+            .filter(|command| command.get_name() != "help")
+        {
+            collect_leaf_commands(command, vec![command.get_name().to_string()], &mut actual);
+        }
+        let expected = CLI_LEAF_COMMANDS
+            .iter()
+            .map(|command| (*command).to_string())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            actual, expected,
+            "update the exhaustive recovery-dispatch classification and CLI leaf inventory"
+        );
+    }
+
+    #[test]
+    fn test_representative_writer_and_reader_classification() {
+        assert!(Commands::Init {
+            hierarchy_template: None,
+            profile: None,
+            json: false,
+        }
+        .requires_recovery_dispatch());
+        assert!(Commands::Validate {
+            id: None,
+            json: false,
+            explain: false,
+            scope: None,
+            fix: true,
+            dry_run: false,
+            branch_drift: false,
+            divergence: false,
+            leases: false,
+        }
+        .requires_recovery_dispatch());
+        assert!(!Commands::Status { json: false }.requires_recovery_dispatch());
+        assert!(!Commands::Serve {
+            port: 3000,
+            stop: false,
+            status: true,
+            fg: false,
+            log: None,
+            web_dir: None,
+            json: false,
+        }
+        .requires_recovery_dispatch());
+    }
+
+    #[test]
+    fn test_snapshot_export_requires_recovery_dispatch() {
+        assert!(Commands::Snapshot(SnapshotCommands::Export {
+            out: None,
+            format: "dir".to_string(),
+            scope: "all".to_string(),
+            at: None,
+            working_tree: false,
+            committed_only: false,
+            force: false,
+            json: false,
+        })
+        .requires_recovery_dispatch());
+    }
 }

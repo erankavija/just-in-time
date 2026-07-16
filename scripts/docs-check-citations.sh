@@ -18,7 +18,7 @@ set -euo pipefail
 #            derived below) — this is the repo-root requirement;
 #        (d) it does NOT exist on disk — REGARDLESS of whether the final segment
 #            carries an extension, so an extensionless repo-rooted citation such
-#            as `crates/jit/NOTICE` is caught, not skipped.
+#            as `crates/<crate>/NOTICE` is caught, not skipped.
 #   2. `@/<kind>/<self-id>` addressable-item citations must resolve through
 #      `jit item show`, but only for a `<kind>` that is a live registered item
 #      kind or alias (derived from `item_kinds` config). This skips the
@@ -26,7 +26,7 @@ set -euo pipefail
 #      documented parse-error examples, not project-scope citations.
 #
 # DEFERRED to the semantic doc-review reviewer (NOT silently ignored) — per the
-# plan's auditor-adjudicated M3 design (`dev/active/2d109173-plan.md` §2, M3):
+# plan's auditor-adjudicated M3 design (`dev/active/<plan>.md` §2, M3):
 #   (i)   bare filenames with no `/` (e.g. `Cargo.toml` in prose);
 #   (ii)  tokens rooted at a segment that is NOT a tracked repo top-level entry —
 #         relative-to-subdirectory citations (`schemas/spec-body.json`,
@@ -108,12 +108,37 @@ status=0
 # during recursion) is an environment error; surface it as exit 2 rather than
 # letting the checker go false-green.
 grc=0
+# Generated skill evaluation evidence and profile install-time projection
+# inputs are not live repository prose. Evaluation fixtures preserve
+# disposable paths; install assets contain destination-scoped item ids that
+# resolve only after the package is applied. Match their complete structural
+# paths rather than suppressing every directory with a common basename.
+scan_matches() {
+  local regex=$1 raw line path match
+  shift
+  grc=0
+  raw=$(grep -rHoE "$regex" "$@") || grc=$?
+  [ "$grc" -ge 2 ] && return 2
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    path=${line%%:*}
+    match=${line#*:}
+    case "/$path/" in
+      */.agents/skills/*/evals/* | */profiles/*/assets/install/*) continue ;;
+    esac
+    printf '%s\n' "$match"
+  done <<<"$raw"
+}
+
 # shellcheck disable=SC2016  # the backticks in the grep regex are literal, not expansion
-backtick_raw=$(grep -rhoE '`[^`]+`' "$@") || grc=$?
-[ "$grc" -ge 2 ] && { echo "docs-check-citations: read error scanning footprint for citations" >&2; exit 2; }
-grc=0
-item_raw=$(grep -rhoE '@/[a-z][a-z-]*/[a-zA-Z0-9-]+' "$@") || grc=$?
-[ "$grc" -ge 2 ] && { echo "docs-check-citations: read error scanning footprint for @/ items" >&2; exit 2; }
+backtick_raw=$(scan_matches '`[^`]+`' "$@") || {
+  echo "docs-check-citations: read error scanning footprint for citations" >&2
+  exit 2
+}
+item_raw=$(scan_matches '@/[a-z][a-z-]*/[a-zA-Z0-9-]+' "$@") || {
+  echo "docs-check-citations: read error scanning footprint for @/ items" >&2
+  exit 2
+}
 
 # 1. Repo-rooted file-path citations in backtick spans (see header for the
 # four-part rule and the deferral classes).

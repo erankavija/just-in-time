@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "run_id": "188fe5be-0163-4341-b3e2-6113e5394011",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "52665a07-3d30-47e5-a3c7-d2aacc63cec5",
+  "commit": "33c48d6a5ad4acff53c7b805bf42b1c85d5f0e9a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T15:21:36.311479212Z",
+  "completed_at": "2026-07-16T15:25:52.687682003Z",
+  "duration_ms": 256376,
+  "exit_code": 1,
+  "stdout": "Attribution: d3ecd278, 8901b649, 4a950394, 74071a9, d3d64146 (all `jit:52665a07`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2 (dev/vision/9db27a3a-charter.md); @/charter/D-3 (dev/vision/9db27a3a-charter.md); @/inv/domain-agnostic (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1; unnamed test failure plus incremental-state check); doc-review pending; docs-mechanical passed (exit 0)\nTruncation recovery: reread patches by commit/path, inspected the merge combined diff, and narrowed broad metadata/name searches to relevant policy, test, and gate-result files\n\n1. **[blocking, issue-impact]** The retained planning presets remain compiled gate definitions, contradicting the issue’s `per:@/charter/D-2` claim and the domain-agnostic invariant. `BuiltinPresets::load` constructs and registers all three, while `planning.rs` hardcodes their names, titles, commands, prompts, and timeouts. D-2 explicitly says even the planning-bracket trio belongs in `.jit/gates.toml`, and no resolved policy establishes an exception. `AGENTS.md:101` was changed to assert the opposite, leaving an attributable policy conflict. References: `@/charter/D-2`, `@/inv/domain-agnostic`.\n\n2. **[blocking, issue-impact]** REQ-02 specifically requires an end-to-end *harness* test for a project-defined preset. The new coverage is a CLI subprocess integration test (`assert_cmd`/temporary repository), not a `TestHarness` test; existing harness coverage exercises only the built-in planning presets. The requested project-defined mechanism therefore lacks the stipulated harness-level coverage.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The removal is largely implemented, but retained compiled planning presets contradict canonical policy and the required harness coverage is absent.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Compiled planning presets hardcode gate definitions despite D-2 and the domain-agnostic invariant requiring configuration-declared gate keys.\",\"file\":\"crates/jit/src/gate_presets/builtin.rs\",\"line\":35,\"references\":[\"@/charter/D-2\",\"@/inv/domain-agnostic\"],\"disposition\":\"blocking\",\"origin\":\"issue-impact\"},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"The added project-preset test is CLI integration coverage, not the required end-to-end TestHarness coverage.\",\"file\":\"crates/jit/tests/cli_repo_workflow/gate_preset_tests.rs\",\"line\":55,\"references\":[],\"disposition\":\"blocking\",\"origin\":\"issue-impact\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8763 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6b84-da24-73e0-b310-cd5d77d29fad\n--------\nuser\n--- 8750 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The removal is largely implemented, but retained compiled planning presets contradict canonical policy and the required harness coverage is absent.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Compiled planning presets hardcode gate definitions despite D-2 and the domain-agnostic invariant requiring configuration-declared gate keys.",
+        "file": "crates/jit/src/gate_presets/builtin.rs",
+        "line": 35,
+        "references": [
+          "@/charter/D-2",
+          "@/inv/domain-agnostic"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The added project-preset test is CLI integration coverage, not the required end-to-end TestHarness coverage.",
+        "file": "crates/jit/tests/cli_repo_workflow/gate_preset_tests.rs",
+        "line": 55
+      }
+    ]
+  }
+}

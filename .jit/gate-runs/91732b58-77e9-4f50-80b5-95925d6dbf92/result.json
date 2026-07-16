@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "91732b58-77e9-4f50-80b5-95925d6dbf92",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563",
+  "commit": "64875072a9e1671eeadaf4fe5ece3b23bbb92c3f",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-16T11:54:07.833493166Z",
+  "completed_at": "2026-07-16T11:58:34.078909423Z",
+  "duration_ms": 266245,
+  "exit_code": 0,
+  "stdout": "Attribution: 9a072149, aa0b0d73, 2f52f1c9, 2b8fd550, 414e9d5b, 51fcfe2c, 6e829841, 3ceed759, aa535ed6, 64875072 (all reachable `jit:0aec3b1e` commits)\nPolicy sources: AGENTS.md; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/invariant/domain-agnostic, @/invariant/bounded-rust-build-footprint, @/gate/jit-validate, @/gate/repo-validate, @/charter/D-6, @/charter/D-8\nGate evidence: cargo-ci passed (exit 0); repo-validate passed (exit 0); security-review passed (no recorded exit); secret-detection passed (exit 0); dependency-audit passed (exit 0)\nTruncation recovery: narrowed broad issue searches to the specific issue, parent, and scope-brief records; read package source in bounded ranges; inspected each tagged commit individually. Non-qualified `satisfies:REQ-*` item lookup was lock-blocked, so its direct parent source was read without treating it as a resolved item.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable implementation and acceptance evidence satisfy the scoped package-contract criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All attributable implementation and acceptance evidence satisfy the scoped package-contract criteria.",
+    "findings": []
+  }
+}

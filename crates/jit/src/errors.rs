@@ -9,7 +9,7 @@
 
 use std::fmt;
 
-use crate::domain::{GateStatus, Issue, State, SHORT_ID_LENGTH};
+use crate::domain::{GateMode, GateStatus, Issue, State, SHORT_ID_LENGTH};
 
 /// An error with diagnostic context and remediation steps.
 ///
@@ -188,6 +188,49 @@ impl AlreadyExistsError {
     }
 
     /// The user-facing already-exists message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+/// Error returned when `jit issue delete` is refused for missing operator
+/// confirmation.
+///
+/// Deletion is a destructive, discouraged operation (Phase 3 safety): the
+/// caller's process environment must set `JIT_ALLOW_DELETION=1` or the delete
+/// is refused before anything is written (jit:0daba57d). Refusing used to
+/// `anyhow::bail!` a plain string, which fell through `error_to_exit_code` to
+/// the generic-error code; a caller checking for `exit 0` (or treating any
+/// nonzero as equivalent) had no reliable way to branch on the refusal. This
+/// typed wrapper is downcastable in `error_to_exit_code` (→
+/// `ExitCode::InvalidArgument`, exit `2`) and renders as `DELETION_NOT_CONFIRMED`
+/// under `--json`, so both output modes let a script distinguish "refused" from
+/// "deleted" reliably.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("{message}")]
+pub struct DeletionNotConfirmedError {
+    message: String,
+}
+
+impl DeletionNotConfirmedError {
+    /// Build the refusal for `issue_id`, naming it in the example remediation
+    /// command.
+    pub fn new(issue_id: impl std::fmt::Display) -> Self {
+        let actionable = ActionableError::new(
+            "Issue deletion is discouraged and requires explicit confirmation.",
+        )
+        .with_cause("Deletion is a destructive operation")
+        .with_remedy(format!(
+            "Set JIT_ALLOW_DELETION=1 environment variable to proceed: \
+             JIT_ALLOW_DELETION=1 jit issue delete {issue_id}"
+        ))
+        .with_remedy("Consider closing issues instead of deleting them");
+        Self {
+            message: actionable.to_error_message(),
+        }
+    }
+
+    /// The fully-rendered, user-facing refusal message.
     pub fn message(&self) -> &str {
         &self.message
     }
@@ -598,6 +641,10 @@ pub(crate) enum TransitionBlocker {
     Gate {
         gate_key: String,
         status: GateStatus,
+        /// The gate's registry mode, so the remediation hint can name the
+        /// `--by <attestor>` form for a manual gate (jit:1d59070d REQ-03)
+        /// rather than a bare `evaluate` that now fails without one.
+        mode: GateMode,
     },
     /// An enforcing graph rule (`enforce = true`, severity error) produced a
     /// finding attributed to this issue in its target state, blocking the
@@ -605,6 +652,15 @@ pub(crate) enum TransitionBlocker {
     GraphRule {
         rule: String,
         message: String,
+    },
+    /// A revive out of [`State::Archived`] targeted a state other than the
+    /// recorded pre-archive origin. `Archived` is terminality-preserving
+    /// (`jit:45a140ae`): reviving restores the pre-archive state exactly, so
+    /// the round-trip cannot resurrect a completed issue into the active
+    /// lifecycle. Carries the only legal revive target.
+    ArchivedRevive {
+        /// The recorded pre-archive origin, the sole permitted revive target.
+        origin: State,
     },
 }
 
@@ -628,7 +684,7 @@ impl TransitionBlockedError {
         issue_id: String,
         requested_state: State,
         actual_state: State,
-        gates: Vec<(String, GateStatus)>,
+        gates: Vec<(String, GateStatus, GateMode)>,
     ) -> Self {
         Self {
             issue_id,
@@ -636,7 +692,11 @@ impl TransitionBlockedError {
             actual_state,
             blockers: gates
                 .into_iter()
-                .map(|(gate_key, status)| TransitionBlocker::Gate { gate_key, status })
+                .map(|(gate_key, status, mode)| TransitionBlocker::Gate {
+                    gate_key,
+                    status,
+                    mode,
+                })
                 .collect(),
             warnings: Vec::new(),
         }
@@ -661,6 +721,21 @@ impl TransitionBlockedError {
                 .into_iter()
                 .map(|(rule, message)| TransitionBlocker::GraphRule { rule, message })
                 .collect(),
+            warnings: Vec::new(),
+        }
+    }
+
+    /// A revive out of [`State::Archived`] refused because it targeted a state
+    /// other than the recorded pre-archive origin (`jit:45a140ae`).
+    ///
+    /// `requested_state` is the attempted target, `origin` the only legal revive
+    /// target. Maps to exit 4 like the other transition refusals.
+    pub(crate) fn archived_revive(issue_id: String, requested_state: State, origin: State) -> Self {
+        Self {
+            issue_id,
+            requested_state,
+            actual_state: State::Archived,
+            blockers: vec![TransitionBlocker::ArchivedRevive { origin }],
             warnings: Vec::new(),
         }
     }
@@ -706,7 +781,18 @@ impl TransitionBlockedError {
 
     pub(crate) fn summary(&self) -> String {
         let requested = state_name(self.requested_state);
-        if self
+        if let Some(TransitionBlocker::ArchivedRevive { origin }) = self
+            .blockers
+            .iter()
+            .find(|blocker| matches!(blocker, TransitionBlocker::ArchivedRevive { .. }))
+        {
+            format!(
+                "Cannot revive archived issue to '{}': an archived issue only revives to its \
+                 pre-archive state '{}'",
+                requested,
+                state_name(*origin)
+            )
+        } else if self
             .blockers
             .iter()
             .any(|blocker| matches!(blocker, TransitionBlocker::Gate { .. }))
@@ -743,6 +829,13 @@ impl TransitionBlockedError {
             Some(TransitionBlocker::GraphRule { .. }) => {
                 format!("jit validate --explain {}", self.issue_id)
             }
+            Some(TransitionBlocker::ArchivedRevive { origin }) => {
+                format!(
+                    "jit issue update {} --state {}  # revive restores the pre-archive state",
+                    self.issue_id,
+                    state_name(*origin)
+                )
+            }
             _ => format!("jit graph deps {}", self.issue_id),
         };
 
@@ -767,9 +860,21 @@ impl TransitionBlockedError {
                         issue_id
                     )]
                 }
-                TransitionBlocker::Gate { gate_key, .. } => {
+                TransitionBlocker::Gate { gate_key, mode, .. } => {
+                    // A manual gate's evaluate now requires --by (jit:1d59070d
+                    // REQ-03); name the attested form so the remediation stays
+                    // actionable rather than pointing at a call that fails.
+                    let evaluate_hint = match mode {
+                        GateMode::Manual => format!(
+                            "jit gate evaluate {} {} --by <attestor>",
+                            self.issue_id, gate_key
+                        ),
+                        GateMode::Auto => {
+                            format!("jit gate evaluate {} {}", self.issue_id, gate_key)
+                        }
+                    };
                     vec![
-                        format!("jit gate evaluate {} {}", self.issue_id, gate_key),
+                        evaluate_hint,
                         format!(
                             "jit gate status {} {} --all  # run history",
                             self.issue_id, gate_key
@@ -780,6 +885,13 @@ impl TransitionBlockedError {
                     vec![format!(
                         "jit issue update {} ...  # satisfy or fix rule '{}', or re-run with --force",
                         self.issue_id, rule
+                    )]
+                }
+                TransitionBlocker::ArchivedRevive { origin } => {
+                    vec![format!(
+                        "jit issue update {} --state {}  # the only legal revive target",
+                        self.issue_id,
+                        state_name(*origin)
                     )]
                 }
             }))
@@ -867,11 +979,20 @@ impl fmt::Display for TransitionBlocker {
             Self::MissingDependency { issue_id } => {
                 write!(f, "{} (missing issue) [missing]", short_id(issue_id))
             }
-            Self::Gate { gate_key, status } => {
+            Self::Gate {
+                gate_key, status, ..
+            } => {
                 write!(f, "{} [{}]", gate_key, gate_status_name(*status))
             }
             Self::GraphRule { rule, message } => {
                 write!(f, "[{}] {}", rule, message)
+            }
+            Self::ArchivedRevive { origin } => {
+                write!(
+                    f,
+                    "archived issue only revives to its pre-archive state [{}]",
+                    state_name(*origin)
+                )
             }
         }
     }
@@ -1111,10 +1232,53 @@ mod tests {
             "issue-123".to_string(),
             State::Done,
             State::Gated,
-            vec![("code-review".to_string(), GateStatus::Pending)],
+            vec![(
+                "code-review".to_string(),
+                GateStatus::Pending,
+                GateMode::Auto,
+            )],
         );
 
         assert!(!error.to_string().contains("jit issue assign"));
+    }
+
+    /// REQ-03 (jit:1d59070d): a manual gate's remediation names the attested
+    /// `--by` form, since a bare `gate evaluate` on it is now a usage error.
+    #[test]
+    fn test_gate_block_remediation_names_by_for_manual_gate() {
+        let error = TransitionBlockedError::gates(
+            "issue-123".to_string(),
+            State::Done,
+            State::Gated,
+            vec![(
+                "code-review".to_string(),
+                GateStatus::Pending,
+                GateMode::Manual,
+            )],
+        );
+
+        let commands = error.remediation_commands();
+        assert!(commands
+            .iter()
+            .any(|cmd| cmd == "jit gate evaluate issue-123 code-review --by <attestor>"));
+    }
+
+    /// The auto-gate counterpart: no `--by` in the remediation, since the
+    /// checker supplies the verdict.
+    #[test]
+    fn test_gate_block_remediation_omits_by_for_auto_gate() {
+        let error = TransitionBlockedError::gates(
+            "issue-123".to_string(),
+            State::Done,
+            State::Gated,
+            vec![("tests".to_string(), GateStatus::Pending, GateMode::Auto)],
+        );
+
+        let commands = error.remediation_commands();
+        assert!(commands
+            .iter()
+            .any(|cmd| cmd == "jit gate evaluate issue-123 tests"));
+        assert!(!commands.iter().any(|cmd| cmd.contains("--by")));
     }
 
     #[test]
@@ -1186,6 +1350,23 @@ mod tests {
         let any: anyhow::Error = err.into();
         assert_eq!(any.to_string(), msg);
         assert!(any.downcast_ref::<AlreadyExistsError>().is_some());
+    }
+
+    #[test]
+    fn test_deletion_not_confirmed_error_names_issue_and_env_var() {
+        let err = DeletionNotConfirmedError::new("abc12345");
+        let msg = err.to_string();
+
+        assert_eq!(msg, err.message());
+        assert!(msg.contains("discouraged"));
+        assert!(msg.contains("JIT_ALLOW_DELETION=1"));
+        assert!(msg.contains("jit issue delete abc12345"));
+        // ActionableError's rendering, not a bespoke format: no doubled prefix.
+        assert!(!msg.contains("Error:"));
+
+        let any: anyhow::Error = err.into();
+        assert_eq!(any.to_string(), msg);
+        assert!(any.downcast_ref::<DeletionNotConfirmedError>().is_some());
     }
 
     #[test]

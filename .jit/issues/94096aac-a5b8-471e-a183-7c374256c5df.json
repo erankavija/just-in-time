@@ -1,0 +1,35 @@
+{
+  "id": "94096aac-a5b8-471e-a183-7c374256c5df",
+  "title": "Foreground serve deadlocks: parent retains bootstrap recovery lock while blocking on child",
+  "description": "Discovered during jit:894337e2 rework (pre-existing, unchanged by it): `jit serve --fg` deadlocks on repos where the child must acquire the bootstrap lock. `Serve { status: false }` sets `requires_recovery_dispatch` (cli.rs, added in jit:eceffc17), so the parent holds the `.jit-bootstrap` lock for its whole lifetime; in foreground mode it then blocks on `child.wait()`, starving the child's own recovery (5s lock timeout, child errors out). Daemon mode is unaffected because the parent exits right after spawning.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit serve --fg` serves successfully in a repository where the child performs bootstrap recovery: the parent releases its recovery session (or the child owns recovery) before the parent blocks on the child.\n- [hard] REQ-02: Daemon-mode behavior is unchanged.\n- [hard] REQ-03: A regression test covers the foreground path acquiring the lock end to end.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-16T14:21:28.373504926Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-16T14:21:28.364852169Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:core-maintenance",
+    "component:cli",
+    "type:bug"
+  ],
+  "created_at": "2026-07-16T14:21:12.423873757Z",
+  "updated_at": "2026-07-16T14:21:28.373542286Z",
+  "first_ready_at": "2026-07-16T14:21:12.423876257Z"
+}

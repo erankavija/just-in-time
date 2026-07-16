@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "731b2e29-5435-4fbc-abb5-2ddb7a6d5cfc",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "commit": "7a4362c45bc9efa383f523eaafac053bfabba79b",
+  "branch": "worktree-agent-7ad4019b",
+  "status": "failed",
+  "started_at": "2026-07-16T15:59:16.280090787Z",
+  "completed_at": "2026-07-16T16:02:50.732910812Z",
+  "duration_ms": 214452,
+  "exit_code": 1,
+  "stdout": "Attribution: 7a4362c4 (production payload) and e3304357 (progress metadata)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6,D-7 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic,@/invariant/single-source-prose,@/invariant/gate-semantics (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci pending; docs-mechanical passed (exit 0); doc-review pending; repo-validate passed (exit 0)\nTruncation recovery: narrowed reads by commit, source subtree, manifest ranges, and individual skill groups\n\n1. **[blocking][issue-impact][medium]** `jit-breakdown` tells users that `.jit/reference/content-standards.md` is relative to its prompt file, but that location only exists at the repository root. Following it from the installed skill resolves to a nonexistent `.agents/skills/.../.jit/...` path, preventing the skill from loading its canonical standard. [`.agents/skills/jit-breakdown/references/analysis-prompt.md:125`](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b/.agents/skills/jit-breakdown/references/analysis-prompt.md:125)\n\n2. **[blocking][issue-impact][high]** The packaged `jit-project-lead` skill requires a configured `charter` item kind and directs users to resolve `@/charter/<decision-id>`, but the profile manifest contributes no `item_kinds.charter` configuration. A fresh `jit init` configuration does not supply this repository-local kind, so these installed skill operations fail in the repository-neutral adopter the package is meant to support. [`profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead/references/vision-charter.md:39`](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b/profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead/references/vision-charter.md:39) (`@/invariant/domain-agnostic`)\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The portable profile ships two nonportable skill contracts: one invalid canonical-standard path and one undeclared charter item kind.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The installed jit-breakdown prompt incorrectly describes the root-relative content-standard path as relative to itself.\",\"file\":\".agents/skills/jit-breakdown/references/analysis-prompt.md\",\"line\":125,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The installed jit-project-lead skill requires @/charter resolution, but the profile does not install the required charter item-kind configuration.\",\"file\":\"profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead/references/vision-charter.md\",\"line\":39,\"references\":[\"@/invariant/domain-agnostic\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10284 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6ba7-5614-7880-a06c-a8df93e6646a\n--------\nuser\n--- 10271 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The portable profile ships two nonportable skill contracts: one invalid canonical-standard path and one undeclared charter item kind.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The installed jit-breakdown prompt incorrectly describes the root-relative content-standard path as relative to itself.",
+        "file": ".agents/skills/jit-breakdown/references/analysis-prompt.md",
+        "line": 125
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The installed jit-project-lead skill requires @/charter resolution, but the profile does not install the required charter item-kind configuration.",
+        "file": "profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead/references/vision-charter.md",
+        "line": 39,
+        "references": [
+          "@/invariant/domain-agnostic"
+        ]
+      }
+    ]
+  }
+}

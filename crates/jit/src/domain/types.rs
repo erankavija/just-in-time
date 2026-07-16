@@ -94,19 +94,56 @@ impl State {
     }
 }
 
-/// Whether a dependency whose target sits in `state` is met.
+/// The terminal state an issue counts as for dependency, readiness, and
+/// delivery-accounting purposes — its *effective* terminal state.
+///
+/// `Archived` is terminality-preserving (`jit:45a140ae`): archiving preserves
+/// whatever was true before it. So the effective terminal state is:
+///
+/// - `Some(Done)` / `Some(Rejected)` for a literally terminal issue,
+/// - `archived_from` for an `Archived` issue, but only when that recorded
+///   pre-archive state was itself terminal (`Done`/`Rejected`),
+/// - `None` otherwise — including an `Archived` issue parked from a non-terminal
+///   state and a legacy `Archived` record whose `archived_from` was never
+///   recorded (conservative default: it does not start satisfying dependents).
+///
+/// `state` is the issue's lifecycle state and `archived_from` its
+/// [`Issue::archived_from`]; passing `archived_from` for a non-`Archived` `state`
+/// is ignored.
+pub fn effective_terminal_state(state: State, archived_from: Option<State>) -> Option<State> {
+    match state {
+        State::Done | State::Rejected => Some(state),
+        State::Archived => archived_from.filter(|origin| origin.is_terminal()),
+        _ => None,
+    }
+}
+
+/// Whether an issue in `state` (archived from `archived_from`) is terminal for
+/// dependency and readiness purposes.
+///
+/// The single archived-aware terminality predicate: true exactly when
+/// [`effective_terminal_state`] resolves to a terminal state. Prefer the
+/// convenience methods [`Issue::is_effectively_terminal`] /
+/// [`MinimalIssue::is_effectively_terminal`] when a whole record is in hand.
+pub fn is_effectively_terminal(state: State, archived_from: Option<State>) -> bool {
+    effective_terminal_state(state, archived_from).is_some()
+}
+
+/// Whether a dependency whose target sits in `state` (archived from
+/// `archived_from`) is met.
 ///
 /// This is the single definition of dependency satisfaction: a dependency is met
-/// exactly when its target reached a terminal state ([`State::is_terminal`] —
-/// `Done` or `Rejected`). Every surface that asks whether a dependency still
-/// holds work back routes through here: [`Issue::is_blocked`], the blocked-reason
-/// enumeration, the transition blockers, and unmet-dependency rendering.
+/// exactly when its target reached an *effective* terminal state
+/// ([`is_effectively_terminal`] — `Done`, `Rejected`, or `Archived` from one of
+/// those). Every surface that asks whether a dependency still holds work back
+/// routes through here: [`Issue::is_blocked`], the blocked-reason enumeration,
+/// the transition blockers, and unmet-dependency rendering.
 ///
 /// A dependency id that resolves to no issue is dangling. That is a separate
 /// condition, reported on each surface's own terms, so it is not this predicate's
 /// input.
-pub fn is_dependency_met(state: State) -> bool {
-    state.is_terminal()
+pub fn is_dependency_met(state: State, archived_from: Option<State>) -> bool {
+    is_effectively_terminal(state, archived_from)
 }
 
 impl FromStr for State {
@@ -428,6 +465,20 @@ pub struct Issue {
     /// event log. Skipped on serialize when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done_at: Option<DateTime<Utc>>,
+    /// The lifecycle state this issue held immediately before entering
+    /// [`State::Archived`], making `Archived` terminality-preserving
+    /// (`jit:45a140ae`).
+    ///
+    /// Set when the issue transitions into `Archived` (recording the state it
+    /// left) and cleared on revive, so it is `Some` only while `state ==
+    /// Archived`. It drives the issue's effective terminal state
+    /// ([`Issue::effective_terminal_state`]) and constrains revive to the
+    /// recorded origin. Absent (`None`) for every non-`Archived` issue and for a
+    /// legacy record archived before this field existed; a legacy `Archived`
+    /// issue is treated as non-terminal (the pre-change behavior). Skipped on
+    /// serialize when absent, so old issue files round-trip unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archived_from: Option<State>,
 }
 
 impl Issue {
@@ -453,6 +504,7 @@ impl Issue {
             first_ready_at: None,
             claimed_at: None,
             done_at: None,
+            archived_from: None,
         }
     }
 
@@ -487,7 +539,23 @@ impl Issue {
             first_ready_at: None,
             claimed_at: None,
             done_at: None,
+            archived_from: None,
         }
+    }
+
+    /// The terminal state this issue counts as for dependency, readiness, and
+    /// delivery accounting — its effective terminal state
+    /// ([`effective_terminal_state`]). `Some(Done)`/`Some(Rejected)` when
+    /// literally terminal or archived from one of those; `None` otherwise.
+    pub fn effective_terminal_state(&self) -> Option<State> {
+        effective_terminal_state(self.state, self.archived_from)
+    }
+
+    /// Whether this issue is terminal for dependency and readiness purposes,
+    /// accounting for terminality-preserving `Archived`
+    /// ([`is_effectively_terminal`]).
+    pub fn is_effectively_terminal(&self) -> bool {
+        is_effectively_terminal(self.state, self.archived_from)
     }
 
     /// Check if this issue is blocked by unmet dependencies
@@ -497,7 +565,7 @@ impl Issue {
     /// Note: Gates do not block work from starting, only from completing.
     pub fn is_blocked(&self, resolved_issues: &HashMap<String, &Issue>) -> bool {
         self.dependencies.iter().any(|dep_id| {
-            !matches!(resolved_issues.get(dep_id), Some(issue) if is_dependency_met(issue.state))
+            !matches!(resolved_issues.get(dep_id), Some(issue) if is_dependency_met(issue.state, issue.archived_from))
         })
     }
 
@@ -576,6 +644,12 @@ pub struct MinimalIssue {
     /// Labels for categorization (optional for context)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<String>,
+    /// Pre-archive origin state, carried so a dependency projection can decide
+    /// effective terminality without the full record. Mirrors
+    /// [`Issue::archived_from`]: `Some` only for an `Archived` issue that
+    /// recorded its origin, absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archived_from: Option<State>,
 }
 
 // Custom serialization to add computed short_id
@@ -585,7 +659,7 @@ impl Serialize for MinimalIssue {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("MinimalIssue", 7)?;
+        let mut state = serializer.serialize_struct("MinimalIssue", 8)?;
         state.serialize_field("id", &self.id)?;
         state.serialize_field("short_id", &self.short_id())?;
         state.serialize_field("title", &self.title)?;
@@ -598,6 +672,9 @@ impl Serialize for MinimalIssue {
         }
         if !self.labels.is_empty() {
             state.serialize_field("labels", &self.labels)?;
+        }
+        if let Some(archived_from) = self.archived_from {
+            state.serialize_field("archived_from", &archived_from)?;
         }
         state.end()
     }
@@ -612,6 +689,7 @@ impl From<&Issue> for MinimalIssue {
             priority: issue.priority,
             assignee: issue.assignee.as_ref().map(Assignee::to_string),
             labels: issue.labels.clone(),
+            archived_from: issue.archived_from,
         }
     }
 }
@@ -622,11 +700,18 @@ impl MinimalIssue {
         self.id.chars().take(SHORT_ID_LENGTH).collect()
     }
 
+    /// Whether this issue is terminal for dependency and readiness purposes,
+    /// accounting for terminality-preserving `Archived`
+    /// ([`is_effectively_terminal`]).
+    pub fn is_effectively_terminal(&self) -> bool {
+        is_effectively_terminal(self.state, self.archived_from)
+    }
+
     /// Get state symbol for human-readable output
-    /// - ✓ for terminal states (done/rejected)
+    /// - ✓ for effectively terminal states (done/rejected, or archived from one)
     /// - ○ for active states
     pub fn state_symbol(&self) -> &str {
-        if self.state.is_terminal() {
+        if self.is_effectively_terminal() {
             "✓"
         } else {
             "○"
@@ -1033,6 +1118,16 @@ pub struct GateRunResult {
     pub commit: Option<String>,
     /// Git branch (if available)
     pub branch: Option<String>,
+    /// Whether the working tree differed from the named [`commit`](Self::commit)
+    /// when the checker started. `Some(true)` means the tree carried uncommitted
+    /// or untracked changes, so the run evidences that modified tree rather than
+    /// the commit alone; `Some(false)` means the tree matched the commit exactly;
+    /// `None` means there was no commit to compare against (the working directory
+    /// is not a git repository, or the repository has no commits yet) — a clean
+    /// tree is never fabricated in that case. Defaulted so run records written
+    /// before this field existed parse as `None`.
+    #[serde(default)]
+    pub tree_dirty: Option<bool>,
     /// Result status
     pub status: GateRunStatus,
     /// When execution started
@@ -1075,6 +1170,14 @@ pub enum GateRunStatus {
     Pending,
     /// Not applicable (future: for conditional gates)
     Skipped,
+}
+
+/// Origin vocabulary persisted for an installed profile package.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfileOrigin {
+    /// Package bytes were compiled into the running JIT binary.
+    Embedded,
 }
 
 /// System event types for audit log
@@ -1362,6 +1465,29 @@ pub enum Event {
         /// Number of issues whose lifecycle timestamps were backfilled
         issues_updated: usize,
     },
+    /// An embedded profile package was transactionally applied.
+    ///
+    /// Repository-scoped: package targets, the minimal installed record, and
+    /// this event become durable in one recoverable transaction.
+    ProfileApplied {
+        /// Event ID.
+        id: String,
+        /// When the transaction was constructed.
+        timestamp: DateTime<Utc>,
+        /// Stable profile identifier.
+        profile_id: String,
+        /// Applied semantic version.
+        version: String,
+        /// Package discovery origin.
+        origin: ProfileOrigin,
+        /// Hash of the complete canonical package.
+        package_hash: String,
+        /// Package contribution hashes keyed by repository target.
+        target_hashes: std::collections::BTreeMap<String, String>,
+        /// Whether the transaction isolated a pre-existing non-newline,
+        /// malformed event tail immediately before this record.
+        isolated_torn_tail: bool,
+    },
 }
 
 impl Event {
@@ -1635,6 +1761,27 @@ impl Event {
         }
     }
 
+    /// Create a repository-scoped profile application event.
+    pub fn new_profile_applied(
+        profile_id: String,
+        version: String,
+        origin: ProfileOrigin,
+        package_hash: String,
+        target_hashes: std::collections::BTreeMap<String, String>,
+        isolated_torn_tail: bool,
+    ) -> Self {
+        Event::ProfileApplied {
+            id: Uuid::new_v4().to_string(),
+            timestamp: Utc::now(),
+            profile_id,
+            version,
+            origin,
+            package_hash,
+            target_hashes,
+            isolated_torn_tail,
+        }
+    }
+
     /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
@@ -1658,6 +1805,7 @@ impl Event {
             Event::GateDefinitionCreated { .. } => "", // No associated issue (registry-scoped)
             Event::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
             Event::LifecycleTimestampsBackfilled { .. } => "", // No associated issue (repo-scoped)
+            Event::ProfileApplied { .. } => "",        // No associated issue (repo-scoped)
         }
     }
 
@@ -2124,17 +2272,52 @@ mod tests {
 
     #[test]
     fn test_is_dependency_met_accepts_terminal_states() {
-        assert!(is_dependency_met(State::Done));
-        assert!(is_dependency_met(State::Rejected));
+        assert!(is_dependency_met(State::Done, None));
+        assert!(is_dependency_met(State::Rejected, None));
     }
 
     #[test]
     fn test_is_dependency_met_rejects_non_terminal_states() {
-        assert!(!is_dependency_met(State::Backlog));
-        assert!(!is_dependency_met(State::Ready));
-        assert!(!is_dependency_met(State::InProgress));
-        assert!(!is_dependency_met(State::Gated));
-        assert!(!is_dependency_met(State::Archived));
+        assert!(!is_dependency_met(State::Backlog, None));
+        assert!(!is_dependency_met(State::Ready, None));
+        assert!(!is_dependency_met(State::InProgress, None));
+        assert!(!is_dependency_met(State::Gated, None));
+        // Legacy archived (no recorded origin) stays non-terminal.
+        assert!(!is_dependency_met(State::Archived, None));
+    }
+
+    #[test]
+    fn test_effective_terminality_preserves_archived_origin() {
+        // Archived is terminality-preserving: a dependency archived from a
+        // terminal state stays met; one archived from a non-terminal state or
+        // with no recorded origin (legacy) does not.
+        assert!(is_dependency_met(State::Archived, Some(State::Done)));
+        assert!(is_dependency_met(State::Archived, Some(State::Rejected)));
+        assert!(!is_dependency_met(State::Archived, Some(State::InProgress)));
+        assert!(!is_dependency_met(State::Archived, None));
+
+        assert_eq!(
+            effective_terminal_state(State::Archived, Some(State::Done)),
+            Some(State::Done)
+        );
+        assert_eq!(
+            effective_terminal_state(State::Archived, Some(State::Rejected)),
+            Some(State::Rejected)
+        );
+        assert_eq!(
+            effective_terminal_state(State::Archived, Some(State::Gated)),
+            None
+        );
+        assert_eq!(effective_terminal_state(State::Archived, None), None);
+        // A non-archived state ignores any archived_from value.
+        assert_eq!(
+            effective_terminal_state(State::Done, None),
+            Some(State::Done)
+        );
+        assert_eq!(
+            effective_terminal_state(State::Ready, Some(State::Done)),
+            None
+        );
     }
 
     #[test]

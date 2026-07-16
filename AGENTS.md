@@ -98,7 +98,7 @@ Structured lines in issue descriptions and project registries carry a self-id an
 
 This repository tracks jit's own development with jit: `.jit/` here is project configuration, distinct from what the product ships.
 
-- **`jit init` ships**: `index.json`, an empty `gates.toml`, `events.jsonl`, a template-generated `config.toml` (milestone/epic/story/task hierarchy plus the namespace and item-kind registries), `rules.toml` with the default ruleset (format, registry, hierarchy, and per-namespace uniqueness checks). Gate presets (language starter bundles like `rust-tdd`, plus `minimal`, `security-audit`, and the planning-bracket trio) live in code and materialize only via `jit gate preset apply`; `templates.toml`, `invariants.toml`, and the projection tables are authored per project, never scaffolded.
+- **`jit init` ships**: `index.json`, an empty `gates.toml`, `events.jsonl`, a template-generated `config.toml` (milestone/epic/story/task hierarchy plus the namespace and item-kind registries), `rules.toml` with the default ruleset (format, registry, hierarchy, and per-namespace uniqueness checks). Gate presets: only the planning-bracket trio (`plan-review`, `coverage-preview`, `breakdown-review`) is built into the binary and materializes via `jit gate preset apply`; language- or workflow-specific bundles are declared per project under `.jit/config/gate-presets/`. `templates.toml`, `invariants.toml`, and the projection tables are authored per project, never scaffolded.
 - **This repo's local layer**: gates wired to repo scripts, declared in `.jit/gates.toml` with per-workspace scope stated in each gate's description; `planning`/`breakdown`/`bug`/`enhancement` types; `brackets:`/`satisfies:`/`per:` namespaces; the `coverage-preview` rule; the `plan` template; the `definition` and `charter` item kinds; the invariant projection into this file and the rules-gates projection into `docs/reference/rules-and-gates.md`; the `dev/` doc lifecycle.
 
 When editing docs or config, keep this boundary explicit: adopter-facing text describes the shipped surface, repo-local values are signalled as this project's configuration.
@@ -162,9 +162,16 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **CLI commands must support `--json`** for machine-readable output. List-emitting commands wrap collections in the envelope `{"count": N, "<collection>": [...]}`.
 - **git is optional** — jit must work without git unless a feature strictly requires it (`@/charter/D-4`). Exception: the `jit claim` lease subcommands require a git repository for worktree identity and branch tracking; they fail with a typed `ClaimRequiresGitError` (exit 10) when run outside one.
 
-### Domain Invariants
+<!-- jit:dogfood-guidance:begin -->
+## JIT workflow
 
-Each invariant is addressable at `@/inv/<name>`.
+- Treat `.jit/` as repository-owned workflow configuration and issue data.
+- Read `.jit/reference/content-standards.md` before authoring issues or planning documents.
+- Derive hierarchy, templates, gates, namespaces, and documentation paths from repository configuration.
+- Use `jit issue status`, `jit query available`, and the dependency graph to select and sequence work.
+- Run the configured gates before completing an issue; a passing review placeholder is advisory evidence only.
+
+### Project invariants
 
 <!-- jit:invariants:begin -->
 - **label-format** — Every label is namespace:value (namespace lowercase-kebab, value non-empty).
@@ -179,6 +186,7 @@ Each invariant is addressable at `@/inv/<name>`.
 - **single-source-prose** — Every fact with a single source of truth reaches prose by projection or citation; volatile facts (counts, enumerations, registry contents) are stated structurally or derived, and a hand-maintained copy is a staleness defect.
 - **bounded-rust-build-footprint** — Rust test topology stays bounded to a small number of cohesive suites rather than one Cargo target per test file, build profiles stay compact rather than embedding a full debugger payload in every test executable, dependency features stay intentional rather than pulling in unused remote-resolution or duplicate TLS infrastructure, and integration-test target count and active test-executable bytes remain within automatically enforced budgets.
 <!-- jit:invariants:end -->
+<!-- jit:dogfood-guidance:end -->
 
 ## Commit Conventions
 

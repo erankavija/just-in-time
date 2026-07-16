@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "2f0791e1-8c72-4276-bfb8-27c1a894bed6",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "8d7fc762-0a6d-4ef0-b1bd-6b5eb6a77d06",
+  "commit": "ec8e6ebe1033f823621537f840f21b2dea175710",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-16T09:17:34.866178844Z",
+  "completed_at": "2026-07-16T09:18:31.812178324Z",
+  "duration_ms": 56945,
+  "exit_code": 0,
+  "stdout": "Attribution: leaf `8d7fc762` (type `bug`, no resolved children). I inspected four reachable `jit:8d7fc762` commits individually with rename detection; only `b32daf0` changes implementation/tests, while the others are merge or issue-metadata commits.\n\nThe fix changes an internal MCP execution timeout policy only. The MCP README accurately states that commands use per-command timeouts without promising values or verb-specific behavior. No adopter documentation update is required.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue fixes undocumented internal MCP timeout selection; affected documentation remains accurate and needs no update.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The issue fixes undocumented internal MCP timeout selection; affected documentation remains accurate and needs no update.",
+    "findings": []
+  }
+}

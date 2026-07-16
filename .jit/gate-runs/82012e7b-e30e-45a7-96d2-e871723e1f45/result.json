@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "82012e7b-e30e-45a7-96d2-e871723e1f45",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
+  "commit": "4762f887b9d6aa81db5740c9ad5d1c0a5efcfa94",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-16T11:18:41.165140983Z",
+  "completed_at": "2026-07-16T11:22:38.215312491Z",
+  "duration_ms": 237050,
+  "exit_code": 0,
+  "stdout": "Attribution: 9a072149, 3e02db29, f2df3982, af432931, 2d935a6b, bdc0cdb9, 7e35e868, 293700cf, 4762f887 (all reachable `jit:d3709cc6`)\nPolicy sources: AGENTS.md; .jit/gates.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/gate/cargo-ci, @/gate/cargo-ci-features, @/gate/dependency-audit, @/gate/jit-validate (.jit/gates.toml); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed/0 (2026-07-16T07:33Z); jit-validate passed/0 (2026-07-16T07:36Z); cargo-ci-features passed/0 (2026-07-16T11:07Z); dependency-audit passed/0 (2026-07-16T11:18Z); prior code-review failed/1, with both structured findings addressed\nTruncation recovery: segmented the 378-line Cargo.lock patch; re-read affected commit metadata separately; extracted structured gate metadata; compared implementation and merge patch IDs; inspected current consumers and regression tests\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are supported by current gate evidence and the dependency API migration is covered.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard success criteria are supported by current gate evidence and the dependency API migration is covered.",
+    "findings": []
+  }
+}

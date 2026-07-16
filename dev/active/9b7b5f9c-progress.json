@@ -1,76 +1,152 @@
 {
   "epic_id": "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f",
   "epic_short_id": "9b7b5f9c",
-  "current_wave": 2,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
       "issues": [
-        {"id": "866a5bbd-c98d-4588-83e8-7423f3b12005", "short_id": "866a5bbd", "title": "Add the durable file-set transaction kernel", "classification": "implementation", "status": "done"},
-        {"id": "92039d9c-1433-4b24-b3f6-2c206648cc8f", "short_id": "92039d9c", "title": "Provide portable deterministic checks and review warnings", "classification": "implementation", "status": "done"},
-        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "done"}
+        {
+          "id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
+          "short_id": "866a5bbd",
+          "title": "Add the durable file-set transaction kernel",
+          "classification": "implementation",
+          "status": "done"
+        },
+        {
+          "id": "92039d9c-1433-4b24-b3f6-2c206648cc8f",
+          "short_id": "92039d9c",
+          "title": "Provide portable deterministic checks and review warnings",
+          "classification": "implementation",
+          "status": "done"
+        },
+        {
+          "id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc",
+          "short_id": "be542b98",
+          "title": "Route repository validation through an overlay view",
+          "classification": "implementation",
+          "status": "done"
+        }
       ]
     },
     {
       "wave_number": 2,
       "issues": [
-        {"id": "eceffc17-98ce-4e7d-8fe1-cbb539a078a2", "short_id": "eceffc17", "title": "Enforce recovery at the universal mutation boundary", "classification": "implementation", "status": "pending"}
+        {
+          "id": "eceffc17-98ce-4e7d-8fe1-cbb539a078a2",
+          "short_id": "eceffc17",
+          "title": "Enforce recovery at the universal mutation boundary",
+          "classification": "implementation",
+          "status": "done"
+        }
       ]
     },
     {
       "wave_number": 3,
       "issues": [
-        {"id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563", "short_id": "0aec3b1e", "title": "Define and validate embedded profile packages", "classification": "implementation", "status": "blocked_external_dependency"}
+        {
+          "id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563",
+          "short_id": "0aec3b1e",
+          "title": "Define and validate embedded profile packages",
+          "classification": "implementation",
+          "status": "done"
+        }
       ]
     },
     {
       "wave_number": 4,
       "issues": [
-        {"id": "0d8f20a8-db02-43ba-ad9e-8f219b427690", "short_id": "0d8f20a8", "title": "Build package projection and drift mechanics", "classification": "implementation", "status": "pending"},
-        {"id": "56838d99-dc9d-4028-9b41-6ba691fc4852", "short_id": "56838d99", "title": "Plan safe deterministic profile application", "classification": "implementation", "status": "pending"}
+        {
+          "id": "0d8f20a8-db02-43ba-ad9e-8f219b427690",
+          "short_id": "0d8f20a8",
+          "title": "Build package projection and drift mechanics",
+          "classification": "implementation",
+          "status": "done"
+        },
+        {
+          "id": "56838d99-dc9d-4028-9b41-6ba691fc4852",
+          "short_id": "56838d99",
+          "title": "Plan safe deterministic profile application",
+          "classification": "implementation",
+          "status": "done"
+        }
       ]
     },
     {
       "wave_number": 5,
       "issues": [
-        {"id": "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004", "short_id": "9b0a997e", "title": "Apply profiles with transactional provenance and audit", "classification": "implementation", "status": "pending"}
+        {
+          "id": "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004",
+          "short_id": "9b0a997e",
+          "title": "Apply profiles with transactional provenance and audit",
+          "classification": "implementation",
+          "status": "done"
+        }
       ]
     },
     {
       "wave_number": 6,
       "issues": [
-        {"id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c", "short_id": "7ad4019b", "title": "Author the portable dogfood workflow package", "classification": "implementation", "status": "pending"}
+        {
+          "id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+          "short_id": "7ad4019b",
+          "title": "Author the portable dogfood workflow package",
+          "classification": "implementation",
+          "status": "in_progress"
+        }
       ]
     },
     {
       "wave_number": 7,
       "issues": [
-        {"id": "070ca05f-f7a9-4922-b796-3376a0b813b2", "short_id": "070ca05f", "title": "Expose profile commands through init, schema, and MCP", "classification": "implementation", "status": "pending"}
+        {
+          "id": "070ca05f-f7a9-4922-b796-3376a0b813b2",
+          "short_id": "070ca05f",
+          "title": "Expose profile commands through init, schema, and MCP",
+          "classification": "implementation",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 8,
       "issues": [
-        {"id": "c533ac18-88dc-42b6-a773-18228a5d2320", "short_id": "c533ac18", "title": "Consolidate adopter profile documentation", "classification": "documentation", "status": "pending"}
+        {
+          "id": "c533ac18-88dc-42b6-a773-18228a5d2320",
+          "short_id": "c533ac18",
+          "title": "Consolidate adopter profile documentation",
+          "classification": "documentation",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 9,
       "issues": [
-        {"id": "bcff56be-2e8f-44ae-9b3b-5739be414630", "short_id": "bcff56be", "title": "Exercise cross-platform profile adoption", "classification": "implementation", "status": "pending"}
+        {
+          "id": "bcff56be-2e8f-44ae-9b3b-5739be414630",
+          "short_id": "bcff56be",
+          "title": "Exercise cross-platform profile adoption",
+          "classification": "implementation",
+          "status": "pending"
+        }
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "id": "46657f6f",
+      "short_id": "46657f6f",
+      "title": "Gate checkers cannot invoke mutating jit: recovery session lock is not cross-process reentrant",
+      "status": "done"
+    }
+  ],
   "active_prerequisites": [
     {
       "id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
       "short_id": "d3709cc6",
       "title": "Remediate Rust dependency advisories",
-      "status": "code_review_failed_requires_cargo_ci_features_gate_approval",
-      "branch": "worktree-agent-d3709cc6",
-      "commit": "f2df39827576f443c7dba0d454fa64760d3fbb9f",
-      "merge_commit": "af432931d532f8e550b2b720e408f14c99a63b2d"
+      "status": "done"
     }
   ],
   "escalations": [
@@ -78,57 +154,31 @@
       "category": "cross-epic dependency",
       "issue_id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563",
       "blocking_issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
-      "status": "explicitly brought into scope by invoker; claimed and remediation checkpoint preserved"
+      "status": "resolved with explicit invoker authorization"
     },
     {
       "category": "external AI review data export",
-      "issue_id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
-      "status": "approved by invoker"
-    },
-    {
-      "category": "pre-existing secret-scan findings outside epic",
-      "issue_id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
-      "finding_paths": [
-        ".jit/issues/0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe.json",
-        "dev/active/8b05a612-plan.md"
-      ],
-      "status": "resolved by approved wording edits"
+      "status": "approved for configured code-review and doc-review gates in this epic"
     },
     {
       "category": "maximum rework attempts reached",
       "issue_id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc",
-      "status": "continued rework through completion authorized by invoker; attempt 5 worker verification passed and commit awaits lead integration",
-      "authorized_at": "2026-07-15",
-      "renewed_authorization_at": "2026-07-15",
-      "gate_run_id": "27811bd8-1fe5-40e0-9877-7ff21a86c745",
-      "latest_gate_run_id": "be860123-be85-4169-83c2-e173e642faff",
-      "findings": [
-        "repository validation omits claims-index consistency",
-        "deleted overlay documents can be accepted from live Git HEAD",
-        "whole-repository structural failure discards simultaneous rule findings",
-        "overlay template and item-link tests are not adversarial",
-        "profile-planning comments are premature",
-        "built-in repository_validation gate bypasses the repository-view pipeline"
-      ]
-    },
-    {
-      "category": "external AI review data export",
-      "issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
-      "status": "approved by invoker; first code review completed",
-      "scope": "configured JIT code-review and later doc-review gates invoke codex exec with repository code and issue context"
+      "status": "resolved through completion with renewed invoker authorization"
     },
     {
       "category": "issue gate scope change",
       "issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
-      "status": "awaiting invoker approval",
-      "requested_gate": "cargo-ci-features",
-      "finding": "code review eaf0c6f1-becf-4258-af6f-f2ccb0969a1c requires canonical feature-enabled clippy/test evidence for the optional quick-xml upgrade"
+      "status": "resolved with invoker approval; cargo-ci-features added and passed"
     }
   ],
   "rework_counts": {
     "866a5bbd-c98d-4588-83e8-7423f3b12005": 1,
     "92039d9c-1433-4b24-b3f6-2c206648cc8f": 1,
-    "be542b98-8d5a-4c1f-8000-9fd0c480bebc": 5
+    "be542b98-8d5a-4c1f-8000-9fd0c480bebc": 5,
+    "0d8f20a8-db02-43ba-ad9e-8f219b427690": 1,
+    "56838d99-dc9d-4028-9b41-6ba691fc4852": 1,
+    "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004": 2
   },
-  "started_at": "2026-07-15T15:20:34+03:00"
+  "started_at": "2026-07-15T15:20:34+03:00",
+  "updated_at": "2026-07-16T17:32:44+03:00"
 }

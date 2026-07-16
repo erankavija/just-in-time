@@ -199,6 +199,12 @@ fn render_diagnostics<T: Serialize>(rendered: &mut String, heading: &str, diagno
             .and_then(Value::as_str)
             .unwrap_or("target");
         let _ = writeln!(rendered, "  - {code}: {path}");
+        // A state-caused blocker carries a `guidance` field (REQ-05): show the
+        // permitted next action right under the blocker so the operator does not
+        // have to look the code up.
+        if let Some(guidance) = value.get("guidance").and_then(Value::as_str) {
+            let _ = writeln!(rendered, "      next action: {guidance}");
+        }
     }
 }
 
@@ -248,6 +254,7 @@ mod archive_render_tests {
             issue: "12345678-1234-1234-1234-123456789abc".into(),
             document_index: 2,
             state: State::Done,
+            archived_from: None,
             inside_subtree: true,
             pinned: false,
             selected_for_relink: false,
@@ -664,20 +671,32 @@ impl ErrorCode {
     /// `GATE_FAILED`, the checker never ran, so the envelope carries no
     /// `verdict` field.
     pub const STALE_BINARY: &'static str = "STALE_BINARY";
+    /// `jit issue delete` was refused for missing operator confirmation
+    /// (`JIT_ALLOW_DELETION=1` not set in the process environment; exit code 2).
+    pub const DELETION_NOT_CONFIRMED: &'static str = "DELETION_NOT_CONFIRMED";
+    /// Requested embedded profile ID does not exist.
+    pub const PROFILE_NOT_FOUND: &'static str = "PROFILE_NOT_FOUND";
+    /// Profile package planning or final-state validation rejected the operation.
+    pub const PROFILE_CONFLICT: &'static str = "PROFILE_CONFLICT";
 }
 
 impl ErrorCode {
     /// Map error code string to exit code
     pub fn to_exit_code(code: &str) -> ExitCode {
         match code {
-            Self::ISSUE_NOT_FOUND | Self::GATE_NOT_FOUND => ExitCode::NotFound,
-            Self::CYCLE_DETECTED | Self::VALIDATION_FAILED | Self::BLOCKED | Self::GATE_FAILED => {
-                ExitCode::ValidationFailed
+            Self::ISSUE_NOT_FOUND | Self::GATE_NOT_FOUND | Self::PROFILE_NOT_FOUND => {
+                ExitCode::NotFound
             }
+            Self::CYCLE_DETECTED
+            | Self::VALIDATION_FAILED
+            | Self::BLOCKED
+            | Self::GATE_FAILED
+            | Self::PROFILE_CONFLICT => ExitCode::ValidationFailed,
             Self::INVALID_ARGUMENT
             | Self::INVALID_STATE
             | Self::AMBIGUOUS_ID
-            | Self::INVALID_ID_PREFIX => ExitCode::InvalidArgument,
+            | Self::INVALID_ID_PREFIX
+            | Self::DELETION_NOT_CONFIRMED => ExitCode::InvalidArgument,
             Self::ALREADY_EXISTS => ExitCode::AlreadyExists,
             Self::REPOSITORY_NOT_FOUND => ExitCode::NotFound,
             Self::IO_ERROR
@@ -847,15 +866,28 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
             "title": "(missing issue)",
             "state": "missing",
         }),
-        TransitionBlocker::Gate { gate_key, status } => serde_json::json!({
+        TransitionBlocker::Gate {
+            gate_key,
+            status,
+            mode,
+        } => serde_json::json!({
             "type": "gate",
             "key": gate_key,
             "status": gate_status_name(*status),
+            "mode": mode.as_str(),
         }),
         TransitionBlocker::GraphRule { rule, message } => serde_json::json!({
             "type": "graph_rule",
             "rule": rule,
             "message": message,
+        }),
+        TransitionBlocker::ArchivedRevive { origin } => serde_json::json!({
+            "type": "archived_revive",
+            "origin": state_name(*origin),
+            "message": format!(
+                "an archived issue only revives to its pre-archive state '{}'",
+                state_name(*origin)
+            ),
         }),
     }
 }
@@ -1104,6 +1136,12 @@ pub struct DependencyTreeNode {
     /// Whether this node appears multiple times in the tree (shared dependency)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shared: Option<bool>,
+    /// Pre-archive origin state, present only for an `Archived` node that
+    /// recorded one. Carried so dependency consumers can compute effective
+    /// terminality (`jit:45a140ae`): an `archived` node with a terminal origin
+    /// still satisfies its dependents.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archived_from: Option<State>,
     /// Child dependencies
     pub children: Vec<DependencyTreeNode>,
 }
@@ -1119,15 +1157,20 @@ impl DependencyTreeNode {
             priority: issue.priority,
             level,
             shared: None,
+            archived_from: issue.archived_from,
             children: Vec::new(),
         }
     }
 
     /// Get state symbol for display
+    ///
+    /// `✓` for effectively terminal nodes — `done`, `rejected`, or `archived`
+    /// from one of those (`jit:45a140ae`) — `○` otherwise.
     pub fn state_symbol(&self) -> &str {
-        match self.state {
-            State::Done | State::Rejected => "✓",
-            _ => "○",
+        if crate::domain::is_effectively_terminal(self.state, self.archived_from) {
+            "✓"
+        } else {
+            "○"
         }
     }
 }
@@ -1342,10 +1385,12 @@ impl GateView {
 /// A single unmet dependency, as projected into `issue show --json` and the
 /// compact `issue status` view.
 ///
-/// A dependency is *unmet* when it is not in a terminal state (`Done` or
-/// `Rejected`) — the exact same readiness test as [`Issue::is_blocked`] and
-/// [`query_ready`](crate::domain::queries::query_ready): a terminal dependency
-/// unblocks its dependents, so it is never listed here. The shape is a subset of
+/// A dependency is *unmet* when it is not effectively terminal (`Done`,
+/// `Rejected`, or `Archived` retired from one of those —
+/// [`Issue::is_effectively_terminal`]) — the exact same readiness test as
+/// [`Issue::is_blocked`] and
+/// [`query_ready`](crate::domain::queries::query_ready): an effectively terminal
+/// dependency unblocks its dependents, so it is never listed here. The shape is a subset of
 /// the enriched `dependencies` entries (`id`, `short_id`, `title`, `state`),
 /// carrying only what an orchestrator needs to see what is still blocking work.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -1392,7 +1437,7 @@ pub struct IssueShowResponse {
     /// hidden.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dangling_dependency_ids: Vec<String>,
-    /// The subset of `dependencies` that are not yet met (state is not terminal),
+    /// The subset of `dependencies` that are not yet met (not effectively terminal),
     /// consistent with readiness — see [`UnmetDependency`]. Always an array,
     /// empty when every dependency is `Done`/`Rejected` or there are none.
     pub unmet_dependencies: Vec<UnmetDependency>,
@@ -1460,7 +1505,7 @@ impl IssueShowResponse {
         // projected here.
         let unmet_dependencies: Vec<UnmetDependency> = enriched_deps
             .iter()
-            .filter(|dep| !crate::domain::is_dependency_met(dep.state))
+            .filter(|dep| !crate::domain::is_dependency_met(dep.state, dep.archived_from))
             .map(UnmetDependency::from)
             .collect();
 
@@ -1534,7 +1579,7 @@ pub struct IssueStatusResponse {
     pub state: State,
     /// One entry per required gate, `{key, status}` only.
     pub gates: Vec<GateStatusEntry>,
-    /// Short ids of the dependencies that are not yet met (state not terminal),
+    /// Short ids of the dependencies that are not yet met (not effectively terminal),
     /// consistent with readiness. Empty when nothing is blocking.
     pub unmet_dependencies: Vec<String>,
     pub title: String,
@@ -1619,12 +1664,15 @@ pub struct StateCount {
 /// (@/inv/domain-agnostic — the state list is enumerated, never hardcoded).
 /// `count` is `by_state.len()` (the list-envelope count, one entry per state).
 ///
-/// Terminal-state semantics, tied to [`State::is_terminal`] (`Done`/`Rejected`):
-/// `done` and `rejected` are reported separately because a rejected issue is
-/// terminal but not delivered; `open` is every non-terminal issue
-/// (`total − done − rejected`, so `Archived` — which is not terminal — counts
-/// as open). The `done`/`total` ratio and `percent` (rounded, `0` when `total`
-/// is `0`) measure delivery, i.e. `done` against `total`.
+/// Effective-terminal semantics ([`Issue::effective_terminal_state`],
+/// `Done`/`Rejected`): `done` and `rejected` are reported separately because a
+/// rejected issue is terminal but not delivered. `Archived` is
+/// terminality-preserving, so an issue archived from `Done` counts toward `done`
+/// and one archived from `Rejected` toward `rejected`; an `Archived` issue with a
+/// non-terminal (or unrecorded, legacy) origin is not effectively terminal and
+/// counts as `open`. `open` is every issue that is not effectively terminal
+/// (`total − done − rejected`). The `done`/`total` ratio and `percent` (rounded,
+/// `0` when `total` is `0`) measure delivery, i.e. `done` against `total`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct StateRollup {
     /// Length of `by_state` (list-envelope count); equals the number of
@@ -1649,7 +1697,9 @@ impl StateRollup {
     ///
     /// `by_state` is [`count_by_state`](crate::domain::queries::count_by_state)
     /// (every variant, zero-count states kept); `done`/`rejected`/`open` and
-    /// `percent` follow the terminal-state semantics documented on the type.
+    /// `percent` follow the effective-terminal semantics documented on the type,
+    /// folding an `Archived` issue into `done`/`rejected` by its pre-archive
+    /// origin ([`Issue::effective_terminal_state`]).
     pub fn from_issues(issues: &[Issue]) -> Self {
         let by_state: Vec<StateCount> = crate::domain::queries::count_by_state(issues)
             .into_iter()
@@ -1657,8 +1707,17 @@ impl StateRollup {
             .collect();
 
         let total = issues.len();
-        let done = issues.iter().filter(|i| i.state == State::Done).count();
-        let rejected = issues.iter().filter(|i| i.state == State::Rejected).count();
+        // Delivery accounting folds by effective terminal state: an issue archived
+        // from Done counts as delivered, one archived from Rejected as rejected,
+        // so a fully-delivered-then-archived container still reports 100%.
+        let done = issues
+            .iter()
+            .filter(|i| i.effective_terminal_state() == Some(State::Done))
+            .count();
+        let rejected = issues
+            .iter()
+            .filter(|i| i.effective_terminal_state() == Some(State::Rejected))
+            .count();
         let open = total - done - rejected;
         let percent = if total == 0 {
             0
@@ -1950,6 +2009,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///     issue_id: "i1".into(),
 ///     commit: None,
 ///     branch: None,
+///     tree_dirty: None,
 ///     status: GateRunStatus::Passed,
 ///     started_at: Utc::now(),
 ///     completed_at: None,
@@ -1987,6 +2047,14 @@ pub struct GateRunSummary {
     pub commit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
+    /// Whether the working tree differed from [`commit`](Self::commit) when the
+    /// checker started: `true` dirty, `false` clean, omitted when there was no
+    /// commit to compare against. Carries
+    /// [`GateRunResult::tree_dirty`](crate::domain::GateRunResult) so a machine
+    /// reader can tell a pass evidencing the commit from one taken on a modified
+    /// tree.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tree_dirty: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2030,6 +2098,7 @@ impl GateRunSummary {
             command: r.command.clone(),
             commit: r.commit.clone(),
             branch: r.branch.clone(),
+            tree_dirty: r.tree_dirty,
             by: r.by.clone(),
             message: r.message.clone(),
             stdout: include_output.then(|| r.stdout.clone()),
@@ -2221,6 +2290,33 @@ pub struct WorktreeListResponse {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// jit:45a140ae REQ-02: a dependency-tree node archived from a terminal
+    /// state renders and serializes as effectively terminal; a legacy Archived
+    /// node (no recorded origin) stays non-terminal.
+    #[test]
+    fn test_dependency_tree_node_effective_terminality() {
+        let mut issue = crate::domain::MinimalIssue {
+            id: "a".repeat(36),
+            title: "Archived dep".to_string(),
+            state: State::Archived,
+            priority: Priority::Normal,
+            assignee: None,
+            labels: Vec::new(),
+            archived_from: Some(State::Done),
+        };
+        let node = DependencyTreeNode::from_minimal(&issue, 1);
+        assert_eq!(node.archived_from, Some(State::Done));
+        assert_eq!(node.state_symbol(), "✓");
+        let serialized = serde_json::to_value(&node).unwrap();
+        assert_eq!(serialized["archived_from"], json!("done"));
+
+        issue.archived_from = None;
+        let legacy = DependencyTreeNode::from_minimal(&issue, 1);
+        assert_eq!(legacy.state_symbol(), "○");
+        let serialized = serde_json::to_value(&legacy).unwrap();
+        assert!(serialized.get("archived_from").is_none());
+    }
 
     #[test]
     fn test_is_broken_pipe_write_panic_matches_stdout_and_stderr_messages() {
@@ -2463,6 +2559,7 @@ mod tests {
             issue_id: issue.id.clone(),
             commit: None,
             branch: None,
+            tree_dirty: None,
             status: GateRunStatus::Passed,
             started_at: run_at,
             completed_at: Some(run_at),
@@ -2654,6 +2751,7 @@ mod tests {
             priority: Priority::Normal,
             assignee: None,
             labels: Vec::new(),
+            archived_from: None,
         }
     }
 

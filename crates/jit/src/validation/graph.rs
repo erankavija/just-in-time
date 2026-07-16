@@ -45,7 +45,9 @@ use std::collections::BTreeSet;
 use chrono::{DateTime, Utc};
 
 use crate::document::content_parser_for;
-use crate::domain::item::{parse_kind_segmented_address, AddressScope, PROJECT_SCOPE_SENTINEL};
+use crate::domain::item::{
+    parse_kind_segmented_address, text_after_checkbox, AddressScope, PROJECT_SCOPE_SENTINEL,
+};
 use crate::domain::type_taxonomy::{
     validate_orphans, validate_strategic_labels, HierarchyConfig, ValidationWarning,
 };
@@ -928,9 +930,10 @@ fn describe_link(link: ChildLink) -> &'static str {
 /// Extract the canonical criterion ids from a source issue's criteria section.
 ///
 /// The section is located by `section_slug` in the (lazily parsed) projection.
-/// For each list item, if `marker` is set the item must start with it; the first
-/// match of `id_pattern` in the item text is the criterion id. Ids are returned
-/// de-duplicated in first-seen order.
+/// For each list item, if `marker` is set the item must start with it — tolerating
+/// one leading GitHub-style checkbox token ahead of the marker (see
+/// [`text_after_checkbox`]) — and the first match of `id_pattern` in the item text
+/// is the criterion id. Ids are returned de-duplicated in first-seen order.
 ///
 /// The criteria source is the issue's own [`description`](crate::domain::Issue)
 /// UNLESS `plan_content` carries an entry for `source.id` — then that injected
@@ -971,7 +974,7 @@ fn criterion_ids(
     Ok(section
         .items
         .iter()
-        .filter(|item| marker.is_none_or(|m| item.trim_start().starts_with(m)))
+        .filter(|item| marker.is_none_or(|m| text_after_checkbox(item).starts_with(m)))
         .filter_map(|item| id_pattern.find(item).map(|m| m.as_str().to_string()))
         .filter(|id| seen.insert(id.clone()))
         .collect())
@@ -2151,6 +2154,42 @@ source-of-truth = "markdown-first"
             findings.is_empty(),
             "aspirational criterion must not be required: {findings:?}"
         );
+    }
+
+    #[test]
+    fn test_label_coverage_marker_tolerates_checkbox_prefix() {
+        // jit:16402e14 REQ-01/REQ-02: a GitHub task-list checkbox ahead of the
+        // marker (`- [ ] [hard] ...`, `- [x] [hard] ...`) still counts as a [hard]
+        // criterion, so an uncovered one is reported rather than coverage passing
+        // vacuously over an empty extracted set.
+        let rule = coverage_rule("marker = \"[hard]\"");
+        let body = "## Success Criteria\n\n\
+            - [ ] [hard] REQ-01: unchecked, uncovered\n\
+            - [x] [hard] REQ-02: checked, uncovered\n";
+        let mut epic = Issue::new("epic".to_string(), body.to_string());
+        epic.labels = vec!["type:epic".to_string()];
+        // No satisfying children: both criteria must be reported as uncovered.
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[epic],
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert_eq!(
+            findings.len(),
+            2,
+            "checkbox-prefixed [hard] criteria must not vacuously pass coverage: {findings:?}"
+        );
+        assert!(findings
+            .iter()
+            .any(|f| f.finding.message.contains("REQ-01")));
+        assert!(findings
+            .iter()
+            .any(|f| f.finding.message.contains("REQ-02")));
     }
 
     #[test]

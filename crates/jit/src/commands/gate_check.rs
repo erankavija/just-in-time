@@ -280,7 +280,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let context = self.build_gate_context(checker, &full_id, gate_key, gate, &repo_root)?;
 
         let result = match checker {
-            crate::domain::GateChecker::Exec { .. } => {
+            crate::domain::GateChecker::Exec { .. } => self.storage.run_external_process(|| {
                 gate_execution::execute_gate_checker_with_context(
                     gate_key,
                     &full_id,
@@ -289,8 +289,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     &working_dir,
                     context.as_ref(),
                     &issue.documents,
-                )?
-            }
+                )
+            })?,
             _ => self.execute_builtin_checker(gate_key, &full_id, gate.stage, checker)?,
         };
 
@@ -520,6 +520,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue_id: issue_id.to_string(),
             commit: None,
             branch: None,
+            // In-process built-in checker: it stamps no commit, so there is no
+            // named commit for the tree to match.
+            tree_dirty: None,
             status,
             started_at,
             completed_at: Some(chrono::Utc::now()),
@@ -793,7 +796,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                             full_id.clone(),
                             State::InProgress,
                             issue.state,
-                            vec![(gate_key.clone(), status)],
+                            vec![(gate_key.clone(), status, GateMode::Manual)],
                         )
                         .into());
                     }
@@ -808,7 +811,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 issue.state,
                 failed_gates
                     .into_iter()
-                    .map(|(key, _)| (key, GateStatus::Failed))
+                    .map(|(key, _)| (key, GateStatus::Failed, GateMode::Auto))
                     .collect(),
             )
             .into());
@@ -918,6 +921,7 @@ enforce_leases = "off"
             issue_id: "issue-1".to_string(),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
+            tree_dirty: None,
             status: GateRunStatus::Failed,
             started_at: Utc.timestamp_opt(started_at, 0).unwrap(),
             completed_at: Some(Utc.timestamp_opt(started_at + 1, 0).unwrap()),
@@ -1547,7 +1551,12 @@ assert = { require-section = { heading = "Summary" } }
 
         // Attesting the manual gate makes every required gate green.
         executor
-            .pass_gate(&issue_id, "manual-gate".to_string(), None, false)
+            .pass_gate(
+                &issue_id,
+                "manual-gate".to_string(),
+                Some("human:tester".to_string()),
+                false,
+            )
             .unwrap();
         let statuses = executor
             .get_required_gate_statuses_for_issue(&issue_id)

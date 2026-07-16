@@ -110,6 +110,8 @@ pub enum EventTag {
     GateDefinitionRemoved,
     /// `lifecycle_timestamps_backfilled`
     LifecycleTimestampsBackfilled,
+    /// `profile_applied`
+    ProfileApplied,
 }
 
 impl EventTag {
@@ -117,7 +119,7 @@ impl EventTag {
     ///
     /// A conformance test compares this list against the variants schemars
     /// derives from the enum, so a tag left out of it fails the suite.
-    pub const ALL: [EventTag; 20] = [
+    pub const ALL: [EventTag; 21] = [
         EventTag::IssueCreated,
         EventTag::IssueClaimed,
         EventTag::IssueStateChanged,
@@ -138,6 +140,7 @@ impl EventTag {
         EventTag::GateDefinitionCreated,
         EventTag::GateDefinitionRemoved,
         EventTag::LifecycleTimestampsBackfilled,
+        EventTag::ProfileApplied,
     ];
 
     /// The tag as serde writes it into a record's `type` field.
@@ -163,6 +166,7 @@ impl EventTag {
             EventTag::GateDefinitionCreated => "gate_definition_created",
             EventTag::GateDefinitionRemoved => "gate_definition_removed",
             EventTag::LifecycleTimestampsBackfilled => "lifecycle_timestamps_backfilled",
+            EventTag::ProfileApplied => "profile_applied",
         }
     }
 
@@ -187,9 +191,9 @@ impl EventTag {
             EventTag::GateDefinitionUpdated
             | EventTag::GateDefinitionCreated
             | EventTag::GateDefinitionRemoved => EventScope::Registry,
-            EventTag::ArtifactArchiveExecuted | EventTag::LifecycleTimestampsBackfilled => {
-                EventScope::Repository
-            }
+            EventTag::ArtifactArchiveExecuted
+            | EventTag::LifecycleTimestampsBackfilled
+            | EventTag::ProfileApplied => EventScope::Repository,
         }
     }
 
@@ -241,6 +245,10 @@ impl EventTag {
             EventTag::LifecycleTimestampsBackfilled => {
                 "The one-time `jit migrate lifecycle-timestamps` backfill wrote derived \
                  lifecycle timestamps; the record carries the number of issues it updated."
+            }
+            EventTag::ProfileApplied => {
+                "An embedded profile package, its minimal installed record, and this audit \
+                 event reached one durable transaction commit point."
             }
         }
     }
@@ -392,6 +400,19 @@ impl EventTag {
                 timestamp,
                 issues_updated: 3,
             },
+            EventTag::ProfileApplied => Event::ProfileApplied {
+                id,
+                timestamp,
+                profile_id: "example".to_string(),
+                version: "1.0.0".to_string(),
+                origin: crate::domain::ProfileOrigin::Embedded,
+                package_hash: "package-hash".to_string(),
+                target_hashes: std::collections::BTreeMap::from([(
+                    "docs/example.md".to_string(),
+                    "target-hash".to_string(),
+                )]),
+                isolated_torn_tail: false,
+            },
         }
     }
 }
@@ -425,6 +446,7 @@ impl Event {
             Event::GateDefinitionCreated { .. } => EventTag::GateDefinitionCreated,
             Event::GateDefinitionRemoved { .. } => EventTag::GateDefinitionRemoved,
             Event::LifecycleTimestampsBackfilled { .. } => EventTag::LifecycleTimestampsBackfilled,
+            Event::ProfileApplied { .. } => EventTag::ProfileApplied,
         }
     }
 }
@@ -735,6 +757,7 @@ mod tests {
                 "gate_definition_removed",
                 "gate_definition_updated",
                 "lifecycle_timestamps_backfilled",
+                "profile_applied",
             ]),
         );
     }

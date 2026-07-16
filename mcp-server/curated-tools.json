@@ -50,6 +50,9 @@
     "jit_item_search": "Finds an addressable item by text when the self-id is unknown.",
     "jit_label_namespaces": "Lists declared label namespaces, which an agent needs to write a label the namespace-registry invariant accepts.",
     "jit_label_values": "Lists values in use in a namespace, so an agent reuses the project vocabulary.",
+    "jit_profile_list": "Discovers the offline workflow packages embedded in the connected JIT binary.",
+    "jit_profile_show": "Inspects an embedded profile manifest and package identity before an agent applies it.",
+    "jit_profile_apply": "Dry-runs or atomically applies an embedded workflow package to the current repository.",
     "jit_search": "Text search across issues and documents in one call.",
     "jit_apply": "Instantiates a graph template into a container, the plan-before-fan-out scaffold.",
     "jit_validate": "Repository integrity check; an agent runs it before handing work back."

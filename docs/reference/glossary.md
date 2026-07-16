@@ -31,7 +31,11 @@ Terminal state for issues that won't be completed. Common reasons include duplic
 
 Format: `resolution:reason` (e.g., `resolution:duplicate`, `resolution:wont-fix`). Added automatically via `jit issue reject --reason <REASON>` command.
 
-**Archived**: Long-term storage
+**Archived**: Retired lifecycle state, parked out of active views
+
+Terminality-preserving: it records the state it was entered from and keeps whatever that state meant for dependents. An issue archived from a terminal state (`Done`/`Rejected`) stays effectively terminal; one archived from a non-terminal state does not satisfy dependents. Reviving restores the recorded origin state exactly. Distinct from `jit archive`, which relocates linked documents on disk.
+
+**Archive (command)**: `jit archive`, the dependency-aware relocation of linked documents into an on-disk mirror (`archive_root`). Distinct from the `Archived` lifecycle state; a successful `jit archive container` retires its container into `Archived`.
 
 ## Gate Types
 

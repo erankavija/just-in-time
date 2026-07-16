@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "39dd7cdb-e3d0-4add-a3b2-9db7ad7950fc",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "0d8f20a8-db02-43ba-ad9e-8f219b427690",
+  "commit": "6d6b860334193857583989cbe536b4e7dee26c13",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-16T12:22:48.849996448Z",
+  "completed_at": "2026-07-16T12:26:36.012441665Z",
+  "duration_ms": 227162,
+  "exit_code": 0,
+  "stdout": "Attribution: 989e2146, ea3e2c4a, d24db47d, e2cf28ce, 7f4896d9, 8d38704d, 6d6b8603 (`jit:0d8f20a8`, reachable from `HEAD`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml, registry-first); @/gate/cargo-ci, @/gate/jit-validate, @/gate/repo-validate (.jit/gates.toml, registry-first); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml, registry-first); @/charter/D-8 (dev/vision/9db27a3a-charter.md, markdown-first); @/issue/9b7b5f9c/requirement/REQ-10 and REQ-12 (parent issue markdown-first; item lookup blocked because it attempts lock creation)\nGate evidence: cargo-ci passed (exit 0, latest post-fix run); repo-validate pending (no run)\nTruncation recovery: Replaced a truncated repository-wide REQ search with bounded parent-issue, fixture, and per-path patch reads\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The projection, drift, and preset mechanics meet the issue-scoped criteria; the prior atomic-write finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The projection, drift, and preset mechanics meet the issue-scoped criteria; the prior atomic-write finding is resolved.",
+    "findings": []
+  }
+}

@@ -7,7 +7,6 @@ use std::path::Path;
 ///
 /// Creates `.git/jit/` with subdirectories for coordination state:
 /// - `locks/` - File locks for atomic operations
-/// - `heartbeat/` - Agent heartbeat files
 /// - `events/` - Control plane event log
 ///
 /// All directories created with 0700 permissions (owner-only access).
@@ -19,7 +18,6 @@ pub fn init_control_plane(git_dir: &Path) -> Result<()> {
 
     // Create subdirectories
     create_dir_with_permissions(&control_dir.join("locks"), 0o700)?;
-    create_dir_with_permissions(&control_dir.join("heartbeat"), 0o700)?;
     create_dir_with_permissions(&control_dir.join("events"), 0o700)?;
 
     Ok(())
@@ -70,7 +68,6 @@ mod tests {
 
         // Verify subdirectories exist
         assert!(jit_dir.join("locks").exists());
-        assert!(jit_dir.join("heartbeat").exists());
         assert!(jit_dir.join("events").exists());
     }
 

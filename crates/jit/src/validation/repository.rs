@@ -14,7 +14,7 @@ use crate::domain::item::{
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressScope,
     ProjectSource, RawScopeItem,
 };
-use crate::domain::{Event, EventTag, GateChecker, Issue, SHORT_ID_LENGTH};
+use crate::domain::{parse_known_events, GateChecker, Issue, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
 use crate::storage::GateRegistry;
 use crate::validation::engine::Finding;
@@ -455,6 +455,47 @@ pub fn validate_repository(
     }
 }
 
+/// Resolve the configured rules/gates projection target from a proposed
+/// repository image.
+pub(crate) fn rules_gates_projection_target(view: &dyn RepositoryView) -> Result<Option<PathBuf>> {
+    Ok(load_config(view)?
+        .rules_gates_projection
+        .as_ref()
+        .map(|projection| PathBuf::from(projection.target())))
+}
+
+/// Render the exact configured rules/gates projection for a proposed final
+/// repository image.
+///
+/// Profile planning uses this before validation so a package-owned projection
+/// target is derived from the merged registries rather than frozen from only
+/// the package's contribution rows.
+pub(crate) fn render_rules_gates_projection(
+    view: &dyn RepositoryView,
+) -> Result<Option<(PathBuf, Vec<u8>)>> {
+    let config = load_config(view)?;
+    let Some(projection) = config.rules_gates_projection.as_ref() else {
+        return Ok(None);
+    };
+    let namespaces =
+        ConfigManager::new(view.repository_root().join(".jit")).namespaces_from_config(&config);
+    let rules = load_rules(view, &config, &namespaces)?;
+    let gates = load_gates(view)?;
+    let rendered = render_rules_and_gates_markdown(&rules, &gates, projection.style());
+    let content = projected_content(
+        view,
+        projection.target(),
+        projection.mode(),
+        &rendered,
+        projection.region_begin(),
+        projection.region_end(),
+    )?;
+    Ok(Some((
+        PathBuf::from(projection.target()),
+        content.into_bytes(),
+    )))
+}
+
 fn validate_relative(path: &Path) -> Result<()> {
     if path.as_os_str().is_empty()
         || path.is_absolute()
@@ -645,26 +686,9 @@ fn load_records(view: &dyn RepositoryView) -> Result<Records> {
 
     let mut event_count = 0;
     if let Some(events) = read_text(view, ".jit/events.jsonl")? {
-        for (offset, line) in events.lines().enumerate() {
-            if line.trim().is_empty() {
-                continue;
-            }
-            let value: serde_json::Value = serde_json::from_str(line)
-                .with_context(|| format!("invalid .jit/events.jsonl line {}", offset + 1))?;
-            let tag = value
-                .get("type")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| anyhow!("event line {} is missing a string type", offset + 1))?;
-            if EventTag::ALL.iter().any(|known| known.as_str() == tag) {
-                let _: Event = serde_json::from_value(value).with_context(|| {
-                    format!(
-                        "invalid known event on .jit/events.jsonl line {}",
-                        offset + 1
-                    )
-                })?;
-                event_count += 1;
-            }
-        }
+        event_count = parse_known_events(&events)
+            .context("invalid .jit/events.jsonl")?
+            .len();
     }
     Ok(Records {
         issues,

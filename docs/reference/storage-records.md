@@ -71,6 +71,7 @@ other `.jit/` write uses.
   "issue_id": "9d1f6c02-4a77-4f2b-8f3d-5e0b7a1c8e64",
   "commit": "9f1c0f0a2b3c4d5e6f708192a3b4c5d6e7f80910",
   "branch": "main",
+  "tree_dirty": false,
   "status": "passed",
   "started_at": "2026-01-09T23:06:40Z",
   "completed_at": "2026-01-09T23:06:40Z",
@@ -117,6 +118,7 @@ a `null` one alike.
 | `issue_id` | always | Full id of the issue the run is about. An issue's runs are selected by matching this field across the run directories, so `gate-runs/` is flat rather than nested per issue. |
 | `commit` | `null` when unset | Git commit the run was taken at, when the working directory is a git repository. |
 | `branch` | `null` when unset | Git branch the run was taken on, when the working directory is a git repository. |
+| `tree_dirty` | `null` when unset | Whether the working tree differed from `commit` when the checker started: `true` if it carried uncommitted or untracked changes, `false` if it matched the commit exactly. A `true` run evidences that modified tree rather than the commit alone. Absent when there was no commit to compare against — the working directory is not a git repository, or the repository has no commits yet — in which case a clean tree is never assumed. |
 | `status` | always | The run's verdict: `passed`, `failed`, `error`, `pending`, or `skipped`. For an executed checker the exit code decides it — `0` passes; a shell that could not run the command (`126`, `127`) and a checker killed by a signal or by its timeout are an `error`; any other code fails. |
 | `started_at` | always | RFC 3339 timestamp taken before the checker is launched. |
 | `completed_at` | `null` when unset | RFC 3339 timestamp taken once the checker has returned. |

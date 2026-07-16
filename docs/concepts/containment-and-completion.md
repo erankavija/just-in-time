@@ -73,16 +73,20 @@ This is a consequence of the direction of the edge, not an extra rule. Three
 facts compose:
 
 1. A container depends on its contents (the edge direction above).
-2. An issue is blocked while any of its dependencies is outside a terminal state
-   (`Issue::is_blocked`). The terminal states are `Done` and `Rejected`
-   (`State::is_terminal`), so a rejected dependency counts as met.
+2. An issue is blocked while any of its dependencies is outside an *effective*
+   terminal state (`Issue::is_blocked`). The terminal states are `Done` and
+   `Rejected`, so a rejected dependency counts as met; `Archived` is
+   terminality-preserving, so a dependency archived from `Done` or `Rejected`
+   also counts as met, while one archived from a non-terminal state (or a legacy
+   archived record with no recorded origin) does not.
 3. A blocked issue never becomes workable: `jit query available` returns only
    unassigned issues in state `Ready` that are unblocked, and a `Backlog` issue
    auto-promotes to `Ready` exactly when it stops being blocked.
 
-Compose them: a container is blocked while any issue it contains is non-terminal.
-Because blocking follows the edges transitively, an epic is blocked until every
-task beneath every story beneath it is `Done` or `Rejected`. So a container
+Compose them: a container is blocked while any issue it contains is not
+effectively terminal. Because blocking follows the edges transitively, an epic
+is blocked until every task beneath every story beneath it is `Done`,
+`Rejected`, or `Archived` from one of those. So a container
 surfaces as available work only once its entire subtree is terminal, and its own
 work (the closing gates, the acceptance pass, the release note) is the last thing
 the graph offers.

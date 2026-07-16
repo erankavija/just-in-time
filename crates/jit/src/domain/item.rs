@@ -819,15 +819,40 @@ impl ItemKind {
 
     /// Whether an item's text qualifies under this kind's markers.
     ///
-    /// True when the kind declares no markers, or the text (after leading
-    /// whitespace) begins with ANY declared marker.
+    /// True when the kind declares no markers, or the text — after leading
+    /// whitespace and at most one leading GitHub-style checkbox token (see
+    /// [`text_after_checkbox`]) — begins with ANY declared marker.
     fn marker_matches(&self, text: &str) -> bool {
-        self.markers.is_empty()
-            || self
-                .markers
-                .iter()
-                .any(|m| text.trim_start().starts_with(m))
+        self.markers.is_empty() || {
+            let candidate = text_after_checkbox(text);
+            self.markers.iter().any(|m| candidate.starts_with(m))
+        }
     }
+}
+
+/// A leading GitHub-style task-list checkbox token skipped before a marker check.
+const CHECKBOX_TOKENS: [&str; 3] = ["[ ]", "[x]", "[X]"];
+
+/// `text`, minus one leading GitHub-style task-list checkbox token, if present.
+///
+/// The markdown parser used for criteria projection
+/// ([`MarkdownContentParser`](crate::document::MarkdownContentParser)) does not
+/// enable pulldown-cmark's task-list extension, so a checkbox-style bullet
+/// (`- [ ] [hard] REQ-01: ...`) projects the checkbox as literal item text
+/// (`"[ ] [hard] REQ-01: ..."`) rather than stripping it. A start-anchored marker
+/// check (`starts_with("[hard]")`) run directly against that text never matches,
+/// silently dropping the criterion from every marker-gated rule (`label-coverage`,
+/// `criteria-to-check`, `criteria-label-match`) and from `jit item list`
+/// (jit:16402e14). Skipping at most one checkbox token — `[ ]`, `[x]`, or `[X]` —
+/// before the marker check tolerates the checkbox without changing behavior for
+/// text that never had one.
+pub(crate) fn text_after_checkbox(text: &str) -> &str {
+    let trimmed = text.trim_start();
+    CHECKBOX_TOKENS
+        .iter()
+        .find_map(|token| trimmed.strip_prefix(token))
+        .map(str::trim_start)
+        .unwrap_or(trimmed)
 }
 
 /// Mint an addressable item's canonical qualified id under the uniform
@@ -1656,6 +1681,52 @@ mod tests {
         let items = index_items(&issue, &[req_kind()], &MarkdownContentParser).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].self_id, "REQ-01");
+    }
+
+    // --- checkbox-prefixed criteria (jit:16402e14) --------------------------
+
+    #[test]
+    fn test_text_after_checkbox_strips_unchecked_and_checked_tokens() {
+        assert_eq!(
+            text_after_checkbox("[ ] [hard] REQ-01: a"),
+            "[hard] REQ-01: a"
+        );
+        assert_eq!(
+            text_after_checkbox("[x] [hard] REQ-01: a"),
+            "[hard] REQ-01: a"
+        );
+        assert_eq!(
+            text_after_checkbox("[X] [hard] REQ-01: a"),
+            "[hard] REQ-01: a"
+        );
+    }
+
+    #[test]
+    fn test_text_after_checkbox_is_noop_without_a_checkbox() {
+        assert_eq!(text_after_checkbox("[hard] REQ-01: a"), "[hard] REQ-01: a");
+        assert_eq!(text_after_checkbox("plain prose"), "plain prose");
+    }
+
+    #[test]
+    fn test_index_items_recognizes_checkbox_prefixed_hard_criterion() {
+        // jit:16402e14 REQ-01/REQ-02: a GitHub task-list checkbox ahead of the
+        // marker (`- [ ] [hard] ...`, `- [x] [hard] ...`) does not hide the
+        // criterion from the item projection.
+        let issue = Issue::new(
+            "T".to_string(),
+            "## Success Criteria\n\n\
+             - [ ] [hard] REQ-01: unchecked box\n\
+             - [x] [hard] REQ-02: checked box\n"
+                .to_string(),
+        );
+        let items = index_items(&issue, &[req_kind()], &MarkdownContentParser).unwrap();
+        assert_eq!(
+            items.len(),
+            2,
+            "both checkbox-prefixed [hard] criteria must register: {items:?}"
+        );
+        let self_ids: HashSet<&str> = items.iter().map(|item| item.self_id.as_str()).collect();
+        assert_eq!(self_ids, HashSet::from(["REQ-01", "REQ-02"]));
     }
 
     #[test]

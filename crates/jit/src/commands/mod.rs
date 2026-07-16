@@ -42,12 +42,14 @@ mod gate_check;
 mod gate_cli_tests;
 pub mod graph;
 pub mod hooks;
+mod init;
 pub mod invariant;
 mod issue;
 pub mod item;
 mod labels;
 pub mod migrate;
 pub mod plan_doc;
+mod profile;
 mod query;
 pub mod reference;
 mod search;
@@ -71,13 +73,15 @@ pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use config::{resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigSetOutcome};
 pub use gate::{
     FieldEdit, GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, GateUpdate,
-    PassAllOutcome,
+    ManualGateAttestationRequiredError, PassAllOutcome,
 };
-pub use graph::GraphExportFormat;
+pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
+pub use init::FreshInitResult;
 pub use invariant::{InvariantCheckResult, InvariantRenderResult};
 pub use issue::DescriptionUpdate;
 pub use item::{ItemListResult, ItemShowResult};
 pub use migrate::LifecycleBackfillResult;
+pub use profile::ProfileApplyError;
 pub use reference::RulesGatesRenderResult;
 pub use template::TemplateApplyResult;
 pub use template_expand::{
@@ -94,7 +98,8 @@ pub use crate::storage::worktree_identity::WorktreeIdentity;
 use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
 use crate::domain::{
-    is_dependency_met, Event, Gate, GateState, GateStatus, Issue, LabelNamespaces, Priority, State,
+    is_dependency_met, Event, Gate, GateMode, GateState, GateStatus, Issue, LabelNamespaces,
+    Priority, State,
 };
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
@@ -106,13 +111,22 @@ use chrono::Utc;
 use serde::Serialize;
 use std::sync::OnceLock;
 
-/// The unpassed gates of `issue` paired with their current status, in the order
-/// [`Issue::get_unpassed_gates`] reports them.
+/// The unpassed gates of `issue` paired with their current status and registry
+/// mode, in the order [`Issue::get_unpassed_gates`] reports them.
 ///
-/// A required gate with no recorded run counts as [`GateStatus::Pending`]. Shared
-/// by the transition guard and the gate-diversion path so both describe a
-/// gate-blocked completion with the same blockers.
-fn unpassed_gate_blockers(issue: &Issue) -> Vec<(String, GateStatus)> {
+/// A required gate with no recorded run counts as [`GateStatus::Pending`]. A
+/// gate key missing from `registry` (should not normally happen) defaults to
+/// [`GateMode::Manual`], matching [`CommandExecutor::pass_gate`]'s own
+/// fallback: an unregistered gate never matches the `Auto` branch there
+/// either, so it is treated as requiring `--by` just the same. Shared by the
+/// transition guard and the gate-diversion path so both describe a
+/// gate-blocked completion with the same blockers, and so the remediation
+/// hint can name the `--by <attestor>` form for a manual gate (jit:1d59070d
+/// REQ-03).
+fn unpassed_gate_blockers(
+    issue: &Issue,
+    registry: &crate::storage::GateRegistry,
+) -> Vec<(String, GateStatus, GateMode)> {
     issue
         .get_unpassed_gates()
         .into_iter()
@@ -122,7 +136,12 @@ fn unpassed_gate_blockers(issue: &Issue) -> Vec<(String, GateStatus)> {
                 .get(&gate_key)
                 .map(|gate| gate.status)
                 .unwrap_or(GateStatus::Pending);
-            (gate_key, status)
+            let mode = registry
+                .gates
+                .get(&gate_key)
+                .map(|gate| gate.mode)
+                .unwrap_or(GateMode::Manual);
+            (gate_key, status, mode)
         })
         .collect()
 }
@@ -200,6 +219,9 @@ pub struct DocumentDiffResult {
 pub struct DocumentAddResult {
     pub issue_id: String,
     pub document: crate::domain::DocumentReference,
+    /// `true` when `path` was already linked to the issue and this call
+    /// refreshed that entry in place; `false` when it appended a new one.
+    pub updated: bool,
 }
 
 /// Result of removing a document reference
@@ -295,6 +317,20 @@ pub struct WriteValidation {
     /// `--force`. One [`Event::LocalRuleBypassed`] must be logged per entry,
     /// AFTER the write commits.
     pub bypassed_rules: Vec<String>,
+}
+
+/// Outcome of [`CommandExecutor::sync_default_rule_membership`]: the
+/// `namespace-unique-*` default-rule NAMES appended to `.jit/rules.toml` and
+/// those dropped from it. Both empty means the file already matched the
+/// `[namespaces]` registry (a no-op write).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RuleMembershipSync {
+    /// Names of the `origin = "default"` `namespace-unique-<ns>` rows
+    /// appended, in [`default_ruleset`](crate::validation::defaults::default_ruleset)'s
+    /// emission order.
+    pub added: Vec<String>,
+    /// Names of the `origin = "default"` `namespace-unique-<ns>` rows dropped.
+    pub dropped: Vec<String>,
 }
 
 /// Executes CLI commands with business logic and validation.
@@ -590,7 +626,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// 1. **No-op guard.** If `issue.state == target` there is nothing to
     ///    transition: returns `Ok(vec![])` without enforcing, saving, or logging.
-    /// 2. **Dependency and gate guards.** Runs
+    /// 2. **Archived revive guard (`jit:45a140ae`).** Leaving
+    ///    [`State::Archived`] is a revive: it may only restore the recorded
+    ///    pre-archive origin ([`Issue::archived_from`]). Targeting any other state
+    ///    returns a
+    ///    [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
+    ///    4, `ArchivedRevive` blocker) and persists NOTHING, so the archive
+    ///    round-trip cannot resurrect a completed issue into the active lifecycle.
+    ///    A legacy Archived record with no recorded origin keeps the prior
+    ///    unconstrained revive but returns an advisory warning.
+    /// 3. **Dependency and gate guards.** Runs
     ///    [`transition_blockers`](Self::transition_blockers): a transition into
     ///    [`State::Ready`] or [`State::Done`] requires every dependency met, and
     ///    [`State::Done`] additionally requires every required gate passed
@@ -601,17 +646,20 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///    calling in, so they reach the chokepoint with the target they intend to
     ///    land; the guard is a pure read, so running it there as well is
     ///    idempotent.
-    /// 3. **Graph-rule enforcement.** Runs
+    /// 4. **Graph-rule enforcement.** Runs
     ///    [`enforce_transition_graph_rules`](Self::enforce_transition_graph_rules)
     ///    on the issue projected into its TARGET state, EXCEPT when `target` is
-    ///    [`State::Rejected`] — rejection deliberately bypasses validation
-    ///    (abandoning an issue must not be gated on coverage). That policy is
-    ///    encoded HERE, not at call sites, so no caller can accidentally enforce
-    ///    (or fail to skip) on rejection. A blocking enforce rule returns a
+    ///    [`State::Rejected`] or [`State::Archived`] — rejection and
+    ///    archival/parking deliberately bypass validation (abandoning or retiring
+    ///    an issue must not be gated on coverage). That policy is encoded HERE, not
+    ///    at call sites, so no caller can accidentally enforce (or fail to skip) on
+    ///    those targets. A blocking enforce rule returns a
     ///    [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
     ///    4) and persists NOTHING; non-blocking findings are returned as warnings.
-    /// 4. **State mutation.** Sets `issue.state = target`.
-    /// 5. **Persistence + audit (when `persist`).** When `persist` is true, saves
+    /// 5. **State mutation.** Sets `issue.state = target`, and maintains
+    ///    [`Issue::archived_from`]: entering [`State::Archived`] records the state
+    ///    left behind, reviving out of it clears the field.
+    /// 6. **Persistence + audit (when `persist`).** When `persist` is true, saves
     ///    the issue and appends the `issue_state_changed` event (plus
     ///    `issue_completed` when landing [`State::Done`]). Including the event
     ///    write here — not only at call sites — means a future caller that forgets
@@ -648,12 +696,40 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(Vec::new());
         }
 
+        // Archived is terminality-preserving (`jit:45a140ae`): a revive out of
+        // Archived may only restore the recorded pre-archive origin, so the
+        // archive round-trip cannot resurrect a completed issue into the active
+        // lifecycle. A legacy Archived record (no recorded origin) keeps the prior
+        // unconstrained revive, with an advisory warning.
+        let mut revive_warnings = Vec::new();
+        if old_state == State::Archived {
+            match issue.archived_from {
+                Some(origin) if target != origin => {
+                    return Err(crate::errors::TransitionBlockedError::archived_revive(
+                        issue.id.clone(),
+                        target,
+                        origin,
+                    )
+                    .into());
+                }
+                None => revive_warnings.push(format!(
+                    "issue {} was archived before its pre-archive state was recorded; reviving to \
+                     '{}' without a verified origin",
+                    issue.short_id(),
+                    target.as_str()
+                )),
+                Some(_) => {}
+            }
+        }
+
         // Dependency and gate guards, ahead of any mutation.
         self.transition_blockers(issue, target)?;
 
-        // Rejection deliberately bypasses graph-rule enforcement; every other
-        // target runs it against the TARGET-state projection of the issue.
-        let warnings = if target == State::Rejected {
+        // Rejection and archival deliberately bypass graph-rule enforcement:
+        // abandoning or retiring/parking an issue must not be gated on rules such
+        // as coverage. Every other target runs enforcement against the TARGET-state
+        // projection of the issue.
+        let warnings = if matches!(target, State::Rejected | State::Archived) {
             Vec::new()
         } else {
             let mut projected = issue.clone();
@@ -663,6 +739,16 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Enforcement passed (or was bypassed/skipped): land the new state.
         issue.state = target;
+
+        // Maintain the pre-archive origin (`jit:45a140ae`): entering Archived
+        // records the state left behind (never Archived — the no-op guard above
+        // rules that out); leaving Archived (revive) clears it, so `archived_from`
+        // is `Some` only while the issue is Archived.
+        if target == State::Archived {
+            issue.archived_from = Some(old_state);
+        } else if old_state == State::Archived {
+            issue.archived_from = None;
+        }
 
         // Stamp the lifecycle timestamp for this transition (first-occurrence
         // only; see `Issue::mark_*`). Done HERE, at the single chokepoint every
@@ -690,7 +776,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        Ok(warnings)
+        // Surface the legacy-revive advisory ahead of any enforcement warnings.
+        revive_warnings.extend(warnings);
+        Ok(revive_warnings)
     }
 
     /// The dependency and gate guards a transition must clear, evaluated against
@@ -725,11 +813,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         if target == State::Done && issue.has_unpassed_gates() {
+            let registry = self.storage.load_gate_registry()?;
             return Err(crate::errors::TransitionBlockedError::gates(
                 issue.id.clone(),
                 State::Done,
                 issue.state,
-                unpassed_gate_blockers(issue),
+                unpassed_gate_blockers(issue, &registry),
             )
             .into());
         }
@@ -952,10 +1041,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         Option<WorktreeIdentity>,
         Vec<crate::storage::StorageWarning>,
     )> {
+        self.storage.init()?;
+        self.initialize_worktree_identity()
+    }
+
+    /// Create or refresh machine-local worktree identity after repository
+    /// scaffold publication.
+    ///
+    /// Kept separate from [`Self::init`] so the fresh profiled path can publish
+    /// all repository bytes transactionally before performing optional Git host
+    /// integration.
+    pub fn initialize_worktree_identity(
+        &self,
+    ) -> Result<(
+        Option<WorktreeIdentity>,
+        Vec<crate::storage::StorageWarning>,
+    )> {
         use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
         use crate::storage::worktree_paths::WorktreePaths;
-
-        self.storage.init()?;
 
         // Check if we're actually in a git repository
         let in_git_repo = std::process::Command::new("git")
@@ -1006,9 +1109,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Idempotent: a no-op when `.jit/rules.toml` already exists (the present file
     /// is left untouched, so re-init never clobbers user edits) beyond republishing
-    /// its projections (the header comment and `schemas/default-*.json`). Returns
-    /// `true` when it wrote a fresh file, `false` when it was a projection-only
-    /// refresh.
+    /// its projections (the header comment and `schemas/default-*.json`) and
+    /// write-through syncing `namespace-unique-*` MEMBERSHIP
+    /// ([`sync_default_rule_membership`](Self::sync_default_rule_membership)).
+    /// Returns `true` when it wrote a fresh file, `false` when it was a
+    /// projection-and-membership-only refresh.
     pub fn scaffold_default_rules(&self) -> Result<bool> {
         let jit_root = self.storage.root();
 
@@ -1026,10 +1131,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             // rules validate against the config registry derived in memory, but the
             // `schemas/default-*.json` files and the file's header comment are
             // projections; republish both from the current registry / contract so a
-            // re-init refreshes them. The header rewrite preserves every rule body
-            // (including custom-rule comments). Idempotent and atomic; a no-op when
-            // already current.
+            // re-init refreshes them. The `namespace-unique-*` MEMBERSHIP is
+            // additionally write-through synced into the file itself (not just
+            // projected) so `@/rule/<name>` addressability tracks the registry too.
+            // The header rewrite preserves every rule body (including custom-rule
+            // comments). Idempotent and atomic; a no-op when already current.
             self.refresh_default_schema_projections()?;
+            self.sync_default_rule_membership()?;
             crate::storage::ruleset_store::rewrite_rules_header(
                 jit_root,
                 crate::validation::serialize::rules_file_header(),
@@ -1090,6 +1198,68 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
         Ok(written)
+    }
+
+    /// Write-through the `namespace-unique-*` DEFAULT-rule file MEMBERSHIP into
+    /// `.jit/rules.toml` itself (not just its `schemas/*.json` projections), so
+    /// the registry-first `rule` item kind — which resolves `@/rule/<name>`
+    /// straight from the file, not the in-memory-reconciled ruleset (`jit item
+    /// show`/`list`, docs-mechanical citation checking) — never dangles behind
+    /// [`reconcile_default_rules_with_config`](crate::validation::defaults::reconcile_default_rules_with_config)'s
+    /// load-time-only reconciliation.
+    ///
+    /// Computes [`default_rule_membership_diff`](crate::validation::defaults::default_rule_membership_diff)
+    /// between the CURRENT on-disk `rules.toml` and the CURRENT `[namespaces]`
+    /// registry, then appends the row for each newly-unique namespace and drops
+    /// the row for each namespace no longer unique or no longer declared —
+    /// `origin = "default"` rows ONLY. Every other byte of the file (custom
+    /// rules, hand-edited policy fields on surviving default rules, comments,
+    /// formatting) is untouched (REQ-01, jit:d74a9ed1).
+    ///
+    /// Called from the same jit-driven-write triggers as
+    /// [`refresh_default_schema_projections`](Self::refresh_default_schema_projections)
+    /// (init/re-init, `config set`), so a registry edit that changes derived
+    /// membership propagates to the file on the next jit write, not only in
+    /// memory. A no-op when `rules.toml` is absent or the diff is empty.
+    ///
+    /// In-memory reconciliation stays the validation authority (out of scope
+    /// for this write-through) — this exists only so the file cannot lag it
+    /// for addressability.
+    pub fn sync_default_rule_membership(&self) -> Result<RuleMembershipSync> {
+        let jit_root = self.storage.root();
+        if !jit_root.join("rules.toml").exists() {
+            return Ok(RuleMembershipSync::default());
+        }
+
+        // Identity-only read (never full RuleSet validation): a custom rule
+        // whose assertion fails to load must not strand this sync after
+        // config.toml was already saved (jit:d74a9ed1 review F1).
+        let identities = crate::storage::ruleset_store::read_rule_identities(jit_root)?;
+        let config = self.config_manager.load()?;
+        let namespaces = self.config_manager.namespaces_from_config(&config);
+        let diff = crate::validation::defaults::default_rule_membership_diff_from_identities(
+            &identities,
+            &namespaces,
+        );
+        if diff.is_empty() {
+            return Ok(RuleMembershipSync::default());
+        }
+
+        let to_add_blocks: Vec<String> = diff
+            .to_add
+            .iter()
+            .map(crate::validation::serialize::render_rule_block)
+            .collect();
+        crate::storage::ruleset_store::sync_namespace_unique_rules(
+            jit_root,
+            &to_add_blocks,
+            &diff.to_drop,
+        )?;
+
+        Ok(RuleMembershipSync {
+            added: diff.to_add.into_iter().map(|r| r.name).collect(),
+            dropped: diff.to_drop,
+        })
     }
 
     /// Acquire the control-plane lock named `lock_file`, held until the returned

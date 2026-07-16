@@ -26,9 +26,10 @@ jit issue claim <short-hash> agent:your-id
 # Check status
 jit issue show <short-hash> --json
 
-# Evaluate gates, inspect their statuses, then complete explicitly
+# Evaluate gates, inspect their statuses, then complete explicitly. A manual
+# gate's evaluate requires --by <attestor>; an automated gate runs its checker.
 jit gate evaluate <short-hash> tests
-jit gate evaluate <short-hash> code-review
+jit gate evaluate <short-hash> <manual-gate> --by "human:reviewer"
 jit gate status-all <short-hash>
 
 # Complete
@@ -69,7 +70,6 @@ This tutorial shows the basics. For the full power of label hierarchies, see [Fi
 ## Prerequisites
 
 - JIT installed (see [INSTALL.md](../../INSTALL.md))
-- `jq` (the `--json` examples pipe through it)
 - Basic command line knowledge
 - A project directory (we'll create one)
 
@@ -79,12 +79,19 @@ This tutorial shows the basics. For the full power of label hierarchies, see [Fi
 # Create a new project
 mkdir my-project && cd my-project
 
-# Initialize JIT (creates .jit/ directory)
-jit init
+# Initialize JIT with the embedded, offline workflow profile
+jit init --profile jit-dogfood
 
 # Check initial status
 jit status
 ```
+
+This is the preferred setup for new repositories. It installs JIT's portable
+planning, validation, gate, projection, and agent workflow without Git, network
+access, `jq`, or a source checkout. Plain `jit init` remains the minimal,
+methodology-neutral alternative. The
+[Repository Profiles reference](../reference/profiles.md) is the canonical
+command, package, guarantee, and lifecycle reference.
 
 ## Create Your First Issues
 
@@ -93,13 +100,13 @@ jit status
 TASK1=$(jit issue create \
   --title "Fix login bug" \
   --priority high \
-  --json | jq -r '.id')
+  -q)
 
 # Create another task
 TASK2=$(jit issue create \
   --title "Add dark mode" \
   --priority normal \
-  --json | jq -r '.id')
+  -q)
 
 # List all issues
 jit query all
@@ -133,23 +140,24 @@ jit query available
 TASK3=$(jit issue create \
   --title "Implement user profile" \
   --priority high \
-  --json | jq -r '.id')
+  -q)
 
-# Define a gate (manual review)
-jit gate define code-review \
-  --title "Code Review" \
+# Define a separate manual gate for this tutorial
+jit gate define tutorial-review \
+  --title "Tutorial Review" \
   --description "Peer review required" \
   --mode manual
 
 # Add gate to the issue
-jit gate add $TASK3 code-review
+jit gate add $TASK3 tutorial-review
 
 # Try to mark it done (will fail - gate not passed)
 jit issue update $TASK3 --state done
 # Transitions to 'gated' instead
 
-# Record manual approval. A manual pass may complete an already gated issue.
-jit gate evaluate $TASK3 code-review
+# Record manual approval; --by names the attestor. A manual pass may
+# complete an already gated issue.
+jit gate evaluate $TASK3 tutorial-review --by "human:reviewer"
 
 # Inspect status; if it is still gated, retry explicit completion.
 jit gate status-all $TASK3

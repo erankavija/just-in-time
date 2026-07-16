@@ -2,7 +2,7 @@
   "id": "f04f7888-a828-4677-aea8-f640a6702375",
   "title": "Implement graceful jit-server process shutdown",
   "description": "Shared SSE cancellation plus `axum-server`'s deadline-aware handle guarantees clean exit even when an ordinary connection cannot finish voluntarily.\n\n## Success Criteria\n\n- [hard] REQ-01: Add `axum-server` 0.8 and `tokio-util`; define one application constant `GRACEFUL_DRAIN_TIMEOUT = Duration::from_secs(5)`. One `CancellationToken` is cloned into AppState/router/SSE, and one `axum_server::Handle` owns listener/connection shutdown. Registered Ctrl-C or Unix terminate errors propagate.\n- [hard] REQ-02: On signal, cancel the token first so `sse::change_stream` reaches EOF and its 15-second keepalive stops, then call `handle.graceful_shutdown(Some(GRACEFUL_DRAIN_TIMEOUT))`. The server stops acceptance, allows ordinary connections at most five seconds, force-closes/aborts survivors at the deadline, and its future returns `Ok`; logs include signal, deadline, connection count before/at expiry, forced-close path, and clean completion.\n- [hard] REQ-03: A Unix real-process test opens `/api/events/stream`, observes initial/keepalive connection, and starts a deliberately non-completing ordinary response/body or stalled connection. After SIGTERM it requires SSE EOF promptly, the ordinary connection forcibly closed at the five-second deadline, socket closure and process exit 0 in strictly less than ten seconds—never signal death, test-side kill, or 137.\n- [hard] REQ-04: Fixtures cover multiple SSE plus completing and non-completing ordinary requests, connection-count/deadline logs, no child, valid repository and immediate restart. Cross-platform tests cover token/Ctrl-C/handle behavior without Unix-only APIs.\n- [hard] REQ-05: The new `axum-server`/`tokio-util` versions are pinned by Cargo.lock, compile on declared MSRV, and pass `cargo audit -D warnings`; no advisory allowlist is added.\n\n## Notes\n\nBlast radius: `crates/server/src/main.rs`, `routes.rs`/`AppState`, `sse.rs`, optional shutdown/test-only routes or modules, `crates/server/tests/`, `crates/server/Cargo.toml`, workspace `Cargo.lock`, and Rust security-audit evidence; domain and storage semantics are unchanged.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -23,6 +23,6 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-15T09:12:53.175034980Z",
-  "updated_at": "2026-07-15T09:12:53.811136583Z",
+  "updated_at": "2026-07-16T11:22:58.254931363Z",
   "first_ready_at": "2026-07-15T09:12:53.175035200Z"
 }

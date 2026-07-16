@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "0f781ca6-3aa4-45a0-9d93-febfc433a3d8",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "8917c558-2c6d-4425-96ed-9dad1dbe7f2b",
+  "commit": "f23479ed2aed7a3ce334d3f322b2d1b87ab383e4",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T15:12:14.705283645Z",
+  "completed_at": "2026-07-16T15:14:11.470571574Z",
+  "duration_ms": 116765,
+  "exit_code": 1,
+  "stdout": "Attribution used the level-4 `bug` leaf’s four current-branch `jit:8917c558` commits, inspected separately with rename detection. It has no resolved children; no fallback attribution was needed. The reference correctly documents idempotency, event tagging, and JSON output, but its commit-pin table conflicts with the shipped behavior.\n\n1. **F1 — blocking, issue-impact, high:** [docs/reference/cli-commands.md:2380](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2380) says `--commit` “Defaults to `HEAD`,” although an omitted flag stores no commit pin; re-adding without it intentionally clears a stale pin. The generated CLI help repeats the error at `crates/jit/src/cli.rs:1857`. Replace both with wording that omission leaves the reference unpinned (using current `HEAD` when read with Git available, otherwise the working tree).\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The doc-add reference and CLI help incorrectly say an omitted --commit defaults to HEAD rather than storing an unpinned reference.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The --commit default is documented incorrectly, contradicting the issue's re-add semantics that clear a stale pin when the flag is omitted.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2380}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "grep: /tmp/tmp.RRlhGo8xyT: binary file matches\n--- agent stderr (first 13 of 28461 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6b7c-4928-7541-bb40-7537ac90aac7\n--------\nuser\n--- 28448 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The doc-add reference and CLI help incorrectly say an omitted --commit defaults to HEAD rather than storing an unpinned reference.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The --commit default is documented incorrectly, contradicting the issue's re-add semantics that clear a stale pin when the flag is omitted.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 2380
+      }
+    ]
+  }
+}

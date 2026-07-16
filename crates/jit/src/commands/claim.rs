@@ -1117,7 +1117,6 @@ mod tests {
 
         assert!(temp.path().join(".git/jit").exists());
         assert!(temp.path().join(".git/jit/locks").exists());
-        assert!(temp.path().join(".git/jit/heartbeat").exists());
         Ok(())
     }
 

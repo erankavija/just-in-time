@@ -2,7 +2,7 @@
   "id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
   "title": "Remediate Rust dependency advisories",
   "description": "The committed Rust dependency graph is advisory-free without an ignore list and retains CLI and server behavior.\n\n## Success Criteria\n\n- [hard] REQ-01: cargo audit -D warnings exits zero against the committed Cargo.lock with no advisory ignore or blanket allowlist.\n- [hard] REQ-02: Workspace formatting, clippy with zero warnings, all-target/all-feature builds, and Rust tests pass after the dependency changes.\n- [hard] REQ-03: Any dependency API migration updates every affected CLI or server consumer and its regression tests in the same change.\n\n## Notes\n\nBlast radius: `Cargo.toml`, `Cargo.lock`, affected crate manifests and only source/tests required by changed dependency APIs; CLI and server are verified together.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:worker",
   "dependencies": [
@@ -12,23 +12,35 @@
   "gates_required": [
     "cargo-ci",
     "code-review",
-    "jit-validate"
+    "jit-validate",
+    "cargo-ci-features",
+    "dependency-audit"
   ],
   "gates_status": {
-    "cargo-ci": {
+    "dependency-audit": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T07:33:28.593536947Z"
+      "updated_at": "2026-07-16T11:18:23.155035777Z"
+    },
+    "cargo-ci-features": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T11:07:05.625258523Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T11:18:41.165140983Z"
     },
     "jit-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T07:36:07.452661876Z"
     },
-    "code-review": {
-      "status": "failed",
+    "cargo-ci": {
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T07:45:17.633948484Z"
+      "updated_at": "2026-07-16T07:33:28.593536947Z"
     }
   },
   "context": {},
@@ -40,7 +52,8 @@
     "satisfies:REQ-02"
   ],
   "created_at": "2026-07-15T09:12:53.166170434Z",
-  "updated_at": "2026-07-16T07:49:40.427294361Z",
+  "updated_at": "2026-07-16T11:22:55.599627772Z",
   "first_ready_at": "2026-07-15T09:12:53.166170684Z",
-  "claimed_at": "2026-07-15T17:53:57.655577204Z"
+  "claimed_at": "2026-07-15T17:53:57.655577204Z",
+  "done_at": "2026-07-16T11:22:55.599625012Z"
 }

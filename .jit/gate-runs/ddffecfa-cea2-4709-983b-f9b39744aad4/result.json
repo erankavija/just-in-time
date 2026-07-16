@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "ddffecfa-cea2-4709-983b-f9b39744aad4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "894337e2-e708-466b-ac25-3aed102a166f",
+  "commit": "30e74734ab182cc0c515c5a3b03b870c20790891",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T09:50:01.891974705Z",
+  "completed_at": "2026-07-16T09:53:51.780935295Z",
+  "duration_ms": 229888,
+  "exit_code": 1,
+  "stdout": "Attribution: 78d36840, 8901b649, 749583dc, 9934f89d, 30e74734\nPolicy sources: AGENTS.md; .jit/gates.toml; .jit/invariants.toml\nResolved items: @/gate/cargo-ci (.jit/gates.toml); @/gate/code-review (.jit/gates.toml); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0; latest run started 2026-07-16T09:44:02Z); code-review pending/unrun\nTruncation recovery: Re-read the worker patch, merge integration diff, issue-specific metadata patches, and current serve/main/server ranges; excluded unrelated multi-issue claim and gate records.\n\n1. **[blocking][issue-impact] F1 — The startup handoff still has the probe-then-bind race.** `start_server` drops its owned listener at [`crates/jit/src/commands/serve.rs:333`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/serve.rs:333) before spawning `jit-server`, which independently binds the same address at [`crates/server/src/main.rs:132`](/home/vkaskivuo/Projects/just-in-time/crates/server/src/main.rs:132). Foreground mode repeats this at [`crates/jit/src/main.rs:6853`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:6853). Another process can acquire the port after the drop and before the child bind, so REQ-2 is not met and the original flaky failure remains possible. The new unit tests only validate selection, not ownership transfer through child startup.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The implementation still releases and re-binds the selected port during server startup, leaving the reported race unresolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Daemon and foreground startup drop the selected listener before jit-server independently binds the same port, so the probe-then-bind race remains.\",\"file\":\"crates/jit/src/commands/serve.rs\",\"line\":333,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4005 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6a55-4ad8-7103-bf9a-37aa3ab02bed\n--------\nuser\n--- 3992 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The implementation still releases and re-binds the selected port during server startup, leaving the reported race unresolved.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Daemon and foreground startup drop the selected listener before jit-server independently binds the same port, so the probe-then-bind race remains.",
+        "file": "crates/jit/src/commands/serve.rs",
+        "line": 333
+      }
+    ]
+  }
+}

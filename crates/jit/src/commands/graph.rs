@@ -8,9 +8,8 @@ use std::collections::{HashMap, HashSet};
 /// Serialization format for `jit graph export`.
 ///
 /// Deriving [`clap::ValueEnum`] lets clap reject an unknown format at parse time
-/// (with the accepted values listed), replacing the previous runtime
-/// `to_lowercase()` match. The value names are the lowercase variant names:
-/// `dot`, `mermaid`, `json`.
+/// (with the accepted values listed). The value names are the lowercase variant
+/// names: `dot`, `mermaid`, `json`, `batch`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum GraphExportFormat {
     /// Graphviz DOT format.
@@ -19,6 +18,57 @@ pub enum GraphExportFormat {
     Mermaid,
     /// JSON node/edge format.
     Json,
+    /// `batch-create` input schema: a JSON array of issue definitions, the
+    /// structural inverse of `jit issue batch-create`. Handled on a separate
+    /// path ([`export_graph_batch`](CommandExecutor::export_graph_batch)); the
+    /// graph-rendering [`export_graph`](CommandExecutor::export_graph) never
+    /// receives it.
+    Batch,
+}
+
+/// A dependency edge dropped from batch output because it crosses the export's
+/// membership scope: `from` (a batch node) depends on `to` (a real issue outside
+/// the scope). Both are short ids. Surfaced so no edge is dropped silently.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct BoundaryEdge {
+    /// Short id of the in-scope batch node the edge originates from.
+    pub from: String,
+    /// Short id of the out-of-scope dependency the edge points to.
+    pub to: String,
+}
+
+/// The result of a batch-shape export: the batch-create definitions plus the
+/// scope-boundary edges that were excluded from them.
+///
+/// [`defs`](Self::defs) serializes to exactly the JSON array `jit issue
+/// batch-create --from-json` consumes.
+#[derive(Debug, Clone)]
+pub struct BatchExport {
+    /// The exported issue definitions, ordered by short id.
+    pub defs: Vec<BatchIssueDef>,
+    /// Edges excluded because they cross the membership scope boundary
+    /// (REQ-06), ordered by `(from, to)`.
+    pub boundary_edges: Vec<BoundaryEdge>,
+}
+
+/// Whether a label survives batch export: kept unless it is the `type:*` label
+/// (lifted into the def's `type` field) or its namespace is identity-bound.
+fn keep_generic_label(label: &str, stripped_ns: &HashSet<String>) -> bool {
+    let namespace = label.split(':').next().unwrap_or(label);
+    namespace != crate::labels::TYPE_NAMESPACE && !stripped_ns.contains(namespace)
+}
+
+/// The `batch-create` priority string for `priority` (the value
+/// [`Priority::from_str`](std::str::FromStr) round-trips), so an exported def
+/// re-imports at the same priority.
+fn priority_str(priority: crate::domain::Priority) -> &'static str {
+    use crate::domain::Priority;
+    match priority {
+        Priority::Low => "low",
+        Priority::Normal => "normal",
+        Priority::High => "high",
+        Priority::Critical => "critical",
+    }
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -109,7 +159,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(roots.into_iter().cloned().collect())
     }
 
-    /// Render the whole-repository dependency graph in `format`.
+    /// Render the dependency graph in `format`, optionally scoped to a container.
     ///
     /// `full` selects the complete-record JSON node shape
     /// ([`export_json_full`](crate::visualization::export_json_full)) instead of
@@ -117,23 +167,237 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`GraphExportFormat::Json`]. The caller (CLI) rejects `full` with a
     /// non-JSON format as a usage error before reaching here, so the `dot`/
     /// `mermaid` arms ignore it.
-    pub fn export_graph(&self, format: GraphExportFormat, full: bool) -> Result<String> {
+    ///
+    /// `scope = Some(container)` restricts the listed nodes to the container's
+    /// DAG-authoritative containment membership
+    /// ([`membership_closure`](crate::graph::hierarchy::HierarchyResolution::membership_closure));
+    /// `scope = None` lists the whole repository. Hierarchy resolution stays
+    /// repository-wide either way, so a scoped node's `parent`/`cluster` may
+    /// point at a container outside the subtree (matching `graph tree`).
+    ///
+    /// [`GraphExportFormat::Batch`] is handled by
+    /// [`export_graph_batch`](Self::export_graph_batch) and is not a valid
+    /// argument here.
+    pub fn export_graph(
+        &self,
+        format: GraphExportFormat,
+        full: bool,
+        scope: Option<&str>,
+    ) -> Result<String> {
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let graph = DependencyGraph::new(&issue_refs);
+
+        // Resolve the hierarchy once when it is needed — for scoping and/or the
+        // full JSON node shape. Resolution is always repository-wide.
+        let needs_full_json = matches!((format, full), (GraphExportFormat::Json, true));
+        let resolution = if scope.is_some() || needs_full_json {
+            let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
+            Some(crate::graph::hierarchy::resolve_hierarchy(
+                &issue_refs,
+                &config,
+            ))
+        } else {
+            None
+        };
+
+        let member_ids = match scope {
+            Some(container) => {
+                let container_id = self.storage.resolve_issue_id(container)?;
+                Some(
+                    resolution
+                        .as_ref()
+                        .expect("resolution is built whenever scope is Some")
+                        .membership_closure(&container_id),
+                )
+            }
+            None => None,
+        };
+        let selected: Vec<&Issue> = issue_refs
+            .iter()
+            .copied()
+            .filter(|i| member_ids.as_ref().is_none_or(|m| m.contains(&i.id)))
+            .collect();
+        let graph = DependencyGraph::new(&selected);
 
         Ok(match format {
             GraphExportFormat::Dot => crate::visualization::export_dot(&graph),
             GraphExportFormat::Mermaid => crate::visualization::export_mermaid(&graph),
-            GraphExportFormat::Json if full => {
-                // The full node shape carries the DAG-resolved parent + cluster;
-                // resolution reads the repo's configured type hierarchy.
+            GraphExportFormat::Json if full => crate::visualization::export_json_full(
+                &graph,
+                resolution
+                    .as_ref()
+                    .expect("resolution is built for the full JSON shape"),
+            ),
+            GraphExportFormat::Json => crate::visualization::export_json(&graph),
+            GraphExportFormat::Batch => {
+                return Err(anyhow::anyhow!(
+                    "batch format is handled by export_graph_batch, not export_graph"
+                ));
+            }
+        })
+    }
+
+    /// Export the graph in the `batch-create` input schema — the structural
+    /// inverse of [`batch_create_from_json`](Self::batch_create_from_json).
+    ///
+    /// `scope = Some(container)` captures that container's containment subtree;
+    /// `scope = None` captures the whole graph. Each in-scope, non-bracket node
+    /// becomes a [`BatchIssueDef`] keyed by its short id, carrying only
+    /// structural fields (title, description, type, priority, surviving generic
+    /// labels, gates, and in-scope `depends_on` keys) — no lifecycle fields, and
+    /// every in-scope node regardless of state.
+    ///
+    /// Three projection policies, all config-derived (never hardcoded,
+    /// `@/inv/domain-agnostic`):
+    ///
+    /// - **Identity-bound labels stripped**: `type:*` is lifted into the `type`
+    ///   field; membership namespaces (`[type_hierarchy.label_associations]`)
+    ///   and the coverage rule's `satisfies-namespace`/`container-from-label`
+    ///   namespaces are dropped. Generic labels survive.
+    /// - **Bracket nodes excluded**: nodes whose type is a template planning- or
+    ///   breakdown-role node type are dropped together with every edge touching
+    ///   them, keeping the seed template-compatible.
+    /// - **Boundary edges reported**: a dependency on a real issue outside the
+    ///   membership scope is excluded and recorded in
+    ///   [`BatchExport::boundary_edges`] rather than dropped silently.
+    ///
+    /// The returned [`BatchExport::defs`] serializes to exactly the JSON array
+    /// `batch-create` consumes.
+    pub fn export_graph_batch(&self, scope: Option<&str>) -> Result<BatchExport> {
+        let issues = self.storage.list_issues()?;
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+
+        // Membership scope (the whole graph when unscoped).
+        let member_ids: Option<HashSet<String>> = match scope {
+            Some(container) => {
+                let container_id = self.storage.resolve_issue_id(container)?;
                 let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
                 let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
-                crate::visualization::export_json_full(&graph, &resolution)
+                Some(resolution.membership_closure(&container_id))
             }
-            GraphExportFormat::Json => crate::visualization::export_json(&graph),
+            None => None,
+        };
+        let in_scope = |id: &str| member_ids.as_ref().is_none_or(|m| m.contains(id));
+
+        // Config-derived projection inputs.
+        let stripped_ns = self.identity_bound_namespaces()?;
+        let bracket_types = self.bracket_node_types()?;
+        let is_bracket = |issue: &Issue| {
+            crate::labels::type_label_value(&issue.labels)
+                .is_some_and(|t| bracket_types.contains(t))
+        };
+        let by_id: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
+        let short_of = |id: &str| -> String { id.chars().take(8).collect() };
+
+        // Batch node set: in-scope, non-bracket nodes, ordered by short id.
+        let mut nodes: Vec<&Issue> = issue_refs
+            .iter()
+            .copied()
+            .filter(|i| in_scope(&i.id) && !is_bracket(i))
+            .collect();
+        nodes.sort_by_key(|i| i.short_id());
+        let node_ids: HashSet<&str> = nodes.iter().map(|i| i.id.as_str()).collect();
+
+        let mut boundary_edges: Vec<BoundaryEdge> = Vec::new();
+        let defs: Vec<BatchIssueDef> = nodes
+            .iter()
+            .map(|issue| {
+                let mut depends_on: Vec<String> = Vec::new();
+                for dep in &issue.dependencies {
+                    if node_ids.contains(dep.as_str()) {
+                        // Internal edge: reference the dependency by its key.
+                        depends_on.push(short_of(dep));
+                    } else if by_id.get(dep.as_str()).is_some_and(|d| is_bracket(d)) {
+                        // Edge to a bracket node: dropped with the bracket (REQ-05).
+                    } else if by_id.contains_key(dep.as_str()) {
+                        // A real issue outside the membership scope: a boundary
+                        // edge — excluded but reported, never dropped silently.
+                        boundary_edges.push(BoundaryEdge {
+                            from: issue.short_id(),
+                            to: short_of(dep),
+                        });
+                    }
+                    // else: dangling id — the integrity check owns broken edges.
+                }
+                depends_on.sort();
+
+                let labels: Vec<String> = issue
+                    .labels
+                    .iter()
+                    .filter(|label| keep_generic_label(label, &stripped_ns))
+                    .cloned()
+                    .collect();
+
+                BatchIssueDef {
+                    key: issue.short_id(),
+                    title: issue.title.clone(),
+                    description: issue.description.clone(),
+                    r#type: crate::labels::type_label_value(&issue.labels).map(str::to_string),
+                    priority: Some(priority_str(issue.priority).to_string()),
+                    labels,
+                    gates: issue.gates_required.clone(),
+                    depends_on,
+                }
+            })
+            .collect();
+
+        boundary_edges.sort_by(|a, b| (&a.from, &a.to).cmp(&(&b.from, &b.to)));
+        Ok(BatchExport {
+            defs,
+            boundary_edges,
         })
+    }
+
+    /// The set of label namespaces that are identity-bound and therefore
+    /// stripped from batch export (REQ-04). Derived from configuration only:
+    /// membership namespaces declared in `[type_hierarchy.label_associations]`,
+    /// plus the `satisfies-namespace` and `container-from-label` values of every
+    /// `label-coverage` rule in the effective ruleset.
+    fn identity_bound_namespaces(&self) -> Result<HashSet<String>> {
+        use crate::validation::rules::Assertion;
+
+        let mut namespaces: HashSet<String> = HashSet::new();
+
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        for (_type_name, namespace) in hierarchy.membership_namespaces() {
+            namespaces.insert(namespace.clone());
+        }
+
+        for rule in &self.effective_rules()?.rules {
+            if let Assertion::LabelCoverage { config } = &rule.assert {
+                for key in ["satisfies-namespace", "container-from-label"] {
+                    if let Some(ns) = config.get(key).and_then(|v| v.as_str()) {
+                        namespaces.insert(ns.to_string());
+                    }
+                }
+            }
+        }
+
+        Ok(namespaces)
+    }
+
+    /// The set of issue type names that serve a template planning- or
+    /// breakdown-role node (REQ-05). Collected across every registered template
+    /// via [`GraphTemplate::planning_type`]/[`breakdown_type`], resolved through
+    /// the repository's [`RoleBindings`] — no role or type literal.
+    ///
+    /// [`GraphTemplate::planning_type`]: crate::templates::GraphTemplate::planning_type
+    /// [`breakdown_type`]: crate::templates::GraphTemplate::breakdown_type
+    /// [`RoleBindings`]: crate::templates::RoleBindings
+    fn bracket_node_types(&self) -> Result<HashSet<String>> {
+        let registry = &self.cached_config()?.templates;
+        Ok(registry
+            .templates
+            .iter()
+            .flat_map(|t| {
+                [
+                    t.planning_type(&registry.roles),
+                    t.breakdown_type(&registry.roles),
+                ]
+            })
+            .flatten()
+            .map(str::to_string)
+            .collect())
     }
 
     /// Resolve the canonical hierarchy for `graph tree`, optionally scoped to a
@@ -334,6 +598,7 @@ mod tests {
             priority: Priority::Normal,
             level: 1,
             shared: None,
+            archived_from: None,
             children: vec![],
         }
     }

@@ -3,6 +3,7 @@
   "epic_short_id": "6eb585bc",
   "batch": "core-maintenance-2026-07-14 (18 open children: 14 filed since the usability batch, carryovers 1d59070d/0daba57d/c505031a, adopted 16402e14; prior batch report dev/active/6eb585bc-batch-report-2026-07-05.md, handoff dev/active/6eb585bc-handoff.md)",
   "current_wave": 3,
+  "replan_2026_07_16": "Invoker directive (session 3): use as much parallelism as possible; supersedes one-wave-at-a-time. Remaining 15 children regrouped into two parallel worktree waves by file footprint. WAVE A (dispatched 2026-07-16, anchored 8901b649, 9 parallel): 6f881a85, 0daba57d, 8917c558, 894337e2, 8d7fc762, 16402e14, 1d59070d, 52665a07, 3e12ffbd. WAVE B (after A merges; contended surfaces): c505031a (gate-verb sweep, after 1d59070d+8d7fc762), 554ad07f (gate.rs, after 1d59070d), 450db193 (CLAUDE.md/cli.rs, after 52665a07), d74a9ed1, 0283ce74 (shares exit-codes doc with 0daba57d), 45a140ae (invoker interview first). Gate inheritance applied to 16402e14 (had zero gates): cargo-ci, code-review, doc-review, docs-mechanical. Old wave numbering below retained for history; statuses remain authoritative per issue.",
   "note": "No inter-sibling deps; wave order is risk-driven: wave 1 hardens the verification loop (validator registry authority, merged-commit gate evidence, stale-binary detection, mcp CI coverage) so later waves' gate results are trustworthy; wave 2 settles CLI output/exit contracts; wave 3 gate-surface semantics with alias removal last as the one breaking sweep; wave 4 dead paths + validation correctness; wave 5 enhancements (45a140ae needs invoker interview on the semantic model before dispatch). One wave at a time per invoker directive (2026-07-14); parallel worktree dispatch within a wave where footprints are disjoint (protocol: skill scripts dispatch-worker-worktree.sh + check-leak-into-main.sh), sub-serialized where contended (wave 1: 45e1b7e8 before 7446af34, shared scripts/gate machinery; wave 2: main.rs cluster; wave 3: 1d59070d before c505031a in cli.rs). Standing directives from batch 1 remain: worker model per difficulty (sonnet easy, opus hard); workers self-verify with ./scripts/cargo-ci.sh; new public APIs need # Examples doctests; reinstall jit (cargo install --path crates/jit) after waves changing output/storage shapes; DOGFOOD newly landed surfaces lead-side and log friction here; help/doc text states current behavior only (no legacy narration); post-merge mainline build check after every merge (this is 45e1b7e8's subject \u2014 until it lands, verify manually). INTERLEAVE (invoker 2026-07-14): story 73482aa1 (rust-build-efficiency, filed by a parallel session under this epic) executes as wave 2, before the remaining CLI/gate/validation waves; former waves 2-5 renumbered 3-6. SESSION 2 BOUNDARY (2026-07-15): handoff dev/active/6eb585bc-handoff-2.md; story 73482aa1 complete; wave 2.5 interleaves done; wave 3 in flight at f40f1b0a.",
   "waves": [
     {
@@ -220,7 +221,12 @@
       ]
     }
   ],
+  "session_3_boundary": "2026-07-16: handoff dev/active/6eb585bc-handoff-3.md. Wave A snapshot: 8d7fc762 merged (0a468803), 4/5 gates green, docs-mechanical blocked by 46657f6f; 894337e2 merged (9934f89d), gates evaluating; 46657f6f (recovery-lock hotfix, INVOKER: complete immediately) dispatched; 8917c558/16402e14/52665a07/45a140ae/d74a9ed1 committed in worktrees; 6f881a85/0daba57d/1d59070d/3e12ffbd mid-work in worktrees. Wave B not dispatched.",
   "created_during_execution": [
+    {
+      "short_id": "46657f6f",
+      "note": "Gate checkers cannot invoke mutating jit: recovery session lock (eceffc17, codex session) is not cross-process reentrant; blocks docs-mechanical for the whole wave. Filed+dispatched 2026-07-16 per invoker 'file + fix now'; COMPLETE THIS FIRST (invoker: fix must be completed immediately)"
+    },
     {
       "short_id": "ef0065ad",
       "note": "Scope bracket validation to the requested container; filed by the project-lead session 2026-07-15 (@/charter/D-15); interleaved as wave 2.5. STANDING CHANGE (@/charter/D-14, commit 57ec9eb7): the epic is now a finite v1.0 prerequisite \u2014 close 6eb585bc when this scope completes, before production-readiness source freeze; the living-container decision is superseded"
@@ -232,9 +238,27 @@
     {
       "short_id": "d74a9ed1",
       "note": "Write default-rule membership through to rules.toml on config refresh; split from af4c901a round-3 (dangling @/rule/namespace-unique-brackets); slotted into wave 6 (former wave 5)"
+    },
+    {
+      "short_id": "94096aac",
+      "note": "Foreground serve deadlocks: parent retains bootstrap recovery lock while blocking on child; pre-existing, flagged by 894337e2 rework worker 2026-07-16; wired under epic, gates cargo-ci+code-review; ready for dispatch"
     }
   ],
   "escalations": [
+    {
+      "issue": "46657f6f",
+      "date": "2026-07-16",
+      "policy": "7 (shared infrastructure) / 6 (blocker outside epic scope)",
+      "question": "eceffc17 (codex session) made the recovery bootstrap lock non-reentrant across processes; gate checkers spawning mutating jit (docs-mechanical M5) always time out. Who fixes?",
+      "resolution": "invoker chose 'I file + fix now': bug filed under epic, opus fix worker dispatched with env-handshake design; invoker follow-up directive: the fix must be completed immediately"
+    },
+    {
+      "issue": "45a140ae",
+      "date": "2026-07-16",
+      "policy": "6 (architectural decision), pre-dispatch interview per batch plan",
+      "question": "Archived lifecycle semantic model: terminality, coupling with artifact archival, revive transitions (subsumes handoff-1's archived-resurrection open question)",
+      "resolution": "invoker chose: terminality-preserving overlay; coupled retirement (archive execution requires Done/Rejected, success transitions to Archived); revive restores the exact pre-archive state, closing the done->archived->ready loophole. Pinned into the issue description; 45a140ae is now dispatchable in wave B"
+    },
     {
       "issue": "3c4d6fe8",
       "date": "2026-07-15",
@@ -248,7 +272,14 @@
     "45e1b7e8": 2,
     "7446af34": 2,
     "af4c901a": 3,
-    "f40f1b0a": 6
+    "f40f1b0a": 6,
+    "894337e2": 1,
+    "8917c558": 1,
+    "3e12ffbd": 1,
+    "45a140ae": 1,
+    "0daba57d": 1,
+    "d74a9ed1": 1
   },
-  "started_at": "2026-07-14T00:00:00Z"
+  "started_at": "2026-07-14T00:00:00Z",
+  "session_4": "2026-07-16 session 4 CLOSED, handoff dev/active/6eb585bc-handoff-4.md. DONE this session: 8d7fc762, 16402e14. MERGED awaiting gates (sweep take 5 running at handoff): 8917c558 (lead fixes f23479ed+2a5aff7e, 3/4 green), 52665a07 (+d3d64146), 3e12ffbd, 45a140ae, 0daba57d, d74a9ed1, 1d59070d, 894337e2 (rework merge dbe1a50b). IN-FLIGHT workers at handoff: 450db193 (committed 8aa61b84), 0283ce74 (4 commits), c505031a (29 dirty, functionally complete), 554ad07f (committed 99072933, desk-review PASS \u2014 merge directly), 6f881a85-r1 (replacement, no commits yet). Filed 94096aac (foreground-serve deadlock, ready). Gate-sweep recipe + traps in handoff-4."
 }

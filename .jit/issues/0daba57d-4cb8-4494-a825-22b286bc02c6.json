@@ -13,15 +13,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:52:56.545151753Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:49:57.854096963Z"
+    },
     "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:38:45.826441832Z"
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:55:50.998245501Z"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:38:45.834296777Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:52:55.861042866Z"
     }
   },
   "context": {},
@@ -32,7 +42,7 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T22:41:02.663869625Z",
-  "updated_at": "2026-07-16T08:40:04.558426554Z",
+  "updated_at": "2026-07-16T15:58:21.414712560Z",
   "first_ready_at": "2026-07-05T22:41:02.663883645Z",
   "claimed_at": "2026-07-16T08:40:04.558426374Z"
 }

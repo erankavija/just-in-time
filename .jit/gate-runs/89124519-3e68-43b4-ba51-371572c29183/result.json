@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "89124519-3e68-43b4-ba51-371572c29183",
+  "gate_key": "dependency-audit",
+  "stage": "postcheck",
+  "issue_id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563",
+  "commit": "51fcfe2cb711351abdeb843abfb9f7464f5f8c0f",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-16T11:51:33.070728976Z",
+  "completed_at": "2026-07-16T11:51:41.285750800Z",
+  "duration_ms": 8215,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Fetching advisory database from `https://github.com/RustSec/advisory-db.git`\n      Loaded 1160 security advisories (from /home/vkaskivuo/.cargo/advisory-db)\n    Updating crates.io index\n    Scanning Cargo.lock for vulnerabilities (379 crate dependencies)\n",
+  "command": "cargo audit -D warnings",
+  "by": "auto:executor",
+  "message": null
+}

@@ -97,6 +97,60 @@ fn test_cycle_detected_error_json() {
 }
 
 #[test]
+fn test_deletion_not_confirmed_error_json() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let created = Command::new(jit)
+        .args(["issue", "create", "-t", "Doomed", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id = serde_json::from_slice::<serde_json::Value>(&created.stdout).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Delete without JIT_ALLOW_DELETION=1: refused (REQ-02).
+    let output = Command::new(jit)
+        .args(["issue", "delete", &id, "--json"])
+        .env_remove("JIT_ALLOW_DELETION")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "refusal must exit 2 (REQ-01)"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["error"]["code"], "DELETION_NOT_CONFIRMED");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("discouraged"));
+    let suggestions = json["error"]["suggestions"].as_array().unwrap();
+    assert!(
+        suggestions
+            .iter()
+            .any(|s| s.as_str().unwrap().contains("JIT_ALLOW_DELETION=1")),
+        "suggestions must carry the confirmation hint, got: {suggestions:?}"
+    );
+
+    // The issue must still exist: the refusal must not have deleted it.
+    let show = Command::new(jit)
+        .args(["issue", "show", &id])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(show.status.success(), "issue must survive a refused delete");
+}
+
+#[test]
 fn test_invalid_state_error_json() {
     let temp = setup_test_repo();
     let jit = jit_binary();

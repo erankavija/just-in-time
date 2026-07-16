@@ -6,19 +6,21 @@
 //! layout). The directory location can be overridden with the `JIT_DATA_DIR`
 //! environment variable.
 
-use crate::domain::{Event, EventTag, Issue};
+use crate::domain::{parse_known_events, Event, Issue};
 use crate::storage::{
     AmbiguousIdError, FileLocker, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError,
-    IssueNotFoundError, IssueStore, RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError,
-    RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
+    IssueNotFoundError, IssueStore, RecoveryCoordinator, RecoverySession, RepoWriteGuard,
+    RepoWriteLock, RepositoryFormatTooNewError, RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, bail, Context, Result};
+use cap_std::{ambient_authority, fs::Dir};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// On-disk repository-format version this binary writes and understands.
@@ -113,6 +115,11 @@ impl Default for Index {
     }
 }
 
+/// Render the byte-exact empty index created by a fresh repository.
+pub(crate) fn fresh_index_bytes() -> Result<Vec<u8>> {
+    serde_json::to_vec_pretty(&Index::default()).context("Failed to serialize fresh index")
+}
+
 /// Reject an index whose on-disk format version is newer than this binary
 /// supports; otherwise pass it through unchanged.
 ///
@@ -142,9 +149,10 @@ fn ensure_supported_index_version(index: Index) -> Result<Index> {
 /// All file writes are atomic (write to temp file, then rename).
 ///
 /// File locking is used to prevent race conditions in concurrent access:
-/// - Every mutating path first takes the repository write lock
-///   ([`RepoWriteLock`], `.repo-write.lock`), so a caller holding it across a
-///   multi-write sequence excludes all other writers for the whole sequence
+/// - Every mutating path takes the repository-sibling bootstrap lock before the
+///   repository write lock ([`RepoWriteLock`], `.repo-write.lock`), so a caller
+///   holding the chain across a multi-write sequence excludes all other writers
+///   for the whole sequence
 /// - Index updates are protected with exclusive locks
 /// - Individual issue updates use per-file locks
 /// - Gate registry and event log use exclusive locks for writes
@@ -152,9 +160,22 @@ fn ensure_supported_index_version(index: Index) -> Result<Index> {
 pub struct JsonFileStorage {
     root: PathBuf,
     locker: FileLocker,
+    /// Repository-sibling lock acquired before `.jit/.repo-write.lock`.
+    ///
+    /// It deliberately lives outside `.jit-bootstrap/`: fresh-root recovery
+    /// removes that control directory while retaining this guard, and deleting
+    /// the backing lock inode would let another process lock a replacement.
+    bootstrap_lock: Arc<RepoWriteLock>,
     /// Shared by every clone of this instance, so a nested write inside a
     /// sequence that already holds the lock reenters it instead of deadlocking.
     repo_lock: Arc<RepoWriteLock>,
+    /// Startup recovery boundary retained by CLI mutation dispatch.
+    ///
+    /// External checker execution temporarily removes and drops this session,
+    /// then reacquires it and recovers any journals before checker results are
+    /// persisted. Clones share the slot so the command executor sees the same
+    /// boundary installed by `main`.
+    recovery_session: Arc<Mutex<Option<RecoverySession>>>,
 }
 
 impl JsonFileStorage {
@@ -170,11 +191,97 @@ impl JsonFileStorage {
             ));
 
         let root = root.as_ref().to_path_buf();
+        let bootstrap_lock_path = root
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(".jit-bootstrap.lock");
+        let bootstrap_lock = RepoWriteLock::for_lock_path(bootstrap_lock_path, timeout);
         Self {
-            repo_lock: RepoWriteLock::for_storage_root(&root, timeout),
+            repo_lock: RepoWriteLock::for_storage_root_after(
+                &root,
+                timeout,
+                Some(Arc::clone(&bootstrap_lock)),
+            ),
+            bootstrap_lock,
+            recovery_session: Arc::new(Mutex::new(None)),
             root,
             locker: FileLocker::new(timeout),
         }
+    }
+
+    /// Retain the startup recovery boundary for this storage and every clone.
+    ///
+    /// CLI mutation dispatch installs the session after pre-service recovery.
+    /// At most one session may be retained for one storage instance.
+    pub fn retain_recovery_session(&self, session: RecoverySession) -> Result<()> {
+        let mut retained = self
+            .recovery_session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if retained.is_some() {
+            anyhow::bail!("A recovery session is already retained for this storage");
+        }
+        *retained = Some(session);
+        Ok(())
+    }
+
+    /// Acquire only the repository-sibling bootstrap lock.
+    ///
+    /// Startup recovery uses this before touching `.jit/`, because a prepared
+    /// fresh-root transaction may need to restore the complete absence of that
+    /// directory.
+    pub(crate) fn acquire_bootstrap_write_lock(&self) -> Result<RepoWriteGuard> {
+        self.bootstrap_lock.acquire()
+    }
+
+    /// Acquire the repository lock after the bootstrap lock.
+    ///
+    /// The lock instance is shared by every storage clone, allowing startup
+    /// recovery to retain it while command-layer writes re-enter it.
+    pub(crate) fn acquire_repo_write_lock_raw(&self) -> Result<RepoWriteGuard> {
+        self.repo_lock.acquire()
+    }
+
+    /// Acquire the event-log lock after the repository write lock.
+    ///
+    /// Profile application replaces the complete next event-log image inside a
+    /// file-set transaction, so readers must be excluded for that publication
+    /// just as they are for the ordinary append path.
+    pub(crate) fn acquire_events_write_lock(&self) -> Result<crate::storage::lock::LockGuard> {
+        self.locker.lock_exclusive(&self.root.join(".events.lock"))
+    }
+
+    /// Open a capability for the repository containing this JIT data directory.
+    pub(crate) fn open_repository_capability(&self) -> Result<Dir> {
+        let root = repository_root_for_storage(&self.root)?;
+        Dir::open_ambient_dir(root, ambient_authority())
+            .with_context(|| format!("Failed to open repository root {}", root.display()))
+    }
+
+    /// Capture byte-exact profile target paths and their existing ancestors.
+    ///
+    /// The selected data directory is exposed through the canonical virtual
+    /// `.jit/` prefix so custom `JIT_DATA_DIR` storage uses the same planner
+    /// model. Unrelated trees such as Cargo targets or Node modules are never
+    /// read into memory.
+    pub(crate) fn capture_profile_snapshot<'a>(
+        &self,
+        paths: impl IntoIterator<Item = &'a str>,
+    ) -> Result<crate::profile::RepositorySnapshot> {
+        let repository_root = repository_root_for_storage(&self.root)?.to_path_buf();
+        let entries =
+            paths
+                .into_iter()
+                .try_fold(BTreeMap::new(), |mut entries, virtual_path| {
+                    capture_profile_path(
+                        &repository_root,
+                        &self.root,
+                        Path::new(virtual_path),
+                        &mut entries,
+                    )?;
+                    Ok::<_, anyhow::Error>(entries)
+                })?;
+        crate::profile::RepositorySnapshot::new(repository_root, entries).map_err(Into::into)
     }
 
     /// Check if the storage directory exists and is initialized.
@@ -592,8 +699,104 @@ impl JsonFileStorage {
     }
 }
 
+fn repository_root_for_storage(storage_root: &Path) -> Result<&Path> {
+    storage_root
+        .parent()
+        .map(|parent| {
+            if parent.as_os_str().is_empty() {
+                Path::new(".")
+            } else {
+                parent
+            }
+        })
+        .context("JIT data directory has no repository parent")
+}
+
+fn capture_profile_path(
+    repository_root: &Path,
+    storage_root: &Path,
+    requested: &Path,
+    entries: &mut BTreeMap<PathBuf, crate::profile::SnapshotEntry>,
+) -> Result<()> {
+    let mut virtual_path = PathBuf::new();
+    let mut real_path = repository_root.to_path_buf();
+    for (index, component) in requested.components().enumerate() {
+        virtual_path.push(component.as_os_str());
+        if index == 0 && component.as_os_str() == ".jit" {
+            real_path = storage_root.to_path_buf();
+        } else {
+            real_path.push(component.as_os_str());
+        }
+        if entries.contains_key(&virtual_path) {
+            if !matches!(
+                entries.get(&virtual_path),
+                Some(crate::profile::SnapshotEntry::Directory)
+            ) {
+                break;
+            }
+            continue;
+        }
+        let Some(entry) = capture_profile_entry(&real_path)? else {
+            break;
+        };
+        let recurse = matches!(entry, crate::profile::SnapshotEntry::Directory);
+        entries.insert(virtual_path.clone(), entry);
+        if !recurse {
+            break;
+        }
+    }
+    Ok(())
+}
+
+fn capture_profile_entry(real_path: &Path) -> Result<Option<crate::profile::SnapshotEntry>> {
+    use crate::profile::{ProjectedFileMode, SnapshotEntry, SnapshotFile};
+
+    let metadata = match fs::symlink_metadata(real_path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(error).with_context(|| format!("Failed to inspect {}", real_path.display()))
+        }
+    };
+    if metadata.file_type().is_symlink() {
+        return Ok(Some(SnapshotEntry::Symlink {
+            target: fs::read_link(real_path)
+                .with_context(|| format!("Failed to read link {}", real_path.display()))?,
+        }));
+    }
+    if metadata.is_dir() {
+        return Ok(Some(SnapshotEntry::Directory));
+    }
+    if metadata.is_file() {
+        return Ok(Some(SnapshotEntry::File(SnapshotFile {
+            bytes: fs::read(real_path)
+                .with_context(|| format!("Failed to read {}", real_path.display()))?,
+            mode: if profile_file_is_executable(&metadata) {
+                ProjectedFileMode::Executable
+            } else {
+                ProjectedFileMode::Regular
+            },
+        })));
+    }
+    Ok(Some(SnapshotEntry::Unsupported {
+        reason: "not a regular file, directory, or symbolic link".to_string(),
+    }))
+}
+
+#[cfg(unix)]
+fn profile_file_is_executable(metadata: &fs::Metadata) -> bool {
+    use std::os::unix::fs::PermissionsExt as _;
+    metadata.permissions().mode() & 0o111 != 0
+}
+
+#[cfg(not(unix))]
+fn profile_file_is_executable(_metadata: &fs::Metadata) -> bool {
+    false
+}
+
 impl IssueStore for JsonFileStorage {
     fn init(&self) -> Result<()> {
+        let _repo_lock = self.repo_lock.acquire()?;
         // `init` is the one command that does not pass through `validate()`, so
         // it must run the same format guard itself: re-initializing over an
         // EXISTING repository whose `index.json` is newer than this binary
@@ -638,6 +841,43 @@ impl IssueStore for JsonFileStorage {
 
     fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard> {
         self.repo_lock.acquire()
+    }
+
+    fn run_external_process<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
+        let mut retained = self
+            .recovery_session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Some(session) = retained.take() else {
+            return operation();
+        };
+
+        // External checkers may invoke mutating jit subprocesses. Release the
+        // process-local session guards before spawning them so those subprocesses
+        // acquire the ordinary cross-process bootstrap → repository chain.
+        drop(session);
+        let operation_result = operation();
+
+        // Re-establish the boundary before the caller can persist a verdict.
+        // This also repairs a journal left by a checker-side mutation that
+        // crashed after preparing or committing its transaction.
+        match RecoveryCoordinator::recover_before_services(self) {
+            Ok(session) => {
+                *retained = Some(session);
+                operation_result
+            }
+            Err(recovery_error) => {
+                let context = match operation_result {
+                    Ok(_) => "Failed to restore recovery serialization after external process"
+                        .to_string(),
+                    Err(operation_error) => format!(
+                        "Failed to restore recovery serialization after external process; \
+                         the external process also failed: {operation_error:#}"
+                    ),
+                };
+                Err(recovery_error.context(context))
+            }
+        }
     }
 
     fn save_issue(&self, mut issue: Issue) -> Result<()> {
@@ -867,30 +1107,8 @@ impl IssueStore for JsonFileStorage {
         let events_lock_path = self.root.join(".events.lock");
         let _lock = self.locker.lock_shared(&events_lock_path)?;
 
-        let file = fs::File::open(&events_path).context("Failed to open events file")?;
-        let reader = BufReader::new(file);
-
-        let mut events = Vec::new();
-        for line in reader.lines() {
-            let line = line.context("Failed to read line from events file")?;
-            if line.trim().is_empty() {
-                continue;
-            }
-            let value: serde_json::Value =
-                serde_json::from_str(&line).context("Failed to deserialize event")?;
-            let event_type = value
-                .as_object()
-                .and_then(|object| object.get("type"))
-                .and_then(serde_json::Value::as_str)
-                .context("Event record is missing a string type")?;
-            if EventTag::ALL.iter().any(|tag| tag.as_str() == event_type) {
-                events.push(
-                    serde_json::from_value(value).context("Failed to deserialize known event")?,
-                );
-            }
-        }
-
-        Ok(events)
+        let contents = fs::read_to_string(&events_path).context("Failed to read events file")?;
+        parse_known_events(&contents).context("Failed to deserialize event log")
     }
 
     fn read_artifact_archive_events(&self) -> Result<Vec<Event>> {
@@ -932,6 +1150,8 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()> {
+        let _repo_lock = self.repo_lock.acquire()?;
+
         // Single source for the run's location; create its parent directory.
         let result_path = self.result_path(&result.run_id);
         let run_dir = result_path
@@ -1040,6 +1260,7 @@ impl IssueStore for JsonFileStorage {
         // the same shape-level inputs as the read path (empty, absolute,
         // `..`-escaping) before any I/O.
         validate_repo_relative_input(rel_path)?;
+        let _repo_lock = self.repo_lock.acquire().map_err(PathReadError::Other)?;
 
         // Resolve repo root (parent of `.jit`) and join the validated relative
         // path. Shape validation alone is not enough: a symlinked directory
@@ -1101,6 +1322,7 @@ impl IssueStore for JsonFileStorage {
     ) -> Result<std::path::PathBuf> {
         // Validate preset
         preset.validate()?;
+        let _repo_lock = self.repo_lock.acquire()?;
 
         // Create presets directory if needed
         let presets_dir = self.root.join("config").join("gate-presets");
@@ -1257,6 +1479,34 @@ mod tests {
     use crate::storage::IssueStore;
     use tempfile::TempDir;
 
+    fn assert_direct_writer_waits_for_repository_guard(
+        storage: &JsonFileStorage,
+        writer: impl FnOnce(JsonFileStorage) -> Result<()> + Send + 'static,
+    ) {
+        let guard = storage.repo_lock.acquire().unwrap();
+        let writer_storage = storage.clone();
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let handle = std::thread::spawn(move || {
+            started_tx.send(()).unwrap();
+            done_tx.send(writer(writer_storage)).unwrap();
+        });
+
+        started_rx.recv().unwrap();
+        assert!(
+            done_rx
+                .recv_timeout(std::time::Duration::from_millis(100))
+                .is_err(),
+            "direct storage writer bypassed the held repository guard"
+        );
+        drop(guard);
+        done_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("writer did not resume after repository guard release")
+            .unwrap();
+        handle.join().unwrap();
+    }
+
     fn setup_storage() -> (TempDir, JsonFileStorage) {
         let temp_dir = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp_dir.path());
@@ -1385,6 +1635,24 @@ mod tests {
         assert!(!temp.path().join("../escape.md").exists());
     }
 
+    #[test]
+    fn test_write_repo_file_waits_for_repository_guard() {
+        let temp = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(temp.path().join(".jit"));
+        storage.init().unwrap();
+
+        assert_direct_writer_waits_for_repository_guard(&storage, |storage| {
+            storage
+                .write_repo_file("docs/serialized.md", "serialized")
+                .map_err(anyhow::Error::from)
+        });
+
+        assert_eq!(
+            fs::read_to_string(temp.path().join("docs/serialized.md")).unwrap(),
+            "serialized"
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn test_write_repo_file_rejects_symlinked_parent_escape() {
@@ -1467,6 +1735,7 @@ mod tests {
             issue_id: "issue-1".to_string(),
             commit: None,
             branch: None,
+            tree_dirty: None,
             status: GateRunStatus::Passed,
             started_at: now,
             completed_at: Some(now),
@@ -1496,6 +1765,78 @@ mod tests {
         let loaded = storage.list_gate_runs_for_issue("issue-1").unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].run_id, "run-atomic");
+    }
+
+    #[test]
+    fn test_save_gate_run_result_waits_for_repository_guard() {
+        use crate::domain::{GateRunResult, GateRunStatus, GateStage};
+        use chrono::Utc;
+
+        let temp = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(temp.path().join(".jit"));
+        storage.init().unwrap();
+        let now = Utc::now();
+        let result = GateRunResult {
+            schema_version: 1,
+            run_id: "run-serialized".to_string(),
+            gate_key: "tests".to_string(),
+            stage: GateStage::Postcheck,
+            issue_id: "issue-serialized".to_string(),
+            commit: None,
+            branch: None,
+            tree_dirty: None,
+            status: GateRunStatus::Passed,
+            started_at: now,
+            completed_at: Some(now),
+            duration_ms: Some(1),
+            exit_code: Some(0),
+            stdout: String::new(),
+            stderr: String::new(),
+            command: "true".to_string(),
+            by: None,
+            message: None,
+            findings: None,
+        };
+
+        assert_direct_writer_waits_for_repository_guard(&storage, move |storage| {
+            storage.save_gate_run_result(&result)
+        });
+
+        assert!(temp
+            .path()
+            .join(".jit/gate-runs/run-serialized/result.json")
+            .exists());
+    }
+
+    #[test]
+    fn test_save_gate_preset_waits_for_repository_guard() {
+        use crate::domain::{GateMode, GateStage};
+        use crate::gate_presets::{GatePresetDefinition, GateTemplate};
+
+        let temp = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(temp.path().join(".jit"));
+        storage.init().unwrap();
+        let preset = GatePresetDefinition {
+            name: "serialized".to_string(),
+            description: "Serialized preset".to_string(),
+            gates: vec![GateTemplate {
+                key: "review".to_string(),
+                title: "Review".to_string(),
+                description: "Review gate".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+            }],
+        };
+
+        assert_direct_writer_waits_for_repository_guard(&storage, move |storage| {
+            storage.save_gate_preset(&preset).map(|_| ())
+        });
+
+        assert!(temp
+            .path()
+            .join(".jit/config/gate-presets/serialized.json")
+            .exists());
     }
 
     #[test]

@@ -106,8 +106,20 @@ pub struct EmbeddedArtifactOwner {
     pub issue: String,
     /// Current lifecycle state of the owner.
     pub state: State,
+    /// Pre-archive origin, so an `Archived` owner classifies by its effective
+    /// terminal state (`jit:45a140ae`).
+    pub archived_from: Option<State>,
     /// Whether the owner belongs to the selected resolved subtree.
     pub inside_subtree: bool,
+}
+
+impl EmbeddedArtifactOwner {
+    /// Whether this owner is terminal for archival classification, accounting for
+    /// terminality-preserving `Archived`
+    /// ([`crate::domain::is_effectively_terminal`]).
+    pub fn is_effectively_terminal(&self) -> bool {
+        crate::domain::is_effectively_terminal(self.state, self.archived_from)
+    }
 }
 
 /// Existing state of a container's short-id destination directory.
@@ -314,10 +326,10 @@ fn classify_entry(
         || repository_embedded
             .iter()
             .any(|owner| embedded_owner_is_outside(owner, target));
-    let active_owner = owners.iter().any(|owner| !owner.state.is_terminal())
+    let active_owner = owners.iter().any(|owner| !owner.is_effectively_terminal())
         || repository_embedded
             .iter()
-            .any(|owner| !owner.state.is_terminal());
+            .any(|owner| !owner.is_effectively_terminal());
     let unselected_unpinned = owners
         .iter()
         .any(|owner| !owner.pinned && !owner.selected_for_relink);
@@ -518,7 +530,7 @@ fn selected_destination_roots(
                 .any(|root| contains_path(root, source));
             let selected = match target {
                 PlanTarget::Container { .. } => entry.owners().iter().any(|owner| {
-                    owner.inside_subtree && owner.state.is_terminal() && !owner.pinned
+                    owner.inside_subtree && owner.is_effectively_terminal() && !owner.pinned
                 }),
                 PlanTarget::Document { .. } => document_all_terminal,
             };
@@ -617,7 +629,7 @@ fn select_direct_owners(
                 && !archived_source
                 && match target {
                     PlanTarget::Container { .. } => {
-                        owner.inside_subtree && owner.state.is_terminal()
+                        owner.inside_subtree && owner.is_effectively_terminal()
                     }
                     PlanTarget::Document { .. } => document_all_terminal,
                 };
@@ -638,10 +650,10 @@ fn document_owners_all_terminal(
     artifacts
         .iter()
         .flat_map(ArtifactPlanEntry::owners)
-        .all(|owner| owner.state.is_terminal())
+        .all(|owner| owner.is_effectively_terminal())
         && embedded.iter().all(|owner| {
             !inventory_paths.contains(&normalize_artifact_path(&owner.artifact))
-                || owner.state.is_terminal()
+                || owner.is_effectively_terminal()
         })
 }
 
@@ -846,10 +858,32 @@ mod tests {
             issue: issue.to_string(),
             document_index: 0,
             state,
+            archived_from: None,
             inside_subtree: inside,
             pinned: false,
             selected_for_relink: false,
         }
+    }
+
+    fn archived_owner(issue: &str, archived_from: Option<State>, inside: bool) -> ArtifactOwner {
+        ArtifactOwner {
+            archived_from,
+            ..owner(issue, State::Archived, inside)
+        }
+    }
+
+    #[test]
+    fn test_owner_effective_terminality_preserves_archived_origin() {
+        // An owner archived from a terminal state is effectively terminal (its
+        // documents can be archived); one archived from a non-terminal state, or
+        // a legacy archived owner with no recorded origin, is not — it still
+        // counts as an active owner.
+        assert!(archived_owner("owner", Some(State::Done), true).is_effectively_terminal());
+        assert!(archived_owner("owner", Some(State::Rejected), true).is_effectively_terminal());
+        assert!(!archived_owner("owner", Some(State::InProgress), true).is_effectively_terminal());
+        assert!(!archived_owner("owner", None, true).is_effectively_terminal());
+        assert!(owner("owner", State::Done, true).is_effectively_terminal());
+        assert!(!owner("owner", State::InProgress, true).is_effectively_terminal());
     }
 
     fn explicit(path: &str, owners: Vec<ArtifactOwner>) -> ArtifactPlanEntry {
@@ -1200,6 +1234,7 @@ mod tests {
             root: "dev/active/outside.md".into(),
             issue: "outside".into(),
             state: State::Done,
+            archived_from: None,
             inside_subtree: false,
         });
         let plan = container(
@@ -1329,6 +1364,7 @@ mod tests {
             root: "dev/active/active-parent.md".into(),
             issue: "active".into(),
             state: State::InProgress,
+            archived_from: None,
             inside_subtree: false,
         });
         let plan = classify(
@@ -1362,6 +1398,7 @@ mod tests {
             root: "dev/active/unrelated.md".into(),
             issue: "active".into(),
             state: State::InProgress,
+            archived_from: None,
             inside_subtree: false,
         });
         let plan = classify(
@@ -1413,6 +1450,7 @@ mod tests {
             root: "dev/active/doc.md".into(),
             issue: "done".into(),
             state: State::Done,
+            archived_from: None,
             inside_subtree: false,
         });
         let plan = classify(

@@ -14,14 +14,24 @@
   ],
   "gates_status": {
     "docs-mechanical": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:38:45.867466541Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:30:47.616865618Z"
     },
     "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:38:45.859084795Z"
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:35:33.605578782Z"
+    },
+    "cargo-ci": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:28:53.596626865Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:30:48.200313632Z"
     }
   },
   "context": {},
@@ -32,6 +42,13 @@
       "label": "Use-case analysis",
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/active/3e12ffbd-batch-export-design.md",
+      "commit": null,
+      "label": "Batch export design",
+      "doc_type": "design",
+      "format": "markdown"
     }
   ],
   "labels": [
@@ -40,7 +57,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-07T09:07:13.958951843Z",
-  "updated_at": "2026-07-16T08:40:04.675513069Z",
+  "updated_at": "2026-07-16T15:37:20.014066800Z",
   "first_ready_at": "2026-07-07T09:07:13.958962083Z",
   "claimed_at": "2026-07-16T08:40:04.675512859Z"
 }

@@ -2,16 +2,15 @@
 //!
 //! Three presets bundle the gates that bracket a breakable container:
 //!
-//! - [`plan_review_preset`] attaches the **agent** plan-quality gate to the
+//! - [`plan_review_preset`] attaches the external-review placeholder to the
 //!   planning node `P` (`type:planning`). It mirrors the `plan-review` gate
-//!   already registered in adopting repos so applying the preset is sufficient
-//!   even when that gate has not been hand-defined yet.
+//!   authored by the embedded dogfood profile.
 //! - [`coverage_preview_preset`] attaches the **deterministic** coverage-preview
 //!   gate to the breakdown node `B` (`type:breakdown`). Its checker resolves the
 //!   container `C` from `B`'s `brackets:<C-short-id>` label and runs
 //!   `jit validate --scope <C>` (T2), which exits 4 when a `[hard]` criterion is
 //!   left uncovered.
-//! - [`breakdown_review_preset`] attaches the **agent** breakdown-quality gate to
+//! - [`breakdown_review_preset`] attaches the external-review placeholder to
 //!   the same breakdown node `B` — the quality half of `B`'s quality-vs-coverage
 //!   split. It reviews the decomposition itself (content standards, dependency-DAG
 //!   coherence, right-sized depth) and does not re-check `[hard]` coverage.
@@ -28,10 +27,9 @@
 //! runs on.
 
 use super::{GatePresetDefinition, GateTemplate};
-use crate::domain::{GateChecker, GateMode, GateStage};
+use crate::profile::jit_dogfood_gate;
 use crate::validation::rules::{Assertion, Rule, Selector};
 use anyhow::{anyhow, Result};
-use std::collections::HashMap;
 
 /// Preset name for the agent plan-quality gate (planning node `P`).
 pub const PLAN_REVIEW_PRESET: &str = "plan-review";
@@ -47,79 +45,31 @@ pub const BREAKDOWN_REVIEW_PRESET: &str = "breakdown-review";
 
 /// Build the `plan-review` preset: an agent review gate for the planning node.
 ///
-/// The single bundled gate is an auto (command-backed) postcheck mirroring the
-/// `plan-review` gate registered in adopting repos (checker
-/// `./scripts/ai-review.sh`, reviewer agent + prompt file supplied via env /
-/// `prompt_file`, structured context passed). Applying this preset to a
-/// `type:planning` issue attaches that gate, so the plan is reviewed before the
-/// fan-out (D8).
-pub fn plan_review_preset() -> GatePresetDefinition {
-    let mut env = HashMap::new();
-    env.insert("REVIEWER_AGENT".to_string(), "codex exec".to_string());
-
-    GatePresetDefinition {
-        name: PLAN_REVIEW_PRESET.to_string(),
-        description: "Agent plan-quality review on the planning node before fan-out".to_string(),
-        gates: vec![GateTemplate {
-            key: "plan-review".to_string(),
-            title: "AI Plan Review".to_string(),
-            description:
-                "AI-powered plan/design review before fan-out, against the planning issue's \
-                 success criteria and linked design document"
-                    .to_string(),
-            stage: GateStage::Postcheck,
-            mode: GateMode::Auto,
-            checker: Some(GateChecker::Exec {
-                command: "./scripts/ai-review.sh".to_string(),
-                timeout_seconds: 1800,
-                working_dir: None,
-                env,
-                pass_context: true,
-                prompt: None,
-                prompt_file: Some("./scripts/plan-review-prompt.md".to_string()),
-            }),
-        }],
-    }
+/// The gate shape is derived from the embedded `jit-dogfood` package. Its
+/// review-placeholder checker makes an unconfigured external reviewer visible
+/// without making the built-in preset a second authored definition.
+///
+/// # Errors
+///
+/// Returns an error if the embedded dogfood package or its gate definition is
+/// invalid.
+pub fn plan_review_preset() -> Result<GatePresetDefinition> {
+    package_gate_preset(PLAN_REVIEW_PRESET)
 }
 
 /// Build the `coverage-preview` preset: a deterministic coverage gate for the
 /// breakdown node.
 ///
-/// The bundled gate is an auto postcheck whose checker is
-/// `./scripts/coverage-preview.sh`. JIT sets `JIT_ISSUE_ID` to the gated
-/// issue (the breakdown node `B`); the script reads `B`'s `brackets:<C-short-id>`
-/// label to recover the container `C` and runs `jit validate --scope <C>` (T2),
-/// which exits 4 — failing the gate — when the drafted children leave a
-/// `[hard]` criterion uncovered. The container thus reaches the checker via
-/// issue context, mirroring the other context-bearing gates; nothing here is
-/// hardcoded to a particular container type.
-pub fn coverage_preview_preset() -> GatePresetDefinition {
-    GatePresetDefinition {
-        name: COVERAGE_PREVIEW_PRESET.to_string(),
-        description: "Deterministic coverage preview on the breakdown node (scoped validate)"
-            .to_string(),
-        gates: vec![GateTemplate {
-            key: COVERAGE_PREVIEW_GATE.to_string(),
-            title: "Coverage Preview".to_string(),
-            description:
-                "Run scoped validation for the container resolved from the breakdown node's \
-                 brackets: label; blocks when a [hard] criterion is uncovered at plan time"
-                    .to_string(),
-            stage: GateStage::Postcheck,
-            mode: GateMode::Auto,
-            checker: Some(GateChecker::Exec {
-                command: "./scripts/coverage-preview.sh".to_string(),
-                timeout_seconds: 300,
-                working_dir: None,
-                env: HashMap::new(),
-                // Context is passed so the script can fall back to the gate
-                // context file; it primarily uses JIT_ISSUE_ID.
-                pass_context: true,
-                prompt: None,
-                prompt_file: None,
-            }),
-        }],
-    }
+/// The package-authored native checker resolves the container from the gated
+/// breakdown issue's `brackets:<short-id>` label and runs scoped validation
+/// in-process. Nothing here is hardcoded to a particular container type.
+///
+/// # Errors
+///
+/// Returns an error if the embedded dogfood package or its gate definition is
+/// invalid.
+pub fn coverage_preview_preset() -> Result<GatePresetDefinition> {
+    package_gate_preset(COVERAGE_PREVIEW_PRESET)
 }
 
 /// Build the `breakdown-review` preset: an **agent** quality review of the
@@ -134,42 +84,33 @@ pub fn coverage_preview_preset() -> GatePresetDefinition {
 /// deliberately does **not** re-check `[hard]`-criterion coverage; that is the
 /// deterministic gate's job.
 ///
-/// The single bundled gate mirrors [`plan_review_preset`]'s command-backed agent
-/// mechanism (checker `./scripts/ai-review.sh`, reviewer agent via env, structured
-/// context passed) but points at `./scripts/breakdown-review-prompt.md`. Because
-/// it is an ordinary postcheck gate on `B`, jit's gate enforcement is
-/// self-guiding: `B` cannot complete — and the impl fan-out it gates cannot be
-/// released — until the review passes.
-pub fn breakdown_review_preset() -> GatePresetDefinition {
-    let mut env = HashMap::new();
-    env.insert("REVIEWER_AGENT".to_string(), "codex exec".to_string());
+/// The gate shape is derived from the embedded `jit-dogfood` package and begins
+/// as a visible review placeholder. Because it is an ordinary postcheck gate on
+/// `B`, jit's gate enforcement remains self-guiding after an adopter replaces
+/// the placeholder with its reviewer integration.
+///
+/// # Errors
+///
+/// Returns an error if the embedded dogfood package or its gate definition is
+/// invalid.
+pub fn breakdown_review_preset() -> Result<GatePresetDefinition> {
+    package_gate_preset(BREAKDOWN_REVIEW_PRESET)
+}
 
-    GatePresetDefinition {
-        name: BREAKDOWN_REVIEW_PRESET.to_string(),
-        description: "Agent quality review of the decomposition on the breakdown node before \
-                      fan-out"
-            .to_string(),
+pub(crate) fn package_gate_preset(key: &str) -> Result<GatePresetDefinition> {
+    let gate = jit_dogfood_gate(key)?;
+    Ok(GatePresetDefinition {
+        name: key.to_string(),
+        description: gate.description.clone(),
         gates: vec![GateTemplate {
-            key: "breakdown-review".to_string(),
-            title: "AI Breakdown Review".to_string(),
-            description:
-                "AI-powered adversarial review of a breakdown against the design doc and content \
-                 standards: per-child content standards, dependency-DAG coherence, and right-sized \
-                 decomposition (coverage of [hard] criteria is the separate coverage-preview gate)"
-                    .to_string(),
-            stage: GateStage::Postcheck,
-            mode: GateMode::Auto,
-            checker: Some(GateChecker::Exec {
-                command: "./scripts/ai-review.sh".to_string(),
-                timeout_seconds: 1800,
-                working_dir: None,
-                env,
-                pass_context: true,
-                prompt: None,
-                prompt_file: Some("./scripts/breakdown-review-prompt.md".to_string()),
-            }),
+            key: gate.key,
+            title: gate.title,
+            description: gate.description,
+            stage: gate.stage,
+            mode: gate.mode,
+            checker: gate.checker,
         }],
-    }
+    })
 }
 
 /// Derive the **preview** coverage rule from a **closure** `label-coverage`
@@ -296,6 +237,7 @@ pub fn preview_coverage_rule(closure: &Rule, breakdown_type: &str) -> Result<Rul
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::{GateMode, GateStage};
     use crate::validation::rules::RuleSet;
     use std::path::Path;
 
@@ -314,7 +256,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 
     #[test]
     fn test_plan_review_preset_attaches_agent_gate() {
-        let preset = plan_review_preset();
+        let preset = plan_review_preset().unwrap();
         assert_eq!(preset.name, "plan-review");
         assert_eq!(preset.gates.len(), 1);
 
@@ -323,33 +265,16 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
         assert_eq!(gate.stage, GateStage::Postcheck);
         assert_eq!(gate.mode, GateMode::Auto);
 
-        match gate.checker.as_ref().expect("agent gate has a checker") {
-            GateChecker::Exec {
-                command,
-                pass_context,
-                prompt_file,
-                env,
-                ..
-            } => {
-                assert_eq!(command, "./scripts/ai-review.sh");
-                assert!(*pass_context, "agent gate passes structured context");
-                assert_eq!(
-                    prompt_file.as_deref(),
-                    Some("./scripts/plan-review-prompt.md")
-                );
-                assert_eq!(
-                    env.get("REVIEWER_AGENT").map(String::as_str),
-                    Some("codex exec")
-                );
-            }
-            other => panic!("expected exec checker, got {other:?}"),
-        }
+        assert_eq!(
+            gate.checker,
+            Some(crate::domain::GateChecker::ReviewPlaceholder)
+        );
         assert!(preset.validate().is_ok());
     }
 
     #[test]
     fn test_breakdown_review_preset_attaches_agent_gate() {
-        let preset = breakdown_review_preset();
+        let preset = breakdown_review_preset().unwrap();
         assert_eq!(preset.name, "breakdown-review");
         assert_eq!(preset.gates.len(), 1);
 
@@ -358,33 +283,16 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
         assert_eq!(gate.stage, GateStage::Postcheck);
         assert_eq!(gate.mode, GateMode::Auto);
 
-        match gate.checker.as_ref().expect("agent gate has a checker") {
-            GateChecker::Exec {
-                command,
-                pass_context,
-                prompt_file,
-                env,
-                ..
-            } => {
-                assert_eq!(command, "./scripts/ai-review.sh");
-                assert!(*pass_context, "agent gate passes structured context");
-                assert_eq!(
-                    prompt_file.as_deref(),
-                    Some("./scripts/breakdown-review-prompt.md")
-                );
-                assert_eq!(
-                    env.get("REVIEWER_AGENT").map(String::as_str),
-                    Some("codex exec")
-                );
-            }
-            other => panic!("expected exec checker, got {other:?}"),
-        }
+        assert_eq!(
+            gate.checker,
+            Some(crate::domain::GateChecker::ReviewPlaceholder)
+        );
         assert!(preset.validate().is_ok());
     }
 
     #[test]
     fn test_coverage_preview_preset_runs_scoped_validate() {
-        let preset = coverage_preview_preset();
+        let preset = coverage_preview_preset().unwrap();
         assert_eq!(preset.name, "coverage-preview");
         assert_eq!(preset.gates.len(), 1);
 
@@ -393,17 +301,10 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
         assert_eq!(gate.mode, GateMode::Auto);
 
         match gate.checker.as_ref().expect("coverage gate has a checker") {
-            GateChecker::Exec {
-                command,
-                pass_context,
-                ..
-            } => {
-                // The checker resolves C from B's brackets: label (via
-                // JIT_ISSUE_ID) and runs `jit validate --scope <C>`.
-                assert_eq!(command, "./scripts/coverage-preview.sh");
-                assert!(*pass_context);
+            crate::domain::GateChecker::LabelTargetValidation { label_namespace } => {
+                assert_eq!(label_namespace, "brackets");
             }
-            other => panic!("expected exec checker, got {other:?}"),
+            other => panic!("expected label-target checker, got {other:?}"),
         }
         assert!(preset.validate().is_ok());
     }

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "run_id": "1bb9d419-8b7a-4518-822a-a93661956b38",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "52665a07-3d30-47e5-a3c7-d2aacc63cec5",
+  "commit": "33c48d6a5ad4acff53c7b805bf42b1c85d5f0e9a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T15:25:52.776166727Z",
+  "completed_at": "2026-07-16T15:28:26.269286944Z",
+  "duration_ms": 153493,
+  "exit_code": 1,
+  "stdout": "Attribution: `enhancement` is a level-4 leaf with no resolved children. I inspected the five reachable `jit:52665a07` commits individually; three contain the implementation/docs footprint, while two only create/claim issue metadata. Current-tree behavior was verified without attributing uncommitted work.\n\nThe project-preset how-to and generated builtin reference are largely aligned, but three issue-authored user-visible documentation defects remain.\n\n1. **F1 — blocking, issue-impact (medium):** The `jit gate preset list` reference output omits the shipped `breakdown-review` preset, although the current builtin registry contains all three planning-bracket presets. Add its `[builtin]` output line. [docs/reference/cli-commands.md:1806](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1806)\n\n2. **F2 — blocking, issue-impact (medium):** The revised CLI-help pipeline example passes human-readable `jit query all` output to `xargs`; that output includes headings, titles, states, and priorities, not only IDs. Replace it with the JSON-and-`jq` ID extraction used in the canonical reference. [crates/jit/src/cli.rs:1786](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:1786)\n\n3. **F3 — blocking, issue-impact (medium):** Newly added prose presents “the `plan` graph template” as the context for the builtins without saying that templates are project-declared, optional configuration. `jit init` does not scaffold `templates.toml`; clarify that only the three presets ship, while a project must declare a `plan` template to resolve them, and link the adoption guide. [docs/how-to/custom-gates.md:617](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:617)\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three issue-impact documentation defects remain: an incomplete builtin-list example, an invalid CLI-help pipeline, and an unstated project-config prerequisite for the plan template.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The preset-list output example omits the shipped breakdown-review builtin.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1806},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"CLI help pipes human-readable query output to xargs instead of extracting issue IDs from JSON.\",\"file\":\"crates/jit/src/cli.rs\",\"line\":1786},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Preset documentation implies a plan template is available without stating it is optional project-declared configuration.\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":617}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 13602 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6b88-c407-73e0-a4a9-cd9bce393da1\n--------\nuser\n--- 13589 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Three issue-impact documentation defects remain: an incomplete builtin-list example, an invalid CLI-help pipeline, and an unstated project-config prerequisite for the plan template.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The preset-list output example omits the shipped breakdown-review builtin.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1806
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "CLI help pipes human-readable query output to xargs instead of extracting issue IDs from JSON.",
+        "file": "crates/jit/src/cli.rs",
+        "line": 1786
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Preset documentation implies a plan template is available without stating it is optional project-declared configuration.",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 617
+      }
+    ]
+  }
+}

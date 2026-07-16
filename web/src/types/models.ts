@@ -34,6 +34,7 @@ export interface GateRunSummary {
   command: string;
   commit?: string;
   branch?: string;
+  tree_dirty?: boolean;
   by?: string;
   message?: string;
 }

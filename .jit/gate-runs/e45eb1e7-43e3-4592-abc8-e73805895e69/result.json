@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "e45eb1e7-43e3-4592-abc8-e73805895e69",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "46657f6f-5ee5-42d8-aba0-652346c4e2e4",
+  "commit": "50c7e54b4e3228f8568c3137e46d3515161de3e2",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T10:14:29.116991636Z",
+  "completed_at": "2026-07-16T10:15:56.928719140Z",
+  "duration_ms": 87811,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest commands::issue::tests::test_claim_issue_enforces_prechecks ... FAILED\ntest commands::issue::tests::test_claim_issue_succeeds_when_prechecks_pass ... FAILED\ntest commands::issue::tests::test_claim_rejects_different_assignee_when_already_assigned ... FAILED\ntest commands::issue::tests::test_claim_promotes_existing_same_assignee_assignment_once_unblocked ... FAILED\ntest commands::serve::tests::test_find_available_port_returns_bound_listener ... FAILED\ntest commands::serve::tests::test_find_available_port_skips_bound_port ... FAILED\ntest commands::serve::tests::test_start_server_errors_when_child_exits_immediately ... FAILED\ntest result: FAILED. 1758 passed; 7 failed; 4 ignored; 0 measured; 0 filtered out; finished in 5.17s\n---- commands::issue::tests::test_claim_issue_enforces_prechecks stdout ----\n\nthread 'commands::issue::tests::test_claim_issue_enforces_prechecks' (1406) panicked at crates/jit/src/commands/issue.rs:1274:9:\nassertion failed: result.unwrap_err().to_string().contains(\"tdd-reminder\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n---- commands::issue::tests::test_claim_issue_succeeds_when_prechecks_pass stdout ----\n\n---- commands::issue::tests::test_claim_rejects_different_assignee_when_already_assigned stdout ----\n\n---- commands::issue::tests::test_claim_promotes_existing_same_assignee_assignment_once_unblocked stdout ----\n\n---- commands::serve::tests::test_find_available_port_returns_bound_listener stdout ----\n\n---- commands::serve::tests::test_find_available_port_skips_bound_port stdout ----\n\n---- commands::serve::tests::test_start_server_errors_when_child_exits_immediately stdout ----\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1033 bytes=17731902)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=993595984/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
