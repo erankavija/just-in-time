@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>A workflow in one command — JIT epic 9b7b5f9c</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- reveal.js core only (no reveal theme — base.css + the theme token file own all appearance) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+
+<!-- KaTeX (synchronous math; deterministic heights for the fit-checker) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+<!-- Theme system: structure is theme-agnostic; swap the #theme link to retheme -->
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- ── 1 · TITLE ───────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>A workflow in one command</h1>
+  <p class="tagline">Versioned repository profiles and the portable <code>jit-dogfood</code> setup</p>
+  <p>JIT epic 9b7b5f9c &nbsp;·&nbsp; just-in-time &nbsp;·&nbsp; 2026-07-17</p>
+  <p class="caption">12 / 12 <span class="kbd">[hard]</span> criteria · 9 waves · 3,579 tests · one embedded v1.0 profile</p>
+</section>
+
+<!-- ── 2 · THE ADOPTION PROBLEM ────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Motivation <span class="num">· 2 / 20</span></span>
+  <h2>Adoption was an assembly project</h2>
+  <p>To reproduce JIT's recommended workflow, an adopter had to gather and align
+     policy from several locations:</p>
+  <ul>
+    <li>hierarchy, label namespaces, rules, and planning templates</li>
+    <li>gate definitions, checker scripts, and review prompts</li>
+    <li>agent skills, content standards, and managed projections</li>
+    <li><code>AGENTS.md</code> guidance and repository-specific file placement</li>
+  </ul>
+  <div class="note">The problem was not missing primitives. It was installing one coherent, portable combination without drift.</div>
+</section>
+
+<!-- ── 3 · ONE PUBLIC WORKFLOW ─────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Adoption <span class="num">· 3 / 20</span></span>
+  <h2>New or existing repository — the same application path</h2>
+<pre><code class="language-bash" data-trim># preferred setup for a new repository
+mkdir my-project &amp;&amp; cd my-project
+jit init --profile jit-dogfood
+
+# add the workflow to an existing JIT repository
+jit profile apply jit-dogfood --dry-run
+jit profile apply jit-dogfood</code></pre>
+  <div class="note">Plain <code>jit init</code> remains methodology-neutral. Choosing the profile is explicit.</div>
+</section>
+
+<!-- ── 4 · PACKAGE CONTRACT ────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Package contract <span class="num">· 4 / 20</span></span>
+  <h2>Small, immutable, and deliberately boring</h2>
+  <table>
+    <thead><tr><th>Property</th><th>v1.0 contract</th></tr></thead>
+    <tbody>
+      <tr><td>Origin</td><td>embedded in the running <code>jit</code> binary</td></tr>
+      <tr><td>Identity</td><td>versioned TOML manifest + canonical package hash</td></tr>
+      <tr><td>Availability</td><td>offline; no network, Git, <code>jq</code>, or source checkout</td></tr>
+      <tr><td>Execution</td><td>semantic contributions and declared assets; no arbitrary install hooks</td></tr>
+      <tr><td>Engine boundary</td><td>workflow vocabulary stays configuration, never hardcoded behavior</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── 5 · REAL PACKAGE IDENTITY ───────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Package contract <span class="num">· 5 / 20</span></span>
+  <h2>Inspect exactly what the binary carries</h2>
+<pre><code class="language-bash" data-trim>$ jit profile show jit-dogfood
+Profile: jit-dogfood
+Version: 1.0.0
+Origin: embedded
+Compatible JIT: &gt;=0.2.1, &lt;0.3.0
+Files: 64 (450657 bytes)
+Targets: 67</code></pre>
+  <ul>
+    <li><code>profile show --json</code> exposes the full manifest and target hashes</li>
+    <li>generated JSON Schema constrains manifest, request, result, and error shapes</li>
+  </ul>
+</section>
+
+<!-- ── 6 · WHAT GETS INSTALLED ─────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Installed workflow <span class="num">· 6 / 20</span></span>
+  <h2>One package, four coordinated layers</h2>
+  <div class="two-col">
+    <div>
+      <h3>Method</h3>
+      <ul>
+        <li>milestone → epic → story → task hierarchy</li>
+        <li>planning, breakdown, bug, enhancement types</li>
+        <li>epic-only plan-before-fan-out template</li>
+        <li>hard-criterion coverage rules</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Agent surface</h3>
+      <ul>
+        <li>plan, breakdown, code, and validation gates</li>
+        <li>portable prompts and checker scripts</li>
+        <li>repository-neutral JIT skill suite</li>
+        <li>content standards and managed projections</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note">The manifest is the package inventory; renderers derive from it instead of maintaining a second workflow list.</div>
+</section>
+
+<!-- ── 7 · PLAN-BEFORE-FAN-OUT ─────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Installed workflow <span class="num">· 7 / 20</span></span>
+  <h2>The planning bracket arrives ready to use</h2>
+  <table>
+    <thead><tr><th>Phase</th><th>Node</th><th>Required checkpoint</th><th>Unlocks</th></tr></thead>
+    <tbody>
+      <tr><td>Plan</td><td>planning</td><td><code>plan-review</code></td><td>decomposition</td></tr>
+      <tr><td>Decompose</td><td>breakdown</td><td><code>coverage-preview</code> + <code>breakdown-review</code></td><td>implementation</td></tr>
+      <tr><td>Build</td><td>task / bug / enhancement</td><td>configured issue gates</td><td>epic completion</td></tr>
+      <tr><td>Close</td><td>epic</td><td><code>repo-validate</code> + hard-criteria coverage</td><td>Done</td></tr>
+    </tbody>
+  </table>
+  <p>Planning and decomposition are explicit quality checkpoints; implementation
+     fans out only after both pass.</p>
+</section>
+
+<!-- ── 8 · DRY RUN ─────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Determinism <span class="num">· 8 / 20</span></span>
+  <h2>Preview the final state, not a best-effort script</h2>
+<pre><code class="language-json" data-trim>{
+  "status": "would_apply",
+  "plan_hash": "…",
+  "targets": [
+    { "path": ".jit/config.toml", "action": "update" },
+    { "path": "scripts/ai-review.sh",
+      "action": "create", "executable": true }
+  ]
+}</code></pre>
+  <p><code>--dry-run</code> builds and validates the complete deterministic plan
+     without writing.</p>
+</section>
+
+<!-- ── 9 · EXACT REAPPLICATION ─────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Determinism <span class="num">· 9 / 20</span></span>
+  <h2>Exact reapplication is a successful no-op</h2>
+<pre><code class="language-bash" data-trim>$ jit profile apply jit-dogfood --dry-run
+Profile jit-dogfood 1.0.0: unchanged
+  unchanged: .jit/config.toml
+  unchanged: .jit/gates.toml
+  ...
+  unchanged: scripts/plan-review-prompt.md
+# 67 / 67 projected targets unchanged</code></pre>
+  <ul>
+    <li><code>.jit/profiles/jit-dogfood.json</code> records version, origin, package hash, and target hashes.</li>
+    <li>A successful application appends the repository-scoped <code>profile_applied</code> audit event.</li>
+  </ul>
+</section>
+
+<!-- ── 10 · PUBLICATION PIPELINE ───────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Safety <span class="num">· 10 / 20</span></span>
+  <h2>Validate first; publish once</h2>
+  <div class="item-decl">capture → plan → overlay validate → lock → rebuild plan → transact → verify</div>
+  <ol>
+    <li>Capture every target and repository input relevant to the package.</li>
+    <li>Build the complete merged final state in an overlay view.</li>
+    <li>Reject path, package, conflict, and repository-validation failures.</li>
+    <li>Acquire the repository-wide mutation lock and rebuild the plan.</li>
+    <li>Publish the file set through one durable transaction protocol.</li>
+  </ol>
+  <div class="note">A preflight failure mutates no target. The plan checked before locking cannot go stale unnoticed.</div>
+</section>
+
+<!-- ── 11 · ROLLBACK AND RECOVERY ──────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Safety <span class="num">· 11 / 20</span></span>
+  <h2>Handled failure rolls back; uncertainty becomes durable</h2>
+  <div class="two-col">
+    <div>
+      <h3>Before commit point</h3>
+      <ul>
+        <li>restore every old byte and mode</li>
+        <li>verify exact rollback</li>
+        <li>return failure only after proof</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Crash or uncertain cleanup</h3>
+      <ul>
+        <li>retain a typed transaction journal</li>
+        <li>prepared → converge to all-old</li>
+        <li>committed → verify all-new, then clean</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note">Every later mutating JIT command performs mandatory recovery before normal repository services start.</div>
+</section>
+
+<!-- ── 12 · CONFLICT PRESERVATION ──────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Safety <span class="num">· 12 / 20</span></span>
+  <h2>Repository-owned content is not collateral</h2>
+  <table>
+    <thead><tr><th>Existing state</th><th>Outcome</th></tr></thead>
+    <tbody>
+      <tr><td>identical bytes</td><td><span class="badge green">unchanged</span> byte-exact no-op</td></tr>
+      <tr><td>different one-to-one asset</td><td><span class="badge orange">conflict</span> no overwrite</td></tr>
+      <tr><td>managed marked region</td><td>replace only the owned region</td></tr>
+      <tr><td>prose outside markers</td><td>preserved exactly</td></tr>
+      <tr><td>existing issues / Git history</td><td>never rewritten; no commits created</td></tr>
+    </tbody>
+  </table>
+  <p>Absolute paths, traversal, escaping symlinks, invalid interpolation, and
+     undeclared executable assets are rejected before publication.</p>
+</section>
+
+<!-- ── 13 · PUBLIC SURFACE ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Interfaces <span class="num">· 13 / 20</span></span>
+  <h2>CLI, JSON Schema, and MCP agree</h2>
+<pre><code class="language-bash" data-trim>jit profile list [--json]
+jit profile show &lt;id&gt; [--json]
+jit profile apply &lt;id&gt; [--dry-run] [--json]
+
+# generated MCP tools
+jit_profile_list
+jit_profile_show
+jit_profile_apply</code></pre>
+  <div class="note">The acceptance suite asserts the surface exactly, including that deferred install/compose/upgrade/remove/diff tools do not leak into schema or MCP.</div>
+</section>
+
+<!-- ── 14 · PORTABILITY CONTRACT ───────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Portability <span class="num">· 14 / 20</span></span>
+  <h2>Portable means tested under missing assumptions</h2>
+  <table>
+    <thead><tr><th>Assumption removed</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Git repository</td><td>fresh and existing adoption succeed with no <code>.git/</code></td></tr>
+      <tr><td>network</td><td>proxy endpoints forced to an unreachable local port</td></tr>
+      <tr><td><code>jq</code></td><td>checker <code>PATH</code> replaced by an allowlist without it</td></tr>
+      <tr><td>JIT source tree</td><td>installed assets execute from the adopter repository</td></tr>
+      <tr><td>Unix mode semantics</td><td>package intent asserted on all platforms; mode bits only on Unix</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── 15 · END-TO-END ACCEPTANCE ──────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Portability <span class="num">· 15 / 20</span></span>
+  <h2>The acceptance journey reaches implementation-ready work</h2>
+<pre><code class="language-bash" data-trim>jit init --profile jit-dogfood
+jit issue create "Acceptance epic" --type epic
+jit apply plan &lt;epic-id&gt;
+# pass plan review → add credited task → pass breakdown gates
+jit issue status &lt;breakdown-id&gt; &lt;task-id&gt;
+# breakdown: done · implementation task: ready</code></pre>
+  <ul>
+    <li>Ubuntu exercises the full installed-checker journey.</li>
+    <li>Windows verifies equivalent package state, paths, and executable intent.</li>
+  </ul>
+</section>
+
+<!-- ── 16 · DELIVERY QUALITY ───────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Delivery <span class="num">· 16 / 20</span></span>
+  <h2>Built as a gated system, not a feature pile</h2>
+  <table>
+    <thead><tr><th>Measure</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Direct epic children</td><td>13 / 13 done, 0 rejected</td></tr>
+      <tr><td>Execution waves</td><td>9 topological waves</td></tr>
+      <tr><td>Tracked worker / rework dispatches</td><td>at least 38</td></tr>
+      <tr><td>AI-review failures driving convergence</td><td>29 recorded runs</td></tr>
+      <tr><td>Final Rust gate</td><td>3,579 tests passed, 0 failed</td></tr>
+      <tr><td>Epic gates</td><td>cargo, repository, docs, doc review — 4 / 4</td></tr>
+    </tbody>
+  </table>
+  <p>Every review failure was treated as rework input; no quality gate was removed or bypassed.</p>
+</section>
+
+<!-- ── 17 · RECOVERY-LOCK BUG: CAUSE ───────────────────────────────────── -->
+<section>
+  <span class="seclabel">Hard-earned lesson <span class="num">· 17 / 20</span></span>
+  <h2>A universal safety boundary created a process boundary bug</h2>
+  <div class="item-decl">gate evaluate [holds recovery locks] → checker → mutating jit child [waits 5s] → timeout</div>
+  <ul>
+    <li>The universal mutation boundary retained bootstrap and repository locks for the whole command.</li>
+    <li>Lock reentrancy was in-process only; external checkers are child processes.</li>
+    <li><code>docs-mechanical</code> spawned <code>jit invariant render</code>, so parent and child deadlocked.</li>
+  </ul>
+  <p><strong>Root cause:</strong> a correct recovery boundary carried an
+     in-process lock-lifetime assumption across a process boundary.</p>
+</section>
+
+<!-- ── 18 · RECOVERY-LOCK BUG: FIX ─────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Hard-earned lesson <span class="num">· 18 / 20</span></span>
+  <h2>Release, execute, reacquire, recover</h2>
+  <div class="item-decl">release session → run checker child under ordinary locks → reacquire + recover → persist verdict</div>
+  <ol>
+    <li>Temporarily drop the evaluator's retained recovery session.</li>
+    <li>Let the checker and nested JIT commands use the ordinary lock chain.</li>
+    <li>Reacquire serialization and recover any checker-side journal.</li>
+    <li>Only then persist the gate result.</li>
+  </ol>
+  <div class="note">Regression tests prove both sides: nested mutating checkers pass, and unrelated processes still serialize.</div>
+</section>
+
+<!-- ── 19 · V1 BOUNDARY ────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Honest scope <span class="num">· 19 / 20</span></span>
+  <h2>V1.0 is intentionally apply-only</h2>
+  <div class="two-col">
+    <div>
+      <h3>Delivered now</h3>
+      <ul>
+        <li>one embedded immutable profile</li>
+        <li>inspect, preview, and apply</li>
+        <li>provenance and exact no-op detection</li>
+        <li>safe first installation</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Post-1.0 continuation</h3>
+      <ul>
+        <li>composition and local packages</li>
+        <li>variables and shared ownership</li>
+        <li>reconfiguration and detailed diff</li>
+        <li>three-way upgrade and safe removal</li>
+      </ul>
+    </div>
+  </div>
+  <div class="warning">No hidden command, schema field, or MCP tool pretends the deferred lifecycle already exists.</div>
+</section>
+
+<!-- ── 20 · CLOSING ────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>Takeaways</h1>
+  <p class="tagline">One explicit command installs a complete workflow · deterministic plans make changes inspectable · durable transactions make failure recoverable</p>
+  <p>Portable by construction: offline, Git-free, source-free, and <code>jq</code>-free.</p>
+  <p class="caption">Epic 9b7b5f9c · <code>jit-dogfood</code> 1.0.0 · strict about the lifecycle boundary</p>
+</section>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+  // fitcheck.py waits on these flags before measuring.
+  window.__deckReady = false;
+  window.__mathReady = false;
+
+  function initDeck() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+    window.__mathReady = true;
+
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  // KaTeX scripts are deferred; run once they (and the DOM) are available.
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      // give deferred KaTeX a tick to attach renderMathInElement
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>

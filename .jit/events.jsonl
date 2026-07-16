@@ -8187,3 +8187,4 @@
 {"type":"gate_passed","id":"829d98c1-2f37-42a8-86b7-c7b2a4a310e1","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-16T21:21:19.611187532Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"da8597a2-528e-4ca2-8b93-9105786148b1","issue_id":"0daba57d-4cb8-4494-a825-22b286bc02c6","timestamp":"2026-07-16T21:27:23.199847515Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"33e6f20b-70f5-46cf-91dc-8bd4ce31d12f","issue_id":"894337e2-e708-466b-ac25-3aed102a166f","timestamp":"2026-07-16T21:30:33.308328438Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"issue_updated","id":"4c4712a2-a527-4de9-b87e-6e89d89370f4","issue_id":"9b7b5f9c-6357-4e99-a1df-bef80d6bca1f","timestamp":"2026-07-16T21:29:35.464396455Z","updated_by":"doc-add","fields":["documents"]}
