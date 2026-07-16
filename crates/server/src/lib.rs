@@ -125,8 +125,30 @@ mod recovery_startup_tests {
 mod resolve_listener_tests {
     use super::*;
 
+    /// Serializes every test that reads or writes the `LISTEN_*` environment.
+    ///
+    /// The process environment is global, and `ListenFd::from_env` (inside
+    /// [`resolve_listener`]) CONSUMES it — listenfd removes `LISTEN_FDS` and
+    /// `LISTEN_PID` after reading them — so two tests interleaving on these
+    /// variables steal each other's state nondeterministically under the
+    /// default parallel test runner (observed live as both spurious `Bound`
+    /// and spurious `Inherited` outcomes, jit:894337e2 / jit:6eb585bc s4).
+    static LISTEN_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Remove every `LISTEN_*` variable so a test starts from a clean slate
+    /// even after a sibling's leftovers (listenfd does not remove
+    /// `LISTEN_FDS_FIRST_FD`).
+    fn scrub_listen_env() {
+        std::env::remove_var("LISTEN_FDS");
+        std::env::remove_var("LISTEN_FDS_FIRST_FD");
+        std::env::remove_var("LISTEN_PID");
+    }
+
     #[test]
     fn test_resolve_listener_binds_when_no_fd_inherited() {
+        let _guard = LISTEN_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        scrub_listen_env();
+
         // No LISTEN_FDS in the environment → the server binds the address
         // itself. `:0` asks the OS for a free ephemeral port, so this test
         // never contends with a sibling over a fixed port number.
@@ -141,12 +163,14 @@ mod resolve_listener_tests {
     /// This is the in-process half of the cross-process handoff — the parent
     /// half (clearing close-on-exec and publishing `LISTEN_FDS*`) is covered
     /// by `commands::serve::tests::test_inherit_listener_hands_off_socket` in
-    /// the `jit` crate. Only this test touches the `LISTEN_*` environment, so
-    /// it stays deterministic under parallel execution.
+    /// the `jit` crate.
     #[test]
     #[cfg(unix)]
     fn test_resolve_listener_adopts_inherited_fd() {
         use std::os::unix::io::AsRawFd;
+
+        let _guard = LISTEN_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        scrub_listen_env();
 
         // Stand in for the parent: bind the real serving socket up front.
         let parent_bound = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -156,7 +180,6 @@ mod resolve_listener_tests {
         // Reproduce the environment the parent publishes for the child.
         std::env::set_var("LISTEN_FDS", "1");
         std::env::set_var("LISTEN_FDS_FIRST_FD", fd.to_string());
-        std::env::remove_var("LISTEN_PID");
 
         let (listener, source) = resolve_listener("127.0.0.1:0").unwrap();
         assert_eq!(source, ListenerSource::Inherited);
@@ -169,5 +192,7 @@ mod resolve_listener_tests {
         // `take_tcp_listener` built a new owner over the same descriptor; leak
         // the original handle so its Drop does not close the fd twice.
         std::mem::forget(parent_bound);
+        // listenfd consumed LISTEN_FDS/LISTEN_PID; drop our leftover too.
+        scrub_listen_env();
     }
 }
