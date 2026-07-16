@@ -779,7 +779,7 @@ fn test_bracket_breakdown_rejects_cyclic_child_plan() {
 //
 // The breakdown step is a spine-splicer: B's coverage gate was attached by
 // `jit apply plan` and is never run/stamped/fabricated by breakdown. The gate is
-// run later by the standard gate runner (`jit gate pass <B> coverage-preview`).
+// run later by the standard gate runner (`jit gate evaluate <B> coverage-preview`).
 
 /// A child that credits the given `[hard]` criterion id via `satisfies:<id>`.
 fn child_satisfying(title: &str, req_id: &str) -> BracketChild {

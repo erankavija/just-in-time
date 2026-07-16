@@ -616,9 +616,9 @@ fn test_gates() {
         .unwrap()
         .to_string();
 
-    // Pass gate
+    // Evaluate gate
     let output = Command::new(jit)
-        .args(["gate", "pass", &id, "tests", "-b", "ci:bot"])
+        .args(["gate", "evaluate", &id, "tests", "-b", "ci:bot"])
         .current_dir(temp.path())
         .output()
         .unwrap();

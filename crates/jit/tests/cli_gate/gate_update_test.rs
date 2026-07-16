@@ -279,7 +279,14 @@ fn test_gate_update_leaves_per_issue_status_unchanged() {
         .unwrap()
         .to_string();
     jit(&temp)
-        .args(["gate", "pass", &issue_id, "review", "--by", "human:tester"])
+        .args([
+            "gate",
+            "evaluate",
+            &issue_id,
+            "review",
+            "--by",
+            "human:tester",
+        ])
         .assert()
         .success();
 

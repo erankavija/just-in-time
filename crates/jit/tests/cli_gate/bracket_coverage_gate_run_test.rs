@@ -3,7 +3,7 @@
 //! The bracket-breakdown helper is a pure bracket-builder: it ATTACHES the
 //! coverage-preview gate to the breakdown node `B` (left PENDING) and never runs
 //! it. The gate is run separately by the standard gate runner
-//! (`jit gate pass <B> coverage-preview`) as a breakdown-workflow step. This test
+//! (`jit gate evaluate <B> coverage-preview`) as a breakdown-workflow step. This test
 //! proves that the *attached* gate, when run via the real runner against a
 //! manually-built bracket fixture, executes the deterministic
 //! `jit validate --scope <C>` checker (the project's `scripts/coverage-preview.sh`)
@@ -233,10 +233,10 @@ fn assert_gate_run(temp: &TempDir, breakdown_id: &str, expected_status: &str) {
         .is_some();
     assert!(any_run, "a GateRunResult must be persisted for the run");
 
-    // `jit gate check` reflects the recorded run (status + exit code).
+    // `jit gate status` reflects the recorded run (status + exit code).
     let json = jit_json(
         temp,
-        &["gate", "check", breakdown_id, "coverage-preview", "--json"],
+        &["gate", "status", breakdown_id, "coverage-preview", "--json"],
     );
     assert_eq!(
         json["status"].as_str(),
@@ -257,7 +257,7 @@ fn test_attached_coverage_gate_runs_and_passes_when_hard_criterion_covered() {
 
     // Run the ATTACHED gate via the standard runner. Covered → exit 0.
     jit(&temp)
-        .args(["gate", "pass", &b, "coverage-preview"])
+        .args(["gate", "evaluate", &b, "coverage-preview"])
         .assert()
         .success();
 
@@ -284,7 +284,7 @@ fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
 
     // Run the ATTACHED gate via the standard runner. Uncovered → exit 4.
     jit(&temp)
-        .args(["gate", "pass", &b, "coverage-preview"])
+        .args(["gate", "evaluate", &b, "coverage-preview"])
         .assert()
         .failure()
         .code(4);
@@ -292,7 +292,7 @@ fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
     assert_gate_run(&temp, &b, "failed");
 
     // The persisted run's stdout names the uncovered criterion.
-    let json = jit_json(&temp, &["gate", "check", &b, "coverage-preview", "--json"]);
+    let json = jit_json(&temp, &["gate", "status", &b, "coverage-preview", "--json"]);
     assert!(
         json["stdout"]
             .as_str()

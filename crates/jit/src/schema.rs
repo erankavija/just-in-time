@@ -243,7 +243,6 @@ impl CommandSchema {
             "doc_history",
             "events_query",
             "events_tail",
-            "gate_check",
             "gate_define",
             "gate_preset_apply",
             "gate_preset_create",
@@ -569,7 +568,7 @@ impl CommandSchema {
             ),
 
             // Gate commands
-            "gate_check-all" => (
+            "gate_status-all" => (
                 Some(schema_to_value::<GateCheckAllResponse>()),
                 "GateCheckAllResponse",
             ),
@@ -813,6 +812,12 @@ impl CommandSchema {
                 code: 10,
                 description: "External dependency failed (git, file system, etc.)".to_string(),
             },
+            ExitCodeDoc {
+                code: 141,
+                description: "Downstream reader closed the pipe while jit was writing \
+                    (128 + SIGPIPE)"
+                    .to_string(),
+            },
         ]
     }
 
@@ -1014,6 +1019,16 @@ impl CommandSchema {
                 "The daemon start, stop, or status operation failed (exits 0 on \
                  success).",
                 false,
+            ),
+            // Every command reaches this if its stdout write outlives the
+            // downstream reader (`| head`, etc.): a direct process::exit site
+            // (main's panic hook + catch_unwind), not the typed-error
+            // classifier.
+            row(
+                "*",
+                141,
+                "A downstream reader closed the pipe while jit was still writing.",
+                true,
             ),
             // `serve --fg` passes the inline server child's own code through.
             CommandExitCode {
@@ -1376,21 +1391,44 @@ mod tests {
             dep.aliases
         );
 
-        // The `gate evaluate` subcommand accepts the visible aliases `pass`
-        // and `eval`.
+        // The `gate evaluate` subcommand accepts the visible alias `eval`.
         let evaluate = schema
             .commands
             .get("gate")
             .and_then(|c| c.subcommands.as_ref())
             .and_then(|s| s.get("evaluate"))
             .expect("gate evaluate subcommand");
-        for alias in ["pass", "eval"] {
-            assert!(
-                evaluate.aliases.iter().any(|a| a == alias),
-                "gate evaluate must expose its `{alias}` alias; found {:?}",
-                evaluate.aliases
-            );
-        }
+        assert!(
+            evaluate.aliases.iter().any(|a| a == "eval"),
+            "gate evaluate must expose its `eval` alias; found {:?}",
+            evaluate.aliases
+        );
+    }
+
+    /// Regression (jit:c505031a): `gate status-all`'s output schema lookup
+    /// key must match its canonical clap subcommand path (`gate_status-all`),
+    /// not a retired alias spelling (`gate_check-all`). The lookup key is
+    /// keyed by the canonical name regardless of what visible aliases a
+    /// command carries, so a stale key silently drops the schema rather than
+    /// raising a compile error.
+    #[test]
+    fn test_schema_gate_status_all_has_output_schema() {
+        let schema = CommandSchema::generate();
+        let status_all = schema
+            .commands
+            .get("gate")
+            .and_then(|c| c.subcommands.as_ref())
+            .and_then(|s| s.get("status-all"))
+            .expect("gate status-all subcommand");
+        let output = status_all
+            .output
+            .as_ref()
+            .expect("gate status-all should have an output schema");
+        assert_eq!(output.success, "GateCheckAllResponse");
+        assert!(
+            output.success_schema.is_some(),
+            "gate status-all success_schema should be present"
+        );
     }
 
     #[test]
