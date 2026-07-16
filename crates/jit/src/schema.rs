@@ -966,14 +966,6 @@ impl CommandSchema {
                 true,
             ),
             row(
-                "config validate",
-                2,
-                "Reserved: the handler has an exit(2) branch for configuration \
-                 warnings, but no warning condition is defined today, so 2 is \
-                 never emitted.",
-                true,
-            ),
-            row(
                 "doc check-links",
                 1,
                 "One or more documents have broken links.",
@@ -1035,10 +1027,7 @@ pub fn render_exit_code_reference() -> String {
          that produces it: the shared classifier (`error_to_exit_code` in \
          `crates/jit/src/main.rs`) for codes raised as typed errors, and the \
          command's own `std::process::exit` site for codes a completed run emits \
-         directly (the findings signals and the `serve --fg` pass-through). One \
-         row is documented as *reserved* rather than bound: `config validate` `2` \
-         names a branch the handler carries but no condition reaches, so nothing \
-         emits it.\n\n",
+         directly (the findings signals and the `serve --fg` pass-through).\n\n",
     );
 
     out.push_str("## Global taxonomy\n\n");

@@ -3518,9 +3518,7 @@ the per-command mappings and exceptions, is the [Exit Codes reference](exit-code
 `command_exit_codes` array (the per-command rows). Every emitted row is bound by a
 test to the runtime that produces it: to the shared classifier for codes raised as
 typed errors, and to the command's own exit site for codes a completed run emits
-directly. The lone row marked *reserved* there (`config validate` `2`) names a
-handler branch no condition reaches, so nothing emits it. The `--json` `code`
-distinctions below refine that taxonomy.
+directly. The `--json` `code` distinctions below refine that taxonomy.
 
 Exit `4` covers several validation failures that share the code but carry a
 distinguishing `code` under `--json`: `CYCLE_DETECTED` (a dependency edge would

@@ -5781,7 +5781,6 @@ fn run() -> Result<()> {
                 #[derive(Default)]
                 struct ValidationResult {
                     errors: Vec<String>,
-                    warnings: Vec<String>,
                 }
 
                 let mut result = ValidationResult::default();
@@ -5824,51 +5823,35 @@ fn run() -> Result<()> {
                 let _ = loader.with_repo_config(&jit_dir);
 
                 let has_errors = !result.errors.is_empty();
-                let has_warnings = !result.warnings.is_empty();
 
                 if json {
                     let output = json!({
                         "valid": !has_errors,
                         "errors": result.errors,
-                        "warnings": result.warnings,
                     });
                     println!(
                         "{}",
                         JsonOutput::success(output, "config validate")
                             .with_message(if has_errors {
                                 format!("Validation failed: {} error(s)", result.errors.len())
-                            } else if has_warnings {
-                                format!(
-                                    "Validation passed with {} warning(s)",
-                                    result.warnings.len()
-                                )
                             } else {
                                 "Configuration is valid".to_string()
                             })
                             .to_json_string()?
                     );
-                } else if result.errors.is_empty() && result.warnings.is_empty() {
-                    println!("✓ Configuration is valid");
+                } else if has_errors {
+                    println!("Errors:");
+                    for err in &result.errors {
+                        println!("  ✗ {}", err);
+                    }
                 } else {
-                    if !result.errors.is_empty() {
-                        println!("Errors:");
-                        for err in &result.errors {
-                            println!("  ✗ {}", err);
-                        }
-                    }
-                    if !result.warnings.is_empty() {
-                        println!("Warnings:");
-                        for warn in &result.warnings {
-                            println!("  ⚠ {}", warn);
-                        }
-                    }
+                    println!("✓ Configuration is valid");
                 }
 
-                // Exit with appropriate code
+                // A source that failed to load or carried an invalid value exits 1;
+                // a valid configuration exits 0. There is no warning outcome.
                 if has_errors {
                     std::process::exit(1);
-                } else if has_warnings {
-                    std::process::exit(2);
                 }
             }
             jit::cli::ConfigCommands::ShowHierarchy { json } => {
