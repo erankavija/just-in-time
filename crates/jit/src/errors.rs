@@ -193,6 +193,49 @@ impl AlreadyExistsError {
     }
 }
 
+/// Error returned when `jit issue delete` is refused for missing operator
+/// confirmation.
+///
+/// Deletion is a destructive, discouraged operation (Phase 3 safety): the
+/// caller's process environment must set `JIT_ALLOW_DELETION=1` or the delete
+/// is refused before anything is written (jit:0daba57d). Refusing used to
+/// `anyhow::bail!` a plain string, which fell through `error_to_exit_code` to
+/// the generic-error code; a caller checking for `exit 0` (or treating any
+/// nonzero as equivalent) had no reliable way to branch on the refusal. This
+/// typed wrapper is downcastable in `error_to_exit_code` (→
+/// `ExitCode::InvalidArgument`, exit `2`) and renders as `DELETION_NOT_CONFIRMED`
+/// under `--json`, so both output modes let a script distinguish "refused" from
+/// "deleted" reliably.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("{message}")]
+pub struct DeletionNotConfirmedError {
+    message: String,
+}
+
+impl DeletionNotConfirmedError {
+    /// Build the refusal for `issue_id`, naming it in the example remediation
+    /// command.
+    pub fn new(issue_id: impl std::fmt::Display) -> Self {
+        let actionable = ActionableError::new(
+            "Issue deletion is discouraged and requires explicit confirmation.",
+        )
+        .with_cause("Deletion is a destructive operation")
+        .with_remedy(format!(
+            "Set JIT_ALLOW_DELETION=1 environment variable to proceed: \
+             JIT_ALLOW_DELETION=1 jit issue delete {issue_id}"
+        ))
+        .with_remedy("Consider closing issues instead of deleting them");
+        Self {
+            message: actionable.to_error_message(),
+        }
+    }
+
+    /// The fully-rendered, user-facing refusal message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
 /// A validation failure that rejects an operation: a repository-integrity
 /// violation found by `jit validate`'s silent pass (broken dependency, undefined
 /// required gate, dangling document reference, cyclic/isolated DAG, …) or a
@@ -1242,6 +1285,23 @@ mod tests {
         let any: anyhow::Error = err.into();
         assert_eq!(any.to_string(), msg);
         assert!(any.downcast_ref::<AlreadyExistsError>().is_some());
+    }
+
+    #[test]
+    fn test_deletion_not_confirmed_error_names_issue_and_env_var() {
+        let err = DeletionNotConfirmedError::new("abc12345");
+        let msg = err.to_string();
+
+        assert_eq!(msg, err.message());
+        assert!(msg.contains("discouraged"));
+        assert!(msg.contains("JIT_ALLOW_DELETION=1"));
+        assert!(msg.contains("jit issue delete abc12345"));
+        // ActionableError's rendering, not a bespoke format: no doubled prefix.
+        assert!(!msg.contains("Error:"));
+
+        let any: anyhow::Error = err.into();
+        assert_eq!(any.to_string(), msg);
+        assert!(any.downcast_ref::<DeletionNotConfirmedError>().is_some());
     }
 
     #[test]

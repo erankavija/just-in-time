@@ -608,6 +608,29 @@ fn test_command_exit_codes_gate_define_duplicate_emits_6() {
     documented_row("gate define", Some(6), false);
 }
 
+/// `jit issue delete` exits 2 when refused for missing operator confirmation
+/// (`JIT_ALLOW_DELETION=1` not set) — matching `issue delete`/2 (jit:0daba57d).
+#[test]
+fn test_command_exit_codes_issue_delete_unconfirmed_emits_2() {
+    let temp = setup();
+    let id = create_issue(&temp, "Doomed", &[]);
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp)
+        .env_remove("JIT_ALLOW_DELETION")
+        .args(["issue", "delete", &id])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    documented_row("issue delete", Some(2), false);
+}
+
 /// `jit issue batch-create` exits 2 when pre-validation rejects the file (here an
 /// entry depending on a key the file never defines) — matching
 /// `issue batch-create`/2. The companion `/10` row (a write that fails after some
@@ -710,6 +733,7 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("dep add", Some(4)),
         ("issue update, issue claim, issue claim-next", Some(4)),
         ("gate define", Some(6)),
+        ("issue delete", Some(2)),
         ("issue batch-create", Some(2)),
         ("snapshot export", Some(6)),
         ("claim", Some(10)),

@@ -872,6 +872,13 @@ impl CommandSchema {
                 false,
             ),
             row(
+                "issue delete",
+                2,
+                "Deletion was refused for missing operator confirmation \
+                 (JIT_ALLOW_DELETION=1 not set in the process environment).",
+                false,
+            ),
+            row(
                 "issue batch-create",
                 2,
                 "The batch file failed pre-validation; no issues were created.",

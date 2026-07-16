@@ -1,7 +1,7 @@
 //! Issue CRUD operations and lifecycle management
 
 use super::*;
-use crate::errors::{TransitionBlockedError, TransitionBlocker};
+use crate::errors::{DeletionNotConfirmedError, TransitionBlockedError, TransitionBlocker};
 use crate::storage::StorageWarning;
 
 /// How `update_issue` should apply a new description value.
@@ -674,6 +674,32 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(warnings)
+    }
+
+    /// Confirm operator intent for the destructive `jit issue delete` command
+    /// (jit:0daba57d).
+    ///
+    /// Deletion is disabled by default (Phase 3 safety): the caller must pass
+    /// `allowed = true`, which the CLI dispatch derives from the process
+    /// environment (`JIT_ALLOW_DELETION=1`). Reading that environment variable
+    /// is left to the caller — mirroring `resolve_gate_key`'s
+    /// already-resolved-input pattern — so this stays a pure decision, testable
+    /// without mutating global process state. Returns
+    /// [`DeletionNotConfirmedError`] (classified by `error_to_exit_code` as
+    /// `ExitCode::InvalidArgument`, exit code 2) rather than performing the
+    /// delete when `allowed` is `false`; `id` is echoed verbatim in the
+    /// refusal's example remediation command, so it need not be a resolved
+    /// full id.
+    pub fn confirm_deletion_allowed(
+        &self,
+        id: &str,
+        allowed: bool,
+    ) -> std::result::Result<(), DeletionNotConfirmedError> {
+        if allowed {
+            Ok(())
+        } else {
+            Err(DeletionNotConfirmedError::new(id))
+        }
     }
 
     /// Delete an issue.
@@ -1982,6 +2008,24 @@ enforce_leases = "off"
             ),
             other => panic!("expected IssueUpdated, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_confirm_deletion_allowed_refuses_when_not_allowed() {
+        let executor = setup();
+
+        let result = executor.confirm_deletion_allowed("abc12345", false);
+
+        let err = result.expect_err("must refuse without confirmation");
+        assert!(err.message().contains("JIT_ALLOW_DELETION=1"));
+        assert!(err.message().contains("abc12345"));
+    }
+
+    #[test]
+    fn test_confirm_deletion_allowed_ok_when_allowed() {
+        let executor = setup();
+
+        assert!(executor.confirm_deletion_allowed("abc12345", true).is_ok());
     }
 
     #[test]
