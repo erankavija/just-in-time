@@ -6,9 +6,9 @@
     {
       "wave_number": 1,
       "issues": [
-        {"id": "866a5bbd-c98d-4588-83e8-7423f3b12005", "short_id": "866a5bbd", "title": "Add the durable file-set transaction kernel", "classification": "implementation", "status": "blocked_gates"},
+        {"id": "866a5bbd-c98d-4588-83e8-7423f3b12005", "short_id": "866a5bbd", "title": "Add the durable file-set transaction kernel", "classification": "implementation", "status": "gates_passed_waiting_wave"},
         {"id": "92039d9c-1433-4b24-b3f6-2c206648cc8f", "short_id": "92039d9c", "title": "Provide portable deterministic checks and review warnings", "classification": "implementation", "status": "gates_passed_waiting_wave"},
-        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "attempt_5_verified_worker_commit_unmerged"}
+        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "deterministic_gates_passed_external_review_blocked"}
       ]
     },
     {
@@ -67,9 +67,10 @@
       "id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
       "short_id": "d3709cc6",
       "title": "Remediate Rust dependency advisories",
-      "status": "wip_checkpoint_verification_incomplete",
+      "status": "deterministic_gates_passed_external_review_blocked",
       "branch": "worktree-agent-d3709cc6",
-      "commit": "854dff4504ba0fa0a272042132e43365a5b0c2eb"
+      "commit": "f2df39827576f443c7dba0d454fa64760d3fbb9f",
+      "merge_commit": "af432931d532f8e550b2b720e408f14c99a63b2d"
     }
   ],
   "escalations": [
@@ -109,6 +110,12 @@
         "profile-planning comments are premature",
         "built-in repository_validation gate bypasses the repository-view pipeline"
       ]
+    },
+    {
+      "category": "external AI review data export",
+      "issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
+      "status": "awaiting informed invoker approval after sandbox rejection; no data sent",
+      "scope": "configured JIT code-review and later doc-review gates invoke codex exec with repository code and issue context"
     }
   ],
   "rework_counts": {
