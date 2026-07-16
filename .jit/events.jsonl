@@ -8113,3 +8113,5 @@
 {"type":"gate_passed","id":"bead20b9-432e-4ae4-90e4-d1a9a70349c7","issue_id":"7ad4019b-2998-424b-9ea0-6d8ce3ff402c","timestamp":"2026-07-16T17:49:28.871444536Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"12d495a1-7073-44c6-9ac8-edbf6712720f","issue_id":"7ad4019b-2998-424b-9ea0-6d8ce3ff402c","timestamp":"2026-07-16T17:49:46.184186855Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"e12f6f1e-b213-4704-8a89-abc70c7ea374","issue_id":"7ad4019b-2998-424b-9ea0-6d8ce3ff402c","timestamp":"2026-07-16T17:49:48.103327561Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"3362f0aa-33ca-4d9f-baf7-60ec93303333","issue_id":"070ca05f-f7a9-4922-b796-3376a0b813b2","timestamp":"2026-07-16T17:56:55.420473336Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"5baa01a5-db67-42c1-9239-56437f921795","issue_id":"070ca05f-f7a9-4922-b796-3376a0b813b2","timestamp":"2026-07-16T17:56:55.420952606Z","assignee":"agent:codex-profile-cli"}

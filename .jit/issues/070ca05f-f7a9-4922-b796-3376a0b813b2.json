@@ -2,9 +2,9 @@
   "id": "070ca05f-f7a9-4922-b796-3376a0b813b2",
   "title": "Expose profile commands through init, schema, and MCP",
   "description": "Users and agents can list, inspect, dry-run, and apply the embedded profile, including via explicit init delegation, with stable human/JSON/schema/MCP contracts.\n\n## Background\n\nThis task consumes the cache-free recovery coordinator without changing recovery classification; adopter documentation is outside scope.\n\n## Success Criteria\n\n- [hard] REQ-01: Plain init remains byte-contract compatible; plain and profiled init share pure scaffold generation and the established bootstrap dispatch, while explicit `init --profile jit-dogfood` combines neutral/profile bytes, validates and publishes one external-journal transaction, and never invokes mutating plain init first.\n- [hard] REQ-02: Conflict, package, validation, concurrent-init, interruption, stale bootstrap state, and rollback tests prove failed profiled init restores no `.jit/`, leaves only recoverable/terminal machine-local control state after crashes, and works outside Git.\n- [hard] REQ-03: `profile list`, `show`, and `apply` provide typed human/count-wrapped JSON/dry-run/error/schema output, and generated MCP curation/tests cover every command without duplicating recovery classification.\n\n## Scope\n\n**Blast radius:** profile CLI parsing and dispatch integration, command executor, output, error, and schema code, init, config, and storage tests, CLI and schema integration tests, and MCP curation, loader, and tests. Recovery-classification changes and adopter documentation are outside scope.\n\n**Green landing:** CLI, schema, and MCP surfaces ship together with passing Rust and MCP contract tests; plain init retains its existing behavior when no profile is selected.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:codex-profile-cli",
   "dependencies": [
     "7ad4019b-2998-424b-9ea0-6d8ce3ff402c"
   ],
@@ -27,6 +27,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.040872776Z",
-  "updated_at": "2026-07-16T17:10:38.003076414Z",
-  "first_ready_at": "2026-07-14T22:28:46.040872986Z"
+  "updated_at": "2026-07-16T17:56:55.420575056Z",
+  "first_ready_at": "2026-07-14T22:28:46.040872986Z",
+  "claimed_at": "2026-07-16T17:56:55.420574346Z"
 }
