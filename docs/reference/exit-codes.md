@@ -16,6 +16,7 @@
 | `5` | Permission denied |
 | `6` | Resource already exists |
 | `10` | External dependency failed (git, file system, etc.) |
+| `141` | Downstream reader closed the pipe while jit was writing (128 + SIGPIPE) |
 
 ## Command-specific mappings
 
@@ -51,6 +52,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `doc check-links` | `2` | Documents have only risky-link warnings; here 2 means warnings, not a usage error. | yes |
 | `gate preset apply` | `1` | One or more issues failed to apply the preset (partial batch). | yes |
 | `serve, serve --stop, serve --status` | `1` | The daemon start, stop, or status operation failed (exits 0 on success). |  |
+| `*` | `141` | A downstream reader closed the pipe while jit was still writing. | yes |
 | `serve --fg` | `child` | Foreground mode passes through the inline dev-server child's own exit code (1 when the child produced none). | yes |
 
 For the full `jit gate evaluate` verdict taxonomy and the `--json` `verdict` field, see [the gate command reference](cli-commands.md).

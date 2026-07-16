@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- **The legacy gate-verb aliases `pass`, `pass-all`, `check`, and `check-all`
+  are gone.** Issue 949cd9d0 renamed these verbs to `evaluate`, `evaluate-all`,
+  `status`, and `status-all` and kept the old spellings as silent aliases so no
+  caller broke at rename time. This change drops the four aliases: invoking
+  any of them now fails with clap's standard unrecognized-subcommand error,
+  the same as any other unknown command. The short alias `eval` (for
+  `evaluate`) is unaffected and continues to work. `jit gate --help` and the
+  schema's `gate` subcommand listing now show only the canonical verbs
+  (`evaluate`/`eval`, `evaluate-all`, `fail`, `status`, `status-all`, plus the
+  configuration and inspection verbs), and in-repo docs and tests were swept
+  to the canonical spellings.
+
 ### Changed
 
 - **Build provenance no longer tracks Git metadata or the wall clock.**
@@ -392,6 +406,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `jit issue assign`/`claim`/`release`/`unassign` (assignee bookkeeping) and
   `jit claim acquire`/`release` (exclusive, time-boxed leases) share verbs but
   are different mechanisms; each command's `--help` now names its counterpart.
+- **A downstream reader closing the pipe mid-write no longer panics.** Piping
+  any command into something that exits early (`jit query all | head -1`,
+  `jit --schema | head -c1`) used to surface Rust's raw panic banner (`thread
+  'main' panicked ...: Broken pipe (os error 32)`, plus a backtrace hint) and
+  exit `101`, because most of `main.rs`'s output goes through direct
+  `println!`/`print!` calls that panic on a write error. `jit` now exits
+  quietly with `141` (`128 + SIGPIPE`, the exit status a shell reports for a
+  process a signal actually terminated), matching how everyday Unix pipelines
+  compose.
 
 ### Migration
 

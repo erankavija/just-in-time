@@ -1576,7 +1576,7 @@ jit gate status abc123 code-review --findings
 ### `jit gate status-all`
 
 Report the readiness of every required gate on an issue (inspection only,
-non-mutating). Alias: `check-all`.
+non-mutating).
 
 **Usage:**
 ```bash
@@ -1621,7 +1621,7 @@ Gate 'clippy' has not been run yet for issue abc123. Use 'jit gate evaluate' to 
 
 Run the checker (auto gates) or record attestation (manual gates) for a gate on
 an issue. This produces a verdict (which may be *fail*), so it is not an
-override. Aliases: `pass`; short alias `eval`.
+override. Short alias: `eval`.
 
 **Usage:**
 ```bash
@@ -1666,6 +1666,10 @@ jit gate evaluate abc123 --gate tests --force
   recorded run; both must be present and equal. When there is no git repository
   or no commit (`HEAD` unresolvable), the run is never skipped — the prior pass
   cannot be proven current.
+- For a manual gate the skip additionally requires the recorded pass to be
+  attested: its attestor must be a human or agent, not the automated executor. An
+  unattested auto-era pass — e.g. left behind when an auto gate is redefined to
+  manual — is never skipped; a bare `jit gate evaluate` still requires `--by`.
 - `--force` bypasses the check and re-runs the checker unconditionally.
 - On a normal run (manual attestation, or a freshly executed checker), `--json`
   reports `already_passed: false`.
@@ -1758,8 +1762,7 @@ jit gate evaluate abc123 tests --json
 
 ### `jit gate evaluate-all`
 
-Evaluate all of an issue's required gates in one command, **fail-fast**. Alias:
-`pass-all`.
+Evaluate all of an issue's required gates in one command, **fail-fast**.
 
 **Usage:**
 ```bash
@@ -1774,7 +1777,8 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 - Runs each required gate in declaration order, delegating to `jit gate evaluate`, so
   every gate inherits the same exit-code taxonomy, `verdict` semantics, and the
   **skip-if-passed-at-HEAD** behaviour (an already-passed gate is not re-run;
-  its entry reports `already_passed: true`).
+  its entry reports `already_passed: true`). For a manual gate the skip applies
+  only when the recorded pass is attested.
 - **Fail-fast:** on the FIRST gate that does not pass, the command stops
   immediately and exits with that gate's code from the
   [`jit gate evaluate`](#jit-gate-evaluate) taxonomy (see the
@@ -1914,8 +1918,9 @@ jit gate preset list [--json]
 `jit gate preset show <name>` for a preset's actual gate list and count; the
 builtin registry is the source of truth, so the totals below are placeholders):
 ```
-[builtin] plan-review - External-review placeholder for the linked plan before implementation work fans out (<N> gates)
-[builtin] coverage-preview - Deterministic coverage preview on the breakdown node (scoped validate) (<N> gates)
+[builtin] plan-review - External-review placeholder for the linked plan before implementation work fans out. (<N> gates)
+[builtin] breakdown-review - External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation. (<N> gates)
+[builtin] coverage-preview - Validate the container named by the breakdown issue's brackets label. (<N> gates)
 [custom] my-workflow - Custom preset created from issue abc123 (<N> gates)
 ```
 

@@ -1,9 +1,9 @@
-//! Integration tests for `jit gate pass-all` (issue df7f934c).
+//! Integration tests for `jit gate evaluate-all` (issue df7f934c).
 //!
 //! Covers: all-pass -> exit 0 with per-gate JSON; fail-fast at the first
 //! non-passing gate (a later gate's checker never runs) -> exit 4; runner error
 //! -> exit 10; inheritance of the skip-if-passed-at-HEAD behaviour from
-//! `gate pass` (already-passed gates are not re-run); and, for a mixed
+//! `gate evaluate` (already-passed gates are not re-run); and, for a mixed
 //! auto/manual gate set, fail-fast at an unattested manual gate rather than a
 //! silent pass (jit:1d59070d REQ-03).
 
@@ -134,7 +134,7 @@ fn run_count(root: &Path, key: &str) -> usize {
 }
 
 #[test]
-fn test_pass_all_all_gates_pass_exit_0() {
+fn test_evaluate_all_all_gates_pass_exit_0() {
     let (_temp, root) = setup_git_jit_repo();
     define_gate(&root, "g1", "true");
     define_gate(&root, "g2", "true");
@@ -142,7 +142,7 @@ fn test_pass_all_all_gates_pass_exit_0() {
 
     let out = jit()
         .current_dir(&root)
-        .args(["gate", "pass-all", &id, "--json"])
+        .args(["gate", "evaluate-all", &id, "--json"])
         .output()
         .unwrap();
 
@@ -165,7 +165,7 @@ fn test_pass_all_all_gates_pass_exit_0() {
 }
 
 #[test]
-fn test_pass_all_json_includes_native_placeholder_warning_per_gate() {
+fn test_evaluate_all_json_includes_native_placeholder_warning_per_gate() {
     let (_temp, root) = setup_git_jit_repo();
     define_review_placeholder_gate(&root, "review-any-key");
     let id = create_issue_with_gates(&root, &["review-any-key"]);
@@ -199,7 +199,7 @@ fn test_pass_all_json_includes_native_placeholder_warning_per_gate() {
 }
 
 #[test]
-fn test_pass_all_fail_fast_stops_at_first_failure_exit_4() {
+fn test_evaluate_all_fail_fast_stops_at_first_failure_exit_4() {
     let (_temp, root) = setup_git_jit_repo();
     define_gate(&root, "g1", "false"); // first gate fails (checker exit 1)
     define_gate(&root, "g2", "true"); // must never run
@@ -207,7 +207,7 @@ fn test_pass_all_fail_fast_stops_at_first_failure_exit_4() {
 
     let out = jit()
         .current_dir(&root)
-        .args(["gate", "pass-all", &id, "--json"])
+        .args(["gate", "evaluate-all", &id, "--json"])
         .output()
         .unwrap();
 
@@ -233,7 +233,7 @@ fn test_pass_all_fail_fast_stops_at_first_failure_exit_4() {
 }
 
 #[test]
-fn test_pass_all_runner_error_exit_10() {
+fn test_evaluate_all_runner_error_exit_10() {
     let (_temp, root) = setup_git_jit_repo();
     // First gate's checker kills itself -> no exit code -> runner error.
     define_gate(&root, "g1", "kill -9 $$");
@@ -242,7 +242,7 @@ fn test_pass_all_runner_error_exit_10() {
 
     let out = jit()
         .current_dir(&root)
-        .args(["gate", "pass-all", &id, "--json"])
+        .args(["gate", "evaluate-all", &id, "--json"])
         .output()
         .unwrap();
 
@@ -260,23 +260,23 @@ fn test_pass_all_runner_error_exit_10() {
 }
 
 #[test]
-fn test_pass_all_skips_already_passed_gate() {
+fn test_evaluate_all_skips_already_passed_gate() {
     let (_temp, root) = setup_git_jit_repo();
     define_gate(&root, "g1", "true");
     define_gate(&root, "g2", "true");
     let id = create_issue_with_gates(&root, &["g1", "g2"]);
 
-    // Pre-pass g1 at HEAD so pass-all should skip it.
+    // Pre-pass g1 at HEAD so evaluate-all should skip it.
     jit()
         .current_dir(&root)
-        .args(["gate", "pass", &id, "g1"])
+        .args(["gate", "evaluate", &id, "g1"])
         .output()
         .unwrap();
     assert_eq!(run_count(&root, "g1"), 1);
 
     let out = jit()
         .current_dir(&root)
-        .args(["gate", "pass-all", &id, "--json"])
+        .args(["gate", "evaluate-all", &id, "--json"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(0));
@@ -297,13 +297,13 @@ fn test_pass_all_skips_already_passed_gate() {
 }
 
 #[test]
-fn test_pass_all_no_required_gates_exit_0() {
+fn test_evaluate_all_no_required_gates_exit_0() {
     let (_temp, root) = setup_git_jit_repo();
     let id = create_issue_with_gates(&root, &[]);
 
     let out = jit()
         .current_dir(&root)
-        .args(["gate", "pass-all", &id, "--json"])
+        .args(["gate", "evaluate-all", &id, "--json"])
         .output()
         .unwrap();
 
@@ -313,12 +313,12 @@ fn test_pass_all_no_required_gates_exit_0() {
 }
 
 #[test]
-fn test_pass_all_issue_not_found_exit_3() {
+fn test_evaluate_all_issue_not_found_exit_3() {
     let (_temp, root) = setup_git_jit_repo();
 
     let out = jit()
         .current_dir(&root)
-        .args(["gate", "pass-all", "nonexistent", "--json"])
+        .args(["gate", "evaluate-all", "nonexistent", "--json"])
         .output()
         .unwrap();
 
@@ -335,7 +335,7 @@ fn test_pass_all_issue_not_found_exit_3() {
 /// manual gate fails with the same usage error and hint — evaluate-all never
 /// reports an all-green result that includes an unattested manual gate.
 #[test]
-fn test_pass_all_mixed_gates_without_by_fails_fast_at_manual_gate() {
+fn test_evaluate_all_mixed_gates_without_by_fails_fast_at_manual_gate() {
     let (_temp, root) = setup_git_jit_repo();
     define_gate(&root, "auto-gate", "true"); // runs first (declared first)
     define_manual_gate(&root, "manual-gate");
@@ -374,7 +374,7 @@ fn test_pass_all_mixed_gates_without_by_fails_fast_at_manual_gate() {
 /// The same mixed set with `--by` supplied: every gate passes, auto via its
 /// checker and manual via attestation.
 #[test]
-fn test_pass_all_mixed_gates_with_by_all_pass() {
+fn test_evaluate_all_mixed_gates_with_by_all_pass() {
     let (_temp, root) = setup_git_jit_repo();
     define_gate(&root, "auto-gate", "true");
     define_manual_gate(&root, "manual-gate");

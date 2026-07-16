@@ -1,11 +1,11 @@
 //! Integration tests for the `jit gate status-all` strict readiness exit
-//! (issue 949cd9d0) and for the legacy verb aliases resolving to the renamed
-//! canonical commands.
+//! (issue 949cd9d0) and for the removal of the legacy verb aliases
+//! `pass`/`pass-all`/`check`/`check-all` (issue c505031a).
 //!
 //! `status-all` exits 0 only when every required gate — automated AND manual —
 //! has passed; a pending (auto never run, manual never attested) or failed gate
-//! yields exit 4. The legacy verbs `pass`/`pass-all`/`check`/`check-all` remain
-//! silent aliases of `evaluate`/`evaluate-all`/`status`/`status-all`.
+//! yields exit 4. The retired verbs no longer parse at all: clap rejects them
+//! as unrecognized subcommands rather than resolving them as aliases.
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
@@ -227,32 +227,7 @@ fn test_status_all_all_passed_exits_0() {
     }
 }
 
-// ===== REQ-01 / REQ-03: legacy verb aliases resolve to the renamed commands =====
-
-#[test]
-fn test_pass_alias_runs_checker_like_evaluate() {
-    let temp = setup_repo();
-    define_auto_gate(&temp, "gate-a", "exit 0");
-    let id = create_issue(&temp, &["gate-a"]);
-
-    // `gate pass` (alias) must execute the checker identically to `gate evaluate`.
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "pass", &id, "gate-a", "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
-    assert_eq!(json["verdict"], "pass");
-    // The recorded gate status confirms the checker actually ran.
-    jit()
-        .current_dir(temp.path())
-        .args(["gate", "status-all", &id])
-        .assert()
-        .success();
-}
+// ===== REQ-01: `eval` remains a working alias of `evaluate` =====
 
 #[test]
 fn test_eval_alias_runs_checker_like_evaluate() {
@@ -268,45 +243,93 @@ fn test_eval_alias_runs_checker_like_evaluate() {
         .stdout(predicate::str::contains("\"verdict\": \"pass\""));
 }
 
+// ===== REQ-01: retired verbs `pass`/`pass-all`/`check`/`check-all` are gone =====
+
 #[test]
-fn test_check_all_alias_resolves_to_status_all() {
+fn test_removed_gate_aliases_fail_as_unknown_subcommand() {
+    let temp = setup_repo();
+    define_auto_gate(&temp, "gate-a", "exit 0");
+    let id = create_issue(&temp, &["gate-a"]);
+
+    // `pass` and `check` no longer exist as gate subcommands: clap rejects
+    // them as unrecognized rather than resolving them as aliases of
+    // `evaluate` / `status`.
+    for removed in ["pass", "check"] {
+        let output = jit()
+            .current_dir(temp.path())
+            .args(["gate", removed, &id, "gate-a"])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "`gate {removed}` exit code");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(&format!("unrecognized subcommand '{removed}'")),
+            "`gate {removed}` stderr: {stderr}"
+        );
+    }
+
+    // `pass-all` and `check-all` no longer exist either.
+    for removed in ["pass-all", "check-all"] {
+        let output = jit()
+            .current_dir(temp.path())
+            .args(["gate", removed, &id])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "`gate {removed}` exit code");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(&format!("unrecognized subcommand '{removed}'")),
+            "`gate {removed}` stderr: {stderr}"
+        );
+    }
+}
+
+#[test]
+fn test_canonical_verbs_still_work_after_alias_removal() {
     let temp = setup_repo();
     define_auto_gate(&temp, "gate-c", "exit 0");
-    let id = create_issue(&temp, &["gate-c"]);
+    define_manual_gate(&temp, "gate-d");
+    let id = create_issue(&temp, &["gate-c", "gate-d"]);
 
-    // `check-all` (alias) shares the strict exit of `status-all`: pending -> 4.
+    // `evaluate` (formerly aliased as `pass`) still runs the checker.
+    let out = jit()
+        .current_dir(temp.path())
+        .args(["gate", "evaluate", &id, "gate-c", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(json["verdict"], "pass");
+
+    // `status` (formerly aliased as `check`) still inspects a single gate,
+    // non-strictly: a pending manual gate exits 0.
     jit()
         .current_dir(temp.path())
-        .args(["gate", "check-all", &id])
+        .args(["gate", "status", &id, "gate-d"])
+        .assert()
+        .success();
+
+    // `status-all` (formerly aliased as `check-all`) still enforces the
+    // strict readiness exit: gate-d is still pending, so this exits 4.
+    jit()
+        .current_dir(temp.path())
+        .args(["gate", "status-all", &id])
         .assert()
         .failure()
         .code(4);
 
+    // `evaluate-all` (formerly aliased as `pass-all`) still evaluates every
+    // required gate; once gate-d is attested, status-all exits 0.
     jit()
         .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "gate-c"])
+        .args(["gate", "evaluate-all", &id, "--by", "human:reviewer"])
         .assert()
         .success();
-
-    // After passing, the alias exits 0 like `status-all`.
     jit()
         .current_dir(temp.path())
-        .args(["gate", "check-all", &id])
-        .assert()
-        .success();
-}
-
-#[test]
-fn test_check_alias_resolves_to_status_non_strict() {
-    let temp = setup_repo();
-    define_manual_gate(&temp, "gate-d");
-    let id = create_issue(&temp, &["gate-d"]);
-
-    // `check` (alias) resolves to the non-strict singular `status`: inspecting a
-    // pending gate exits 0 (pure inspection, no readiness contract).
-    jit()
-        .current_dir(temp.path())
-        .args(["gate", "check", &id, "gate-d"])
+        .args(["gate", "status-all", &id])
         .assert()
         .success();
 }

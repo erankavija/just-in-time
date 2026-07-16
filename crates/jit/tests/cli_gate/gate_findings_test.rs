@@ -86,7 +86,7 @@ fn run_gate(temp: &TempDir, issue_id: &str, gate_key: &str) {
     // Records a fresh run by executing the checker, regardless of verdict.
     jit()
         .current_dir(temp.path())
-        .args(["gate", "pass", issue_id, gate_key, "--force"])
+        .args(["gate", "evaluate", issue_id, gate_key, "--force"])
         .assert();
 }
 
@@ -358,10 +358,10 @@ fn test_findings_in_gate_failed_error_envelope() {
     define_auto_gate(&temp, "code-review", findings_checker());
     let id = create_issue(&temp, &["code-review"]);
 
-    // `gate pass` (no --force) runs the checker; it exits 1 -> GATE_FAILED.
+    // `gate evaluate` (no --force) runs the checker; it exits 1 -> GATE_FAILED.
     let output = jit()
         .current_dir(temp.path())
-        .args(["gate", "pass", &id, "code-review", "--json"])
+        .args(["gate", "evaluate", &id, "code-review", "--json"])
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(4));

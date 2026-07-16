@@ -1600,13 +1600,63 @@ fn reject_parent_query_filters(
     ))
 }
 
+/// True when a caught panic payload is std's "failed printing to
+/// std{out,err}: Broken pipe" panic (see
+/// [`jit::output::is_broken_pipe_write_panic`]) — the panic API hands back an
+/// opaque `dyn Any` rather than the typed `io::Error`, so detection happens on
+/// the formatted message downcast from either payload shape `panic!` can
+/// produce. Takes the unadorned `&dyn Any`: the panic hook's payload is `&dyn
+/// Any` and `catch_unwind`'s is `&(dyn Any + Send)`, and a reference to the
+/// latter coerces to the former (dropping an auto trait is a valid unsized
+/// coercion), so one function serves both call sites.
+fn panic_is_broken_pipe(payload: &dyn std::any::Any) -> bool {
+    payload
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| payload.downcast_ref::<&str>().copied())
+        .is_some_and(jit::output::is_broken_pipe_write_panic)
+}
+
 fn main() {
-    let exit_code = match run() {
+    // A downstream reader closing the pipe mid-write (`jit ... | head`) makes
+    // std's print!/println! machinery panic with a "failed printing to
+    // std{out,err}: Broken pipe" message (`library/std/src/io/stdio.rs`).
+    // Main.rs's hundreds of direct println!/print! call sites make guarding
+    // each individually impractical, so this single top-level guard covers
+    // all of them: a panic hook suppresses the panic banner for exactly that
+    // message (any other panic still gets the default hook, unwinds out of
+    // main, and keeps std's normal exit-101 behavior), and catch_unwind lets
+    // main convert the caught broken-pipe panic into a quiet exit using the
+    // `ExitCode::BrokenPipe` (128 + SIGPIPE = 141) convention — the exit
+    // status a shell reports for a process a signal actually killed,
+    // without jit altering its own signal disposition (jit:6f881a85
+    // REQ-01/REQ-02).
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if !panic_is_broken_pipe(info.payload()) {
+            default_hook(info);
+        }
+    }));
+
+    let outcome = std::panic::catch_unwind(|| match run() {
         Ok(()) => ExitCode::Success,
         Err(e) => {
             eprintln!("Error: {}", e);
             emit_startup_json_error(&e);
             error_to_exit_code(&e)
+        }
+    });
+
+    let exit_code = match outcome {
+        Ok(code) => code,
+        Err(payload) => {
+            if panic_is_broken_pipe(payload.as_ref()) {
+                std::process::exit(ExitCode::BrokenPipe.code());
+            }
+            // Not a broken-pipe panic: resume the unwind so it escapes main
+            // exactly as it would have without this hook (default hook
+            // already printed the banner; exit 101).
+            std::panic::resume_unwind(payload);
         }
     };
 
