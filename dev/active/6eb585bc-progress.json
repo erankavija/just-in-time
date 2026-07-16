@@ -275,7 +275,8 @@
     "f40f1b0a": 6,
     "894337e2": 1,
     "8917c558": 1,
-    "3e12ffbd": 1
+    "3e12ffbd": 1,
+    "45a140ae": 1
   },
   "started_at": "2026-07-14T00:00:00Z",
   "session_4": "2026-07-16 session 4 CLOSED, handoff dev/active/6eb585bc-handoff-4.md. DONE this session: 8d7fc762, 16402e14. MERGED awaiting gates (sweep take 5 running at handoff): 8917c558 (lead fixes f23479ed+2a5aff7e, 3/4 green), 52665a07 (+d3d64146), 3e12ffbd, 45a140ae, 0daba57d, d74a9ed1, 1d59070d, 894337e2 (rework merge dbe1a50b). IN-FLIGHT workers at handoff: 450db193 (committed 8aa61b84), 0283ce74 (4 commits), c505031a (29 dirty, functionally complete), 554ad07f (committed 99072933, desk-review PASS \u2014 merge directly), 6f881a85-r1 (replacement, no commits yet). Filed 94096aac (foreground-serve deadlock, ready). Gate-sweep recipe + traps in handoff-4."
