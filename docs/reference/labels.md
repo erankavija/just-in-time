@@ -50,7 +50,7 @@ flowchart LR
 ```
 
 The label makes the task a member of the Auth epic. The dependency stops the task from
-starting until "Setup DB" reaches a terminal state (done or rejected).
+starting until "Setup DB" reaches an effective terminal state (done, rejected, or archived from one).
 
 Both can flow the same direction (task → epic → milestone) but serve different purposes and can be used independently.
 

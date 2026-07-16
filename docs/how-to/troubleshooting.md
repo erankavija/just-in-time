@@ -60,7 +60,8 @@ A manual gate's `evaluate` requires `--by <attestor>` (e.g. `--by
 manual. Automated gates run their checker without `--by`.
 
 **Cause:** JIT enforces dependency and gate blockers before state transitions.
-Dependencies must be terminal (`done` or `rejected`) before dependent work can
+Dependencies must be effectively terminal (`done`, `rejected`, or `archived`
+from one of those) before dependent work can
 become ready or complete. Required gates must pass before an issue can become
 `done`.
 

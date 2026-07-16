@@ -8,7 +8,7 @@ Dependencies control work order by expressing "FROM depends on TO" relationships
 
 ### Express Work Order Constraints
 
-Dependencies represent blocking relationships: "FROM stays blocked until TO reaches a terminal state (done or rejected)."
+Dependencies represent blocking relationships: "FROM stays blocked until TO reaches an effective terminal state (done, rejected, or archived from one)."
 
 **Basic syntax:**
 ```bash

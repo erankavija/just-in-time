@@ -1099,6 +1099,12 @@ pub struct DependencyTreeNode {
     /// Whether this node appears multiple times in the tree (shared dependency)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shared: Option<bool>,
+    /// Pre-archive origin state, present only for an `Archived` node that
+    /// recorded one. Carried so dependency consumers can compute effective
+    /// terminality (`jit:45a140ae`): an `archived` node with a terminal origin
+    /// still satisfies its dependents.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archived_from: Option<State>,
     /// Child dependencies
     pub children: Vec<DependencyTreeNode>,
 }
@@ -1114,15 +1120,20 @@ impl DependencyTreeNode {
             priority: issue.priority,
             level,
             shared: None,
+            archived_from: issue.archived_from,
             children: Vec::new(),
         }
     }
 
     /// Get state symbol for display
+    ///
+    /// `✓` for effectively terminal nodes — `done`, `rejected`, or `archived`
+    /// from one of those (`jit:45a140ae`) — `○` otherwise.
     pub fn state_symbol(&self) -> &str {
-        match self.state {
-            State::Done | State::Rejected => "✓",
-            _ => "○",
+        if crate::domain::is_effectively_terminal(self.state, self.archived_from) {
+            "✓"
+        } else {
+            "○"
         }
     }
 }
@@ -2232,6 +2243,33 @@ pub struct WorktreeListResponse {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// jit:45a140ae REQ-02: a dependency-tree node archived from a terminal
+    /// state renders and serializes as effectively terminal; a legacy Archived
+    /// node (no recorded origin) stays non-terminal.
+    #[test]
+    fn test_dependency_tree_node_effective_terminality() {
+        let mut issue = crate::domain::MinimalIssue {
+            id: "a".repeat(36),
+            title: "Archived dep".to_string(),
+            state: State::Archived,
+            priority: Priority::Normal,
+            assignee: None,
+            labels: Vec::new(),
+            archived_from: Some(State::Done),
+        };
+        let node = DependencyTreeNode::from_minimal(&issue, 1);
+        assert_eq!(node.archived_from, Some(State::Done));
+        assert_eq!(node.state_symbol(), "✓");
+        let serialized = serde_json::to_value(&node).unwrap();
+        assert_eq!(serialized["archived_from"], json!("done"));
+
+        issue.archived_from = None;
+        let legacy = DependencyTreeNode::from_minimal(&issue, 1);
+        assert_eq!(legacy.state_symbol(), "○");
+        let serialized = serde_json::to_value(&legacy).unwrap();
+        assert!(serialized.get("archived_from").is_none());
+    }
 
     #[test]
     fn test_gate_definition_json_includes_builtin_checker_configuration() {
