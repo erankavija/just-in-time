@@ -62,23 +62,54 @@ impl<S: IssueStore> CommandExecutor<S> {
             (None, Vec::new())
         };
 
-        let doc_ref = DocumentReference {
-            path: path.to_string(),
-            commit: commit.map(String::from),
-            label: label.map(String::from),
-            doc_type: doc_type.map(String::from),
-            format,
-            assets,
+        // Identity is (issue, path): re-adding a path already linked to this
+        // issue refreshes that entry in place instead of appending a
+        // duplicate. `commit`/`label`/`doc_type` follow the same
+        // partial-update convention as `issue update` — an omitted flag
+        // (`None`) leaves the existing value alone rather than clearing it —
+        // while `format`/`assets` are always the freshly computed scan
+        // result (or empty, under `--skip-scan`), mirroring a fresh add.
+        let existing_index = issue.documents.iter().position(|d| d.path == path);
+        let is_update = existing_index.is_some();
+
+        let doc_ref = match existing_index {
+            Some(idx) => {
+                let existing = &issue.documents[idx];
+                DocumentReference {
+                    path: path.to_string(),
+                    commit: commit.map(String::from).or_else(|| existing.commit.clone()),
+                    label: label.map(String::from).or_else(|| existing.label.clone()),
+                    doc_type: doc_type
+                        .map(String::from)
+                        .or_else(|| existing.doc_type.clone()),
+                    format,
+                    assets,
+                }
+            }
+            None => DocumentReference {
+                path: path.to_string(),
+                commit: commit.map(String::from),
+                label: label.map(String::from),
+                doc_type: doc_type.map(String::from),
+                format,
+                assets,
+            },
         };
 
-        issue.documents.push(doc_ref.clone());
+        match existing_index {
+            Some(idx) => issue.documents[idx] = doc_ref.clone(),
+            None => issue.documents.push(doc_ref.clone()),
+        }
         self.storage.save_issue(issue)?;
 
         // Log the mutation (after the save), mirroring `issue.rs`/`bulk_update.rs`
         // so every `documents` change is captured in the event log (@/inv/event-log).
+        // A re-add of an already-linked path is tagged `doc-update` rather than
+        // `doc-add`, so the log distinguishes a genuine new link from a refresh
+        // of an existing one.
         let event = crate::domain::Event::new_issue_updated(
             full_id.clone(),
-            "doc-add".to_string(),
+            if is_update { "doc-update" } else { "doc-add" }.to_string(),
             vec!["documents".to_string()],
         );
         self.storage.append_event(&event)?;
@@ -87,6 +118,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             DocumentAddResult {
                 issue_id: full_id,
                 document: doc_ref,
+                updated: is_update,
             },
             warnings,
         ))

@@ -200,6 +200,9 @@ pub struct DocumentDiffResult {
 pub struct DocumentAddResult {
     pub issue_id: String,
     pub document: crate::domain::DocumentReference,
+    /// `true` when `path` was already linked to the issue and this call
+    /// refreshed that entry in place; `false` when it appended a new one.
+    pub updated: bool,
 }
 
 /// Result of removing a document reference
