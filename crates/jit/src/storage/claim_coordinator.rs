@@ -23,8 +23,6 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use super::lock::FileLocker;
-use super::lock_cleanup;
-use super::temp_cleanup;
 use super::worktree_paths::WorktreePaths;
 use crate::errors;
 
@@ -1056,64 +1054,6 @@ impl ClaimCoordinator {
         })
     }
 
-    /// Startup recovery routine - runs on every jit command
-    ///
-    /// Performs automatic recovery:
-    /// 1. Cleanup stale locks from dead processes
-    /// 2. Rebuild index if corrupted or inconsistent
-    /// 3. Evict expired leases
-    ///
-    /// This is safe to call repeatedly and has minimal overhead when no recovery needed.
-    ///
-    /// # Returns
-    ///
-    /// The non-fatal [`StorageWarning`]s observed during recovery. The caller's
-    /// output layer decides whether and how to render them; this routine never
-    /// writes to stderr itself.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if a required recovery step (lock cleanup, index
-    /// rebuild, or eviction) fails irrecoverably. Best-effort temp-file cleanup
-    /// failures are surfaced as [`StorageWarning::TempCleanupFailed`] rather
-    /// than errors.
-    pub fn startup_recovery(&self) -> Result<Vec<StorageWarning>> {
-        let mut warnings = Vec::new();
-
-        // 1. Clean up stale locks
-        let lock_dir = self.paths.shared_jit.join("locks");
-        warnings.extend(lock_cleanup::cleanup_stale_locks(&lock_dir)?);
-
-        // 2. Rebuild index if corrupted
-        let (consistent, verify_warnings) = self.verify_index_consistency()?;
-        warnings.extend(verify_warnings);
-        if !consistent {
-            warnings.push(StorageWarning::IndexRebuilt);
-            let index = self.rebuild_index_from_log()?;
-            warnings.extend(index.warnings());
-            self.write_index_atomic(&index)?;
-        }
-
-        // 3. Evict expired leases
-        let mut index = self.load_claims_index()?;
-        self.evict_expired(&mut index)?;
-        self.write_index_atomic(&index)?;
-
-        // 4. Clean up orphaned temp files
-        let jit_data_dir = &self.paths.local_jit;
-        if let Err(e) = temp_cleanup::cleanup_orphaned_temp_files(
-            jit_data_dir,
-            crate::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS,
-        ) {
-            // Surface but don't fail - temp file cleanup is best-effort.
-            warnings.push(StorageWarning::TempCleanupFailed {
-                reason: e.to_string(),
-            });
-        }
-
-        Ok(warnings)
-    }
-
     /// Verify index consistency
     ///
     /// Returns `(true, _)` if the index is valid and `(false, _)` if it needs
@@ -1927,134 +1867,6 @@ mod tests {
             stale: false,
         };
         assert!(!index.is_stale(&finite_lease));
-    }
-
-    #[test]
-    fn test_startup_recovery_runs_successfully() {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        // Should succeed without error
-        coordinator.startup_recovery().unwrap();
-    }
-
-    #[test]
-    fn test_startup_recovery_rebuilds_corrupted_index() {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        // Acquire a claim to create log entries and index
-        let _lease = coordinator.acquire_claim("issue-001", 600).unwrap();
-
-        // Verify index exists
-        let index_path = temp_dir.path().join(".git/jit/claims.index.json");
-        assert!(index_path.exists(), "Index should exist after claim");
-
-        // Corrupt the index by writing invalid JSON
-        fs::write(&index_path, "invalid json{{{").unwrap();
-
-        // Recovery should rebuild from log and surface the rebuild as a warning
-        let warnings = coordinator.startup_recovery().unwrap();
-        assert!(
-            warnings.contains(&StorageWarning::IndexRebuilt),
-            "Rebuilding a corrupted index must surface an IndexRebuilt warning, got {warnings:?}"
-        );
-
-        // Index should be valid and contain the lease
-        let index = coordinator.load_claims_index().unwrap();
-        assert_eq!(index.leases.len(), 1);
-        assert_eq!(index.leases[0].issue_id, "issue-001");
-    }
-
-    #[test]
-    fn test_startup_recovery_evicts_expired_leases() {
-        use std::thread;
-        use std::time::Duration as StdDuration;
-
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        // Create a lease with 1-second TTL
-        coordinator.acquire_claim("issue-001", 1).unwrap();
-
-        // Wait for it to expire
-        thread::sleep(StdDuration::from_secs(2));
-
-        // Recovery should evict the expired lease
-        coordinator.startup_recovery().unwrap();
-
-        // Index should be empty
-        let index = coordinator.load_claims_index().unwrap();
-        assert_eq!(index.leases.len(), 0, "Expired lease should be evicted");
-    }
-
-    #[test]
-    fn test_startup_recovery_cleans_stale_locks() {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        // Create a lock directory in the correct location (shared control plane)
-        let lock_dir = temp_dir.path().join(".git/jit/locks");
-        fs::create_dir_all(&lock_dir).unwrap();
-
-        // Create an unheld lock file (will be cleaned)
-        let lock_path = lock_dir.join("stale.lock");
-        fs::write(&lock_path, "").unwrap();
-
-        // Create metadata with dead process PID
-        let meta_path = lock_dir.join("stale.lock.meta");
-        let metadata = crate::storage::lock::LockMetadata {
-            pid: u32::MAX - 1,
-            agent_id: "agent:dead".to_string(),
-            created_at: Utc::now(),
-            last_updated: Utc::now(),
-        };
-        fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap()).unwrap();
-
-        // Recovery should remove stale lock
-        coordinator.startup_recovery().unwrap();
-
-        assert!(!lock_path.exists(), "Stale lock should be removed");
-        assert!(!meta_path.exists(), "Stale lock metadata should be removed");
-    }
-
-    /// The orphaned-temp-file cleanup step scans `local_jit`; when that scan
-    /// fails, recovery must surface it as `StorageWarning::TempCleanupFailed`
-    /// rather than aborting. Deterministic: an unreadable directory makes the
-    /// scan fail without depending on timing. Earlier recovery steps operate on
-    /// `shared_jit`, so they are unaffected.
-    #[test]
-    #[cfg(unix)]
-    fn test_startup_recovery_surfaces_temp_cleanup_failure() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        // Make the local .jit directory unreadable so the temp-file scan errors.
-        let local_jit = temp_dir.path().join(".jit");
-        fs::create_dir_all(&local_jit).unwrap();
-        fs::set_permissions(&local_jit, fs::Permissions::from_mode(0o000)).unwrap();
-
-        // Confirm the failure actually reproduces here (a root sandbox bypasses
-        // 0o000); if it cannot be reproduced, restore and skip rather than flake.
-        let reproduces = temp_cleanup::cleanup_orphaned_temp_files(&local_jit, 3600).is_err();
-        let result = coordinator.startup_recovery();
-
-        // Restore permissions so TempDir cleanup can remove the directory.
-        fs::set_permissions(&local_jit, fs::Permissions::from_mode(0o755)).unwrap();
-
-        if !reproduces {
-            return; // environment cannot deny directory reads; nothing to assert
-        }
-
-        let warnings = result.unwrap();
-        assert!(
-            warnings
-                .iter()
-                .any(|w| matches!(w, StorageWarning::TempCleanupFailed { .. })),
-            "startup_recovery must surface TempCleanupFailed when temp cleanup fails, got {warnings:?}"
-        );
     }
 
     #[test]
