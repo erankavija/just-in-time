@@ -8077,3 +8077,4 @@
 {"type":"gate_failed","id":"c97bf6e7-c2bf-4cf6-a0cc-313da67f9f1d","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-16T16:06:51.961543028Z","gate_key":"doc-review","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"6078808d-fcfb-4dd9-a46f-7375cfe3de0b","issue_id":"1d59070d-bebc-4a55-9456-c6c7a3caba2a","timestamp":"2026-07-16T16:09:29.166439964Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"ea7ede56-a19a-4c21-906c-45d557e495f9","issue_id":"1d59070d-bebc-4a55-9456-c6c7a3caba2a","timestamp":"2026-07-16T16:09:29.724825910Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"9e25ac97-5e61-44bb-8090-6302ecbc7d2c","issue_id":"1d59070d-bebc-4a55-9456-c6c7a3caba2a","timestamp":"2026-07-16T16:13:55.335197025Z","gate_key":"code-review","updated_by":"auto:executor"}
