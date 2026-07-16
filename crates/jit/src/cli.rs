@@ -280,23 +280,22 @@ pub enum Commands {
     #[command(subcommand)]
     Item(ItemCommands),
 
-    /// Project the project-invariant registry into its documentation target
+    /// Invariant enforcement-drift check
     ///
-    /// Invariants are declared in `.jit/invariants.toml`; `render` writes them
-    /// into the documentation target configured by `[invariant_projection]`
-    /// (default: a separate jit-owned file). The target path comes only from
-    /// config.
+    /// `check` reports invariants whose `enforced-by` binding names a missing or
+    /// unloadable rule/gate. To render the invariant registry into documentation,
+    /// use `jit project render` (the generic `[projection.*]` command).
     #[command(subcommand)]
     Invariant(InvariantCommands),
 
-    /// Project the rule + gate registries into a reference document
+    /// Render documentation projections declared in `[projection.*]`
     ///
-    /// Rules live in `.jit/rules.toml` and gates in `.jit/gates.toml`; `render`
-    /// writes them as one reference document into the target configured by
-    /// `[rules_gates_projection]` (default: a separate jit-owned file). The target
-    /// path comes only from config.
+    /// Each `[projection.<name>]` config table projects an addressable item kind
+    /// (or kinds) into a documentation target. `render` writes every declared
+    /// projection, or a single named one, atomically; in region mode only the
+    /// delimited block changes. Targets and delimiters come only from config.
     #[command(subcommand)]
-    Reference(ReferenceCommands),
+    Project(ProjectCommands),
 
     /// Search issues and documents
     ///
@@ -546,29 +545,11 @@ pub enum ItemCommands {
 
 /// Project-invariant subcommands.
 ///
-/// `render` projects the loaded `.jit/invariants.toml` registry into the
-/// `[invariant_projection]` target. `check` runs the enforcement-drift check
-/// between the registry and the declared rules/gates, reporting the sole
-/// declared-but-unenforced direction (an invariant whose `enforced-by` resolves
-/// to no loadable rule/gate). The target path/mode/delimiters come only from
-/// config.
+/// `check` runs the enforcement-drift check between the registry and the declared
+/// rules/gates, reporting the sole declared-but-unenforced direction (an invariant
+/// whose `enforced-by` resolves to no loadable rule/gate).
 #[derive(Subcommand)]
 pub enum InvariantCommands {
-    /// Render the invariant registry into its configured documentation target
-    ///
-    /// Reads `[invariant_projection]` from config (default: separate-file mode
-    /// targeting a jit-owned file) and writes the rendered registry there. In
-    /// region mode only the delimited region is rewritten; everything outside is
-    /// byte-preserved.
-    ///
-    /// Examples:
-    ///   jit invariant render          # Write the configured target
-    ///   jit invariant render --json   # Machine-readable result
-    Render {
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
     /// Check enforcement drift between invariants and declared rules/gates
     ///
     /// Reports the declared-but-unenforced direction: an invariant whose
@@ -588,26 +569,31 @@ pub enum InvariantCommands {
     },
 }
 
-/// Rules-and-gates reference subcommands.
+/// Documentation-projection subcommands.
 ///
-/// `render` projects the effective rule set (`.jit/rules.toml`) and the gate
-/// registry (`.jit/gates.toml`) into one reference document at the
-/// `[rules_gates_projection]` target. Every rule/gate is addressed by its
-/// canonical kind-segmented form (`@/rule/<name>`, `@/gate/<key>`). The target
-/// path/mode/delimiters come only from config.
+/// `render` projects each `[projection.<name>]` config table (an addressable item
+/// kind or kinds) into its documentation target: a markdown-first kind renders its
+/// `- **{self-id}** — {text}` rows, the built-in invariant and rule+gate registries
+/// render their rich views. Targets, modes, and region delimiters come only from
+/// config; delimiters default to `<!-- jit:<name>:begin/end -->`.
 #[derive(Subcommand)]
-pub enum ReferenceCommands {
-    /// Render the rule + gate registries into their configured reference document
+pub enum ProjectCommands {
+    /// Render declared documentation projections into their configured targets
     ///
-    /// Reads `[rules_gates_projection]` from config (default: separate-file mode
-    /// targeting a jit-owned file) and writes the rendered registries there. In
-    /// region mode only the delimited region is rewritten; everything outside is
-    /// byte-preserved.
+    /// Writes every `[projection.*]` table, or a single `--name`d one, atomically.
+    /// In region mode only the delimited block is rewritten; everything outside is
+    /// byte-preserved. A missing target/source, an unknown kind, or an absent
+    /// region marker is a typed error and nothing is written.
     ///
     /// Examples:
-    ///   jit reference render          # Write the configured target
-    ///   jit reference render --json   # Machine-readable result
+    ///   jit project render                 # Render every declared projection
+    ///   jit project render --name charter  # Render only the `charter` projection
+    ///   jit project render --json          # Machine-readable result
     Render {
+        /// Render only the projection with this `[projection.<name>]` name
+        #[arg(long)]
+        name: Option<String>,
+
         /// Output as JSON
         #[arg(long)]
         json: bool,
@@ -2814,7 +2800,7 @@ impl Commands {
             Self::Claim(command) => command.requires_recovery_dispatch(),
             Self::Hooks(command) => command.requires_recovery_dispatch(),
             Self::Invariant(command) => command.requires_recovery_dispatch(),
-            Self::Reference(command) => command.requires_recovery_dispatch(),
+            Self::Project(command) => command.requires_recovery_dispatch(),
             Self::Snapshot(command) => command.requires_recovery_dispatch(),
             Self::Validate { fix, dry_run, .. } => *fix && !*dry_run,
             Self::Serve { status, .. } => !*status,
@@ -2969,15 +2955,16 @@ impl HooksCommands {
 impl InvariantCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
-            Self::Render { .. } => true,
             Self::Check { .. } => false,
         }
     }
 }
 
-impl ReferenceCommands {
+impl ProjectCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
+            // `render` writes documentation targets, so it must run under the
+            // stale-binary recovery dispatch like the other write commands.
             Self::Render { .. } => true,
         }
     }
@@ -3056,7 +3043,6 @@ mod recovery_dispatch_tests {
         "hooks install",
         "init",
         "invariant check",
-        "invariant render",
         "issue assign",
         "issue batch-create",
         "issue children",
@@ -3088,6 +3074,7 @@ mod recovery_dispatch_tests {
         "label values",
         "list",
         "migrate lifecycle-timestamps",
+        "project render",
         "query all",
         "query available",
         "query blocked",
@@ -3097,7 +3084,6 @@ mod recovery_dispatch_tests {
         "query strategic",
         "rdeps",
         "recover",
-        "reference render",
         "search",
         "serve",
         "snapshot export",

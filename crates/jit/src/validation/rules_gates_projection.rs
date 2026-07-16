@@ -9,24 +9,22 @@
 //! - the region-splice function [`splice_region`], and
 //! - the shared, typed [`ProjectionError`] plus the storage atomic-write boundary.
 //!
-//! This is a NEW, generically-typed renderer — [`render_rules_and_gates_markdown`]
-//! takes the two registries directly, rather than reusing the invariant-typed
-//! [`render_invariants_markdown`](crate::validation::projection::render_invariants_markdown),
-//! which is specialized to the invariant registry. The orchestrator
-//! [`project_rules_and_gates`] mirrors
-//! [`project_invariants`](crate::validation::projection::project_invariants) as a
-//! pattern (config-driven target, mode branch, atomic write) without calling it.
+//! [`render_rules_and_gates_markdown`] is the built-in `full`-style render for the
+//! `rule` + `gate` registry-first kinds: it takes the two registries directly,
+//! since their typed fields (severity, enforcement, gate title) are absent from a
+//! generic addressable row. The generic projection command
+//! ([`project_render`](crate::validation::project_render)) selects this renderer for
+//! a `full`-style projection over the rule + gate kinds, then writes the body
+//! through the shared [`write_projection`](crate::validation::projection::write_projection).
 //!
 //! Every rule/gate is addressed by its canonical kind-segmented form —
 //! `@/rule/<name>` and `@/gate/<key>` — matching the `[item_kinds.rule]` /
 //! `[item_kinds.gate]` registry projection.
 //!
-//! Rendering is PURE and unit-testable; the orchestrator is the only function that
-//! performs I/O.
+//! Rendering is PURE and unit-testable.
 
-use crate::config::{ProjectionMode, ProjectionStyle, RulesGatesProjectionConfig};
-use crate::storage::{GateRegistry, IssueStore};
-use crate::validation::projection::{splice_region, ProjectionError};
+use crate::config::ProjectionStyle;
+use crate::storage::GateRegistry;
 use crate::validation::rules::RuleSet;
 
 /// The canonical kind-segmented address of a rule (`@/rule/<name>`).
@@ -202,67 +200,10 @@ fn render_id_anchor(rules: &RuleSet, gates: &GateRegistry) -> String {
     out
 }
 
-/// Project `rules` and `gates` into the documentation target described by `config`.
-///
-/// The orchestrator (the only function here that performs I/O) reads the target
-/// path, mode, render style, and delimiters ONLY from `config` — this module
-/// contains no documentation-filename literal. It mirrors
-/// [`project_invariants`](crate::validation::projection::project_invariants) as a
-/// pattern (it does not call it): render → for `separate-file`, atomic-write the
-/// whole file; for `region`, read the existing target through the storage
-/// boundary, splice the rendered block between the configured delimiters via the
-/// shared [`splice_region`] (byte-preserving everything outside), then atomic-write
-/// the result. Persistence goes through
-/// [`write_repo_file`](crate::storage::IssueStore::write_repo_file), which
-/// path-validates the config-driven target (rejecting absolute/`..`-escaping paths)
-/// and writes atomically. A missing target or missing/malformed delimiters is a
-/// typed [`ProjectionError`] — the file is never silently clobbered.
-///
-/// Returns the repo-relative path that was written.
-pub fn project_rules_and_gates<S: IssueStore>(
-    store: &S,
-    config: &RulesGatesProjectionConfig,
-    rules: &RuleSet,
-    gates: &GateRegistry,
-) -> Result<String, ProjectionError> {
-    let target = config.target();
-    let rendered = render_rules_and_gates_markdown(rules, gates, config.style());
-
-    let content = match config.mode() {
-        ProjectionMode::SeparateFile => rendered,
-        ProjectionMode::Region => {
-            let existing = store
-                .read_repo_file(target)
-                .map_err(|source| ProjectionError::Read {
-                    path: target.to_string(),
-                    source,
-                })?
-                .ok_or_else(|| ProjectionError::TargetNotFound {
-                    path: target.to_string(),
-                })?;
-            splice_region(
-                &existing,
-                &rendered,
-                config.region_begin(),
-                config.region_end(),
-            )?
-        }
-    };
-
-    store
-        .write_repo_file(target, &content)
-        .map_err(|source| ProjectionError::Write {
-            path: target.to_string(),
-            source,
-        })?;
-    Ok(target.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::domain::{Gate, GateMode, GateStage};
-    use crate::storage::{JsonFileStorage, PathReadError};
     use std::collections::HashMap;
     use std::path::Path;
 
@@ -454,117 +395,5 @@ assert = { require-section = { heading = "Goal" } }
             ProjectionStyle::IdAnchor,
         );
         assert_eq!(md, "- **@/gate/bare** — Bare Gate\n");
-    }
-
-    #[test]
-    fn test_project_separate_file_writes_atomically() {
-        let dir = tempfile::tempdir().unwrap();
-        let jit_root = dir.path().join(".jit");
-        std::fs::create_dir_all(&jit_root).unwrap();
-        let store = JsonFileStorage::new(&jit_root);
-
-        let cfg = RulesGatesProjectionConfig {
-            mode: Some(ProjectionMode::SeparateFile),
-            target: Some("docs/rules-and-gates.md".to_string()),
-            ..Default::default()
-        };
-        let written = project_rules_and_gates(&store, &cfg, &ruleset(), &gate_registry()).unwrap();
-        assert_eq!(written, "docs/rules-and-gates.md");
-
-        let on_disk = std::fs::read_to_string(dir.path().join("docs/rules-and-gates.md")).unwrap();
-        assert!(on_disk.contains("@/rule/label-format"));
-        assert!(on_disk.contains("@/gate/cargo-ci"));
-        // No leftover temp file (atomic temp+rename leaves only the target).
-        let leftovers: Vec<_> = std::fs::read_dir(dir.path().join("docs"))
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("tmp"))
-            .collect();
-        assert!(leftovers.is_empty(), "no .tmp temp file should remain");
-    }
-
-    #[test]
-    fn test_project_region_byte_preserves_surrounding_file() {
-        let dir = tempfile::tempdir().unwrap();
-        let jit_root = dir.path().join(".jit");
-        std::fs::create_dir_all(&jit_root).unwrap();
-        let store = JsonFileStorage::new(&jit_root);
-
-        let begin = "<!-- jit:rules-and-gates:begin -->";
-        let end = "<!-- jit:rules-and-gates:end -->";
-        let prefix = "# Rules and Gates\n\nHand-authored intro.\n\n";
-        let suffix = "\n\n## Footer\n\nHand-authored outro.\n";
-        let original = format!("{prefix}{begin}\nstale\n{end}{suffix}");
-        std::fs::write(dir.path().join("REF.md"), &original).unwrap();
-
-        let cfg = RulesGatesProjectionConfig {
-            mode: Some(ProjectionMode::Region),
-            target: Some("REF.md".to_string()),
-            region_begin: Some(begin.to_string()),
-            region_end: Some(end.to_string()),
-            ..Default::default()
-        };
-        project_rules_and_gates(&store, &cfg, &ruleset(), &gate_registry()).unwrap();
-
-        let updated = std::fs::read_to_string(dir.path().join("REF.md")).unwrap();
-        // Bytes OUTSIDE the region are byte-identical.
-        assert!(updated.starts_with(&format!("{prefix}{begin}")));
-        assert!(updated.ends_with(&format!("{end}{suffix}")));
-        // Region replaced with the rendered registries.
-        assert!(updated.contains("@/rule/label-format"));
-        assert!(updated.contains("@/gate/breakdown-review"));
-        assert!(!updated.contains("stale"));
-    }
-
-    #[test]
-    fn test_project_region_missing_target_is_typed_error() {
-        let dir = tempfile::tempdir().unwrap();
-        let jit_root = dir.path().join(".jit");
-        std::fs::create_dir_all(&jit_root).unwrap();
-        let store = JsonFileStorage::new(&jit_root);
-
-        let cfg = RulesGatesProjectionConfig {
-            mode: Some(ProjectionMode::Region),
-            target: Some("MISSING.md".to_string()),
-            ..Default::default()
-        };
-        let err = project_rules_and_gates(&store, &cfg, &ruleset(), &gate_registry()).unwrap_err();
-        assert!(matches!(err, ProjectionError::TargetNotFound { .. }));
-    }
-
-    #[test]
-    fn test_project_separate_file_rejects_escaping_target() {
-        let dir = tempfile::tempdir().unwrap();
-        let jit_root = dir.path().join(".jit");
-        std::fs::create_dir_all(&jit_root).unwrap();
-        let store = JsonFileStorage::new(&jit_root);
-
-        for bad in ["../escape.md", "/tmp/jit-escape.md"] {
-            let cfg = RulesGatesProjectionConfig {
-                mode: Some(ProjectionMode::SeparateFile),
-                target: Some(bad.to_string()),
-                ..Default::default()
-            };
-            let err =
-                project_rules_and_gates(&store, &cfg, &ruleset(), &gate_registry()).unwrap_err();
-            assert!(
-                matches!(
-                    err,
-                    ProjectionError::Write {
-                        source: PathReadError::InvalidPath(_),
-                        ..
-                    }
-                ),
-                "escaping target {bad} must be rejected with InvalidPath, got {err:?}"
-            );
-        }
-        assert!(!dir.path().join("../escape.md").exists());
-    }
-
-    #[test]
-    fn test_default_config_targets_separate_jit_owned_file() {
-        let cfg = RulesGatesProjectionConfig::default();
-        assert_eq!(cfg.mode(), ProjectionMode::SeparateFile);
-        assert_eq!(cfg.target(), ".jit/rules-and-gates.md");
     }
 }

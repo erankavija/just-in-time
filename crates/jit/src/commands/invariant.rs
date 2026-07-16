@@ -1,35 +1,17 @@
-//! Invariant projection and drift commands (`jit invariant render` / `check`).
+//! Invariant enforcement-drift command (`jit invariant check`).
 //!
-//! `render` projects the loaded `.jit/invariants.toml` registry into the
-//! documentation target declared by `[invariant_projection]` (default: a
-//! separate jit-owned file). `check` computes the
-//! enforcement-drift between the invariant registry and the declared
-//! rules/gates. Both are thin boundaries: they pull the cached config (registry +
-//! projection target) plus the effective ruleset and gate registry, and delegate
-//! ALL rendering / drift logic to the pure engine
-//! ([`projection`](crate::validation::projection),
-//! [`drift`](crate::validation::drift)). They own no CLI parsing or output
+//! `check` computes the enforcement-drift between the invariant registry and the
+//! declared rules/gates. It is a thin boundary: it pulls the effective ruleset and
+//! gate registry and delegates ALL drift logic to the pure engine
+//! ([`drift`](crate::validation::drift)). It owns no CLI parsing or output
 //! formatting (the layer boundary in AGENTS.md "Separation of Concerns").
+//!
+//! Projecting the registry into documentation is no longer an invariant-specific
+//! command: it is the generic [`project_render`](crate::commands::project) command
+//! (`jit project render`), driven by the `[projection.*]` config.
 
 use super::*;
-use crate::config::InvariantProjectionConfig;
 use crate::validation::drift::DriftFinding;
-use crate::validation::projection::project_invariants;
-
-/// Result of a `jit invariant render` projection.
-///
-/// Returned by [`CommandExecutor::render_invariants`] and serialized as the
-/// `--json` payload: the repo-relative `target` that was written, the `mode` used
-/// (`separate-file`|`region`), and the `count` of invariants rendered.
-#[derive(Debug, Serialize)]
-pub struct InvariantRenderResult {
-    /// The repo-relative documentation target that was written (from config).
-    pub target: String,
-    /// The projection mode used, as its config token (`separate-file`|`region`).
-    pub mode: String,
-    /// Number of invariants rendered into the target.
-    pub count: usize,
-}
 
 /// Result of a `jit invariant check` enforcement-drift run.
 ///
@@ -55,35 +37,6 @@ impl InvariantCheckResult {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Render the loaded invariant registry into its configured documentation
-    /// target and return what was written.
-    ///
-    /// Reads the `[invariant_projection]` table and the `.jit/invariants.toml`
-    /// registry from the cached config (falling back to the shipped default —
-    /// separate-file mode targeting a jit-owned file — when the table is absent),
-    /// then delegates to
-    /// [`project_invariants`](crate::validation::projection::project_invariants),
-    /// which path-validates the config-driven target and writes atomically
-    /// through the storage boundary. The target path comes ONLY from config.
-    pub fn render_invariants(&self) -> Result<InvariantRenderResult> {
-        let config = self.cached_config()?;
-        let default = InvariantProjectionConfig::default();
-        let projection = config.invariant_projection.as_ref().unwrap_or(&default);
-        let registry = &config.invariants;
-
-        let target = project_invariants(self.storage(), projection, registry)
-            .map_err(|err| anyhow!("invariant projection failed: {err}"))?;
-
-        Ok(InvariantRenderResult {
-            target,
-            mode: match projection.mode() {
-                crate::config::ProjectionMode::SeparateFile => "separate-file".to_string(),
-                crate::config::ProjectionMode::Region => "region".to_string(),
-            },
-            count: registry.invariants.len(),
-        })
-    }
-
     /// Compute the enforcement-drift between the invariant registry and the
     /// declared rules/gates, returning every drift finding.
     ///

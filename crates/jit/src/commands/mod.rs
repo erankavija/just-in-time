@@ -48,8 +48,8 @@ pub mod item;
 mod labels;
 pub mod migrate;
 pub mod plan_doc;
+pub mod project;
 mod query;
-pub mod reference;
 mod search;
 pub mod serve;
 pub mod snapshot;
@@ -74,11 +74,11 @@ pub use gate::{
     PassAllOutcome,
 };
 pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
-pub use invariant::{InvariantCheckResult, InvariantRenderResult};
+pub use invariant::InvariantCheckResult;
 pub use issue::DescriptionUpdate;
 pub use item::{ItemListResult, ItemShowResult};
 pub use migrate::LifecycleBackfillResult;
-pub use reference::RulesGatesRenderResult;
+pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use template::TemplateApplyResult;
 pub use template_expand::{
     expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,

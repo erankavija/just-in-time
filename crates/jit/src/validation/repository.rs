@@ -19,10 +19,10 @@ use crate::graph::DependencyGraph;
 use crate::storage::GateRegistry;
 use crate::validation::engine::Finding;
 use crate::validation::invariants::InvariantRegistry;
-use crate::validation::projection::{render_invariants_markdown, splice_region};
+use crate::validation::project_render::{render_projection_body, ProjectionInputs};
+use crate::validation::projection::splice_region;
 use crate::validation::report::{ReportedFinding, RuleReport};
 use crate::validation::rules::{RuleConfigError, RuleSet, SchemaSource, Severity};
-use crate::validation::rules_gates_projection::render_rules_and_gates_markdown;
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -1116,42 +1116,33 @@ fn validate_projections(
     rules: &RuleSet,
     gates: &GateRegistry,
 ) -> Result<()> {
-    if let Some(projection) = config.invariant_projection.as_ref() {
-        let rendered = render_invariants_markdown(&config.invariants, projection.style());
+    let Some(projections) = config.projection.as_ref() else {
+        return Ok(());
+    };
+    let inputs = ProjectionInputs {
+        config,
+        rules,
+        gates,
+    };
+    for (name, projection) in projections {
+        // Re-render the body through the SAME generic code path `jit project
+        // render` uses (binding freshness to the projection code, never a stored
+        // mirror), then compare the spliced-in result against the target's bytes.
+        let mut read = |path: &str| read_text(view, path);
+        let (body, _count) = render_projection_body(projection, &inputs, &mut read)?;
+        let target = projection.target(name);
         let expected = projected_content(
             view,
-            projection.target(),
+            &target,
             projection.mode(),
-            &rendered,
-            projection.region_begin(),
-            projection.region_end(),
+            &body,
+            &projection.region_begin(name),
+            &projection.region_end(name),
         )?;
-        let actual = read_text(view, projection.target())?
-            .ok_or_else(|| anyhow!("projection target '{}' is missing", projection.target()))?;
+        let actual = read_text(view, &target)?
+            .ok_or_else(|| anyhow!("projection target '{target}' is missing"))?;
         if actual != expected {
-            return Err(anyhow!(
-                "invariant projection '{}' is stale",
-                projection.target()
-            ));
-        }
-    }
-    if let Some(projection) = config.rules_gates_projection.as_ref() {
-        let rendered = render_rules_and_gates_markdown(rules, gates, projection.style());
-        let expected = projected_content(
-            view,
-            projection.target(),
-            projection.mode(),
-            &rendered,
-            projection.region_begin(),
-            projection.region_end(),
-        )?;
-        let actual = read_text(view, projection.target())?
-            .ok_or_else(|| anyhow!("projection target '{}' is missing", projection.target()))?;
-        if actual != expected {
-            return Err(anyhow!(
-                "rules/gates projection '{}' is stale",
-                projection.target()
-            ));
+            return Err(anyhow!("projection '{name}' target '{target}' is stale"));
         }
     }
     Ok(())
@@ -1501,7 +1492,26 @@ mod tests {
     #[test]
     fn test_overlay_projection_rejects_stale_planned_target_despite_live_state() {
         let repo = fixture();
-        let config = "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[invariant_projection]\ntarget = \"INVARIANTS.md\"\nmode = \"separate-file\"\n";
+        let config = "\
+[type_hierarchy.types]
+task = 4
+[namespaces.type]
+description = \"Issue type\"
+unique = true
+[item_kinds.invariant]
+section = \"success_criteria\"
+id-pattern = \"[a-z][a-z0-9-]*\"
+markers = []
+link-namespaces = [\"enforces\"]
+scope = \"project\"
+source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
+source-of-truth = \"registry-first\"
+[projection.invariants]
+kind = \"invariant\"
+target = \"INVARIANTS.md\"
+mode = \"separate-file\"
+style = \"full\"
+";
         let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
         let view = overlay(
             &repo,

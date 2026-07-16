@@ -202,24 +202,35 @@ scope = "project"
 source = "dev/vision/9db27a3a-charter.md"
 source-of-truth = "markdown-first"
 
-[invariant_projection]
-# Region mode: replace only the delimited region inside AGENTS.md (REQ-06).
-# The markers <!-- jit:invariants:begin --> and <!-- jit:invariants:end --> wrap
-# the id-anchor bullet list; `jit invariant render` keeps everything outside
-# those markers byte-exact and writes atomically through storage.
-# id-anchor style (REQ-08): heading-less `- **{id}** — {statement}` bullets, so
-# the hand-authored "### Domain Invariants" heading above the markers stays put.
+# Documentation projections (`jit project render`). Each `[projection.<name>]`
+# renders an addressable item kind into a region of a target file; region markers
+# default to `<!-- jit:<name>:begin/end -->`, and everything outside stays
+# byte-exact through the atomic storage write (@/inv/atomic-writes).
+
+[projection.invariants]
+# id-anchor: heading-less `- **{id}** — {statement}` bullets into the region under
+# the hand-authored "### Domain Invariants" heading in AGENTS.md, byte-preserving
+# everything outside <!-- jit:invariants:begin --> / <!-- jit:invariants:end -->.
+kind = "invariant"
 mode = "region"
 target = "AGENTS.md"
 style = "id-anchor"
 
-[rules_gates_projection]
-# Region mode: replace only the delimited region inside the reference doc.
-# The markers <!-- jit:rules-and-gates:begin --> and <!-- jit:rules-and-gates:end -->
-# wrap the rendered `## Rules` / `## Gates` sections; `jit reference render` keeps
-# everything outside those markers byte-exact and writes atomically through storage.
-# full style: section headings + metadata bullets, addressed by the canonical
-# kind-segmented forms @/rule/<name> and @/gate/<key>.
+[projection.rules-and-gates]
+# full: `## Rules` / `## Gates` sections with severity/enforcement metadata,
+# addressed by the canonical kind-segmented forms @/rule/<name> and @/gate/<key>,
+# into the region in the reference doc (markers <!-- jit:rules-and-gates:begin/end -->).
+kind = ["rule", "gate"]
 mode = "region"
 target = "docs/reference/rules-and-gates.md"
 style = "full"
+
+[projection.charter]
+# id-anchor dogfood: the charter decision log (`@/charter/D-N`, markdown-first over
+# the vision charter) renders `- **D-N** — <one-liner>` bullets into the
+# "### Charter Decisions" region of AGENTS.md (CLAUDE.md is a symlink to it), so the
+# always-loaded agent context carries the decision log without hand-copying (D-6).
+kind = "charter"
+mode = "region"
+target = "AGENTS.md"
+style = "id-anchor"

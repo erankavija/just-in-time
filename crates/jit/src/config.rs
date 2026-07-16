@@ -39,26 +39,18 @@ pub struct JitConfig {
     /// `decision`, `risk`, etc. are all just configuration. See
     /// [`ItemKindConfig`].
     pub item_kinds: Option<HashMap<String, ItemKindConfig>>,
-    /// Documentation target the invariant registry projects into (optional).
+    /// Generic documentation-projection registry (optional).
     ///
-    /// When the `[invariant_projection]` table is ABSENT, the projection engine
-    /// falls back to [`InvariantProjectionConfig::default`], which targets a
-    /// separate jit-owned file ([`DEFAULT_INVARIANT_PROJECTION_TARGET`]) in
-    /// separate-file mode, so the default never touches existing docs. The target
-    /// path lives ONLY here in the config layer; the projection engine reads it
-    /// from config and never hardcodes a documentation filename. See
-    /// [`InvariantProjectionConfig`].
-    pub invariant_projection: Option<InvariantProjectionConfig>,
-    /// Documentation target the rule + gate registries project into (optional).
-    ///
-    /// The rules/gates analogue of [`invariant_projection`](Self::invariant_projection):
-    /// when the `[rules_gates_projection]` table is ABSENT, the projection engine
-    /// falls back to [`RulesGatesProjectionConfig::default`], which targets a
-    /// separate jit-owned file ([`DEFAULT_RULES_GATES_PROJECTION_TARGET`]) in
-    /// separate-file mode, so the default never touches existing docs. The target
-    /// path lives ONLY here in the config layer. See
-    /// [`RulesGatesProjectionConfig`].
-    pub rules_gates_projection: Option<RulesGatesProjectionConfig>,
+    /// Each `[projection.<name>]` table declares one projection of an addressable
+    /// item kind (or kinds) into a documentation target: its `kind`, `mode`
+    /// (`separate-file`|`region`), `target` (repo-relative), render `style`
+    /// (`id-anchor`|`full`), and optional region delimiters. Keyed by the
+    /// projection name, which also derives the default region markers
+    /// (`<!-- jit:<name>:begin -->` / `<!-- jit:<name>:end -->`). The engine drives
+    /// every declared projection from the single `jit project render` command; the
+    /// target path and delimiters live ONLY here in config. See
+    /// [`ProjectionConfig`].
+    pub projection: Option<std::collections::BTreeMap<String, ProjectionConfig>>,
     /// Worktree and parallel work configuration (optional).
     pub worktree: Option<WorktreeConfig>,
     /// Coordination settings for leases and agents (optional).
@@ -831,119 +823,190 @@ pub enum SourceOfTruth {
     RegistryFirst,
 }
 
-/// The shipped DEFAULT documentation target for invariant projection.
+/// The default begin marker delimiting projection `<name>`'s region in `region`
+/// mode: `<!-- jit:<name>:begin -->`.
 ///
-/// A separate jit-owned file under `.jit/` so the default behavior never touches
-/// existing project docs (decision D3). This is the SOLE place the default
-/// filename lives: the projection engine reads the resolved target from config
-/// and contains no documentation-filename literal. It is the value
-/// [`InvariantProjectionConfig::target`] resolves to when no `target` is set.
-pub const DEFAULT_INVARIANT_PROJECTION_TARGET: &str = ".jit/invariants.md";
+/// Derived from the projection name (the `[projection.<name>]` table key), so a
+/// projection needs no explicit `region-begin` unless it wants a custom marker.
+/// Used by [`ProjectionConfig::region_begin`].
+pub fn default_region_begin(name: &str) -> String {
+    format!("<!-- jit:{name}:begin -->")
+}
 
-/// The default begin marker delimiting the invariant region in `region` mode.
-///
-/// Used by [`InvariantProjectionConfig::region_begin`] when no `region-begin` is
-/// configured.
-pub const DEFAULT_INVARIANT_REGION_BEGIN: &str = "<!-- jit:invariants:begin -->";
+/// The default end marker delimiting projection `<name>`'s region in `region`
+/// mode: `<!-- jit:<name>:end -->`. The name-derived counterpart of
+/// [`default_region_begin`], used by [`ProjectionConfig::region_end`].
+pub fn default_region_end(name: &str) -> String {
+    format!("<!-- jit:{name}:end -->")
+}
 
-/// The default end marker delimiting the invariant region in `region` mode.
+/// The item kind(s) a projection renders: one kind name, or several.
 ///
-/// Used by [`InvariantProjectionConfig::region_end`] when no `region-end` is
-/// configured.
-pub const DEFAULT_INVARIANT_REGION_END: &str = "<!-- jit:invariants:end -->";
+/// Deserializes from either a bare string (`kind = "invariant"`) or an array
+/// (`kind = ["rule", "gate"]`); serializes back to the same shape (a single-element
+/// list round-trips to the bare string), so `jit config get` renders what a
+/// hand-authored `config.toml` would write. The names are resolved to configured
+/// [`ItemKind`](crate::domain::item::ItemKind)s at render time — an unknown name is
+/// a typed error there, not here.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ProjectionKinds(Vec<String>);
 
-/// Where and how the invariant registry projects into human-readable docs.
+impl ProjectionKinds {
+    /// The declared kind names, in authored order.
+    pub fn names(&self) -> &[String] {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for ProjectionKinds {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        // A bare string is one kind; a sequence is several. A Visitor keeps this
+        // robust under the TOML deserializer (mirrors `ItemKindSource`).
+        struct KindsVisitor;
+        impl<'de> serde::de::Visitor<'de> for KindsVisitor {
+            type Value = ProjectionKinds;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a kind name string, or an array of kind name strings")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(ProjectionKinds(vec![v.to_string()]))
+            }
+
+            fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value, E> {
+                Ok(ProjectionKinds(vec![v]))
+            }
+
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<Self::Value, A::Error> {
+                let mut names = Vec::new();
+                while let Some(name) = seq.next_element::<String>()? {
+                    names.push(name);
+                }
+                Ok(ProjectionKinds(names))
+            }
+        }
+        deserializer.deserialize_any(KindsVisitor)
+    }
+}
+
+impl Serialize for ProjectionKinds {
+    /// Mirrors [`Deserialize`]: a single kind serializes as a bare string, several
+    /// as an array, so a value round-trips through TOML or JSON unchanged.
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self.0.as_slice() {
+            [one] => serializer.serialize_str(one),
+            many => many.serialize(serializer),
+        }
+    }
+}
+
+/// One generic documentation projection declared as `[projection.<name>]`.
 ///
-/// Mirrors the `[item_kinds]` / `[namespaces.*]` registry precedent: an optional
-/// `[invariant_projection]` table on [`JitConfig`]. When the table is ABSENT, the
-/// engine uses [`InvariantProjectionConfig::default`] — separate-file mode
-/// targeting [`DEFAULT_INVARIANT_PROJECTION_TARGET`] — so the default never
-/// touches existing docs (decision D3). The `target` path and region delimiters
-/// are config-driven; the projection engine hardcodes no documentation filename.
-/// The `style` field selects how each invariant is rendered ([`ProjectionStyle`],
-/// defaulting to the original full render).
+/// Replaces the bespoke per-projection tables: any addressable item kind renders
+/// into a documentation target through this one shape, driven by the single
+/// `jit project render` command. Fields:
+///
+/// - `kind` — the [`ProjectionKinds`] to render (one name, or an array).
+/// - `mode` — [`ProjectionMode`] (`separate-file` writes a whole file; `region`
+///   rewrites only a delimited block, byte-preserving everything outside).
+/// - `target` — repo-relative documentation path (config-driven; the engine
+///   hardcodes no filename).
+/// - `style` — [`ProjectionStyle`] (`id-anchor` renders generic `- **{id}** —
+///   {text}` rows; `full` renders the built-in rich registry views).
+/// - `region-begin` / `region-end` — optional region delimiters; when unset they
+///   default to `<!-- jit:<name>:begin -->` / `<!-- jit:<name>:end -->`, derived
+///   from the projection name (so the accessors take that name).
 ///
 /// # Examples
 ///
 /// ```
-/// use jit::config::{
-///     InvariantProjectionConfig, ProjectionMode, DEFAULT_INVARIANT_PROJECTION_TARGET,
-/// };
+/// use jit::config::{ProjectionConfig, ProjectionMode, ProjectionStyle};
 ///
-/// // The default targets a separate jit-owned file.
-/// let default = InvariantProjectionConfig::default();
-/// assert_eq!(default.mode(), ProjectionMode::SeparateFile);
-/// assert_eq!(default.target(), DEFAULT_INVARIANT_PROJECTION_TARGET);
-///
-/// // Region mode is opt-in via the `[invariant_projection]` table.
-/// let cfg: InvariantProjectionConfig = toml::from_str(
+/// let cfg: ProjectionConfig = toml::from_str(
 ///     r#"
+/// kind = "charter"
 /// mode = "region"
-/// target = "docs/invariants.md"
-/// region-begin = "<!-- INV START -->"
-/// region-end = "<!-- INV END -->"
+/// target = "AGENTS.md"
+/// style = "id-anchor"
 /// "#,
 /// )
 /// .unwrap();
+/// assert_eq!(cfg.kind.names(), ["charter"]);
 /// assert_eq!(cfg.mode(), ProjectionMode::Region);
-/// assert_eq!(cfg.target(), "docs/invariants.md");
-/// assert_eq!(cfg.region_begin(), "<!-- INV START -->");
-/// ```
+/// assert_eq!(cfg.style(), ProjectionStyle::IdAnchor);
+/// // Region markers default from the projection name.
+/// assert_eq!(cfg.region_begin("charter"), "<!-- jit:charter:begin -->");
 ///
-/// All fields are `Option`s defaulting to `None`: a `None` accessor resolves to
-/// its config-layer const default, so [`InvariantProjectionConfig::default`] (an
-/// absent `[invariant_projection]` table) is separate-file mode targeting the
-/// jit-owned file.
+/// // `kind` also accepts an array (e.g. the rules-and-gates projection).
+/// let multi: ProjectionConfig =
+///     toml::from_str("kind = [\"rule\", \"gate\"]\ntarget = \"ref.md\"\n").unwrap();
+/// assert_eq!(multi.kind.names(), ["rule", "gate"]);
+/// ```
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
-pub struct InvariantProjectionConfig {
-    /// Projection mode: a separate jit-owned file or a delimited region within an
+pub struct ProjectionConfig {
+    /// The item kind(s) whose addressable rows this projection renders.
+    pub kind: ProjectionKinds,
+    /// Projection mode: a whole separate file, or a delimited region within an
     /// existing file. Defaults to [`ProjectionMode::SeparateFile`] when unset.
     #[serde(default)]
     pub mode: Option<ProjectionMode>,
     /// Repo-relative path of the documentation target. Defaults to
-    /// [`DEFAULT_INVARIANT_PROJECTION_TARGET`] when unset.
+    /// `.jit/<name>.md` (resolved by [`ProjectionConfig::target`]) when unset.
     #[serde(default)]
     pub target: Option<String>,
     /// Begin marker delimiting the rewritten region in `region` mode. Defaults to
-    /// [`DEFAULT_INVARIANT_REGION_BEGIN`] when unset.
+    /// `<!-- jit:<name>:begin -->` when unset.
     #[serde(default, rename = "region-begin")]
     pub region_begin: Option<String>,
     /// End marker delimiting the rewritten region in `region` mode. Defaults to
-    /// [`DEFAULT_INVARIANT_REGION_END`] when unset.
+    /// `<!-- jit:<name>:end -->` when unset.
     #[serde(default, rename = "region-end")]
     pub region_end: Option<String>,
     /// Render style for the projected markdown block. Defaults to
-    /// [`ProjectionStyle::Full`] when unset, so an absent `style` field keeps the
-    /// existing `## Project invariants` header + `[kind]`/enforced-by bullets.
+    /// [`ProjectionStyle::Full`] when unset.
     #[serde(default)]
     pub style: Option<ProjectionStyle>,
 }
 
-impl InvariantProjectionConfig {
+impl ProjectionConfig {
+    /// The declared kind names, in authored order.
+    pub fn kinds(&self) -> &[String] {
+        self.kind.names()
+    }
+
     /// The resolved projection mode (defaulting to [`ProjectionMode::SeparateFile`]).
     pub fn mode(&self) -> ProjectionMode {
         self.mode.unwrap_or_default()
     }
 
-    /// The resolved repo-relative target path (defaulting to the jit-owned file).
-    pub fn target(&self) -> &str {
+    /// The resolved repo-relative target path, defaulting to `.jit/<name>.md`.
+    ///
+    /// Takes the projection `name` (the `[projection.<name>]` table key) so the
+    /// default is name-derived; a declared `target` overrides it.
+    pub fn target(&self, name: &str) -> String {
         self.target
-            .as_deref()
-            .unwrap_or(DEFAULT_INVARIANT_PROJECTION_TARGET)
+            .clone()
+            .unwrap_or_else(|| format!(".jit/{name}.md"))
     }
 
-    /// The resolved begin marker for `region` mode (defaulting to the const).
-    pub fn region_begin(&self) -> &str {
+    /// The resolved begin marker for `region` mode, defaulting to the name-derived
+    /// [`default_region_begin`].
+    pub fn region_begin(&self, name: &str) -> String {
         self.region_begin
-            .as_deref()
-            .unwrap_or(DEFAULT_INVARIANT_REGION_BEGIN)
+            .clone()
+            .unwrap_or_else(|| default_region_begin(name))
     }
 
-    /// The resolved end marker for `region` mode (defaulting to the const).
-    pub fn region_end(&self) -> &str {
+    /// The resolved end marker for `region` mode, defaulting to the name-derived
+    /// [`default_region_end`].
+    pub fn region_end(&self, name: &str) -> String {
         self.region_end
-            .as_deref()
-            .unwrap_or(DEFAULT_INVARIANT_REGION_END)
+            .clone()
+            .unwrap_or_else(|| default_region_end(name))
     }
 
     /// The resolved render style (defaulting to [`ProjectionStyle::Full`]).
@@ -952,17 +1015,16 @@ impl InvariantProjectionConfig {
     }
 }
 
-/// How the invariant registry is projected into its documentation target.
+/// How a registry is projected into its documentation target.
 ///
 /// Deserialized from the kebab-case tokens `"separate-file"` / `"region"` via
 /// serde rename; an unrecognized value is a descriptive parse error rather than a
-/// silent default. The shipped default (no `[invariant_projection]` table) is
-/// [`ProjectionMode::SeparateFile`].
+/// silent default. The default (no `mode` field) is [`ProjectionMode::SeparateFile`].
 #[derive(
     Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq, schemars::JsonSchema,
 )]
 pub enum ProjectionMode {
-    /// Write the rendered invariants to a separate jit-owned file (the default).
+    /// Write the rendered block to a separate whole file (the default).
     #[default]
     #[serde(rename = "separate-file")]
     SeparateFile,
@@ -972,146 +1034,34 @@ pub enum ProjectionMode {
     Region,
 }
 
-/// How each invariant is rendered into the projected markdown block.
+/// How a projected registry is rendered into the markdown block.
 ///
 /// Deserialized from the kebab-case tokens `"full"` / `"id-anchor"` via serde
 /// rename; an unrecognized value is a descriptive parse error rather than a
-/// silent default. The shipped default (no `style` field) is
-/// [`ProjectionStyle::Full`], which reproduces the original
-/// `## Project invariants` header plus `- **id** [kind] (enforced-by): statement`
-/// bullets. [`ProjectionStyle::IdAnchor`] renders a heading-less bullet list of
-/// `- **{id}** — {statement}` lines (no kind tag, no enforced-by), suited to a
-/// region beneath a hand-authored heading.
+/// silent default. The default (no `style` field) is [`ProjectionStyle::Full`].
+///
+/// - [`ProjectionStyle::IdAnchor`] renders a heading-less generic bullet list of
+///   `- **{self-id}** — {text}` rows from a kind's addressable items — the
+///   kind-agnostic style any item kind can use with no dedicated code.
+/// - [`ProjectionStyle::Full`] renders the built-in rich registry views (the
+///   invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
+///   registries' `## Rules` / `## Gates` sections with severity/enforce metadata),
+///   which carry typed fields absent from a generic addressable row.
 #[derive(
     Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq, schemars::JsonSchema,
 )]
 pub enum ProjectionStyle {
-    /// Reproduce the original render: a `## Project invariants` header followed by
-    /// `- **{id}** [{kind}]{enforced_by}: {statement}` bullets (the default).
+    /// Render the built-in rich registry view for the projection's kind(s) (the
+    /// default): the invariant registry's `[kind]`/enforced-by bullets, or the
+    /// rule + gate registries' `## Rules` / `## Gates` sections with metadata.
     #[default]
     #[serde(rename = "full")]
     Full,
-    /// Render a heading-less bullet list of `- **{id}** — {statement}` lines, with
-    /// no kind tag and no enforced-by, for embedding beneath a hand-authored
-    /// heading.
+    /// Render a heading-less generic bullet list of `- **{self-id}** — {text}`
+    /// rows from the kind's addressable items, for embedding beneath a
+    /// hand-authored heading. Kind-agnostic: any item kind renders this way.
     #[serde(rename = "id-anchor")]
     IdAnchor,
-}
-
-/// The shipped DEFAULT documentation target for the rules-and-gates projection.
-///
-/// A separate jit-owned file under `.jit/` so the default behavior never touches
-/// existing project docs, mirroring [`DEFAULT_INVARIANT_PROJECTION_TARGET`]. This
-/// is the SOLE place the default filename lives: the projection engine reads the
-/// resolved target from config and contains no documentation-filename literal. It
-/// is the value [`RulesGatesProjectionConfig::target`] resolves to when no
-/// `target` is set.
-pub const DEFAULT_RULES_GATES_PROJECTION_TARGET: &str = ".jit/rules-and-gates.md";
-
-/// The default begin marker delimiting the rules-and-gates region in `region` mode.
-///
-/// Used by [`RulesGatesProjectionConfig::region_begin`] when no `region-begin` is
-/// configured.
-pub const DEFAULT_RULES_GATES_REGION_BEGIN: &str = "<!-- jit:rules-and-gates:begin -->";
-
-/// The default end marker delimiting the rules-and-gates region in `region` mode.
-///
-/// Used by [`RulesGatesProjectionConfig::region_end`] when no `region-end` is
-/// configured.
-pub const DEFAULT_RULES_GATES_REGION_END: &str = "<!-- jit:rules-and-gates:end -->";
-
-/// Where and how the rule and gate registries project into human-readable docs.
-///
-/// The rules/gates analogue of [`InvariantProjectionConfig`]: an optional
-/// `[rules_gates_projection]` table on [`JitConfig`] declaring the SAME
-/// projection-mode / render-style / region-delimiter knobs (reusing
-/// [`ProjectionMode`] and [`ProjectionStyle`]). When the table is ABSENT, the
-/// engine uses [`RulesGatesProjectionConfig::default`] — separate-file mode
-/// targeting [`DEFAULT_RULES_GATES_PROJECTION_TARGET`] — so the default never
-/// touches existing docs. The `target` path and region delimiters are
-/// config-driven; the projection engine hardcodes no documentation filename.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{
-///     RulesGatesProjectionConfig, ProjectionMode, DEFAULT_RULES_GATES_PROJECTION_TARGET,
-/// };
-///
-/// // The default targets a separate jit-owned file.
-/// let default = RulesGatesProjectionConfig::default();
-/// assert_eq!(default.mode(), ProjectionMode::SeparateFile);
-/// assert_eq!(default.target(), DEFAULT_RULES_GATES_PROJECTION_TARGET);
-///
-/// // Region mode into a hand-authored reference doc is opt-in via the table.
-/// let cfg: RulesGatesProjectionConfig = toml::from_str(
-///     r#"
-/// mode = "region"
-/// target = "docs/reference/rules-and-gates.md"
-/// region-begin = "<!-- RG START -->"
-/// region-end = "<!-- RG END -->"
-/// "#,
-/// )
-/// .unwrap();
-/// assert_eq!(cfg.mode(), ProjectionMode::Region);
-/// assert_eq!(cfg.target(), "docs/reference/rules-and-gates.md");
-/// assert_eq!(cfg.region_begin(), "<!-- RG START -->");
-/// ```
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
-pub struct RulesGatesProjectionConfig {
-    /// Projection mode: a separate jit-owned file or a delimited region within an
-    /// existing file. Defaults to [`ProjectionMode::SeparateFile`] when unset.
-    #[serde(default)]
-    pub mode: Option<ProjectionMode>,
-    /// Repo-relative path of the documentation target. Defaults to
-    /// [`DEFAULT_RULES_GATES_PROJECTION_TARGET`] when unset.
-    #[serde(default)]
-    pub target: Option<String>,
-    /// Begin marker delimiting the rewritten region in `region` mode. Defaults to
-    /// [`DEFAULT_RULES_GATES_REGION_BEGIN`] when unset.
-    #[serde(default, rename = "region-begin")]
-    pub region_begin: Option<String>,
-    /// End marker delimiting the rewritten region in `region` mode. Defaults to
-    /// [`DEFAULT_RULES_GATES_REGION_END`] when unset.
-    #[serde(default, rename = "region-end")]
-    pub region_end: Option<String>,
-    /// Render style for the projected markdown block. Defaults to
-    /// [`ProjectionStyle::Full`] when unset (section headings + metadata bullets).
-    #[serde(default)]
-    pub style: Option<ProjectionStyle>,
-}
-
-impl RulesGatesProjectionConfig {
-    /// The resolved projection mode (defaulting to [`ProjectionMode::SeparateFile`]).
-    pub fn mode(&self) -> ProjectionMode {
-        self.mode.unwrap_or_default()
-    }
-
-    /// The resolved repo-relative target path (defaulting to the jit-owned file).
-    pub fn target(&self) -> &str {
-        self.target
-            .as_deref()
-            .unwrap_or(DEFAULT_RULES_GATES_PROJECTION_TARGET)
-    }
-
-    /// The resolved begin marker for `region` mode (defaulting to the const).
-    pub fn region_begin(&self) -> &str {
-        self.region_begin
-            .as_deref()
-            .unwrap_or(DEFAULT_RULES_GATES_REGION_BEGIN)
-    }
-
-    /// The resolved end marker for `region` mode (defaulting to the const).
-    pub fn region_end(&self) -> &str {
-        self.region_end
-            .as_deref()
-            .unwrap_or(DEFAULT_RULES_GATES_REGION_END)
-    }
-
-    /// The resolved render style (defaulting to [`ProjectionStyle::Full`]).
-    pub fn style(&self) -> ProjectionStyle {
-        self.style.unwrap_or_default()
-    }
 }
 
 /// An error validating an explicitly-declared `[item_kinds.X]` table.
@@ -1492,8 +1442,7 @@ impl JitConfig {
                 documentation: None,
                 namespaces: None,
                 item_kinds: None,
-                invariant_projection: None,
-                rules_gates_projection: None,
+                projection: None,
                 worktree: None,
                 coordination: None,
                 global_operations: None,
@@ -1887,7 +1836,7 @@ impl EffectiveConfig {
     ///   config show`.
     /// - every other section (`version`, `project`, `type_hierarchy`,
     ///   `validation`, `documentation`, `namespaces`, `item_kinds`,
-    ///   `invariant_projection`, `rules_gates_projection`): read from the
+    ///   `projection`): read from the
     ///   REPO config only, with no system/user merge and no built-in
     ///   defaults layered in. jit has no notion of a system/user override for
     ///   a repo's type hierarchy, label namespaces, or item kinds — every
@@ -1942,12 +1891,8 @@ impl EffectiveConfig {
             section(repo.and_then(|c| c.item_kinds.as_ref()))?,
         );
         map.insert(
-            "invariant_projection".to_string(),
-            section(repo.and_then(|c| c.invariant_projection.as_ref()))?,
-        );
-        map.insert(
-            "rules_gates_projection".to_string(),
-            section(repo.and_then(|c| c.rules_gates_projection.as_ref()))?,
+            "projection".to_string(),
+            section(repo.and_then(|c| c.projection.as_ref()))?,
         );
 
         map.insert(

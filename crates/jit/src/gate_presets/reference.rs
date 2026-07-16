@@ -255,7 +255,7 @@ pub fn render_reference_markdown() -> Result<String> {
          repository has configured. `jit init` writes an empty gate registry, so nothing\n\
          below reaches a project until `jit gate preset apply` runs. The gates a project\n\
          actually enforces live in its own `.jit/gates.toml`, its settings in\n\
-         `.jit/config.toml`; render those with `jit reference render` (see\n\
+         `.jit/config.toml`; render those with `jit project render` (see\n\
          [Rules and Gates](rules-and-gates.md)).\n\
          \n\
          ## Portable checker types\n\

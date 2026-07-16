@@ -2,15 +2,16 @@
 
 > **Diátaxis Type:** Reference
 
-`jit reference render` projects a project's two enforcement registries into a
+`jit project render` projects a project's two enforcement registries into a
 markdown document, so the rules and gates a repository enforces reach prose from
 their source of truth:
 
 - **Rules**: validation rules from `.jit/rules.toml`, addressed as `@/rule/<name>`.
 - **Gates**: quality gates from `.jit/gates.toml`, addressed as `@/gate/<key>`.
 
-The target document and its mode are configured under `[rules_gates_projection]`
-in `.jit/config.toml`. In region mode, rendering rewrites the delimited region
+The target document and its mode are configured under a `[projection.<name>]`
+table in `.jit/config.toml` (here, `[projection.rules-and-gates]` in `full`
+style). In region mode, rendering rewrites the delimited region
 and byte-preserves everything around it, leaving the surrounding prose yours to
 author. Edit the registries and re-render to change what the region says.
 
@@ -43,7 +44,7 @@ names, gate keys, and checkers your project declares.
 - **@/gate/coverage-preview** — Coverage Preview: Run scoped validation for the container resolved from the breakdown node's brackets: label; blocks when a [hard] criterion is uncovered at plan time
 - **@/gate/dependency-audit** — Dependency vulnerabilities checked: cargo-audit checks Cargo.lock and treats vulnerabilities plus all audit warnings as blocking failures.
 - **@/gate/doc-review** — AI Documentation Review: An issue-scoped documentation-impact review. It uses the repository-configured hierarchy and DAG-resolved descendants to distinguish leaves from containers. A leaf footprint contains only its own individually inspected `jit:<short-id>` commit patches; a container footprint also contains every delivered descendant's patches without absorbing unrelated sequencing dependencies. It derives the smallest impact cone, including required but untouched docs; rather than replaying leaf reviews, container reviews assess the combined documentation contract for workflow coverage, cross-child consistency, canonical placement, discoverability, and aggregate concision. Issue-impact defects fail the gate; unrelated pre-existing drift is advisory. Missing tags fall back to issue intent and linked documents without attributing uncommitted changes. All reviews enforce concise style.
-- **@/gate/docs-mechanical** — Documentation Mechanical Checks: Deterministic mechanical checks over the adopter-facing documentation surface, each deriving both comparison sides live from the tree so it encodes no product facts: markdown link + heading-anchor resolution (M2), source-path + @/… citation existence (M3), and registry projection freshness (M5, re-runs jit invariant render / jit reference render and diffs the configured targets). Runs ./scripts/docs-mechanical.sh, which fans out to the three committed checkers under scripts/ (docs-check-links.sh, docs-check-citations.sh, docs-check-projections.sh). The footprint is caller-supplied: area audits and the container's full-surface run pass their own paths via positional arguments or the DOCS_FOOTPRINT environment variable; with none supplied the checker defaults to the configured permanent documentation roots (currently docs/).
+- **@/gate/docs-mechanical** — Documentation Mechanical Checks: Deterministic mechanical checks over the adopter-facing documentation surface, each deriving both comparison sides live from the tree so it encodes no product facts: markdown link + heading-anchor resolution (M2), source-path + @/… citation existence (M3), and registry projection freshness (M5, re-runs jit project render and diffs the configured targets). Runs ./scripts/docs-mechanical.sh, which fans out to the three committed checkers under scripts/ (docs-check-links.sh, docs-check-citations.sh, docs-check-projections.sh). The footprint is caller-supplied: area audits and the container's full-surface run pass their own paths via positional arguments or the DOCS_FOOTPRINT environment variable; with none supplied the checker defaults to the configured permanent documentation roots (currently docs/).
 - **@/gate/fmt** — Code Formatted: Code must be formatted with cargo fmt
 - **@/gate/jit-validate** — JIT Validate: Per-issue validation must pass (jit validate <ISSUE_ID> exits 0; evaluates only the issue under review)
 - **@/gate/mcp-ci** — MCP CI (mcp-server test suite): MCP server workspace checks: the mcp-server unit and integration suites both pass. Covers the workspace that npm-ci (web) and cargo-ci (Rust crates) leave unexercised.
