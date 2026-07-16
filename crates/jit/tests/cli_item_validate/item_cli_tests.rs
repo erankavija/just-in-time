@@ -1077,10 +1077,11 @@ fn test_item_show_rule_renders_description_and_name_fallback() {
 fn test_namespace_unique_rule_addressable_after_config_driven_write() {
     // REQ-02 (jit:d74a9ed1): a namespace hand-declared unique in config.toml —
     // with no intervening jit write to regenerate rules.toml — becomes
-    // resolvable at `@/rule/namespace-unique-<ns>` once the NEXT jit-driven
-    // write (here, `jit config set`) runs. The registry-first `rule` item kind
-    // reads `.jit/rules.toml` straight off disk, not the in-memory-reconciled
-    // ruleset, so this only holds because the write-through actually persists
+    // resolvable at `@/rule/<name>` (here, its `namespace-unique-<ns>` row)
+    // once the NEXT jit-driven write (here, `jit config set`) runs. The
+    // registry-first `rule` item kind reads `.jit/rules.toml` straight off
+    // disk, not the in-memory-reconciled ruleset, so this only holds because
+    // the write-through actually persists
     // the row.
     let temp = setup_test_repo();
     let config_path = temp.path().join(".jit").join("config.toml");

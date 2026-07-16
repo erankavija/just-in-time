@@ -66,10 +66,11 @@ solely so `rules.toml` cannot lag it for addressability.
 - `rules.toml` is no longer scaffold-then-frozen for the `namespace-unique-*`
   family: it tracks `[namespaces]` the same way `schemas/default-*.json`
   already did, on the same triggers.
-- `@/rule/namespace-unique-<ns>` resolves for every namespace the registry
-  currently declares unique after any jit-driven config write, so
-  docs-mechanical citation checking and `enforces:@/rule/...` labels cannot
-  dangle on a reconciled-but-unwritten rule.
+- `@/rule/<name>` addressing resolves the `namespace-unique-<ns>` rule for
+  every namespace the registry currently declares unique after any
+  jit-driven config write, so docs-mechanical citation checking and an
+  `enforces:` label naming that rule cannot dangle on a
+  reconciled-but-unwritten row.
 - Hand edits to a surviving default rule's policy fields (severity, enforce,
   selector, description) and all custom rules survive every sync byte-exact —
   the splice never touches a block it does not add or drop.
