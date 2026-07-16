@@ -16,7 +16,7 @@ the project `AGENTS.md` via `jit invariant render`.
 
 **Guarantee:** Dependencies always form a directed acyclic graph (DAG) - cycles are strictly prevented. (`@/invariant/dag-acyclic`)
 
-Dependencies in JIT represent "FROM depends on TO" relationships. If issue A depends on B, then A cannot proceed until B reaches a terminal state (done or rejected). To prevent deadlock, JIT enforces that the dependency graph is always acyclic.
+Dependencies in JIT represent "FROM depends on TO" relationships. If issue A depends on B, then A cannot proceed until B reaches an effective terminal state (done, rejected, or archived from one of those). To prevent deadlock, JIT enforces that the dependency graph is always acyclic.
 
 **How it works:**
 

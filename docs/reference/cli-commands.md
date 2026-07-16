@@ -855,9 +855,10 @@ that point at a missing target, keeping those ids visible alongside the
 
 **Unmet dependencies:** the `issue show --json` object also carries an
 `unmet_dependencies` array: the subset of `dependencies` that are not yet **met**.
-A dependency is met exactly when it is in a terminal state (`done` or
-`rejected`) — the same readiness test `jit query ready` uses to decide whether an
-issue is blocked — so a `rejected` dependency counts as met and is **not** listed.
+A dependency is met exactly when it is in an effective terminal state (`done`,
+`rejected`, or `archived` from one of those) — the same readiness test `jit query
+ready` uses to decide whether an issue is blocked — so a `rejected` dependency
+counts as met and is **not** listed.
 Each entry is a subset of the matching `dependencies` entry: `{id, short_id,
 title, state}`. The array is always present (empty `[]` when every dependency is
 met or there are none), so a caller reads the filter straight from the response.

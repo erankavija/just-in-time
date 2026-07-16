@@ -118,7 +118,7 @@ stateDiagram-v2
 
 **States:**
 - **backlog**: Has unmet dependencies
-- **ready**: Every dependency is terminal (done or rejected), available to claim
+- **ready**: Every dependency is effectively terminal (done, rejected, or archived from one), available to claim
 - **in_progress**: Work actively happening
 - **gated**: Work complete, awaiting quality gate approval
 - **done**: All gates passed, work complete; satisfies dependents. Can be reopened to an active state
@@ -129,7 +129,7 @@ Issues record lifecycle timestamps (first ready, claimed, done) as they transiti
 
 ### Dependencies Form a DAG
 
-Issues depend on other issues. An issue is **blocked** until all its dependencies reach a terminal state (done or rejected), and containment (which epic a task belongs to) is derived from the same graph.
+Issues depend on other issues. An issue is **blocked** until all its dependencies reach an effective terminal state (done, rejected, or archived from one), and containment (which epic a task belongs to) is derived from the same graph.
 
 ```bash
 jit dep add <blocked-issue> <dependency-issue...>   # atomic, all-or-nothing
