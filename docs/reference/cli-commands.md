@@ -1576,7 +1576,7 @@ jit gate status abc123 code-review --findings
 ### `jit gate status-all`
 
 Report the readiness of every required gate on an issue (inspection only,
-non-mutating). Alias: `check-all`.
+non-mutating).
 
 **Usage:**
 ```bash
@@ -1621,7 +1621,7 @@ Gate 'clippy' has not been run yet for issue abc123. Use 'jit gate evaluate' to 
 
 Run the checker (auto gates) or record attestation (manual gates) for a gate on
 an issue. This produces a verdict (which may be *fail*), so it is not an
-override. Aliases: `pass`; short alias `eval`.
+override. Short alias: `eval`.
 
 **Usage:**
 ```bash
@@ -1758,8 +1758,7 @@ jit gate evaluate abc123 tests --json
 
 ### `jit gate evaluate-all`
 
-Evaluate all of an issue's required gates in one command, **fail-fast**. Alias:
-`pass-all`.
+Evaluate all of an issue's required gates in one command, **fail-fast**.
 
 **Usage:**
 ```bash

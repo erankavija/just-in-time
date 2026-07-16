@@ -263,18 +263,18 @@ fn test_workflow_gates() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Gated"));
 
-    // Pass tests gate
-    run_jit(&temp, &["gate", "pass", &id, "tests"]);
+    // Evaluate tests gate
+    run_jit(&temp, &["gate", "evaluate", &id, "tests"]);
 
     // Still in Gated (review not passed)
     let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Gated"));
 
-    // Pass review gate
+    // Evaluate review gate
     run_jit(
         &temp,
-        &["gate", "pass", &id, "review", "--by", "human:reviewer"],
+        &["gate", "evaluate", &id, "review", "--by", "human:reviewer"],
     );
 
     // Now should auto-transition to Done
@@ -399,17 +399,24 @@ fn test_workflow_complex_epic() {
     assert!(stdout.contains(&epic));
 
     // Complete backend
-    run_jit(&temp, &["gate", "pass", &backend, "tests"]);
+    run_jit(&temp, &["gate", "evaluate", &backend, "tests"]);
     run_jit(&temp, &["issue", "update", &backend, "--state", "done"]);
 
     // Complete frontend
-    run_jit(&temp, &["gate", "pass", &frontend, "tests"]);
+    run_jit(&temp, &["gate", "evaluate", &frontend, "tests"]);
     run_jit(&temp, &["issue", "update", &frontend, "--state", "done"]);
 
     // Complete docs
     run_jit(
         &temp,
-        &["gate", "pass", &docs, "review", "--by", "human:reviewer"],
+        &[
+            "gate",
+            "evaluate",
+            &docs,
+            "review",
+            "--by",
+            "human:reviewer",
+        ],
     );
     run_jit(&temp, &["issue", "update", &docs, "--state", "done"]);
 

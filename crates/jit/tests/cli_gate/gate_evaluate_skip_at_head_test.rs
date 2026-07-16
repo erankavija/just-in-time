@@ -1,9 +1,10 @@
-//! Integration tests for `jit gate pass` skipping the checker when the gate
-//! already passed at the current HEAD commit (issue 9bfcc474).
+//! Integration tests for `jit gate evaluate` skipping the checker when the
+//! gate already passed at the current HEAD commit (issue 9bfcc474).
 //!
 //! Scenarios:
-//!   (a) pass, then pass again at same HEAD -> exit 0, `already_passed: true`,
-//!       checker did NOT re-run (asserted via a checker side-effect file).
+//!   (a) evaluate, then evaluate again at same HEAD -> exit 0,
+//!       `already_passed: true`, checker did NOT re-run (asserted via a
+//!       checker side-effect file).
 //!   (b) `--force` re-runs even when already passed.
 //!   (c) HEAD advanced / no prior passing run -> checker runs normally.
 //!   (d) not a git repo (no HEAD) -> never skips, runs normally.
@@ -89,14 +90,14 @@ fn run_count(root: &Path) -> usize {
 }
 
 #[test]
-fn test_gate_pass_skips_when_already_passed_at_head() {
+fn test_gate_evaluate_skips_when_already_passed_at_head() {
     let (_temp, root) = setup_git_jit_repo();
     let id = define_counting_gate_and_issue(&root);
 
     // First pass: checker runs once.
     let first = jit()
         .current_dir(&root)
-        .args(["gate", "pass", &id, "counting", "--json"])
+        .args(["gate", "evaluate", &id, "counting", "--json"])
         .output()
         .unwrap();
     assert_eq!(first.status.code(), Some(0));
@@ -108,7 +109,7 @@ fn test_gate_pass_skips_when_already_passed_at_head() {
     // Second pass at the SAME HEAD: must skip, checker count unchanged.
     let second = jit()
         .current_dir(&root)
-        .args(["gate", "pass", &id, "counting", "--json"])
+        .args(["gate", "evaluate", &id, "counting", "--json"])
         .output()
         .unwrap();
     assert_eq!(second.status.code(), Some(0));
@@ -123,13 +124,13 @@ fn test_gate_pass_skips_when_already_passed_at_head() {
 }
 
 #[test]
-fn test_gate_pass_force_reruns_even_when_already_passed() {
+fn test_gate_evaluate_force_reruns_even_when_already_passed() {
     let (_temp, root) = setup_git_jit_repo();
     let id = define_counting_gate_and_issue(&root);
 
     jit()
         .current_dir(&root)
-        .args(["gate", "pass", &id, "counting"])
+        .args(["gate", "evaluate", &id, "counting"])
         .output()
         .unwrap();
     assert_eq!(run_count(&root), 1);
@@ -137,7 +138,7 @@ fn test_gate_pass_force_reruns_even_when_already_passed() {
     // --force must re-run the checker even though it already passed at HEAD.
     let forced = jit()
         .current_dir(&root)
-        .args(["gate", "pass", &id, "counting", "--force", "--json"])
+        .args(["gate", "evaluate", &id, "counting", "--force", "--json"])
         .output()
         .unwrap();
     assert_eq!(forced.status.code(), Some(0));
@@ -148,13 +149,13 @@ fn test_gate_pass_force_reruns_even_when_already_passed() {
 }
 
 #[test]
-fn test_gate_pass_reruns_when_head_advanced() {
+fn test_gate_evaluate_reruns_when_head_advanced() {
     let (_temp, root) = setup_git_jit_repo();
     let id = define_counting_gate_and_issue(&root);
 
     jit()
         .current_dir(&root)
-        .args(["gate", "pass", &id, "counting"])
+        .args(["gate", "evaluate", &id, "counting"])
         .output()
         .unwrap();
     assert_eq!(run_count(&root), 1);
@@ -166,7 +167,7 @@ fn test_gate_pass_reruns_when_head_advanced() {
 
     let again = jit()
         .current_dir(&root)
-        .args(["gate", "pass", &id, "counting", "--json"])
+        .args(["gate", "evaluate", &id, "counting", "--json"])
         .output()
         .unwrap();
     assert_eq!(again.status.code(), Some(0));
@@ -176,7 +177,7 @@ fn test_gate_pass_reruns_when_head_advanced() {
 }
 
 #[test]
-fn test_gate_pass_does_not_skip_without_git() {
+fn test_gate_evaluate_does_not_skip_without_git() {
     // No git repo: HEAD is None, so the skip path can never engage even after a
     // prior pass. The checker re-runs every time.
     let temp = TempDir::new().unwrap();
@@ -186,14 +187,14 @@ fn test_gate_pass_does_not_skip_without_git() {
 
     jit()
         .current_dir(&root)
-        .args(["gate", "pass", &id, "counting"])
+        .args(["gate", "evaluate", &id, "counting"])
         .output()
         .unwrap();
     assert_eq!(run_count(&root), 1);
 
     let second = jit()
         .current_dir(&root)
-        .args(["gate", "pass", &id, "counting", "--json"])
+        .args(["gate", "evaluate", &id, "counting", "--json"])
         .output()
         .unwrap();
     assert_eq!(second.status.code(), Some(0));
@@ -229,7 +230,7 @@ fn gate_status(root: &Path, id: &str, key: &str) -> String {
 }
 
 #[test]
-fn test_gate_pass_reruns_when_status_reset_despite_passing_run_at_head() {
+fn test_gate_evaluate_reruns_when_status_reset_despite_passing_run_at_head() {
     // Regression: a passing GateRunResult lingers at HEAD, but the gate's CURRENT
     // status was reset to Pending (remove + re-add). The skip must NOT engage on
     // the stale historical run alone, or the gate would stay Pending while the
@@ -240,7 +241,7 @@ fn test_gate_pass_reruns_when_status_reset_despite_passing_run_at_head() {
     // Pass once: records a passing run at HEAD and sets status Passed.
     jit()
         .current_dir(&root)
-        .args(["gate", "pass", &id, "counting"])
+        .args(["gate", "evaluate", &id, "counting"])
         .output()
         .unwrap();
     assert_eq!(run_count(&root), 1);
@@ -263,7 +264,7 @@ fn test_gate_pass_reruns_when_status_reset_despite_passing_run_at_head() {
     // Pass again at the SAME HEAD: must RUN the checker (not skip on stale run).
     let again = jit()
         .current_dir(&root)
-        .args(["gate", "pass", &id, "counting", "--json"])
+        .args(["gate", "evaluate", &id, "counting", "--json"])
         .output()
         .unwrap();
     assert_eq!(again.status.code(), Some(0));

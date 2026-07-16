@@ -627,7 +627,7 @@ mod tests {
         let redirect =
             fs::read_to_string(root.join("docs/reference/jit-content-standards.md")).unwrap();
         assert!(redirect.contains("contributors to the JIT source repository"));
-        assert!(redirect.contains("ordinary `jit init` does not install it"));
+        assert!(redirect.contains("Ordinary `jit init` does not install it"));
         assert!(redirect.contains("does not expose a public profile-install command"));
     }
 
