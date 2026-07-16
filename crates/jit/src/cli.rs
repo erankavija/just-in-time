@@ -2794,6 +2794,7 @@ impl Commands {
             Self::Hooks(command) => command.requires_recovery_dispatch(),
             Self::Invariant(command) => command.requires_recovery_dispatch(),
             Self::Reference(command) => command.requires_recovery_dispatch(),
+            Self::Snapshot(command) => command.requires_recovery_dispatch(),
             Self::Validate { fix, dry_run, .. } => *fix && !*dry_run,
             Self::Serve { status, .. } => !*status,
             Self::List { .. }
@@ -2802,7 +2803,6 @@ impl Commands {
             | Self::Rdeps { .. }
             | Self::Query { .. }
             | Self::Label(_)
-            | Self::Snapshot(_)
             | Self::Worktree(_)
             | Self::Item(_)
             | Self::Search { .. }
@@ -2962,9 +2962,169 @@ impl ReferenceCommands {
     }
 }
 
+impl SnapshotCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Export { .. } => true,
+        }
+    }
+}
+
 #[cfg(test)]
 mod recovery_dispatch_tests {
     use super::*;
+    use clap::CommandFactory;
+    use std::collections::BTreeSet;
+
+    const CLI_LEAF_COMMANDS: &[&str] = &[
+        "apply",
+        "archive candidates",
+        "archive container",
+        "archive document",
+        "claim acquire",
+        "claim force-evict",
+        "claim heartbeat",
+        "claim list",
+        "claim release",
+        "claim renew",
+        "claim status",
+        "config get",
+        "config list-templates",
+        "config set",
+        "config show",
+        "config show-hierarchy",
+        "config validate",
+        "dep add",
+        "dep delete",
+        "dep remove",
+        "dep rm",
+        "doc add",
+        "doc assets list",
+        "doc check-links",
+        "doc delete",
+        "doc diff",
+        "doc history",
+        "doc list",
+        "doc remove",
+        "doc rm",
+        "doc show",
+        "events query",
+        "events tail",
+        "gate add",
+        "gate define",
+        "gate delete",
+        "gate evaluate",
+        "gate evaluate-all",
+        "gate fail",
+        "gate list",
+        "gate preset apply",
+        "gate preset create",
+        "gate preset list",
+        "gate preset show",
+        "gate remove",
+        "gate rm",
+        "gate show",
+        "gate status",
+        "gate status-all",
+        "gate update",
+        "graph deps",
+        "graph export",
+        "graph rdeps",
+        "graph roots",
+        "graph tree",
+        "hooks install",
+        "init",
+        "invariant check",
+        "invariant render",
+        "issue assign",
+        "issue batch-create",
+        "issue children",
+        "issue claim",
+        "issue claim-next",
+        "issue complete",
+        "issue create",
+        "issue delete",
+        "issue edit",
+        "issue list",
+        "issue progress",
+        "issue reject",
+        "issue release",
+        "issue remove",
+        "issue rm",
+        "issue search",
+        "issue show",
+        "issue status",
+        "issue unassign",
+        "issue update",
+        "item list",
+        "item resolve",
+        "item search",
+        "item show",
+        "label add",
+        "label namespaces",
+        "label remove",
+        "label rm",
+        "label values",
+        "list",
+        "migrate lifecycle-timestamps",
+        "query all",
+        "query available",
+        "query blocked",
+        "query closed",
+        "query count",
+        "query divergence",
+        "query strategic",
+        "rdeps",
+        "recover",
+        "reference render",
+        "search",
+        "serve",
+        "snapshot export",
+        "status",
+        "validate",
+        "version",
+        "worktree info",
+        "worktree list",
+    ];
+
+    fn collect_leaf_commands(
+        command: &clap::Command,
+        path: Vec<String>,
+        leaves: &mut BTreeSet<String>,
+    ) {
+        let subcommands = command
+            .get_subcommands()
+            .filter(|subcommand| subcommand.get_name() != "help")
+            .collect::<Vec<_>>();
+        if subcommands.is_empty() {
+            leaves.insert(path.join(" "));
+            return;
+        }
+        for subcommand in subcommands {
+            let mut subcommand_path = path.clone();
+            subcommand_path.push(subcommand.get_name().to_string());
+            collect_leaf_commands(subcommand, subcommand_path, leaves);
+        }
+    }
+
+    #[test]
+    fn test_recovery_dispatch_inventory_covers_every_generated_cli_leaf() {
+        let mut actual = BTreeSet::new();
+        for command in Cli::command()
+            .get_subcommands()
+            .filter(|command| command.get_name() != "help")
+        {
+            collect_leaf_commands(command, vec![command.get_name().to_string()], &mut actual);
+        }
+        let expected = CLI_LEAF_COMMANDS
+            .iter()
+            .map(|command| (*command).to_string())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            actual, expected,
+            "update the exhaustive recovery-dispatch classification and CLI leaf inventory"
+        );
+    }
 
     #[test]
     fn test_representative_writer_and_reader_classification() {
@@ -2995,6 +3155,21 @@ mod recovery_dispatch_tests {
             web_dir: None,
             json: false,
         }
+        .requires_recovery_dispatch());
+    }
+
+    #[test]
+    fn test_snapshot_export_requires_recovery_dispatch() {
+        assert!(Commands::Snapshot(SnapshotCommands::Export {
+            out: None,
+            format: "dir".to_string(),
+            scope: "all".to_string(),
+            at: None,
+            working_tree: false,
+            committed_only: false,
+            force: false,
+            json: false,
+        })
         .requires_recovery_dispatch());
     }
 }

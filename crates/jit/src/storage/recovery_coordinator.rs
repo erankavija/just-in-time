@@ -9,6 +9,7 @@ use super::{
 };
 use anyhow::{Context, Result};
 use cap_std::{ambient_authority, fs::Dir};
+use std::path::Path;
 
 /// Transaction journals recovered before normal repository services start.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -62,12 +63,7 @@ impl RecoveryCoordinator {
     /// Lock order is fixed at bootstrap → repository. The returned session keeps
     /// both locks alive for callers that must close the startup-to-write race.
     pub fn recover_before_services(storage: &JsonFileStorage) -> Result<RecoverySession> {
-        let repo_root = storage.root().parent().ok_or_else(|| {
-            anyhow::anyhow!(
-                "JIT data directory has no repository parent: {}",
-                storage.root().display()
-            )
-        })?;
+        let repo_root = repository_root(storage.root())?;
         let root = Dir::open_ambient_dir(repo_root, ambient_authority())
             .with_context(|| format!("Failed to open repository root {}", repo_root.display()))?;
         let kernel = FileTransactionKernel::new(root)?;
@@ -107,6 +103,30 @@ impl RecoveryCoordinator {
     }
 }
 
+/// Resolve the repository directory containing a JIT data directory.
+///
+/// `Path::parent` represents the parent of a single relative component such as
+/// `.jit` as the empty path. Ambient directory APIs do not interpret that empty
+/// path as the current directory, so normalize it to `.`. This is the server's
+/// default data-directory spelling and must remain a valid startup path.
+fn repository_root(storage_root: &Path) -> Result<&Path> {
+    storage_root
+        .parent()
+        .map(|parent| {
+            if parent.as_os_str().is_empty() {
+                Path::new(".")
+            } else {
+                parent
+            }
+        })
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "JIT data directory has no repository parent: {}",
+                storage_root.display()
+            )
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,6 +163,15 @@ mod tests {
         );
         let guard = lock.acquire().unwrap();
         (lock, guard)
+    }
+
+    #[test]
+    fn test_relative_default_data_dir_resolves_repository_root_to_current_directory() {
+        assert_eq!(repository_root(Path::new(".jit")).unwrap(), Path::new("."));
+        assert_eq!(
+            repository_root(Path::new("nested/.jit")).unwrap(),
+            Path::new("nested")
+        );
     }
 
     #[test]
