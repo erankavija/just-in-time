@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "ce6984f9-8337-47e1-9428-64e9533d0116",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "bcff56be-2e8f-44ae-9b3b-5739be414630",
+  "commit": "16ce1e02cc5ec9c9a76331fba464d27a63981459",
+  "branch": "worktree-agent-bcff56be",
+  "tree_dirty": false,
+  "status": "passed",
+  "started_at": "2026-07-16T20:32:21.799319836Z",
+  "completed_at": "2026-07-16T20:34:21.025855104Z",
+  "duration_ms": 119226,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a leaf at configured maximum hierarchy level and has no resolved children. I reviewed its nine reachable `jit:bcff56be` commits individually; the substantive footprint adds cross-platform acceptance coverage and minor public-profile response wording. Current profile documentation accurately describes the tested offline, Git-free, `jq`-free workflow and provenance semantics.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's acceptance coverage introduces no unresolved documentation-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue's acceptance coverage introduces no unresolved documentation-impact defects.",
+    "findings": []
+  }
+}

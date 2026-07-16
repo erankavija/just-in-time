@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "cb1128c0-2e6d-47fa-97c5-7e772a3346d7",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f",
+  "commit": "b214c89c622fbd356075f5a3964ac28dceff8c49",
+  "branch": "worktree-agent-bcff56be",
+  "tree_dirty": false,
+  "status": "passed",
+  "started_at": "2026-07-16T20:49:28.958122751Z",
+  "completed_at": "2026-07-16T20:53:00.465666204Z",
+  "duration_ms": 211507,
+  "exit_code": 0,
+  "stdout": "Attribution: epic plus 14 delivered DAG descendants; 173 reachable tagged commits inspected individually, with 10 touching adopter docs. All included issues had tagged commits.\n\nThe combined profile documentation is accurate, discoverable, and concise; current CLI/schema behavior matches the documented contract.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Profile documentation accurately covers the delivered embedded workflow and its boundaries.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Profile documentation accurately covers the delivered embedded workflow and its boundaries.",
+    "findings": []
+  }
+}

@@ -7143,6 +7143,14 @@ fn run() -> Result<()> {
                             cmd.arg("--web-dir").arg(web);
                         }
                     }
+                    // Release this process's startup recovery boundary before
+                    // spawning the server we then block on. Pre-service recovery
+                    // already ran on the parent; the server child runs its own
+                    // recovery under the ordinary bootstrap → repository chain,
+                    // so holding the guards across `child.wait()` would deadlock
+                    // the child against the parent for the parent's lifetime.
+                    storage.release_recovery_session();
+
                     // Hand the bound socket to the child (inherited fd on
                     // Unix); it adopts this exact socket instead of re-binding.
                     let mut child = spawn_with_listener(&mut cmd, listener)

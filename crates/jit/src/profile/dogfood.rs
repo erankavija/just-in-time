@@ -632,7 +632,7 @@ mod tests {
     }
 
     #[test]
-    fn test_public_content_standards_redirect_does_not_promise_profile_installation() {
+    fn test_public_content_standards_redirect_links_profile_installation() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let redirect =
             fs::read_to_string(root.join("docs/reference/jit-content-standards.md")).unwrap();
@@ -640,6 +640,10 @@ mod tests {
         assert!(redirect.contains("Ordinary `jit init` does not install it"));
         assert!(redirect.contains("profile-installed workflow policy"));
         assert!(redirect.contains("repositories that use plain initialization"));
+        assert!(redirect.contains("`jit init --profile jit-dogfood`"));
+        assert!(redirect.contains("`jit profile apply jit-dogfood`"));
+        assert!(redirect.contains("[Repository Profiles](profiles.md)"));
+        assert!(!redirect.contains("does not expose a public profile-install command"));
     }
 
     #[test]

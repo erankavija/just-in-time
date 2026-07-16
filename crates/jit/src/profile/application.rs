@@ -81,7 +81,7 @@ pub struct ProfileSummary {
     pub origin: ProfileOrigin,
     /// Compatible JIT version requirement authored by the manifest.
     pub jit: String,
-    /// Whether an exact installed record exists in the selected repository.
+    /// Whether stored provenance exactly names this embedded package version and hash.
     pub applied: bool,
 }
 
@@ -109,7 +109,7 @@ pub struct ProfileShowResult {
     pub file_count: usize,
     /// Total embedded byte size.
     pub byte_size: usize,
-    /// Exact installed record when the selected repository has one.
+    /// Stored provenance record when the selected repository has one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub applied: Option<AppliedProfileRecord>,
 }

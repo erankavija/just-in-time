@@ -1,7 +1,7 @@
 {
   "epic_id": "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f",
   "epic_short_id": "9b7b5f9c",
-  "current_wave": 6,
+  "current_wave": 10,
   "waves": [
     {
       "wave_number": 1,
@@ -92,7 +92,7 @@
           "short_id": "7ad4019b",
           "title": "Author the portable dogfood workflow package",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
@@ -104,7 +104,7 @@
           "short_id": "070ca05f",
           "title": "Expose profile commands through init, schema, and MCP",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -116,7 +116,7 @@
           "short_id": "c533ac18",
           "title": "Consolidate adopter profile documentation",
           "classification": "documentation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -128,7 +128,7 @@
           "short_id": "bcff56be",
           "title": "Exercise cross-platform profile adoption",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     }
@@ -177,8 +177,12 @@
     "be542b98-8d5a-4c1f-8000-9fd0c480bebc": 5,
     "0d8f20a8-db02-43ba-ad9e-8f219b427690": 1,
     "56838d99-dc9d-4028-9b41-6ba691fc4852": 1,
-    "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004": 2
+    "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004": 2,
+    "7ad4019b-2998-424b-9ea0-6d8ce3ff402c": 9,
+    "070ca05f-f7a9-4922-b796-3376a0b813b2": 2,
+    "c533ac18-88dc-42b6-a773-18228a5d2320": 1,
+    "bcff56be-2e8f-44ae-9b3b-5739be414630": 2
   },
   "started_at": "2026-07-15T15:20:34+03:00",
-  "updated_at": "2026-07-16T17:32:44+03:00"
+  "updated_at": "2026-07-16T23:39:26+03:00"
 }

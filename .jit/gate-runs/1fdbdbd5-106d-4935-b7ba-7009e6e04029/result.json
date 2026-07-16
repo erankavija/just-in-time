@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "1fdbdbd5-106d-4935-b7ba-7009e6e04029",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "bcff56be-2e8f-44ae-9b3b-5739be414630",
+  "commit": "aea3536d906a48aeec9c1c9aad72f44225b69a2d",
+  "branch": "worktree-agent-bcff56be",
+  "tree_dirty": false,
+  "status": "passed",
+  "started_at": "2026-07-16T20:27:47.322891393Z",
+  "completed_at": "2026-07-16T20:31:28.445424338Z",
+  "duration_ms": 221122,
+  "exit_code": 0,
+  "stdout": "Attribution: afcdb1f7, 3375c599, 34e83213, 22e4c845, 95df3d1c, 83fb0c6b, a29494f2, aea3536d\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/charter/D-3, @/charter/D-4, @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); mcp-ci passed (0); docs-mechanical passed (0); doc-review pending (none); repo-validate passed (0)\nTruncation recovery: re-read individual commit/path patches and gate metadata summaries after truncated broad reads\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard acceptance criteria are covered; the prior deferred-field finding is fixed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard acceptance criteria are covered; the prior deferred-field finding is fixed.",
+    "findings": []
+  }
+}
