@@ -34,10 +34,12 @@
 //! feeds which projection) lives in
 //! [`project_render`](crate::validation::project_render).
 
-use crate::config::{ProjectionConfig, ProjectionStyle};
+use crate::config::{ProjectionConfig, ProjectionMode, ProjectionStyle};
 use crate::domain::item::AddressableItem;
 use crate::storage::PathReadError;
 use crate::validation::invariants::{InvariantKind, InvariantRegistry};
+use anyhow::Result;
+use std::collections::BTreeMap;
 use thiserror::Error;
 
 /// Errors raised while rendering or writing a generic projection.
@@ -323,6 +325,44 @@ pub fn splice_region(
         "{prefix}\n{rendered}\n{suffix}",
         rendered = rendered.trim_end_matches('\n')
     ))
+}
+
+/// Compose one projection's rendered `body` into `pending`, threading region
+/// splices through progressively-updated target content.
+///
+/// `pending` maps each repo-relative target path to its in-progress content. In
+/// region mode the splice base is the target's PENDING content when another
+/// projection already rewrote it this pass, otherwise the bytes `read_base`
+/// returns (a `None` there is a typed [`ProjectionError::TargetNotFound`], since
+/// region mode cannot create a target); separate-file mode makes `body` the whole
+/// target. The composed content is stored back in `pending`, so several
+/// projections sharing ONE target each observe the prior one's change rather than
+/// overwriting it (last-writer-wins). Shared by the two-phase `jit project render`
+/// command and profile planning's projection re-render so both compose shared
+/// targets identically.
+pub fn compose_projection(
+    pending: &mut BTreeMap<String, String>,
+    target: &str,
+    mode: ProjectionMode,
+    body: &str,
+    begin: &str,
+    end: &str,
+    read_base: impl FnOnce(&str) -> Result<Option<String>>,
+) -> Result<()> {
+    let content = match mode {
+        ProjectionMode::SeparateFile => body.to_string(),
+        ProjectionMode::Region => {
+            let base = match pending.get(target) {
+                Some(current) => current.clone(),
+                None => read_base(target)?.ok_or_else(|| ProjectionError::TargetNotFound {
+                    path: target.to_string(),
+                })?,
+            };
+            splice_region(&base, body, begin, end)?
+        }
+    };
+    pending.insert(target.to_string(), content);
+    Ok(())
 }
 
 /// Resolve a projection's required `target`, naming the projection on omission.

@@ -3111,8 +3111,12 @@ Renders every declared `[projection.*]` into its configured target, or the singl
 {text}` bullets from a **project-scoped** addressable kind's rows (issue-scoped
 kinds have no project source and are not renderable); `full` writes the built-in
 rich views (the invariant registry, or the rule + gate registries with their
-metadata). A projection that declares no `target`, a missing source, an unknown
-kind, or an absent region marker is a typed error (exit `4`). Rendering is
+metadata) and is likewise limited to **project-scoped** registry kinds. Both
+styles apply the same pre-write guards: a projection that declares no `target`, a
+declared source that does not exist (a markdown-first kind's source file or a
+`full` kind's registry store), an issue-scoped kind, an unknown kind, or an absent
+region marker is a typed error (exit `4`) raised before any file is written — a
+missing registry store is never rendered as an empty block. Rendering is
 two-phase: every projection is rendered and its target's final bytes materialized
 in memory before any file is written, so any such failure — even in a later
 projection of a whole-`[projection.*]` run — leaves every target byte-identical;

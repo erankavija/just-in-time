@@ -201,7 +201,7 @@ mechanism is generic — any project-scoped kind projects this way. Fields:
 | `kind` | a kind name, or an array of names | The addressable item kind(s) to render (e.g. `"invariant"`, or `["rule", "gate"]`). Must be project-scoped; issue-scoped kinds are not renderable. |
 | `mode` | `region` \| `separate-file` | `region` rewrites only the delimited block inside an existing `target`, byte-preserving everything outside it; `separate-file` writes the whole `target` file. Defaults to `separate-file`. |
 | `target` | repo-relative path | **Required.** The documentation file written. There is no default — a projection with no `target` is an error. |
-| `style` | `id-anchor` \| `full` | `id-anchor` renders generic `- **{self-id}** — {text}` bullets (any kind); `full` renders the built-in rich views (the invariant registry, or the rule + gate registries with severity/enforcement metadata). Defaults to `full`. |
+| `style` | `id-anchor` \| `full` | `id-anchor` renders generic `- **{self-id}** — {text}` bullets and works for any project-scoped kind; `full` renders the built-in rich views (severity/enforcement metadata) and is limited to the registry kinds whose declared `source` is exactly the invariant store (`.jit/invariants.toml`) or exactly the rule + gate stores together (`.jit/rules.toml` + `.jit/gates.toml`) — the only sources with a whole-file renderer. A markdown-first kind, or a registry kind whose source points elsewhere, must use `id-anchor`. Defaults to `full`. |
 | `region-begin` / `region-end` | marker strings | `region`-mode delimiters. Default to `<!-- jit:<name>:begin -->` / `<!-- jit:<name>:end -->`, derived from the projection name. |
 
 Run `jit project render` (optionally `--name <name>` for one) after editing a

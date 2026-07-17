@@ -20,7 +20,7 @@
 use super::*;
 use crate::config::{ProjectionConfig, ProjectionMode, ProjectionStyle};
 use crate::validation::project_render::{render_projection_body, ProjectionInputs};
-use crate::validation::projection::{require_target, splice_region, ProjectionError};
+use crate::validation::projection::{compose_projection, require_target, ProjectionError};
 use std::collections::BTreeMap;
 
 /// The result of rendering ONE projection, serialized as an element of
@@ -126,32 +126,27 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .with_context(|| format!("projection '{proj_name}'"))?;
             let target = require_target(projection, proj_name)
                 .with_context(|| format!("projection '{proj_name}'"))?;
-            let content = match projection.mode() {
-                ProjectionMode::SeparateFile => body,
-                ProjectionMode::Region => {
-                    let base = match pending.get(&target) {
-                        Some(current) => current.clone(),
-                        None => self
-                            .storage()
-                            .read_repo_file(&target)
-                            .map_err(|source| ProjectionError::Read {
-                                path: target.clone(),
-                                source,
-                            })?
-                            .ok_or_else(|| ProjectionError::TargetNotFound {
-                                path: target.clone(),
-                            })?,
-                    };
-                    splice_region(
-                        &base,
-                        &body,
-                        &projection.region_begin(proj_name),
-                        &projection.region_end(proj_name),
-                    )
-                    .with_context(|| format!("projection '{proj_name}'"))?
-                }
-            };
-            pending.insert(target.clone(), content);
+            // Region projections that share a target thread their splices through
+            // the shared `pending` map, so a later region composes onto an earlier
+            // one's change instead of overwriting it.
+            compose_projection(
+                &mut pending,
+                &target,
+                projection.mode(),
+                &body,
+                &projection.region_begin(proj_name),
+                &projection.region_end(proj_name),
+                |path| {
+                    self.storage().read_repo_file(path).map_err(|source| {
+                        ProjectionError::Read {
+                            path: path.to_string(),
+                            source,
+                        }
+                        .into()
+                    })
+                },
+            )
+            .with_context(|| format!("projection '{proj_name}'"))?;
             projections.push(ProjectionRenderReport {
                 name: proj_name.clone(),
                 target,

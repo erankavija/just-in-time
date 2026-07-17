@@ -86,7 +86,7 @@ pub fn render_projection_body(
             let count = rows.len();
             Ok((render_id_anchor_rows(&rows), count))
         }
-        ProjectionStyle::Full => render_full_body(proj, &resolved, inputs),
+        ProjectionStyle::Full => render_full_body(proj, &resolved, inputs, read),
     }
 }
 
@@ -169,11 +169,31 @@ const GATE_STORE: &str = ".jit/gates.toml";
 /// render the rule + gate registries. Any other source set — a markdown-first kind
 /// with no registry source, or a registry that is not one of jit's own stores — is
 /// [`ProjectionError::FullStyleUnsupported`] (there is no built-in rich view for it).
+///
+/// Full style shares the id-anchor style's pre-write guards: because each kind
+/// declares its own source of truth (`@/charter/D-6`), a non-project kind is a
+/// typed [`ProjectionError::NotProjectScoped`] and a declared registry source that
+/// does not exist over the same `read` boundary is a typed
+/// [`ProjectionError::SourceNotFound`] — both raised BEFORE any body is returned,
+/// so a missing store never renders an empty block from the defaulted in-memory
+/// registry (REQ-07).
 fn render_full_body(
     proj: &ProjectionConfig,
     kinds: &[&ItemKind],
     inputs: &ProjectionInputs,
+    read: &mut dyn FnMut(&str) -> Result<Option<String>>,
 ) -> Result<(String, usize)> {
+    // A non-project kind has no project-scope registry to render (mirrors the
+    // id-anchor guard), so reject it before touching any source.
+    for kind in kinds {
+        if !kind.kind_scope().is_project() {
+            return Err(ProjectionError::NotProjectScoped {
+                kind: kind.name().to_string(),
+            }
+            .into());
+        }
+    }
+
     // Every kind must declare a registry source; a missing one (a markdown-first
     // kind) has no built-in rich view.
     let Some(sources) = kinds
@@ -189,6 +209,21 @@ fn render_full_body(
         }
         .into());
     };
+
+    // Each declared registry source must exist over the SAME read boundary the
+    // body renders from; an absent store is a typed pre-write SourceNotFound, not a
+    // silent empty render from the defaulted registry the rich views read.
+    for kind in kinds {
+        if let Some(descriptor) = kind.toml_source() {
+            if read(&descriptor.toml)?.is_none() {
+                return Err(ProjectionError::SourceNotFound {
+                    path: descriptor.toml.clone(),
+                    kind: kind.name().to_string(),
+                }
+                .into());
+            }
+        }
+    }
 
     if sources == BTreeSet::from([INVARIANT_STORE]) {
         let registry = &inputs.config.invariants;
