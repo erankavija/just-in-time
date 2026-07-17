@@ -151,15 +151,20 @@ pub fn read_rule_identities(jit_root: &Path) -> Result<Vec<(String, Option<Strin
         .collect())
 }
 
-/// Byte offsets of every line that opens a REAL `[[rules]]` table, in file
-/// order.
+/// Byte offsets of the LINE START of every REAL `[[rules]]` table header, in
+/// file order.
 ///
-/// "Real" means the token sits at the start of a physical line AND outside any
+/// "Real" means the header is preceded on its physical line ONLY by whitespace
+/// (TOML permits leading indentation before a table header) AND is outside any
 /// string or comment context. A `[[rules]]` sequence inside a `#` comment or a
 /// `'''`/`"""` multiline string (a rule's `description`, say) is prose, not a
 /// table boundary, so it is skipped. The scan tracks TOML string/comment state
 /// across lines, so it cannot be fooled by an in-string occurrence that a naive
 /// `\n[[rules]]` search would mis-split on (jit:d74a9ed1 review F2).
+///
+/// The recorded offset is the header line's first byte — its indentation
+/// included — so a block sliced from one offset to the next carries the header
+/// line verbatim (jit:d74a9ed1 review F1, round 3).
 ///
 /// Manual state tracking (rather than `toml_edit`) keeps every consumer working
 /// on raw byte slices of the original file, preserving each block's exact
@@ -182,10 +187,12 @@ fn rule_header_offsets(content: &str) -> Vec<usize> {
 
     let mut offsets = Vec::new();
     let mut mode = Mode::Normal;
-    // A physical-line start is a boundary candidate only when the scanner reaches
-    // it in `Normal` mode (i.e. the prior line did not leave us mid multiline
-    // string). Offset 0 is the first line's start.
-    let mut line_start = true;
+    // `line_begin` is the current physical line's first byte; `leading_ws` is true
+    // while, in `Normal` mode, only whitespace has been seen since `line_begin`.
+    // A `[[rules]]` reached with `leading_ws` still set is a real header, and its
+    // recorded offset is `line_begin` (indentation included).
+    let mut line_begin = 0;
+    let mut leading_ws = true;
     let mut i = 0;
 
     while i < len {
@@ -193,18 +200,18 @@ fn rule_header_offsets(content: &str) -> Vec<usize> {
             Mode::Normal => {
                 if content[i..].starts_with("\"\"\"") {
                     mode = Mode::BasicMulti;
-                    line_start = false;
+                    leading_ws = false;
                     i += 3;
                     continue;
                 }
                 if content[i..].starts_with("'''") {
                     mode = Mode::LiteralMulti;
-                    line_start = false;
+                    leading_ws = false;
                     i += 3;
                     continue;
                 }
-                if line_start && content[i..].starts_with("[[rules]]") {
-                    offsets.push(i);
+                if leading_ws && content[i..].starts_with("[[rules]]") {
+                    offsets.push(line_begin);
                 }
                 let c = bytes[i];
                 match c {
@@ -213,16 +220,20 @@ fn rule_header_offsets(content: &str) -> Vec<usize> {
                     b'\'' => mode = Mode::LiteralSingle,
                     _ => {}
                 }
-                line_start = c == b'\n';
+                if c == b'\n' {
+                    line_begin = i + 1;
+                    leading_ws = true;
+                } else if c != b' ' && c != b'\t' {
+                    leading_ws = false;
+                }
                 i += char_len(i);
             }
             Mode::Comment => {
                 let c = bytes[i];
                 if c == b'\n' {
                     mode = Mode::Normal;
-                    line_start = true;
-                } else {
-                    line_start = false;
+                    line_begin = i + 1;
+                    leading_ws = true;
                 }
                 i += char_len(i);
             }
@@ -234,21 +245,27 @@ fn rule_header_offsets(content: &str) -> Vec<usize> {
                     if i < len {
                         i += char_len(i);
                     }
-                    line_start = false;
                     continue;
                 }
-                if c == b'"' || c == b'\n' {
+                if c == b'\n' {
+                    // Malformed (a single-line string cannot span lines); recover.
+                    mode = Mode::Normal;
+                    line_begin = i + 1;
+                    leading_ws = true;
+                } else if c == b'"' {
                     mode = Mode::Normal;
                 }
-                line_start = c == b'\n';
                 i += char_len(i);
             }
             Mode::LiteralSingle => {
                 let c = bytes[i];
-                if c == b'\'' || c == b'\n' {
+                if c == b'\n' {
+                    mode = Mode::Normal;
+                    line_begin = i + 1;
+                    leading_ws = true;
+                } else if c == b'\'' {
                     mode = Mode::Normal;
                 }
-                line_start = c == b'\n';
                 i += char_len(i);
             }
             Mode::BasicMulti => {
@@ -263,7 +280,6 @@ fn rule_header_offsets(content: &str) -> Vec<usize> {
                 if content[i..].starts_with("\"\"\"") {
                     mode = Mode::Normal;
                     i += 3;
-                    line_start = false;
                     continue;
                 }
                 i += char_len(i);
@@ -272,7 +288,6 @@ fn rule_header_offsets(content: &str) -> Vec<usize> {
                 if content[i..].starts_with("'''") {
                     mode = Mode::Normal;
                     i += 3;
-                    line_start = false;
                     continue;
                 }
                 i += char_len(i);
@@ -820,6 +835,44 @@ assert = { require-section = { heading = \"Goals\" } }\n\
             "original preserved as a prefix"
         );
         assert!(updated.contains("This is prose inside a string, not a real table."));
+        assert!(updated.contains("name = \"namespace-unique-squad\""));
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_sync_preserves_indented_rules_header() {
+        // TOML permits leading whitespace before a table header, so an indented
+        // `[[rules]]` is a valid custom rule. A column-zero-only splitter would
+        // miss it, undercount blocks against the parsed rule count, and abort the
+        // sync — leaving rules.toml stale (jit:d74a9ed1 review F1, round 3).
+        let dir = tempfile::tempdir().unwrap();
+        // NB: the indented block is one segment with explicit `\n  ` so Rust's
+        // `\`-continuation does not strip the leading spaces we are testing.
+        let content = "\
+# header\n\
+\n\
+[[rules]]\n\
+name = \"label-format\"\n\
+origin = \"default\"\n\
+assert = { require-section = { heading = \"H\" } }\n\
+\n  [[rules]]\n  name = \"custom-indented\"\n  severity = \"warn\"\n  assert = { require-section = { heading = \"Goals\" } }\n";
+        write_rules(dir.path(), content);
+        // Sanity: the indented header is a real, parseable table (two rules).
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 2);
+
+        let new_block = "[[rules]]\nname = \"namespace-unique-squad\"\norigin = \"default\"\nassert = { require-label = { label = \"squad:*\", min = 0, max = 1 } }\n\n";
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[new_block.to_string()], &[]).unwrap();
+        assert!(changed, "sync proceeds despite the indented header");
+
+        let updated = read_rules(dir.path());
+        // The indented rule survives byte-exact (indentation included), the
+        // membership add landed, and the whole file still parses (no corruption).
+        assert!(
+            updated.starts_with(content),
+            "original preserved as a prefix"
+        );
+        assert!(updated.contains("  [[rules]]\n  name = \"custom-indented\""));
         assert!(updated.contains("name = \"namespace-unique-squad\""));
         assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 3);
     }
