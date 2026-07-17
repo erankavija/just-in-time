@@ -1439,7 +1439,8 @@ pub struct IssueShowResponse {
     pub dangling_dependency_ids: Vec<String>,
     /// The subset of `dependencies` that are not yet met (not effectively terminal),
     /// consistent with readiness — see [`UnmetDependency`]. Always an array,
-    /// empty when every dependency is `Done`/`Rejected` or there are none.
+    /// empty when every dependency is effectively terminal (`Done`, `Rejected`,
+    /// or `Archived` from one of those) or there are none.
     pub unmet_dependencies: Vec<UnmetDependency>,
     /// Per-gate view, one entry per required gate, enriched from each gate's
     /// latest run.

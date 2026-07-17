@@ -23,15 +23,15 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T21:06:00.784164773Z"
     },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T01:26:35.167333204Z"
+    },
     "doc-review": {
       "status": "failed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T16:14:24.230521867Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T20:52:22.668369029Z"
     }
   },
   "context": {},
@@ -42,7 +42,7 @@
     "component:gates"
   ],
   "created_at": "2026-07-05T22:41:02.599866709Z",
-  "updated_at": "2026-07-17T00:50:57.435245836Z",
+  "updated_at": "2026-07-17T01:29:40.262231580Z",
   "first_ready_at": "2026-07-05T22:41:02.599889509Z",
   "claimed_at": "2026-07-16T08:40:04.642434515Z"
 }

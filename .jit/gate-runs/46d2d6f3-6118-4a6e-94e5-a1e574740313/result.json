@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "run_id": "46d2d6f3-6118-4a6e-94e5-a1e574740313",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "45a140ae-1baa-4f32-96e2-b4dcf21d6694",
+  "commit": "44ee4258a4e2588ea04c51e6cfb2b215206447b2",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T01:39:06.605781422Z",
+  "completed_at": "2026-07-17T01:43:37.622165949Z",
+  "duration_ms": 271016,
+  "exit_code": 1,
+  "stdout": "Attribution: c7699f38, ad2b52fd, 2be47597, cea1dbfa, 2856ad0f, c03d1ba9, ffde113d, 8a02869e, c15b26eb, 30a39aac, 0e330d21, 2fd8a8ff, f280f8b6, b020f788, db0fe018; uncommitted changes excluded  \nPolicy sources: AGENTS.md  \nResolved items: @/invariant/gate-semantics and @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-1, D-2, D-4, D-6, D-7 (dev/vision/9db27a3a-charter.md)  \nGate evidence: cargo-ci passed (0, 2026-07-17T01:23Z); docs-mechanical passed (0, 2026-07-17T00:31Z); doc-review failed (1, 2026-07-16T15:49Z); prior code-review failed (1, 2026-07-17T00:42Z)—its candidate/prose findings are addressed by later tagged commits  \nTruncation recovery: narrower per-commit, path, and line-range reads for merge patches, archive execution, diagnostics, tests, and current docs; issue-scoped item lookup was unavailable because it attempts a lock in the read-only sandbox  \n\n1. **[blocking][issue-impact][high]** `crates/jit/src/domain/artifact_plan.rs:471` gives every `non-terminal-target` the same “update to done or reject” guidance. For a container already `Archived` from `InProgress` (or any non-terminal origin), both actions are refused by the revive guard; it must first revive to its recorded origin. The same invalid advice is serialized into plan JSON and used by execution errors, so REQ-05 is unmet. Add origin-aware guidance and cover archived-from-nonterminal container and document-owner cases.\n\n2. **[blocking][issue-impact][medium]** `crates/jit/src/output.rs:1442` says `unmet_dependencies` is empty only when dependencies are `Done`/`Rejected`, omitting terminal-origin `Archived`. This prose is emitted by `jit --schema`, while runtime filtering at line 1508 correctly treats such dependencies as met. The machine-readable contract is therefore inconsistent with the implemented status projection. [@/invariant/single-source-prose]\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Archive diagnostics are invalid for Archived-from-nonterminal issues, and the emitted issue-show schema misstates effective-terminal dependency semantics.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Lifecycle-state archive guidance recommends direct done/reject transitions that the Archived revive guard refuses for non-terminal-origin Archived issues.\",\"file\":\"crates/jit/src/domain/artifact_plan.rs\",\"line\":471},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The emitted issue-show JSON Schema says unmet dependencies clear only for Done/Rejected, contradicting effective-terminal Archived behavior.\",\"file\":\"crates/jit/src/output.rs\",\"line\":1442,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 9924 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6dba-31b8-78f2-ba2e-135c9dfe65ba\n--------\nuser\n--- 9911 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Archive diagnostics are invalid for Archived-from-nonterminal issues, and the emitted issue-show schema misstates effective-terminal dependency semantics.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Lifecycle-state archive guidance recommends direct done/reject transitions that the Archived revive guard refuses for non-terminal-origin Archived issues.",
+        "file": "crates/jit/src/domain/artifact_plan.rs",
+        "line": 471
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The emitted issue-show JSON Schema says unmet dependencies clear only for Done/Rejected, contradicting effective-terminal Archived behavior.",
+        "file": "crates/jit/src/output.rs",
+        "line": 1442,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

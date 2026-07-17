@@ -469,9 +469,12 @@ impl BlockerCode {
     pub const fn guidance(self) -> Option<&'static str> {
         match self {
             Self::NonTerminalTarget => Some(
-                "artifact archival requires a terminal container: complete it \
+                "artifact archival requires an effectively terminal container: complete it \
                  (jit issue update <id> --state done) or reject it (jit issue reject <id>), \
-                 then re-run archival. Successful archival then retires the container to archived.",
+                 then re-run archival. An issue already Archived from a non-terminal state \
+                 first revives to that exact pre-archive state (jit issue update <id> \
+                 --state <origin>), then completes or rejects. Successful archival then \
+                 retires the container to archived.",
             ),
             Self::DocumentNonTerminalOwner => Some(
                 "this document has an owning issue that is not terminal: complete or reject \

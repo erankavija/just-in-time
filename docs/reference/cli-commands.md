@@ -2749,8 +2749,9 @@ name emitted nodes. A `--scope <container>` export lists only the container's
 members — scoping filters which nodes are listed, not how they resolve — so a
 kept node's `parent`, `cluster`, or `children` can reference ids outside the
 export, exactly as when you filter unscoped output downstream. Dependency edges
-that cross the scope boundary are excluded from `edges` and surfaced in
-`boundary_edges` rather than dropped silently. The same caveat applies to
+that cross the scope boundary are excluded from the scoped output; the `batch`
+format additionally reports each excluded crossing edge on stderr so none is
+dropped silently. The same caveat applies to
 `jit graph tree <root-id>`, which scopes the listed nodes.
 
 The default (no `--full`) output stays in the lean summary shape; the four

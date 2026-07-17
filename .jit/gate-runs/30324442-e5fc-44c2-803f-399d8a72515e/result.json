@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "30324442-e5fc-44c2-803f-399d8a72515e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3e12ffbd-694e-44b3-81c9-5a24ebf17340",
+  "commit": "44ee4258a4e2588ea04c51e6cfb2b215206447b2",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T01:35:30.641192288Z",
+  "completed_at": "2026-07-17T01:39:06.500533005Z",
+  "duration_ms": 215859,
+  "exit_code": 1,
+  "stdout": "Attribution: 970b8066, 08c1b23a, 8901b649, e8b9b8da, 1c26833b, 7ca34a54, d291bf11, 76bed774, 4e6dadbb, b301eded (`jit:3e12ffbd`)\nPolicy sources: AGENTS.md\nResolved items: none (item resolution requires a lock-file open unavailable in this read-only sandbox)\nGate evidence: cargo-ci passed (exit 0); doc-review failed (exit 1); docs-mechanical passed (exit 0)\nTruncation recovery: recovered the truncated merge patch with narrower first-parent reads for implementation, tests, and docs\n\n1. F1 — blocking, issue-impact, medium: [docs/reference/cli-commands.md:2752](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2752) says scoped JSON boundary edges are surfaced in `boundary_edges`. Both JSON response shapes contain only `nodes` and `edges` ([visualization.rs:63](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/visualization.rs:63)); `boundary_edges` exists only for batch export, which reports it to stderr ([main.rs:4894](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:4894)). The documentation promises a nonexistent JSON field.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Scoped JSON documentation promises a nonexistent boundary_edges output field.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The full scoped-JSON docs claim boundary edges are surfaced in boundary_edges, but only batch export has that internal collection and reports it on stderr.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2752,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 7454 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6db6-e626-7e50-acec-6c09b38ea7a9\n--------\nuser\n--- 7441 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Scoped JSON documentation promises a nonexistent boundary_edges output field.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The full scoped-JSON docs claim boundary edges are surfaced in boundary_edges, but only batch export has that internal collection and reports it on stderr.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 2752
+      }
+    ]
+  }
+}

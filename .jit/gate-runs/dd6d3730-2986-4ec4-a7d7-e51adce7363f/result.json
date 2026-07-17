@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "dd6d3730-2986-4ec4-a7d7-e51adce7363f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "894337e2-e708-466b-ac25-3aed102a166f",
+  "commit": "44ee4258a4e2588ea04c51e6cfb2b215206447b2",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T01:32:43.083002293Z",
+  "completed_at": "2026-07-17T01:35:30.538180863Z",
+  "duration_ms": 167455,
+  "exit_code": 1,
+  "stdout": "Attribution: 78d36840, 8901b649, 749583dc, 9934f89d, 30e74734, 077084c4, 1c351243, dbe1a50b, 04e45b89, c89133aa, 857de4f2\nPolicy sources: AGENTS.md; .jit/gates.toml; .jit/invariants.toml\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0; 2026-07-16T21:27:23Z); prior code-review passed (exit 0; 2026-07-17T00:34:05Z)\nTruncation recovery: Narrowed merge-parent diffs to attributable code paths and re-read current handoff/test ranges; excluded unrelated administrative merge content.\n\n1. **[blocking][issue-impact] F1 — The non-Unix startup path still drops and re-binds the selected port.** [`spawn_with_listener`](crates/jit/src/commands/serve.rs:226) drops the owned listener before spawning the child, explicitly relying on `jit-server` to bind `--bind` again. This violates REQ-2’s “no code path re-binds” requirement and retains the race on supported non-Unix builds.\n\n2. **[blocking][issue-impact] F2 — Unix handoff fails when the parent environment already has `LISTEN_PID`.** [`inherit_listener`](crates/jit/src/commands/serve.rs:194) sets `LISTEN_FDS` but does not remove inherited `LISTEN_PID`, despite documenting that it must be unset. The child then declines the inherited descriptor and falls back to the second bind in [`resolve_listener`](crates/server/src/lib.rs:45); because the parent still holds the socket, startup fails. Existing tests scrub the environment before exercising the path, so they do not cover this case.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The listener handoff still violates REQ-2 on non-Unix and when an inherited LISTEN_PID prevents Unix descriptor adoption.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The non-Unix path drops the selected listener and lets jit-server bind the same port again, reopening the probe-to-bind race.\",\"file\":\"crates/jit/src/commands/serve.rs\",\"line\":226,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"inherit_listener does not remove an inherited LISTEN_PID, so listenfd rejects the child handoff and resolve_listener performs a second bind while the parent still owns the port.\",\"file\":\"crates/jit/src/commands/serve.rs\",\"line\":194,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 11978 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6db4-57ea-7972-8531-3811d06c9a9f\n--------\nuser\n--- 11965 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The listener handoff still violates REQ-2 on non-Unix and when an inherited LISTEN_PID prevents Unix descriptor adoption.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The non-Unix path drops the selected listener and lets jit-server bind the same port again, reopening the probe-to-bind race.",
+        "file": "crates/jit/src/commands/serve.rs",
+        "line": 226
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "inherit_listener does not remove an inherited LISTEN_PID, so listenfd rejects the child handoff and resolve_listener performs a second bind while the parent still owns the port.",
+        "file": "crates/jit/src/commands/serve.rs",
+        "line": 194
+      }
+    ]
+  }
+}

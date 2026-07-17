@@ -8207,3 +8207,10 @@
 {"type":"gate_failed","id":"4cb82e16-900c-4cc1-bc38-631a69e83b4f","issue_id":"c505031a-9ba4-4547-aeb7-a83aa8e8ae3f","timestamp":"2026-07-17T00:58:56.663904420Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"f27df5a9-3888-4665-9de7-7040e78fe953","issue_id":"554ad07f-edd8-4ac9-8f6d-139902abbf7e","timestamp":"2026-07-17T01:01:25.137940496Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"0c3b6178-538f-4da2-984c-4af9a446b4ca","issue_id":"0283ce74-95ee-49dc-95f6-8f2c17c57c5d","timestamp":"2026-07-17T01:05:27.680816288Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"91db3f1a-76cc-4d5d-964a-92d23b028178","issue_id":"45a140ae-1baa-4f32-96e2-b4dcf21d6694","timestamp":"2026-07-17T01:23:22.252831521Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"1da3cf4b-a805-441f-b9e7-edd9e62e40dc","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-17T01:26:35.060830726Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"9f6a56d6-3afe-487d-90ca-84c137847eca","issue_id":"1d59070d-bebc-4a55-9456-c6c7a3caba2a","timestamp":"2026-07-17T01:29:40.262463381Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"0fd67fcd-0930-45c4-a31b-694c09799205","issue_id":"554ad07f-edd8-4ac9-8f6d-139902abbf7e","timestamp":"2026-07-17T01:32:42.951908858Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"f51e0edd-8410-4cc3-b83e-10b5d3bc6ecc","issue_id":"894337e2-e708-466b-ac25-3aed102a166f","timestamp":"2026-07-17T01:35:30.538607193Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"7582a953-dbe8-45ae-a12c-35efdd6aae70","issue_id":"3e12ffbd-694e-44b3-81c9-5a24ebf17340","timestamp":"2026-07-17T01:39:06.500930656Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"c50ff3aa-fa4d-40df-a6f7-47d23ff64841","issue_id":"45a140ae-1baa-4f32-96e2-b4dcf21d6694","timestamp":"2026-07-17T01:43:37.622653879Z","gate_key":"code-review","updated_by":"auto:executor"}
