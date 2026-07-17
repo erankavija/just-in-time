@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "c836e3c3-5895-42f7-9168-e17f3a169c99",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "db2be186251719603794721f60608668857721b2",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T12:35:19.355181726Z",
+  "completed_at": "2026-07-17T12:40:43.931548800Z",
+  "duration_ms": 324576,
+  "exit_code": 1,
+  "stdout": "Attribution: tagged commits e4966077, ae397f87, b14c125c, 2a8c9e7b, d0bb829a, 68d76c31, d657c607, 2abed5ba, a22f0443, fbe2bb36, 58adc1bc, 3dc0123c, 8aa61b84, 90b14057, bcb3a2bd, d3ecd278, 7c6452c1\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 and @/charter/D-7 — dev/vision/9db27a3a-charter.md; @/invariant/single-source-prose and @/invariant/atomic-writes — .jit/invariants.toml; @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci passed (0, 2026-07-17T12:32:39Z); doc-review failed (1, 2026-07-17T12:03:55Z); docs-mechanical passed (0, 2026-07-17T12:35:18Z); prior code-review failed, with its two blockers resolved in current tree\nTruncation recovery: re-read tagged patches by commit/path; narrowed current config, renderer, CLI-dispatch, error-taxonomy, tests, and documentation reads\n\n1. [blocking][issue-impact] `jit project render --json` exits 1 for typed projection failures, not the documented validation exit 4. Non-JSON errors reach `error_to_exit_code`, which classifies `ProjectionError` as 4, but the JSON path immediately exits using the unclassified `PROJECT_COMMAND_FAILED` envelope, which maps to generic 1. This makes machine clients observe different exit semantics and contradicts the command reference. [crates/jit/src/main.rs:1372](crates/jit/src/main.rs:1372), [docs/reference/cli-commands.md:3121](docs/reference/cli-commands.md:3121) (`@/invariant/single-source-prose`).\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"JSON projection failures exit 1 instead of the documented typed validation exit 4.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The --json project-render error path exits via unclassified PROJECT_COMMAND_FAILED (1), bypassing ProjectionError's validation classification (4).\",\"file\":\"crates/jit/src/main.rs\",\"line\":1372,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 24696 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7012-f9ae-7912-9f83-55f22e2857bd\n--------\nuser\n--- 24683 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "JSON projection failures exit 1 instead of the documented typed validation exit 4.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The --json project-render error path exits via unclassified PROJECT_COMMAND_FAILED (1), bypassing ProjectionError's validation classification (4).",
+        "file": "crates/jit/src/main.rs",
+        "line": 1372,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

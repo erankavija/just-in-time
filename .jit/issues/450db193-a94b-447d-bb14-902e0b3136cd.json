@@ -16,22 +16,22 @@
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T11:57:38.448180178Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T12:00:17.623235156Z"
+      "updated_at": "2026-07-17T12:32:39.277674911Z"
     },
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T12:00:16.905912235Z"
+      "updated_at": "2026-07-17T12:35:18.636025563Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T12:35:19.355181726Z"
     },
     "doc-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T12:03:55.833655964Z"
+      "updated_at": "2026-07-17T12:40:44.015300381Z"
     }
   },
   "context": {},
@@ -54,7 +54,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "created_at": "2026-07-09T11:21:10.588643085Z",
-  "updated_at": "2026-07-17T12:05:31.478655065Z",
+  "updated_at": "2026-07-17T12:42:50.224710897Z",
   "first_ready_at": "2026-07-09T11:21:10.588652835Z",
   "claimed_at": "2026-07-16T14:06:20.526133281Z"
 }

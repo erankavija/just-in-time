@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "4e0ccbbd-a4fc-4691-a101-a26d3f07b732",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "db2be186251719603794721f60608668857721b2",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T12:40:44.015300381Z",
+  "completed_at": "2026-07-17T12:42:50.224460737Z",
+  "duration_ms": 126209,
+  "exit_code": 1,
+  "stdout": "Attribution: `enhancement` is a level-4 leaf, so I reviewed only the 17 reachable commits tagged `jit:450db193`, individually with rename detection. Uncommitted changes were excluded. The prior missing-registry-source finding is resolved.\n\nThe generic projection documentation is otherwise accurate, but its canonical configuration reference has two issue-impact omissions.\n\n1. **F1 — blocking, issue-impact, medium:** [`docs/reference/configuration.md:201`](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:201) does not state that `kind` is required. A projection without `kind` fails configuration parsing, and an empty list is rejected. Mark it required with at least one project-scoped kind; mirror this in [`docs/reference/example-config.toml:153`](/home/vkaskivuo/Projects/just-in-time/docs/reference/example-config.toml:153).\n\n2. **F2 — blocking, issue-impact, medium:** [`docs/reference/configuration.md:194`](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:194) describes every projection source as a “source registry” and instructs users to re-render after editing a registry. This is inaccurate for the issue’s new markdown-first capability. Refer to the canonical source (registry or markdown file) and instruct users to render after changing either; align [`docs/reference/example-config.toml:152`](/home/vkaskivuo/Projects/just-in-time/docs/reference/example-config.toml:152).\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The projection configuration reference omits the required kind field and misdescribes markdown-first sources as registries.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The configuration reference does not state that projection kind is required and must name at least one kind.\",\"file\":\"docs/reference/configuration.md\",\"line\":201},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The configuration reference calls every projection source a registry, which is inaccurate for markdown-first projections.\",\"file\":\"docs/reference/configuration.md\",\"line\":194}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "grep: /tmp/tmp.XddUnNdWzc: binary file matches\n--- agent stderr (first 12 of 5121 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7017-edaf-7ba3-ab0a-18b317e94305\n--------\n--- 5109 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The projection configuration reference omits the required kind field and misdescribes markdown-first sources as registries.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The configuration reference does not state that projection kind is required and must name at least one kind.",
+        "file": "docs/reference/configuration.md",
+        "line": 201
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The configuration reference calls every projection source a registry, which is inaccurate for markdown-first projections.",
+        "file": "docs/reference/configuration.md",
+        "line": 194
+      }
+    ]
+  }
+}

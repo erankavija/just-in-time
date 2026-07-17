@@ -8310,3 +8310,10 @@
 {"type":"issue_completed","id":"bfce7ba6-a8c6-4e8a-a65c-57f04ea82cb1","issue_id":"45a140ae-1baa-4f32-96e2-b4dcf21d6694","timestamp":"2026-07-17T12:18:31.730842525Z"}
 {"type":"issue_state_changed","id":"727defae-a2f4-4368-8293-f9674b04c19c","issue_id":"0283ce74-95ee-49dc-95f6-8f2c17c57c5d","timestamp":"2026-07-17T12:18:32.508506721Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"afad585b-12e5-4fc7-b568-4c989a1b8284","issue_id":"0283ce74-95ee-49dc-95f6-8f2c17c57c5d","timestamp":"2026-07-17T12:18:32.508538661Z"}
+{"type":"gate_passed","id":"3a3e64ad-523f-4f4f-9112-ea818c2ccca3","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-17T12:29:48.397050321Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"572fce03-afd5-4daf-a075-0a2dd03d4ffa","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-17T12:29:49.120261547Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"72016c9b-5cad-40d1-9730-6979f7341fce","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-17T12:32:39.192171889Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"7b12e55b-6b0b-4daa-b4c2-7fc0075685a1","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-17T12:35:18.553372573Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"004f96cd-483f-4019-a3bd-5b8d59ae2dfa","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-17T12:35:19.271897315Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"c494563a-15f1-4f07-81b9-8fa9b831fec2","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-17T12:40:43.931991130Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"d2ce1902-0603-411a-82eb-8dfc04541e06","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-17T12:42:50.224910097Z","gate_key":"doc-review","updated_by":"auto:executor"}

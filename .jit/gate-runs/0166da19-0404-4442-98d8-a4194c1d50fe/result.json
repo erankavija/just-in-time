@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "0166da19-0404-4442-98d8-a4194c1d50fe",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "db2be186251719603794721f60608668857721b2",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T12:29:49.202377736Z",
+  "completed_at": "2026-07-17T12:32:39.191648049Z",
+  "duration_ms": 169989,
+  "exit_code": 1,
+  "stdout": "Attribution: e4966077, 882bf88d, 93e7ed5b, b2be904a, e7efa262, 4b0b39e, 46e8c5ae, ff365b3a, 6d4efad1, 2fe3ed74, 68fccbca, d98c927f, a32e1707, 5c1b1602, a1adb140, d9d67143, 271c650b, b876f3b7 (`jit:d74a9ed1`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6,D-7 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics,atomic-writes,single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/rule/namespace-unique-brackets (.jit/rules.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-17T12:26:21Z); doc-review passed (exit 0, 2026-07-17T04:00:05Z); docs-mechanical passed (exit 0, 2026-07-17T12:29:48Z)\nTruncation recovery: re-read bounded current ranges for membership sync, storage rewrite, diff logic, tests, design, and CLI reference; inspected merge-parent changed-file lists separately\n\n1. **[blocking][issue-impact][medium]** The public `sync_default_rule_membership` API documentation still promises that every other byte is untouched, but a membership drop deliberately reserializes through `toml_edit` and may canonicalize valid TOML syntax. The design and CLI reference now document the approved exception, so this leaves the prior F1 only partially addressed and creates conflicting attributable prose. [crates/jit/src/commands/mod.rs:1215](crates/jit/src/commands/mod.rs:1215) References: `@/invariant/single-source-prose`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The API documentation still contradicts the approved membership-drop canonicalization behavior.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"sync_default_rule_membership promises byte-exact preservation on drops although drops reserialize TOML and may canonicalize syntax.\",\"file\":\"crates/jit/src/commands/mod.rs\",\"line\":1215,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 9408 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f700d-efd6-7900-a7c3-ccae05592aaf\n--------\nuser\n--- 9395 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The API documentation still contradicts the approved membership-drop canonicalization behavior.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "sync_default_rule_membership promises byte-exact preservation on drops although drops reserialize TOML and may canonicalize syntax.",
+        "file": "crates/jit/src/commands/mod.rs",
+        "line": 1215,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}
