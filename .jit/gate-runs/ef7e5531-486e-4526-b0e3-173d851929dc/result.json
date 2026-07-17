@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "ef7e5531-486e-4526-b0e3-173d851929dc",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "c505031a-9ba4-4547-aeb7-a83aa8e8ae3f",
+  "commit": "62c8025a44251899b29f141dabf9a6fd045a0c20",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T08:08:53.534543318Z",
+  "completed_at": "2026-07-17T08:11:22.708915414Z",
+  "duration_ms": 149174,
+  "exit_code": 0,
+  "stdout": "Attribution: leaf `c505031a`; reviewed five reachable tagged commits individually. The current docs and CLI use only canonical gate verbs, all four retired aliases return unknown-subcommand errors, and the prior grammar finding is fixed.\n\n1. [Low, advisory, pre-existing] The canonical grammar’s configuration list omits `gate update`, although it is a current gate command. Add it beside `gate define` and `gate remove`. [docs/reference/cli-command-grammar.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-command-grammar.md:185)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The alias-removal documentation contract is accurate and discoverable; one unrelated pre-existing grammar omission remains advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The gate configuration grammar omits the current `gate update` command.\",\"file\":\"docs/reference/cli-command-grammar.md\",\"line\":185}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The alias-removal documentation contract is accurate and discoverable; one unrelated pre-existing grammar omission remains advisory.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "pre-existing",
+        "summary": "The gate configuration grammar omits the current `gate update` command.",
+        "file": "docs/reference/cli-command-grammar.md",
+        "line": 185
+      }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "c73ecd9f-4d8b-48d5-8719-2af77c93d76a",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "1d59070d-bebc-4a55-9456-c6c7a3caba2a",
+  "commit": "62c8025a44251899b29f141dabf9a6fd045a0c20",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T08:04:59.860448276Z",
+  "completed_at": "2026-07-17T08:06:22.243779933Z",
+  "duration_ms": 82383,
+  "exit_code": 0,
+  "stdout": "Attribution: `bug` is a leaf type (level 4) and has no resolved children. I reviewed the 11 reachable `jit:1d59070d` commits individually; the current docs and CLI help match the shipped behavior. The prior troubleshooting finding is fixed at `docs/how-to/troubleshooting.md:82-84`.\n\nDocumentation accurately covers mode inference, manual/checker conflict, required manual attestation, and evaluate-all behavior.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Issue-scoped gate documentation is accurate and the prior manual-attestation remediation finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Issue-scoped gate documentation is accurate and the prior manual-attestation remediation finding is resolved.",
+    "findings": []
+  }
+}

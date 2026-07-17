@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "398c1d75-8b82-4887-9879-d59c085ad126",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "554ad07f-edd8-4ac9-8f6d-139902abbf7e",
+  "commit": "62c8025a44251899b29f141dabf9a6fd045a0c20",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T08:11:23.024209764Z",
+  "completed_at": "2026-07-17T08:12:51.824560887Z",
+  "duration_ms": 88800,
+  "exit_code": 0,
+  "stdout": "Attribution: leaf issue; inspected its nine reachable `jit:554ad07f`-tagged commits individually (including merge patches), excluding uncommitted changes. The prior `tree_dirty` null-case finding is resolved in the generated storage reference.\n\nDocumentation accurately covers the stored field, values, legacy compatibility, and unstable-HEAD unknown case at `docs/reference/storage-records.md:121`.\n\n1. None.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue's gate-run cleanliness evidence is accurately documented; no issue-impact findings remain.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The issue's gate-run cleanliness evidence is accurately documented; no issue-impact findings remain.",
+    "findings": []
+  }
+}

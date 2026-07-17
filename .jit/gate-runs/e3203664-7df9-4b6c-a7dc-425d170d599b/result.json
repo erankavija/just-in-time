@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "e3203664-7df9-4b6c-a7dc-425d170d599b",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "52665a07-3d30-47e5-a3c7-d2aacc63cec5",
+  "commit": "62c8025a44251899b29f141dabf9a6fd045a0c20",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T08:06:22.347712849Z",
+  "completed_at": "2026-07-17T08:08:53.425520279Z",
+  "duration_ms": 151077,
+  "exit_code": 0,
+  "stdout": "Attribution used the 11 individually inspected commits reachable on `HEAD` tagged `jit:52665a07`; this level-4 enhancement is a leaf with no resolved children. The affected docs accurately describe the three built-in presets and project-defined alternatives; the prior contradiction is resolved.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf’s preset-removal documentation impact is accurate, discoverable, and complete.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf’s preset-removal documentation impact is accurate, discoverable, and complete.",
+    "findings": []
+  }
+}

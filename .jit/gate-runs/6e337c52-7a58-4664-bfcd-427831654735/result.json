@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "run_id": "6e337c52-7a58-4664-bfcd-427831654735",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "45a140ae-1baa-4f32-96e2-b4dcf21d6694",
+  "commit": "62c8025a44251899b29f141dabf9a6fd045a0c20",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T08:02:31.586226215Z",
+  "completed_at": "2026-07-17T08:04:59.756757171Z",
+  "duration_ms": 148170,
+  "exit_code": 1,
+  "stdout": "Attribution: `45a140ae` is a level-4 leaf with no resolved children. I reviewed the union of its 19 individually inspected tagged commits; uncommitted JIT state was excluded. The prior four blockers are fixed, but five directly affected documentation statements still use literal terminality or misstate JSON output.\n\n1. **F1 — medium, blocking, issue-impact:** [docs/reference/cli-commands.md:2203](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2203) says dependency targets “must reach a terminal state.” Change it to effective terminality and name `Archived` from `Done`/`Rejected`.\n\n2. **F2 — high, blocking, issue-impact:** [docs/reference/cli-commands.md:2610](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2610) says every archived graph-dependency node carries `archived_from`, but the current serializer omits it when no origin was recorded. Document that it is present only when recorded and that omission denotes a legacy/unknown origin which blocks.\n\n3. **F3 — medium, blocking, issue-impact:** [README.md:111](/home/vkaskivuo/Projects/just-in-time/README.md:111) labels the `backlog → ready` transition as “dependencies terminal.” Make the diagram say “dependencies effectively terminal.”\n\n4. **F4 — medium, blocking, issue-impact:** [docs/how-to/dependency-management.md:37](/home/vkaskivuo/Projects/just-in-time/docs/how-to/dependency-management.md:37) summarizes dependency semantics as “Blocks until terminal.” Replace it with effective-terminal wording.\n\n5. **F5 — medium, blocking, issue-impact:** [docs/concepts/core-model.md:682](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:682) labels readiness as “dependencies terminal.” Use “dependencies effectively terminal” to match the documented lifecycle model.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Five issue-impact documentation statements remain inconsistent with terminality-preserving Archived semantics or its JSON representation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The jit dep add argument contract still requires literal terminality instead of effective terminality.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2203},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The jit graph deps JSON reference incorrectly promises archived_from on every archived node although legacy nodes omit it.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2610},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The README lifecycle diagram labels readiness with literal terminality rather than effective terminality.\",\"file\":\"README.md\",\"line\":111},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The dependency-management comparison table still summarizes dependencies as blocking until literal terminality.\",\"file\":\"docs/how-to/dependency-management.md\",\"line\":37},{\"id\":\"F5\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The canonical lifecycle diagram labels Backlog-to-Ready with literal terminality rather than effective terminality.\",\"file\":\"docs/concepts/core-model.md\",\"line\":682}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 14775 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6f19-38d8-7772-86da-cefbf1f0b5ee\n--------\nuser\n--- 14762 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Five issue-impact documentation statements remain inconsistent with terminality-preserving Archived semantics or its JSON representation.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The jit dep add argument contract still requires literal terminality instead of effective terminality.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 2203
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The jit graph deps JSON reference incorrectly promises archived_from on every archived node although legacy nodes omit it.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 2610
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The README lifecycle diagram labels readiness with literal terminality rather than effective terminality.",
+        "file": "README.md",
+        "line": 111
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The dependency-management comparison table still summarizes dependencies as blocking until literal terminality.",
+        "file": "docs/how-to/dependency-management.md",
+        "line": 37
+      },
+      {
+        "id": "F5",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The canonical lifecycle diagram labels Backlog-to-Ready with literal terminality rather than effective terminality.",
+        "file": "docs/concepts/core-model.md",
+        "line": 682
+      }
+    ]
+  }
+}

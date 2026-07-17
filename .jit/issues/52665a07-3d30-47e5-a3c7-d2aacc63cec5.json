@@ -2,7 +2,7 @@
   "id": "52665a07-3d30-47e5-a3c7-d2aacc63cec5",
   "title": "Remove language-flavored builtin gate presets; presets resolve project-declared bundles",
   "description": "Remove the language- and content-flavored builtin gate presets from engine code; presets stay as a mechanism resolving project-declared bundles.\n\n## Background\n\n`crates/jit/src/gate_presets/builtin.rs` compiles domain vocabulary into the binary: `rust-tdd`, `python-tdd`, `js-tdd`, `minimal`, and `security-audit` bundle hardcoded gate keys, titles, and checkers. This predates the current design: the preset system landed 2026-02-10 under production-polish, months before config-declared gates (@/charter/D-2) and the domain-agnostic invariant (@/inv/domain-agnostic: gate keys come from repository configuration, never from hardcoded domain assumptions). D-2's rejection rationale — every new or tuned gate requires recompiling — describes builtin bundles exactly.\n\nThe surrounding machinery is already domain-agnostic and stays: storage lists builtin and custom presets, `save_gate_preset` persists project-defined bundles, and graph templates resolve node/anchor gate names through the preset manager. The planning-bracket presets (`plan-review`, `breakdown-review`, `coverage-preview`) are workflow infrastructure of the plan bracket (@/charter/D-3), not domain vocabulary; they are what the bracket genuinely needs from this module.\n\n## Success Criteria\n\n- [hard] REQ-01: The builtin preset set no longer contains language- or content-flavored bundles (`rust-tdd`, `python-tdd`, `js-tdd`, `minimal`, `security-audit`); `jit gate preset list` shows project-defined presets plus the planning-bracket presets only.\n- [hard] REQ-02: The preset mechanism is unchanged for project-defined presets: save, list, show, apply, and template gate-name resolution all work against project-declared bundles; harness tests cover a project-defined preset end to end.\n- [hard] REQ-03: The planning-bracket presets remain available to template role resolution, and their retention as workflow infrastructure (rather than domain content) is stated where the domain-agnostic boundary is documented.\n- [hard] REQ-04: Every reference to a removed preset name is swept from CLI help text, docs/, and CLAUDE.md; `jit validate` and repo-wide search find no dangling mentions.\n- [hard] REQ-05: Adopter documentation shows how to declare an equivalent bundle as a project-defined preset, replacing the removed builtins.\n\n## Notes\n\nDecisions pinned during intake:\n\n- **Remove, in v1.0 scope.** A binary shipping baked-in domain vocabulary undercuts the charter's domain-agnostic claim at release. Rejected: filing without a milestone — presets are opt-in, but the contradiction is with the release's own invariant projection; and documenting a boundary exception — the invariant wording admits none for gate keys.\n- **The mechanism survives, the content goes.** Project-defined presets and template resolution are config-driven and consistent with @/inv/domain-agnostic; only the compiled-in bundles violate it.\n- **Planning-bracket trio retained.** `plan-review`, `breakdown-review`, `coverage-preview` encode jit's own plan-before-fan-out workflow (@/charter/D-3), not an adopter domain.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:worker",
   "dependencies": [],
@@ -13,25 +13,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "doc-review": {
-      "status": "failed",
+    "code-review": {
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T04:03:50.645900519Z"
+      "updated_at": "2026-07-17T00:50:57.541797233Z"
     },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T20:39:49.643919438Z"
     },
+    "doc-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T08:06:22.347712849Z"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T15:21:35.625977233Z"
-    },
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T00:50:57.541797233Z"
     }
   },
   "context": {},
@@ -44,7 +44,8 @@
     "per:@/charter/D-2"
   ],
   "created_at": "2026-07-09T11:25:06.642012697Z",
-  "updated_at": "2026-07-17T04:06:14.545625709Z",
+  "updated_at": "2026-07-17T08:13:53.252560446Z",
   "first_ready_at": "2026-07-09T11:25:06.642021737Z",
-  "claimed_at": "2026-07-16T08:40:04.659278837Z"
+  "claimed_at": "2026-07-16T08:40:04.659278837Z",
+  "done_at": "2026-07-17T08:13:53.252559676Z"
 }

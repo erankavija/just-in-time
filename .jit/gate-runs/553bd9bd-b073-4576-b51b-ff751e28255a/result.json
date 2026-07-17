@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "553bd9bd-b073-4576-b51b-ff751e28255a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "62c8025a44251899b29f141dabf9a6fd045a0c20",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T07:55:19.573240865Z",
+  "completed_at": "2026-07-17T07:58:39.310157659Z",
+  "duration_ms": 199736,
+  "exit_code": 1,
+  "stdout": "Attribution: 624ffa8e, b876f3b7, 0500ef34, 271c650b, d9d67143, a1adb140, 5c1b1602, a32e1707, d98c927f, 68fccbca, 2fe3ed74, 6d4efad1, ff365b3a, 46e8c5ae (jit:d74a9ed1)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes (.jit/invariants.toml); @/rule/namespace-unique-brackets (.jit/rules.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-17T07:48:23Z); doc-review passed (exit 0, 2026-07-17T04:00:05Z); docs-mechanical passed (exit 0, 2026-07-17T00:31:38Z)\nTruncation recovery: narrowed reads of the current sync, tests, call sites, and individual historical patches\n\n1. **F1 — high, blocking, issue-impact:** Dropping a namespace-unique rule that is the first `[[rules]]` entry discards the leading header/comments. The implementation removes that table with `ArrayOfTables::retain`; its prefix decoration owns the leading trivia (as `rewrite_rules_header` relies on), and `retain` does not transfer it to the next table. A repository-level `jit config set` therefore violates REQ-01/REQ-03’s byte-exact preservation when a user has reordered a removable default rule first. Existing drop tests cover middle and final rows, not the first-row case. `crates/jit/src/storage/ruleset_store.rs:218`\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Dropping a first namespace-unique rule loses unrelated leading TOML trivia.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Dropping a first namespace-unique rule loses the leading header/comments because its TOML prefix decoration is removed with the table.\",\"file\":\"crates/jit/src/storage/ruleset_store.rs\",\"line\":218,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8804 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6f12-a161-7340-8003-a8782537f7c8\n--------\nuser\n--- 8791 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Dropping a first namespace-unique rule loses unrelated leading TOML trivia.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Dropping a first namespace-unique rule loses the leading header/comments because its TOML prefix decoration is removed with the table.",
+        "file": "crates/jit/src/storage/ruleset_store.rs",
+        "line": 218
+      }
+    ]
+  }
+}
