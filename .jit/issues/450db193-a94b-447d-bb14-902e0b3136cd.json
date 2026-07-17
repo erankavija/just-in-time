@@ -13,20 +13,20 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "code-review": {
+    "cargo-ci": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-07-09T11:21:19.715488522Z"
+      "updated_at": "2026-07-09T11:21:19.715437842Z"
     },
     "docs-mechanical": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-12T13:38:45.883870413Z"
     },
-    "cargo-ci": {
+    "code-review": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-07-09T11:21:19.715437842Z"
+      "updated_at": "2026-07-09T11:21:19.715488522Z"
     },
     "doc-review": {
       "status": "pending",
@@ -35,7 +35,15 @@
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/450db193-generic-projection-design.md",
+      "commit": null,
+      "label": null,
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:enhancement",
     "epic:core-maintenance",
@@ -46,7 +54,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "created_at": "2026-07-09T11:21:10.588643085Z",
-  "updated_at": "2026-07-16T14:06:20.526133611Z",
+  "updated_at": "2026-07-17T00:17:25.707894766Z",
   "first_ready_at": "2026-07-09T11:21:10.588652835Z",
   "claimed_at": "2026-07-16T14:06:20.526133281Z"
 }
