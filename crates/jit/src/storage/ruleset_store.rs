@@ -92,14 +92,10 @@ pub fn rewrite_rules_header(jit_root: &Path, header: &str) -> Result<bool> {
     }
     let content =
         std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
-    // Match `[[rules]]` only at the START of a line, so a `[[rules]]` sequence
-    // inside a header comment or a rule description can never be mistaken for the
-    // first rule table.
-    let body_start = if content.starts_with("[[rules]]") {
-        Some(0)
-    } else {
-        content.find("\n[[rules]]").map(|idx| idx + 1)
-    };
+    // The body starts at the first REAL `[[rules]]` table header. `rule_header_offsets`
+    // resolves those string-/comment-aware, so a `[[rules]]` sequence inside a header
+    // comment or a multiline rule description is never mistaken for the first table.
+    let body_start = rule_header_offsets(&content).first().copied();
     let rebuilt = match body_start {
         Some(idx) => format!("{header}{}", &content[idx..]),
         None => header.to_string(),
@@ -155,6 +151,138 @@ pub fn read_rule_identities(jit_root: &Path) -> Result<Vec<(String, Option<Strin
         .collect())
 }
 
+/// Byte offsets of every line that opens a REAL `[[rules]]` table, in file
+/// order.
+///
+/// "Real" means the token sits at the start of a physical line AND outside any
+/// string or comment context. A `[[rules]]` sequence inside a `#` comment or a
+/// `'''`/`"""` multiline string (a rule's `description`, say) is prose, not a
+/// table boundary, so it is skipped. The scan tracks TOML string/comment state
+/// across lines, so it cannot be fooled by an in-string occurrence that a naive
+/// `\n[[rules]]` search would mis-split on (jit:d74a9ed1 review F2).
+///
+/// Manual state tracking (rather than `toml_edit`) keeps every consumer working
+/// on raw byte slices of the original file, preserving each block's exact
+/// bytes — comments, blank lines, and field formatting — which the membership
+/// sync's byte-exact preservation contract depends on.
+fn rule_header_offsets(content: &str) -> Vec<usize> {
+    enum Mode {
+        Normal,
+        Comment,
+        BasicSingle,
+        LiteralSingle,
+        BasicMulti,
+        LiteralMulti,
+    }
+
+    let bytes = content.as_bytes();
+    let len = content.len();
+    // Advance past one whole char at `idx` (keeps `i` on a UTF-8 boundary).
+    let char_len = |idx: usize| content[idx..].chars().next().map_or(1, char::len_utf8);
+
+    let mut offsets = Vec::new();
+    let mut mode = Mode::Normal;
+    // A physical-line start is a boundary candidate only when the scanner reaches
+    // it in `Normal` mode (i.e. the prior line did not leave us mid multiline
+    // string). Offset 0 is the first line's start.
+    let mut line_start = true;
+    let mut i = 0;
+
+    while i < len {
+        match mode {
+            Mode::Normal => {
+                if content[i..].starts_with("\"\"\"") {
+                    mode = Mode::BasicMulti;
+                    line_start = false;
+                    i += 3;
+                    continue;
+                }
+                if content[i..].starts_with("'''") {
+                    mode = Mode::LiteralMulti;
+                    line_start = false;
+                    i += 3;
+                    continue;
+                }
+                if line_start && content[i..].starts_with("[[rules]]") {
+                    offsets.push(i);
+                }
+                let c = bytes[i];
+                match c {
+                    b'#' => mode = Mode::Comment,
+                    b'"' => mode = Mode::BasicSingle,
+                    b'\'' => mode = Mode::LiteralSingle,
+                    _ => {}
+                }
+                line_start = c == b'\n';
+                i += char_len(i);
+            }
+            Mode::Comment => {
+                let c = bytes[i];
+                if c == b'\n' {
+                    mode = Mode::Normal;
+                    line_start = true;
+                } else {
+                    line_start = false;
+                }
+                i += char_len(i);
+            }
+            Mode::BasicSingle => {
+                let c = bytes[i];
+                if c == b'\\' {
+                    // Skip the escaped char so `\"` does not close the string.
+                    i += 1;
+                    if i < len {
+                        i += char_len(i);
+                    }
+                    line_start = false;
+                    continue;
+                }
+                if c == b'"' || c == b'\n' {
+                    mode = Mode::Normal;
+                }
+                line_start = c == b'\n';
+                i += char_len(i);
+            }
+            Mode::LiteralSingle => {
+                let c = bytes[i];
+                if c == b'\'' || c == b'\n' {
+                    mode = Mode::Normal;
+                }
+                line_start = c == b'\n';
+                i += char_len(i);
+            }
+            Mode::BasicMulti => {
+                if bytes[i] == b'\\' {
+                    // Escapes apply in basic strings, so `\"""` is not a close.
+                    i += 1;
+                    if i < len {
+                        i += char_len(i);
+                    }
+                    continue;
+                }
+                if content[i..].starts_with("\"\"\"") {
+                    mode = Mode::Normal;
+                    i += 3;
+                    line_start = false;
+                    continue;
+                }
+                i += char_len(i);
+            }
+            Mode::LiteralMulti => {
+                if content[i..].starts_with("'''") {
+                    mode = Mode::Normal;
+                    i += 3;
+                    line_start = false;
+                    continue;
+                }
+                i += char_len(i);
+            }
+        }
+    }
+
+    offsets
+}
+
 /// Split `rules.toml` content into its leading header (everything before the
 /// first `[[rules]]` table) and the raw text of each `[[rules]]` block, in
 /// file order.
@@ -162,20 +290,11 @@ pub fn read_rule_identities(jit_root: &Path) -> Result<Vec<(String, Option<Strin
 /// A block's text runs from its `[[rules]]` line up to (but not including) the
 /// next `[[rules]]` line, or EOF — so it carries every line that belongs to
 /// it: its fields AND any comments/blank lines authored inside or immediately
-/// after it. Mirrors [`rewrite_rules_header`]'s start-of-line-only match, so a
-/// `[[rules]]`-looking string inside a description or comment is never
-/// mistaken for a table boundary.
+/// after it. Table boundaries come from [`rule_header_offsets`], so a
+/// `[[rules]]`-looking string inside a description or comment is never mistaken
+/// for one.
 fn split_rule_blocks(content: &str) -> (&str, Vec<&str>) {
-    let mut starts: Vec<usize> = Vec::new();
-    if content.starts_with("[[rules]]") {
-        starts.push(0);
-    }
-    let mut search_from = 0;
-    while let Some(idx) = content[search_from..].find("\n[[rules]]") {
-        let start = search_from + idx + 1; // just past the '\n'
-        starts.push(start);
-        search_from = start + 1;
-    }
+    let starts = rule_header_offsets(content);
 
     let header = match starts.first() {
         Some(&first) => &content[..first],
@@ -248,6 +367,13 @@ pub fn sync_namespace_unique_rules(
         if !drop {
             rebuilt.push_str(block);
         }
+    }
+    // A hand-authored rules.toml may end without a final newline; appending a
+    // generated block directly would fuse its `[[rules]]` line onto the file's
+    // last token, corrupting the TOML. Guarantee exactly one separating newline:
+    // add it only when content precedes the append and lacks a trailing newline.
+    if !to_add.is_empty() && !rebuilt.is_empty() && !rebuilt.ends_with('\n') {
+        rebuilt.push('\n');
     }
     for block in to_add {
         rebuilt.push_str(block);
@@ -609,6 +735,93 @@ assert = { require-section = { heading = \"Goals\" } }\n\
         .unwrap();
         assert!(!changed);
         assert_eq!(read_rules(dir.path()), HAND_AUTHORED_RULES);
+    }
+
+    #[test]
+    fn test_sync_appends_to_file_without_trailing_newline() {
+        // A valid, hand-authored rules.toml whose final line has NO trailing
+        // newline. Appending a generated block naively would fuse `} }[[rules]]`
+        // into one line, corrupting the TOML (jit:d74a9ed1 review F1).
+        let dir = tempfile::tempdir().unwrap();
+        let no_newline = "\
+[[rules]]\n\
+name = \"label-format\"\n\
+origin = \"default\"\n\
+assert = { require-section = { heading = \"H\" } }";
+        assert!(
+            !no_newline.ends_with('\n'),
+            "fixture must lack a final newline"
+        );
+        write_rules(dir.path(), no_newline);
+
+        let new_block = "[[rules]]\nname = \"namespace-unique-squad\"\norigin = \"default\"\nassert = { require-label = { label = \"squad:*\", min = 0, max = 1 } }\n";
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[new_block.to_string()], &[]).unwrap();
+        assert!(changed);
+
+        let updated = read_rules(dir.path());
+        // Exactly one newline separates the old last token from the new block —
+        // added, not doubled — so the file parses cleanly.
+        assert!(
+            updated.contains("heading = \"H\" } }\n[[rules]]\nname = \"namespace-unique-squad\""),
+            "one separating newline inserted:\n{updated}"
+        );
+        // The round-trip parses and carries both the old and the appended rule.
+        let names: Vec<String> = read_rule_identities(dir.path())
+            .unwrap()
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect();
+        assert_eq!(names, vec!["label-format", "namespace-unique-squad"]);
+    }
+
+    #[test]
+    fn test_sync_preserves_multiline_string_containing_rules_marker() {
+        // A custom rule whose `description` multiline string contains a line
+        // reading `[[rules]]`. A naive splitter would treat that inner line as a
+        // table boundary, count one block too many, and abort the sync — leaving
+        // rules.toml stale (jit:d74a9ed1 review F2).
+        let dir = tempfile::tempdir().unwrap();
+        let content = "\
+# header\n\
+\n\
+[[rules]]\n\
+name = \"label-format\"\n\
+origin = \"default\"\n\
+assert = { require-section = { heading = \"H\" } }\n\
+\n\
+[[rules]]\n\
+name = \"custom-doc\"\n\
+description = '''\n\
+Documents the on-disk shape:\n\
+[[rules]]\n\
+name = \"...\"\n\
+This is prose inside a string, not a real table.\n\
+'''\n\
+assert = { require-section = { heading = \"Goals\" } }\n\
+";
+        write_rules(dir.path(), content);
+        // Sanity: the file really parses to exactly two rules.
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 2);
+
+        let new_block = "[[rules]]\nname = \"namespace-unique-squad\"\norigin = \"default\"\nassert = { require-label = { label = \"squad:*\", min = 0, max = 1 } }\n\n";
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[new_block.to_string()], &[]).unwrap();
+        assert!(
+            changed,
+            "sync proceeds despite the inner `[[rules]]` marker"
+        );
+
+        let updated = read_rules(dir.path());
+        // The custom rule and its multiline description survive byte-exact, the
+        // membership add landed, and the whole file still parses (no corruption).
+        assert!(
+            updated.starts_with(content),
+            "original preserved as a prefix"
+        );
+        assert!(updated.contains("This is prose inside a string, not a real table."));
+        assert!(updated.contains("name = \"namespace-unique-squad\""));
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 3);
     }
 
     #[test]
