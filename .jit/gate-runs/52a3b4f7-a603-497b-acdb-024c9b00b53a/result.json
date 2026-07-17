@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "52a3b4f7-a603-497b-acdb-024c9b00b53a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c505031a-9ba4-4547-aeb7-a83aa8e8ae3f",
+  "commit": "2abed5ba15cf563cd79f19fb750da10e203db2dc",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T00:54:52.230888734Z",
+  "completed_at": "2026-07-17T00:58:56.663478649Z",
+  "duration_ms": 244432,
+  "exit_code": 1,
+  "stdout": "Attribution: 92e3a812 (claim metadata), b36f23aa (implementation), ae271000 (merge)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/gate-semantics (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-2 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); docs-mechanical passed (exit 0); doc-review pending\nTruncation recovery: path-scoped implementation, documentation, MCP, and renamed-test diffs; merge first-parent patch inspected\n\n1. **F1 — blocking, issue-impact:** [docs/reference/cli-commands.md:1478](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1478) still advertises `check` as an alias of `jit gate status`. The CLI removes that alias and its integration test confirms clap rejects it, so this violates REQ-03 and leaves shipped documentation contradictory. References: `@/invariant/single-source-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact documentation remnant leaves the removed `check` alias advertised.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The CLI reference still advertises removed `check` as an alias of `jit gate status`, violating REQ-03 and contradicting the shipped CLI.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1478,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 28490 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6d91-b5a0-7621-92ee-443ae510d43d\n--------\nuser\n--- 28477 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "One issue-impact documentation remnant leaves the removed `check` alias advertised.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The CLI reference still advertises removed `check` as an alias of `jit gate status`, violating REQ-03 and contradicting the shipped CLI.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1478,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

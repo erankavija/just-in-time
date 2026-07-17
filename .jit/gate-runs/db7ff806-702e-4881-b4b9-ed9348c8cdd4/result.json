@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "run_id": "db7ff806-702e-4881-b4b9-ed9348c8cdd4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "2abed5ba15cf563cd79f19fb750da10e203db2dc",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T00:42:12.676276934Z",
+  "completed_at": "2026-07-17T00:46:35.018749943Z",
+  "duration_ms": 262342,
+  "exit_code": 1,
+  "stdout": "Attribution: 624ffa8e, 0500ef34, 271c650b, b876f3b7, d9d67143, a1adb140 (`jit:d74a9ed1`; uncommitted changes excluded)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/inv/atomic-writes (.jit/invariants.toml); @/inv/single-source-prose (.jit/invariants.toml); @/rule/namespace-unique-brackets (.jit/rules.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review failed (exit 1, prior run); doc-review failed (exit 1); docs-mechanical passed (exit 0)\nTruncation recovery: path-scoped merge, storage, current-line, test, and documentation reads; excluded the merge’s unrelated second-parent delta\n\n1. **Blocking · issue-impact · high** — Appending to a valid `rules.toml` without a final newline produces invalid TOML. `sync_namespace_unique_rules` concatenates each new block directly at [crates/jit/src/storage/ruleset_store.rs:258](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:258); generated blocks begin with `[[rules]]`. Thus a final `assert = …}` becomes `assert = …}[[rules]]`. This violates REQ-01/03 for hand-authored content and can make the addressable registry unreadable. Existing preservation tests only use newline-terminated files. References: @/charter/D-6.\n\n2. **Blocking · issue-impact · high** — The structural splitter treats `\\n[[rules]]` inside a valid multiline TOML string as a table boundary at [crates/jit/src/storage/ruleset_store.rs:169](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:169). The TOML identity parse then reports fewer rules than raw blocks and synchronization aborts at line 240, after `config.toml` may already have been saved. A custom rule description containing that line therefore leaves membership stale, contrary to REQ-01–03. References: @/charter/D-6.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Valid hand-authored rules.toml forms can still leave membership stale or emit invalid TOML.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Appending a generated rule block to a valid rules.toml without a final newline concatenates TOML tokens and corrupts the file.\",\"file\":\"crates/jit/src/storage/ruleset_store.rs\",\"line\":258,\"references\":[\"@/charter/D-6\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The raw block splitter mistakes [[rules]] inside a multiline TOML string for a table boundary, aborting sync and leaving rules.toml stale.\",\"file\":\"crates/jit/src/storage/ruleset_store.rs\",\"line\":169,\"references\":[\"@/charter/D-6\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8710 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6d86-19fd-7943-b9d5-2beba07d7498\n--------\nuser\n--- 8697 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Valid hand-authored rules.toml forms can still leave membership stale or emit invalid TOML.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Appending a generated rule block to a valid rules.toml without a final newline concatenates TOML tokens and corrupts the file.",
+        "file": "crates/jit/src/storage/ruleset_store.rs",
+        "line": 258,
+        "references": [
+          "@/charter/D-6"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The raw block splitter mistakes [[rules]] inside a multiline TOML string for a table boundary, aborting sync and leaving rules.toml stale.",
+        "file": "crates/jit/src/storage/ruleset_store.rs",
+        "line": 169,
+        "references": [
+          "@/charter/D-6"
+        ]
+      }
+    ]
+  }
+}

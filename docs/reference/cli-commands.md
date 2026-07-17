@@ -92,7 +92,8 @@ Gate-blocked example:
         {
           "type": "gate",
           "key": "code-review",
-          "status": "pending"
+          "status": "pending",
+          "mode": "auto"
         }
       ],
       "remediation": [
@@ -109,6 +110,11 @@ Gate-blocked example:
   }
 }
 ```
+
+Each gate blocker carries the gate's registry `mode`. For a `"mode": "manual"`
+blocker the remediation hint names the attested form —
+`jit gate evaluate <id> <gate> --by <attestor>` — because a manual gate's
+bare `evaluate` exits 2 without an attestor.
 
 ## Command and flag aliases
 
@@ -1475,8 +1481,8 @@ Gate: tests
 
 ### `jit gate status`
 
-The unified gate-run inspection surface (inspection only, non-mutating). Alias:
-`check`. It offers four views over the stored run records: the latest
+The unified gate-run inspection surface (inspection only, non-mutating). It
+offers four views over the stored run records: the latest
 run (default), prior runs (history), the raw report text (flat), and the
 structured findings (findings). All are read-only and reuse already-recorded
 runs; none executes a checker or mutates gate state. Unlike
@@ -1779,6 +1785,11 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
   **skip-if-passed-at-HEAD** behaviour (an already-passed gate is not re-run;
   its entry reports `already_passed: true`). For a manual gate the skip applies
   only when the recorded pass is attested.
+- **Manual gates require attestation:** every manual gate in the required set
+  needs `--by <attestor>` (applied uniformly; ignored by automated gates).
+  Without it, evaluation fails fast at the first manual gate reached in
+  declaration order with exit `2` and **no verdict recorded** for that gate —
+  automated gates evaluated before it keep their recorded verdicts.
 - **Fail-fast:** on the FIRST gate that does not pass, the command stops
   immediately and exits with that gate's code from the
   [`jit gate evaluate`](#jit-gate-evaluate) taxonomy (see the
@@ -2729,10 +2740,14 @@ placement in one call instead of globbing the issue files or re-deriving
 containment. The `edges` list is the same as the summary shape.
 
 Resolution is always computed over the **whole repository**, never over a subset
-of nodes. Export emits every issue, so its resolution fields always name emitted
-nodes; once you filter the exported nodes downstream, a kept node's `parent`,
-`cluster`, or `children` can reference ids you dropped. The same caveat applies
-to `jit graph tree <root-id>`, which scopes the listed nodes.
+of nodes. An unscoped export emits every issue, so its resolution fields always
+name emitted nodes. A `--scope <container>` export lists only the container's
+members — scoping filters which nodes are listed, not how they resolve — so a
+kept node's `parent`, `cluster`, or `children` can reference ids outside the
+export, exactly as when you filter unscoped output downstream. Dependency edges
+that cross the scope boundary are excluded from `edges` and surfaced in
+`boundary_edges` rather than dropped silently. The same caveat applies to
+`jit graph tree <root-id>`, which scopes the listed nodes.
 
 The default (no `--full`) output stays in the lean summary shape; the four
 hierarchy fields appear only in the `--full` shape. See

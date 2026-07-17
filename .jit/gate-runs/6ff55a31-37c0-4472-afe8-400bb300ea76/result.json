@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "run_id": "6ff55a31-37c0-4472-afe8-400bb300ea76",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "1d59070d-bebc-4a55-9456-c6c7a3caba2a",
+  "commit": "2abed5ba15cf563cd79f19fb750da10e203db2dc",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T00:46:35.125535501Z",
+  "completed_at": "2026-07-17T00:50:57.434969536Z",
+  "duration_ms": 262309,
+  "exit_code": 1,
+  "stdout": "Attribution: c5e56064, ed776d46, 8123cf7f, dd6888bd, 6b24ca42, 37369032, 3bb9c937, 8901b649 (`jit:1d59070d`; uncommitted changes excluded)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/gate-semantics, @/invariant/event-log, @/invariant/assignee-format (.jit/invariants.toml); @/charter/D-2, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T20:52:22Z); doc-review failed (exit 1, 2026-07-16T16:14:24Z); docs-mechanical passed (exit 0, 2026-07-16T21:06:00Z)\nTruncation recovery: narrowed individual commit, merge-parent, implementation, test, and current-documentation reads\n\n1. **F1 — blocking, issue-impact, high:** The gate-blocker JSON example still recommends bare `jit gate evaluate work-id code-review` in both `remediation` and `suggestions`, despite manual gates requiring `--by <attestor>`. This prior doc-review finding remains at `docs/reference/cli-commands.md:100`.\n\n2. **F2 — blocking, issue-impact, medium:** The `evaluate-all` reference still omits that `--by` is required if any required gate is manual, and omits the resulting exit-2/no-verdict fail-fast result. This prior finding remains at `docs/reference/cli-commands.md:1760`.\n\n3. **F3 — blocking, issue-impact, medium:** `jit gate evaluate-all --help` says the first manual gate is reached in “priority order,” but the implementation iterates `issue.gates_required` in declaration order. `crates/jit/src/cli.rs:1570` contradicts `crates/jit/src/commands/gate.rs:525`.\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three issue-impact documentation defects remain in manual-gate and evaluate-all guidance.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The gate-blocker JSON example recommends bare evaluation for a manual gate, omitting required --by <attestor>.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":100},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The evaluate-all reference omits manual-gate attestation and its exit-2/no-verdict fail-fast behavior.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1760},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Evaluate-all help claims priority ordering, but implementation evaluates gates in declaration order.\",\"file\":\"crates/jit/src/cli.rs\",\"line\":1570}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 9472 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6d8a-1b36-7742-aa60-2fdc7501b1cd\n--------\nuser\n--- 9459 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Three issue-impact documentation defects remain in manual-gate and evaluate-all guidance.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The gate-blocker JSON example recommends bare evaluation for a manual gate, omitting required --by <attestor>.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 100
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The evaluate-all reference omits manual-gate attestation and its exit-2/no-verdict fail-fast behavior.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1760
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Evaluate-all help claims priority ordering, but implementation evaluates gates in declaration order.",
+        "file": "crates/jit/src/cli.rs",
+        "line": 1570
+      }
+    ]
+  }
+}

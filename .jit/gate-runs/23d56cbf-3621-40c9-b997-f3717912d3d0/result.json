@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "run_id": "23d56cbf-3621-40c9-b997-f3717912d3d0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "45a140ae-1baa-4f32-96e2-b4dcf21d6694",
+  "commit": "2abed5ba15cf563cd79f19fb750da10e203db2dc",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T00:38:41.736116413Z",
+  "completed_at": "2026-07-17T00:42:12.574131360Z",
+  "duration_ms": 210838,
+  "exit_code": 1,
+  "stdout": "Attribution: db0fe018, b020f788, f280f8b, 2fd8a8f, 0e330d2, 30a39aa, c15b26e, 8a02869, ffde113, c03d1ba, 2856ad0, cea1dbf (`jit:45a140ae`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T20:56:17Z); doc-review failed (exit 1, 2026-07-16T15:46:41Z); docs-mechanical passed (exit 0, 2026-07-17T00:31:36Z); prior code-review failed findings F1/F2 inspected\nTruncation recovery: narrowed individual commit/path reads for the decision record, implementation, docs, candidate selector/tests, current output projections, and canonical-policy registry\n\n1. **[blocking][issue-impact][high]** `jit archive candidates` still selects only literal `Done`/`Rejected` containers at [crates/jit/src/commands/archive.rs:36](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/archive.rs:36), and its test explicitly excludes `Archived` at line 1085. This conflicts with the implemented preview/execution behavior, which accepts an `Archived` container retired from a terminal origin for reconciliation, and with REQ-02’s requirement to apply the model to archive candidates. The documentation codifies the same mismatch at [docs/reference/cli-commands.md:218](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:218).\n\n2. **[blocking][issue-impact][high]** Canonical lifecycle and CLI-help prose remains internally contradictory about effective terminality. [docs/concepts/core-model.md:127](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:127) and line 754 say dependencies require a terminal state, while line 770 correctly explains that terminal-origin `Archived` dependencies satisfy dependents. CLI help still says only literal terminal states at [crates/jit/src/cli.rs:1189](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:1189), and [docs/reference/cli-commands.md:2304](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2304) incorrectly describes `query closed`, whose implementation includes effectively terminal archived issues. This leaves REQ-07 and the resolved single-source-prose invariant unmet. References: `@/invariant/single-source-prose`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Archive-candidate selection and remaining canonical/CLI prose are inconsistent with terminality-preserving Archived semantics.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Archive candidates exclude Archived-from-terminal containers even though direct planning/execution accepts them for eligible reconciliation.\",\"file\":\"crates/jit/src/commands/archive.rs\",\"line\":36,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Canonical lifecycle and CLI-help prose still describes literal terminality and query closed despite effective-terminal Archived behavior.\",\"file\":\"docs/concepts/core-model.md\",\"line\":127,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6360 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6d82-e214-7d01-8ff1-bae542357072\n--------\nuser\n--- 6347 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Archive-candidate selection and remaining canonical/CLI prose are inconsistent with terminality-preserving Archived semantics.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Archive candidates exclude Archived-from-terminal containers even though direct planning/execution accepts them for eligible reconciliation.",
+        "file": "crates/jit/src/commands/archive.rs",
+        "line": 36
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Canonical lifecycle and CLI-help prose still describes literal terminality and query closed despite effective-terminal Archived behavior.",
+        "file": "docs/concepts/core-model.md",
+        "line": 127,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

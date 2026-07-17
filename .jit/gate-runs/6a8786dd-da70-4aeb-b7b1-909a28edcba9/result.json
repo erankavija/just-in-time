@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "6a8786dd-da70-4aeb-b7b1-909a28edcba9",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "52665a07-3d30-47e5-a3c7-d2aacc63cec5",
+  "commit": "2abed5ba15cf563cd79f19fb750da10e203db2dc",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T00:50:57.541797233Z",
+  "completed_at": "2026-07-17T00:54:52.009949943Z",
+  "duration_ms": 234468,
+  "exit_code": 0,
+  "stdout": "Attribution: d3ecd278, 8901b649, 4a950394, 74071a9, d3d64146, 26e42470, 14b025d2, 2b548b24, b67e3055, 48c4fd11 (`jit:52665a07`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2 (dev/vision/9db27a3a-charter.md); @/charter/D-3 (dev/vision/9db27a3a-charter.md); @/inv/domain-agnostic (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T20:39:49Z); doc-review failed (exit 1, 2026-07-16T15:25:52Z); docs-mechanical passed (exit 0, 2026-07-16T15:21:35Z)\nTruncation recovery: reread the truncated implementation and merge patches by affected path; direct `jit validate` was unavailable because it attempted `.jit/.index.lock` in the read-only environment.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-impact success criteria are satisfied; prior code- and documentation-review findings are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All issue-impact success criteria are satisfied; prior code- and documentation-review findings are addressed.",
+    "findings": []
+  }
+}

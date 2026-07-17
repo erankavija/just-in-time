@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "09837c6f-4331-4e60-9de3-9f485c923eae",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "894337e2-e708-466b-ac25-3aed102a166f",
+  "commit": "2abed5ba15cf563cd79f19fb750da10e203db2dc",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T00:31:39.572910706Z",
+  "completed_at": "2026-07-17T00:34:05.696398894Z",
+  "duration_ms": 146123,
+  "exit_code": 0,
+  "stdout": "Attribution: 78d36840, 8901b649, 9934f89d, 30e74734, 077084c4, 1c351243, dbe1a50b, 04e45b89, c89133aa, 857de4f2 (`jit:894337e2`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6,D-7 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics,atomic-writes,bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T21:27:23Z)\nTruncation recovery: none (all bounded reads completed; unrelated merge second-parent deltas excluded)\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The owned-listener API and Unix descriptor handoff eliminate the re-bind window in daemon and foreground startup; parallel-test hazards are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The owned-listener API and Unix descriptor handoff eliminate the re-bind window in daemon and foreground startup; parallel-test hazards are addressed.",
+    "findings": []
+  }
+}

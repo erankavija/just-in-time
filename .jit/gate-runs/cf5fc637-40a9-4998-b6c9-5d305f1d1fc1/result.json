@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "cf5fc637-40a9-4998-b6c9-5d305f1d1fc1",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "0283ce74-95ee-49dc-95f6-8f2c17c57c5d",
+  "commit": "2abed5ba15cf563cd79f19fb750da10e203db2dc",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T01:01:25.242060242Z",
+  "completed_at": "2026-07-17T01:05:27.612940598Z",
+  "duration_ms": 242370,
+  "exit_code": 1,
+  "stdout": "Attribution: `3a078eed` (merge), `b9c63edf`, `22b8d6ee` tagged `jit:0283ce74`\nPolicy sources: `AGENTS.md`\nResolved items: `@/invariant/single-source-prose` (`.jit/invariants.toml`, registry-first); `@/invariant/dag-acyclic` (`.jit/invariants.toml`, registry-first); `@/charter/D-3`, `@/charter/D-4`, `@/charter/D-6`, `@/charter/D-7` (`dev/vision/9db27a3a-charter.md`, markdown-first); `@/gate/jit-validate` (`.jit/gates.toml`, registry-first)\nGate evidence: cargo-ci passed/0 (2026-07-16); doc-review pending/no run; docs-mechanical passed/0 (2026-07-16)\nTruncation recovery: narrowed merge, config, exit-code, and deleted-heartbeat reads by path and line range\n\n1. **[blocking][issue-impact]** The heartbeat removal left live prose describing the deleted `.git/jit/heartbeat/` directory and the nonexistent background/auto-renew heartbeat configuration. [docs/concepts/guarantees.md](file:///home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md#L382) still lists the directory, while [dev/design/worktree-parallel-work.md](file:///home/vkaskivuo/Projects/just-in-time/dev/design/worktree-parallel-work.md#L58) specifies heartbeat files and later documents the removed scheduler/configuration. This fails REQ-02’s required prose sweep and `@/invariant/single-source-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Heartbeat removal left live prose describing deleted runtime behavior.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Deleted heartbeat control-plane behavior remains documented in live prose.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":382,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10428 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6d97-b06a-7af0-8c16-450fa88d2176\n--------\nuser\n--- 10415 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Heartbeat removal left live prose describing deleted runtime behavior.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Deleted heartbeat control-plane behavior remains documented in live prose.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 382,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

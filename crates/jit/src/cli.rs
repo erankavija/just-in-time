@@ -1567,9 +1567,9 @@ pub enum GateCommands {
     /// manual gate requires `--by <attestor>`, applied to every manual gate in
     /// the set. If the set mixes manual and automated gates and `--by` is
     /// omitted, evaluation fails fast at the first manual gate reached in
-    /// priority order (auto gates before it still run and record their
-    /// verdict; later gates are not attempted) — it never silently passes a
-    /// manual gate.
+    /// declaration order — the order gates appear on the issue's required
+    /// list (auto gates before it still run and record their verdict; later
+    /// gates are not attempted) — it never silently passes a manual gate.
     ///
     /// Each gate inherits the skip-if-passed-at-HEAD behaviour: a gate already
     /// passed at the current HEAD commit is not re-run; for a manual gate the skip

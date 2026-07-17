@@ -13,16 +13,6 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T16:00:47.706977351Z"
-    },
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T16:00:47.111456558Z"
-    },
     "doc-review": {
       "status": "failed",
       "updated_by": "auto:executor",
@@ -32,6 +22,16 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T21:16:25.972307145Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T00:31:38.121728121Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T00:42:12.676276934Z"
     }
   },
   "context": {},
@@ -51,7 +51,7 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-14T19:05:10.783498583Z",
-  "updated_at": "2026-07-16T21:21:19.610993602Z",
+  "updated_at": "2026-07-17T00:46:35.019010113Z",
   "first_ready_at": "2026-07-14T19:05:10.783504203Z",
   "claimed_at": "2026-07-16T08:53:53.042220838Z"
 }

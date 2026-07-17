@@ -377,9 +377,8 @@ worktree of the repository.
 └── events.jsonl              # Append-only event log
 
 .git/jit/
-├── claims.jsonl              # Claim log (append-only)
+├── claims.jsonl              # Claim log (append-only); `jit claim heartbeat` appends here and updates the index
 ├── claims.index.json         # Active claims (exclusive lock)
-├── heartbeat/                # Initialized but empty; heartbeats append to claims.jsonl and update the index
 └── locks/claims.lock         # Advisory lock guarding claim-log operations
 ```
 
