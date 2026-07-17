@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "db851290-e4fd-4b54-a287-0b6dadbdad3e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "882bf88d0e61254e0e8ae8f7b446726aff5f89d0",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T12:00:17.623235156Z",
+  "completed_at": "2026-07-17T12:03:55.750357223Z",
+  "duration_ms": 218127,
+  "exit_code": 1,
+  "stdout": "Attribution: jit:450db193 commits 7c6452c, d3ecd278, bcb3a2bd, 90b14057, 8aa61b84, 3dc0123c, 58adc1bc, fbe2bb36, a22f0443, 2abed5ba, d657c607, 68d76c31, d0bb829a, 2a8c9e7b, b14c125c, ae397f87\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 and @/charter/D-7 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose and @/invariant/atomic-writes (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-17T11:57:38Z); doc-review failed (exit 1, 2026-07-17T08:55:33Z); docs-mechanical passed (exit 0, 2026-07-17T12:00:16Z); prior code-review blockers were addressed in b14c125c\nTruncation recovery: Partitioned current-source and merge-patch reads for 8aa61b84, d657c607, b14c125c, and 3dc0123c; omitted d3ecd278 records for unrelated issues outside this issue’s impact cone.\n\n1. **[blocking, issue-impact, medium]** `kind = []` is accepted and renders a successful “no items” projection instead of rejecting a projection without an addressable kind. The deserializer returns an empty `ProjectionKinds` list at [config.rs:885](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:885>), and the id-anchor path then renders it without validation at [project_render.rs:72](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/project_render.rs:72>). This violates REQ-01’s required kind declaration and permits malformed generic projection config.\n\n2. **[blocking, issue-impact, medium]** The charter projection is not located under “Key Design Principles” as REQ-06 requires. `### Charter Decisions` is at [AGENTS.md:191](</home/vkaskivuo/Projects/just-in-time/AGENTS.md:191>), after the separate `## JIT workflow` section and its dogfood-guidance boundary, rather than adjacent to a Domain Invariants subsection under `## Key Design Principles` at line 135. `CLAUDE.md` is a symlink to this file, so its effective placement is also incorrect.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-impact blockers remain: empty projection kind lists are accepted, and the charter section is in the wrong document hierarchy.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"An empty projection kind array is accepted and renders a no-items projection instead of rejecting a table with no addressable kind.\",\"file\":\"crates/jit/src/config.rs\",\"line\":885,\"references\":[]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The charter decision region is outside Key Design Principles rather than adjacent to Domain Invariants as required.\",\"file\":\"AGENTS.md\",\"line\":191,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8007 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6ff2-e79c-7803-8208-1c8f741b8a58\n--------\nuser\n--- 7994 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two issue-impact blockers remain: empty projection kind lists are accepted, and the charter section is in the wrong document hierarchy.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "An empty projection kind array is accepted and renders a no-items projection instead of rejecting a table with no addressable kind.",
+        "file": "crates/jit/src/config.rs",
+        "line": 885
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The charter decision region is outside Key Design Principles rather than adjacent to Domain Invariants as required.",
+        "file": "AGENTS.md",
+        "line": 191
+      }
+    ]
+  }
+}

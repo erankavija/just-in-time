@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "5c77ce29-d723-42c6-8d06-93986ceeaf2e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "882bf88d0e61254e0e8ae8f7b446726aff5f89d0",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T11:53:42.998400175Z",
+  "completed_at": "2026-07-17T11:57:38.363831047Z",
+  "duration_ms": 235365,
+  "exit_code": 1,
+  "stdout": "Attribution: tagged commits 882bf88d, 93e7ed5b, b2be904a, e7efa262, 4b0b39e7, 46e8c5ae, ff365b3a, 6d4efad1, 2fe3ed74, 68fccbca, d98c927f, a32e1707, 5c1b1602, a1adb140, d9d67143, 271c650b, b876f3b7\nPolicy sources: AGENTS.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/rule/namespace-unique-brackets (.jit/rules.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-17T11:50:13Z); doc-review passed (exit 0, 2026-07-17T04:00:05Z); docs-mechanical passed (exit 0, 2026-07-17T11:53:42Z)\nTruncation recovery: reread affected commits and final implementation/tests in bounded per-file calls; excluded unrelated merge-parent changes outside this issue’s impact cone.\n\n1. [blocking][issue-impact][medium] The attributable prose has an internally inconsistent and user-visible preservation contract. The design’s Decision still promises a structural, byte-preserving splice at [dev/active/d74a9ed1-write-through-namespace-unique-membership.md:38](/home/vkaskivuo/Projects/just-in-time/dev/active/d74a9ed1-write-through-namespace-unique-membership.md:38), while its Consequences correctly state that drops reserialize through `toml_edit`. The public `jit init` reference at [docs/reference/cli-commands.md:466](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:466) and API docs at [crates/jit/src/commands/mod.rs:1215](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:1215) likewise promise byte-exact preservation with no drop exception. Current code explicitly permits canonicalization on a drop at [ruleset_store.rs:352](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:352), matching the amended criterion. These claims must be reconciled. References: @/invariant/single-source-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Attributable design, API, and user documentation omit the approved membership-drop canonicalization exception.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Documentation promises byte-exact preservation even though membership drops reserialize through toml_edit and may canonicalize syntax.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":466,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 9036 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6fec-e3a9-73d2-a234-92053fae0ea8\n--------\nuser\n--- 9023 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Attributable design, API, and user documentation omit the approved membership-drop canonicalization exception.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Documentation promises byte-exact preservation even though membership drops reserialize through toml_edit and may canonicalize syntax.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 466,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

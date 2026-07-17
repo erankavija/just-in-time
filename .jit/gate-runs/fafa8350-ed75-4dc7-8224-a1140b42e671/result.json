@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "fafa8350-ed75-4dc7-8224-a1140b42e671",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "0283ce74-95ee-49dc-95f6-8f2c17c57c5d",
+  "commit": "882bf88d0e61254e0e8ae8f7b446726aff5f89d0",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T12:12:54.500101799Z",
+  "completed_at": "2026-07-17T12:16:17.976675532Z",
+  "duration_ms": 203476,
+  "exit_code": 0,
+  "stdout": "Attribution: 22b8d6ee, 3a078eed, b9c63edf, b301eded, c13c4841, 6cad67f0\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/invariant/dag-acyclic (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-17T12:10:14Z); doc-review passed (exit 0, 2026-07-17T08:31:44Z); docs-mechanical passed (exit 0, 2026-07-17T12:12:53Z); prior code-review passed with no findings\nTruncation recovery: replaced truncated merge/config and historical gate-run output with first-parent, path-scoped diffs and focused current source/document reads; unrelated mixed-commit paths were outside the issue impact cone.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four paths are removed or made reachable with current code, tests, and projections aligned.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All four paths are removed or made reachable with current code, tests, and projections aligned.",
+    "findings": []
+  }
+}
