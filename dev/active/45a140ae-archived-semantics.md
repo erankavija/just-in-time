@@ -130,7 +130,10 @@ re-relocating.
   enforcement for `Archived` (alongside `Rejected`). The bulk-update path routes
   through the same chokepoint.
 - Archive (`commands/archive.rs`): `NonTerminalTarget` blocker uses effective
-  terminality; `execute_archive_target` transitions the container to `Archived`
+  terminality; `archive_candidates` selection (`effectively_terminal_container_ids`)
+  uses the same `Issue::is_effectively_terminal` predicate, so an
+  Archived-from-terminal container the direct path would reconcile also surfaces
+  as a candidate; `execute_archive_target` transitions the container to `Archived`
   as its final durable step; `ArtifactOwner`/`EmbeddedArtifactOwner` carry
   `archived_from` so shared-document owner terminality (independently archived
   descendants) is archived-aware.

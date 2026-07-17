@@ -56,7 +56,8 @@ selects the kind of target. Its canonical forms are:
 - `jit archive container <id>`, where `<id>` is an issue reference resolved by
   the normal full-id, `short_id`, or unique-prefix rules below.
 - `jit archive candidates`, which has no subject because it evaluates the
-  complete set of terminal configured non-leaf containers.
+  complete set of effectively terminal configured non-leaf containers (Done,
+  Rejected, or Archived from one of those).
 
 The document and container forms construct and display a read-only archive plan
 by default.

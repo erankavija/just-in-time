@@ -29,11 +29,20 @@ enum ArchiveTarget<'a> {
     Container(&'a str),
 }
 
-fn terminal_container_ids(issues: &[Issue], hierarchy: &HierarchyConfig) -> Vec<String> {
+/// Ids of configured non-leaf containers that are archive candidates: those that
+/// are effectively terminal ([`Issue::is_effectively_terminal`]) — Done, Rejected,
+/// or already Archived from one of those. This is the same predicate the direct
+/// archive path gates coupled retirement on (`jit:45a140ae`), so an
+/// Archived-from-terminal container the direct path would reconcile also appears
+/// as a candidate.
+fn effectively_terminal_container_ids(
+    issues: &[Issue],
+    hierarchy: &HierarchyConfig,
+) -> Vec<String> {
     let leaf_level = hierarchy.types().map(|(_, level)| *level).max();
     let mut ids = issues
         .iter()
-        .filter(|issue| issue.state.is_terminal())
+        .filter(|issue| issue.is_effectively_terminal())
         .filter(|issue| {
             crate::labels::type_label_value(&issue.labels)
                 .and_then(|type_name| hierarchy.get_level(type_name))
@@ -108,11 +117,12 @@ fn apply_recorded_residue_identities(
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Fully evaluate every terminal configured non-leaf container without mutation.
+    /// Fully evaluate every effectively terminal configured non-leaf container
+    /// without mutation.
     pub fn archive_candidates(&self) -> Result<ArchiveCandidates> {
         let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
         let issues = self.storage.list_issues()?;
-        let plans = terminal_container_ids(&issues, &hierarchy)
+        let plans = effectively_terminal_container_ids(&issues, &hierarchy)
             .into_iter()
             .map(|id| self.plan_archive_target(ArchiveTarget::Container(&id)))
             .collect::<Result<Vec<_>>>()?;
@@ -1063,34 +1073,63 @@ mod tests {
     }
 
     #[test]
-    fn test_terminal_container_ids_use_live_non_leaf_levels_and_terminal_semantics() {
+    fn test_effectively_terminal_container_ids_use_live_non_leaf_levels_and_effective_terminality()
+    {
         let hierarchy = HierarchyConfig::new(
             HashMap::from([("portfolio".to_string(), 2), ("unit".to_string(), 7)]),
             HashMap::new(),
         )
         .unwrap();
-        let issue = |id: &str, state: State, issue_type: Option<&str>| {
-            let mut issue = Issue::new(id.to_string(), String::new());
-            issue.id = id.to_string();
-            issue.state = state;
-            issue.labels = issue_type
-                .map(|kind| vec![format!("type:{kind}")])
-                .unwrap_or_default();
-            issue
-        };
+        let issue =
+            |id: &str, state: State, archived_from: Option<State>, issue_type: Option<&str>| {
+                let mut issue = Issue::new(id.to_string(), String::new());
+                issue.id = id.to_string();
+                issue.state = state;
+                issue.archived_from = archived_from;
+                issue.labels = issue_type
+                    .map(|kind| vec![format!("type:{kind}")])
+                    .unwrap_or_default();
+                issue
+            };
         let issues = vec![
-            issue("done-container", State::Done, Some("portfolio")),
-            issue("rejected-container", State::Rejected, Some("portfolio")),
-            issue("active-container", State::InProgress, Some("portfolio")),
-            issue("archived-container", State::Archived, Some("portfolio")),
-            issue("done-leaf", State::Done, Some("unit")),
-            issue("done-unknown", State::Done, Some("epic")),
-            issue("done-untyped", State::Done, None),
+            issue("done-container", State::Done, None, Some("portfolio")),
+            issue(
+                "rejected-container",
+                State::Rejected,
+                None,
+                Some("portfolio"),
+            ),
+            issue(
+                "active-container",
+                State::InProgress,
+                None,
+                Some("portfolio"),
+            ),
+            // Archived from a terminal state is effectively terminal, so it is a
+            // reconcilable candidate — same as the direct archive path accepts.
+            issue(
+                "archived-from-done",
+                State::Archived,
+                Some(State::Done),
+                Some("portfolio"),
+            ),
+            // Archived from a non-terminal state (and a legacy record with no
+            // recorded origin) is not effectively terminal, so it is excluded.
+            issue(
+                "archived-from-active",
+                State::Archived,
+                Some(State::InProgress),
+                Some("portfolio"),
+            ),
+            issue("archived-legacy", State::Archived, None, Some("portfolio")),
+            issue("done-leaf", State::Done, None, Some("unit")),
+            issue("done-unknown", State::Done, None, Some("epic")),
+            issue("done-untyped", State::Done, None, None),
         ];
 
         assert_eq!(
-            terminal_container_ids(&issues, &hierarchy),
-            vec!["done-container", "rejected-container"]
+            effectively_terminal_container_ids(&issues, &hierarchy),
+            vec!["archived-from-done", "done-container", "rejected-container"]
         );
     }
 

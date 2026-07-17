@@ -874,9 +874,11 @@ pub enum IssueCommands {
     /// Membership follows the dependency DAG (direct dependencies are the
     /// children; labels are advisory and not consulted). `by state` lists every
     /// lifecycle state, zero-count states included. `done` and `rejected` are
-    /// counted distinctly — a rejected child is terminal but not delivered — and
-    /// `open` is every non-terminal child; the `done/total` ratio and percent
-    /// measure delivery. For a deep rollup use `jit graph deps <id> --depth`; to
+    /// counted distinctly — a rejected child is terminal but not delivered — and,
+    /// because `archived` is terminality-preserving, a child archived from
+    /// `done`/`rejected` counts toward that origin; `open` is every child that is
+    /// not effectively terminal; the `done/total` ratio and percent measure
+    /// delivery. For a deep rollup use `jit graph deps <id> --depth`; to
     /// aggregate a label bucket use `jit query count --by state --label ns:v`.
     ///
     /// `--json` emits `{container: {short_id, title, state}, count, by_state:
@@ -1977,7 +1979,8 @@ pub enum DocCommands {
 /// Dependency-aware archive planning commands; mutation requires `--execute`.
 #[derive(Subcommand)]
 pub enum ArchiveCommands {
-    /// Fully evaluate every terminal configured non-leaf container without mutation
+    /// Fully evaluate every effectively terminal configured non-leaf container
+    /// (Done, Rejected, or Archived from one of those) without mutation
     Candidates {
         /// Output schema version 1 with count and complete candidate plans
         #[arg(long)]
@@ -2318,7 +2321,8 @@ pub enum QueryCommands {
         json: bool,
     },
 
-    /// Query closed issues (Done or Rejected states)
+    /// Query closed issues: those effectively terminal (Done, Rejected, or
+    /// Archived from one of those)
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Closed {
@@ -2348,8 +2352,10 @@ pub enum QueryCommands {
     /// advisory grouping counterpart to the DAG-authoritative `issue progress`
     /// over a container's children. `--by state` lists every lifecycle state,
     /// zero-count states included. `done` and `rejected` are counted distinctly
-    /// (a rejected issue is terminal but not delivered) and `open` is every
-    /// non-terminal issue; the `done/total` ratio and percent measure delivery.
+    /// (a rejected issue is terminal but not delivered) and, because `archived` is
+    /// terminality-preserving, an issue archived from `done`/`rejected` counts
+    /// toward that origin; `open` is every issue that is not effectively terminal;
+    /// the `done/total` ratio and percent measure delivery.
     ///
     /// `--json` emits `{count, by_state: [{state, count}], total, done, rejected,
     /// open, percent}` where `count` is the number of state buckets.
