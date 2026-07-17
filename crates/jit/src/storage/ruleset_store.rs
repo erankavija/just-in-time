@@ -176,6 +176,11 @@ const RULES_ARRAY_KEY: &str = "rules";
 /// and any UNRELATED trailing tables — round-trips byte-exact (REQ-01,
 /// jit:d74a9ed1). The drop matches the document model's `name`/`origin` values
 /// directly, so it can never over-reach into neighbouring or trailing content.
+/// Dropping the FIRST rule transfers its prefix decoration — where `toml_edit`
+/// stores the file's leading header/comments — onto the new first rule, so the
+/// leading trivia is preserved rather than removed with the entry. Dropping the
+/// last remaining rule leaves the generated header to the header-rewrite path
+/// while any unrelated trailing tables survive.
 ///
 /// `to_add` entries are typically rendered via
 /// [`crate::validation::serialize::render_rule_block`] and are appended verbatim
@@ -214,17 +219,34 @@ pub fn sync_namespace_unique_rules(
             .get_mut(RULES_ARRAY_KEY)
             .and_then(toml_edit::Item::as_array_of_tables_mut)
             .is_some_and(|rules| {
-                let before = rules.len();
-                rules.retain(|table| {
-                    let is_default = table.get("origin").and_then(toml_edit::Item::as_str)
-                        == Some(DEFAULT_ORIGIN);
-                    let dropped = is_default
+                let is_dropped = |table: &toml_edit::Table| {
+                    table.get("origin").and_then(toml_edit::Item::as_str) == Some(DEFAULT_ORIGIN)
                         && table
                             .get("name")
                             .and_then(toml_edit::Item::as_str)
-                            .is_some_and(|name| to_drop.iter().any(|d| d == name));
-                    !dropped
-                });
+                            .is_some_and(|name| to_drop.iter().any(|d| d == name))
+                };
+                // `toml_edit` stores the file's leading header/comments as the
+                // FIRST entry's prefix decoration. If that entry is dropped, capture
+                // its prefix so it can be transferred onto the new first entry —
+                // otherwise the leading trivia would vanish with the removed entry.
+                let leading_prefix = rules
+                    .get(0)
+                    .filter(|first| is_dropped(first))
+                    .and_then(|first| first.decor().prefix())
+                    .and_then(|raw| raw.as_str())
+                    .map(str::to_owned);
+
+                let before = rules.len();
+                rules.retain(|table| !is_dropped(table));
+
+                // Restore the leading trivia onto whatever is now first (mirrors the
+                // first-entry prefix handling in `rewrite_rules_header`). When the
+                // drop empties the array there is no entry to carry it; the generated
+                // header is re-published by the header-rewrite path instead.
+                if let (Some(prefix), Some(new_first)) = (leading_prefix, rules.get_mut(0)) {
+                    new_first.decor_mut().set_prefix(prefix);
+                }
                 rules.len() != before
             });
 
@@ -572,6 +594,54 @@ note = \"unrelated trailing table, must survive\"\n\
         );
         // Exactly one `rules` entry remains; the trailing table is not a rule.
         assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_sync_drop_of_first_rule_preserves_leading_header() {
+        // The dropped rule is the FIRST `[[rules]]` entry. `toml_edit` stores the
+        // file's leading header/comments as that entry's prefix decoration, so a
+        // naive removal would delete them. The header must move onto the new first
+        // entry byte-exact (jit:d74a9ed1 review F1, round 6).
+        let dir = tempfile::tempdir().unwrap();
+        let content = "# LEADING HEADER\n# line two\n\n[[rules]]\nname = \"namespace-unique-team\"\norigin = \"default\"\nassert = { require-label = { label = \"team:*\", min = 0, max = 1 } }\n\n[[rules]]\nname = \"custom-rule\"\nseverity = \"warn\"\nassert = { require-section = { heading = \"Goals\" } }\n";
+        write_rules(dir.path(), content);
+
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[], &["namespace-unique-team".to_string()])
+                .unwrap();
+        assert!(changed);
+
+        let updated = read_rules(dir.path());
+        // The leading comment block survives, now atop the surviving rule.
+        let expected = "# LEADING HEADER\n# line two\n\n[[rules]]\nname = \"custom-rule\"\nseverity = \"warn\"\nassert = { require-section = { heading = \"Goals\" } }\n";
+        assert_eq!(updated, expected, "leading header transferred byte-exact");
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_sync_drop_of_all_rules_preserves_trailing_table() {
+        // Dropping the ONLY rule empties the array. No entry remains to carry the
+        // generated leading header (the header-rewrite path republishes it), but an
+        // unrelated trailing table must not be lost (jit:d74a9ed1 review, round 6b).
+        let dir = tempfile::tempdir().unwrap();
+        let content = "# HEADER\n\n[[rules]]\nname = \"namespace-unique-team\"\norigin = \"default\"\nassert = { require-label = { label = \"team:*\", min = 0, max = 1 } }\n\n[extra]\nnote = \"survives\"\n";
+        write_rules(dir.path(), content);
+
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[], &["namespace-unique-team".to_string()])
+                .unwrap();
+        assert!(changed);
+
+        let updated = read_rules(dir.path());
+        assert!(
+            !updated.contains("namespace-unique-team"),
+            "the only rule is dropped"
+        );
+        assert!(
+            updated.contains("[extra]\nnote = \"survives\""),
+            "unrelated trailing table preserved:\n{updated}"
+        );
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 0);
     }
 
     #[test]
