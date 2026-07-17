@@ -222,9 +222,13 @@ a blocker caused by lifecycle state (`non-terminal-target`,
 the permitted next action.
 
 `jit archive candidates` is the read-only container report. It lists every
-`Done` or `Rejected` issue whose `type:*` is configured at a non-leaf level of
-the live `[type_hierarchy]`; it does not hardcode type names. `Archived`, active,
-untyped, unknown-type, and leaf issues are excluded. Each selected container is
+effectively terminal issue — `Done`, `Rejected`, or `Archived` from one of those
+— whose `type:*` is configured at a non-leaf level of the live
+`[type_hierarchy]`; it does not hardcode type names. This is the same predicate
+the direct archive path gates coupled retirement on, so an Archived-from-terminal
+container it would reconcile also appears here. Active, untyped, unknown-type,
+leaf, and Archived issues whose pre-archive state was non-terminal (or a legacy
+archived record with no recorded origin) are excluded. Each selected container is
 fully evaluated through the same resolved-hierarchy planner as `archive
 container`, including zero-document containers and ineligible plans. Ordinary
 sequencing edges do not enlarge a candidate's resolved subtree.
@@ -2312,7 +2316,7 @@ are ANDed: an issue is returned only if it matches every pattern given.
 | `jit query ready` | — | Visible alias of `available` |
 | `jit query blocked` | — | Blocked issues with blocking reasons |
 | `jit query strategic` | — | Issues carrying labels from strategic namespaces |
-| `jit query closed` | — | Issues in Done or Rejected state |
+| `jit query closed` | — | Effectively terminal issues (Done, Rejected, or Archived from one of those) |
 | `jit query count` | — | Counts by a dimension over a label bucket, with a done/total rollup |
 | `jit query divergence` | — | Membership labels not backed by the DAG (advisory) |
 

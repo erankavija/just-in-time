@@ -124,10 +124,10 @@ See [Assignees](#assignees) for complete specification.
 
 #### Dependencies - Work Order
 
-List of issue IDs that must reach a terminal state before this issue can proceed.
+List of issue IDs that must reach an effective terminal state (`done`, `rejected`, or `archived` from one of those) before this issue can proceed.
 
 **Semantics:** "This issue depends on those issues"
-- Blocks readiness and claiming until dependencies reach a terminal state
+- Blocks readiness and claiming until dependencies reach an effective terminal state
 - Blocks completion (state transition to `done`)
 - Enforces DAG structure (no cycles)
 
