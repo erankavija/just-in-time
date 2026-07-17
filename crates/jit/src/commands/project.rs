@@ -5,16 +5,23 @@
 //! the projection registry plus the effective rules and gate registry, delegates
 //! ALL body rendering to
 //! [`render_projection_body`](crate::validation::project_render::render_projection_body)
-//! and all region-splicing / atomic writing to
-//! [`write_projection`](crate::validation::projection::write_projection), and owns
-//! no CLI parsing or output formatting (the layer boundary in AGENTS.md
-//! "Separation of Concerns"). The target path, mode, style, and delimiters come
-//! ONLY from config.
+//! and region-splicing to
+//! [`splice_region`](crate::validation::projection::splice_region), and owns no CLI
+//! parsing or output formatting (the layer boundary in AGENTS.md "Separation of
+//! Concerns"). The target path, mode, style, and delimiters come ONLY from config.
+//!
+//! The render is TWO-PHASE (REQ-07): phase 1 renders every projection body and
+//! materializes every target's final bytes in memory — where every typed failure
+//! (unknown kind, missing source, missing target, missing region file, absent
+//! markers) surfaces; phase 2 writes the materialized targets atomically only once
+//! every projection has validated. A failing render therefore leaves the working
+//! tree byte-identical (`@/inv/atomic-writes`).
 
 use super::*;
 use crate::config::{ProjectionConfig, ProjectionMode, ProjectionStyle};
 use crate::validation::project_render::{render_projection_body, ProjectionInputs};
-use crate::validation::projection::write_projection;
+use crate::validation::projection::{require_target, splice_region, ProjectionError};
+use std::collections::BTreeMap;
 
 /// The result of rendering ONE projection, serialized as an element of
 /// [`ProjectRenderResult::projections`].
@@ -99,6 +106,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             gates: &gates,
         };
 
+        // Phase 1 — render every projection body and materialize every target's
+        // final bytes in memory. Every REQ-07 typed failure (unknown kind, missing
+        // source, missing target, missing region file, absent markers) surfaces
+        // here, BEFORE any write. Region projections that share a target thread
+        // their splices through the same pending content, so a later region sees an
+        // earlier one's change (matching the sequential single-write result).
+        let mut pending: BTreeMap<String, String> = BTreeMap::new();
         let mut projections = Vec::with_capacity(selected.len());
         for (proj_name, projection) in &selected {
             let mut read = |path: &str| {
@@ -106,19 +120,38 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .read_repo_file(path)
                     .map_err(anyhow::Error::from)
             };
+            // The typed `ProjectionError`s flow through `with_context` (which anyhow
+            // keeps downcastable) so they map to the validation exit code.
             let (body, count) = render_projection_body(projection, &inputs, &mut read)
                 .with_context(|| format!("projection '{proj_name}'"))?;
-            // Propagate the typed `ProjectionError` (through `with_context`, which
-            // anyhow keeps downcastable) so it maps to the validation exit code.
-            let target = write_projection(
-                self.storage(),
-                projection.mode(),
-                &projection.target(proj_name),
-                &projection.region_begin(proj_name),
-                &projection.region_end(proj_name),
-                &body,
-            )
-            .with_context(|| format!("projection '{proj_name}'"))?;
+            let target = require_target(projection, proj_name)
+                .with_context(|| format!("projection '{proj_name}'"))?;
+            let content = match projection.mode() {
+                ProjectionMode::SeparateFile => body,
+                ProjectionMode::Region => {
+                    let base = match pending.get(&target) {
+                        Some(current) => current.clone(),
+                        None => self
+                            .storage()
+                            .read_repo_file(&target)
+                            .map_err(|source| ProjectionError::Read {
+                                path: target.clone(),
+                                source,
+                            })?
+                            .ok_or_else(|| ProjectionError::TargetNotFound {
+                                path: target.clone(),
+                            })?,
+                    };
+                    splice_region(
+                        &base,
+                        &body,
+                        &projection.region_begin(proj_name),
+                        &projection.region_end(proj_name),
+                    )
+                    .with_context(|| format!("projection '{proj_name}'"))?
+                }
+            };
+            pending.insert(target.clone(), content);
             projections.push(ProjectionRenderReport {
                 name: proj_name.clone(),
                 target,
@@ -127,6 +160,18 @@ impl<S: IssueStore> CommandExecutor<S> {
                 kinds: projection.kinds().to_vec(),
                 count,
             });
+        }
+
+        // Phase 2 — write every materialized target atomically through the storage
+        // boundary, only now that all projections have validated. Each distinct
+        // target is written once (`@/inv/atomic-writes`).
+        for (target, content) in &pending {
+            self.storage()
+                .write_repo_file(target, content)
+                .map_err(|source| ProjectionError::Write {
+                    path: target.clone(),
+                    source,
+                })?;
         }
 
         Ok(ProjectRenderResult {

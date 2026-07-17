@@ -147,6 +147,29 @@ description = "Reason for issue closure (used with rejected state)"
 unique = true
 examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"]
 
+# Documentation projections (optional). Each `[projection.<name>]` table makes
+# `jit project render` write one or more addressable item kinds into a doc file,
+# keeping the rendered copy in sync with its source registry. Fields:
+#   kind   — a kind name, or an array (must be project-scoped)
+#   mode   — "region" (rewrite only the delimited block, preserving the rest) or
+#            "separate-file" (write the whole file); defaults to "separate-file"
+#   target — REQUIRED repo-relative path (no default)
+#   style  — "id-anchor" (generic `- **{id}** — {text}` bullets) or "full" (the
+#            built-in rich invariant / rule+gate views); defaults to "full"
+#   region-begin / region-end — region markers; default to
+#            "<!-- jit:<name>:begin -->" / "<!-- jit:<name>:end -->"
+# [projection.invariants]
+# kind = "invariant"
+# mode = "region"
+# target = "AGENTS.md"
+# style = "id-anchor"
+#
+# [projection.rules-and-gates]
+# kind = ["rule", "gate"]
+# mode = "separate-file"
+# target = "docs/reference/rules-and-gates.md"
+# style = "full"
+
 # =============================================================================
 # EXAMPLES: Alternative Configurations
 # =============================================================================

@@ -3078,13 +3078,18 @@ jit project render [--name <name>] [--json]
 
 Renders every declared `[projection.*]` into its configured target, or the single
 `--name`d one. Two render styles: `id-anchor` writes generic `- **{self-id}** —
-{text}` bullets from any kind's addressable rows; `full` writes the built-in rich
-views (the invariant registry, or the rule + gate registries with their metadata).
-A missing target or source, an unknown kind, or an absent region marker is a typed
-error and nothing is written (exit `4`). JSON uses the list envelope
-`{"count": N, "projections": [...]}`, each entry `{name, target, mode, style,
-kinds, count}`. A failing command under `--json` returns the error envelope with
-code `PROJECT_COMMAND_FAILED`.
+{text}` bullets from a **project-scoped** addressable kind's rows (issue-scoped
+kinds have no project source and are not renderable); `full` writes the built-in
+rich views (the invariant registry, or the rule + gate registries with their
+metadata). A projection that declares no `target`, a missing source, an unknown
+kind, or an absent region marker is a typed error (exit `4`). Rendering is
+two-phase: every projection is rendered and its target's final bytes materialized
+in memory before any file is written, so any such failure — even in a later
+projection of a whole-`[projection.*]` run — leaves every target byte-identical;
+the per-target writes that do happen are each individually atomic. JSON uses the
+list envelope `{"count": N, "projections": [...]}`, each entry `{name, target,
+mode, style, kinds, count}`. A failing command under `--json` returns the error
+envelope with code `PROJECT_COMMAND_FAILED`.
 
 ### `jit invariant check`
 
