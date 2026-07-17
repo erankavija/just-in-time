@@ -16,11 +16,17 @@
 //!   registry (the rule + gate `full` render lives in
 //!   [`rules_gates_projection`](crate::validation::rules_gates_projection));
 //! - [`splice_region`] — the PURE region splice; and
-//! - [`write_projection`] — the sole I/O orchestrator: it branches on
-//!   [`ProjectionMode`], splices in region mode, and writes atomically through the
-//!   storage boundary
-//!   ([`IssueStore::write_repo_file`](crate::storage::IssueStore::write_repo_file),
-//!   itself over [`write_file_atomic`](crate::validation::serialize::write_file_atomic)).
+//! - [`require_target`] — resolve a projection's REQUIRED `target`, naming the
+//!   projection on omission (no default is applied, REQ-07).
+//!
+//! Materializing final bytes (branch on
+//! [`ProjectionMode`](crate::config::ProjectionMode), splice in region mode)
+//! and the atomic write itself are orchestrated by the two-phase
+//! [`project_render`](crate::commands) command, which renders and materializes
+//! EVERY projection before writing ANY target so a failing render leaves the tree
+//! untouched; the write lands through the storage boundary
+//! ([`IssueStore::write_repo_file`](crate::storage::IssueStore::write_repo_file),
+//! itself over [`write_file_atomic`](crate::validation::serialize::write_file_atomic)).
 //!
 //! Target path, mode, style, and delimiters come ONLY from
 //! [`ProjectionConfig`](crate::config::ProjectionConfig); this module hardcodes no
@@ -28,21 +34,22 @@
 //! feeds which projection) lives in
 //! [`project_render`](crate::validation::project_render).
 
-use crate::config::{ProjectionMode, ProjectionStyle};
+use crate::config::{ProjectionConfig, ProjectionStyle};
 use crate::domain::item::AddressableItem;
-use crate::storage::{IssueStore, PathReadError};
+use crate::storage::PathReadError;
 use crate::validation::invariants::{InvariantKind, InvariantRegistry};
 use thiserror::Error;
 
 /// Errors raised while rendering or writing a generic projection.
 ///
-/// Shared by [`write_projection`] (the region splice + atomic write) and the
-/// body-rendering wiring in
-/// [`project_render`](crate::validation::project_render) (kind resolution + source
-/// reads). Every variant carries enough context (the offending marker, the target
-/// path, the unknown kind, or the underlying I/O error) to point an author at the
-/// problem. A missing/malformed region, source, or kind NEVER silently clobbers a
-/// file or writes a partial one: it is a typed error raised BEFORE any write.
+/// Shared by [`splice_region`] and [`require_target`] here, the body-rendering
+/// wiring in [`project_render`](crate::validation::project_render) (kind and source
+/// resolution), and the two-phase `jit project render` command that materializes
+/// and writes targets. Every variant carries enough context (the
+/// offending marker, the target path, the missing projection, the unknown kind, or
+/// the underlying I/O error) to point an author at the problem. A missing target,
+/// missing/malformed region, source, or kind NEVER silently clobbers a file or
+/// writes a partial one: it is a typed error raised BEFORE any write.
 #[derive(Debug, Error)]
 pub enum ProjectionError {
     /// The configured begin marker was not found in the region-mode target.
@@ -77,6 +84,14 @@ pub enum ProjectionError {
     TargetNotFound {
         /// The configured target path.
         path: String,
+    },
+
+    /// A projection declared no `target`. The path is required (the engine applies
+    /// no default), so this surfaces before any render or write.
+    #[error("projection '{projection}' declares no target (a projection must set `target`)")]
+    MissingTarget {
+        /// The `[projection.<name>]` name that omitted `target`.
+        projection: String,
     },
 
     /// The region-mode target could not be read (invalid path or I/O failure).
@@ -310,64 +325,28 @@ pub fn splice_region(
     ))
 }
 
-/// Write an already-rendered projection `body` into `target` under `mode`.
+/// Resolve a projection's required `target`, naming the projection on omission.
 ///
-/// The sole I/O orchestrator, generic over every projection kind and style: it
-/// takes the pre-rendered markdown `body` and, per `mode`,
-///
-/// - **separate-file**: atomic-writes the whole file to `target`;
-/// - **region**: reads the existing `target` through the storage boundary, splices
-///   `body` between `region_begin` / `region_end` (byte-preserving everything
-///   outside via [`splice_region`]), then atomic-writes the result.
-///
-/// ALL persistence goes through [`write_repo_file`], which path-validates the
-/// config-driven `target` (rejecting an absolute or `..`-escaping path) BEFORE any
-/// write and writes atomically through the shared
-/// [`write_file_atomic`](crate::validation::serialize::write_file_atomic). A
-/// missing region target or missing/malformed delimiters is a typed
-/// [`ProjectionError`] raised before writing — the file is never silently
-/// clobbered or left partially written. Returns the repo-relative path written.
-///
-/// [`read_repo_file`]: crate::storage::IssueStore::read_repo_file
-/// [`write_repo_file`]: crate::storage::IssueStore::write_repo_file
-pub fn write_projection<S: IssueStore>(
-    store: &S,
-    mode: ProjectionMode,
-    target: &str,
-    region_begin: &str,
-    region_end: &str,
-    body: &str,
+/// The engine applies no default target (REQ-07): a `[projection.<name>]` table
+/// with no `target` is a typed [`ProjectionError::MissingTarget`] raised before any
+/// render or write, wherever a projection's target is needed (the `jit project
+/// render` command, `jit validate`'s freshness check, and profile planning).
+pub fn require_target(
+    projection: &ProjectionConfig,
+    name: &str,
 ) -> Result<String, ProjectionError> {
-    let content = match mode {
-        ProjectionMode::SeparateFile => body.to_string(),
-        ProjectionMode::Region => {
-            let existing = store
-                .read_repo_file(target)
-                .map_err(|source| ProjectionError::Read {
-                    path: target.to_string(),
-                    source,
-                })?
-                .ok_or_else(|| ProjectionError::TargetNotFound {
-                    path: target.to_string(),
-                })?;
-            splice_region(&existing, body, region_begin, region_end)?
-        }
-    };
-
-    store
-        .write_repo_file(target, &content)
-        .map_err(|source| ProjectionError::Write {
-            path: target.to_string(),
-            source,
-        })?;
-    Ok(target.to_string())
+    projection
+        .target
+        .clone()
+        .ok_or_else(|| ProjectionError::MissingTarget {
+            projection: name.to_string(),
+        })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{ProjectionMode, ProjectionStyle};
-    use crate::storage::JsonFileStorage;
+    use crate::config::ProjectionStyle;
 
     fn registry_with_two() -> InvariantRegistry {
         InvariantRegistry::from_toml_str(
@@ -566,197 +545,6 @@ kind = "advisory"
         assert_eq!(
             render_id_anchor_rows(&rows),
             render_invariants_markdown(&reg, ProjectionStyle::IdAnchor)
-        );
-    }
-
-    /// A body written in separate-file mode lands atomically at the target.
-    #[test]
-    fn test_write_projection_separate_file_writes_atomically() {
-        let dir = tempfile::tempdir().unwrap();
-        let jit_root = dir.path().join(".jit");
-        std::fs::create_dir_all(&jit_root).unwrap();
-        let store = JsonFileStorage::new(&jit_root);
-
-        let body = render_invariants_markdown(&registry_with_two(), ProjectionStyle::Full);
-        // The write goes through storage, which creates intermediate dirs (the
-        // repo root is the parent of `.jit`).
-        let written = write_projection(
-            &store,
-            ProjectionMode::SeparateFile,
-            "docs/invariants.md",
-            "",
-            "",
-            &body,
-        )
-        .unwrap();
-        assert_eq!(written, "docs/invariants.md");
-
-        let on_disk = std::fs::read_to_string(dir.path().join("docs/invariants.md")).unwrap();
-        assert!(on_disk.contains("sample-invariant"));
-        assert!(on_disk.contains("second-invariant"));
-        // No leftover temp file (atomic temp+rename leaves only the target).
-        let leftovers: Vec<_> = std::fs::read_dir(dir.path().join("docs"))
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("tmp"))
-            .collect();
-        assert!(leftovers.is_empty(), "no .tmp temp file should remain");
-    }
-
-    #[test]
-    fn test_write_projection_region_byte_preserves_surrounding_file() {
-        let dir = tempfile::tempdir().unwrap();
-        let jit_root = dir.path().join(".jit");
-        std::fs::create_dir_all(&jit_root).unwrap();
-        let store = JsonFileStorage::new(&jit_root);
-
-        let begin = "<!-- jit:invariants:begin -->";
-        let end = "<!-- jit:invariants:end -->";
-        let prefix = "# Hand-written doc\n\nIntro the user wrote.\n\n";
-        let suffix = "\n\n## Footer\n\nMore hand-written prose.\n";
-        let original = format!("{prefix}{begin}\nstale\n{end}{suffix}");
-        std::fs::write(dir.path().join("GUIDE.md"), &original).unwrap();
-
-        let body = render_invariants_markdown(&registry_with_two(), ProjectionStyle::Full);
-        write_projection(
-            &store,
-            ProjectionMode::Region,
-            "GUIDE.md",
-            begin,
-            end,
-            &body,
-        )
-        .unwrap();
-
-        let updated = std::fs::read_to_string(dir.path().join("GUIDE.md")).unwrap();
-        // Surrounding bytes preserved exactly.
-        assert!(updated.starts_with(&format!("{prefix}{begin}")));
-        assert!(updated.ends_with(&format!("{end}{suffix}")));
-        // Region replaced.
-        assert!(updated.contains("sample-invariant"));
-        assert!(!updated.contains("stale"));
-    }
-
-    #[test]
-    fn test_write_projection_region_missing_target_is_typed_error() {
-        let dir = tempfile::tempdir().unwrap();
-        let jit_root = dir.path().join(".jit");
-        std::fs::create_dir_all(&jit_root).unwrap();
-        let store = JsonFileStorage::new(&jit_root);
-
-        let err = write_projection(
-            &store,
-            ProjectionMode::Region,
-            "MISSING.md",
-            "<!--b-->",
-            "<!--e-->",
-            "body",
-        )
-        .unwrap_err();
-        assert!(matches!(err, ProjectionError::TargetNotFound { .. }));
-    }
-
-    #[test]
-    fn test_write_projection_separate_file_rejects_escaping_target() {
-        // A separate-file target that escapes the repo (absolute or `..`) is
-        // rejected by the storage path validator BEFORE any write — nothing is
-        // written outside the repo.
-        let dir = tempfile::tempdir().unwrap();
-        let jit_root = dir.path().join(".jit");
-        std::fs::create_dir_all(&jit_root).unwrap();
-        let store = JsonFileStorage::new(&jit_root);
-
-        for bad in ["../escape.md", "/tmp/jit-escape.md"] {
-            let err = write_projection(&store, ProjectionMode::SeparateFile, bad, "", "", "body")
-                .unwrap_err();
-            assert!(
-                matches!(
-                    err,
-                    ProjectionError::Write {
-                        source: PathReadError::InvalidPath(_),
-                        ..
-                    }
-                ),
-                "escaping target {bad} must be rejected with InvalidPath, got {err:?}"
-            );
-        }
-        // Nothing leaked outside the repo.
-        assert!(!dir.path().join("../escape.md").exists());
-    }
-
-    /// REQ-06: with region markers in place and `mode=region, target=AGENTS.md`,
-    /// the write replaces ONLY the marked region.
-    #[test]
-    fn test_write_projection_region_into_agents_md_scenario() {
-        let dir = tempfile::tempdir().unwrap();
-        let jit_root = dir.path().join(".jit");
-        std::fs::create_dir_all(&jit_root).unwrap();
-        let store = JsonFileStorage::new(&jit_root);
-
-        // Simulate AGENTS.md: hand-authored content wrapping a jit-managed region.
-        let begin = "<!-- jit:charter:begin -->";
-        let end = "<!-- jit:charter:end -->";
-        let preamble = "# AGENTS.md\n\n### Charter Decisions\n\n";
-        let postamble = "\n\n## Commit Conventions\n\nRun cargo fmt.\n";
-        let original = format!("{preamble}{begin}\nstale hand-authored prose\n{end}{postamble}");
-        std::fs::write(dir.path().join("AGENTS.md"), &original).unwrap();
-
-        let body = render_id_anchor_rows(&[row("D-1", "D-1: JSON-in-git storage")]);
-        let written = write_projection(
-            &store,
-            ProjectionMode::Region,
-            "AGENTS.md",
-            begin,
-            end,
-            &body,
-        )
-        .unwrap();
-        assert_eq!(written, "AGENTS.md");
-
-        let updated = std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
-        // Bytes OUTSIDE the region are byte-identical (REQ-01).
-        assert!(updated.starts_with(&format!("{preamble}{begin}")));
-        assert!(updated.ends_with(&format!("{end}{postamble}")));
-        // Stale hand-authored prose was replaced with the projected row.
-        assert!(!updated.contains("stale hand-authored prose"));
-        assert!(updated.contains("- **D-1** — JSON-in-git storage"));
-        // Markers themselves survive.
-        assert!(updated.contains(begin));
-        assert!(updated.contains(end));
-    }
-
-    /// REQ-07: malformed/missing markers raise a typed `ProjectionError` WITHOUT
-    /// clobbering the file (the file must remain byte-identical after the error).
-    #[test]
-    fn test_write_projection_region_malformed_markers_do_not_clobber() {
-        let dir = tempfile::tempdir().unwrap();
-        let jit_root = dir.path().join(".jit");
-        std::fs::create_dir_all(&jit_root).unwrap();
-        let store = JsonFileStorage::new(&jit_root);
-
-        let original = "# AGENTS.md\n\nNo markers here.\n\n## Commit Conventions\n";
-        std::fs::write(dir.path().join("AGENTS.md"), original).unwrap();
-
-        // Missing begin marker is a typed error.
-        let err = write_projection(
-            &store,
-            ProjectionMode::Region,
-            "AGENTS.md",
-            "<!-- jit:x:begin -->",
-            "<!-- jit:x:end -->",
-            "body",
-        )
-        .unwrap_err();
-        assert!(
-            matches!(err, ProjectionError::MissingBeginMarker { .. }),
-            "expected MissingBeginMarker, got {err:?}"
-        );
-
-        // File is byte-identical — no clobber.
-        let after = std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
-        assert_eq!(
-            after, original,
-            "file must not be modified when markers are missing"
         );
     }
 }

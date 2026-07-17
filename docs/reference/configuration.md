@@ -175,6 +175,40 @@ Rule names are colon-free slugs (`namespace-registry`, `namespace-unique-team`,
 on its `.jit/rules.toml` entry, not part of its name. Every rule is addressable
 at `@/rule/<self-id>` (`self-id` being its `name`), e.g. `@/rule/label-format`.
 
+### `[projection.<name>]`
+
+```toml
+[projection.invariants]
+kind = "invariant"
+mode = "region"
+target = "AGENTS.md"
+style = "id-anchor"
+
+[projection.rules-and-gates]
+kind = ["rule", "gate"]
+mode = "separate-file"
+target = "docs/reference/rules-and-gates.md"
+style = "full"
+```
+
+Declare a documentation projection: `jit project render` writes one or more
+addressable item kinds into a documentation file, keeping the rendered copy in
+sync with its source registry so a hand-maintained duplicate never drifts. The
+mechanism is generic — any project-scoped kind projects this way. Fields:
+
+| Field | Values | Meaning |
+|-------|--------|---------|
+| `kind` | a kind name, or an array of names | The addressable item kind(s) to render (e.g. `"invariant"`, or `["rule", "gate"]`). Must be project-scoped; issue-scoped kinds are not renderable. |
+| `mode` | `region` \| `separate-file` | `region` rewrites only the delimited block inside an existing `target`, byte-preserving everything outside it; `separate-file` writes the whole `target` file. Defaults to `separate-file`. |
+| `target` | repo-relative path | **Required.** The documentation file written. There is no default — a projection with no `target` is an error. |
+| `style` | `id-anchor` \| `full` | `id-anchor` renders generic `- **{self-id}** — {text}` bullets (any kind); `full` renders the built-in rich views (the invariant registry, or the rule + gate registries with severity/enforcement metadata). Defaults to `full`. |
+| `region-begin` / `region-end` | marker strings | `region`-mode delimiters. Default to `<!-- jit:<name>:begin -->` / `<!-- jit:<name>:end -->`, derived from the projection name. |
+
+Run `jit project render` (optionally `--name <name>` for one) after editing a
+source registry; `jit validate` reports a stale target. This repository's own
+three projections (`invariants`, `charter`, `rules-and-gates`) are repo-local
+configuration, not a shipped default.
+
 ### Template bindings (`.jit/templates.toml`)
 
 A `[[template]]` names its own nodes with arbitrary `role`s and its own anchor

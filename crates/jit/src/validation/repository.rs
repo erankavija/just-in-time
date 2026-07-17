@@ -20,7 +20,7 @@ use crate::storage::GateRegistry;
 use crate::validation::engine::Finding;
 use crate::validation::invariants::InvariantRegistry;
 use crate::validation::project_render::{render_projection_body, ProjectionInputs};
-use crate::validation::projection::splice_region;
+use crate::validation::projection::{require_target, splice_region};
 use crate::validation::report::{ReportedFinding, RuleReport};
 use crate::validation::rules::{RuleConfigError, RuleSet, SchemaSource, Severity};
 use anyhow::{anyhow, Context, Result};
@@ -463,16 +463,13 @@ pub fn validate_repository(
 /// registries, not frozen from the package's contribution rows).
 pub(crate) fn projection_targets(view: &dyn RepositoryView) -> Result<BTreeSet<PathBuf>> {
     let config = load_config(view)?;
-    Ok(config
-        .projection
-        .as_ref()
-        .map(|projections| {
-            projections
-                .iter()
-                .map(|(name, projection)| PathBuf::from(projection.target(name)))
-                .collect()
-        })
-        .unwrap_or_default())
+    let Some(projections) = config.projection.as_ref() else {
+        return Ok(BTreeSet::new());
+    };
+    projections
+        .iter()
+        .map(|(name, projection)| Ok(PathBuf::from(require_target(projection, name)?)))
+        .collect()
 }
 
 /// Render every configured projection for a proposed final repository image.
@@ -500,7 +497,7 @@ pub(crate) fn render_projections(view: &dyn RepositoryView) -> Result<Vec<(PathB
     for (name, projection) in projections {
         let mut read = |path: &str| read_text(view, path);
         let (body, _count) = render_projection_body(projection, &inputs, &mut read)?;
-        let target = projection.target(name);
+        let target = require_target(projection, name)?;
         let content = projected_content(
             view,
             &target,
@@ -1172,7 +1169,7 @@ fn validate_projections(
         // mirror), then compare the spliced-in result against the target's bytes.
         let mut read = |path: &str| read_text(view, path);
         let (body, _count) = render_projection_body(projection, &inputs, &mut read)?;
-        let target = projection.target(name);
+        let target = require_target(projection, name)?;
         let expected = projected_content(
             view,
             &target,

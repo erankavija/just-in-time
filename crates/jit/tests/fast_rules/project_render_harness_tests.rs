@@ -252,3 +252,80 @@ style = \"id-anchor\"
     assert!(storage.read_repo_file(".jit/out.md").unwrap().is_none());
     let _ = std::fs::remove_dir_all(storage.root());
 }
+
+/// REQ-07 (F1): a projection that declares no `target` is a typed
+/// `ProjectionError::MissingTarget` naming the projection, and no default
+/// `.jit/<name>.md` file is silently written.
+#[test]
+fn test_missing_target_is_typed_error_naming_projection() {
+    let config = format!(
+        "{INVARIANT_KIND}\n[projection.invariants]\nkind = \"invariant\"\nstyle = \"id-anchor\"\n"
+    );
+    let storage = storage_with(&config, &[]);
+    storage.add_repo_file(".jit/invariants.toml", INVARIANTS_TOML);
+    let executor = CommandExecutor::new(storage.clone());
+
+    let err = executor.project_render(Some("invariants")).unwrap_err();
+    let typed = err.downcast_ref::<jit::validation::projection::ProjectionError>();
+    assert!(
+        matches!(
+            typed,
+            Some(jit::validation::projection::ProjectionError::MissingTarget { projection })
+                if projection == "invariants"
+        ),
+        "expected MissingTarget naming the projection, got {err:#}"
+    );
+    // The removed silent default `.jit/invariants.md` is NOT created.
+    assert!(storage
+        .read_repo_file(".jit/invariants.md")
+        .unwrap()
+        .is_none());
+    let _ = std::fs::remove_dir_all(storage.root());
+}
+
+/// REQ-07 (F2): rendering ALL projections is two-phase — with a valid first
+/// projection and a second whose region markers are absent, the render writes
+/// NOTHING. The valid first target stays byte-identical because every projection
+/// materializes before any target is written.
+#[test]
+fn test_two_phase_render_writes_nothing_when_a_later_projection_fails() {
+    let config = format!(
+        "{INVARIANT_KIND}\n\
+         [projection.a-good]\nkind = \"invariant\"\nmode = \"region\"\n\
+         target = \"FIRST.md\"\nstyle = \"id-anchor\"\n\
+         [projection.b-bad]\nkind = \"invariant\"\nmode = \"region\"\n\
+         target = \"SECOND.md\"\nstyle = \"id-anchor\"\n"
+    );
+    let storage = storage_with(&config, &[]);
+    storage.add_repo_file(".jit/invariants.toml", INVARIANTS_TOML);
+    // FIRST.md carries `a-good`'s default region markers (rendering succeeds);
+    // SECOND.md carries NONE, so `b-bad` fails on its absent begin marker.
+    let first_original =
+        "# First\n\n<!-- jit:a-good:begin -->\nstale\n<!-- jit:a-good:end -->\n\n## Tail\n";
+    let second_original = "# Second\n\nNo managed region here.\n";
+    storage.add_repo_file("FIRST.md", first_original);
+    storage.add_repo_file("SECOND.md", second_original);
+
+    let executor = CommandExecutor::new(storage.clone());
+    // `a-good` sorts before `b-bad`, so it materializes (phase 1) before `b-bad`
+    // fails — yet phase 2 never runs, so nothing is written anywhere.
+    let err = executor.project_render(None).unwrap_err();
+    let typed = err.downcast_ref::<jit::validation::projection::ProjectionError>();
+    assert!(
+        matches!(
+            typed,
+            Some(jit::validation::projection::ProjectionError::MissingBeginMarker { .. })
+        ),
+        "expected MissingBeginMarker, got {err:#}"
+    );
+    assert_eq!(
+        storage.read_repo_file("FIRST.md").unwrap().unwrap(),
+        first_original,
+        "the valid first projection's target must be byte-identical"
+    );
+    assert_eq!(
+        storage.read_repo_file("SECOND.md").unwrap().unwrap(),
+        second_original
+    );
+    let _ = std::fs::remove_dir_all(storage.root());
+}

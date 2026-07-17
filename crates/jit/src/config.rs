@@ -937,8 +937,10 @@ impl schemars::JsonSchema for ProjectionKinds {
 /// - `kind` — the [`ProjectionKinds`] to render (one name, or an array).
 /// - `mode` — [`ProjectionMode`] (`separate-file` writes a whole file; `region`
 ///   rewrites only a delimited block, byte-preserving everything outside).
-/// - `target` — repo-relative documentation path (config-driven; the engine
-///   hardcodes no filename).
+/// - `target` — REQUIRED repo-relative documentation path (config-driven; the
+///   engine hardcodes no filename and applies no default). A projection that
+///   declares no target is a typed error at render and validation, never a
+///   silent default.
 /// - `style` — [`ProjectionStyle`] (`id-anchor` renders generic `- **{id}** —
 ///   {text}` rows; `full` renders the built-in rich registry views).
 /// - `region-begin` / `region-end` — optional region delimiters; when unset they
@@ -978,8 +980,11 @@ pub struct ProjectionConfig {
     /// existing file. Defaults to [`ProjectionMode::SeparateFile`] when unset.
     #[serde(default)]
     pub mode: Option<ProjectionMode>,
-    /// Repo-relative path of the documentation target. Defaults to
-    /// `.jit/<name>.md` (resolved by [`ProjectionConfig::target`]) when unset.
+    /// Repo-relative path of the documentation target. REQUIRED: a projection
+    /// that declares no `target` is a typed error at render and validation
+    /// (`ProjectionError::MissingTarget`), never a silent default. The field is
+    /// deserialized as optional so a target-less table parses and then fails with
+    /// a projection-named error rather than an opaque serde message.
     #[serde(default)]
     pub target: Option<String>,
     /// Begin marker delimiting the rewritten region in `region` mode. Defaults to
@@ -1005,16 +1010,6 @@ impl ProjectionConfig {
     /// The resolved projection mode (defaulting to [`ProjectionMode::SeparateFile`]).
     pub fn mode(&self) -> ProjectionMode {
         self.mode.unwrap_or_default()
-    }
-
-    /// The resolved repo-relative target path, defaulting to `.jit/<name>.md`.
-    ///
-    /// Takes the projection `name` (the `[projection.<name>]` table key) so the
-    /// default is name-derived; a declared `target` overrides it.
-    pub fn target(&self, name: &str) -> String {
-        self.target
-            .clone()
-            .unwrap_or_else(|| format!(".jit/{name}.md"))
     }
 
     /// The resolved begin marker for `region` mode, defaulting to the name-derived
