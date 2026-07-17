@@ -460,7 +460,7 @@ flowchart TD
 ```
 
 The label says "this task belongs to the auth epic" (task → epic). The dependency
-says "the epic requires this task to reach a terminal state" (epic → task). They
+says "the epic requires this task to become effectively terminal" (epic → task). They
 connect the same pair of issues but point opposite ways: membership points a leaf
 up to its container, while a dependency points a container down to its contents.
 
@@ -485,7 +485,7 @@ invalid: v1.0 cannot "belong to" a v2.0 task.
 - Querying specific subsets
 
 **Use Dependencies:**
-- Enforcing work order (A must reach a terminal state before B)
+- Enforcing work order (A must become effectively terminal before B)
 - Blocking work until prerequisites ready
 - Determining what's available to work on
 - Controlling state transitions
@@ -751,7 +751,7 @@ stateDiagram-v2
 
 ### State Descriptions
 
-**Backlog**: Issue is not yet ready to work on. Dependencies have not all reached a terminal state, or the issue is explicitly marked as future work.
+**Backlog**: Issue is not yet ready to work on. Dependencies have not all become effectively terminal (done, rejected, or archived from one of those), or the issue is explicitly marked as future work.
 
 **Ready**: Issue is unblocked (all dependencies satisfied). It may be assigned;
 `jit query available` selects ready, unassigned work.
@@ -1008,7 +1008,7 @@ See [Dependencies vs Labels](#dependencies-vs-labels-understanding-the-differenc
 # Task belongs to auth epic (label)
 jit issue create --title "JWT utils" --label "epic:auth"
 
-# Epic requires task to reach a terminal state (dependency)
+# Epic requires task to become effectively terminal (dependency)
 jit dep add <epic-id> <task-id>
 
 # Query by label: "epic:auth" → Shows all auth work

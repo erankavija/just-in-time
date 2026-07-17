@@ -112,7 +112,7 @@ See [Storage Format](../reference/storage-format.md) for the authoritative layou
 
 **Coordination:**
 - Issues move through states: `backlog → ready → in_progress → gated → done`
-- Dependencies block issues until prerequisites reach a terminal state
+- Dependencies block issues until prerequisites become effectively terminal
 - Gates block completion until quality standards met
 - Assignees record ownership; advisory leases provide exclusive coordination
 - The event log records issue lifecycle changes (state transitions and a defined event set), not every repository mutation

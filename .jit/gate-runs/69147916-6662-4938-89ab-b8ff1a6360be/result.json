@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "69147916-6662-4938-89ab-b8ff1a6360be",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "554ad07f-edd8-4ac9-8f6d-139902abbf7e",
+  "commit": "e5839de66db930e666d5dee7fca4927b970d29c8",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T03:35:00.134221802Z",
+  "completed_at": "2026-07-17T03:37:55.543746145Z",
+  "duration_ms": 175409,
+  "exit_code": 0,
+  "stdout": "Attribution: 92e3a812, 99072933, cb669c79, 55de9475, 44ee4258, c13c4841 (jit:554ad07f)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, @/charter/D-4 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (0, 2026-07-17T01:29:40Z); doc-review pending; docs-mechanical passed (0, 2026-07-16T21:06:02Z); prior code-review failed (1, 2026-07-17T03:00:11Z)\nTruncation recovery: narrowed per-path patches for 99072933/55de9475/c13c4841 and bounded current source, output, storage, and reference-document reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior unstable-HEAD finding is addressed by recording unknown cleanliness after bounded retry exhaustion.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard criteria are met; the prior unstable-HEAD finding is addressed by recording unknown cleanliness after bounded retry exhaustion.",
+    "findings": []
+  }
+}

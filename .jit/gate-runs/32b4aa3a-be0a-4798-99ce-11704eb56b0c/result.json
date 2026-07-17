@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "32b4aa3a-be0a-4798-99ce-11704eb56b0c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "894337e2-e708-466b-ac25-3aed102a166f",
+  "commit": "e5839de66db930e666d5dee7fca4927b970d29c8",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T03:32:20.538577318Z",
+  "completed_at": "2026-07-17T03:35:00.023272971Z",
+  "duration_ms": 159484,
+  "exit_code": 0,
+  "stdout": "Attribution: 78d36840, 8901b649, 9934f89d, 30e74734, 077084c4, dbe1a50b, 1c351243, 04e45b89, c89133aa, 857de4f2, 32cc8366, e5839de6\nPolicy sources: AGENTS.md; .jit/gates.toml; .jit/invariants.toml\nResolved items: @/gate/cargo-ci (.jit/gates.toml); @/gate/jit-validate (.jit/gates.toml); @/invariant/atomic-writes and @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T21:27:23Z); prior code-review failed on F1/F2, both resolved by e5839de6\nTruncation recovery: narrowed merge reads to affected serve/main/server paths; re-read current callers and tests; excluded unrelated multi-issue metadata\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current implementation preserves the owned listener through child startup, removes LISTEN_PID fallback risk, and uses isolated ephemeral-port tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The current implementation preserves the owned listener through child startup, removes LISTEN_PID fallback risk, and uses isolated ephemeral-port tests.",
+    "findings": []
+  }
+}

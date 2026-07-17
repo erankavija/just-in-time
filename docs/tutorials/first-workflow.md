@@ -262,12 +262,12 @@ jit issue update $TASK4 --state done
 # Check status
 jit status
 jit query blocked
-# Epic is now unblocked (all dependencies reached a terminal state)
+# Epic is now unblocked (all dependencies became effectively terminal)
 ```
 
 **What we did:**
 - Passed each task's postcheck gates, then marked it done
-- The epic automatically became unblocked once its dependencies reached a terminal state
+- The epic automatically became unblocked once its dependencies became effectively terminal
 - Ready for final integration
 
 ## Step 8: Complete the Epic

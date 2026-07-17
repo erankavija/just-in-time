@@ -477,8 +477,11 @@ impl BlockerCode {
                  retires the container to archived.",
             ),
             Self::DocumentNonTerminalOwner => Some(
-                "this document has an owning issue that is not terminal: complete or reject \
-                 every owning issue before archiving it.",
+                "this document has an owning issue that is not effectively terminal: \
+                 complete or reject every owning issue before archiving it. An owner \
+                 already Archived from a non-terminal state first revives to that exact \
+                 pre-archive state (jit issue update <id> --state <origin>), then \
+                 completes or rejects.",
             ),
             _ => None,
         }

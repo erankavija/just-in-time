@@ -57,7 +57,7 @@ jit dep add $EPIC $TASK
 ```
 
 **When to use dependencies:**
-- One piece of work must reach a terminal state before another can start
+- One piece of work must become effectively terminal (done, rejected, or archived from one of those) before another can start
 - Enforcing execution order (A → B → C)
 - Determining what's available to work on
 - Controlling state transitions automatically
@@ -355,7 +355,7 @@ flowchart LR
     FROM --> TO
 ```
 
-An edge reads "FROM depends on TO": FROM is blocked until TO reaches a terminal state.
+An edge reads "FROM depends on TO": FROM is blocked until TO is effectively terminal.
 
 **Graph reading tips:**
 - **No outgoing edges** = Root issue (has no dependencies; it can become ready without dependency blockers)

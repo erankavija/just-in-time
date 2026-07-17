@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "9241c7fd-016a-471a-ac77-ac9da439ac0f",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "3e12ffbd-694e-44b3-81c9-5a24ebf17340",
+  "commit": "e5839de66db930e666d5dee7fca4927b970d29c8",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T03:42:41.236438124Z",
+  "completed_at": "2026-07-17T03:44:26.600056222Z",
+  "duration_ms": 105363,
+  "exit_code": 0,
+  "stdout": "Attribution used the leaf-only footprint: 11 reachable commits containing `jit:3e12ffbd`, individually inspected with rename detection. The issue is an `enhancement` at the configured maximum hierarchy level and has no resolved children. Current source confirms the documented scoped and batch-export behavior.\n\nThe prior blocking finding is resolved: batch output is saved or redirected to a file before `batch-create` reads it at [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2797). The affected CLI reference and storage-format note accurately cover scope, batch shape, filtering, boundary reporting, and replay.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Scoped batch graph export is accurately and discoverably documented; prior issue-impact finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Scoped batch graph export is accurately and discoverably documented; prior issue-impact finding is resolved.",
+    "findings": []
+  }
+}

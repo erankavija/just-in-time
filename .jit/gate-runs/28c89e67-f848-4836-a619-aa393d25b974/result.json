@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "28c89e67-f848-4836-a619-aa393d25b974",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "8917c558-2c6d-4425-96ed-9dad1dbe7f2b",
+  "commit": "e5839de66db930e666d5dee7fca4927b970d29c8",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T03:41:41.794548880Z",
+  "completed_at": "2026-07-17T03:42:41.133420109Z",
+  "duration_ms": 59338,
+  "exit_code": 0,
+  "stdout": "Attribution: leaf issue; inspected all five `jit:8917c558` commits individually. The current CLI reference accurately documents idempotent re-adds and unpinned omitted `--commit`; prior blocking feedback is resolved.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-scoped doc-add reference accurately documents the shipped idempotent refresh behavior and commit-pin semantics.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The issue-scoped doc-add reference accurately documents the shipped idempotent refresh behavior and commit-pin semantics.",
+    "findings": []
+  }
+}

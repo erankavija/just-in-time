@@ -1189,7 +1189,8 @@ pub enum IssueCommands {
 
 #[derive(Subcommand)]
 pub enum DepCommands {
-    /// Add a work dependency: FROM is blocked until TO reaches a terminal state
+    /// Add a work dependency: FROM is blocked until TO is effectively terminal
+    /// (done, rejected, or archived from one of those)
     ///
     /// FROM and TO can be any issues. Work flows from TO (upstream) into FROM (downstream).
     /// Dependencies are orthogonal to labels - issues don't need matching labels to depend on each other.
@@ -1201,7 +1202,7 @@ pub enum DepCommands {
         /// The blocked issue (depends on the others)
         from_id: String,
 
-        /// The blocking issue(s) that must reach a terminal state first
+        /// The blocking issue(s) that must become effectively terminal first
         #[arg(required = true)]
         to_ids: Vec<String>,
 
@@ -2042,7 +2043,8 @@ pub enum AssetCommands {
 pub enum GraphCommands {
     /// Show what an issue depends on (upstream dependencies)
     ///
-    /// Shows the issues that must reach a terminal state before this issue can proceed.
+    /// Shows the issues that must become effectively terminal (done, rejected,
+    /// or archived from one of those) before this issue can proceed.
     /// By default shows immediate dependencies only (depth 1).
     ///
     /// Examples:

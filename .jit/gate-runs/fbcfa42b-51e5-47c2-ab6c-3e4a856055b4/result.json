@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "fbcfa42b-51e5-47c2-ab6c-3e4a856055b4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "1d59070d-bebc-4a55-9456-c6c7a3caba2a",
+  "commit": "e5839de66db930e666d5dee7fca4927b970d29c8",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "passed",
+  "started_at": "2026-07-17T03:24:16.249107794Z",
+  "completed_at": "2026-07-17T03:27:51.626546511Z",
+  "duration_ms": 215377,
+  "exit_code": 0,
+  "stdout": "Attribution: c13c4841, b301eded, c5e56064, ed776d46, 8123cf7f, dd6888bd, 6b24ca42, 37369032, 3bb9c937, 8901b649 (`jit:1d59070d`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/gate-semantics (.jit/invariants.toml); @/charter/D-2 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-17T01:26:35Z); doc-review failed (exit 1, 2026-07-16T16:14:24Z); docs-mechanical passed (exit 0, 2026-07-16T21:06:00Z)\nTruncation recovery: narrowed c13c4841 to this issue’s run record and code hunk; excluded other-issue immutable gate-run records from truncated shared commits.\n\n1. **F1 — advisory · issue-impact · low:** The regression-test comment says `evaluate-all` processes the manual gate in “priority order,” but the implementation and shipped help correctly use required-gate declaration order. [crates/jit/tests/cli_gate/gate_evaluate_all_test.rs:334](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_gate/gate_evaluate_all_test.rs:334)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria and the prior blocking finding are addressed; one test comment has stale ordering terminology.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The evaluate-all regression-test comment incorrectly says priority order although required gates are evaluated in declaration order.\",\"file\":\"crates/jit/tests/cli_gate/gate_evaluate_all_test.rs\",\"line\":334,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard success criteria and the prior blocking finding are addressed; one test comment has stale ordering terminology.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "The evaluate-all regression-test comment incorrectly says priority order although required gates are evaluated in declaration order.",
+        "file": "crates/jit/tests/cli_gate/gate_evaluate_all_test.rs",
+        "line": 334
+      }
+    ]
+  }
+}

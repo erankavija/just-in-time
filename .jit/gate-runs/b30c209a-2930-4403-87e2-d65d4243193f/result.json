@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "run_id": "b30c209a-2930-4403-87e2-d65d4243193f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "45a140ae-1baa-4f32-96e2-b4dcf21d6694",
+  "commit": "e5839de66db930e666d5dee7fca4927b970d29c8",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T03:37:55.653433545Z",
+  "completed_at": "2026-07-17T03:41:41.684723360Z",
+  "duration_ms": 226031,
+  "exit_code": 1,
+  "stdout": "Attribution: `jit:45a140ae` commits db0fe018, b020f788, f280f8b6, 2fd8a8ff, 0e330d21, 30a39aac, c15b26eb, 8a02869e, ffde113d, c03d1ba9, 2856ad0f, cea1dbfa, 2be47597, c7699f38; uncommitted changes excluded\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/invariant/gate-semantics (.jit/invariants.toml)\nGate evidence: cargo-ci passed (0, 2026-07-17T01:19:13Z); doc-review failed (1, 2026-07-16T15:46:41Z); docs-mechanical passed (0, 2026-07-17T00:31:36Z)\nTruncation recovery: recovered broad-patch truncation with commit/path-scoped diffs and bounded current source, test, and documentation reads\n\n1. **[blocking][issue-impact]** `document-non-terminal-owner` guidance tells users only to complete or reject owners, but an owner archived from a nonterminal state must first revive to its recorded origin; direct completion/rejection is refused by the revive guard. This invalid guidance is emitted in both human and JSON diagnostics, failing REQ-05. [crates/jit/src/domain/artifact_plan.rs:479](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/artifact_plan.rs:479)\n\n2. **[blocking][issue-impact]** Dependency and graph help/reference prose still says dependencies require a literal terminal state, excluding `Archived` issues with terminal origins despite the implemented effective-terminal predicate. Examples include CLI `dep add` and `graph deps` help at [crates/jit/src/cli.rs:1192](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:1192) and [crates/jit/src/cli.rs:2045](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:2045), plus the corresponding command reference at [docs/reference/cli-commands.md:2190](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2190). This leaves the changed lifecycle behavior inconsistently documented. References: @/invariant/single-source-prose.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Archive owner guidance and dependency/graph help remain inconsistent with terminality-preserving Archived semantics.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Document-owner archive guidance omits the required revive-to-origin step for an owner archived from a nonterminal state.\",\"file\":\"crates/jit/src/domain/artifact_plan.rs\",\"line\":479,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"CLI and reference dependency/graph prose still excludes terminal-origin Archived dependencies from satisfaction semantics.\",\"file\":\"crates/jit/src/cli.rs\",\"line\":1192,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10123 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6e26-f9c6-75d2-9a22-21b36755bb35\n--------\nuser\n--- 10110 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Archive owner guidance and dependency/graph help remain inconsistent with terminality-preserving Archived semantics.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Document-owner archive guidance omits the required revive-to-origin step for an owner archived from a nonterminal state.",
+        "file": "crates/jit/src/domain/artifact_plan.rs",
+        "line": 479
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "CLI and reference dependency/graph prose still excludes terminal-origin Archived dependencies from satisfaction semantics.",
+        "file": "crates/jit/src/cli.rs",
+        "line": 1192,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

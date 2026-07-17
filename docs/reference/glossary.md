@@ -55,8 +55,9 @@ Terminality-preserving: it records the state it was entered from and keeps whate
 
 ## Dependency Relationships
 
-**Depends On / Blocks**: “A depends on B” means B blocks A. B must reach a
-terminal state before A can become ready.
+**Depends On / Blocks**: “A depends on B” means B blocks A. B must reach an
+effectively terminal state (done, rejected, or archived from one of those)
+before A can become ready.
 
 **Blocked By**: A is blocked by B when A depends on B
 

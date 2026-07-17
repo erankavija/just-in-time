@@ -49,7 +49,7 @@ jit dep add g7h8i9 a1b2c3  # ✗ ERROR: Cycle detected
 
 **Why this matters:**
 
-- **No deadlocks:** Issues can always make progress once dependencies reach a terminal state
+- **No deadlocks:** Issues can always make progress once dependencies become effectively terminal
 - **Clear work order:** Topological sort determines execution order
 - **Predictable scheduling:** Agents can identify ready work deterministically
 

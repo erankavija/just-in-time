@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "4c174258-038e-41fc-8474-64ae4c127b8a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "e5839de66db930e666d5dee7fca4927b970d29c8",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T03:27:51.732403388Z",
+  "completed_at": "2026-07-17T03:30:10.509794324Z",
+  "duration_ms": 138777,
+  "exit_code": 1,
+  "stdout": "Attribution: 624ffa8e, b876f3b7, 0500ef34, 271c650b, d9d67143, a1adb140, 5c1b1602, a32e1707, d98c927f, 68fccbca (`jit:d74a9ed1`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-17); docs-mechanical passed (exit 0, 2026-07-17); doc-review failed (exit 1, 2026-07-16)\nTruncation recovery: narrowed current implementation and test reads by path/line range; inspected individual tagged-commit stats, file lists, and patches\n\n1. **[blocking, issue-impact, high]** `rule_header_offsets` recognizes only the literal `[[rules]]` token. Valid TOML also permits whitespace inside an array-table header, such as `[[ rules ]]` or `[[\\trules\\t]]`; the identity TOML parse accepts these forms, but the scanner at [ruleset_store.rs:213](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:213) records no block. `sync_namespace_unique_rules` then detects fewer blocks than parsed rules and aborts at [ruleset_store.rs:369](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:369), after `config set` has already persisted `config.toml`. This leaves the default rule absent from the registry-first `rules.toml`, violating REQ-01/REQ-02. The prior indented-header regression test does not cover whitespace within the brackets. References: `@/charter/D-6`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Valid whitespace-padded TOML [[ rules ]] headers still make membership synchronization abort and leave rules.toml stale.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The raw rules-header scanner misses valid TOML headers with whitespace inside [[ rules ]], so sync aborts on a block-count mismatch after config persistence and fails to write the registry-first default rule.\",\"file\":\"crates/jit/src/storage/ruleset_store.rs\",\"line\":213,\"references\":[\"@/charter/D-6\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 7558 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6e1d-c27a-78a2-bbfa-32eb2b96b584\n--------\nuser\n--- 7545 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Valid whitespace-padded TOML [[ rules ]] headers still make membership synchronization abort and leave rules.toml stale.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The raw rules-header scanner misses valid TOML headers with whitespace inside [[ rules ]], so sync aborts on a block-count mismatch after config persistence and fails to write the registry-first default rule.",
+        "file": "crates/jit/src/storage/ruleset_store.rs",
+        "line": 213,
+        "references": [
+          "@/charter/D-6"
+        ]
+      }
+    ]
+  }
+}
