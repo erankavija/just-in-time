@@ -78,9 +78,12 @@ pub fn write_baked_schema(jit_root: &Path, file_name: &str, content: &str) -> Re
 /// preserving every `[[rules]]` block below it (and any comments authored inside
 /// them) verbatim.
 ///
-/// The header region is everything before the first line that starts a `[[rules]]`
-/// table — a generated comment block, republished so it always states the current
-/// default-rule contract without disturbing custom rules. A ruleset file with no
+/// The header region is the leading trivia before the first `[[rules]]` table —
+/// a generated comment block, modelled as the prefix decoration of the first
+/// `rules` entry in a [`toml_edit::DocumentMut`]. Republishing it (setting that
+/// prefix) always states the current default-rule contract without disturbing
+/// any rule body, so a `[[rules]]` sequence inside a comment or a multiline rule
+/// description can never be mistaken for the first table. A ruleset file with no
 /// `[[rules]]` block (an intentionally empty ruleset) is rewritten to `header`
 /// alone. A no-op when `rules.toml` is absent (the scaffold path writes a fresh
 /// file, header included) or already current. Returns `true` when the file was
@@ -92,12 +95,19 @@ pub fn rewrite_rules_header(jit_root: &Path, header: &str) -> Result<bool> {
     }
     let content =
         std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
-    // The body starts at the first REAL `[[rules]]` table header. `rule_header_offsets`
-    // resolves those string-/comment-aware, so a `[[rules]]` sequence inside a header
-    // comment or a multiline rule description is never mistaken for the first table.
-    let body_start = rule_header_offsets(&content).first().copied();
-    let rebuilt = match body_start {
-        Some(idx) => format!("{header}{}", &content[idx..]),
+    let mut doc = content
+        .parse::<toml_edit::DocumentMut>()
+        .with_context(|| format!("parsing {} as TOML", path.display()))?;
+    let rebuilt = match doc
+        .get_mut(RULES_ARRAY_KEY)
+        .and_then(toml_edit::Item::as_array_of_tables_mut)
+        .and_then(|rules| rules.get_mut(0))
+    {
+        Some(first) => {
+            first.decor_mut().set_prefix(header);
+            doc.to_string()
+        }
+        // No `[[rules]]` block: the file is header-only, replaced wholesale.
         None => header.to_string(),
     };
     if rebuilt == content {
@@ -108,11 +118,11 @@ pub fn rewrite_rules_header(jit_root: &Path, header: &str) -> Result<bool> {
 }
 
 /// Minimal per-rule identity read off a `[[rules]]` block: just enough
-/// (`name`, `origin`) to drive [`sync_namespace_unique_rules`]'s structural
-/// add/drop, without pulling in the full `assert`-table deserialization
-/// [`crate::validation::rules::RuleSet`] performs (which resolves schema
-/// files and is unnecessary — and unnecessarily fragile — for a membership
-/// sync that never inspects a rule's assertion).
+/// (`name`, `origin`) to compute the membership diff that drives
+/// [`sync_namespace_unique_rules`], without pulling in the full `assert`-table
+/// deserialization [`crate::validation::rules::RuleSet`] performs (which
+/// resolves schema files and is unnecessary — and unnecessarily fragile — for a
+/// membership sync that never inspects a rule's assertion).
 #[derive(Debug, Deserialize)]
 struct RuleIdentity {
     name: String,
@@ -151,241 +161,32 @@ pub fn read_rule_identities(jit_root: &Path) -> Result<Vec<(String, Option<Strin
         .collect())
 }
 
-/// Whether `line` (a physical line, its trailing newline already excluded,
-/// starting at its first `[`) is a TOML array-of-tables header for the single
-/// key `rules`.
-///
-/// Matches the full header grammar `[[` ws* KEY ws* `]]` followed only by
-/// whitespace or a `#` comment to end of line, where ws is space or tab and KEY
-/// is the bare key `rules`, the basic-quoted `"rules"`, or the literal-quoted
-/// `'rules'` — three interchangeable spellings of the SAME table. A header for
-/// any other key (`[[ruleset]]`, or the dotted path `[[rules.x]]`) is a
-/// different table and does not match (jit:d74a9ed1 review F1, round 4).
-fn line_opens_rules_table(line: &str) -> bool {
-    let ws: &[char] = &[' ', '\t'];
-    let Some(after_open) = line.strip_prefix("[[") else {
-        return false;
-    };
-    // The key, in any of its three interchangeable spellings.
-    let after_key = ["rules", "\"rules\"", "'rules'"]
-        .iter()
-        .find_map(|key| after_open.trim_start_matches(ws).strip_prefix(key));
-    let Some(after_key) = after_key else {
-        return false;
-    };
-    let Some(tail) = after_key.trim_start_matches(ws).strip_prefix("]]") else {
-        return false;
-    };
-    let tail = tail.trim_start_matches(ws);
-    tail.is_empty() || tail.starts_with('#')
-}
-
-/// Byte offsets of the LINE START of every REAL `[[rules]]` table header, in
-/// file order.
-///
-/// "Real" means the line is preceded ONLY by whitespace (TOML permits leading
-/// indentation before a table header), is outside any string or comment
-/// context, and parses as a `rules` array-of-tables header per
-/// [`line_opens_rules_table`] (so every valid spelling — internal whitespace,
-/// quoted key, trailing comment — is recognized, and other tables such as
-/// `[[ruleset]]` are not). A `[[rules]]` sequence inside a `#` comment or a
-/// `'''`/`"""` multiline string (a rule's `description`, say) is prose, not a
-/// table boundary, so it is skipped: the scan tracks TOML string/comment state
-/// across lines, so it cannot be fooled by an in-string occurrence that a naive
-/// `\n[[rules]]` search would mis-split on (jit:d74a9ed1 review F2).
-///
-/// The recorded offset is the header line's first byte — its indentation
-/// included — so a block sliced from one offset to the next carries the header
-/// line verbatim (jit:d74a9ed1 review F1, round 3).
-///
-/// Manual state tracking (rather than `toml_edit`) keeps every consumer working
-/// on raw byte slices of the original file, preserving each block's exact
-/// bytes — comments, blank lines, and field formatting — which the membership
-/// sync's byte-exact preservation contract depends on.
-fn rule_header_offsets(content: &str) -> Vec<usize> {
-    enum Mode {
-        Normal,
-        Comment,
-        BasicSingle,
-        LiteralSingle,
-        BasicMulti,
-        LiteralMulti,
-    }
-
-    let bytes = content.as_bytes();
-    let len = content.len();
-    // Advance past one whole char at `idx` (keeps `i` on a UTF-8 boundary).
-    let char_len = |idx: usize| content[idx..].chars().next().map_or(1, char::len_utf8);
-
-    let mut offsets = Vec::new();
-    let mut mode = Mode::Normal;
-    // `line_begin` is the current physical line's first byte; `leading_ws` is true
-    // while, in `Normal` mode, only whitespace has been seen since `line_begin`.
-    // A `[[rules]]` reached with `leading_ws` still set is a real header, and its
-    // recorded offset is `line_begin` (indentation included).
-    let mut line_begin = 0;
-    let mut leading_ws = true;
-    let mut i = 0;
-
-    while i < len {
-        match mode {
-            Mode::Normal => {
-                if content[i..].starts_with("\"\"\"") {
-                    mode = Mode::BasicMulti;
-                    leading_ws = false;
-                    i += 3;
-                    continue;
-                }
-                if content[i..].starts_with("'''") {
-                    mode = Mode::LiteralMulti;
-                    leading_ws = false;
-                    i += 3;
-                    continue;
-                }
-                if leading_ws && content[i..].starts_with("[[") {
-                    // Match the whole header line against the `rules` table grammar.
-                    let line_end = content[i..].find('\n').map_or(content.len(), |n| i + n);
-                    let line = content[i..line_end]
-                        .strip_suffix('\r')
-                        .unwrap_or(&content[i..line_end]);
-                    if line_opens_rules_table(line) {
-                        offsets.push(line_begin);
-                    }
-                }
-                let c = bytes[i];
-                match c {
-                    b'#' => mode = Mode::Comment,
-                    b'"' => mode = Mode::BasicSingle,
-                    b'\'' => mode = Mode::LiteralSingle,
-                    _ => {}
-                }
-                if c == b'\n' {
-                    line_begin = i + 1;
-                    leading_ws = true;
-                } else if c != b' ' && c != b'\t' {
-                    leading_ws = false;
-                }
-                i += char_len(i);
-            }
-            Mode::Comment => {
-                let c = bytes[i];
-                if c == b'\n' {
-                    mode = Mode::Normal;
-                    line_begin = i + 1;
-                    leading_ws = true;
-                }
-                i += char_len(i);
-            }
-            Mode::BasicSingle => {
-                let c = bytes[i];
-                if c == b'\\' {
-                    // Skip the escaped char so `\"` does not close the string.
-                    i += 1;
-                    if i < len {
-                        i += char_len(i);
-                    }
-                    continue;
-                }
-                if c == b'\n' {
-                    // Malformed (a single-line string cannot span lines); recover.
-                    mode = Mode::Normal;
-                    line_begin = i + 1;
-                    leading_ws = true;
-                } else if c == b'"' {
-                    mode = Mode::Normal;
-                }
-                i += char_len(i);
-            }
-            Mode::LiteralSingle => {
-                let c = bytes[i];
-                if c == b'\n' {
-                    mode = Mode::Normal;
-                    line_begin = i + 1;
-                    leading_ws = true;
-                } else if c == b'\'' {
-                    mode = Mode::Normal;
-                }
-                i += char_len(i);
-            }
-            Mode::BasicMulti => {
-                if bytes[i] == b'\\' {
-                    // Escapes apply in basic strings, so `\"""` is not a close.
-                    i += 1;
-                    if i < len {
-                        i += char_len(i);
-                    }
-                    continue;
-                }
-                if content[i..].starts_with("\"\"\"") {
-                    mode = Mode::Normal;
-                    i += 3;
-                    continue;
-                }
-                i += char_len(i);
-            }
-            Mode::LiteralMulti => {
-                if content[i..].starts_with("'''") {
-                    mode = Mode::Normal;
-                    i += 3;
-                    continue;
-                }
-                i += char_len(i);
-            }
-        }
-    }
-
-    offsets
-}
-
-/// Split `rules.toml` content into its leading header (everything before the
-/// first `[[rules]]` table) and the raw text of each `[[rules]]` block, in
-/// file order.
-///
-/// A block's text runs from its `[[rules]]` line up to (but not including) the
-/// next `[[rules]]` line, or EOF — so it carries every line that belongs to
-/// it: its fields AND any comments/blank lines authored inside or immediately
-/// after it. Table boundaries come from [`rule_header_offsets`], so a
-/// `[[rules]]`-looking string inside a description or comment is never mistaken
-/// for one.
-fn split_rule_blocks(content: &str) -> (&str, Vec<&str>) {
-    let starts = rule_header_offsets(content);
-
-    let header = match starts.first() {
-        Some(&first) => &content[..first],
-        None => content,
-    };
-    let blocks = starts
-        .iter()
-        .enumerate()
-        .map(|(i, &start)| {
-            let end = starts.get(i + 1).copied().unwrap_or(content.len());
-            &content[start..end]
-        })
-        .collect();
-    (header, blocks)
-}
+/// The `rules.toml` array-of-tables key holding every `[[rules]]` block.
+const RULES_ARRAY_KEY: &str = "rules";
 
 /// Apply a `namespace-unique-*` DEFAULT-rule membership delta to
 /// `<jit_root>/rules.toml`: append each pre-rendered `[[rules]]` block in
 /// `to_add` at the END of the file, and remove the `origin = "default"` block
-/// for each name in `to_drop` — identified STRUCTURALLY (by parsing each
-/// block's own `name`/`origin`, never by content-diffing), so every OTHER
-/// byte of the file — every other rule's fields, hand-edited policy fields on
-/// surviving default rules, custom rules, comments, and blank-line formatting
-/// — survives untouched (REQ-01, jit:d74a9ed1).
+/// for each name in `to_drop`.
+///
+/// The file is edited through a [`toml_edit::DocumentMut`], which is lossless
+/// for untouched content: every OTHER byte of the file — other rules' fields,
+/// hand-edited policy fields on surviving default rules, custom rules, comments,
+/// blank-line formatting, exotic-but-valid header spellings, multiline strings,
+/// and any UNRELATED trailing tables — round-trips byte-exact (REQ-01,
+/// jit:d74a9ed1). The drop matches the document model's `name`/`origin` values
+/// directly, so it can never over-reach into neighbouring or trailing content.
 ///
 /// `to_add` entries are typically rendered via
-/// [`crate::validation::serialize::render_rule_block`]. A name in `to_drop`
-/// that does not match an `origin = "default"` block (already absent, or
-/// present only under a different origin) is silently skipped — dropping
-/// something not there is a no-op, not an error.
+/// [`crate::validation::serialize::render_rule_block`] and are appended verbatim
+/// (exactly the canonical text `jit init` scaffolds), so blocks jit itself wrote
+/// stay byte-stable. A name in `to_drop` that does not match an
+/// `origin = "default"` block (already absent, or present only under a different
+/// origin) is silently skipped — dropping something not there is a no-op.
 ///
-/// A no-op (`Ok(false)`) when `rules.toml` is absent (nothing to sync), or
-/// when neither list changes the file. Atomic (temp + rename). Returns an
-/// error if the file's `[[rules]]` blocks cannot be parsed to identity, or if
-/// the parsed rule count does not match the number of `[[rules]]` blocks found
-/// (a malformed or unexpectedly-shaped file this function cannot safely edit
-/// structurally).
+/// A no-op (`Ok(false)`) when `rules.toml` is absent (nothing to sync), when
+/// neither list changes the file, or when the diff is empty. Atomic (temp +
+/// rename). Returns an error only if the file does not parse as TOML.
 pub fn sync_namespace_unique_rules(
     jit_root: &Path,
     to_add: &[String],
@@ -401,31 +202,47 @@ pub fn sync_namespace_unique_rules(
 
     let content =
         std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
-    let (header, blocks) = split_rule_blocks(&content);
+    let mut doc = content
+        .parse::<toml_edit::DocumentMut>()
+        .with_context(|| format!("parsing {} as TOML", path.display()))?;
 
-    let identities: RuleIdentitiesFile = toml::from_str(&content)
-        .with_context(|| format!("parsing {} to locate rule identities", path.display()))?;
-    if identities.rules.len() != blocks.len() {
-        anyhow::bail!(
-            "cannot structurally sync {}: parsed {} rule(s) but found {} `[[rules]]` block(s)",
-            path.display(),
-            identities.rules.len(),
-            blocks.len()
-        );
-    }
+    // DROP through the document model: remove each `origin = "default"` rule
+    // named in `to_drop`. Matching on the model's own `name`/`origin` values can
+    // never over-reach into neighbouring or trailing content.
+    let dropped_any = !to_drop.is_empty()
+        && doc
+            .get_mut(RULES_ARRAY_KEY)
+            .and_then(toml_edit::Item::as_array_of_tables_mut)
+            .is_some_and(|rules| {
+                let before = rules.len();
+                rules.retain(|table| {
+                    let is_default = table.get("origin").and_then(toml_edit::Item::as_str)
+                        == Some(DEFAULT_ORIGIN);
+                    let dropped = is_default
+                        && table
+                            .get("name")
+                            .and_then(toml_edit::Item::as_str)
+                            .is_some_and(|name| to_drop.iter().any(|d| d == name));
+                    !dropped
+                });
+                rules.len() != before
+            });
 
-    let mut rebuilt = header.to_string();
-    for (identity, block) in identities.rules.iter().zip(blocks.iter()) {
-        let drop = identity.origin.as_deref() == Some(DEFAULT_ORIGIN)
-            && to_drop.iter().any(|name| name == &identity.name);
-        if !drop {
-            rebuilt.push_str(block);
-        }
-    }
-    // A hand-authored rules.toml may end without a final newline; appending a
-    // generated block directly would fuse its `[[rules]]` line onto the file's
-    // last token, corrupting the TOML. Guarantee exactly one separating newline:
-    // add it only when content precedes the append and lacks a trailing newline.
+    // Re-serialize only when a drop actually removed a table: `toml_edit` is
+    // lossless for retained content EXCEPT that it canonicalizes exotic-but-valid
+    // header spellings (`[[ rules ]]`, quoted keys). When nothing was dropped
+    // (an add-only sync, or a drop of an absent name), keep the original bytes so
+    // hand-authored formatting is never rewritten just to append a rule.
+    let mut rebuilt = if dropped_any {
+        doc.to_string()
+    } else {
+        content.clone()
+    };
+    // ADD by appending each already-rendered canonical block at EOF — the same
+    // text `serialize_ruleset` concatenates, so an appended rule is byte-identical
+    // to a scaffolded one. Guarantee exactly one separating newline: a source file
+    // (or serialized document) may lack a final newline, and appending a block
+    // onto an unterminated last line would fuse the tokens.
     if !to_add.is_empty() && !rebuilt.is_empty() && !rebuilt.ends_with('\n') {
         rebuilt.push('\n');
     }
@@ -709,6 +526,52 @@ assert = { require-section = { heading = \"Goals\" } }\n\
             1,
         );
         assert_eq!(updated, expected);
+    }
+
+    #[test]
+    fn test_sync_drop_preserves_unrelated_trailing_table() {
+        // The dropped rule is the LAST `[[rules]]` block, followed by an unrelated
+        // top-level table. The drop must remove only that rule and leave the
+        // trailing table intact — a raw splitter whose final block ran to EOF
+        // would delete it (jit:d74a9ed1 review F1, round 5).
+        let dir = tempfile::tempdir().unwrap();
+        let content = "\
+[[rules]]\n\
+name = \"label-format\"\n\
+origin = \"default\"\n\
+assert = { require-section = { heading = \"H\" } }\n\
+\n\
+[[rules]]\n\
+name = \"namespace-unique-team\"\n\
+origin = \"default\"\n\
+assert = { require-label = { label = \"team:*\", min = 0, max = 1 } }\n\
+\n\
+[extra]\n\
+note = \"unrelated trailing table, must survive\"\n\
+";
+        write_rules(dir.path(), content);
+
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[], &["namespace-unique-team".to_string()])
+                .unwrap();
+        assert!(changed);
+
+        let updated = read_rules(dir.path());
+        assert!(
+            !updated.contains("namespace-unique-team"),
+            "the final rules block is dropped"
+        );
+        assert!(
+            updated.contains("name = \"label-format\""),
+            "the first rule survives"
+        );
+        // The unrelated trailing table is NOT swallowed by dropping the final block.
+        assert!(
+            updated.contains("[extra]\nnote = \"unrelated trailing table, must survive\""),
+            "trailing table preserved verbatim:\n{updated}"
+        );
+        // Exactly one `rules` entry remains; the trailing table is not a rule.
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 1);
     }
 
     #[test]
