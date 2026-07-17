@@ -886,6 +886,11 @@ impl<'de> Deserialize<'de> for ProjectionKinds {
                 while let Some(name) = seq.next_element::<String>()? {
                     names.push(name);
                 }
+                if names.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "a projection `kind` list must name at least one addressable kind",
+                    ));
+                }
                 Ok(ProjectionKinds(names))
             }
         }
@@ -2480,6 +2485,27 @@ unique = false
 
         let component_ns = &namespaces["component"];
         assert!(component_ns.examples.is_none());
+    }
+
+    #[test]
+    fn test_projection_empty_kind_list_is_rejected() {
+        // A `[projection.*]` table with `kind = []` declares nothing addressable
+        // to render; parsing rejects it instead of accepting a no-items
+        // projection (jit:450db193 review F1, round 4).
+        let config_toml = r#"
+[projection.empty]
+kind = []
+mode = "region"
+target = "AGENTS.md"
+"#;
+        let error = toml::from_str::<JitConfig>(config_toml)
+            .expect_err("empty projection kind list must not parse");
+        assert!(
+            error
+                .to_string()
+                .contains("must name at least one addressable kind"),
+            "error names the empty-kind-list defect: {error}"
+        );
     }
 
     #[test]

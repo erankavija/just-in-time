@@ -241,10 +241,13 @@ pub fn read_rule_identities(jit_root: &Path) -> Result<Vec<(String, Option<Strin
 /// for each name in `to_drop`.
 ///
 /// The file is edited through a [`toml_edit::DocumentMut`], which is lossless
-/// for untouched content: every OTHER byte of the file — other rules' fields,
-/// hand-edited policy fields on surviving default rules, custom rules, comments,
-/// blank-line formatting, exotic-but-valid header spellings, multiline strings,
-/// and any UNRELATED trailing tables — round-trips byte-exact (REQ-01,
+/// for untouched content. On an add-only sync every OTHER byte of the file —
+/// other rules' fields, hand-edited policy fields on surviving default rules,
+/// custom rules, comments, blank-line formatting, exotic-but-valid header
+/// spellings, multiline strings, and any UNRELATED trailing tables — round-trips
+/// byte-exact. A sync that drops an entry re-serializes the document, which may
+/// canonicalize exotic-but-valid TOML syntax spellings elsewhere in the file:
+/// semantically lossless, all content preserved (REQ-01 as amended,
 /// jit:d74a9ed1). The drop matches the document model's `name`/`origin` values
 /// directly, so it can never over-reach into neighbouring or trailing content.
 /// Dropping the FIRST rule transfers its prefix decoration — where `toml_edit`

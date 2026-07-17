@@ -162,32 +162,6 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **CLI commands must support `--json`** for machine-readable output. List-emitting commands wrap collections in the envelope `{"count": N, "<collection>": [...]}`.
 - **git is optional** — jit must work without git unless a feature strictly requires it (`@/charter/D-4`). Exception: the `jit claim` lease subcommands require a git repository for worktree identity and branch tracking; they fail with a typed `ClaimRequiresGitError` (exit 10) when run outside one.
 
-<!-- jit:dogfood-guidance:begin -->
-## JIT workflow
-
-- Treat `.jit/` as repository-owned workflow configuration and issue data.
-- Read `.jit/reference/content-standards.md` before authoring issues or planning documents.
-- Derive hierarchy, templates, gates, namespaces, and documentation paths from repository configuration.
-- Use `jit issue status`, `jit query available`, and the dependency graph to select and sequence work.
-- Run the configured gates before completing an issue; a passing review placeholder is advisory evidence only.
-
-### Project invariants
-
-<!-- jit:invariants:begin -->
-- **label-format** — Every label is namespace:value (namespace lowercase-kebab, value non-empty).
-- **namespace-registry** — Every label namespace is declared in the namespace registry.
-- **dag-acyclic** — Cycle detection runs before every dependency operation; the graph stays acyclic.
-- **gate-semantics** — An issue cannot reach Done with pending or failed gates; unpassed gates divert completion to Gated.
-- **event-log** — Every state change appends an event to events.jsonl.
-- **atomic-writes** — All file replacements use the temp-file + atomic-rename pattern; new-file publication uses verified staging plus atomic no-replace publication, so an occupied destination is never overwritten.
-- **pid-safety** — Process-signaling code rejects sentinel or lossy PID conversions before invoking the operating system, including the `u32::MAX as i32 == -1` case that would turn a targeted signal into `kill(-1, sig)`.
-- **assignee-format** — Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
-- **domain-agnostic** — Engine logic is domain-agnostic: type names, label vocabularies, gate keys, templates, and workflow shapes come from repository configuration (.jit/), never from hardcoded domain assumptions. The one sanctioned exception is the planning-bracket preset trio (plan-review, coverage-preview, breakdown-review): it encodes jit's own plan-before-fan-out workflow (@/charter/D-3), not an adopter domain, so it is retained as the single binary-shipped preset bundle.
-- **single-source-prose** — Every fact with a single source of truth reaches prose by projection or citation; volatile facts (counts, enumerations, registry contents) are stated structurally or derived, and a hand-maintained copy is a staleness defect.
-- **bounded-rust-build-footprint** — Rust test topology stays bounded to a small number of cohesive suites rather than one Cargo target per test file, build profiles stay compact rather than embedding a full debugger payload in every test executable, dependency features stay intentional rather than pulling in unused remote-resolution or duplicate TLS infrastructure, and integration-test target count and active test-executable bytes remain within automatically enforced budgets.
-<!-- jit:invariants:end -->
-<!-- jit:dogfood-guidance:end -->
-
 ### Charter Decisions
 
 The v1.0 vision charter's decision log, addressable as `@/charter/D-N`. Projected from `dev/vision/9db27a3a-charter.md` by `jit project render`; edit the charter, not the region below.
@@ -209,6 +183,32 @@ The v1.0 vision charter's decision log, addressable as `@/charter/D-N`. Projecte
 - **D-14** — Gate source freeze on completed profiles MVP and core maintenance
 - **D-15** — Fix scoped validation in core rather than weakening bracket evidence
 <!-- jit:charter:end -->
+
+<!-- jit:dogfood-guidance:begin -->
+### Project invariants
+
+<!-- jit:invariants:begin -->
+- **label-format** — Every label is namespace:value (namespace lowercase-kebab, value non-empty).
+- **namespace-registry** — Every label namespace is declared in the namespace registry.
+- **dag-acyclic** — Cycle detection runs before every dependency operation; the graph stays acyclic.
+- **gate-semantics** — An issue cannot reach Done with pending or failed gates; unpassed gates divert completion to Gated.
+- **event-log** — Every state change appends an event to events.jsonl.
+- **atomic-writes** — All file replacements use the temp-file + atomic-rename pattern; new-file publication uses verified staging plus atomic no-replace publication, so an occupied destination is never overwritten.
+- **pid-safety** — Process-signaling code rejects sentinel or lossy PID conversions before invoking the operating system, including the `u32::MAX as i32 == -1` case that would turn a targeted signal into `kill(-1, sig)`.
+- **assignee-format** — Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
+- **domain-agnostic** — Engine logic is domain-agnostic: type names, label vocabularies, gate keys, templates, and workflow shapes come from repository configuration (.jit/), never from hardcoded domain assumptions. The one sanctioned exception is the planning-bracket preset trio (plan-review, coverage-preview, breakdown-review): it encodes jit's own plan-before-fan-out workflow (@/charter/D-3), not an adopter domain, so it is retained as the single binary-shipped preset bundle.
+- **single-source-prose** — Every fact with a single source of truth reaches prose by projection or citation; volatile facts (counts, enumerations, registry contents) are stated structurally or derived, and a hand-maintained copy is a staleness defect.
+- **bounded-rust-build-footprint** — Rust test topology stays bounded to a small number of cohesive suites rather than one Cargo target per test file, build profiles stay compact rather than embedding a full debugger payload in every test executable, dependency features stay intentional rather than pulling in unused remote-resolution or duplicate TLS infrastructure, and integration-test target count and active test-executable bytes remain within automatically enforced budgets.
+<!-- jit:invariants:end -->
+
+## JIT workflow
+
+- Treat `.jit/` as repository-owned workflow configuration and issue data.
+- Read `.jit/reference/content-standards.md` before authoring issues or planning documents.
+- Derive hierarchy, templates, gates, namespaces, and documentation paths from repository configuration.
+- Use `jit issue status`, `jit query available`, and the dependency graph to select and sequence work.
+- Run the configured gates before completing an issue; a passing review placeholder is advisory evidence only.
+<!-- jit:dogfood-guidance:end -->
 
 ## Commit Conventions
 

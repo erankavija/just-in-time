@@ -463,11 +463,14 @@ Use `jit version` when you need the full provenance record.
 Initialize (or re-initialize) the `.jit/` repository in the current directory.
 Idempotent: re-running over an existing repository never overwrites
 `config.toml`, and leaves `index.json`/`events.jsonl` intact. `rules.toml`
-keeps every custom rule and hand-edited policy field byte-exact; the one
+keeps every custom rule and hand-edited policy field intact; the one
 synchronization re-init performs (when default-origin rules remain enabled) is
 the default `namespace-unique-*` row set, appended or dropped to match the
 current `[namespaces]`/`[type_hierarchy]` registry so each row's `@/rule/<name>`
-address stays resolvable.
+address stays resolvable. An append-only synchronization preserves the rest of
+the file byte-exact; one that drops a row re-serializes the document and may
+canonicalize unusual-but-valid TOML syntax spellings elsewhere in the file —
+semantically lossless, with every rule, comment, and unrelated table preserved.
 
 ```bash
 jit init [--hierarchy-template <name>] [--profile <profile-id>] [--json]
@@ -3114,7 +3117,7 @@ rich views (the invariant registry, or the rule + gate registries with their
 metadata) and is likewise limited to **project-scoped** registry kinds. Both
 styles apply the same pre-write guards: a projection that declares no `target`, a
 declared source that does not exist (a markdown-first kind's source file or a
-`full` kind's registry store), an issue-scoped kind, an unknown kind, or an absent
+registry kind's store, under either style), an issue-scoped kind, an unknown kind, or an absent
 region marker is a typed error (exit `4`) raised before any file is written — a
 missing registry store is never rendered as an empty block. Rendering is
 two-phase: every projection is rendered and its target's final bytes materialized
