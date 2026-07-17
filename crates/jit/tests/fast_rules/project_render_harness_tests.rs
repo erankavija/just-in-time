@@ -329,3 +329,47 @@ fn test_two_phase_render_writes_nothing_when_a_later_projection_fails() {
     );
     let _ = std::fs::remove_dir_all(storage.root());
 }
+
+/// Round-2 F1 (`@/inv/domain-agnostic`): `full`-style dispatch keys on the kind's
+/// DECLARED registry source, not its name. A RENAMED registry-first kind whose
+/// `source` points at the invariants store full-renders identically to what the
+/// built-in `invariant`-named projection would produce — no engine change needed
+/// to rename the kind.
+#[test]
+fn test_full_style_dispatches_on_registry_source_not_kind_name() {
+    // `house-rules` is a renamed invariant kind: a different NAME, the SAME
+    // registry source (`.jit/invariants.toml`).
+    let renamed_kind = r#"
+[item_kinds.house-rules]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
+source-of-truth = "registry-first"
+"#;
+    let config = format!(
+        "{renamed_kind}\n[projection.house]\nkind = \"house-rules\"\n\
+         mode = \"separate-file\"\ntarget = \".jit/house.md\"\nstyle = \"full\"\n"
+    );
+    // Full style renders `config.invariants`, loaded from the `.jit/invariants.toml`
+    // store on the filesystem root — seed it there.
+    let storage = storage_with(&config, &[("invariants.toml", INVARIANTS_TOML)]);
+    let executor = CommandExecutor::new(storage.clone());
+
+    executor.project_render(Some("house")).unwrap();
+    let written = storage
+        .read_repo_file(".jit/house.md")
+        .unwrap()
+        .expect("separate-file target written");
+
+    // Byte-identical to the built-in `full` invariant render over the same registry
+    // — the exact output the built-in `invariant`-named projection would write.
+    let registry = InvariantRegistry::from_toml_str(INVARIANTS_TOML).unwrap();
+    let expected = render_invariants_markdown(&registry, jit::config::ProjectionStyle::Full);
+    assert_eq!(written, expected);
+    assert!(written.contains("## Project invariants"));
+
+    let _ = std::fs::remove_dir_all(storage.root());
+}

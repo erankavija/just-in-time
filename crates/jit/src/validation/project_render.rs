@@ -16,9 +16,11 @@
 //!   code — this is what the charter dogfood exercises.
 //! - **`full`** — the built-in rich registry views, whose typed fields (invariant
 //!   kind/enforced-by; rule severity/enforcement; gate title) are absent from a
-//!   generic row. Selected by the projection's declared kinds: the `invariant`
-//!   kind renders the invariant registry, the `rule`+`gate` pair renders the rule +
-//!   gate registries. Any other kind set under `full` is a typed error.
+//!   generic row. Selected by the kind's declared registry SOURCE, not its name: a
+//!   projection whose kinds' `[item_kinds.<name>].source` is the invariant store
+//!   renders the invariant registry, and the rule + gate stores together render the
+//!   rule + gate registries — so a repo may rename the equivalent kind freely
+//!   (`@/inv/domain-agnostic`). Any other source set under `full` is a typed error.
 //!
 //! A missing source, an unknown kind, or a non-project kind is a typed
 //! [`ProjectionError`] raised BEFORE any body is returned, so the caller never
@@ -148,25 +150,51 @@ fn resolve_rows(
     Ok(rows)
 }
 
+/// The engine's own registry stores — fixed `.jit/` locations jit reads its
+/// invariant, rule, and gate registries from (repository.rs loads `config.invariants`
+/// from `.jit/invariants.toml`, and the rule/gate stores live beside it). These are
+/// jit's infrastructure, NOT a user domain vocabulary.
+const INVARIANT_STORE: &str = ".jit/invariants.toml";
+const RULE_STORE: &str = ".jit/rules.toml";
+const GATE_STORE: &str = ".jit/gates.toml";
+
 /// Render the `full` body for the built-in registry-first kinds.
 ///
-/// Dispatches on the projection's canonical kind set: `{invariant}` renders the
-/// invariant registry, `{rule, gate}` renders the rule + gate registries. These
-/// are jit's own built-in infrastructure kinds (the same ones addressed by
-/// `@/invariant/…`, `@/rule/…`, `@/gate/…` literals elsewhere), so naming them
-/// here keeps the USER-domain surface agnostic. Any other kind set is
-/// [`ProjectionError::FullStyleUnsupported`].
+/// Dispatches on what CONFIGURATION declares, not on kind NAMES: a projected
+/// kind's `[item_kinds.<name>].source` registry path selects the rich view, so a
+/// repo may RENAME or alias the equivalent kind freely and still get the right
+/// render as long as its source points at the engine's registry store
+/// (`@/inv/domain-agnostic`). A projection whose kinds' declared sources are the
+/// invariant store renders the invariant registry; the rule + gate stores together
+/// render the rule + gate registries. Any other source set — a markdown-first kind
+/// with no registry source, or a registry that is not one of jit's own stores — is
+/// [`ProjectionError::FullStyleUnsupported`] (there is no built-in rich view for it).
 fn render_full_body(
     proj: &ProjectionConfig,
     kinds: &[&ItemKind],
     inputs: &ProjectionInputs,
 ) -> Result<(String, usize)> {
-    let canonical: BTreeSet<&str> = kinds.iter().map(|kind| kind.name()).collect();
-    if canonical == BTreeSet::from(["invariant"]) {
+    // Every kind must declare a registry source; a missing one (a markdown-first
+    // kind) has no built-in rich view.
+    let Some(sources) = kinds
+        .iter()
+        .map(|kind| {
+            kind.toml_source()
+                .map(|descriptor| descriptor.toml.as_str())
+        })
+        .collect::<Option<BTreeSet<&str>>>()
+    else {
+        return Err(ProjectionError::FullStyleUnsupported {
+            kinds: proj.kinds().to_vec(),
+        }
+        .into());
+    };
+
+    if sources == BTreeSet::from([INVARIANT_STORE]) {
         let registry = &inputs.config.invariants;
         let body = render_invariants_markdown(registry, ProjectionStyle::Full);
         Ok((body, registry.invariants.len()))
-    } else if canonical == BTreeSet::from(["gate", "rule"]) {
+    } else if sources == BTreeSet::from([RULE_STORE, GATE_STORE]) {
         let body =
             render_rules_and_gates_markdown(inputs.rules, inputs.gates, ProjectionStyle::Full);
         Ok((body, inputs.rules.rules.len() + inputs.gates.gates.len()))
