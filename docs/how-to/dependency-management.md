@@ -34,7 +34,7 @@ Both can flow in the same direction, but serve different purposes:
 
 | Aspect | Dependencies | Labels |
 |--------|--------------|--------|
-| **Semantics** | "Blocks until terminal" | "Belongs to group" |
+| **Semantics** | "Blocks until effectively terminal" | "Belongs to group" |
 | **Enforces** | Work order (workflow) | Organization (categorization) |
 | **Dynamic** | Affects state transitions | Static metadata |
 | **Structure** | Arbitrary DAG | Flat `namespace:value` pairs |

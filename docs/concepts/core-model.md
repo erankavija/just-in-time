@@ -679,7 +679,7 @@ Gates influence state transitions:
 
 ```mermaid
 stateDiagram-v2
-    Backlog --> Ready: dependencies terminal
+    Backlog --> Ready: dependencies effectively terminal
     Ready --> InProgress: prechecks pass
     InProgress --> Gated: done requested with unpassed gates
     Gated --> Done: done retried after gate statuses pass
@@ -1012,7 +1012,7 @@ jit issue create --title "JWT utils" --label "epic:auth"
 jit dep add <epic-id> <task-id>
 
 # Query by label: "epic:auth" → Shows all auth work
-# Query ready: → Shows task if unblocked, epic once task is terminal
+# Query ready: → Shows task if unblocked, epic once task is effectively terminal
 ```
 
 ### Label Namespaces Discovery

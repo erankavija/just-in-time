@@ -74,8 +74,8 @@ This is a consequence of the direction of the edge, not an extra rule. Three
 facts compose:
 
 1. A container depends on its contents (the edge direction above).
-2. An issue is blocked while any of its dependencies is outside an *effective*
-   terminal state (`Issue::is_blocked`). The terminal states are `Done` and
+2. An issue is blocked while any of its dependencies is not *effectively
+   terminal* (`Issue::is_blocked`). The terminal states are `Done` and
    `Rejected`, so a rejected dependency counts as met; `Archived` is
    terminality-preserving, so a dependency archived from `Done` or `Rejected`
    also counts as met, while one archived from a non-terminal state (or a legacy
@@ -88,7 +88,8 @@ Compose them: a container is blocked while any issue it contains is not
 effectively terminal. Because blocking follows the edges transitively, an epic
 is blocked until every task beneath every story beneath it is `Done`,
 `Rejected`, or `Archived` from one of those. So a container
-surfaces as available work only once its entire subtree is terminal, and its own
+surfaces as available work only once its entire subtree is effectively
+terminal, and its own
 work (the closing gates, the acceptance pass, the release note) is the last thing
 the graph offers.
 
@@ -104,7 +105,7 @@ graph LR
 ```
 
 Here both tasks are terminal, so the epic is unblocked and workable; the
-milestone stays blocked until the epic itself reaches a terminal state.
+milestone stays blocked until the epic itself becomes effectively terminal.
 
 Two corollaries follow:
 

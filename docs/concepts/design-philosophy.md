@@ -118,7 +118,7 @@ fn compute_ready_issues_mut(issues: &mut Vec<Issue>) {
 // GOOD: Pure function (same input = same output)
 fn is_blocked(issue: &Issue, all_issues: &[Issue]) -> bool {
     issue.dependencies.iter()
-        .any(|dep_id| !is_terminal(dep_id, all_issues))
+        .any(|dep_id| !is_effectively_terminal(dep_id, all_issues))
 }
 
 // AVOID: Stateful method with hidden dependencies

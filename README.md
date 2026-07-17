@@ -108,7 +108,7 @@ JIT's workflow revolves around **issues** (units of work) that progress through 
 stateDiagram-v2
     [*] --> ready: dependency-free creation
     [*] --> backlog: creation with unmet dependencies
-    backlog --> ready: dependencies terminal
+    backlog --> ready: dependencies effectively terminal
     ready --> in_progress: claim (prechecks pass)
     in_progress --> gated: work submitted
     gated --> done: postchecks pass

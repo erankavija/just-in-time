@@ -2200,7 +2200,8 @@ jit dep add <FROM_ID> <TO_ID>... [--reduce] [--json]
 
 **Arguments:**
 - `FROM_ID` — the issue that becomes blocked
-- `TO_ID...` — one or more issues that must reach a terminal state first
+- `TO_ID...` — one or more issues that must become effectively terminal (done,
+  rejected, or archived from one of those) first
 
 **All-or-nothing (jit:c8518f2a):** every requested edge is validated — id
 resolution, then cycle detection and (by default) a check that the edge
@@ -2607,10 +2608,11 @@ spelling of `jit graph rdeps <id>`.
 
 Show what an issue depends on: the issues that must become effectively terminal
 (done, rejected, or archived from one of those) before it can proceed. In
-`--json` output each dependency node carries its `state` and, for an `archived`
-node, `archived_from` — the preserved pre-archive state that determines whether
-the archived dependency still satisfies (a terminal origin satisfies; a
-non-terminal or absent origin blocks).
+`--json` output each dependency node carries its `state`; an `archived` node
+whose pre-archive state was recorded also carries it as `archived_from`. The
+origin determines whether the archived dependency still satisfies: a terminal
+origin satisfies, a non-terminal origin blocks, and a legacy archived node that
+omits the field blocks.
 
 ```bash
 jit graph deps <ID> [--depth <N>] [--json]
