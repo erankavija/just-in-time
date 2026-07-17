@@ -74,9 +74,71 @@ pub fn write_baked_schema(jit_root: &Path, file_name: &str, content: &str) -> Re
     Ok(true)
 }
 
+/// The `rules.toml` array-of-tables key holding every `[[rules]]` block.
+const RULES_ARRAY_KEY: &str = "rules";
+
+/// Set the leading trivia (prefix decoration) of a top-level [`toml_edit::Item`]
+/// to `prefix`, regardless of the item's shape. A table or bare value carries
+/// its own decoration; an array-of-tables stores its leading trivia on its first
+/// table. A `None` item (an unset key) has nowhere to hang trivia, so this is a
+/// no-op there.
+fn set_item_prefix(item: &mut toml_edit::Item, prefix: &str) {
+    match item {
+        toml_edit::Item::Table(table) => table.decor_mut().set_prefix(prefix),
+        toml_edit::Item::Value(value) => value.decor_mut().set_prefix(prefix),
+        toml_edit::Item::ArrayOfTables(tables) => {
+            if let Some(first) = tables.get_mut(0) {
+                first.decor_mut().set_prefix(prefix);
+            }
+        }
+        toml_edit::Item::None => {}
+    }
+}
+
+/// Read the leading trivia (prefix decoration) of a top-level [`toml_edit::Item`]
+/// as an owned string, mirroring [`set_item_prefix`]'s shape handling. Returns
+/// `None` when the item cannot carry a prefix (an empty array-of-tables or an
+/// unset key) or when it carries none.
+fn item_prefix(item: &toml_edit::Item) -> Option<String> {
+    let decor = match item {
+        toml_edit::Item::Table(table) => table.decor(),
+        toml_edit::Item::Value(value) => value.decor(),
+        toml_edit::Item::ArrayOfTables(tables) => tables.get(0)?.decor(),
+        toml_edit::Item::None => return None,
+    };
+    decor
+        .prefix()
+        .and_then(|raw| raw.as_str())
+        .map(str::to_owned)
+}
+
+/// The key of the first top-level item that is NOT the (possibly empty) `rules`
+/// array, in document order. This is the file's TOP — where the leading
+/// header/comments belong once no `[[rules]]` block remains to carry them
+/// (`rules` itself, empty, emits nothing and cannot hold the trivia).
+fn first_non_rules_key(doc: &toml_edit::DocumentMut) -> Option<String> {
+    doc.as_table()
+        .iter()
+        .find(|(key, _)| *key != RULES_ARRAY_KEY)
+        .map(|(key, _)| key.to_owned())
+}
+
+/// The key of the top-level item immediately FOLLOWING the `rules` array in
+/// document order, or `None` when `rules` is last (or absent). This is where the
+/// emptied array's orphaned leading trivia is relocated — the slot the removed
+/// rules block occupied — so it never jumps ahead of any content that preceded
+/// the array (a leading table).
+fn key_after_rules(doc: &toml_edit::DocumentMut) -> Option<String> {
+    doc.as_table()
+        .iter()
+        .skip_while(|(key, _)| *key != RULES_ARRAY_KEY)
+        .nth(1)
+        .map(|(key, _)| key.to_owned())
+}
+
 /// Rewrite the leading header region of `<jit_root>/rules.toml` to `header`,
 /// preserving every `[[rules]]` block below it (and any comments authored inside
-/// them) verbatim.
+/// them) verbatim, and preserving all other non-generated content unconditionally.
 ///
 /// The header region is the leading trivia before the first `[[rules]]` table —
 /// a generated comment block, modelled as the prefix decoration of the first
@@ -84,10 +146,12 @@ pub fn write_baked_schema(jit_root: &Path, file_name: &str, content: &str) -> Re
 /// prefix) always states the current default-rule contract without disturbing
 /// any rule body, so a `[[rules]]` sequence inside a comment or a multiline rule
 /// description can never be mistaken for the first table. A ruleset file with no
-/// `[[rules]]` block (an intentionally empty ruleset) is rewritten to `header`
-/// alone. A no-op when `rules.toml` is absent (the scaffold path writes a fresh
-/// file, header included) or already current. Returns `true` when the file was
-/// rewritten. Atomic (temp + rename).
+/// `[[rules]]` block but with other content (custom tables, comments) keeps that
+/// content: the header is republished onto the first surviving top-level item's
+/// prefix, never by replacing the whole file. Only a document with no top-level
+/// item at all is rewritten to `header` alone. A no-op when `rules.toml` is
+/// absent (the scaffold path writes a fresh file, header included) or already
+/// current. Returns `true` when the file was rewritten. Atomic (temp + rename).
 pub fn rewrite_rules_header(jit_root: &Path, header: &str) -> Result<bool> {
     let path = jit_root.join(RULES_FILE);
     if !path.exists() {
@@ -107,8 +171,18 @@ pub fn rewrite_rules_header(jit_root: &Path, header: &str) -> Result<bool> {
             first.decor_mut().set_prefix(header);
             doc.to_string()
         }
-        // No `[[rules]]` block: the file is header-only, replaced wholesale.
-        None => header.to_string(),
+        // No `[[rules]]` block. The header is the leading region before the first
+        // top-level item; republish it there, preserving every table body and all
+        // trailing content. Only a document with no item at all is header-only.
+        None => match first_non_rules_key(&doc) {
+            Some(key) => {
+                if let Some(item) = doc.get_mut(&key) {
+                    set_item_prefix(item, header);
+                }
+                doc.to_string()
+            }
+            None => header.to_string(),
+        },
     };
     if rebuilt == content {
         return Ok(false);
@@ -161,9 +235,6 @@ pub fn read_rule_identities(jit_root: &Path) -> Result<Vec<(String, Option<Strin
         .collect())
 }
 
-/// The `rules.toml` array-of-tables key holding every `[[rules]]` block.
-const RULES_ARRAY_KEY: &str = "rules";
-
 /// Apply a `namespace-unique-*` DEFAULT-rule membership delta to
 /// `<jit_root>/rules.toml`: append each pre-rendered `[[rules]]` block in
 /// `to_add` at the END of the file, and remove the `origin = "default"` block
@@ -179,8 +250,10 @@ const RULES_ARRAY_KEY: &str = "rules";
 /// Dropping the FIRST rule transfers its prefix decoration — where `toml_edit`
 /// stores the file's leading header/comments — onto the new first rule, so the
 /// leading trivia is preserved rather than removed with the entry. Dropping the
-/// last remaining rule leaves the generated header to the header-rewrite path
-/// while any unrelated trailing tables survive.
+/// LAST remaining rule empties the array, leaving no entry to carry that trivia;
+/// it is relocated instead onto the first surviving top-level item (prepended to
+/// its prefix) or, when none follows, onto the document's trailing decor, so the
+/// leading header/comments and any unrelated trailing tables all survive.
 ///
 /// `to_add` entries are typically rendered via
 /// [`crate::validation::serialize::render_rule_block`] and are appended verbatim
@@ -214,6 +287,13 @@ pub fn sync_namespace_unique_rules(
     // DROP through the document model: remove each `origin = "default"` rule
     // named in `to_drop`. Matching on the model's own `name`/`origin` values can
     // never over-reach into neighbouring or trailing content.
+    //
+    // `toml_edit` stores the file's leading header/comments as the FIRST entry's
+    // prefix decoration. If that entry is dropped, its trivia is transferred onto
+    // whatever is now first: the new first RULE when one survives, else — when the
+    // drop empties the array — `orphaned_leading_prefix` carries it out for
+    // relocation onto the rest of the document (below), so it is never lost.
+    let mut orphaned_leading_prefix: Option<String> = None;
     let dropped_any = !to_drop.is_empty()
         && doc
             .get_mut(RULES_ARRAY_KEY)
@@ -226,10 +306,6 @@ pub fn sync_namespace_unique_rules(
                             .and_then(toml_edit::Item::as_str)
                             .is_some_and(|name| to_drop.iter().any(|d| d == name))
                 };
-                // `toml_edit` stores the file's leading header/comments as the
-                // FIRST entry's prefix decoration. If that entry is dropped, capture
-                // its prefix so it can be transferred onto the new first entry —
-                // otherwise the leading trivia would vanish with the removed entry.
                 let leading_prefix = rules
                     .get(0)
                     .filter(|first| is_dropped(first))
@@ -240,15 +316,38 @@ pub fn sync_namespace_unique_rules(
                 let before = rules.len();
                 rules.retain(|table| !is_dropped(table));
 
-                // Restore the leading trivia onto whatever is now first (mirrors the
-                // first-entry prefix handling in `rewrite_rules_header`). When the
-                // drop empties the array there is no entry to carry it; the generated
-                // header is re-published by the header-rewrite path instead.
-                if let (Some(prefix), Some(new_first)) = (leading_prefix, rules.get_mut(0)) {
-                    new_first.decor_mut().set_prefix(prefix);
+                if let Some(prefix) = leading_prefix {
+                    match rules.get_mut(0) {
+                        // A rule survives: transfer the trivia onto it (mirrors the
+                        // first-entry prefix handling in `rewrite_rules_header`).
+                        Some(new_first) => new_first.decor_mut().set_prefix(prefix),
+                        // The array is now empty: hand the trivia out to be
+                        // relocated onto the rest of the document.
+                        None => orphaned_leading_prefix = Some(prefix),
+                    }
                 }
                 rules.len() != before
             });
+
+    // The drop emptied the `rules` array, orphaning the leading header/comments
+    // (the now-empty array emits nothing and cannot carry them). Relocate the
+    // trivia so it survives: prepend it to the first surviving top-level item's
+    // prefix, keeping both intact; if nothing follows, keep it as the document's
+    // trailing decor. Either way no non-rule content is lost.
+    if let Some(prefix) = orphaned_leading_prefix {
+        match key_after_rules(&doc) {
+            Some(key) => {
+                if let Some(item) = doc.get_mut(&key) {
+                    let combined = match item_prefix(item) {
+                        Some(existing) => format!("{prefix}{existing}"),
+                        None => prefix,
+                    };
+                    set_item_prefix(item, &combined);
+                }
+            }
+            None => doc.as_table_mut().decor_mut().set_suffix(prefix),
+        }
+    }
 
     // Re-serialize only when a drop actually removed a table: `toml_edit` is
     // lossless for retained content EXCEPT that it canonicalizes exotic-but-valid
@@ -468,6 +567,65 @@ mod tests {
         assert!(!dir.path().join(RULES_FILE).exists());
     }
 
+    #[test]
+    fn test_rewrite_rules_header_preserves_trailing_content_when_no_rules() {
+        // A no-rules `rules.toml` still carrying unrelated content (a custom table
+        // and comments) — the shape a re-init sees after membership sync drops the
+        // last default rule. Republishing the header must NOT replace the whole
+        // file: the header lands atop the surviving content, every other byte of
+        // which is preserved (jit:d74a9ed1 review F3, round 7).
+        let dir = tempfile::tempdir().unwrap();
+        let content = "# stale header\n\n[extra]\nnote = \"custom table, must survive\"\n# a trailing comment\n";
+        std::fs::write(dir.path().join(RULES_FILE), content).unwrap();
+
+        let new_header = "# fresh generated header\n# contract line\n\n";
+        let wrote = rewrite_rules_header(dir.path(), new_header).unwrap();
+        assert!(wrote, "a differing header must be rewritten");
+
+        let updated = std::fs::read_to_string(dir.path().join(RULES_FILE)).unwrap();
+        assert_eq!(
+            updated,
+            "# fresh generated header\n# contract line\n\n[extra]\nnote = \"custom table, must survive\"\n# a trailing comment\n",
+            "header republished atop unrelated content, nothing else deleted:\n{updated}"
+        );
+    }
+
+    #[test]
+    fn test_rewrite_rules_header_no_rules_trailing_content_is_idempotent() {
+        // Republishing the SAME header over a no-rules-with-trailing-content file
+        // twice is a no-op the second time (the header-region prefix already
+        // matches), so re-init never duplicates the header or churns the file.
+        let dir = tempfile::tempdir().unwrap();
+        let content = "# old\n\n[extra]\nnote = \"keep\"\n";
+        std::fs::write(dir.path().join(RULES_FILE), content).unwrap();
+        let header = "# fresh\n\n";
+        assert!(rewrite_rules_header(dir.path(), header).unwrap());
+        let once = std::fs::read_to_string(dir.path().join(RULES_FILE)).unwrap();
+        assert!(
+            !rewrite_rules_header(dir.path(), header).unwrap(),
+            "an already-current header over a no-rules file is a no-op"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(RULES_FILE)).unwrap(),
+            once,
+            "the header is not duplicated on re-run"
+        );
+    }
+
+    #[test]
+    fn test_rewrite_rules_header_empty_file_is_header_only() {
+        // A `rules.toml` with no top-level item at all (whitespace only) is the one
+        // case rewritten to the header alone: there is no content to preserve.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(RULES_FILE), "\n\n").unwrap();
+        let header = "# header\n\n";
+        assert!(rewrite_rules_header(dir.path(), header).unwrap());
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(RULES_FILE)).unwrap(),
+            header
+        );
+    }
+
     // -- sync_namespace_unique_rules (jit:d74a9ed1) ---------------------------
 
     /// A minimal, hand-authored `rules.toml`: one default rule, one custom rule
@@ -619,10 +777,12 @@ note = \"unrelated trailing table, must survive\"\n\
     }
 
     #[test]
-    fn test_sync_drop_of_all_rules_preserves_trailing_table() {
+    fn test_sync_drop_of_all_rules_preserves_header_and_trailing_table() {
         // Dropping the ONLY rule empties the array. No entry remains to carry the
-        // generated leading header (the header-rewrite path republishes it), but an
-        // unrelated trailing table must not be lost (jit:d74a9ed1 review, round 6b).
+        // leading header, so it is relocated onto the first surviving top-level
+        // item (the trailing table): BOTH the header/comments AND the unrelated
+        // trailing table must survive (jit:d74a9ed1 review F2, round 7; round 6b
+        // only preserved the trailing table).
         let dir = tempfile::tempdir().unwrap();
         let content = "# HEADER\n\n[[rules]]\nname = \"namespace-unique-team\"\norigin = \"default\"\nassert = { require-label = { label = \"team:*\", min = 0, max = 1 } }\n\n[extra]\nnote = \"survives\"\n";
         write_rules(dir.path(), content);
@@ -637,9 +797,79 @@ note = \"unrelated trailing table, must survive\"\n\
             !updated.contains("namespace-unique-team"),
             "the only rule is dropped"
         );
+        // The leading header/comments survive rather than vanishing with the entry.
+        assert!(
+            updated.contains("# HEADER"),
+            "leading header preserved when the array empties:\n{updated}"
+        );
         assert!(
             updated.contains("[extra]\nnote = \"survives\""),
             "unrelated trailing table preserved:\n{updated}"
+        );
+        // The header is prepended onto the trailing table's prefix — both the
+        // header text and the table's own separator survive, none is overwritten.
+        assert_eq!(
+            updated, "# HEADER\n\n\n[extra]\nnote = \"survives\"\n",
+            "header and trailing content both intact:\n{updated}"
+        );
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_sync_drop_of_final_rule_preserves_leading_header_byte_exact() {
+        // Dropping the final remaining rule from a header-only ruleset (no trailing
+        // content) empties the array. The leading header/comments have no item to
+        // carry them, so they are kept as the document's trailing decor — surviving
+        // BYTE-EXACT rather than being lost with the entry (jit:d74a9ed1 review F2,
+        // round 7). Without the fix `jit config set` would leave an EMPTY file.
+        let dir = tempfile::tempdir().unwrap();
+        let header = "# generated header line one\n# generated header line two\n\n";
+        let content = format!(
+            "{header}[[rules]]\nname = \"namespace-unique-team\"\norigin = \"default\"\nassert = {{ require-label = {{ label = \"team:*\", min = 0, max = 1 }} }}\n"
+        );
+        write_rules(dir.path(), &content);
+
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[], &["namespace-unique-team".to_string()])
+                .unwrap();
+        assert!(changed);
+
+        let updated = read_rules(dir.path());
+        assert_eq!(
+            updated, header,
+            "leading header/comments preserved byte-exact after the array empties:\n{updated}"
+        );
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_sync_drop_of_final_rule_relocates_header_past_preamble() {
+        // Pathological: a top-level table PRECEDES the rules block, so the dropped
+        // first-rule prefix is inter-block trivia, not the file's top. Emptying the
+        // array must relocate that trivia onto the item that FOLLOWS the rules block
+        // in document order (never to the file top), keeping preamble, the trivia,
+        // and the trailing table all in order (jit:d74a9ed1 review F2, round 7).
+        let dir = tempfile::tempdir().unwrap();
+        let content = "[preamble]\nx = 1\n\n# rules header\n\n[[rules]]\nname = \"namespace-unique-team\"\norigin = \"default\"\nassert = { require-label = { label = \"team:*\", min = 0, max = 1 } }\n\n[extra]\nnote = \"keep\"\n";
+        write_rules(dir.path(), content);
+
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[], &["namespace-unique-team".to_string()])
+                .unwrap();
+        assert!(changed);
+
+        let updated = read_rules(dir.path());
+        assert!(
+            updated.starts_with("[preamble]\nx = 1\n"),
+            "preamble stays first, header trivia is not moved to the top:\n{updated}"
+        );
+        assert!(
+            updated.contains("# rules header"),
+            "the header trivia survives the empty:\n{updated}"
+        );
+        assert!(
+            updated.contains("[extra]\nnote = \"keep\""),
+            "the trailing table survives:\n{updated}"
         );
         assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 0);
     }
