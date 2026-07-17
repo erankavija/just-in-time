@@ -21,7 +21,7 @@ use clap::Parser;
 use jit::cli::{
     ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
     GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, MigrateCommands,
-    ProfileCommands, ReferenceCommands,
+    ProfileCommands, ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate};
 use jit::domain::{GateRunResult, Priority, State};
@@ -72,6 +72,9 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             .is_some()
         || error
             .downcast_ref::<jit::errors::RedundantDependencyError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::validation::projection::ProjectionError>()
             .is_some()
         || error
             .downcast_ref::<jit::profile::ProfilePlanError>()
@@ -1291,12 +1294,9 @@ fn run_invariant<S: IssueStore>(
     command: InvariantCommands,
     quiet: bool,
 ) -> Result<()> {
-    let json = match &command {
-        InvariantCommands::Render { json } => *json,
-        InvariantCommands::Check { json } => *json,
-    };
+    let InvariantCommands::Check { json } = command;
 
-    let result = run_invariant_inner(executor, command, quiet);
+    let result = run_invariant_inner(executor, InvariantCommands::Check { json }, quiet);
     if let Err(e) = result {
         handle_json_error!(
             json,
@@ -1315,23 +1315,6 @@ fn run_invariant_inner<S: IssueStore>(
     quiet: bool,
 ) -> Result<()> {
     match command {
-        InvariantCommands::Render { json } => {
-            let result = executor.render_invariants()?;
-            let output_ctx = OutputContext::new(quiet, json);
-            if json {
-                let msg = format!(
-                    "Rendered {} invariant(s) to {}",
-                    result.count, result.target
-                );
-                let output = JsonOutput::success(&result, "invariant render").with_message(msg);
-                println!("{}", output.to_json_string()?);
-            } else {
-                output_ctx.print_data(format!(
-                    "Rendered {} invariant(s) to {} ({} mode)",
-                    result.count, result.target, result.mode
-                ))?;
-            }
-        }
         InvariantCommands::Check { json } => {
             let result = executor.check_invariants()?;
             let exit_nonzero = result.has_drift();
@@ -1365,56 +1348,57 @@ fn run_invariant_inner<S: IssueStore>(
     Ok(())
 }
 
-/// Run `jit reference <subcommand>`.
+/// Run `jit project <subcommand>`.
 ///
-/// A thin delegation over the [`CommandExecutor`] rules-and-gates methods:
-/// `render` projects the rule + gate registries into their configured reference
-/// document and reports the written target. On `--json` a failure is rendered as a
-/// JSON error object (honoring the machine-readable contract) rather than the
-/// top-level plain `Error: ...`.
-fn run_reference<S: IssueStore>(
+/// A thin delegation over [`CommandExecutor::project_render`]: `render` writes
+/// every declared `[projection.*]` (or a single `--name`d one) into its configured
+/// documentation target and reports what was written. On `--json` a failure is
+/// rendered as a JSON error object (honoring the machine-readable contract) rather
+/// than the top-level plain `Error: ...`.
+fn run_project<S: IssueStore>(
     executor: &CommandExecutor<S>,
-    command: ReferenceCommands,
+    command: ProjectCommands,
     quiet: bool,
 ) -> Result<()> {
     let json = match &command {
-        ReferenceCommands::Render { json } => *json,
+        ProjectCommands::Render { json, .. } => *json,
     };
 
-    let result = run_reference_inner(executor, command, quiet);
+    let result = run_project_inner(executor, command, quiet);
     if let Err(e) = result {
         handle_json_error!(
             json,
             e,
-            jit::output::JsonError::new("REFERENCE_COMMAND_FAILED", e.to_string(), "reference")
+            jit::output::JsonError::new("PROJECT_COMMAND_FAILED", e.to_string(), "project")
         );
     }
     Ok(())
 }
 
-/// Inner dispatch for `jit reference`; errors are converted to JSON by
-/// [`run_reference`] when `--json` is set.
-fn run_reference_inner<S: IssueStore>(
+/// Inner dispatch for `jit project`; errors are converted to JSON by
+/// [`run_project`] when `--json` is set.
+fn run_project_inner<S: IssueStore>(
     executor: &CommandExecutor<S>,
-    command: ReferenceCommands,
+    command: ProjectCommands,
     quiet: bool,
 ) -> Result<()> {
     match command {
-        ReferenceCommands::Render { json } => {
-            let result = executor.render_rules_and_gates()?;
+        ProjectCommands::Render { name, json } => {
+            let result = executor.project_render(name.as_deref())?;
             let output_ctx = OutputContext::new(quiet, json);
             if json {
-                let msg = format!(
-                    "Rendered {} rule(s) and {} gate(s) to {}",
-                    result.rules, result.gates, result.target
-                );
-                let output = JsonOutput::success(&result, "reference render").with_message(msg);
+                let msg = format!("Rendered {} projection(s)", result.count);
+                let output = JsonOutput::success(&result, "project render").with_message(msg);
                 println!("{}", output.to_json_string()?);
+            } else if result.projections.is_empty() {
+                output_ctx.print_data("No projections declared".to_string())?;
             } else {
-                output_ctx.print_data(format!(
-                    "Rendered {} rule(s) and {} gate(s) to {} ({} mode)",
-                    result.rules, result.gates, result.target, result.mode
-                ))?;
+                for projection in &result.projections {
+                    output_ctx.print_data(format!(
+                        "Rendered projection '{}' to {} ({} mode, {} style)",
+                        projection.name, projection.target, projection.mode, projection.style
+                    ))?;
+                }
             }
         }
     }
@@ -6254,8 +6238,8 @@ fn run() -> Result<()> {
         Commands::Invariant(invariant_cmd) => {
             run_invariant(&executor, invariant_cmd, quiet)?;
         }
-        Commands::Reference(reference_cmd) => {
-            run_reference(&executor, reference_cmd, quiet)?;
+        Commands::Project(project_cmd) => {
+            run_project(&executor, project_cmd, quiet)?;
         }
         Commands::Search {
             query,

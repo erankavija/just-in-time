@@ -258,8 +258,8 @@ pub fn render_reference_markdown() -> Result<String> {
          definitions directly, while manual adopters can use `jit gate preset apply`. See\n\
          [Repository Profiles](profiles.md) for the profile contract. The gates a project\n\
          actually enforces live in its own `.jit/gates.toml`, its settings in\n\
-         `.jit/config.toml`; render those with `jit reference render` (see [Rules and\n\
-         Gates](rules-and-gates.md)).\n\
+         `.jit/config.toml`; render those with `jit project render` (see\n\
+         [Rules and Gates](rules-and-gates.md)).\n\
          \n\
          ## Portable checker types\n\
          \n\

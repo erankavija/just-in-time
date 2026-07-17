@@ -81,7 +81,7 @@ Adjacent subsystems include `validation/` (rules engine), `document/` (linked do
 ├── gates.toml          # Gate registry (`@/charter/D-2`)
 ├── templates.toml      # Graph template registry (this repo declares the `plan` bracket)
 ├── rules.toml          # Validation rules
-├── invariants.toml     # Invariants registry (rendered to the `[invariant_projection]` target; here AGENTS.md)
+├── invariants.toml     # Invariants registry (rendered by the `invariants` projection; here AGENTS.md)
 ├── issues/{id}.json    # Individual issue files
 ├── events.jsonl        # Append-only event log
 ├── gate-runs/          # Recorded gate runs (+ structured findings)
@@ -92,14 +92,14 @@ A live repo also carries gitignored machine-local files in `.jit/` (`worktree.js
 
 ### Addressable Items
 
-Structured lines in issue descriptions and project registries carry a self-id and are addressable via qualified ids: `@/<kind>/<self-id>` (project scope, e.g. `@/invariant/dag-acyclic`), `@/issue/<short-id>/<kind>/<self-id>` (issue scope), with `<short-id>/<self-id>` as input sugar. Kinds (requirement, decision, risk, invariant, …) and their aliases (`@/inv/…`) are declared in `[item_kinds]` in `.jit/config.toml`; beyond the kinds `jit init` scaffolds, this repo adds a `definition` kind over `docs/reference/glossary.md` and a `charter` kind over the v1.0 vision charter (`dev/vision/9db27a3a-charter.md`), whose decisions are citable as `@/charter/D-N` via `per:` labels (`@/charter/D-7`). Each kind declares its source of truth (`@/charter/D-6`): markdown-first for description-embedded items (requirement, decision, risk), registry-first for TOML registries (invariant, rule, gate — `jit invariant render` and `jit reference render` project the registries into markdown); the item index is always a projection. Citations like `@/inv/gate-semantics` in docs and issue text resolve through this scheme; `jit validate` flags dangling item links (`dangling-item-link`).
+Structured lines in issue descriptions and project registries carry a self-id and are addressable via qualified ids: `@/<kind>/<self-id>` (project scope, e.g. `@/invariant/dag-acyclic`), `@/issue/<short-id>/<kind>/<self-id>` (issue scope), with `<short-id>/<self-id>` as input sugar. Kinds (requirement, decision, risk, invariant, …) and their aliases (`@/inv/…`) are declared in `[item_kinds]` in `.jit/config.toml`; beyond the kinds `jit init` scaffolds, this repo adds a `definition` kind over `docs/reference/glossary.md` and a `charter` kind over the v1.0 vision charter (`dev/vision/9db27a3a-charter.md`), whose decisions are citable as `@/charter/D-N` via `per:` labels (`@/charter/D-7`). Each kind declares its source of truth (`@/charter/D-6`): markdown-first for description-embedded items (requirement, decision, risk), registry-first for TOML registries (invariant, rule, gate — `jit project render` projects the registries into markdown via `[projection.*]`); the item index is always a projection. Citations like `@/inv/gate-semantics` in docs and issue text resolve through this scheme; `jit validate` flags dangling item links (`dangling-item-link`).
 
 ## Dogfooding Setup
 
 This repository tracks jit's own development with jit: `.jit/` here is project configuration, distinct from what the product ships.
 
-- **`jit init` ships**: `index.json`, an empty `gates.toml`, `events.jsonl`, a template-generated `config.toml` (milestone/epic/story/task hierarchy plus the namespace and item-kind registries), `rules.toml` with the default ruleset (format, registry, hierarchy, and per-namespace uniqueness checks). Gate presets: only the planning-bracket trio (`plan-review`, `coverage-preview`, `breakdown-review`) is built into the binary and materializes via `jit gate preset apply`; language- or workflow-specific bundles are declared per project under `.jit/config/gate-presets/`. `templates.toml`, `invariants.toml`, and the projection tables are authored per project, never scaffolded.
-- **This repo's local layer**: gates wired to repo scripts, declared in `.jit/gates.toml` with per-workspace scope stated in each gate's description; `planning`/`breakdown`/`bug`/`enhancement` types; `brackets:`/`satisfies:`/`per:` namespaces; the `coverage-preview` rule; the `plan` template; the `definition` and `charter` item kinds; the invariant projection into this file and the rules-gates projection into `docs/reference/rules-and-gates.md`; the `dev/` doc lifecycle.
+- **`jit init` ships**: `index.json`, an empty `gates.toml`, `events.jsonl`, a template-generated `config.toml` (milestone/epic/story/task hierarchy plus the namespace and item-kind registries), `rules.toml` with the default ruleset (format, registry, hierarchy, and per-namespace uniqueness checks). Gate presets: only the planning-bracket trio (`plan-review`, `coverage-preview`, `breakdown-review`) is built into the binary and materializes via `jit gate preset apply`; language- or workflow-specific bundles are declared per project under `.jit/config/gate-presets/`. `templates.toml`, `invariants.toml`, and the `[projection.*]` tables are authored per project, never scaffolded.
+- **This repo's local layer**: gates wired to repo scripts, declared in `.jit/gates.toml` with per-workspace scope stated in each gate's description; `planning`/`breakdown`/`bug`/`enhancement` types; `brackets:`/`satisfies:`/`per:` namespaces; the `coverage-preview` rule; the `plan` template; the `definition` and `charter` item kinds; three `[projection.*]` tables (`invariants` and `charter` into this file, `rules-and-gates` into `docs/reference/rules-and-gates.md`), all rendered by `jit project render`; the `dev/` doc lifecycle.
 
 When editing docs or config, keep this boundary explicit: adopter-facing text describes the shipped surface, repo-local values are signalled as this project's configuration.
 
@@ -187,6 +187,28 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **bounded-rust-build-footprint** — Rust test topology stays bounded to a small number of cohesive suites rather than one Cargo target per test file, build profiles stay compact rather than embedding a full debugger payload in every test executable, dependency features stay intentional rather than pulling in unused remote-resolution or duplicate TLS infrastructure, and integration-test target count and active test-executable bytes remain within automatically enforced budgets.
 <!-- jit:invariants:end -->
 <!-- jit:dogfood-guidance:end -->
+
+### Charter Decisions
+
+The v1.0 vision charter's decision log, addressable as `@/charter/D-N`. Projected from `dev/vision/9db27a3a-charter.md` by `jit project render`; edit the charter, not the region below.
+
+<!-- jit:charter:begin -->
+- **D-1** — Repository-local git-versioned JSON storage, not an external database
+- **D-2** — Quality gates declared in .jit/gates.toml, not baked into the binary
+- **D-3** — Plan-before-fan-out bracket gates a breakable container before implementation
+- **D-4** — git optional for core commands, required only for claims and leases
+- **D-5** — A milestone-tier steward skill sits above the epic-level execution lead
+- **D-6** — Each item kind declares its own source of truth (markdown-first or registry-first)
+- **D-7** — Charter decisions are addressable @/charter/D-N items over the vision charter
+- **D-8** — Ship an adoption-focused profile MVP in v1.0 and defer the complete profile lifecycle
+- **D-9** — Remove redundant release surfaces without removing product capabilities
+- **D-10** — Support one Docker topology that serves the API and web UI from a repository mount
+- **D-11** — Release v1.0 with no known dependency advisories and blocking security audits
+- **D-12** — Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
+- **D-13** — Give each adopter-facing fact one canonical documentation home
+- **D-14** — Gate source freeze on completed profiles MVP and core maintenance
+- **D-15** — Fix scoped validation in core rather than weakening bracket evidence
+<!-- jit:charter:end -->
 
 ## Commit Conventions
 

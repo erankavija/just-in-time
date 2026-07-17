@@ -557,13 +557,23 @@ mod tests {
         assert_eq!(guidance.matches("<!-- jit:invariants:begin -->").count(), 1);
 
         let reloaded = CommandExecutor::new(storage);
-        let invariants = reloaded.render_invariants().unwrap();
+        let invariants = reloaded.project_render(Some("invariants")).unwrap();
+        let invariants = &invariants.projections[0];
         assert_eq!(invariants.target, "AGENTS.md");
+        assert_eq!(invariants.mode, "region");
+        assert_eq!(invariants.style, "id-anchor");
+        assert_eq!(invariants.kinds, ["invariant"]);
         assert_eq!(invariants.count, 0);
-        let reference = reloaded.render_rules_and_gates().unwrap();
+        let reference = reloaded.project_render(Some("rules-and-gates")).unwrap();
+        let reference = &reference.projections[0];
         assert_eq!(reference.target, ".jit/reference/rules-and-gates.md");
-        assert_eq!(reference.gates, 6);
-        assert!(temp.path().join(&reference.target).is_file());
+        assert_eq!(reference.mode, "separate-file");
+        assert_eq!(reference.style, "full");
+        assert_eq!(reference.kinds, ["rule", "gate"]);
+        // The separate-file target carries the profile's six gates (registry
+        // composition asserted through the rendered `## Gates` section).
+        let rendered = fs::read_to_string(temp.path().join(&reference.target)).unwrap();
+        assert_eq!(rendered.matches("@/gate/").count(), 6);
 
         let unchanged = reloaded.apply_embedded_profile(&package).unwrap();
         assert_eq!(

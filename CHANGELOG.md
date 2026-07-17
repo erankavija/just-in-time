@@ -52,6 +52,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   a gate run compiles once and exits, so incremental state has no later
   rebuild to amortize its cost against.
 
+- **Documentation projections are declared generically and rendered by one
+  command.** A single `[projection.<name>]` config registry (fields `kind`,
+  `mode`, `target`, `style`, optional `region-begin`/`region-end`) drives every
+  projection, rendered by `jit project render [--name <name>]`. This replaces the
+  bespoke `[invariant_projection]` and `[rules_gates_projection]` config tables
+  and the separate `jit invariant render` / `jit reference render` commands
+  (removed). Any addressable item kind projects its `- **{id}** — {text}` rows
+  through the generic `id-anchor` style with no dedicated code; the built-in
+  `full` style renders the rich invariant and rule+gate registry views.
+
+- **Profile manifests declare projections instead of singleton tables.** The
+  `singleton-table` contribution (with its `invariant-projection` /
+  `rules-gates-projection` targets) is replaced by a `projection` contribution
+  (`kind = "projection"`, `name = "<projection-name>"`, and a complete `value`
+  carrying `kind`/`mode`/`target`/`style`) that merges into the `[projection.*]`
+  registry, so a profile's projection is byte-equal to the config an adopter
+  reads.
+
 ### Added
 
 - **Automatic Rust build-footprint budget enforcement in the `cargo-ci` gate.**

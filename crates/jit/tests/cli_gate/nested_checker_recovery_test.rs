@@ -7,7 +7,7 @@
 //! whole execution. `jit gate evaluate` is mutating (it records gate runs), so
 //! it keeps those locks while the checker runs. A checker that shells out to a
 //! nested mutating `jit` (this repo's `docs-mechanical` gate runs `jit
-//! invariant render`) would block on those exact locks and die at its lock
+//! project render`) would block on those exact locks and die at its lock
 //! timeout — the gate becomes unpassable via `jit gate evaluate`.
 //!
 //! The fix suspends the evaluator's startup recovery session while the external

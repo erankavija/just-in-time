@@ -128,18 +128,18 @@ if git clone --local --no-hardlinks --quiet . "$clone" 2>/dev/null; then
   # Run both projection assertions in a subshell rooted at the clone.
   (
     cd "$clone" || exit 3
-    it=$(jit invariant render --json | jq -r '.target')
-    rt=$(jit reference render --json | jq -r '.target')
+    # All projection targets, deduplicated; the drift is injected into the first.
+    mapfile -t targets < <(jit project render --json | jq -r '.projections[].target' | sort -u)
+    it="${targets[0]}"
     # Stage a freshly-rendered baseline so the index matches the live registries;
     # a genuine clean run is then observable independent of any pre-existing
     # drift committed on the branch.
-    jit invariant render >/dev/null
-    jit reference render >/dev/null
-    git add -- "$it" "$rt"
+    jit project render >/dev/null
+    git add -- "${targets[@]}"
     "$projections" >/dev/null 2>&1
     echo "$?" >"$scratch/rc_fresh"
-    # Defect: append a stray line at EOF of the invariant target, OUTSIDE the
-    # rendered region, so re-render preserves it and the working copy drifts.
+    # Defect: append a stray line at EOF of the first projection target, OUTSIDE
+    # the rendered region, so re-render preserves it and the working copy drifts.
     printf '\n<!-- selftest projection drift -->\n' >>"$it"
     "$projections" >/dev/null 2>&1
     echo "$?" >"$scratch/rc_drift"

@@ -299,9 +299,9 @@ enforced-by = "@/gate/cargo-ci"
 | `enforced-by` | string? | Address of the rule or gate that enforces it, when `kind = "enforced"` |
 
 `jit invariant check` surfaces enforcement drift between this registry and the
-rule/gate registries; `jit invariant render` projects it into a target
-document (see [Guarantees](../concepts/guarantees.md) for the concept and an
-example projection target).
+rule/gate registries; `jit project render` projects it into a target document
+via a `[projection.*]` table (see [Guarantees](../concepts/guarantees.md) for the
+concept and an example projection target).
 
 ## The `.git/jit/` Control Plane
 

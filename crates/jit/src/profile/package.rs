@@ -381,8 +381,8 @@ fn validate_contribution(
                 ))),
             }
         }
-        Contribution::SingletonTable { value, .. } => {
-            validate_relative_path("singleton target", &value.target)
+        Contribution::Projection { value, .. } => {
+            validate_relative_path("projection target", &value.target)
                 .map_err(|error| invalid(error.to_string()))
         }
     }
@@ -427,8 +427,8 @@ fn contribution_identity(contribution: &Contribution) -> String {
         Contribution::KeyedArray {
             target, identity, ..
         } => format!("keyed-array:{target:?}:{identity}"),
-        Contribution::SingletonTable { target, .. } => {
-            format!("singleton-table:{target:?}")
+        Contribution::Projection { name, .. } => {
+            format!("projection:{name}")
         }
     };
     format!("{}:{semantic}", contribution.registry_path())
@@ -560,10 +560,7 @@ fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::{
-        profile_manifest_schema, Contribution, KeyedArrayTarget, MapEntryTarget,
-        SingletonTableTarget,
-    };
+    use crate::profile::{profile_manifest_schema, Contribution, KeyedArrayTarget, MapEntryTarget};
     use include_dir::{include_dir, Dir};
 
     static VALID_PACKAGE: Dir<'_> =
@@ -630,10 +627,7 @@ mod tests {
         ));
         assert!(matches!(
             package.manifest().contributions.last(),
-            Some(Contribution::SingletonTable {
-                target: SingletonTableTarget::RulesGatesProjection,
-                ..
-            })
+            Some(Contribution::Projection { name, .. }) if name == "rules-and-gates"
         ));
         assert_eq!(
             package.source_bytes("nested/scripts/check.sh"),
@@ -652,10 +646,9 @@ mod tests {
             .validate(&instance)
             .expect("runtime manifest must satisfy generated schema");
 
-        let singleton = schema.to_string();
-        assert!(singleton.contains("manifest-version"));
-        assert!(singleton.contains("singleton-table"));
-        assert!(singleton.contains("rules-gates-projection"));
+        let schema_text = schema.to_string();
+        assert!(schema_text.contains("manifest-version"));
+        assert!(schema_text.contains("projection"));
         assert!(!schema_has_property(&schema, "hook"));
         assert!(!schema_has_property(&schema, "dependencies"));
         assert!(!schema_has_property(&schema, "variables"));
@@ -668,12 +661,12 @@ mod tests {
         assert_eq!(first.hashes(), second.hashes());
         assert_eq!(
             first.hashes().package,
-            "6e4547275af698a168d6060f64e561b8446cc8c24d1eeac8c6927263843a1cb3"
+            "d9e124a8b3b87533e53639f16ace39dac3a8b765f7dce648d246dd7410ae0982"
         );
         assert_eq!(first.hashes().targets.len(), 7);
         assert_eq!(
             first.hashes().targets[".jit/config.toml"],
-            "8b53ea2a2993a0777c4f4fb859ea69e06a30e4b1b3308de4b9bcfa1b2a131f16"
+            "0b22a166dff17fbf500cd9682ba0348b3219aac7582736f9df8371f592de4694"
         );
         assert!(first.hashes().targets.contains_key(".jit/gates.toml"));
         assert!(first.hashes().targets.contains_key("AGENTS.md"));
@@ -713,7 +706,7 @@ mod tests {
     }
 
     #[test]
-    fn test_manifest_rejects_hooks_unknown_kinds_and_incomplete_singletons() {
+    fn test_manifest_rejects_hooks_unknown_kinds_and_incomplete_projections() {
         let hook = parse_modified(
             "jit = \">=0.2.0, <2.0.0\"",
             "jit = \">=0.2.0, <2.0.0\"\nhook = \"install.sh\"",
@@ -728,8 +721,8 @@ mod tests {
         assert!(kind.contains("unknown variant `arbitrary-hook`"), "{kind}");
 
         let incomplete = parse_modified(
-            "value = { mode = \"region\", target = \"AGENTS.md\", style = \"id-anchor\" }",
-            "value = { mode = \"region\", target = \"AGENTS.md\" }",
+            "value = { kind = \"invariant\", mode = \"region\", target = \"AGENTS.md\", style = \"id-anchor\" }",
+            "value = { kind = \"invariant\", mode = \"region\", target = \"AGENTS.md\" }",
         )
         .unwrap_err()
         .to_string();
@@ -869,7 +862,7 @@ mod tests {
 
         let duplicate_contribution = manifest_text().replace(
             "[[asset]]\nsource = \"assets/workflow.txt\"",
-            "[[contribution]]\nkind = \"singleton-table\"\ntarget = \"invariant-projection\"\nvalue = { mode = \"separate-file\", target = \"OTHER.md\", style = \"full\" }\n\n[[asset]]\nsource = \"assets/workflow.txt\"",
+            "[[contribution]]\nkind = \"projection\"\nname = \"invariants\"\nvalue = { kind = \"invariant\", mode = \"separate-file\", target = \"OTHER.md\", style = \"full\" }\n\n[[asset]]\nsource = \"assets/workflow.txt\"",
         );
         let mut duplicate = package.files.clone();
         duplicate.insert(
@@ -879,7 +872,7 @@ mod tests {
         assert!(matches!(
             EmbeddedProfilePackage::from_files(duplicate),
             Err(ProfilePackageError::DuplicateContribution(identity))
-                if identity.contains("InvariantProjection")
+                if identity.contains("invariants")
         ));
     }
 

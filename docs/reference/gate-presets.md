@@ -21,8 +21,8 @@ empty gate registry; `jit init --profile jit-dogfood` installs the package's mat
 definitions directly, while manual adopters can use `jit gate preset apply`. See
 [Repository Profiles](profiles.md) for the profile contract. The gates a project
 actually enforces live in its own `.jit/gates.toml`, its settings in
-`.jit/config.toml`; render those with `jit reference render` (see [Rules and
-Gates](rules-and-gates.md)).
+`.jit/config.toml`; render those with `jit project render` (see
+[Rules and Gates](rules-and-gates.md)).
 
 ## Portable checker types
 

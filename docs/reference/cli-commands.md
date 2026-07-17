@@ -3059,23 +3059,32 @@ jit item search "" --kind requirement
 A failing `jit item` command under `--json` returns the error envelope with code
 `ITEM_COMMAND_FAILED`.
 
-## Registry Projection Commands
+## Documentation Projection Commands
 
-Invariants live in `.jit/invariants.toml`; rules live in `.jit/rules.toml` and
-gates in `.jit/gates.toml`. These registries are the source of truth, and the
-`render` verbs project them into markdown. Each target path, projection mode, and
-region delimiter comes from configuration alone. In `region` mode only the
+An addressable item kind is a source of truth: invariants in `.jit/invariants.toml`,
+rules in `.jit/rules.toml`, gates in `.jit/gates.toml`, and any markdown-first kind
+in its own source file. A `[projection.<name>]` config table projects a kind (or
+kinds) into a documentation target. Each target path, projection mode, render
+style, and region delimiter comes from configuration alone; delimiters default to
+`<!-- jit:<name>:begin -->` / `<!-- jit:<name>:end -->`. In `region` mode only the
 delimited region of the target is rewritten and every byte outside it is
-preserved; in `separate-file` mode the whole jit-owned file is written.
+preserved; in `separate-file` mode the whole file is written.
 
-### `jit invariant render`
+### `jit project render`
 
 ```bash
-jit invariant render [--json]
+jit project render [--name <name>] [--json]
 ```
 
-Writes the invariant registry into the target configured by
-`[invariant_projection]`. JSON returns `{target, mode, count, message}`.
+Renders every declared `[projection.*]` into its configured target, or the single
+`--name`d one. Two render styles: `id-anchor` writes generic `- **{self-id}** —
+{text}` bullets from any kind's addressable rows; `full` writes the built-in rich
+views (the invariant registry, or the rule + gate registries with their metadata).
+A missing target or source, an unknown kind, or an absent region marker is a typed
+error and nothing is written (exit `4`). JSON uses the list envelope
+`{"count": N, "projections": [...]}`, each entry `{name, target, mode, style,
+kinds, count}`. A failing command under `--json` returns the error envelope with
+code `PROJECT_COMMAND_FAILED`.
 
 ### `jit invariant check`
 
@@ -3087,21 +3096,8 @@ Reports enforcement drift in the declared-but-unenforced direction: an invariant
 whose `enforced-by` names a rule or gate that does not load. Bindings are
 declarations, and this check never executes them. Exits `4` when any drift is
 present (see the [exit-code reference](exit-codes.md#command-specific-mappings)).
-JSON uses the list envelope `{"count": N, "findings": [...]}`.
-
-### `jit reference render`
-
-```bash
-jit reference render [--json]
-```
-
-Writes the effective rule set and the gate registry as one reference document
-into the target configured by `[rules_gates_projection]`. Every rule and gate is
-addressed by its canonical form, `@/rule/<name>` and `@/gate/<key>`. JSON returns
-`{target, mode, rules, gates, message}`.
-
-A failing command under `--json` returns the error envelope with code
-`INVARIANT_COMMAND_FAILED` or `REFERENCE_COMMAND_FAILED`.
+JSON uses the list envelope `{"count": N, "findings": [...]}`. A failing command
+under `--json` returns the error envelope with code `INVARIANT_COMMAND_FAILED`.
 
 ## Repository Search
 
@@ -3355,8 +3351,8 @@ these sections — `config get` does not invent a third:
 - `worktree`, `coordination`, `global_operations`, `locks`, `events`: the
   system/user/repo-merged, default-filled view (same as `jit config show`).
 - Every other section (`version`, `project`, `type_hierarchy`, `validation`,
-  `documentation`, `namespaces`, `item_kinds`, `invariant_projection`,
-  `rules_gates_projection`): read from the REPO's `config.toml` only, with no
+  `documentation`, `namespaces`, `item_kinds`, `projection`): read from the
+  REPO's `config.toml` only, with no
   system/user merge and no built-in defaults layered in — jit has no concept
   of a system/user override for a repo's type hierarchy or label namespaces.
   This means these sections reflect exactly what `config.toml` declares
@@ -3378,8 +3374,8 @@ segment and its resolved parent path.
 jit config get bogus_section
 # Error: unknown config key 'bogus_section'; valid top-level sections:
 # coordination, documentation, events, global_operations,
-# invariant_projection, item_kinds, locks, namespaces, project,
-# rules_gates_projection, type_hierarchy, validation, version, worktree
+# item_kinds, locks, namespaces, project, projection,
+# type_hierarchy, validation, version, worktree
 
 jit config get documentation.bogus_field
 # Error: unknown config key 'documentation.bogus_field': no 'bogus_field'

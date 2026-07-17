@@ -10,7 +10,7 @@ This document explains what JIT guarantees about data integrity, consistency, an
 JIT's project invariants are cited below by their address (`@/invariant/<id>`);
 run `jit item show <address>` for the registry's canonical statement. The
 invariant registry (`.jit/invariants.toml`) renders into the invariant region of
-the project `AGENTS.md` via `jit invariant render`.
+the project `AGENTS.md` via `jit project render` (the `invariants` projection).
 
 ### DAG Property
 

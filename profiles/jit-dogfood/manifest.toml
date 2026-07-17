@@ -306,14 +306,14 @@ kind = "move-upstream-to-role"
 role = "planning"
 
 [[contribution]]
-kind = "singleton-table"
-target = "invariant-projection"
-value = { mode = "region", target = "AGENTS.md", style = "id-anchor" }
+kind = "projection"
+name = "invariants"
+value = { kind = "invariant", mode = "region", target = "AGENTS.md", style = "id-anchor" }
 
 [[contribution]]
-kind = "singleton-table"
-target = "rules-gates-projection"
-value = { mode = "separate-file", target = ".jit/reference/rules-and-gates.md", style = "full" }
+kind = "projection"
+name = "rules-and-gates"
+value = { kind = ["rule", "gate"], mode = "separate-file", target = ".jit/reference/rules-and-gates.md", style = "full" }
 
 # Install-only adopter state.
 [[asset]]

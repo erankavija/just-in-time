@@ -1311,8 +1311,7 @@ mod tests {
         let text = profile.to_string();
         assert!(text.contains("manifest-version"));
         assert!(text.contains("map-entry"));
-        assert!(text.contains("singleton-table"));
-        assert!(text.contains("rules-gates-projection"));
+        assert!(text.contains("projection"));
     }
 
     /// REQ-02/REQ-03: every global flag accepted at the top level — `quiet`,

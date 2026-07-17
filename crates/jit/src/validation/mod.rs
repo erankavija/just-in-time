@@ -38,6 +38,7 @@ pub mod engine;
 pub mod graph;
 pub mod invariants;
 pub mod local;
+pub mod project_render;
 pub mod projection;
 pub mod report;
 pub mod repository;

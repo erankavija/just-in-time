@@ -1,11 +1,11 @@
 use super::{
     CompleteProjectionConfig, Contribution, EmbeddedProfilePackage, KeyedArrayTarget,
     MapEntryTarget, ProjectedFileMode, ProjectionError, RepositorySnapshot, SetStringTarget,
-    SingletonTableTarget, SnapshotEntry,
+    SnapshotEntry,
 };
 use crate::validation::repository::{
-    render_rules_gates_projection, rules_gates_projection_target, validate_repository,
-    OverlayRepositoryView, RepositoryValidationFailure, RepositoryValidationReport, RepositoryView,
+    projection_targets, render_projections, validate_repository, OverlayRepositoryView,
+    RepositoryValidationFailure, RepositoryValidationReport, RepositoryView,
 };
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -185,12 +185,12 @@ pub fn plan_profile_application_against(
             .map(|(path, (bytes, _))| (PathBuf::from(path), Some(bytes.clone()))),
     )
     .expect("validated semantic target paths remain repository-relative");
-    let managed_rules_gates_target = rules_gates_projection_target(&semantic_view)
-        .map_err(ProfilePlanError::RegistryProjection)?;
+    let managed_projection_targets =
+        projection_targets(&semantic_view).map_err(ProfilePlanError::RegistryProjection)?;
     for (path, projected_file) in projected.files() {
         if asset_targets.contains(path.as_str()) {
             if let Some(existing) = snapshot.file(path) {
-                if managed_rules_gates_target.as_deref() != Some(Path::new(path))
+                if !managed_projection_targets.contains(Path::new(path))
                     && existing.bytes != projected_file.bytes
                 {
                     return Err(ProfilePlanError::AssetConflict {
@@ -215,8 +215,8 @@ pub fn plan_profile_application_against(
             .map(|(path, (bytes, _))| (PathBuf::from(path), Some(bytes.clone()))),
     )
     .expect("validated projected target paths remain repository-relative");
-    if let Some((target, bytes)) = render_rules_gates_projection(&projected_view)
-        .map_err(ProfilePlanError::RegistryProjection)?
+    for (target, bytes) in
+        render_projections(&projected_view).map_err(ProfilePlanError::RegistryProjection)?
     {
         let target = target.to_string_lossy().into_owned();
         if let Some((existing, _)) = desired.get_mut(&target) {
@@ -492,8 +492,8 @@ fn merge_contribution(
             identity,
             value,
         } => merge_keyed_array(registry, document, *target, identity, value),
-        Contribution::SingletonTable { target, value } => {
-            merge_singleton(registry, document, &semantic, *target, value)
+        Contribution::Projection { name, value } => {
+            merge_projection(registry, document, &semantic, name, value)
         }
     }
 }
@@ -635,20 +635,25 @@ fn merge_keyed_array(
     Ok(())
 }
 
-fn merge_singleton(
+fn merge_projection(
     registry: &str,
     document: &mut DocumentMut,
     semantic: &JsonValue,
-    target: SingletonTableTarget,
+    name: &str,
     candidate: &CompleteProjectionConfig,
 ) -> Result<(), ProfilePlanError> {
-    let identity = target.table_name();
     let candidate = serde_json::to_value(candidate).expect("projection config serializes");
-    if let Some(existing) = semantic.get(identity) {
-        return equal_or_conflict(registry, identity, existing, &candidate);
+    // Conflict-check against the existing `[projection.<name>]` subtable so a
+    // re-apply of the same projection is idempotent and a divergent one conflicts.
+    if let Some(existing) = semantic
+        .get("projection")
+        .and_then(|projections| projections.get(name))
+    {
+        return equal_or_conflict(registry, name, existing, &candidate);
     }
-    document.as_table_mut().insert(
-        identity,
+    let projection = ensure_table(document.as_table_mut(), "projection", registry)?;
+    projection.insert(
+        name,
         Item::Table(json_object_to_table(&candidate, registry)?),
     );
     Ok(())
@@ -1052,20 +1057,19 @@ mod tests {
     }
 
     #[test]
-    fn test_partial_singleton_and_unknown_keyed_identity_are_rejected() {
-        let mut singleton: DocumentMut = "[invariant_projection]\nmode = \"region\"\n"
+    fn test_partial_projection_and_unknown_keyed_identity_are_rejected() {
+        let mut projection: DocumentMut = "[projection.invariants]\nmode = \"region\"\n"
             .parse()
             .unwrap();
-        let contribution = Contribution::SingletonTable {
-            target: SingletonTableTarget::InvariantProjection,
-            value: CompleteProjectionConfig {
-                mode: crate::config::ProjectionMode::Region,
-                target: "AGENTS.md".to_string(),
-                style: crate::config::ProjectionStyle::IdAnchor,
-            },
+        let contribution = Contribution::Projection {
+            name: "invariants".to_string(),
+            value: toml::from_str(
+                "kind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n",
+            )
+            .unwrap(),
         };
         assert!(matches!(
-            merge_contribution(".jit/config.toml", &mut singleton, &contribution),
+            merge_contribution(".jit/config.toml", &mut projection, &contribution),
             Err(ProfilePlanError::ContributionConflict { .. })
         ));
 

@@ -6,8 +6,8 @@
 #   enforced  — a rule/gate mechanically guards the property (named in enforced-by)
 #   advisory  — documented intent, not yet mechanically asserted
 #
-# Run `jit invariant check` to surface enforcement drift; `jit invariant render`
-# to project this registry back into its documentation target.
+# Run `jit invariant check` to surface enforcement drift; `jit project render`
+# projects this registry into its documentation target (the `invariants` projection).
 
 [[invariants]]
 id = "label-format"

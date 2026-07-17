@@ -52,14 +52,14 @@ identity = "synthetic-plan"
 value = { name = "synthetic-plan", description = "Synthetic plan" }
 
 [[contribution]]
-kind = "singleton-table"
-target = "invariant-projection"
-value = { mode = "region", target = "AGENTS.md", style = "id-anchor" }
+kind = "projection"
+name = "invariants"
+value = { kind = "invariant", mode = "region", target = "AGENTS.md", style = "id-anchor" }
 
 [[contribution]]
-kind = "singleton-table"
-target = "rules-gates-projection"
-value = { mode = "region", target = "docs/reference.md", style = "full" }
+kind = "projection"
+name = "rules-and-gates"
+value = { kind = ["rule", "gate"], mode = "region", target = "docs/reference.md", style = "full" }
 
 [[asset]]
 source = "assets/workflow.txt"

@@ -28,8 +28,7 @@ pub use drift::{compare_projection_tree, DriftFinding, DriftKind, ProjectionDrif
 pub use manifest::{
     profile_manifest_schema, AssetDeclaration, CompleteProjectionConfig, Contribution,
     KeyedArrayTarget, MapEntryTarget, ProfileManifest, ProfileMetadata, RegionDeclaration,
-    RegionPlacement, SetStringTarget, SingletonTableTarget, MANIFEST_FILE_NAME,
-    PROFILE_MANIFEST_VERSION,
+    RegionPlacement, SetStringTarget, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
 };
 pub use package::{
     EmbeddedProfilePackage, PackageHash, ProfilePackageError, ProfilePackageHashes,

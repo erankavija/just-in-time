@@ -1,45 +1,48 @@
-//! Project the loaded invariant registry into a CONFIGURABLE documentation target.
+//! Projection primitives shared by every generic `[projection.<name>]` render.
 //!
-//! The registry ([`InvariantRegistry`]) renders to a readable markdown block that
-//! is written into one of two config-selected targets (decision D3, REQ-06):
+//! A projection writes a rendered markdown block into a config-selected target in
+//! one of two modes:
 //!
-//! - **separate-file** (the shipped DEFAULT): a jit-owned file written ATOMICALLY,
-//!   so the default behavior never touches existing docs;
+//! - **separate-file**: a whole file written ATOMICALLY;
 //! - **region**: only a delimited region within an existing file is rewritten,
 //!   byte-preserving everything OUTSIDE the delimiters.
 //!
-//! The render is style-selectable (REQ-08): the config's [`ProjectionStyle`]
-//! chooses between the `full` render (a `## Project invariants` header plus
-//! `- **id** [kind] (enforced-by): statement` bullets, the default) and the
-//! heading-less `id-anchor` render (`- **{id}** — {statement}` bullets).
+//! This module holds the mode-independent pieces:
 //!
-//! The target path, mode, render style, and region delimiters come ONLY from
-//! [`InvariantProjectionConfig`]; this module hardcodes NO documentation filename
-//! (REQ-04). Writes go through the shared atomic writer
-//! [`write_file_atomic`](crate::validation::serialize::write_file_atomic) (REQ-02,
-//! REQ-05); region mode reads the existing target through
-//! [`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file).
+//! - [`render_id_anchor_rows`] — the generic `id-anchor` renderer: heading-less
+//!   `- **{self-id}** — {text}` bullets from a kind's addressable items, usable by
+//!   ANY item kind with no dedicated code;
+//! - [`render_invariants_markdown`] — the built-in `full` render of the invariant
+//!   registry (the rule + gate `full` render lives in
+//!   [`rules_gates_projection`](crate::validation::rules_gates_projection));
+//! - [`splice_region`] — the PURE region splice; and
+//! - [`write_projection`] — the sole I/O orchestrator: it branches on
+//!   [`ProjectionMode`], splices in region mode, and writes atomically through the
+//!   storage boundary
+//!   ([`IssueStore::write_repo_file`](crate::storage::IssueStore::write_repo_file),
+//!   itself over [`write_file_atomic`](crate::validation::serialize::write_file_atomic)).
 //!
-//! Rendering ([`render_invariants_markdown`]) and the region splice
-//! ([`splice_region`]) are PURE and unit-testable; the orchestrator
-//! [`project_invariants`] is the only function that performs I/O.
+//! Target path, mode, style, and delimiters come ONLY from
+//! [`ProjectionConfig`](crate::config::ProjectionConfig); this module hardcodes no
+//! documentation filename. The projection-to-body wiring (which registry or source
+//! feeds which projection) lives in
+//! [`project_render`](crate::validation::project_render).
 
-use crate::config::{InvariantProjectionConfig, ProjectionMode, ProjectionStyle};
+use crate::config::{ProjectionMode, ProjectionStyle};
+use crate::domain::item::AddressableItem;
 use crate::storage::{IssueStore, PathReadError};
 use crate::validation::invariants::{InvariantKind, InvariantRegistry};
 use thiserror::Error;
 
-/// Errors raised while projecting a registry into its documentation target.
+/// Errors raised while rendering or writing a generic projection.
 ///
-/// Shared by the invariant projection ([`project_invariants`]) and the
-/// rules-and-gates projection
-/// ([`project_rules_and_gates`](crate::validation::rules_gates_projection::project_rules_and_gates)),
-/// which both splice through [`splice_region`] and write through the storage
-/// atomic helper.
-///
-/// Every variant carries enough context (the offending marker, the target path,
-/// or the underlying I/O error) to point an author at the problem. A missing or
-/// malformed region NEVER silently clobbers the file: it is a typed error.
+/// Shared by [`write_projection`] (the region splice + atomic write) and the
+/// body-rendering wiring in
+/// [`project_render`](crate::validation::project_render) (kind resolution + source
+/// reads). Every variant carries enough context (the offending marker, the target
+/// path, the unknown kind, or the underlying I/O error) to point an author at the
+/// problem. A missing/malformed region, source, or kind NEVER silently clobbers a
+/// file or writes a partial one: it is a typed error raised BEFORE any write.
 #[derive(Debug, Error)]
 pub enum ProjectionError {
     /// The configured begin marker was not found in the region-mode target.
@@ -94,6 +97,43 @@ pub enum ProjectionError {
         path: String,
         /// The underlying typed write error.
         source: PathReadError,
+    },
+
+    /// A projection declared a `kind` that no `[item_kinds.<name>]` table (or any
+    /// kind alias) defines.
+    #[error("projection references unknown item kind '{kind}'")]
+    UnknownKind {
+        /// The unresolved kind name.
+        kind: String,
+    },
+
+    /// A projection references an item kind that is not project-scoped, so it has
+    /// no project-scope source to render from.
+    #[error("projection kind '{kind}' is not project-scoped and cannot be projected")]
+    NotProjectScoped {
+        /// The offending kind name.
+        kind: String,
+    },
+
+    /// A projected kind's declared source file does not exist, so its rows cannot
+    /// be resolved (region-mode rendering never falls back to an empty block).
+    #[error("projection source '{path}' for kind '{kind}' does not exist")]
+    SourceNotFound {
+        /// The configured source path.
+        path: String,
+        /// The kind whose source is missing.
+        kind: String,
+    },
+
+    /// The `full` render style is not defined for the projection's declared kind
+    /// set (only the built-in invariant and rule+gate registry views exist).
+    #[error(
+        "the 'full' render style is not available for kind(s) {kinds:?}; \
+         use 'id-anchor', or declare the built-in invariant or rule+gate projection"
+    )]
+    FullStyleUnsupported {
+        /// The declared kind names the `full` style could not render.
+        kinds: Vec<String>,
     },
 }
 
@@ -173,6 +213,52 @@ fn render_id_anchor(registry: &InvariantRegistry) -> String {
         .collect()
 }
 
+/// Render `rows` as a heading-less `id-anchor` bullet list — the GENERIC,
+/// kind-agnostic projection body any item kind can use with no dedicated code.
+///
+/// Pure: performs no I/O. Each addressable row becomes one
+/// `- **{self-id}** — {display}\n` line, in the order the rows were resolved
+/// (registry order for a registry-first kind, document order for a markdown-first
+/// kind). `display` is the row `text` with a leading occurrence of its OWN
+/// `self-id` and the separator that follows it stripped (see [`id_anchor_display`]),
+/// so a row whose source text repeats its self-id — e.g. a charter decision line
+/// `D-1: <one-liner>` — renders `- **D-1** — <one-liner>` rather than doubling the
+/// id, while a row whose text does not begin with its self-id (e.g. an invariant
+/// statement) is rendered verbatim. An empty row set emits an explicit
+/// `_No items declared._` line so the projected region is never blank.
+pub fn render_id_anchor_rows(rows: &[AddressableItem]) -> String {
+    if rows.is_empty() {
+        return String::from("_No items declared._\n");
+    }
+    rows.iter()
+        .map(|row| {
+            format!(
+                "- **{id}** — {display}\n",
+                id = row.self_id,
+                display = id_anchor_display(&row.self_id, &row.text),
+            )
+        })
+        .collect()
+}
+
+/// The display text of an `id-anchor` row: its `text` with a leading `{self_id}`
+/// and the separator immediately following it removed, if present.
+///
+/// A markdown-sourced row's `text` is the whole source list entry, which for a
+/// self-labelled item (`D-1: ...`) begins with the self-id. Stripping that prefix
+/// plus its trailing separator (`:`, `—`, `-`, or whitespace) yields the bare
+/// one-liner. A row whose text does not start with its self-id (e.g. a
+/// registry-first invariant, whose `text` is the `statement` field) is returned
+/// unchanged.
+fn id_anchor_display<'a>(self_id: &str, text: &'a str) -> &'a str {
+    match text.strip_prefix(self_id) {
+        Some(rest) => {
+            rest.trim_start_matches(|c: char| c == ':' || c == '—' || c == '-' || c.is_whitespace())
+        }
+        None => text,
+    }
+}
+
 /// Replace the text between `begin` and `end` in `existing` with `rendered`,
 /// byte-preserving everything OUTSIDE the delimiters (REQ-01).
 ///
@@ -224,40 +310,36 @@ pub fn splice_region(
     ))
 }
 
-/// Project `registry` into the documentation target described by `config`.
+/// Write an already-rendered projection `body` into `target` under `mode`.
 ///
-/// The orchestrator (the only function here that performs I/O) reads the target
-/// path, mode, render style, and delimiters ONLY from `config` — this module
-/// contains no documentation-filename literal (REQ-04). The chosen
-/// [`ProjectionStyle`](crate::config::ProjectionStyle) is threaded into
-/// [`render_invariants_markdown`]. ALL persistence goes through the
-/// storage boundary: region mode reads the existing target via
-/// [`read_repo_file`] and both modes write via [`write_repo_file`], which
-/// path-validates the config-driven target (rejecting absolute/`..`-escaping
-/// paths) and writes atomically through the shared
-/// [`write_file_atomic`](crate::validation::serialize::write_file_atomic) (REQ-05).
-/// No direct filesystem access happens here.
+/// The sole I/O orchestrator, generic over every projection kind and style: it
+/// takes the pre-rendered markdown `body` and, per `mode`,
 ///
-/// - **separate-file**: render → atomic write of the whole file.
-/// - **region**: read the existing target, splice the rendered block between the
-///   configured delimiters (byte-preserving everything outside), atomic-write the
-///   result. A missing target or missing/malformed delimiters is a typed
-///   [`ProjectionError`] — the file is never silently clobbered.
+/// - **separate-file**: atomic-writes the whole file to `target`;
+/// - **region**: reads the existing `target` through the storage boundary, splices
+///   `body` between `region_begin` / `region_end` (byte-preserving everything
+///   outside via [`splice_region`]), then atomic-writes the result.
 ///
-/// Returns the repo-relative path that was written.
+/// ALL persistence goes through [`write_repo_file`], which path-validates the
+/// config-driven `target` (rejecting an absolute or `..`-escaping path) BEFORE any
+/// write and writes atomically through the shared
+/// [`write_file_atomic`](crate::validation::serialize::write_file_atomic). A
+/// missing region target or missing/malformed delimiters is a typed
+/// [`ProjectionError`] raised before writing — the file is never silently
+/// clobbered or left partially written. Returns the repo-relative path written.
 ///
 /// [`read_repo_file`]: crate::storage::IssueStore::read_repo_file
 /// [`write_repo_file`]: crate::storage::IssueStore::write_repo_file
-pub fn project_invariants<S: IssueStore>(
+pub fn write_projection<S: IssueStore>(
     store: &S,
-    config: &InvariantProjectionConfig,
-    registry: &InvariantRegistry,
+    mode: ProjectionMode,
+    target: &str,
+    region_begin: &str,
+    region_end: &str,
+    body: &str,
 ) -> Result<String, ProjectionError> {
-    let target = config.target();
-    let rendered = render_invariants_markdown(registry, config.style());
-
-    let content = match config.mode() {
-        ProjectionMode::SeparateFile => rendered,
+    let content = match mode {
+        ProjectionMode::SeparateFile => body.to_string(),
         ProjectionMode::Region => {
             let existing = store
                 .read_repo_file(target)
@@ -268,18 +350,10 @@ pub fn project_invariants<S: IssueStore>(
                 .ok_or_else(|| ProjectionError::TargetNotFound {
                     path: target.to_string(),
                 })?;
-            splice_region(
-                &existing,
-                &rendered,
-                config.region_begin(),
-                config.region_end(),
-            )?
+            splice_region(&existing, body, region_begin, region_end)?
         }
     };
 
-    // Persist through the storage boundary: it path-validates the config-driven
-    // target (rejecting an absolute or `..`-escaping path) BEFORE writing, and
-    // writes atomically via the shared writer.
     store
         .write_repo_file(target, &content)
         .map_err(|source| ProjectionError::Write {
@@ -342,8 +416,7 @@ kind = "advisory"
         // REQ-08: an absent `style` field resolves to Full, so the default render
         // is byte-identical to the explicit full render.
         let reg = registry_with_two();
-        let via_default =
-            render_invariants_markdown(&reg, InvariantProjectionConfig::default().style());
+        let via_default = render_invariants_markdown(&reg, ProjectionStyle::default());
         let explicit_full = render_invariants_markdown(&reg, ProjectionStyle::Full);
         assert_eq!(via_default, explicit_full);
         assert!(via_default.starts_with("## Project invariants\n\n"));
@@ -427,21 +500,95 @@ kind = "advisory"
         assert!(matches!(err, ProjectionError::MarkersOutOfOrder { .. }));
     }
 
+    /// Build an addressable row with the given self-id and text (project scope,
+    /// invariant kind), enough to exercise the id-anchor row renderer.
+    fn row(self_id: &str, text: &str) -> AddressableItem {
+        AddressableItem {
+            kind: "invariant".to_string(),
+            qualified_id: format!("@/invariant/{self_id}"),
+            self_id: self_id.to_string(),
+            scope: "@".to_string(),
+            text: text.to_string(),
+            links: Vec::new(),
+        }
+    }
+
     #[test]
-    fn test_project_separate_file_writes_atomically() {
+    fn test_render_id_anchor_rows_keeps_text_without_self_id_prefix() {
+        // A row whose text does NOT begin with its self-id (a registry-first
+        // invariant, whose text is the statement) is rendered verbatim.
+        let rows = [
+            row("label-format", "Every label is namespace:value."),
+            row("dag-acyclic", "The dependency graph stays acyclic."),
+        ];
+        assert_eq!(
+            render_id_anchor_rows(&rows),
+            "- **label-format** — Every label is namespace:value.\n\
+             - **dag-acyclic** — The dependency graph stays acyclic.\n"
+        );
+    }
+
+    #[test]
+    fn test_render_id_anchor_rows_strips_repeated_self_id() {
+        // A markdown-sourced row whose text repeats its self-id (a charter decision
+        // line `D-1: ...`) renders `- **D-1** — <one-liner>`, not a doubled id.
+        let rows = [
+            row("D-1", "D-1: Repository-local git-versioned JSON storage"),
+            row(
+                "D-6",
+                "D-6: Each item kind declares its own source of truth",
+            ),
+        ];
+        assert_eq!(
+            render_id_anchor_rows(&rows),
+            "- **D-1** — Repository-local git-versioned JSON storage\n\
+             - **D-6** — Each item kind declares its own source of truth\n"
+        );
+    }
+
+    #[test]
+    fn test_render_id_anchor_rows_empty_is_explicit_line() {
+        assert_eq!(render_id_anchor_rows(&[]), "_No items declared._\n");
+    }
+
+    /// Parity oracle (REQ-08): the generic id-anchor row renderer reproduces the
+    /// typed invariant id-anchor render, computed LIVE from the same registry —
+    /// two independent code paths, not a committed-doc mirror. This is what keeps
+    /// the migrated `invariants` projection byte-identical to its prior output.
+    #[test]
+    fn test_render_id_anchor_rows_matches_typed_invariant_render() {
+        let reg = registry_with_two();
+        let rows: Vec<AddressableItem> = reg
+            .invariants
+            .iter()
+            .map(|inv| row(&inv.id, &inv.statement))
+            .collect();
+        assert_eq!(
+            render_id_anchor_rows(&rows),
+            render_invariants_markdown(&reg, ProjectionStyle::IdAnchor)
+        );
+    }
+
+    /// A body written in separate-file mode lands atomically at the target.
+    #[test]
+    fn test_write_projection_separate_file_writes_atomically() {
         let dir = tempfile::tempdir().unwrap();
         let jit_root = dir.path().join(".jit");
         std::fs::create_dir_all(&jit_root).unwrap();
         let store = JsonFileStorage::new(&jit_root);
 
-        let cfg = InvariantProjectionConfig {
-            mode: Some(ProjectionMode::SeparateFile),
-            target: Some("docs/invariants.md".to_string()),
-            ..Default::default()
-        };
+        let body = render_invariants_markdown(&registry_with_two(), ProjectionStyle::Full);
         // The write goes through storage, which creates intermediate dirs (the
         // repo root is the parent of `.jit`).
-        let written = project_invariants(&store, &cfg, &registry_with_two()).unwrap();
+        let written = write_projection(
+            &store,
+            ProjectionMode::SeparateFile,
+            "docs/invariants.md",
+            "",
+            "",
+            &body,
+        )
+        .unwrap();
         assert_eq!(written, "docs/invariants.md");
 
         let on_disk = std::fs::read_to_string(dir.path().join("docs/invariants.md")).unwrap();
@@ -457,7 +604,7 @@ kind = "advisory"
     }
 
     #[test]
-    fn test_project_region_byte_preserves_surrounding_file() {
+    fn test_write_projection_region_byte_preserves_surrounding_file() {
         let dir = tempfile::tempdir().unwrap();
         let jit_root = dir.path().join(".jit");
         std::fs::create_dir_all(&jit_root).unwrap();
@@ -470,14 +617,16 @@ kind = "advisory"
         let original = format!("{prefix}{begin}\nstale\n{end}{suffix}");
         std::fs::write(dir.path().join("GUIDE.md"), &original).unwrap();
 
-        let cfg = InvariantProjectionConfig {
-            mode: Some(ProjectionMode::Region),
-            target: Some("GUIDE.md".to_string()),
-            region_begin: Some(begin.to_string()),
-            region_end: Some(end.to_string()),
-            ..Default::default()
-        };
-        project_invariants(&store, &cfg, &registry_with_two()).unwrap();
+        let body = render_invariants_markdown(&registry_with_two(), ProjectionStyle::Full);
+        write_projection(
+            &store,
+            ProjectionMode::Region,
+            "GUIDE.md",
+            begin,
+            end,
+            &body,
+        )
+        .unwrap();
 
         let updated = std::fs::read_to_string(dir.path().join("GUIDE.md")).unwrap();
         // Surrounding bytes preserved exactly.
@@ -489,23 +638,26 @@ kind = "advisory"
     }
 
     #[test]
-    fn test_project_region_missing_target_is_typed_error() {
+    fn test_write_projection_region_missing_target_is_typed_error() {
         let dir = tempfile::tempdir().unwrap();
         let jit_root = dir.path().join(".jit");
         std::fs::create_dir_all(&jit_root).unwrap();
         let store = JsonFileStorage::new(&jit_root);
 
-        let cfg = InvariantProjectionConfig {
-            mode: Some(ProjectionMode::Region),
-            target: Some("MISSING.md".to_string()),
-            ..Default::default()
-        };
-        let err = project_invariants(&store, &cfg, &registry_with_two()).unwrap_err();
+        let err = write_projection(
+            &store,
+            ProjectionMode::Region,
+            "MISSING.md",
+            "<!--b-->",
+            "<!--e-->",
+            "body",
+        )
+        .unwrap_err();
         assert!(matches!(err, ProjectionError::TargetNotFound { .. }));
     }
 
     #[test]
-    fn test_project_separate_file_rejects_escaping_target() {
+    fn test_write_projection_separate_file_rejects_escaping_target() {
         // A separate-file target that escapes the repo (absolute or `..`) is
         // rejected by the storage path validator BEFORE any write — nothing is
         // written outside the repo.
@@ -515,12 +667,8 @@ kind = "advisory"
         let store = JsonFileStorage::new(&jit_root);
 
         for bad in ["../escape.md", "/tmp/jit-escape.md"] {
-            let cfg = InvariantProjectionConfig {
-                mode: Some(ProjectionMode::SeparateFile),
-                target: Some(bad.to_string()),
-                ..Default::default()
-            };
-            let err = project_invariants(&store, &cfg, &registry_with_two()).unwrap_err();
+            let err = write_projection(&store, ProjectionMode::SeparateFile, bad, "", "", "body")
+                .unwrap_err();
             assert!(
                 matches!(
                     err,
@@ -536,61 +684,51 @@ kind = "advisory"
         assert!(!dir.path().join("../escape.md").exists());
     }
 
-    #[test]
-    fn test_default_config_targets_separate_jit_owned_file() {
-        // REQ-03: the shipped default targets a separate jit-owned file.
-        let cfg = InvariantProjectionConfig::default();
-        assert_eq!(cfg.mode(), ProjectionMode::SeparateFile);
-        assert_eq!(cfg.target(), ".jit/invariants.md");
-    }
-
     /// REQ-06: with region markers in place and `mode=region, target=AGENTS.md`,
-    /// projection replaces ONLY the marked region from the registry.
-    ///
-    /// Uses an isolated temp repo so the assertion is stable across registry changes.
+    /// the write replaces ONLY the marked region.
     #[test]
-    fn test_project_region_into_agents_md_scenario() {
+    fn test_write_projection_region_into_agents_md_scenario() {
         let dir = tempfile::tempdir().unwrap();
         let jit_root = dir.path().join(".jit");
         std::fs::create_dir_all(&jit_root).unwrap();
         let store = JsonFileStorage::new(&jit_root);
 
         // Simulate AGENTS.md: hand-authored content wrapping a jit-managed region.
-        let begin = "<!-- jit:invariants:begin -->";
-        let end = "<!-- jit:invariants:end -->";
-        let preamble = "# AGENTS.md\n\n### Domain Invariants\n\n";
+        let begin = "<!-- jit:charter:begin -->";
+        let end = "<!-- jit:charter:end -->";
+        let preamble = "# AGENTS.md\n\n### Charter Decisions\n\n";
         let postamble = "\n\n## Commit Conventions\n\nRun cargo fmt.\n";
         let original = format!("{preamble}{begin}\nstale hand-authored prose\n{end}{postamble}");
         std::fs::write(dir.path().join("AGENTS.md"), &original).unwrap();
 
-        let cfg = InvariantProjectionConfig {
-            mode: Some(ProjectionMode::Region),
-            target: Some("AGENTS.md".to_string()),
-            region_begin: Some(begin.to_string()),
-            region_end: Some(end.to_string()),
-            ..Default::default()
-        };
-        let written = project_invariants(&store, &cfg, &registry_with_two()).unwrap();
+        let body = render_id_anchor_rows(&[row("D-1", "D-1: JSON-in-git storage")]);
+        let written = write_projection(
+            &store,
+            ProjectionMode::Region,
+            "AGENTS.md",
+            begin,
+            end,
+            &body,
+        )
+        .unwrap();
         assert_eq!(written, "AGENTS.md");
 
         let updated = std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
         // Bytes OUTSIDE the region are byte-identical (REQ-01).
         assert!(updated.starts_with(&format!("{preamble}{begin}")));
         assert!(updated.ends_with(&format!("{end}{postamble}")));
-        // Stale hand-authored prose was replaced.
+        // Stale hand-authored prose was replaced with the projected row.
         assert!(!updated.contains("stale hand-authored prose"));
-        // Registry content is present in the region.
-        assert!(updated.contains("sample-invariant"));
-        assert!(updated.contains("second-invariant"));
+        assert!(updated.contains("- **D-1** — JSON-in-git storage"));
         // Markers themselves survive.
         assert!(updated.contains(begin));
         assert!(updated.contains(end));
     }
 
-    /// REQ-06: malformed/missing markers raise a typed `ProjectionError` WITHOUT
+    /// REQ-07: malformed/missing markers raise a typed `ProjectionError` WITHOUT
     /// clobbering the file (the file must remain byte-identical after the error).
     #[test]
-    fn test_project_region_malformed_markers_do_not_clobber_agents_md() {
+    fn test_write_projection_region_malformed_markers_do_not_clobber() {
         let dir = tempfile::tempdir().unwrap();
         let jit_root = dir.path().join(".jit");
         std::fs::create_dir_all(&jit_root).unwrap();
@@ -599,16 +737,16 @@ kind = "advisory"
         let original = "# AGENTS.md\n\nNo markers here.\n\n## Commit Conventions\n";
         std::fs::write(dir.path().join("AGENTS.md"), original).unwrap();
 
-        let cfg = InvariantProjectionConfig {
-            mode: Some(ProjectionMode::Region),
-            target: Some("AGENTS.md".to_string()),
-            region_begin: Some("<!-- jit:invariants:begin -->".to_string()),
-            region_end: Some("<!-- jit:invariants:end -->".to_string()),
-            ..Default::default()
-        };
-
         // Missing begin marker is a typed error.
-        let err = project_invariants(&store, &cfg, &registry_with_two()).unwrap_err();
+        let err = write_projection(
+            &store,
+            ProjectionMode::Region,
+            "AGENTS.md",
+            "<!-- jit:x:begin -->",
+            "<!-- jit:x:end -->",
+            "body",
+        )
+        .unwrap_err();
         assert!(
             matches!(err, ProjectionError::MissingBeginMarker { .. }),
             "expected MissingBeginMarker, got {err:?}"
