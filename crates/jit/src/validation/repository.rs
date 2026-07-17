@@ -20,7 +20,7 @@ use crate::storage::GateRegistry;
 use crate::validation::engine::Finding;
 use crate::validation::invariants::InvariantRegistry;
 use crate::validation::project_render::{render_projection_body, ProjectionInputs};
-use crate::validation::projection::{require_target, splice_region};
+use crate::validation::projection::{compose_projection, require_target, splice_region};
 use crate::validation::report::{ReportedFinding, RuleReport};
 use crate::validation::rules::{RuleConfigError, RuleSet, SchemaSource, Severity};
 use anyhow::{anyhow, Context, Result};
@@ -477,8 +477,10 @@ pub(crate) fn projection_targets(view: &dyn RepositoryView) -> Result<BTreeSet<P
 /// Profile planning uses this before validation so a package-owned projection
 /// target is derived from the merged registries rather than frozen from only the
 /// package's contribution rows. Each returned `(target, bytes)` is the exact
-/// content `jit project render` would write for that projection over the proposed
-/// image, rendered through the SAME generic body path.
+/// content `jit project render` would write over the proposed image, rendered
+/// through the SAME generic body path AND composed through the SAME
+/// [`compose_projection`] mechanism — so several projections that share one target
+/// each land in the final bytes (sequential composition), never last-writer-wins.
 pub(crate) fn render_projections(view: &dyn RepositoryView) -> Result<Vec<(PathBuf, Vec<u8>)>> {
     let config = load_config(view)?;
     let Some(projections) = config.projection.as_ref() else {
@@ -493,22 +495,28 @@ pub(crate) fn render_projections(view: &dyn RepositoryView) -> Result<Vec<(PathB
         rules: &rules,
         gates: &gates,
     };
-    let mut rendered = Vec::with_capacity(projections.len());
+    // Thread every projection through one `pending` map keyed by target, so two
+    // projections into the SAME file compose (each splice sees the prior one's
+    // change) instead of overwriting each other.
+    let mut pending: BTreeMap<String, String> = BTreeMap::new();
     for (name, projection) in projections {
         let mut read = |path: &str| read_text(view, path);
         let (body, _count) = render_projection_body(projection, &inputs, &mut read)?;
         let target = require_target(projection, name)?;
-        let content = projected_content(
-            view,
+        compose_projection(
+            &mut pending,
             &target,
             projection.mode(),
             &body,
             &projection.region_begin(name),
             &projection.region_end(name),
+            |path| read_text(view, path),
         )?;
-        rendered.push((PathBuf::from(&target), content.into_bytes()));
     }
-    Ok(rendered)
+    Ok(pending
+        .into_iter()
+        .map(|(target, content)| (PathBuf::from(target), content.into_bytes()))
+        .collect())
 }
 
 fn validate_relative(path: &Path) -> Result<()> {
@@ -1326,6 +1334,78 @@ mod tests {
         std::fs::write(repo.path().join(".jit/gates.toml"), "not toml = [").unwrap();
         let view = overlay(&repo, [(".jit/gates.toml", Some(""))]);
         assert!(validate_repository(&view).is_ok());
+    }
+
+    /// F1: two region projections into the SAME target compose sequentially — the
+    /// second splices onto the first's change, so BOTH regions are fresh after
+    /// `render_projections` (profile planning's re-render path), never
+    /// last-writer-wins where one region stays stale.
+    #[test]
+    fn test_render_projections_composes_shared_target_both_regions_fresh() {
+        let repo = fixture();
+        let config = "\
+[type_hierarchy.types]
+task = 4
+
+[namespaces.type]
+description = \"Issue type\"
+unique = true
+
+[item_kinds.invariant]
+section = \"success_criteria\"
+id-pattern = \"[a-z][a-z0-9-]*\"
+markers = []
+link-namespaces = [\"enforces\"]
+scope = \"project\"
+source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
+source-of-truth = \"registry-first\"
+
+[projection.first]
+kind = \"invariant\"
+mode = \"region\"
+target = \"SHARED.md\"
+style = \"id-anchor\"
+
+[projection.second]
+kind = \"invariant\"
+mode = \"region\"
+target = \"SHARED.md\"
+style = \"id-anchor\"
+";
+        std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
+        std::fs::write(
+            repo.path().join(".jit/invariants.toml"),
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"Every edge stays acyclic.\"\nkind = \"enforced\"\n",
+        )
+        .unwrap();
+        // ONE file carries BOTH projections' region markers, each wrapping a
+        // distinct stale placeholder.
+        let shared = "# Shared\n\n\
+             <!-- jit:first:begin -->\nSTALE-FIRST\n<!-- jit:first:end -->\n\n\
+             <!-- jit:second:begin -->\nSTALE-SECOND\n<!-- jit:second:end -->\n";
+        std::fs::write(repo.path().join("SHARED.md"), shared).unwrap();
+
+        let rendered = render_projections(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        // The two projections collapse to ONE composed target, not two entries.
+        assert_eq!(rendered.len(), 1, "shared target must yield one entry");
+        let (path, bytes) = &rendered[0];
+        assert_eq!(path, Path::new("SHARED.md"));
+        let out = String::from_utf8(bytes.clone()).unwrap();
+        // BOTH regions are fresh: neither stale placeholder survives, and the
+        // rendered invariant lands in both regions (composition, not last-writer).
+        assert!(
+            !out.contains("STALE-FIRST"),
+            "first region stayed stale: {out}"
+        );
+        assert!(
+            !out.contains("STALE-SECOND"),
+            "second region stayed stale: {out}"
+        );
+        assert_eq!(
+            out.matches("sample-invariant").count(),
+            2,
+            "both regions must carry the rendered invariant: {out}"
+        );
     }
 
     #[test]

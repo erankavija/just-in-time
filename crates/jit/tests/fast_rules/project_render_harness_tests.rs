@@ -203,6 +203,15 @@ fn test_rules_and_gates_projection_parity_with_typed_render() {
          mode = \"separate-file\"\ntarget = \".jit/rules-and-gates.md\"\nstyle = \"full\"\n"
     );
     let storage = storage_with(&config, &[("rules.toml", RULES_TOML)]);
+    // Full style guards its declared registry sources (`.jit/rules.toml`,
+    // `.jit/gates.toml`) for existence over the `read_repo_file` boundary before
+    // rendering, so seed both there (the bytes are probed for presence; the render
+    // itself reads the effective rules and the saved gate registry).
+    storage.add_repo_file(".jit/rules.toml", RULES_TOML);
+    storage.add_repo_file(
+        ".jit/gates.toml",
+        "[[gates]]\nkey = \"cargo-ci\"\ntitle = \"Cargo CI\"\ndescription = \"fmt + clippy\"\nstage = \"postcheck\"\nmode = \"manual\"\n",
+    );
     let mut registry = GateRegistry::default();
     registry.gates.insert(
         "cargo-ci".to_string(),
@@ -354,8 +363,11 @@ source-of-truth = "registry-first"
          mode = \"separate-file\"\ntarget = \".jit/house.md\"\nstyle = \"full\"\n"
     );
     // Full style renders `config.invariants`, loaded from the `.jit/invariants.toml`
-    // store on the filesystem root — seed it there.
+    // store on the filesystem root — seed it there. The pre-write source-existence
+    // guard probes the same store over `read_repo_file`, so seed the repo-file map
+    // too.
     let storage = storage_with(&config, &[("invariants.toml", INVARIANTS_TOML)]);
+    storage.add_repo_file(".jit/invariants.toml", INVARIANTS_TOML);
     let executor = CommandExecutor::new(storage.clone());
 
     executor.project_render(Some("house")).unwrap();
@@ -371,5 +383,79 @@ source-of-truth = "registry-first"
     assert_eq!(written, expected);
     assert!(written.contains("## Project invariants"));
 
+    let _ = std::fs::remove_dir_all(storage.root());
+}
+
+/// F2 (`@/charter/D-6`): full style shares the id-anchor project-scope guard. A
+/// `full` projection over an ISSUE-scoped kind is a typed
+/// `ProjectionError::NotProjectScoped`, and nothing is written.
+#[test]
+fn test_full_style_issue_scoped_kind_is_typed_error_and_writes_nothing() {
+    // `decision` is an issue-scoped markdown-first kind: it has no project-scope
+    // registry, so it cannot back a full-style projection.
+    let issue_scoped_kind = r#"
+[item_kinds.decision]
+section = "decision_log"
+id-pattern = "D-[0-9]+"
+markers = []
+link-namespaces = ["per"]
+scope = "issue"
+source-of-truth = "markdown-first"
+"#;
+    let config = format!(
+        "{issue_scoped_kind}\n[projection.decisions]\nkind = \"decision\"\n\
+         mode = \"separate-file\"\ntarget = \".jit/decisions.md\"\nstyle = \"full\"\n"
+    );
+    let storage = storage_with(&config, &[]);
+    let executor = CommandExecutor::new(storage.clone());
+
+    let err = executor.project_render(Some("decisions")).unwrap_err();
+    let typed = err.downcast_ref::<jit::validation::projection::ProjectionError>();
+    assert!(
+        matches!(
+            typed,
+            Some(jit::validation::projection::ProjectionError::NotProjectScoped { kind })
+                if kind == "decision"
+        ),
+        "expected NotProjectScoped naming the kind, got {err:#}"
+    );
+    assert!(storage
+        .read_repo_file(".jit/decisions.md")
+        .unwrap()
+        .is_none());
+    let _ = std::fs::remove_dir_all(storage.root());
+}
+
+/// F2 (REQ-07): full style shares the id-anchor missing-source guard. A `full`
+/// projection whose declared registry store is absent over the `read_repo_file`
+/// boundary is a typed `ProjectionError::SourceNotFound` raised BEFORE any write,
+/// never a silent empty render from the defaulted in-memory registry.
+#[test]
+fn test_full_style_missing_registry_source_errors_pre_write() {
+    let config = format!(
+        "{INVARIANT_KIND}\n[projection.invariants]\nkind = \"invariant\"\n\
+         mode = \"separate-file\"\ntarget = \".jit/invariants.md\"\nstyle = \"full\"\n"
+    );
+    // The `.jit/invariants.toml` store is seeded NOWHERE: config.invariants loads
+    // empty (a missing store is indistinguishable from an empty one at render
+    // time), and the pre-write existence probe over `read_repo_file` finds nothing.
+    let storage = storage_with(&config, &[]);
+    let executor = CommandExecutor::new(storage.clone());
+
+    let err = executor.project_render(Some("invariants")).unwrap_err();
+    let typed = err.downcast_ref::<jit::validation::projection::ProjectionError>();
+    assert!(
+        matches!(
+            typed,
+            Some(jit::validation::projection::ProjectionError::SourceNotFound { path, kind })
+                if path == ".jit/invariants.toml" && kind == "invariant"
+        ),
+        "expected SourceNotFound for the absent store, got {err:#}"
+    );
+    // No empty block is written to the target.
+    assert!(storage
+        .read_repo_file(".jit/invariants.md")
+        .unwrap()
+        .is_none());
     let _ = std::fs::remove_dir_all(storage.root());
 }

@@ -154,8 +154,10 @@ examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"
 #   mode   — "region" (rewrite only the delimited block, preserving the rest) or
 #            "separate-file" (write the whole file); defaults to "separate-file"
 #   target — REQUIRED repo-relative path (no default)
-#   style  — "id-anchor" (generic `- **{id}** — {text}` bullets) or "full" (the
-#            built-in rich invariant / rule+gate views); defaults to "full"
+#   style  — "id-anchor" (generic `- **{id}** — {text}` bullets, any
+#            project-scoped kind) or "full" (built-in rich views, ONLY for the
+#            invariant store or the rule + gate stores together); defaults to
+#            "full"
 #   region-begin / region-end — region markers; default to
 #            "<!-- jit:<name>:begin -->" / "<!-- jit:<name>:end -->"
 # [projection.invariants]
