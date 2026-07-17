@@ -180,9 +180,11 @@ impl GateRunField {
                 "Whether the working tree differed from `commit` when the checker started: \
                  `true` if it carried uncommitted or untracked changes, `false` if it matched \
                  the commit exactly. A `true` run evidences that modified tree rather than the \
-                 commit alone. Absent when there was no commit to compare against — the working \
-                 directory is not a git repository, or the repository has no commits yet — in \
-                 which case a clean tree is never assumed."
+                 commit alone. `null` when no cleanliness value provably describes the recorded \
+                 commit: there was no commit to compare against (not a git repository, or no \
+                 commits yet), or `HEAD` moved through every paired probe attempt while the \
+                 evidence was being taken, so the tree state is recorded as unknown rather than \
+                 paired with a commit it might not describe."
                     .to_string()
             }
             GateRunField::Status => {
