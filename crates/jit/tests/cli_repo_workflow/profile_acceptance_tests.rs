@@ -311,10 +311,21 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     );
     assert!(!repo.path.join(".git").exists());
 
-    let invariants = success_json_with_path(&repo.path, &["invariant", "render", "--json"], path);
-    assert_eq!(invariants["target"], "AGENTS.md");
-    let references = success_json_with_path(&repo.path, &["reference", "render", "--json"], path);
-    assert_eq!(references["target"], ".jit/reference/rules-and-gates.md");
+    let invariants = success_json_with_path(
+        &repo.path,
+        &["project", "render", "--name", "invariants", "--json"],
+        path,
+    );
+    assert_eq!(invariants["projections"][0]["target"], "AGENTS.md");
+    let references = success_json_with_path(
+        &repo.path,
+        &["project", "render", "--name", "rules-and-gates", "--json"],
+        path,
+    );
+    assert_eq!(
+        references["projections"][0]["target"],
+        ".jit/reference/rules-and-gates.md"
+    );
     let agents = fs::read_to_string(repo.path.join("AGENTS.md")).unwrap();
     assert!(agents.contains("<!-- jit:invariants:begin -->"));
     assert!(agents.contains("<!-- jit:invariants:end -->"));
