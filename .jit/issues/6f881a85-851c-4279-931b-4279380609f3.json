@@ -2,7 +2,7 @@
   "id": "6f881a85-851c-4279-931b-4279380609f3",
   "title": "Exit quietly on closed stdout instead of panicking",
   "description": "When stdout closes early (for example `jit gate status ... | head -2`), jit panics with `failed printing to stdout: Broken pipe (os error 32)` from the std print machinery.\n\n## Background\n\nObserved twice while piping gate output through `head` during an execution-lead session. A CLI whose primary consumer is an agent composing shell pipelines terminates pipelines early as a matter of course; a panic plus backtrace note on every truncated pipe is noise and reads as a crash.\n\n## Success Criteria\n\n- [hard] REQ-01: A command whose stdout closes mid-write exits without a panic message or backtrace hint.\n- [hard] REQ-02: The exit status in the broken-pipe case follows the conventional quiet-termination behavior for CLI tools rather than a panic exit.\n- [hard] REQ-03: A regression test (or harness-level check) covers writing to a closed stdout.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:worker",
   "dependencies": [],
@@ -13,25 +13,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "doc-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T04:11:09.396475278Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T20:59:41.199840089Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T21:06:04.001227213Z"
     },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-17T03:00:11.910589485Z"
     },
-    "docs-mechanical": {
+    "doc-review": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T21:06:04.001227213Z"
+      "updated_at": "2026-07-17T04:11:09.396475278Z"
     }
   },
   "context": {},
@@ -42,7 +42,8 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-07T07:52:08.564670888Z",
-  "updated_at": "2026-07-17T04:12:38.851709187Z",
+  "updated_at": "2026-07-17T06:44:05.357436947Z",
   "first_ready_at": "2026-07-07T07:52:08.564680188Z",
-  "claimed_at": "2026-07-16T08:40:04.541705952Z"
+  "claimed_at": "2026-07-16T08:40:04.541705952Z",
+  "done_at": "2026-07-17T06:44:05.357436407Z"
 }

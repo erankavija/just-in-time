@@ -2,7 +2,7 @@
   "id": "0daba57d-4cb8-4494-a825-22b286bc02c6",
   "title": "Refused issue deletion exits nonzero",
   "description": "Deleting an issue without the confirmation environment variable prints a refusal and exits 0, so scripts treat the refusal as success. Hit live during tracker hygiene: a cleanup step believed a deletion had happened when it had not.\n\n## Success Criteria\n\n- [hard] REQ-01: A deletion refused for missing confirmation exits nonzero (invalid-argument family, exit 2) in both text and JSON modes.\n- [hard] REQ-02: Under --json the refusal emits the structured error envelope with a distinguishing code and the confirmation hint in suggestions.\n- [hard] REQ-03: A confirmed deletion's exit code and output are unchanged.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:worker",
   "dependencies": [],
@@ -13,6 +13,11 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T00:31:37.381758753Z"
+    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -22,11 +27,6 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T21:21:19.717517740Z"
-    },
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T00:31:37.381758753Z"
     },
     "doc-review": {
       "status": "passed",
@@ -42,7 +42,8 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T22:41:02.663869625Z",
-  "updated_at": "2026-07-17T04:00:05.308359299Z",
+  "updated_at": "2026-07-17T06:44:04.577425950Z",
   "first_ready_at": "2026-07-05T22:41:02.663883645Z",
-  "claimed_at": "2026-07-16T08:40:04.558426374Z"
+  "claimed_at": "2026-07-16T08:40:04.558426374Z",
+  "done_at": "2026-07-17T06:44:04.577425420Z"
 }
