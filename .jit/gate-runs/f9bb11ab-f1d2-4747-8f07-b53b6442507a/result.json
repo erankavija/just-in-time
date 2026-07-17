@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "f9bb11ab-f1d2-4747-8f07-b53b6442507a",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "d08e21793b43a375d2689fd2a31b78590a24c33f",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T13:19:45.957445535Z",
+  "completed_at": "2026-07-17T13:21:37.889380689Z",
+  "duration_ms": 111931,
+  "exit_code": 0,
+  "stdout": "Attribution: leaf issue `d74a9ed1`; inspected 22 reachable `jit:d74a9ed1` commits individually with rename detection. Uncommitted JIT metadata was not attributed.\n\nDocumentation accurately covers the write-through behavior, addressability, preservation guarantee, and `init`/`config set` triggers. The prior advisory grammar defect is resolved.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's documentation impact is complete and accurate; no findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue's documentation impact is complete and accurate; no findings.",
+    "findings": []
+  }
+}

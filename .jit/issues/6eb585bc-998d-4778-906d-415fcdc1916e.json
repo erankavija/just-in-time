@@ -2,7 +2,7 @@
   "id": "6eb585bc-998d-4778-906d-415fcdc1916e",
   "title": "Core maintenance",
   "description": "Umbrella for standalone jit core maintenance and bug-fix work that is not part of a feature epic.\n\n## Success Criteria\n\n- Every child maintenance item is resolved (done or rejected) with its own verifiable criteria.",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:jit-execution-lead",
   "dependencies": [
@@ -75,50 +75,51 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.846112271Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T13:25:19.094372944Z"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:38:46.014124388Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T13:25:17.979391434Z"
     },
     "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.846078381Z"
-    },
-    "repo-validate": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.846127671Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T13:22:34.337904327Z"
     },
     "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:38:46.006041922Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T13:29:22.867799281Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T13:25:18.669860306Z"
     }
   },
   "context": {},
   "documents": [
     {
-      "path": "dev/active/6eb585bc-batch-report-2026-07-05.md",
+      "path": "dev/archive/6eb585bc-completion-report.md",
       "commit": null,
-      "label": "Maintenance batch report 2026-07-05",
-      "doc_type": "report"
-    },
-    {
-      "path": "dev/active/6eb585bc-usability-audit-2026-07-05.md",
-      "commit": null,
-      "label": "Usability audit & session mining 2026-07-05",
+      "label": null,
       "doc_type": "report",
       "format": "markdown"
     },
     {
-      "path": "dev/active/6eb585bc-handoff.md",
+      "path": "dev/archive/6eb585bc-batch-report-2026-07-05.md",
       "commit": null,
-      "label": "Session handoff 2026-07-06",
+      "label": null,
+      "doc_type": "report",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/archive/6eb585bc-usability-audit-2026-07-05.md",
+      "commit": null,
+      "label": null,
       "doc_type": "report",
       "format": "markdown"
     }
@@ -129,6 +130,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-16T18:30:52.029597744Z",
-  "updated_at": "2026-07-16T14:21:28.350645599Z",
-  "first_ready_at": "2026-07-05T08:08:20.123562836Z"
+  "updated_at": "2026-07-17T13:33:58.141736793Z",
+  "first_ready_at": "2026-07-05T08:08:20.123562836Z",
+  "done_at": "2026-07-17T13:33:40.339134398Z"
 }

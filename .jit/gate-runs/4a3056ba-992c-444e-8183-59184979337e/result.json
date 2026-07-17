@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "4a3056ba-992c-444e-8183-59184979337e",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "d08e21793b43a375d2689fd2a31b78590a24c33f",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T13:17:58.210606174Z",
+  "completed_at": "2026-07-17T13:19:36.513009267Z",
+  "duration_ms": 98302,
+  "exit_code": 0,
+  "stdout": "Attribution: leaf issue with no resolved children; reviewed 19 individually tagged reachable commits. Uncommitted gate metadata was excluded. Prior blocking wording defects are fixed.\n\nDocumentation impact: generic projections, markdown-first sources, and `jit project render` are accurately documented and discoverable.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact documentation findings; prior source-of-truth wording defects are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "No issue-impact documentation findings; prior source-of-truth wording defects are resolved.",
+    "findings": []
+  }
+}

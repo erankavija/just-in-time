@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "1ba0d94d-3dee-4d8e-bbf0-32cb7b0186b2",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "d08e21793b43a375d2689fd2a31b78590a24c33f",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T13:11:46.275762562Z",
+  "completed_at": "2026-07-17T13:15:01.630914540Z",
+  "duration_ms": 195355,
+  "exit_code": 0,
+  "stdout": "Attribution: `jit:d74a9ed1` commits f889baf9, 575d4dab, e4966077, 882bf88d, 93e7ed5b, b2be904a, e7efa262, 4b0b39e7, 46e8c5ae, ff365b3a, 6d4efad1, 2fe3ed74, 68fccbca, d98c927f, a32e1707, 5c1b1602, a1adb140, d9d67143, 271c650b, 0500ef34, b876f3b7, 624ffa8e\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 — dev/vision/9db27a3a-charter.md; @/rule/namespace-unique-brackets — .jit/rules.toml; @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci passed (exit 0, 2026-07-17T13:07:46Z); doc-review passed (exit 0, 2026-07-17T04:00:05Z); docs-mechanical passed (exit 0, 2026-07-17T13:11:45Z)\nTruncation recovery: individually reread historical storage patches and current implementation/test ranges after an oversized patch batch.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior duplicate-name blocking finding is resolved and covered by regression tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard criteria are met; the prior duplicate-name blocking finding is resolved and covered by regression tests.",
+    "findings": []
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "1930b109-cc0d-4e65-9ea0-a296910b3222",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "6eb585bc-998d-4778-906d-415fcdc1916e",
+  "commit": "d08e21793b43a375d2689fd2a31b78590a24c33f",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T13:25:19.094372944Z",
+  "completed_at": "2026-07-17T13:29:22.784492950Z",
+  "duration_ms": 243690,
+  "exit_code": 0,
+  "stdout": "Attribution: 80 reachable `jit:6eb585bc` commits, individually partitioned and inspected\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2, D-3, D-6, D-7, D-14, D-15 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, single-source-prose, bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0, 2026-07-17T13:22:34Z); repo-validate passed (0, 2026-07-17T13:25:18Z); docs-mechanical passed (0, 2026-07-17T13:25:17Z); doc-review pending; code-review pending\nTruncation recovery: narrowed the two truncated broad patch reads to individual issue-state and relevant-source patches\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All 59 child dependencies are terminal and integrated; the attributable code, documentation, and evidence updates satisfy the epic criterion.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All 59 child dependencies are terminal and integrated; the attributable code, documentation, and evidence updates satisfy the epic criterion.",
+    "findings": []
+  }
+}
