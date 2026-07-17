@@ -277,10 +277,17 @@
     "894337e2": 1,
     "8917c558": 1,
     "3e12ffbd": 1,
-    "45a140ae": 1,
+    "45a140ae": 5,
     "0daba57d": 1,
-    "d74a9ed1": 1
+    "d74a9ed1": 5,
+    "1d59070d": 3,
+    "c505031a": 1,
+    "0283ce74": 1,
+    "554ad07f": 2,
+    "450db193": 1,
+    "52665a07": 2
   },
   "started_at": "2026-07-14T00:00:00Z",
+  "session_5": "2026-07-16/17 session 5. DONE this session: 8917c558, 3e12ffbd, 0daba57d, 6f881a85, 894337e2, 94096aac (bc9ee111), plus all session-4 carryovers merged. MERGED: all 16 batch children are on main. Codex profile epic 9b7b5f9c landed mid-session (d4c57540) after invoker-approved cross-epic integration of 450db193's [projection.*] with the profile manifest (named projection contributions replace singleton-table targets). Six fix-commit windows interleaved with review waves; whole-surface audits broke two one-finding-per-round loops (45a140ae literal-terminality family, 16 sites, 6cad67f0+earlier; d74a9ed1 TOML-scanner family escalated -> invoker approved toml_edit rebuild). AT SESSION END: awaiting final re-run wave results - doc-review re-runs for 45a140ae/1d59070d/52665a07/c505031a/554ad07f/0283ce74 (fixes committed 6cad67f0), d74a9ed1 code-review (toml_edit rebuild), 450db193 code+doc-review (REQ-07 d657c607 + D1-D3). Remaining lead-side: collect wave results, done-transitions, epic completion per Section 10 (@/charter/D-14).",
   "session_4": "2026-07-16 session 4 CLOSED, handoff dev/active/6eb585bc-handoff-4.md. DONE this session: 8d7fc762, 16402e14. MERGED awaiting gates (sweep take 5 running at handoff): 8917c558 (lead fixes f23479ed+2a5aff7e, 3/4 green), 52665a07 (+d3d64146), 3e12ffbd, 45a140ae, 0daba57d, d74a9ed1, 1d59070d, 894337e2 (rework merge dbe1a50b). IN-FLIGHT workers at handoff: 450db193 (committed 8aa61b84), 0283ce74 (4 commits), c505031a (29 dirty, functionally complete), 554ad07f (committed 99072933, desk-review PASS \u2014 merge directly), 6f881a85-r1 (replacement, no commits yet). Filed 94096aac (foreground-serve deadlock, ready). Gate-sweep recipe + traps in handoff-4."
 }
