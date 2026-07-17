@@ -171,12 +171,21 @@ pub fn find_available_port(start: u16) -> Result<TcpListener> {
 /// Configures `cmd` so the spawned `jit-server` child inherits `listener` as
 /// its serving socket instead of binding a port itself (Unix only).
 ///
-/// Clears close-on-exec on the listener's descriptor so it survives the
-/// child's `execve`, then publishes the listenfd environment
-/// (`LISTEN_FDS=1`, `LISTEN_FDS_FIRST_FD=<fd>`) that `jit-server` reads to
-/// adopt the fd. `LISTEN_PID` is intentionally unset: the listenfd protocol
-/// treats an absent `LISTEN_PID` as "addressed to this process", which is
-/// what we want since the child's PID is unknown before the spawn.
+/// Establishes the complete listenfd environment contract for the child:
+/// clears close-on-exec on the listener's descriptor so it survives the
+/// child's `execve`, publishes `LISTEN_FDS=1` and `LISTEN_FDS_FIRST_FD=<fd>`
+/// so `jit-server` adopts that exact descriptor, and removes any `LISTEN_PID`
+/// the parent's own process environment carries. `Command` inherits the
+/// parent's environment by default, so a `LISTEN_PID` left over from e.g. a
+/// socket-activation manager or a stale exported shell variable would
+/// otherwise reach the child unchanged. The listenfd protocol treats an
+/// *absent* `LISTEN_PID` as "addressed to this process" (what we want, since
+/// the child's PID is unknown before the spawn) but treats a *present*,
+/// mismatched `LISTEN_PID` as a rejection — `jit-server`'s `resolve_listener`
+/// then silently falls back to binding a fresh port, exactly the re-bind
+/// this handoff exists to prevent. `LISTEN_FDS` and `LISTEN_FDS_FIRST_FD` are
+/// the only other variables the listenfd protocol reads; both are set above,
+/// so no other `LISTEN_*` name needs scrubbing.
 ///
 /// The caller must keep `listener` alive until after the child is spawned;
 /// the child receives its own dup of the socket at fork time, so the port is
@@ -192,25 +201,35 @@ pub fn inherit_listener(cmd: &mut std::process::Command, listener: &TcpListener)
     fcntl(listener, FcntlArg::F_SETFD(FdFlag::empty()))
         .context("Failed to clear close-on-exec on the server listener")?;
     cmd.env("LISTEN_FDS", "1")
-        .env("LISTEN_FDS_FIRST_FD", fd.to_string());
+        .env("LISTEN_FDS_FIRST_FD", fd.to_string())
+        // See doc comment: an inherited LISTEN_PID would otherwise pass
+        // through to the child and cause listenfd to reject our LISTEN_FDS,
+        // forcing a re-bind.
+        .env_remove("LISTEN_PID");
     Ok(())
 }
 
 /// Spawns `cmd` as the `jit-server` child, handing it `listener` as its
 /// pre-bound serving socket, and returns the running child.
 ///
-/// On Unix the child inherits the exact socket via [`inherit_listener`] — it
+/// The child inherits the exact socket via [`inherit_listener`] — it
 /// performs no bind of its own, so the port `find_available_port` probed is
 /// held continuously across the process boundary and cannot be stolen in a
 /// probe-then-bind window. The parent's handle is dropped only after the
 /// fork, once the child holds its own dup.
 ///
-/// On non-Unix platforms file-descriptor inheritance is unavailable, so the
-/// socket is released before the spawn and the child binds `--bind` itself.
+/// This handoff is Unix-only (fd inheritance across `execve`), which is not
+/// a practical limitation: the crate has no non-Unix build in the first
+/// place, since `nix` — Unix-only itself — is an unconditional dependency.
+/// On a hypothetical non-Unix target this function still refuses to fall
+/// back to releasing `listener` and letting the child bind a fresh port,
+/// since that would reopen the probe-then-bind race this handoff exists to
+/// close; it returns a typed error instead.
 ///
 /// # Errors
-/// Returns an error if the descriptor cannot be made inheritable or the child
-/// process fails to spawn.
+/// Returns an error if the descriptor cannot be made inheritable, the child
+/// process fails to spawn, or (non-Unix only) the platform has no socket
+/// handoff implementation.
 pub fn spawn_with_listener(
     cmd: &mut std::process::Command,
     listener: TcpListener,
@@ -225,9 +244,19 @@ pub fn spawn_with_listener(
     }
     #[cfg(not(unix))]
     {
-        // Release the port so the child can bind it itself.
-        drop(listener);
-        cmd.spawn().context("Failed to spawn jit-server")
+        // Do not drop `listener` and let `cmd` bind a fresh port: that would
+        // reopen the exact probe-then-bind race `find_available_port`'s
+        // caller already closed by binding here (REQ-2). There is no
+        // non-Unix fd-inheritance implementation, so fail explicitly instead
+        // of spawning a child at all — no bind of any kind happens on this
+        // path.
+        let _ = (cmd, listener);
+        bail!(
+            "jit serve's socket handoff requires a Unix platform: this build \
+             has no non-Unix implementation of file-descriptor inheritance, \
+             and re-binding the already-probed port here would reopen the \
+             race this handoff exists to prevent."
+        );
     }
 }
 
@@ -693,6 +722,99 @@ mod tests {
         assert!(
             !envs.contains_key("LISTEN_PID"),
             "LISTEN_PID must remain unset"
+        );
+    }
+
+    /// Guards every test in this module that touches the process-global
+    /// `LISTEN_*` environment, mirroring the lock in crates/server's
+    /// `resolve_listener_tests` (jit:894337e2 / jit:c89133aa): two tests
+    /// mutating these variables in parallel steal each other's state
+    /// nondeterministically under the default parallel test runner.
+    static LISTEN_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    #[cfg(unix)]
+    fn test_inherit_listener_scrubs_inherited_listen_pid() {
+        let _guard = LISTEN_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+        // Simulate a parent process environment that already carries a
+        // foreign LISTEN_PID — e.g. jit itself was launched under a
+        // socket-activation manager, or a stale exported shell variable
+        // lingers. `Command` inherits the parent's environment by default,
+        // so without an explicit removal this would reach the child
+        // unchanged and cause listenfd to reject our LISTEN_FDS on a PID
+        // mismatch, falling back to a re-bind (the race REQ-2 forbids).
+        std::env::set_var("LISTEN_PID", "1");
+
+        let listener = find_available_port(0).unwrap();
+        let mut cmd = std::process::Command::new("true");
+        let result = inherit_listener(&mut cmd, &listener);
+
+        std::env::remove_var("LISTEN_PID");
+        result.unwrap();
+
+        // `Command::get_envs` reports explicit overrides only: a `None`
+        // value means an explicit `env_remove`, which unconditionally wins
+        // over whatever the parent process's real environment carries at
+        // spawn time — this is the property that makes the fix correct
+        // regardless of the ambient LISTEN_PID set above.
+        let envs: std::collections::HashMap<String, Option<String>> = cmd
+            .get_envs()
+            .map(|(k, v)| {
+                (
+                    k.to_str().unwrap().to_owned(),
+                    v.and_then(|v| v.to_str()).map(str::to_owned),
+                )
+            })
+            .collect();
+        assert_eq!(
+            envs.get("LISTEN_FDS").cloned(),
+            Some(Some("1".to_owned())),
+            "LISTEN_FDS must still be set alongside the LISTEN_PID removal"
+        );
+        assert!(
+            envs.get("LISTEN_FDS_FIRST_FD").is_some_and(|v| v.is_some()),
+            "LISTEN_FDS_FIRST_FD must still point at the parent's descriptor"
+        );
+        assert_eq!(
+            envs.get("LISTEN_PID"),
+            Some(&None),
+            "inherit_listener must record an explicit LISTEN_PID removal so \
+             the child never inherits the parent's ambient LISTEN_PID"
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_inherit_listener_child_never_sees_inherited_listen_pid() {
+        let _guard = LISTEN_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+        // End-to-end version of the assertion above: actually spawn a child
+        // and inspect the environment it received, so the test fails if
+        // `Command`'s override semantics ever change out from under the
+        // `get_envs`-only assertion in the sibling test.
+        std::env::set_var("LISTEN_PID", "999999");
+
+        let listener = find_available_port(0).unwrap();
+        let mut cmd = std::process::Command::new("env");
+        let inherit_result = inherit_listener(&mut cmd, &listener);
+        let output = inherit_result.and_then(|()| {
+            cmd.output()
+                .context("failed to spawn `env` to inspect child environment")
+        });
+
+        std::env::remove_var("LISTEN_PID");
+        let output = output.unwrap();
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !stdout.lines().any(|line| line.starts_with("LISTEN_PID=")),
+            "child must not see a LISTEN_PID inherited from the parent's own \
+             environment; got env:\n{stdout}"
+        );
+        assert!(
+            stdout.lines().any(|line| line == "LISTEN_FDS=1"),
+            "child must still see LISTEN_FDS; got env:\n{stdout}"
         );
     }
 
