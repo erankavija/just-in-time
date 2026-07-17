@@ -206,7 +206,8 @@ project-scoped kind projects this way. Fields:
 | `region-begin` / `region-end` | marker strings | `region`-mode delimiters. Default to `<!-- jit:<name>:begin -->` / `<!-- jit:<name>:end -->`, derived from the projection name. |
 
 Run `jit project render` (optionally `--name <name>` for one) after editing a
-source registry; `jit validate` reports a stale target. This repository's own
+projected kind's source of truth — its registry, or its markdown document for a
+markdown-first kind; `jit validate` reports a stale target. This repository's own
 three projections (`invariants`, `charter`, `rules-and-gates`) are repo-local
 configuration, not a shipped default.
 

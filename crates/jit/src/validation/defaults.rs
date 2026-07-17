@@ -320,8 +320,12 @@ pub fn reconcile_default_rules_with_config(
 
     // Append the default rules the registry now generates that `loaded` lacked
     // (e.g. a uniqueness rule for a newly-declared namespace), in default order.
+    // A name already present — including a CUSTOM rule shadowing the derived
+    // default name — suppresses the append, so reconciliation never yields two
+    // rules with one name (jit:d74a9ed1 review F1, round 10).
+    let present: HashSet<String> = rules.iter().map(|r| r.name.clone()).collect();
     for rule in &derived.rules {
-        if !consumed.contains(rule.name.as_str()) {
+        if !consumed.contains(rule.name.as_str()) && !present.contains(&rule.name) {
             rules.push(rule.clone());
         }
     }
@@ -384,9 +388,11 @@ impl DefaultRuleMembershipDiff {
 ///
 /// A rule sharing a `namespace-unique-<ns>` NAME but a different `origin`
 /// (a custom rule shadowing the default name) is never counted as "existing"
-/// here and never targeted for drop, matching how
+/// here, never targeted for drop, and SUPPRESSES the append of the derived
+/// default row — the shadowing rule keeps the name, so the sync never writes a
+/// duplicate-name file that `RuleSet::load` would reject. This matches how
 /// [`reconcile_default_rules_with_config`] only ever touches `origin =
-/// "default"` rows.
+/// "default"` rows and skips a derived default whose name is already present.
 ///
 /// Pure: no I/O, deterministic, total.
 ///
@@ -471,6 +477,14 @@ pub fn default_rule_membership_diff_from_identities(
         })
         .map(|(name, _)| name.as_str())
         .collect();
+    // EVERY existing rule name, regardless of origin: a custom rule shadowing a
+    // derived default name must suppress the append, or the sync would write a
+    // duplicate-name file that `RuleSet::load` rejects (jit:d74a9ed1 review F1,
+    // round 10).
+    let taken: HashSet<&str> = existing_rules
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .collect();
 
     let derived = default_ruleset(namespaces);
     let desired: Vec<&Rule> = derived
@@ -482,7 +496,7 @@ pub fn default_rule_membership_diff_from_identities(
 
     let mut to_add: Vec<Rule> = desired
         .into_iter()
-        .filter(|r| !existing.contains(r.name.as_str()))
+        .filter(|r| !taken.contains(r.name.as_str()))
         .cloned()
         .collect();
     to_add.sort_by(|a, b| a.name.cmp(&b.name));
@@ -1198,6 +1212,30 @@ mod tests {
     // -- default_rule_membership_diff (jit:d74a9ed1) -------------------------
 
     #[test]
+    fn test_reconcile_custom_rule_shadowing_default_name_is_not_duplicated() {
+        // In-memory reconciliation must agree with the write-path diff: the
+        // derived default whose name a custom rule occupies is not appended, so
+        // the reconciled set never carries two rules with one name.
+        let mut loaded =
+            default_ruleset(&registry(vec![("type", LabelNamespace::new("Type", true))]));
+        let mut shadow = custom_json_rule("namespace-unique-team");
+        shadow.origin = None;
+        loaded.rules.push(shadow.clone());
+        let now = registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("team", LabelNamespace::new("Team", true)),
+        ]);
+        let reconciled = reconcile_default_rules_with_config(loaded, &now);
+        let with_name: Vec<_> = reconciled
+            .rules
+            .iter()
+            .filter(|r| r.name == "namespace-unique-team")
+            .collect();
+        assert_eq!(with_name.len(), 1, "exactly one rule owns the name");
+        assert_eq!(with_name[0], &shadow, "the custom rule wins verbatim");
+    }
+
+    #[test]
     fn test_membership_diff_adds_newly_unique_namespace() {
         // `team` was not unique when `loaded` was scaffolded; the registry now
         // declares it unique. The diff must add exactly its uniqueness rule.
@@ -1263,10 +1301,10 @@ mod tests {
     fn test_membership_diff_ignores_custom_rule_with_colliding_name() {
         // A CUSTOM rule (non-default origin) happens to be named
         // `namespace-unique-team`. It is never counted as "existing" for this
-        // family (mirroring `reconcile_default_rules_with_config`), so a
-        // registry that still declares `team` unique still ADDS the default
-        // row rather than treating the custom row as satisfying it, and the
-        // custom row is never a drop target.
+        // family, never a drop target, and OWNS the name: the derived default
+        // row is suppressed rather than appended beside it, so the sync can
+        // never write a duplicate-name file that `RuleSet::load` rejects
+        // (jit:d74a9ed1 review F1, round 10).
         let loaded = RuleSet {
             rules: vec![custom_json_rule("namespace-unique-team")],
         };
@@ -1280,16 +1318,19 @@ mod tests {
         );
 
         // With at least one default-origin rule present (not opted out), the
-        // custom-origin `namespace-unique-team` row still does not block the
-        // default row from being added.
+        // custom-origin `namespace-unique-team` row suppresses the default
+        // row's append and is itself never dropped.
         let mut loaded_with_default = default_ruleset(&registry(vec![]));
         loaded_with_default
             .rules
             .push(custom_json_rule("namespace-unique-team"));
         let diff = default_rule_membership_diff(&loaded_with_default, &reg);
-        assert_eq!(diff.to_add.len(), 1);
-        assert_eq!(diff.to_add[0].name, "namespace-unique-team");
-        assert_eq!(diff.to_add[0].origin.as_deref(), Some("default"));
+        assert!(
+            diff.to_add.is_empty(),
+            "shadowed name must not be re-added: {:?}",
+            diff.to_add.iter().map(|r| &r.name).collect::<Vec<_>>()
+        );
+        assert!(diff.to_drop.is_empty(), "shadowing rule is never dropped");
     }
 
     #[test]

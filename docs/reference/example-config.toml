@@ -149,7 +149,8 @@ examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"
 
 # Documentation projections (optional). Each `[projection.<name>]` table makes
 # `jit project render` write one or more addressable item kinds into a doc file,
-# keeping the rendered copy in sync with its source registry. Fields:
+# keeping the rendered copy in sync with the kind's declared source of truth
+# (a TOML registry, or a markdown document for a markdown-first kind). Fields:
 #   kind   — a kind name, or an array (must be project-scoped)
 #   mode   — "region" (rewrite only the delimited block, preserving the rest) or
 #            "separate-file" (write the whole file); defaults to "separate-file"
