@@ -281,8 +281,10 @@ embedded-closure owner is non-terminal (an owner archived from a terminal state
 counts as terminal); a managed document with no owner remains eligible and
 reports `no-owner` as informational evidence. When a blocker is caused by
 lifecycle state, the refusal — in both the human message and the JSON blocker's
-`guidance` field — names the permitted next action (complete or reject the
-container, then re-run archival).
+`guidance` field — names the permitted next action: complete or reject the
+container, then re-run archival; a target already `Archived` from a
+non-terminal state first revives to its recorded pre-archive state
+(`jit issue update <id> --state <origin>`), then completes or rejects.
 
 A successful container execution retires the container into the `Archived`
 lifecycle state as its final durable step, recording the terminal state it came
