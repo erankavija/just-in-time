@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "83cf8e36-ff28-456d-bebc-db8637a0f9cf",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "6a027033a27efe3c771af88edea58ebbcb808029",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T12:49:38.575738870Z",
+  "completed_at": "2026-07-17T12:54:21.292109145Z",
+  "duration_ms": 282716,
+  "exit_code": 1,
+  "stdout": "Attribution: 575d4dab, e4966077, 882bf88d, 93e7ed5b, b2be904a, e7efa262, 4b0b39e7, 46e8c5ae, ff365b3a, 6d4efad1, 2fe3ed74, 68fccbca, d98c927f, a32e1707, 5c1b1602, a1adb140, d9d67143, 271c650b, 0500ef34, b876f3b7, 624ffa8e\nPolicy sources: AGENTS.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml); @/rule/namespace-unique-brackets (.jit/rules.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review passed (exit 0); docs-mechanical passed (exit 0)\nTruncation recovery: narrowed reads of the sync path, membership diff, storage tests, loader, documentation, and individual patches after broad outputs truncated.\n\n1. **Blocking · issue-impact** — A valid rules file containing a custom `namespace-unique-<ns>` rule and another default-origin rule is silently rewritten with a duplicate rule name. The diff deliberately ignores the custom row when computing default membership at [defaults.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/defaults.rs:467), then appends the default row at [mod.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:1251). `RuleSet` rejects duplicate names at [rules.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/rules.rs:814), leaving subsequent validation and rule loading broken after `config set` has already persisted its config change. This violates REQ-03’s usable preservation of custom rules and prevents reliable rule addressability.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A config-driven membership sync can silently create duplicate rule names when a custom rule shares a derived default-rule name.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The sync appends a default namespace-unique rule beside a same-named custom rule, producing a rules.toml that RuleSet rejects for duplicate names.\",\"file\":\"crates/jit/src/validation/defaults.rs\",\"line\":467,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 11108 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7020-1608-73c1-8936-49b2dbcd4549\n--------\nuser\n--- 11095 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "A config-driven membership sync can silently create duplicate rule names when a custom rule shares a derived default-rule name.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The sync appends a default namespace-unique rule beside a same-named custom rule, producing a rules.toml that RuleSet rejects for duplicate names.",
+        "file": "crates/jit/src/validation/defaults.rs",
+        "line": 467
+      }
+    ]
+  }
+}

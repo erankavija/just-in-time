@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "1798f770-0528-418c-86b1-542d4fe15d2a",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "6a027033a27efe3c771af88edea58ebbcb808029",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T13:01:17.319745640Z",
+  "completed_at": "2026-07-17T13:03:02.842800864Z",
+  "duration_ms": 105523,
+  "exit_code": 1,
+  "stdout": "Attribution: `enhancement` is a configured leaf type (level 4) with no resolved children. I inspected the 18 reachable `jit:450db193` commits individually with rename detection; no fallback attribution was needed. The prior blocking findings in the main configuration reference are fixed, but two issue-authored descriptions still inaccurately limit generic projections to registry sources.\n\n1. **F1 — medium, blocking, issue-impact:** [Configuration reference](docs/reference/configuration.md:208) instructs users to render after editing a “source registry,” despite supporting markdown-first source documents. Change “source registry” to “source of truth” or equivalent.\n\n2. **F2 — medium, blocking, issue-impact:** [Example configuration](docs/reference/example-config.toml:152) says rendered copies synchronize with a “source registry,” which is inaccurate for markdown-first projections. Replace it with source-of-truth wording that covers both TOML registries and markdown documents.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-authored projection descriptions still incorrectly describe all sources as registries.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The configuration reference tells users to re-render after editing a source registry, excluding supported markdown-first source documents.\",\"file\":\"docs/reference/configuration.md\",\"line\":208},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The example configuration inaccurately says generic projections synchronize with a source registry despite markdown-first support.\",\"file\":\"docs/reference/example-config.toml\",\"line\":152}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10227 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f702a-bf84-71f3-a151-2a6f42cc18a6\n--------\nuser\n--- 10214 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two issue-authored projection descriptions still incorrectly describe all sources as registries.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The configuration reference tells users to re-render after editing a source registry, excluding supported markdown-first source documents.",
+        "file": "docs/reference/configuration.md",
+        "line": 208
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The example configuration inaccurately says generic projections synchronize with a source registry despite markdown-first support.",
+        "file": "docs/reference/example-config.toml",
+        "line": 152
+      }
+    ]
+  }
+}

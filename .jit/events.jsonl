@@ -8317,3 +8317,10 @@
 {"type":"gate_passed","id":"004f96cd-483f-4019-a3bd-5b8d59ae2dfa","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-17T12:35:19.271897315Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"c494563a-15f1-4f07-81b9-8fa9b831fec2","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-17T12:40:43.931991130Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"d2ce1902-0603-411a-82eb-8dfc04541e06","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-17T12:42:50.224910097Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"ffe10a47-fec1-4660-a112-d8a75b59cb06","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-17T12:49:37.766392872Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"8f5dab72-5694-4710-8e42-7da178b7a496","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-17T12:49:38.492976020Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"ab35686d-ed80-495a-956b-2539ab64681e","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-17T12:54:21.292709785Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"d74ec285-ed1d-4d6f-9766-16af4311cf81","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-17T12:57:25.274741783Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"897ae5b6-c9cb-4ebd-83f9-56c2faa68842","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-17T12:57:25.991404744Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"820d61dc-957b-4316-b6ad-0a99c299ffa6","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-17T13:01:17.236857730Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"8e105cef-a183-4e7a-ae5f-0c0d6abf0637","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-17T13:03:02.843313825Z","gate_key":"doc-review","updated_by":"auto:executor"}
