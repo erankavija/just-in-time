@@ -362,6 +362,10 @@ fn kill_process_group(child: &mut std::process::Child) {
 
 /// Git context information
 struct GitContext {
+    /// The commit paired with `tree_dirty` by [`probe_stable_git_pair`]: a
+    /// HEAD read taken immediately after the tree-status probe, verified (or,
+    /// past the retry bound, best-effort) to match a HEAD read taken before
+    /// it, so `tree_dirty` is never attributed to the wrong commit.
     commit: Option<String>,
     branch: Option<String>,
     /// Whether the working tree differed from `commit` at capture time. `None`
@@ -370,22 +374,83 @@ struct GitContext {
     tree_dirty: Option<bool>,
 }
 
-/// Get git context, gracefully degrading if not in a git repo
+/// Get git context, gracefully degrading if not in a git repo.
+///
+/// `commit` and `tree_dirty` are read together through
+/// [`probe_stable_git_pair`] so a commit landing between the two reads cannot
+/// pair a cleanliness flag with the wrong commit; `branch` is read
+/// independently since nothing downstream pairs it with `tree_dirty`.
 fn get_git_context(working_dir: &Path) -> GitContext {
-    let commit = get_git_commit(working_dir);
     let branch = get_git_branch(working_dir);
-    // Tree cleanliness is meaningful only relative to a resolved commit; skip the
-    // probe (and record `None`) when HEAD does not resolve, so a repo with no
-    // commits never reports a fabricated clean tree.
-    let tree_dirty = commit
-        .as_ref()
-        .and_then(|_| get_git_tree_dirty(working_dir));
+    let pair = probe_stable_git_pair(
+        || get_git_commit(working_dir),
+        || get_git_tree_dirty(working_dir),
+    );
 
     GitContext {
-        commit,
+        commit: pair.commit,
         branch,
-        tree_dirty,
+        tree_dirty: pair.tree_dirty,
     }
+}
+
+/// Bound on retry attempts in [`probe_stable_git_pair`]: enough to absorb one
+/// or two commits landing mid-probe under this repository's concurrent-agent
+/// commit churn, without looping indefinitely if HEAD never quiesces.
+const STABLE_PAIR_MAX_ATTEMPTS: u32 = 3;
+
+/// A commit paired with a tree-dirty flag by [`probe_stable_git_pair`].
+struct StableGitPair {
+    commit: Option<String>,
+    tree_dirty: Option<bool>,
+}
+
+/// Pair a HEAD probe with a working-tree-status probe so the recorded commit
+/// is never attributed to the wrong `tree_dirty` value.
+///
+/// `head_probe` and `status_probe` are injected as closures — rather than
+/// this function calling [`get_git_commit`]/[`get_git_tree_dirty`] directly —
+/// so a unit test can simulate a commit landing between reads without
+/// shelling out to git.
+///
+/// Each attempt reads HEAD (`h1`), then the tree status, then HEAD again
+/// (`h2`). `status_probe` runs only when `h1` is `Some`: tree cleanliness is
+/// meaningful only relative to a resolved commit, so a repo with no commits
+/// yet never reports a fabricated clean tree. When `h1 == h2`, the two HEAD
+/// reads bracket a quiescent status probe and the pair is returned
+/// immediately.
+///
+/// If `h1 != h2` on every attempt through [`STABLE_PAIR_MAX_ATTEMPTS`], the
+/// LAST attempt's pair is returned anyway, with `commit` set to that
+/// attempt's `h2` — the HEAD read taken immediately after `status_probe`, the
+/// closer of the two bracketing reads to when `tree_dirty` was actually
+/// observed. This keeps the recorded commit bracketing the status probe on
+/// its trailing side even when instability persists across every attempt.
+/// The residual uncertainty this cannot remove: a commit landing during the
+/// `status_probe` call itself is invisible to any number of surrounding HEAD
+/// reads.
+fn probe_stable_git_pair(
+    mut head_probe: impl FnMut() -> Option<String>,
+    mut status_probe: impl FnMut() -> Option<bool>,
+) -> StableGitPair {
+    let mut last = StableGitPair {
+        commit: None,
+        tree_dirty: None,
+    };
+    for _ in 0..STABLE_PAIR_MAX_ATTEMPTS {
+        let h1 = head_probe();
+        let tree_dirty = if h1.is_some() { status_probe() } else { None };
+        let h2 = head_probe();
+        let stable = h1 == h2;
+        last = StableGitPair {
+            commit: h2,
+            tree_dirty,
+        };
+        if stable {
+            return last;
+        }
+    }
+    last
 }
 
 /// Resolve the current `HEAD` commit hash for `working_dir`.
@@ -656,6 +721,86 @@ mod tests {
         let context = get_git_context(temp.path());
         assert!(context.commit.is_none());
         assert_eq!(context.tree_dirty, None);
+    }
+
+    /// TOCTOU fix: a commit landing between the two HEAD reads of the first
+    /// attempt (`h1 = "a"`, `h2 = "b"`) is discarded rather than paired with
+    /// that attempt's `tree_dirty`. The second attempt observes a quiescent
+    /// HEAD (`"b"` both times) and its pair — not the first attempt's — is
+    /// the one returned.
+    #[test]
+    fn test_probe_stable_git_pair_retries_until_stable() {
+        let head_calls = std::cell::Cell::new(0u32);
+        let head_probe = || {
+            let n = head_calls.get();
+            head_calls.set(n + 1);
+            match n {
+                0 => Some("a".to_string()), // attempt 1, h1
+                1 => Some("b".to_string()), // attempt 1, h2 -> mismatch, retry
+                _ => Some("b".to_string()), // attempt 2, h1 and h2 -> stable
+            }
+        };
+        let status_calls = std::cell::Cell::new(0u32);
+        let status_probe = || {
+            let n = status_calls.get();
+            status_calls.set(n + 1);
+            match n {
+                0 => Some(true),  // attempt 1's (discarded) tree_dirty
+                _ => Some(false), // attempt 2's tree_dirty
+            }
+        };
+
+        let pair = probe_stable_git_pair(head_probe, status_probe);
+
+        assert_eq!(pair.commit.as_deref(), Some("b"));
+        assert_eq!(pair.tree_dirty, Some(false));
+        assert_eq!(
+            head_calls.get(),
+            4,
+            "two HEAD reads per attempt, two attempts"
+        );
+        assert_eq!(status_calls.get(), 2);
+    }
+
+    /// TOCTOU fix, give-up bound: when HEAD changes on every read (never
+    /// stable), the probe stops after [`STABLE_PAIR_MAX_ATTEMPTS`] attempts
+    /// and returns the LAST attempt's pair, with `commit` set to that
+    /// attempt's `h2` — the HEAD read bracketing the trailing side of the
+    /// status probe.
+    #[test]
+    fn test_probe_stable_git_pair_gives_up_after_max_attempts() {
+        let head_calls = std::cell::Cell::new(0u32);
+        let head_probe = || {
+            let n = head_calls.get();
+            head_calls.set(n + 1);
+            Some(format!("commit-{n}"))
+        };
+
+        let pair = probe_stable_git_pair(head_probe, || Some(true));
+
+        assert_eq!(head_calls.get(), STABLE_PAIR_MAX_ATTEMPTS * 2);
+        let last_h2 = format!("commit-{}", STABLE_PAIR_MAX_ATTEMPTS * 2 - 1);
+        assert_eq!(pair.commit, Some(last_h2));
+        assert_eq!(pair.tree_dirty, Some(true));
+    }
+
+    /// The seam preserves the existing tie-to-commit rule: when HEAD never
+    /// resolves, the status probe never runs (and the unresolved pair is
+    /// accepted on the first attempt, since `None == None`).
+    #[test]
+    fn test_probe_stable_git_pair_skips_status_probe_when_head_unresolved() {
+        let status_calls = std::cell::Cell::new(0u32);
+        let pair = probe_stable_git_pair(
+            || None,
+            || {
+                status_calls.set(status_calls.get() + 1);
+                Some(false)
+            },
+        );
+
+        assert_eq!(pair.commit, None);
+        assert_eq!(pair.tree_dirty, None);
+        assert_eq!(status_calls.get(), 0);
     }
 
     /// REQ-01/REQ-04: a recorded gate run stamps `tree_dirty == Some(false)` when
