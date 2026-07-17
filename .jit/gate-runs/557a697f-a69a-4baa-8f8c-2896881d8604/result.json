@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "557a697f-a69a-4baa-8f8c-2896881d8604",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "640854b9140975d3b14bd74ed389dd3271b9b5b4",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-17T02:45:42.943466183Z",
+  "completed_at": "2026-07-17T02:48:41.788058895Z",
+  "duration_ms": 178844,
+  "exit_code": 1,
+  "stdout": "Attribution: a32e1707, 5c1b1602, a1adb140, d9d67143, 271c650b, 0500ef34, b876f3b7 (`jit:d74a9ed1`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/rule/namespace-unique-brackets (.jit/rules.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-17T01:23:22Z); docs-mechanical passed (exit 0, 2026-07-17T00:31:38Z); doc-review failed (exit 1, 2026-07-16T16:04:35Z)\nTruncation recovery: re-read the truncated merge patches by path/range and inspected current storage, command, validation, and test sources\n\n1. **[blocking][issue-impact][high]** `crates/jit/src/storage/ruleset_store.rs:206` recognizes a rule table only when `[[rules]]` begins in column zero. Valid TOML permits leading whitespace around table headers; such a file parses into rule identities but produces zero block offsets, so the count guard at lines 354–360 fails. `config set` has already saved `config.toml` before invoking this sync (`commands/config.rs:253-267`), leaving default-rule membership and registry-first `@/rule/<name>` addressability stale. This violates REQ-01/REQ-02 and the registry-first source-of-truth policy. The tests cover column-zero headers only. References: @/charter/D-6.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Valid whitespace-indented TOML rule headers cause membership sync to fail after config save.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The raw rule-header scanner accepts only column-zero [[rules]] headers; valid TOML with leading header whitespace parses but triggers the identity/block-count error, leaving rules.toml stale after config.toml is saved.\",\"file\":\"crates/jit/src/storage/ruleset_store.rs\",\"line\":206,\"references\":[\"@/charter/D-6\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6132 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6df7-2c71-7663-8293-61601f6f3ee3\n--------\nuser\n--- 6119 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Valid whitespace-indented TOML rule headers cause membership sync to fail after config save.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The raw rule-header scanner accepts only column-zero [[rules]] headers; valid TOML with leading header whitespace parses but triggers the identity/block-count error, leaving rules.toml stale after config.toml is saved.",
+        "file": "crates/jit/src/storage/ruleset_store.rs",
+        "line": 206,
+        "references": [
+          "@/charter/D-6"
+        ]
+      }
+    ]
+  }
+}

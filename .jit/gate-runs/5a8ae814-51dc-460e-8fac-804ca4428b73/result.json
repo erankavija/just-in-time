@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "5a8ae814-51dc-460e-8fac-804ca4428b73",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "554ad07f-edd8-4ac9-8f6d-139902abbf7e",
+  "commit": "640854b9140975d3b14bd74ed389dd3271b9b5b4",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T02:58:10.002419637Z",
+  "completed_at": "2026-07-17T03:00:11.801551266Z",
+  "duration_ms": 121799,
+  "exit_code": 1,
+  "stdout": "Attribution: 92e3a812, 99072933, cb669c79, 55de9475, 44ee4258 (jit:554ad07f)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-2, D-3, D-4, D-6, D-7 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics (.jit/invariants.toml)\nGate evidence: cargo-ci passed (0, 2026-07-17T01:29:40Z); doc-review pending; docs-mechanical passed (0, 2026-07-16T21:06:02Z)\nTruncation recovery: Re-read truncated patch output as per-path diffs and bounded current-file ranges.\n\n1. **[blocking][issue-impact][high]** The retry fallback still records a status probe from `h1` against a different `h2` commit whenever HEAD changes in all three attempts. For example, a dirty status can be observed before a concurrent commit consumes those staged changes; the final `h2` names the new clean commit, but `tree_dirty: true` is recorded. This leaves REQ-01 and the prior F1 unresolved. [`crates/jit/src/gate_execution.rs:445`](crates/jit/src/gate_execution.rs:445)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The continuous-HEAD-change fallback can still pair tree cleanliness with the wrong commit.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"After three unstable HEAD probes, the fallback records status observed after h1 with a different h2 commit, so tree_dirty can misdescribe the named commit.\",\"file\":\"crates/jit/src/gate_execution.rs\",\"line\":445,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4256 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6e02-9295-7322-b1db-8f17979f89d6\n--------\nuser\n--- 4243 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The continuous-HEAD-change fallback can still pair tree cleanliness with the wrong commit.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "After three unstable HEAD probes, the fallback records status observed after h1 with a different h2 commit, so tree_dirty can misdescribe the named commit.",
+        "file": "crates/jit/src/gate_execution.rs",
+        "line": 445
+      }
+    ]
+  }
+}

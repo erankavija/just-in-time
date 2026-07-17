@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "5a70c04d-fb8c-4f54-9ff8-27cdbc336043",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3e12ffbd-694e-44b3-81c9-5a24ebf17340",
+  "commit": "640854b9140975d3b14bd74ed389dd3271b9b5b4",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T03:17:54.494510311Z",
+  "completed_at": "2026-07-17T03:21:03.503766694Z",
+  "duration_ms": 189009,
+  "exit_code": 0,
+  "stdout": "Attribution: `jit:3e12ffbd` commits 970b8066, 08c1b23a, 8901b649, e8b9b8da, 1c26833b, 7ca34a, d291bf11, 76bed774, 4e6dadbb, b301eded, 640854b9\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-3 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic and @/invariant/single-source-prose (.jit/invariants.toml); @/rule/coverage-preview (.jit/rules.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); doc-review failed (1, prior F1 addressed); docs-mechanical passed (0); prior code-review failed (1, F1 addressed)\nTruncation recovery: narrowed the truncated core patch into per-file reads; inspected merge first-parent patch and current implementation/tests\n1. None.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped success criteria and prior blocking findings are satisfied.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All issue-scoped success criteria and prior blocking findings are satisfied.",
+    "findings": []
+  }
+}

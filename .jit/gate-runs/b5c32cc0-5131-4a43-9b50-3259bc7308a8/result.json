@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "b5c32cc0-5131-4a43-9b50-3259bc7308a8",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "94096aac-a5b8-471e-a183-7c374256c5df",
+  "commit": "640854b9140975d3b14bd74ed389dd3271b9b5b4",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T03:06:58.158182719Z",
+  "completed_at": "2026-07-17T03:10:18.025533238Z",
+  "duration_ms": 199867,
+  "exit_code": 0,
+  "stdout": "Attribution: 04e45b89, 3b086c85, 4f067cb5, 56d6463d (all `jit:94096aac`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci and @/gate/code-review (.jit/gates.toml); @/invariant/pid-safety and @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-07-17T00:25:27Z; code-review pending (current run)\nTruncation recovery: none\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard success criteria are met; no unresolved issue-impact defects found.",
+    "findings": []
+  }
+}

@@ -18,15 +18,20 @@
       "updated_by": null,
       "updated_at": "2026-07-12T13:38:45.925710494Z"
     },
-    "docs-mechanical": {
+    "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T21:06:04.001227213Z"
+      "updated_at": "2026-07-17T03:00:11.910589485Z"
     },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T20:59:41.199840089Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T21:06:04.001227213Z"
     }
   },
   "context": {},
@@ -37,7 +42,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-07T07:52:08.564670888Z",
-  "updated_at": "2026-07-16T21:06:04.738706349Z",
+  "updated_at": "2026-07-17T03:02:58.066024260Z",
   "first_ready_at": "2026-07-07T07:52:08.564680188Z",
   "claimed_at": "2026-07-16T08:40:04.541705952Z"
 }

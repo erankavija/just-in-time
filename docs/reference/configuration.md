@@ -459,9 +459,7 @@ jit config validate
 ```
 
 Exit codes are listed in [Exit Codes](exit-codes.md), the generated reference:
-`0` when the configuration is valid and `1` when errors are found. The handler
-also carries a `2` (warnings-only) branch, but it defines no warning conditions,
-so `2` is never emitted.
+`0` when the configuration is valid and `1` when errors are found.
 
 ## Example Configurations
 

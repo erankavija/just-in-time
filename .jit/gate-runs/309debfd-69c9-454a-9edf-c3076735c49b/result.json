@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "309debfd-69c9-454a-9edf-c3076735c49b",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "45a140ae-1baa-4f32-96e2-b4dcf21d6694",
+  "commit": "640854b9140975d3b14bd74ed389dd3271b9b5b4",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T03:13:59.103628590Z",
+  "completed_at": "2026-07-17T03:17:54.390532186Z",
+  "duration_ms": 235286,
+  "exit_code": 1,
+  "stdout": "Attribution: `jit:45a140ae` commits db0fe018, b020f788, f280f8b6, 2fd8a8ff, 0e330d21, 30a39aac, c15b26eb, 8a02869e, ffde113d, c03d1ba9, 2856ad0f, cea1dbfa, 2be47597, ad2b52fd, c7699f38, 640854b9; uncommitted changes excluded  \nPolicy sources: AGENTS.md  \nResolved items: @/invariant/gate-semantics and @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/charter/D-3 (dev/vision/9db27a3a-charter.md)  \nGate evidence: cargo-ci passed (0, 2026-07-17T01:19Z); doc-review failed (1, 2026-07-16T15:46Z); docs-mechanical passed (0, 2026-07-17T00:31Z)  \nTruncation recovery: narrowed reads by commit, path, and line range for lifecycle, archive, output, tests, and affected documentation  \n\n1. **[blocking][issue-impact][high]** `jit issue status` help still says an unmet dependency is one not yet `Done`/`Rejected` at `crates/jit/src/cli.rs:820-822`, while its implementation correctly uses effective terminality. Related dependency and graph help remains literal at `crates/jit/src/cli.rs:1191`, `1203`, and `2044`, as do reference passages at `docs/reference/cli-commands.md:689`, `2191`, `2201`, and `2606`. This leaves the shipped status/query guidance inconsistent with terminality-preserving `Archived`, so REQ-02 and REQ-07 remain unmet. [@/invariant/single-source-prose]\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"CLI help and reference prose still define dependency satisfaction as literal terminality despite the implemented effective-terminal Archived model.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Status, dependency, and graph help still excludes terminal-origin Archived dependencies from satisfaction semantics.\",\"file\":\"crates/jit/src/cli.rs\",\"line\":821,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 15521 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6e11-0e01-76e1-98ee-93fa068cffd4\n--------\nuser\n--- 15508 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "CLI help and reference prose still define dependency satisfaction as literal terminality despite the implemented effective-terminal Archived model.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Status, dependency, and graph help still excludes terminal-origin Archived dependencies from satisfaction semantics.",
+        "file": "crates/jit/src/cli.rs",
+        "line": 821,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

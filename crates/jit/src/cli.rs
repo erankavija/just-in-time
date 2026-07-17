@@ -817,8 +817,9 @@ pub enum IssueCommands {
     /// status, and the still-unmet dependencies — one line per issue.
     ///
     /// This is the orchestration one-liner agents otherwise rebuild by piping
-    /// `issue show` JSON through jq. A dependency is *unmet* when it is not yet
-    /// `Done`/`Rejected` (the same readiness test `query available` applies); the section
+    /// `issue show` JSON through jq. A dependency is *unmet* when it is not
+    /// effectively terminal — `Done`, `Rejected`, or `Archived` from one of
+    /// those (the same readiness test `query available` applies); the section
     /// reads `none` when nothing is blocking.
     ///
     /// Text form (default), one line per id:
@@ -2499,7 +2500,7 @@ pub enum ConfigCommands {
         json: bool,
     },
 
-    /// Validate configuration files for errors and warnings
+    /// Validate configuration files for errors
     ///
     /// Checks configuration for:
     /// - Syntax errors in TOML files
@@ -2510,9 +2511,6 @@ pub enum ConfigCommands {
     /// Exit codes (see docs/reference/exit-codes.md, the generated reference):
     ///   0 - Valid configuration
     ///   1 - Errors found (invalid configuration)
-    ///
-    /// The handler also carries a 2 (warnings-only) branch, but it defines no
-    /// warning condition, so 2 is never emitted.
     Validate {
         #[arg(long)]
         json: bool,

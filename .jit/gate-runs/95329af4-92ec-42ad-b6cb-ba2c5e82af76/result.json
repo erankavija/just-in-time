@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "95329af4-92ec-42ad-b6cb-ba2c5e82af76",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "640854b9140975d3b14bd74ed389dd3271b9b5b4",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T03:10:18.131395095Z",
+  "completed_at": "2026-07-17T03:13:58.999318465Z",
+  "duration_ms": 220867,
+  "exit_code": 1,
+  "stdout": "Attribution: 7c6452c1, d3ecd278, bcb3a2bd, 90b14057, 8aa61b84, 3dc0123c, 58adc1bc, fbe2bb36, a22f0443, 2abed5ba (`jit:450db193`); uncommitted changes excluded\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 and @/charter/D-7 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose and @/invariant/atomic-writes (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); docs-mechanical passed (exit 0); doc-review pending\nTruncation recovery: narrowed merge/large patch reads to projection, profile-integration, config, CLI, documentation, and test paths; read current source slices and per-commit patches\n\n1. **[blocking][issue-impact] Missing projection targets are silently defaulted, rather than rejected.** `ProjectionConfig.target` is optional and `target()` substitutes `.jit/<name>.md`, so a declared projection without `target` renders successfully instead of producing the required typed nonzero error. This fails REQ-07. `crates/jit/src/config.rs:981-1018`.\n\n2. **[blocking][issue-impact] Rendering all projections can leave earlier targets modified after a later projection fails.** `project_render(None)` renders and writes each projection inside one loop. A valid alphabetically earlier projection is persisted before a later unknown kind, missing source, or bad region marker returns an error, contradicting REQ-07’s “nothing is partially written” contract and the command documentation. `crates/jit/src/commands/project.rs:102-121`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two REQ-07 error-safety requirements are unmet: missing targets default silently, and all-projection rendering is not failure-atomic.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A missing projection target defaults to .jit/<name>.md instead of returning the required typed error.\",\"file\":\"crates/jit/src/config.rs\",\"line\":1014,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Rendering all projections writes earlier targets before later projection failures, violating the no-partial-write contract.\",\"file\":\"crates/jit/src/commands/project.rs\",\"line\":103,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 13601 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6e0d-aee3-7ef1-a437-16685b9fc5ae\n--------\nuser\n--- 13588 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two REQ-07 error-safety requirements are unmet: missing targets default silently, and all-projection rendering is not failure-atomic.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "A missing projection target defaults to .jit/<name>.md instead of returning the required typed error.",
+        "file": "crates/jit/src/config.rs",
+        "line": 1014
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Rendering all projections writes earlier targets before later projection failures, violating the no-partial-write contract.",
+        "file": "crates/jit/src/commands/project.rs",
+        "line": 103
+      }
+    ]
+  }
+}

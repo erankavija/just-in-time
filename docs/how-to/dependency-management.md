@@ -131,7 +131,7 @@ jit graph deps <issue-id> --depth 2
 # View all transitive dependencies (entire chain)
 jit graph deps <issue-id> --depth 0
 
-# Example output with tree structure (○ = not done, ✓ = done/rejected):
+# Example output with tree structure (○ = not effectively terminal, ✓ = effectively terminal (done, rejected, or archived from one of those)):
 # Dependencies of abc123 (depth 2):
 #   Summary: 2/5 complete
 #
@@ -417,7 +417,7 @@ jit graph deps <issue-id>
 # Full dependency chain
 jit graph deps <issue-id> --depth 0
 
-# Example output (○ = not done, ✓ = done/rejected):
+# Example output (○ = not effectively terminal, ✓ = effectively terminal (done, rejected, or archived from one of those)):
 # Dependencies of abc123 (all transitive):
 #   Summary: 1/3 complete
 #

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "b93a854e-06c7-4666-ba8f-165dd0673344",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "0daba57d-4cb8-4494-a825-22b286bc02c6",
+  "commit": "640854b9140975d3b14bd74ed389dd3271b9b5b4",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T03:02:58.196456845Z",
+  "completed_at": "2026-07-17T03:06:58.054418464Z",
+  "duration_ms": 239857,
+  "exit_code": 0,
+  "stdout": "Attribution: 8901b649, 80a761ce, 78a6181a, 7d19cf69, e9676c8d\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 and @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose and @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); prior code-review passed (exit 0); doc-review failed (exit 1; its F1/F2 are addressed in 7d19cf69); docs-mechanical passed (exit 0)\nTruncation recovery: narrowed patches per commit; checked merge first-parent and combined diffs; reread current source, tests, docs, and gate records by line range\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are implemented, documented, and covered by attributable tests; prior doc-review findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard success criteria are implemented, documented, and covered by attributable tests; prior doc-review findings are resolved.",
+    "findings": []
+  }
+}

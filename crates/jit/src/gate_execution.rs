@@ -421,14 +421,13 @@ struct StableGitPair {
 /// immediately.
 ///
 /// If `h1 != h2` on every attempt through [`STABLE_PAIR_MAX_ATTEMPTS`], the
-/// LAST attempt's pair is returned anyway, with `commit` set to that
-/// attempt's `h2` — the HEAD read taken immediately after `status_probe`, the
-/// closer of the two bracketing reads to when `tree_dirty` was actually
-/// observed. This keeps the recorded commit bracketing the status probe on
-/// its trailing side even when instability persists across every attempt.
-/// The residual uncertainty this cannot remove: a commit landing during the
-/// `status_probe` call itself is invisible to any number of surrounding HEAD
-/// reads.
+/// returned `commit` is the final attempt's trailing `h2` and `tree_dirty` is
+/// `None`: with HEAD moving through every attempt, no observed cleanliness
+/// value provably describes any single commit, so the evidence records the
+/// tree state as unknown rather than pairing a claim with a commit it might
+/// not describe. (A commit landing during a `status_probe` call on an
+/// otherwise-stable attempt remains invisible to the bracketing HEAD reads;
+/// the bracket bounds that window to the one probe call.)
 fn probe_stable_git_pair(
     mut head_probe: impl FnMut() -> Option<String>,
     mut status_probe: impl FnMut() -> Option<bool>,
@@ -450,6 +449,10 @@ fn probe_stable_git_pair(
             return last;
         }
     }
+    // Never pair a cleanliness claim with a commit it might not describe: when
+    // HEAD would not hold still for any attempt, the recorded commit is the
+    // final trailing read and the tree state is unknown.
+    last.tree_dirty = None;
     last
 }
 
@@ -781,7 +784,9 @@ mod tests {
         assert_eq!(head_calls.get(), STABLE_PAIR_MAX_ATTEMPTS * 2);
         let last_h2 = format!("commit-{}", STABLE_PAIR_MAX_ATTEMPTS * 2 - 1);
         assert_eq!(pair.commit, Some(last_h2));
-        assert_eq!(pair.tree_dirty, Some(true));
+        // Instability through every attempt means no cleanliness value provably
+        // describes the recorded commit: the evidence must say "unknown".
+        assert_eq!(pair.tree_dirty, None);
     }
 
     /// The seam preserves the existing tie-to-commit rule: when HEAD never

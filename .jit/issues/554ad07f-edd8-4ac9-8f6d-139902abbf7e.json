@@ -26,7 +26,7 @@
     "code-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T00:58:56.778706793Z"
+      "updated_at": "2026-07-17T02:58:10.002419637Z"
     }
   },
   "context": {},
@@ -38,7 +38,7 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-14T13:07:27.437433470Z",
-  "updated_at": "2026-07-17T01:32:42.951697578Z",
+  "updated_at": "2026-07-17T03:00:11.801804976Z",
   "first_ready_at": "2026-07-14T13:07:27.437438430Z",
   "claimed_at": "2026-07-16T14:29:00.313098205Z"
 }

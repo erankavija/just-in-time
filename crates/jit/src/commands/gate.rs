@@ -46,8 +46,8 @@ pub struct GateNotRequiredError {
 ///
 /// A manual gate has no checker to run, so its "evaluation" is a human
 /// attestation — recording it without saying who attested is indistinguishable
-/// from a silent, unverified pass (the exact failure mode this type closes: see
-/// `@/issue/1d59070d`). This is an argument/usage error (exit code `2`, the
+/// from a silent, unverified pass (the exact failure mode this type closes:
+/// jit:1d59070d). This is an argument/usage error (exit code `2`, the
 /// same family as an explicit `--mode manual` + `--checker-command` conflict
 /// on `gate define`), raised before any write happens. Automated gates are
 /// unaffected — their verdict comes from the checker, not `--by`.

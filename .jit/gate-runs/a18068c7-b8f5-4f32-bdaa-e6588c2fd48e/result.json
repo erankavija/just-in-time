@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "a18068c7-b8f5-4f32-bdaa-e6588c2fd48e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c505031a-9ba4-4547-aeb7-a83aa8e8ae3f",
+  "commit": "640854b9140975d3b14bd74ed389dd3271b9b5b4",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T02:51:46.190323138Z",
+  "completed_at": "2026-07-17T02:55:11.459193664Z",
+  "duration_ms": 205268,
+  "exit_code": 0,
+  "stdout": "Attribution: 92e3a812 (claim metadata); b36f23aa (implementation); ae271000 (merge); b301eded (follow-up documentation fix)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review pending (no run); docs-mechanical passed (exit 0)\nTruncation recovery: path- and parent-scoped patch reads; focused test, documentation, schema, and MCP-generator source reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All alias removals, canonical CLI/schema/MCP surfaces, and live documentation satisfy the issue criteria; the prior documentation finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All alias removals, canonical CLI/schema/MCP surfaces, and live documentation satisfy the issue criteria; the prior documentation finding is resolved.",
+    "findings": []
+  }
+}
