@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "run_id": "29245194-4128-44b8-b20c-5ab15e55a01d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "d20f4467ab6e8f3e54a3f511605a53f16e7604a5",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T08:52:14.268071980Z",
+  "completed_at": "2026-07-17T08:55:33.566492775Z",
+  "duration_ms": 199298,
+  "exit_code": 1,
+  "stdout": "Attribution: `jit:450db193` commits 2a8c9e7b, d0bb829a, 68d76c31, d657c607, 2abed5ba, a22f0443, fbe2bb36, 58adc1bc, 3dc0123c, 8aa61b84, 90b14057, bcb3a2bd, d3ecd278, 7c6452c1\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6, @/charter/D-7 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/domain-agnostic, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-17T08:34:59Z); doc-review failed (exit 1, 2026-07-17T08:31:44Z); docs-mechanical passed (exit 0, 2026-07-17T08:38:03Z)\nTruncation recovery: narrowed truncated merge/history reads to projection, profile-planning, validation, and test paths; unrelated profile asset and gate-run bulk was outside the attributable impact cone.\n\n1. **F1 — blocking, issue-impact, high:** Profile planning still renders every projection sharing a target from the unchanged overlay, then overwrites `desired[target]` per result. With `charter` and `invariants` both targeting `AGENTS.md`, the later result retains the earlier region’s stale bytes. [repository.rs:497](crates/jit/src/validation/repository.rs:497) and [planner.rs:218](crates/jit/src/profile/planner.rs:218). This prior finding remains unresolved. References: `@/invariant/single-source-prose`.\n\n2. **F2 — blocking, issue-impact, high:** The `full` branch bypasses the project-scope and declared-source checks in `resolve_rows`; it directly dispatches to rich renderers. An issue-scoped kind pointing at an infrastructure registry can therefore render, and a missing `.jit/invariants.toml` becomes an empty registry rather than a typed missing-source error. [project_render.rs:89](crates/jit/src/validation/project_render.rs:89), [project_render.rs:193](crates/jit/src/validation/project_render.rs:193), and [repository.rs:558](crates/jit/src/validation/repository.rs:558). This prior finding remains unresolved. References: `@/charter/D-6`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-impact blockers remain in shared-target profile rendering and full-style source validation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Profile planning materializes shared-target projections from the same base and overwrites the earlier result, leaving a configured region stale.\",\"file\":\"crates/jit/src/validation/repository.rs\",\"line\":497,\"references\":[\"@/invariant/single-source-prose\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Full-style rendering bypasses project-scope and declared-source validation, accepting issue-scoped configurations and missing registry sources.\",\"file\":\"crates/jit/src/validation/project_render.rs\",\"line\":89,\"references\":[\"@/charter/D-6\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10023 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6f46-bc05-75a3-820b-ae22b71c5e81\n--------\nuser\n--- 10010 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two issue-impact blockers remain in shared-target profile rendering and full-style source validation.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Profile planning materializes shared-target projections from the same base and overwrites the earlier result, leaving a configured region stale.",
+        "file": "crates/jit/src/validation/repository.rs",
+        "line": 497,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Full-style rendering bypasses project-scope and declared-source validation, accepting issue-scoped configurations and missing registry sources.",
+        "file": "crates/jit/src/validation/project_render.rs",
+        "line": 89,
+        "references": [
+          "@/charter/D-6"
+        ]
+      }
+    ]
+  }
+}

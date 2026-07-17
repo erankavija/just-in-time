@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "c935c3c5-3f1d-4976-b261-8562642569d8",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "d20f4467ab6e8f3e54a3f511605a53f16e7604a5",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-17T08:31:44.754792357Z",
+  "completed_at": "2026-07-17T08:35:03.659796546Z",
+  "duration_ms": 198905,
+  "exit_code": 1,
+  "stdout": "Attribution: 16 tagged commits (624ffa8e, b876f3b7, 0500ef34, 271c650b, d9d67143, a1adb140, 5c1b1602, a32e1707, d98c927f, 68fccbca, 2fe3ed74, 6d4efad1, ff365b3a, 46e8c5ae, 4b0b39e, e7efa262)\nPolicy sources: AGENTS.md; dev/active/d74a9ed1-write-through-namespace-unique-membership.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-17T07:48:23Z); doc-review passed (exit 0, 2026-07-17T04:00:05Z); docs-mechanical passed (exit 0, 2026-07-17T00:31:38Z)\nTruncation recovery: narrowed reads by commit, affected path, implementation, tests, item source, and linked design; unrelated merge-parent output was outside the attributable impact cone\n\n1. **[blocking][issue-impact]** Dropping a rule rewrites unrelated valid TOML syntax instead of preserving it byte-exact. `sync_namespace_unique_rules` serializes `DocumentMut` whenever a drop occurs ([ruleset_store.rs:253](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:253)); its own comment acknowledges that serialization canonicalizes exotic-but-valid rule header spellings ([ruleset_store.rs:253](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:253)). Thus, dropping a default `namespace-unique-*` row can alter an unrelated custom `[[ rules ]]` or quoted-key header, violating REQ-01’s byte-exact preservation. Existing variant-header tests cover add-only syncs, not drops ([ruleset_store.rs:852](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:852)).\n\n2. **[blocking][issue-impact]** Re-init can delete unrelated content when a membership drop leaves no `[[rules]]` entries. Re-init calls the sync and then `rewrite_rules_header` ([mod.rs:1139](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:1139)). With no remaining rule entry, that helper replaces the entire file with the generated header ([ruleset_store.rs:110](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:110)), discarding an unrelated trailing table or other content. The direct-sync test only checks preservation before this re-init-only rewrite step ([ruleset_store.rs:622](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:622)).\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Drop paths do not preserve unrelated rules.toml content byte-exactly.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A membership drop serializes toml_edit and canonicalizes unrelated valid TOML header syntax, violating REQ-01 byte-exact preservation.\",\"file\":\"crates/jit/src/storage/ruleset_store.rs\",\"line\":253,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Re-init deletes unrelated trailing content when a membership drop leaves no rules entries and rewrite_rules_header replaces the file with only its header.\",\"file\":\"crates/jit/src/storage/ruleset_store.rs\",\"line\":110,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 11446 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6f33-f936-7563-b7e8-ffa59cc32113\n--------\nuser\n--- 11433 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Drop paths do not preserve unrelated rules.toml content byte-exactly.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "A membership drop serializes toml_edit and canonicalizes unrelated valid TOML header syntax, violating REQ-01 byte-exact preservation.",
+        "file": "crates/jit/src/storage/ruleset_store.rs",
+        "line": 253
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Re-init deletes unrelated trailing content when a membership drop leaves no rules entries and rewrite_rules_header replaces the file with only its header.",
+        "file": "crates/jit/src/storage/ruleset_store.rs",
+        "line": 110
+      }
+    ]
+  }
+}

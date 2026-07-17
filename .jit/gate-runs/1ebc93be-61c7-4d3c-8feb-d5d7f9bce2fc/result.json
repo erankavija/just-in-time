@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_id": "1ebc93be-61c7-4d3c-8feb-d5d7f9bce2fc",
+  "gate_key": "docs-mechanical",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "d20f4467ab6e8f3e54a3f511605a53f16e7604a5",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T08:38:03.029542129Z",
+  "completed_at": "2026-07-17T08:38:03.667487213Z",
+  "duration_ms": 637,
+  "exit_code": 0,
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nOK: all cited paths and @/ items resolve\n\n== M5 projections ==\nOK: projections fresh\n\n",
+  "stderr": "",
+  "command": "./scripts/docs-mechanical.sh",
+  "by": "auto:executor",
+  "message": null
+}

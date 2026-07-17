@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "run_id": "801517ff-ad52-4ada-a7c7-1e7dc5170eb3",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "d20f4467ab6e8f3e54a3f511605a53f16e7604a5",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-17T08:31:44.713351167Z",
+  "completed_at": "2026-07-17T08:36:33.995258946Z",
+  "duration_ms": 289281,
+  "exit_code": 1,
+  "stdout": "Attribution: jit:450db193 commits 7c6452c1, d3ecd278, bcb3a2bd, 90b14057, 8aa61b84, 3dc0123c, 58adc1bc, fbe2bb36, a22f0443, 2abed5ba, d657c607, 68d76c31, d0bb829a, 2a8c9e7b\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 and @/charter/D-7 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/domain-agnostic, and @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-17T07:52:16Z); doc-review failed (exit 1, 2026-07-17T04:12:38Z); docs-mechanical passed (exit 0, 2026-07-17T00:31:38Z)\nTruncation recovery: narrowed reads covered individual commit patches plus current projection, profile, config, item-model, documentation, and harness-test paths; unrelated bulk profile assets were outside the attributable projection impact cone.\n\n1. **[blocking][issue-impact] F1 (high)** — Profile application loses an earlier region projection when multiple declared projections share a target. [`render_projections`](crates/jit/src/validation/repository.rs:497) derives every region from the unchanged overlay, then [`plan_profile_application_against`](crates/jit/src/profile/planner.rs:219) overwrites `desired[target]` per result. Thus a profile containing both `charter` and `invariants` projections for `AGENTS.md` retains only the last rendered region, unlike `jit project render`, which correctly threads pending target content. This creates projection drift. References: `@/invariant/single-source-prose`.\n\n2. **[blocking][issue-impact] F2 (high)** — `full` projections bypass the generic source and scope validation required by the new config contract. [`render_projection_body`](crates/jit/src/validation/project_render.rs:83) sends `full` directly to [`render_full_body`](crates/jit/src/validation/project_render.rs:174), which neither verifies project scope nor reads the declared registry source. An issue-scoped kind pointed at an engine registry can render successfully, and a missing invariant registry becomes an empty successful render instead of the required typed missing-source error.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior hard-coded kind-name dispatch finding is resolved, but two issue-impact blockers remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Profile planning independently materializes shared-target projections and overwrites the earlier region, leaving one configured projection stale.\",\"file\":\"crates/jit/src/validation/repository.rs\",\"line\":497,\"references\":[\"@/invariant/single-source-prose\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Full-style rendering bypasses project-scope and declared-source validation, allowing invalid issue-scoped configurations and silently accepting missing registry sources.\",\"file\":\"crates/jit/src/validation/project_render.rs\",\"line\":83,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 73997 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6f33-f911-7ed2-bcf2-a05b6bb7cde4\n--------\nuser\n--- 73984 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior hard-coded kind-name dispatch finding is resolved, but two issue-impact blockers remain.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Profile planning independently materializes shared-target projections and overwrites the earlier region, leaving one configured projection stale.",
+        "file": "crates/jit/src/validation/repository.rs",
+        "line": 497,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Full-style rendering bypasses project-scope and declared-source validation, allowing invalid issue-scoped configurations and silently accepting missing registry sources.",
+        "file": "crates/jit/src/validation/project_render.rs",
+        "line": 83
+      }
+    ]
+  }
+}

@@ -247,6 +247,13 @@
   ],
   "escalations": [
     {
+      "issue": "d74a9ed1",
+      "date": "2026-07-17",
+      "policy": "4 (issue scope change)",
+      "question": "Code-review round-7 F1: membership drops re-serialize rules.toml via toml_edit, canonicalizing exotic-but-valid TOML decoration elsewhere in the file; REQ-01 literally promises byte-exact preservation. Amend REQ-01 or make drops byte-exact in code?",
+      "resolution": "invoker chose: amend REQ-01 + design doc. REQ-01 now scopes byte-exactness to add-only syncs and permits semantically lossless drop-path canonicalization (applied to issue description and dev/active/d74a9ed1-write-through-namespace-unique-membership.md, 2026-07-17)"
+    },
+    {
       "issue": "46657f6f",
       "date": "2026-07-16",
       "policy": "7 (shared infrastructure) / 6 (blocker outside epic scope)",
@@ -268,6 +275,7 @@
       "resolution": "invoker approved amending the gate: scripts/secret-scan.sh stages working-tree versions of tracked files and scans that copy fail-closed (25 MB, ~2s); production stream notified via commit message bda8ca92"
     }
   ],
+  "session_6": "2026-07-17 session 6 IN PROGRESS. Merged d74a9ed1 round-6 (e7efa262) + 450db193 round-2 (2a8c9e7b, lead-verified: 7 projection harness + 355 validation lib tests green; worker report never arrived, third occurrence). Terminality doc family closed in one commit d20f4467 (F1-F5 + audit sites). Binary installed commit-matched. LESSON: parallel gate evaluations contend on per-issue locks and lose results — evaluate strictly sequentially (first parallel wave recorded nothing for contended pairs; sequential re-wave recorded everything). Re-eval wave at d20f4467: cargo-ci + docs-mechanical green for d74a9ed1/450db193/45a140ae; 0283ce74 doc-review PASSED at HEAD; four review failures: d74a9ed1 code-review (F1 drop-canonicalization -> ESCALATED, invoker approved amending REQ-01 + design doc, applied; F2 final-entry trivia loss + F3 rewrite_rules_header trailing-content loss -> reworker-d74a9ed1-r7 dispatched into agent-d74a9ed1-r2), 450db193 code-review (F1 shared-target overwrite repository.rs:497, F2 full-style validation bypass project_render.rs:89) + doc-review (cli-commands.md:3112 missing-source claim, configuration.md:204 full-style eligibility) -> reworker-450db193-r3 dispatched into agent-450db193 (code+docs), 45a140ae doc-review (NEW family: archive-guidance revive-first omission cli-commands.md:284 -> fixed lead-direct, uncommitted, single-site family). 0283ce74 cargo-ci/code-review to refresh at next HEAD (6cad67f0 touched schema.rs for it after those passes). Next: collect workers, commit window (worker merges + doc fixes + this file), reinstall, sequential final eval wave, done-transitions, Section 10.",
   "rework_counts": {
     "950256ae": 1,
     "45e1b7e8": 2,
@@ -277,14 +285,14 @@
     "894337e2": 1,
     "8917c558": 1,
     "3e12ffbd": 1,
-    "45a140ae": 5,
+    "45a140ae": 6,
     "0daba57d": 1,
-    "d74a9ed1": 5,
+    "d74a9ed1": 6,
     "1d59070d": 3,
     "c505031a": 1,
     "0283ce74": 1,
     "554ad07f": 2,
-    "450db193": 1,
+    "450db193": 2,
     "52665a07": 2
   },
   "started_at": "2026-07-14T00:00:00Z",

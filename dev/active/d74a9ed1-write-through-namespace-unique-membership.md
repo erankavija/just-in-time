@@ -72,5 +72,8 @@ solely so `rules.toml` cannot lag it for addressability.
   `enforces:` label naming that rule cannot dangle on a
   reconciled-but-unwritten row.
 - Hand edits to a surviving default rule's policy fields (severity, enforce,
-  selector, description) and all custom rules survive every sync byte-exact —
-  the splice never touches a block it does not add or drop.
+  selector, description) and all custom rules survive every sync. Add-only
+  syncs are byte-exact. A membership drop re-serializes the document through
+  toml_edit, which may canonicalize TOML syntax decoration elsewhere in the
+  file (e.g. exotic header spellings) — semantically lossless, all content
+  preserved (REQ-01 as amended, invoker-approved 2026-07-17).

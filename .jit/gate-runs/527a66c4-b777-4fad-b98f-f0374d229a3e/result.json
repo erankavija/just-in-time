@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_id": "527a66c4-b777-4fad-b98f-f0374d229a3e",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "d20f4467ab6e8f3e54a3f511605a53f16e7604a5",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-17T08:31:35.814870266Z",
+  "completed_at": "2026-07-17T08:34:59.041805938Z",
+  "duration_ms": 203226,
+  "exit_code": 1,
+  "stdout": "--- provenance failures ---\ntest version_cli_tests::test_injected_provenance_is_reported_reproduced_and_invalidated ... FAILED\ntest result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 48.14s\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✓ test: 3591 passed, 0 failed, 14 ignored\n  ✗ provenance: FAILED (exit 101)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1047753976/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "f9217762-2bde-4cfc-b843-595940062b05",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "d20f4467ab6e8f3e54a3f511605a53f16e7604a5",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-17T08:31:44.833452704Z",
+  "completed_at": "2026-07-17T08:33:43.360187684Z",
+  "duration_ms": 118526,
+  "exit_code": 1,
+  "stdout": "Attribution: leaf issue; reviewed its individually tagged commits and current documentation contract. Prior F1–F3 are addressed. Two issue-impact documentation inaccuracies remain.\n\n1. **F1 — High, blocking, issue-impact:** The CLI reference promises a missing projection source is a typed pre-write error, but `full` projections accept absent invariant/rule/gate registry files as empty registries and can write output. Align the implementation with the documented guarantee, or qualify the guarantee precisely. [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3112)\n\n2. **F2 — Medium, blocking, issue-impact:** The configuration reference does not state that the default `full` style is unsupported for arbitrary project-scoped kinds. Document that generic markdown-first and other non-built-in registry kinds must use `id-anchor`, and describe the `full` style’s supported source sets. [docs/reference/configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:204)\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Prior findings are fixed, but the generic projection reference still overstates missing-source handling and omits the full-style constraint.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The CLI reference says a missing source is a typed pre-write error, but full projections treat absent built-in registry files as empty and can write output.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3112},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The configuration reference omits that full style is unsupported for arbitrary project-scoped kinds; generic markdown-first kinds must use id-anchor.\",\"file\":\"docs/reference/configuration.md\",\"line\":204}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 12077 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6f33-f996-7040-8a17-b245cde1c780\n--------\nuser\n--- 12064 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Prior findings are fixed, but the generic projection reference still overstates missing-source handling and omits the full-style constraint.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The CLI reference says a missing source is a typed pre-write error, but full projections treat absent built-in registry files as empty and can write output.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 3112
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The configuration reference omits that full style is unsupported for arbitrary project-scoped kinds; generic markdown-first kinds must use id-anchor.",
+        "file": "docs/reference/configuration.md",
+        "line": 204
+      }
+    ]
+  }
+}

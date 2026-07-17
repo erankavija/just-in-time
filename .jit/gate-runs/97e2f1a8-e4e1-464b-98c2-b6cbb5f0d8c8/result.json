@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "97e2f1a8-e4e1-464b-98c2-b6cbb5f0d8c8",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "45a140ae-1baa-4f32-96e2-b4dcf21d6694",
+  "commit": "d20f4467ab6e8f3e54a3f511605a53f16e7604a5",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-17T08:31:44.792743395Z",
+  "completed_at": "2026-07-17T08:34:06.741241956Z",
+  "duration_ms": 141948,
+  "exit_code": 1,
+  "stdout": "Attribution: `enhancement` is a configured leaf and has no resolved children. I reviewed the 18 reachable `jit:45a140ae` commit patches individually; current uncommitted `.jit` changes were excluded. The five prior blocking findings are resolved, but one canonical lifecycle statement remains stale.\n\n1. **F1 — medium, blocking, issue-impact:** [docs/concepts/core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:793) says automatic readiness occurs when a dependency reaches literal terminality (`done` or `rejected`). Readiness instead uses effective terminality, which also includes `Archived` from `Done` or `Rejected`. Replace this condition with the effective-terminal definition to match the current dependency predicate and the surrounding lifecycle documentation.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One canonical lifecycle auto-transition statement still uses literal instead of effective terminality.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The canonical auto-transition rule says readiness waits for literal done/rejected terminality, omitting terminality-preserving Archived semantics.\",\"file\":\"docs/concepts/core-model.md\",\"line\":793}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 27937 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6f33-f96a-70b0-b70b-d1f188b20b38\n--------\nuser\n--- 27924 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "One canonical lifecycle auto-transition statement still uses literal instead of effective terminality.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The canonical auto-transition rule says readiness waits for literal done/rejected terminality, omitting terminality-preserving Archived semantics.",
+        "file": "docs/concepts/core-model.md",
+        "line": 793
+      }
+    ]
+  }
+}

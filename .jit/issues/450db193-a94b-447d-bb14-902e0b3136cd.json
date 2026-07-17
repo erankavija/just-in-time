@@ -13,25 +13,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "docs-mechanical": {
-      "status": "passed",
+    "doc-review": {
+      "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T00:31:38.832378358Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T07:52:16.277941847Z"
+      "updated_at": "2026-07-17T08:55:33.650873276Z"
     },
     "code-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T07:58:39.413554204Z"
+      "updated_at": "2026-07-17T08:52:14.268071980Z"
     },
-    "doc-review": {
-      "status": "failed",
+    "cargo-ci": {
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T04:12:38.959344536Z"
+      "updated_at": "2026-07-17T08:34:59.847180674Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T08:38:03.029542129Z"
     }
   },
   "context": {},
@@ -54,7 +54,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "created_at": "2026-07-09T11:21:10.588643085Z",
-  "updated_at": "2026-07-17T08:02:31.482002579Z",
+  "updated_at": "2026-07-17T08:57:31.411192039Z",
   "first_ready_at": "2026-07-09T11:21:10.588652835Z",
   "claimed_at": "2026-07-16T14:06:20.526133281Z"
 }

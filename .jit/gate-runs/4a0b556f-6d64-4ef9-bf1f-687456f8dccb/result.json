@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "4a0b556f-6d64-4ef9-bf1f-687456f8dccb",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "d20f4467ab6e8f3e54a3f511605a53f16e7604a5",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T08:55:33.650873276Z",
+  "completed_at": "2026-07-17T08:57:31.410862028Z",
+  "duration_ms": 117759,
+  "exit_code": 1,
+  "stdout": "Attribution: leaf issue `450db193` (no resolved children); reviewed the union of 14 reachable `jit:450db193` commit patches, then verified current behavior. The prior blocking findings remain unresolved.\n\n1. **[blocking, issue-impact, high]** [docs/reference/cli-commands.md:3112](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3112) incorrectly says every missing source is a typed pre-write error. `full` projections load JIT’s built-in registries directly; absent registry files become empty registries and the target can be written. Document this exception (or change behavior), while retaining the missing-source guarantee for `id-anchor`.\n\n2. **[blocking, issue-impact, medium]** [docs/reference/configuration.md:204](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:204) omits `full` style’s eligibility constraint, repeated in [docs/reference/cli-commands.md:3110](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3110) and the example config. `full` works only for configured kinds sourced from JIT’s invariant store or the rule-and-gate stores; markdown-first and other registry kinds must use `id-anchor`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generic projection references still overstate missing-source failures and omit the full-style eligibility constraint.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The CLI reference incorrectly says every missing source is a typed pre-write error, although full projections can write empty output when a built-in registry file is absent.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3112},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The references omit that full style is limited to configured invariant or rule-and-gate registry sources; markdown-first and other registry kinds must use id-anchor.\",\"file\":\"docs/reference/configuration.md\",\"line\":204}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 12644 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6f49-c6d2-7f80-b2df-545f5cbba936\n--------\nuser\n--- 12631 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generic projection references still overstate missing-source failures and omit the full-style eligibility constraint.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The CLI reference incorrectly says every missing source is a typed pre-write error, although full projections can write empty output when a built-in registry file is absent.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 3112
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The references omit that full style is limited to configured invariant or rule-and-gate registry sources; markdown-first and other registry kinds must use id-anchor.",
+        "file": "docs/reference/configuration.md",
+        "line": 204
+      }
+    ]
+  }
+}

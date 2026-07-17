@@ -1,7 +1,7 @@
 {
   "id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
   "title": "Write default-rule membership through to rules.toml on config-driven refresh",
-  "description": "Split from af4c901a integration: default-rule MEMBERSHIP is reconciled from the config registry in memory at load, but .jit/rules.toml entries are not updated, so the addressable rule registry (@/rule/<name> resolves rules.toml entries) can lag effective membership. Observed live: brackets was declared unique after scaffold; reconciliation enforced namespace-unique-brackets and the rules-and-gates projection documented it, while @/rule/namespace-unique-brackets dangled until the entry was added by hand.\n\n## Background\n\nThe refresh path from af4c901a already republishes schemas/default-*.json on jit-driven config writes. Extending it to append/drop default-origin namespace-unique-* rule ENTRIES in rules.toml on the same trigger keeps the addressable registry consistent with derived membership. Custom rules and default-rule policy fields (severity, enforce, selector) stay untouched.\n\n## Success Criteria\n\n- [hard] REQ-01: A jit-driven write that changes the config namespace registry appends the namespace-unique-* entry for a newly-unique namespace to rules.toml and drops the entry for a namespace no longer unique or removed, for origin=default entries only, preserving all other file content byte-exact.\n- [hard] REQ-02: Rule addressability (@/rule/<name>) resolves every effectively-enforced default rule after such a write; docs-mechanical citation checking cannot dangle on a reconciled rule.\n- [hard] REQ-03: Hand edits to default-rule policy fields and all custom rules survive the rewrite; tests cover append, drop, and preservation.\n- Out of scope: changing in-memory reconciliation semantics (they remain authoritative at load).",
+  "description": "Split from af4c901a integration: default-rule MEMBERSHIP is reconciled from the config registry in memory at load, but .jit/rules.toml entries are not updated, so the addressable rule registry (@/rule/<name> resolves rules.toml entries) can lag effective membership. Observed live: brackets was declared unique after scaffold; reconciliation enforced namespace-unique-brackets and the rules-and-gates projection documented it, while @/rule/namespace-unique-brackets dangled until the entry was added by hand.\n\n## Background\n\nThe refresh path from af4c901a already republishes schemas/default-*.json on jit-driven config writes. Extending it to append/drop default-origin namespace-unique-* rule ENTRIES in rules.toml on the same trigger keeps the addressable registry consistent with derived membership. Custom rules and default-rule policy fields (severity, enforce, selector) stay untouched.\n\n## Success Criteria\n\n- [hard] REQ-01: A jit-driven write that changes the config namespace registry appends the namespace-unique-* entry for a newly-unique namespace to rules.toml and drops the entry for a namespace no longer unique or removed, for origin=default entries only. Add-only syncs preserve all other file content byte-exact; a membership drop may canonicalize TOML syntax decoration elsewhere in the file (semantically lossless re-serialization, invoker-approved 2026-07-17) and preserves all other content semantically intact.\n- [hard] REQ-02: Rule addressability (@/rule/<name>) resolves every effectively-enforced default rule after such a write; docs-mechanical citation checking cannot dangle on a reconciled rule.\n- [hard] REQ-03: Hand edits to default-rule policy fields and all custom rules survive the rewrite; tests cover append, drop, and preservation.\n- Out of scope: changing in-memory reconciliation semantics (they remain authoritative at load).",
   "state": "in_progress",
   "priority": "normal",
   "assignee": "agent:worker",
@@ -13,25 +13,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T08:45:37.188270763Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-17T08:34:59.126879040Z"
+    },
     "doc-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-17T04:00:05.411100663Z"
     },
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T00:31:38.121728121Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T07:48:23.521475942Z"
-    },
     "code-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T07:55:19.573240865Z"
+      "updated_at": "2026-07-17T08:48:16.027308197Z"
     }
   },
   "context": {},
@@ -51,7 +51,7 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-14T19:05:10.783498583Z",
-  "updated_at": "2026-07-17T07:58:39.310510019Z",
+  "updated_at": "2026-07-17T10:42:58.790400458Z",
   "first_ready_at": "2026-07-14T19:05:10.783504203Z",
   "claimed_at": "2026-07-16T08:53:53.042220838Z"
 }
