@@ -151,14 +151,46 @@ pub fn read_rule_identities(jit_root: &Path) -> Result<Vec<(String, Option<Strin
         .collect())
 }
 
+/// Whether `line` (a physical line, its trailing newline already excluded,
+/// starting at its first `[`) is a TOML array-of-tables header for the single
+/// key `rules`.
+///
+/// Matches the full header grammar `[[` ws* KEY ws* `]]` followed only by
+/// whitespace or a `#` comment to end of line, where ws is space or tab and KEY
+/// is the bare key `rules`, the basic-quoted `"rules"`, or the literal-quoted
+/// `'rules'` — three interchangeable spellings of the SAME table. A header for
+/// any other key (`[[ruleset]]`, or the dotted path `[[rules.x]]`) is a
+/// different table and does not match (jit:d74a9ed1 review F1, round 4).
+fn line_opens_rules_table(line: &str) -> bool {
+    let ws: &[char] = &[' ', '\t'];
+    let Some(after_open) = line.strip_prefix("[[") else {
+        return false;
+    };
+    // The key, in any of its three interchangeable spellings.
+    let after_key = ["rules", "\"rules\"", "'rules'"]
+        .iter()
+        .find_map(|key| after_open.trim_start_matches(ws).strip_prefix(key));
+    let Some(after_key) = after_key else {
+        return false;
+    };
+    let Some(tail) = after_key.trim_start_matches(ws).strip_prefix("]]") else {
+        return false;
+    };
+    let tail = tail.trim_start_matches(ws);
+    tail.is_empty() || tail.starts_with('#')
+}
+
 /// Byte offsets of the LINE START of every REAL `[[rules]]` table header, in
 /// file order.
 ///
-/// "Real" means the header is preceded on its physical line ONLY by whitespace
-/// (TOML permits leading indentation before a table header) AND is outside any
-/// string or comment context. A `[[rules]]` sequence inside a `#` comment or a
+/// "Real" means the line is preceded ONLY by whitespace (TOML permits leading
+/// indentation before a table header), is outside any string or comment
+/// context, and parses as a `rules` array-of-tables header per
+/// [`line_opens_rules_table`] (so every valid spelling — internal whitespace,
+/// quoted key, trailing comment — is recognized, and other tables such as
+/// `[[ruleset]]` are not). A `[[rules]]` sequence inside a `#` comment or a
 /// `'''`/`"""` multiline string (a rule's `description`, say) is prose, not a
-/// table boundary, so it is skipped. The scan tracks TOML string/comment state
+/// table boundary, so it is skipped: the scan tracks TOML string/comment state
 /// across lines, so it cannot be fooled by an in-string occurrence that a naive
 /// `\n[[rules]]` search would mis-split on (jit:d74a9ed1 review F2).
 ///
@@ -210,8 +242,15 @@ fn rule_header_offsets(content: &str) -> Vec<usize> {
                     i += 3;
                     continue;
                 }
-                if leading_ws && content[i..].starts_with("[[rules]]") {
-                    offsets.push(line_begin);
+                if leading_ws && content[i..].starts_with("[[") {
+                    // Match the whole header line against the `rules` table grammar.
+                    let line_end = content[i..].find('\n').map_or(content.len(), |n| i + n);
+                    let line = content[i..line_end]
+                        .strip_suffix('\r')
+                        .unwrap_or(&content[i..line_end]);
+                    if line_opens_rules_table(line) {
+                        offsets.push(line_begin);
+                    }
                 }
                 let c = bytes[i];
                 match c {
@@ -875,6 +914,109 @@ assert = { require-section = { heading = \"H\" } }\n\
         assert!(updated.contains("  [[rules]]\n  name = \"custom-indented\""));
         assert!(updated.contains("name = \"namespace-unique-squad\""));
         assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 3);
+    }
+
+    /// Build a rules.toml with one column-zero `[[rules]]` default rule and a
+    /// SECOND `rules` entry whose header is `variant_header` (an alternate but
+    /// equivalent spelling of the `rules` array-of-tables header), then run a
+    /// membership add. Asserts the sync recognized BOTH entries (no block-count
+    /// abort), preserved the variant byte-exact, and appended the new rule.
+    fn assert_rules_header_variant_synced(variant_header: &str) {
+        let dir = tempfile::tempdir().unwrap();
+        let content = format!(
+            "[[rules]]\n\
+name = \"label-format\"\n\
+origin = \"default\"\n\
+assert = {{ require-section = {{ heading = \"H\" }} }}\n\
+\n\
+{variant_header}\n\
+name = \"custom-variant\"\n\
+severity = \"warn\"\n\
+assert = {{ require-section = {{ heading = \"Goals\" }} }}\n"
+        );
+        write_rules(dir.path(), &content);
+        assert_eq!(
+            read_rule_identities(dir.path()).unwrap().len(),
+            2,
+            "variant header `{variant_header}` is a valid second rules entry"
+        );
+
+        let new_block = "[[rules]]\nname = \"namespace-unique-squad\"\norigin = \"default\"\nassert = { require-label = { label = \"squad:*\", min = 0, max = 1 } }\n\n";
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[new_block.to_string()], &[]).unwrap();
+        assert!(
+            changed,
+            "sync recognizes variant `{variant_header}` and proceeds"
+        );
+
+        let updated = read_rules(dir.path());
+        assert!(
+            updated.starts_with(&content),
+            "variant `{variant_header}` preserved byte-exact:\n{updated}"
+        );
+        assert!(updated.contains(variant_header), "variant header intact");
+        assert!(updated.contains("name = \"namespace-unique-squad\""));
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_sync_recognizes_internal_whitespace_rules_header() {
+        assert_rules_header_variant_synced("[[ rules ]]");
+    }
+
+    #[test]
+    fn test_sync_recognizes_tabbed_rules_header() {
+        assert_rules_header_variant_synced("[[\trules\t]]");
+    }
+
+    #[test]
+    fn test_sync_recognizes_basic_quoted_rules_header() {
+        assert_rules_header_variant_synced("[[\"rules\"]]");
+    }
+
+    #[test]
+    fn test_sync_recognizes_literal_quoted_rules_header() {
+        assert_rules_header_variant_synced("[['rules']]");
+    }
+
+    #[test]
+    fn test_sync_recognizes_trailing_comment_rules_header() {
+        assert_rules_header_variant_synced("[[rules]] # a trailing note");
+    }
+
+    #[test]
+    fn test_sync_ignores_non_rules_array_header() {
+        // `[[ruleset]]` is a DIFFERENT table path, not a `rules` entry. It must
+        // NOT count as a rules block (which would desync the block/identity
+        // counts and abort) and must survive the sync untouched.
+        let dir = tempfile::tempdir().unwrap();
+        let content = "\
+[[rules]]\n\
+name = \"label-format\"\n\
+origin = \"default\"\n\
+assert = { require-section = { heading = \"H\" } }\n\
+\n\
+[[ruleset]]\n\
+name = \"not-a-rule\"\n\
+";
+        write_rules(dir.path(), content);
+        // Only ONE `rules` entry; `[[ruleset]]` is a separate table.
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 1);
+
+        let new_block = "[[rules]]\nname = \"namespace-unique-squad\"\norigin = \"default\"\nassert = { require-label = { label = \"squad:*\", min = 0, max = 1 } }\n\n";
+        let changed =
+            sync_namespace_unique_rules(dir.path(), &[new_block.to_string()], &[]).unwrap();
+        assert!(changed);
+
+        let updated = read_rules(dir.path());
+        assert!(
+            updated.starts_with(content),
+            "the `[[ruleset]]` custom table survives untouched:\n{updated}"
+        );
+        assert!(updated.contains("[[ruleset]]\nname = \"not-a-rule\""));
+        assert!(updated.contains("name = \"namespace-unique-squad\""));
+        // The file's one `rules` entry plus the appended one.
+        assert_eq!(read_rule_identities(dir.path()).unwrap().len(), 2);
     }
 
     #[test]
