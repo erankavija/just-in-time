@@ -1366,10 +1366,20 @@ fn run_project<S: IssueStore>(
 
     let result = run_project_inner(executor, command, quiet);
     if let Err(e) = result {
+        // A typed projection failure is a validation error (exit 4) in JSON mode
+        // too, matching the non-JSON path's top-level classification.
+        let code = if e
+            .downcast_ref::<jit::validation::projection::ProjectionError>()
+            .is_some()
+        {
+            jit::output::ErrorCode::VALIDATION_FAILED
+        } else {
+            "PROJECT_COMMAND_FAILED"
+        };
         handle_json_error!(
             json,
             e,
-            jit::output::JsonError::new("PROJECT_COMMAND_FAILED", e.to_string(), "project")
+            jit::output::JsonError::new(code, e.to_string(), "project")
         );
     }
     Ok(())

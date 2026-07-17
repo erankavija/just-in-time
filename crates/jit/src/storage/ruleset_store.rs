@@ -138,7 +138,10 @@ fn key_after_rules(doc: &toml_edit::DocumentMut) -> Option<String> {
 
 /// Rewrite the leading header region of `<jit_root>/rules.toml` to `header`,
 /// preserving every `[[rules]]` block below it (and any comments authored inside
-/// them) verbatim, and preserving all other non-generated content unconditionally.
+/// them) and all other non-generated content. As with any re-serialization
+/// through the document model, exotic-but-valid TOML syntax spellings elsewhere
+/// in the file may be canonicalized — semantically lossless (REQ-01 as amended,
+/// jit:d74a9ed1).
 ///
 /// The header region is the leading trivia before the first `[[rules]]` table —
 /// a generated comment block, modelled as the prefix decoration of the first

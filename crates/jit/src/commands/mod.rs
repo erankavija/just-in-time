@@ -1212,9 +1212,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// between the CURRENT on-disk `rules.toml` and the CURRENT `[namespaces]`
     /// registry, then appends the row for each newly-unique namespace and drops
     /// the row for each namespace no longer unique or no longer declared —
-    /// `origin = "default"` rows ONLY. Every other byte of the file (custom
-    /// rules, hand-edited policy fields on surviving default rules, comments,
-    /// formatting) is untouched (REQ-01, jit:d74a9ed1).
+    /// `origin = "default"` rows ONLY. All other content (custom rules,
+    /// hand-edited policy fields on surviving default rules, comments,
+    /// formatting) survives: an append-only sync preserves it byte-exact, while
+    /// a sync that drops a row re-serializes the document and may canonicalize
+    /// exotic-but-valid TOML syntax spellings elsewhere in the file —
+    /// semantically lossless (REQ-01 as amended, jit:d74a9ed1).
     ///
     /// Called from the same jit-driven-write triggers as
     /// [`refresh_default_schema_projections`](Self::refresh_default_schema_projections)

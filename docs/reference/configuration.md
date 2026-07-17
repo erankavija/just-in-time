@@ -151,9 +151,8 @@ proceeds and the bypass is logged, at every level.
 > (a hand-declared namespace takes effect on the next command, no regeneration;
 > the next jit-driven config write — `jit config set` or re-init — also writes
 > the matching `namespace-unique-*` row through to `rules.toml` so its
-> `@/rule/<name>` address resolves)
-> step), and author new conventions as custom rules in `rules.toml`. `strictness`
-> tunes how all of these gate operations globally.
+> `@/rule/<name>` address resolves), and author new conventions as custom rules
+> in `rules.toml`. `strictness` tunes how all of these gate operations globally.
 
 ### `[namespaces.*]`
 
@@ -193,12 +192,14 @@ style = "full"
 
 Declare a documentation projection: `jit project render` writes one or more
 addressable item kinds into a documentation file, keeping the rendered copy in
-sync with its source registry so a hand-maintained duplicate never drifts. The
-mechanism is generic — any project-scoped kind projects this way. Fields:
+sync with the kind's declared source of truth — a TOML registry for
+registry-first kinds, a markdown document for markdown-first kinds — so a
+hand-maintained duplicate never drifts. The mechanism is generic — any
+project-scoped kind projects this way. Fields:
 
 | Field | Values | Meaning |
 |-------|--------|---------|
-| `kind` | a kind name, or an array of names | The addressable item kind(s) to render (e.g. `"invariant"`, or `["rule", "gate"]`). Must be project-scoped; issue-scoped kinds are not renderable. |
+| `kind` | a kind name, or an array of names | **Required.** The addressable item kind(s) to render (e.g. `"invariant"`, or `["rule", "gate"]`); an array must name at least one kind — an empty list is rejected at parse. Every kind must be project-scoped; issue-scoped kinds are not renderable. |
 | `mode` | `region` \| `separate-file` | `region` rewrites only the delimited block inside an existing `target`, byte-preserving everything outside it; `separate-file` writes the whole `target` file. Defaults to `separate-file`. |
 | `target` | repo-relative path | **Required.** The documentation file written. There is no default — a projection with no `target` is an error. |
 | `style` | `id-anchor` \| `full` | `id-anchor` renders generic `- **{self-id}** — {text}` bullets and works for any project-scoped kind; `full` renders the built-in rich views (severity/enforcement metadata) and is limited to the registry kinds whose declared `source` is exactly the invariant store (`.jit/invariants.toml`) or exactly the rule + gate stores together (`.jit/rules.toml` + `.jit/gates.toml`) — the only sources with a whole-file renderer. A markdown-first kind, or a registry kind whose source points elsewhere, must use `id-anchor`. Defaults to `full`. |

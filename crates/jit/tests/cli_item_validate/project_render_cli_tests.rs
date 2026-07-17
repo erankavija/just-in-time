@@ -130,6 +130,41 @@ fn test_project_render_named_selects_single_projection() {
 }
 
 #[test]
+fn test_project_render_json_projection_error_exits_validation_failed() {
+    // A typed projection failure under --json carries VALIDATION_FAILED and
+    // exit 4, matching the non-JSON classification (jit:450db193 review F1,
+    // round 5). A region-mode target missing its begin marker fails the splice
+    // with a typed ProjectionError.
+    let temp = setup_test_repo();
+    std::fs::write(temp.path().join(".jit/invariants.toml"), INVARIANTS_TOML).unwrap();
+    std::fs::write(
+        temp.path().join("ARCHITECTURE.md"),
+        "# Architecture\n\nNo region markers here.\n",
+    )
+    .unwrap();
+    append_projection(
+        &temp,
+        "[projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\n\
+         target = \"ARCHITECTURE.md\"\nstyle = \"id-anchor\"\n",
+    );
+
+    let output = Command::new(jit_binary())
+        .args(["project", "render", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(4),
+        "typed projection failure exits 4 under --json; stdout: {} stderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).expect("JSON error object on stdout");
+    assert_eq!(json["error"]["code"].as_str().unwrap(), "VALIDATION_FAILED");
+}
+
+#[test]
 fn test_project_render_unknown_name_errors() {
     let temp = setup_test_repo();
     let output = Command::new(jit_binary())
