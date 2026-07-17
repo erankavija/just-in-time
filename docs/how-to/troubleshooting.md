@@ -79,7 +79,8 @@ become ready or complete. Required gates must pass before an issue can become
 3. **Resolve the blocker:** complete/reject dependency issues, or pass required
    gates:
    ```bash
-   jit gate evaluate <issue-id> <gate-key>
+   jit gate evaluate <issue-id> <gate-key>                    # auto gate: runs the checker
+   jit gate evaluate <issue-id> <gate-key> --by <attestor>    # manual gate: records attestation
    jit gate status-all <issue-id>
    jit issue update <issue-id> --state done
    ```

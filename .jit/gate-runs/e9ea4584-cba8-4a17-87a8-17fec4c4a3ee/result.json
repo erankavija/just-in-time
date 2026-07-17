@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "e9ea4584-cba8-4a17-87a8-17fec4c4a3ee",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "6d4efad15e518ff6f96503b1d5a4d54f71027c55",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T04:00:05.411100663Z",
+  "completed_at": "2026-07-17T04:01:54.329862036Z",
+  "duration_ms": 108918,
+  "exit_code": 0,
+  "stdout": "Attribution: leaf issue (level 4, no resolved children); reviewed the 12 reachable `jit:d74a9ed1` commits individually with rename detection. The prior blocking omission is resolved: the reference docs now cover re-init and repository `config set` write-through, preservation guarantees, and addressability.\n\n1. [Low, advisory, issue-impact] [docs/reference/configuration.md:155](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:155) retains the orphaned phrase “step)” after the new write-through sentence. Remove it or rewrite the parenthetical as one complete sentence.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The prior documentation gap is resolved; one minor issue-authored grammar defect remains advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The write-through explanation retains an orphaned “step)” phrase.\",\"file\":\"docs/reference/configuration.md\",\"line\":155}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The prior documentation gap is resolved; one minor issue-authored grammar defect remains advisory.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "The write-through explanation retains an orphaned “step)” phrase.",
+        "file": "docs/reference/configuration.md",
+        "line": 155
+      }
+    ]
+  }
+}

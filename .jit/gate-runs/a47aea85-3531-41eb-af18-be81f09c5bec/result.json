@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "a47aea85-3531-41eb-af18-be81f09c5bec",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "6d4efad15e518ff6f96503b1d5a4d54f71027c55",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T03:51:39.556005148Z",
+  "completed_at": "2026-07-17T03:55:37.879128050Z",
+  "duration_ms": 238323,
+  "exit_code": 1,
+  "stdout": "Attribution: jit:d74a9ed1 commits 624ffa8e, b876f3b7, 0500ef34, 271c650b, d9d67143, a1adb140, 5c1b1602, a32e1707, d98c927f, 68fccbca, 2fe3ed74, 6d4efad1\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/rule/namespace-unique-brackets (.jit/rules.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review failed (exit 1, independent judgment); docs-mechanical passed (exit 0); prior code-review F1 addressed by 6d4efad1\nTruncation recovery: narrowed per-commit patches and current implementation/test reads for ruleset storage, membership diff, triggers, and docs\n\n1. [blocking][issue-impact] `split_rule_blocks` makes a final `[[rules]]` block extend to EOF ([ruleset_store.rs:361](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:361)); the drop loop then omits that entire slice ([ruleset_store.rs:421](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/ruleset_store.rs:421)). A valid `rules.toml` with a default `namespace-unique-*` row followed by an unrelated root table or `[[ruleset]]` block loses that trailing content when the namespace is removed. This violates REQ-01’s byte-exact preservation guarantee; existing tests cover the trailing table only for append, not drop. References: @/charter/D-6.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Dropping a final default namespace rule can delete unrelated trailing TOML content.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The final raw rules block extends to EOF, so dropping it also removes any unrelated TOML content that follows it.\",\"file\":\"crates/jit/src/storage/ruleset_store.rs\",\"line\":361,\"references\":[\"@/charter/D-6\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 9769 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6e33-8bf8-7ef0-9b73-d654127c1ca7\n--------\nuser\n--- 9756 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Dropping a final default namespace rule can delete unrelated trailing TOML content.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The final raw rules block extends to EOF, so dropping it also removes any unrelated TOML content that follows it.",
+        "file": "crates/jit/src/storage/ruleset_store.rs",
+        "line": 361,
+        "references": [
+          "@/charter/D-6"
+        ]
+      }
+    ]
+  }
+}

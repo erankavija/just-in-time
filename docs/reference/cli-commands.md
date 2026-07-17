@@ -686,7 +686,8 @@ jit issue create "Wire up parser" --json
 **Initial state.** A new issue has no dependencies, so it is born `Ready` and its
 `first_ready_at` timestamp is stamped at creation. Adding a dependency
 afterwards (`jit dep add`) is what moves it back to `Backlog` until the
-dependency reaches a terminal state.
+dependency becomes effectively terminal (done, rejected, or archived from one
+of those).
 
 Under `--quiet` the command prints only the new issue's id, which is what
 scripts capture. Validation warnings go to stderr, so they never pollute that
@@ -2188,8 +2189,9 @@ preset or issue is a not-found error (`3`) per the global taxonomy.
 ### `jit dep add`
 
 Add one or more dependencies to an issue. `FROM` is blocked until every listed
-`TO` reaches a terminal state. Dependencies are orthogonal to labels: issues
-don't need matching labels to depend on each other.
+`TO` is effectively terminal (done, rejected, or archived from one of those).
+Dependencies are orthogonal to labels: issues don't need matching labels to
+depend on each other.
 
 **Usage:**
 ```bash
@@ -2603,8 +2605,12 @@ spelling of `jit graph rdeps <id>`.
 
 ### `jit graph deps`
 
-Show what an issue depends on: the issues that must reach a terminal state before
-it can proceed.
+Show what an issue depends on: the issues that must become effectively terminal
+(done, rejected, or archived from one of those) before it can proceed. In
+`--json` output each dependency node carries its `state` and, for an `archived`
+node, `archived_from` — the preserved pre-archive state that determines whether
+the archived dependency still satisfies (a terminal origin satisfies; a
+non-terminal or absent origin blocks).
 
 ```bash
 jit graph deps <ID> [--depth <N>] [--json]

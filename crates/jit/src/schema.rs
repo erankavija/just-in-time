@@ -886,6 +886,14 @@ impl CommandSchema {
                 false,
             ),
             row(
+                "apply",
+                4,
+                "The template delta would close a dependency cycle through \
+                 existing issues; the apply is rejected before any node is \
+                 created.",
+                false,
+            ),
+            row(
                 "issue update, issue claim, issue claim-next",
                 4,
                 "A state transition is blocked by unmet dependencies or unpassed \

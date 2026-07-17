@@ -29,9 +29,9 @@
       "updated_at": "2026-07-17T00:31:37.381758753Z"
     },
     "doc-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T15:55:50.998245501Z"
+      "updated_at": "2026-07-17T03:59:00.510774599Z"
     }
   },
   "context": {},
@@ -42,7 +42,7 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T22:41:02.663869625Z",
-  "updated_at": "2026-07-17T03:06:58.054662534Z",
+  "updated_at": "2026-07-17T04:00:05.308359299Z",
   "first_ready_at": "2026-07-05T22:41:02.663883645Z",
   "claimed_at": "2026-07-16T08:40:04.558426374Z"
 }

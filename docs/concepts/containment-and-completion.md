@@ -10,8 +10,9 @@ from it.
 
 ## One edge kind
 
-An issue carries a list of dependencies: the ids of the issues that must reach a
-terminal state before it can proceed (`Issue::dependencies`). That is the whole
+An issue carries a list of dependencies: the ids of the issues that must become
+effectively terminal — done, rejected, or archived from one of those — before
+it can proceed (`Issue::dependencies`). That is the whole
 edge vocabulary. There is no separate "parent" edge, no "sub-task-of" edge, and
 no "blocks" edge stored in the opposite direction.
 

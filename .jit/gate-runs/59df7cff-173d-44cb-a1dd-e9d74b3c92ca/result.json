@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "run_id": "59df7cff-173d-44cb-a1dd-e9d74b3c92ca",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "45a140ae-1baa-4f32-96e2-b4dcf21d6694",
+  "commit": "6d4efad15e518ff6f96503b1d5a4d54f71027c55",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T03:55:37.982916706Z",
+  "completed_at": "2026-07-17T03:59:00.408306275Z",
+  "duration_ms": 202425,
+  "exit_code": 1,
+  "stdout": "Attribution: `enhancement` is a level-4 leaf with no resolved children. I reviewed the union of 18 individually inspected reachable `jit:45a140ae` commits and verified the current tree; uncommitted JIT metadata was not attributed. The prior four findings are resolved, but four issue-impact documentation gaps remain.\n\n1. **F1 — medium, blocking, issue-impact:** [docs/reference/cli-commands.md:689](docs/reference/cli-commands.md:689) says adding a dependency demotes an issue until it reaches a literal terminal state. An `Archived` dependency recorded from `Done` or `Rejected` is already met and does not cause that demotion. Replace this with effective-terminal wording.\n\n2. **F2 — high, blocking, issue-impact:** [docs/reference/cli-commands.md:2191](docs/reference/cli-commands.md:2191) and [docs/reference/cli-commands.md:2201](docs/reference/cli-commands.md:2201) define `jit dep add` using literal terminality. Update both to state that `Done`, `Rejected`, and `Archived` from either state satisfy the dependency.\n\n3. **F3 — high, blocking, issue-impact:** [docs/reference/cli-commands.md:2606](docs/reference/cli-commands.md:2606) describes `jit graph deps` with obsolete literal-terminal semantics, and its JSON contract does not explain the optional `archived_from` node field needed to distinguish terminal-origin archived dependencies. Document effective terminality and `archived_from` in this command’s JSON section.\n\n4. **F4 — medium, blocking, issue-impact:** [docs/concepts/containment-and-completion.md:14](docs/concepts/containment-and-completion.md:14) opens the canonical containment model by requiring dependencies to reach a literal terminal state, contradicting the page’s later effective-terminal explanation. Change this definition to effective terminality.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Four issue-impact documentation gaps still describe dependency satisfaction as literal terminality or omit its graph JSON discriminator.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Issue-creation guidance incorrectly says an added dependency demotes work until literal terminality rather than effective terminality.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":689},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The canonical jit dep add contract still requires literal terminality and excludes terminal-origin Archived dependencies.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2191},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The jit graph deps reference retains literal-terminal wording and omits the archived_from JSON field required to interpret Archived dependency nodes.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2606},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The containment model's opening dependency definition conflicts with the new effective-terminal semantics explained later on the same page.\",\"file\":\"docs/concepts/containment-and-completion.md\",\"line\":14}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 16351 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6e37-2f4b-77b3-b5d8-144824a7b6f9\n--------\nuser\n--- 16338 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Four issue-impact documentation gaps still describe dependency satisfaction as literal terminality or omit its graph JSON discriminator.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Issue-creation guidance incorrectly says an added dependency demotes work until literal terminality rather than effective terminality.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 689
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The canonical jit dep add contract still requires literal terminality and excludes terminal-origin Archived dependencies.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 2191
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The jit graph deps reference retains literal-terminal wording and omits the archived_from JSON field required to interpret Archived dependency nodes.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 2606
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The containment model's opening dependency definition conflicts with the new effective-terminal semantics explained later on the same page.",
+        "file": "docs/concepts/containment-and-completion.md",
+        "line": 14
+      }
+    ]
+  }
+}

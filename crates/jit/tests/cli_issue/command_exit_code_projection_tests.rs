@@ -772,6 +772,10 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("*", Some(2)),
         ("*", Some(3)),
         ("dep add", Some(4)),
+        // Pinned by test_apply_rejects_prospective_cycle_and_creates_nothing
+        // (fast_docs_templates), which asserts the typed CycleDetected the
+        // classifier maps to 4.
+        ("apply", Some(4)),
         ("issue update, issue claim, issue claim-next", Some(4)),
         ("gate define", Some(6)),
         ("issue delete", Some(2)),

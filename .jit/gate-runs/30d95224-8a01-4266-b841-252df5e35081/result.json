@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "run_id": "30d95224-8a01-4266-b841-252df5e35081",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "commit": "6d4efad15e518ff6f96503b1d5a4d54f71027c55",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-17T04:12:38.959344536Z",
+  "completed_at": "2026-07-17T04:15:00.144597322Z",
+  "duration_ms": 141185,
+  "exit_code": 1,
+  "stdout": "Attribution: `enhancement` is a level-4 leaf with no resolved children. I inspected the 10 reachable commits tagged `jit:450db193` individually with rename/copy detection; uncommitted changes were excluded. No prior doc-review findings exist.\n\nThe generic projection documentation is partly updated, but its configuration guidance and two CLI guarantees do not match the shipped behavior.\n\n1. **F1 — blocking, issue-impact (high):** The canonical configuration reference omits `[projection.<name>]`, and its advertised “Full annotated example with all options” also has no projection example. Adopters cannot discover how to declare `kind`, `mode`, `target`, `style`, or optional region markers in the canonical configuration location. Add a `[projection.<name>]` section to [docs/reference/configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:32) and an annotated example to `docs/reference/example-config.toml`, covering project-scoped kinds, both modes/styles, defaults, and `jit project render`.\n\n2. **F2 — blocking, issue-impact (medium):** [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3100) says `id-anchor` renders rows from “any kind,” but the implementation rejects non-project-scoped kinds with `NotProjectScoped`. Qualify this as project-scoped addressable kinds and state that issue-scoped kinds cannot be projected.\n\n3. **F3 — blocking, issue-impact (medium):** [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3103) promises that an error means “nothing is written.” When rendering all projections, the command writes them sequentially, so a later failure can leave earlier projections updated. Document the per-projection atomicity and possible earlier writes, or make the command batch-atomic before retaining this guarantee.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Projection configuration is undiscoverable in the canonical config reference, and two CLI guarantees overstate supported scope and all-projection failure atomicity.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The canonical configuration reference and its advertised full example omit the new [projection.<name>] configuration surface.\",\"file\":\"docs/reference/configuration.md\",\"line\":32},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The CLI reference says id-anchor supports any kind, but rendering rejects non-project-scoped kinds.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3100},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The CLI reference promises no writes on error, but all-projection rendering can retain earlier writes before a later projection fails.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3103}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 12219 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6e46-c370-73d1-b77d-e94c33dadc85\n--------\nuser\n--- 12206 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Projection configuration is undiscoverable in the canonical config reference, and two CLI guarantees overstate supported scope and all-projection failure atomicity.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The canonical configuration reference and its advertised full example omit the new [projection.<name>] configuration surface.",
+        "file": "docs/reference/configuration.md",
+        "line": 32
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The CLI reference says id-anchor supports any kind, but rendering rejects non-project-scoped kinds.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 3100
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The CLI reference promises no writes on error, but all-projection rendering can retain earlier writes before a later projection fails.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 3103
+      }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "d1504c06-2a67-4327-9cab-a4805ff9fe91",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "0daba57d-4cb8-4494-a825-22b286bc02c6",
+  "commit": "6d4efad15e518ff6f96503b1d5a4d54f71027c55",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-17T03:59:00.510774599Z",
+  "completed_at": "2026-07-17T04:00:05.308065488Z",
+  "duration_ms": 64797,
+  "exit_code": 0,
+  "stdout": "Attribution: leaf `bug` issue with no resolved children. I inspected its five individually tagged commits; current behavior and docs confirm the prior blocking findings are addressed.\n\nDocumentation decision: the CLI reference now accurately documents the exit-2 refusal, JSON envelope/code/suggestion, confirmation command, and unchanged confirmed deletion behavior.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue's deletion-refusal contract is accurately documented and the prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The issue's deletion-refusal contract is accurately documented and the prior blocking findings are resolved.",
+    "findings": []
+  }
+}

@@ -32,6 +32,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `*` | `10` | The repository's on-disk format is newer than this binary, a gate checker refused to run because the binary predates the repository under review, or a filesystem/subprocess I/O operation failed. |  |
 | `any command that writes an issue` | `4` | An enforcing validation rule rejected the write (the shared write-validation path blocks on rule findings). |  |
 | `dep add` | `4` | The edge would create a cycle, or a redundant (transitively-implied) edge was rejected. |  |
+| `apply` | `4` | The template delta would close a dependency cycle through existing issues; the apply is rejected before any node is created. |  |
 | `issue update, issue claim, issue claim-next` | `4` | A state transition is blocked by unmet dependencies or unpassed gates. |  |
 | `gate define` | `6` | The gate key is already registered. |  |
 | `issue delete` | `2` | Deletion was refused for missing operator confirmation (JIT_ALLOW_DELETION=1 not set in the process environment). |  |

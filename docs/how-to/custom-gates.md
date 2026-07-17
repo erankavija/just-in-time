@@ -627,9 +627,12 @@ the plan bracket declares its own `plan` template in `.jit/templates.toml` (this
 repository does so).
 
 Gate keys, titles, and checkers (a test runner, a linter, a formatter, a security
-audit) are domain vocabulary, so language- or workflow-specific bundles are
-declared per project rather than built in. Declare them once as project presets
-and they load alongside the built-ins.
+audit) are domain vocabulary, so language- and stack-specific bundles are
+declared per project rather than built in. The one built-in bundle is the
+planning-bracket trio (`plan-review`, `coverage-preview`, `breakdown-review`),
+retained because it encodes jit's own plan-before-fan-out workflow, not adopter
+domain vocabulary. Declare project bundles once as project presets and they
+load alongside it.
 
 **List available presets:**
 ```bash

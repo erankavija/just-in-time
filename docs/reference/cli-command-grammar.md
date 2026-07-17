@@ -27,7 +27,7 @@ The command line is `jit <noun> <verb> [arguments] [flags]`. The read-only
   `invariant`, `reference`, `migrate`, `profile`, and `apply`'s target. Nouns
   are singular (`issue`, not `issues`).
 - A **verb** is the action on that noun: `create`, `show`, `list`, `update`,
-  `add`, `remove`, `pass`, `define`, `acquire`. Verbs are imperative and shared
+  `add`, `remove`, `evaluate`, `define`, `acquire`. Verbs are imperative and shared
   across nouns where the action is the same (`list`, `show`, `add`, `remove`
   recur with consistent meaning).
 - A small set of **bare verbs** act on the whole repository and take no noun:

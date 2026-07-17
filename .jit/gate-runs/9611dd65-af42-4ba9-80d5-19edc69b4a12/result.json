@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "9611dd65-af42-4ba9-80d5-19edc69b4a12",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "45a140ae-1baa-4f32-96e2-b4dcf21d6694",
+  "commit": "6d4efad15e518ff6f96503b1d5a4d54f71027c55",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "passed",
+  "started_at": "2026-07-17T03:47:26.297951214Z",
+  "completed_at": "2026-07-17T03:51:39.450164171Z",
+  "duration_ms": 253152,
+  "exit_code": 0,
+  "stdout": "Attribution: `jit:45a140ae` commits db0fe018, b020f788, f280f8b6, 2fd8a8ff, 0e330d21, 30a39aac, c15b26eb, 8a02869e, ffde113d, c03d1ba9, 2856ad0f, cea1dbfa, 2be47597, ad2b52fd, c7699f38, 640854b9, c13c4841, e7f9d43c\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose, @/invariant/gate-semantics, @/invariant/event-log, @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/charter/D-1, @/charter/D-2 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (0, 2026-07-17T01:23:22Z); doc-review failed (1, 2026-07-16T15:49:57Z; findings addressed); docs-mechanical passed (0, 2026-07-17T00:31:37Z); prior code-review failed (1, 2026-07-17T03:41:41Z; findings addressed)\nTruncation recovery: recovered aggregate-output truncation with commit- and path-scoped patches plus bounded current source, test, documentation, and gate-record reads; excluded interleaved unrelated gate/config changes outside the issue impact cone.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The terminality-preserving Archived model, coupled retirement workflow, compatibility behavior, diagnostics, tests, and canonical documentation are consistent in the current attributable tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The terminality-preserving Archived model, coupled retirement workflow, compatibility behavior, diagnostics, tests, and canonical documentation are consistent in the current attributable tree.",
+    "findings": []
+  }
+}
