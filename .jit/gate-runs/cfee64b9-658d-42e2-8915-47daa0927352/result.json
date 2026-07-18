@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "cfee64b9-658d-42e2-8915-47daa0927352",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab",
+  "commit": "c9fc62b08366450883855b1c5f3d48be21b2659f",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "passed",
+  "started_at": "2026-07-18T14:19:30.431183647Z",
+  "completed_at": "2026-07-18T14:26:09.694627972Z",
+  "duration_ms": 399263,
+  "exit_code": 0,
+  "stdout": "## Plan document present and linked\n\nPass. The required `dev/active/cdc840ad-plan.md` exists, is substantive, and is linked as the planning node’s design document. Both linked research documents also exist and were reviewed completely.\n\n## Completeness against the criteria\n\nPass. The criteria matrix at `dev/active/cdc840ad-plan.md:5` addresses all nine `[hard]` container criteria without narrowing scope. The ownership matrix at line 49 and coverage map at lines 116–128 make repair boundaries and criterion accountability explicit.\n\n## Technical soundness and architectural fit\n\nPass. The plan correctly establishes the acyclic `declarations/config → repository_state → validation` architecture while leaving persistence mechanics in storage (`dev/active/cdc840ad-plan.md:21-30`). This fits the current split visible in `crates/jit/src/config.rs:13`, `crates/jit/src/validation/rules.rs:1226`, and the two existing repository views identified by the investigation.\n\nThe design also accurately accounts for current limitations in `TransactionAction` and the kernel’s physical `.jit` assumptions (`crates/jit/src/storage/transaction_action.rs:7`, `crates/jit/src/storage/file_transaction.rs:31`). Its canonical layout, expected-preimage, staged absent-root publication, recoverable deletion, and captured-evidence contracts are technically coherent.\n\n## Decomposition and dependencies\n\nPass. The five cumulative Group A packages form a coherent prerequisite chain, followed by one integration leaf; Group B then supplies the derived-state and release-assurance work (`dev/active/cdc840ad-plan.md:63-130`). Parent rollups depend on their children, sequencing is transitively reduced, and the planning issue itself has no unmet dependencies.\n\nThe internal-engine work in Group A and public validation/assurance work in Group B are distinguishable through their stated outcomes and acceptance criteria, so no blocking overlap or missing prerequisite remains.\n\n## Risks and actionability\n\nPass. Material risks have explicit mitigations covering root aliases, recovery ordering, bounded capture, external edits, deterministic identities and timestamps, event-log preservation, claim synchronization, deletion recovery, mixed-authority rules, backend parity, and direct-cutover staging (`dev/active/cdc840ad-plan.md:143-170`). The decisions at lines 174–196 close the load-bearing questions needed for implementation.\n\n## Prior review feedback\n\nPass. All five findings from the most recent failed run are resolved:\n\n- The captured configuration boundary now uses a pure, filesystem-free and validation-free parser (`dev/active/cdc840ad-plan.md:21`).\n- `.jit-bootstrap` and `Data(tmp)` are reserved from semantic targets (`dev/active/cdc840ad-plan.md:23`).\n- Existing persisted short-ID leases are canonicalized during matching, and the log/index view is reconciled before creation (`dev/active/cdc840ad-plan.md:42`).\n- Claim retry examines both issue state and audit state and emits exactly a missing claim event (`dev/active/cdc840ad-plan.md:42`), addressing the current split at `crates/jit/src/commands/claim.rs:152-153`.\n- Mixed fresh-root deltas place semantic worktree actions after the root-publication commit point, with forward recovery thereafter (`dev/active/cdc840ad-plan.md:31`).\n\n## Findings\n\nNo numbered findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The linked plan addresses all nine hard criteria, resolves all five prior blocking findings, fits the current architecture, and provides an actionable dependency-ordered decomposition.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The linked plan addresses all nine hard criteria, resolves all five prior blocking findings, fits the current architecture, and provides an actionable dependency-ordered decomposition.",
+    "findings": []
+  }
+}
