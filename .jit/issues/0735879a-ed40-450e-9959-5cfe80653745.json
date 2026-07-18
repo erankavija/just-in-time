@@ -6,7 +6,8 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "c639cfb5-8356-4c54-b45c-860064432560"
+    "c639cfb5-8356-4c54-b45c-860064432560",
+    "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3"
   ],
   "gates_required": [
     "code-review"
@@ -19,6 +20,6 @@
     "type:milestone"
   ],
   "created_at": "2026-07-18T12:55:41.530699291Z",
-  "updated_at": "2026-07-18T12:55:48.309819920Z",
+  "updated_at": "2026-07-18T16:58:50.935348868Z",
   "first_ready_at": "2026-07-18T12:55:41.530701561Z"
 }

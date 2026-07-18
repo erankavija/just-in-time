@@ -51,7 +51,13 @@
 //!
 //! - **parent** — the *nearest dominating container*: among all containers whose
 //!   dependency closure includes the node, the one that most directly contains
-//!   it. Directness is read off the reduced graph, where a **direct** edge is an
+//!   it. Containment descends the type hierarchy — a container contains only
+//!   nodes at a strictly deeper level (plus level-less leaves), so a dependency
+//!   into a same- or higher-tier node (an epic that depends on a milestone to
+//!   sequence its work after the release) is *not* containment: it bounds the
+//!   closure, and the higher-tier node keeps its own parent rather than nesting
+//!   under the depender. Directness is read off the reduced graph, where a
+//!   **direct** edge is an
 //!   irreducible one: the container reaches the node by no other route. Such an
 //!   edge outranks a container that reaches the node through intermediate nodes,
 //!   so a task stays under the epic that solely owns it even when a deeper
@@ -374,6 +380,18 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
             let Some(deps) = edges.get(cur) else { continue };
             for &dep in deps {
                 if !visited.insert(dep) {
+                    continue;
+                }
+                // Containment descends the type hierarchy: `container` can only
+                // contain `dep` when `dep` sits at a strictly deeper level, or is
+                // a level-less leaf. A dependency into a same- or higher-tier node
+                // — e.g. an epic that depends on a milestone so the epic's work
+                // lands after the milestone ships — is sequencing, not
+                // containment. Such an edge bounds the closure: the higher-tier
+                // node is neither captured as a child nor traversed through (it
+                // roots its own independent subtree), so a milestone never nests
+                // under an epic that merely sequences after it.
+                if level_of(dep).is_some_and(|dep_level| dep_level <= clevel) {
                     continue;
                 }
                 let ndist = dist + 1;
@@ -884,6 +902,45 @@ mod tests {
         assert_eq!(r.parent("t"), Some("aaa"));
         assert_eq!(r.children("aaa"), ["t".to_string()]);
         assert!(r.children("bbb").is_empty());
+    }
+
+    #[test]
+    fn test_cross_tier_sequencing_dep_does_not_reparent_higher_tier() {
+        // A later epic depends on a milestone so its work sequences after that
+        // release ships (m2 → e_late → m1). The dependency is sequencing, not
+        // containment: the milestone m1 must stay a root, keep its own child t,
+        // and never nest under the epic. The epic itself stays under its own
+        // milestone m2.
+        let m2 = TestNode::new("m2", Some("milestone"), &["e_late"]);
+        let e_late = TestNode::new("e_late", Some("epic"), &["m1"]);
+        let m1 = TestNode::new("m1", Some("milestone"), &["t"]);
+        let t = TestNode::new("t", Some("task"), &[]);
+        let r = resolve_hierarchy(&[&m2, &e_late, &m1, &t], &default_config());
+
+        // The milestone is not captured by the epic that sequences after it.
+        assert_eq!(r.parent("m1"), None, "milestone stays a root");
+        assert!(
+            r.children("e_late").is_empty(),
+            "the epic does not adopt the milestone"
+        );
+        // The milestone keeps its own subtree, unreached by the epic.
+        assert_eq!(r.parent("t"), Some("m1"));
+        assert_eq!(r.cluster("t"), Some("m1"));
+        // The epic clusters under its own milestone, not the one it depends on.
+        assert_eq!(r.parent("e_late"), Some("m2"));
+        assert_eq!(r.cluster("e_late"), Some("m2"));
+    }
+
+    #[test]
+    fn test_same_tier_dependency_is_not_containment() {
+        // One epic depending on another (sequencing between peers) does not make
+        // the depended-on epic a child; both stay roots.
+        let e1 = TestNode::new("e1", Some("epic"), &["e2"]);
+        let e2 = TestNode::new("e2", Some("epic"), &[]);
+        let r = resolve_hierarchy(&[&e1, &e2], &default_config());
+
+        assert_eq!(r.parent("e2"), None);
+        assert!(r.children("e1").is_empty());
     }
 
     #[test]

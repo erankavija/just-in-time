@@ -8478,3 +8478,8 @@
 {"type":"issue_claimed","id":"2fba907c-b167-49ad-9dfc-6449e85a8281","issue_id":"cdc840ad-9332-4936-9381-772318967f0f","timestamp":"2026-07-18T16:22:26.890118352Z","assignee":"agent:jit-execution-lead"}
 {"type":"issue_state_changed","id":"451b42a7-d94f-4f69-a790-efb3d69943a1","issue_id":"cbc3a7e5-813c-4aea-be95-3408bc74413d","timestamp":"2026-07-18T16:23:52.118614508Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"9755fdcb-3568-47f0-a750-892c3281102e","issue_id":"cbc3a7e5-813c-4aea-be95-3408bc74413d","timestamp":"2026-07-18T16:23:52.119827069Z","assignee":"agent:terra"}
+{"type":"issue_updated","id":"45a10bbf-1ed4-4089-8c70-8967c71b665d","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-07-18T16:58:50.941539042Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"a33d50fb-b9da-4eb0-b402-b4d9054ddd8d","issue_id":"13c69884-dfe9-4a62-b2ef-59fa4d2f76f3","timestamp":"2026-07-18T17:02:52.856943897Z","updated_by":"dependency-remove","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"9e3f8a00-4175-4c0b-9f38-befdc8280b09","issue_id":"13c69884-dfe9-4a62-b2ef-59fa4d2f76f3","timestamp":"2026-07-18T17:02:52.891706713Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"563f459b-df5b-4bd9-972e-c1b7473164db","issue_id":"13c69884-dfe9-4a62-b2ef-59fa4d2f76f3","timestamp":"2026-07-18T17:36:09.631630814Z","from":"ready","to":"backlog"}
+{"type":"issue_updated","id":"d08ba76b-8262-4282-b923-ce4a29cae57b","issue_id":"13c69884-dfe9-4a62-b2ef-59fa4d2f76f3","timestamp":"2026-07-18T17:36:09.631656124Z","updated_by":"dependency-add","fields":["dependencies"]}
