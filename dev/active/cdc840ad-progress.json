@@ -1,12 +1,12 @@
 {
   "epic_id": "cdc840ad-9332-4936-9381-772318967f0f",
   "epic_short_id": "cdc840ad",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
       "issues": [
-        {"id": "cbc3a7e5-813c-4aea-be95-3408bc74413d", "short_id": "cbc3a7e5", "title": "Establish declarations, image, capture, and managed documents", "classification": "implementation", "status": "in_progress"}
+        {"id": "cbc3a7e5-813c-4aea-be95-3408bc74413d", "short_id": "cbc3a7e5", "title": "Establish declarations, image, capture, and managed documents", "classification": "implementation", "status": "done"}
       ]
     },
     {
@@ -75,10 +75,21 @@
     {
       "category": "rework-exceeded",
       "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-18T22:10:30+03:00",
+      "resolved_at": "2026-07-19T00:00:00+03:00",
       "situation": "After the two invoker-authorized guided attempts, independent lead review found that the new public validation::rule_loader owns ambient filesystem reads and exposes a mixed caller-bytes/live-schema API, contrary to approved plan section 2 and D14.",
+      "resolution": "Invoker chose lead take-over. Lead moved load_ruleset to storage::ruleset_store, deleted validation::rule_loader and the mixed helper, routed callers, fixed prose, added boundary tests (commit 6f4f11ac). cargo-ci passed; code-review then surfaced two more foundational deviations, triggering the batch audit below.",
       "recommendation": "Authorize one narrow correction that moves the non-mutation loader to storage, deletes the mixed-snapshot helper, routes captured paths through pure parsing only, fixes stale prose, and adds boundary coverage."
+    },
+    {
+      "category": "non-convergent-review-batch-audit",
+      "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
+      "status": "resolved",
+      "opened_at": "2026-07-19T00:00:00+03:00",
+      "resolved_at": "2026-07-19T00:30:00+03:00",
+      "situation": "Fifth review round: the whole-diff code-review kept surfacing new plan deviations in the ~6300-line foundation each round (non-convergence).",
+      "resolution": "Invoker chose a batch plan-conformance audit. Lead fanned out 8 disjoint-footprint auditors over declarations + repository_state vs plan section 2, with an adversarial verify stage. 5 deviations confirmed (empty-string root sentinel -> RootRelativePath Root/Descendant enum; CaptureSpec phase-one Data-only; ExpectedPreimage kind vocabulary mirroring RepositoryEntry; managed-document claimed-child removal rejection; ConfigurationDeclarations transitional whole-config field removed), all fixed with tests (commit ff542ec1). Both gates then passed and the whole-diff code-review found nothing new, breaking the non-convergence. cbc3a7e5 done; merged to main at 0d224f35 (invoker-directed)."
     }
   ],
   "rework_counts": {
