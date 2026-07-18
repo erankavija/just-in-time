@@ -75,9 +75,9 @@
   (`crates/jit/src/commands/gate.rs:673,742,966-986,1093`;
   `.jit/config.toml:219-226`).
 
-## Formal gate resolutions (F1–F4)
+## Accumulated architecture resolutions
 
-### F1 — bounded discovery and capture
+### Bounded discovery and capture
 
 - **[ASSUMED — recommended design]** A `RepositoryStateStore` mutation session
   performs two-phase bounded capture without releasing its guard. Phase one reads
@@ -147,7 +147,7 @@
   an absent selected data-root image plus exact existing `Worktree(...)` targets
   and parent listings.
 
-### F2 — canonical typed records become canonical bytes once
+### Canonical typed records become canonical bytes once
 
 - **[VERIFIED]** Current issue persistence stamps `updated_at` inside
   `IssueStore::save_issue`, writes the issue, and separately updates the index
@@ -240,11 +240,12 @@
   and every command-owned assignment of this field
   (`crates/jit/src/commands/profile.rs:268-281`;
   `crates/jit/src/domain/types.rs:1472-1489`).
-- **[ASSUMED — recommended design]** For an existing root, one JSON mutation
-  session holds locks in the fixed order bootstrap → repository → events for its
-  complete capture/plan/revalidate/publish lifetime; no append or repair path may
-  acquire them in reverse. Claim mutations prepend and retain the coordinator lock,
-  making their complete order coordinator → bootstrap → repository → events.
+- **[ASSUMED — recommended design]** One JSON mutation session holds locks in the
+  fixed order bootstrap → data-root-publication → repository → events for its
+  complete recovery/capture/plan/revalidate/publish lifetime; no append or repair
+  path may acquire them in reverse. Claim mutations prepend and retain the
+  coordinator lock, making their complete order coordinator → bootstrap →
+  data-root-publication → repository → events.
   For an absent selected data root, the worktree bootstrap guard is both repository
   and event-append serialization authority and the session neither creates nor
   acquires an events lock inside the absent root. Gate-run and provenance targets
@@ -316,23 +317,32 @@
   (`crates/jit/src/commands/document.rs:689-723`;
   `crates/jit/src/commands/archive.rs:370-611,771-854`).
 
-### F3 — one vertical cutover, then enforcement
+### Bounded staging packages, one vertical product cutover
 
-- **[ASSUMED — recommended design]** After the canonical declarations/image and
-  exact recoverable delta foundations exist, land one vertical cutover containing
-  the `repository_state` managed-document engine and fixed producers, the complete
-  planner, both `RepositoryStateStore` implementations, every affected command and
-  profile consumer, typed-record serialization, and deletion of every superseded
-  marker/planner/profile/publisher/`IssueStore` mutation path. No adapter, wrapper,
-  alias, dual write, fallback, or command-by-command migration is a permissible
-  merge boundary.
-- **[ASSUMED — recommended design]** Only derived-state enforcement and evidence
-  follow that cutover: the `derived-state-coherence` finding/repair/invariant,
-  conformance/failure/concurrency tests, structural absence scans, and stable public
-  contract evidence. Later “cleanup” work must not be used to remove a competing
-  engine or publisher that the vertical cutover should have deleted.
+- **[ASSUMED — recommended design]** Implement the broad architecture on one
+  dedicated worktree and `integration/cdc840ad` branch as five ordered, cumulative
+  work packages: (1) declarations/image/capture/managed documents; (2) layout-aware
+  store/kernel/recovery; (3) typed mutation/audit/fenced claims v2; (4)
+  materializers/drift/repair; and (5) every consumer migration plus predecessor
+  deletion. Each package commits final-form code only to the staging branch, runs
+  its targeted tests plus all prior cumulative tests, and exposes only final
+  interfaces required by the next package.
+- **[ASSUMED — recommended design]** No work-package commit merges to or releases
+  from main independently. Main retains the old architecture until a final
+  integration package rebases the complete stack, resolves it only in the final
+  architecture, runs the full conformance/recovery/security/docs/schema and
+  structural-absence gates, and lands one reviewed transition. Staging commits are
+  implementation scaffolding in version-control history, not supported product
+  states or partial solutions.
+- **[ASSUMED — recommended design]** No package may introduce an adapter, feature
+  flag, compatibility re-export, dual path/write, fallback, selectable engine,
+  temporary public API, or deferred cleanup. Old definitions disappear on the
+  staging branch as soon as their final consumers move; the fifth package completes
+  the live-tree absence inventory before integration. Independent derived-state and
+  release assurance follows only after that clean product landing and uses the sole
+  engine rather than removing predecessors.
 
-### F4 — explicit layout, recovered sessions, and claim reconciliation
+### Explicit layout, recovered sessions, and claim reconciliation
 
 - **[VERIFIED]** `JsonFileStorage` currently retains only its selected storage root,
   derives bootstrap/repository context from that root's parent, and profile
@@ -382,6 +392,28 @@
   `RepositoryLayout` identity, resolves each action through that layout, and rejects
   a mismatch; it never persists an absolute physical target or a synthetic
   `.jit`-prefixed surrogate.
+- **[ASSUMED — recommended design]** An absent disjoint data root is published
+  through an existing-parent capability, never by incrementally creating the final
+  directory. Layout acquisition opens that parent no-follow, rejects symlink or
+  unsupported ancestry, and derives a permanent parent-sibling
+  `DataRootPublicationLock` key solely from canonical parent identity plus final leaf
+  name. Every repository targeting that physical root therefore takes the same
+  advisory lock before testing root existence and holds it through external
+  recovery, capture/planning, publication, rollback, and committed cleanup.
+- **[ASSUMED — recommended design]** Fresh publication creates and verifies a
+  complete sibling staging directory beneath that parent capability. All
+  `Data(...)` actions resolve against the staging capability while the durable
+  journal remains a canonical worktree action beneath
+  `Worktree(Descendant(".jit-bootstrap/transactions/..."))`. The kernel verifies
+  and synchronizes every staged byte, mode, and directory, atomically publishes the
+  complete root with a no-replace rename, fsyncs the parent, opens the final root
+  no-follow, and verifies its recorded identity. A competing final occupant is a
+  typed root-publication conflict. Rollback and prepared/committed recovery may
+  rename or remove a stage or published root only when recorded parent, leaf, and
+  object identities still match; ambiguous identity preserves evidence and requires
+  recovery. Other processes can therefore observe only absence or the complete
+  root, never a partially populated data directory. Existing roots continue to use
+  internal `Data(Descendant("tmp/transactions/..."))` journals.
 - **[VERIFIED]** Startup recovery already orders external before internal journals,
   but it is a CLI/service boundary and infers repository context from the data-root
   parent (`crates/jit/src/storage/recovery_coordinator.rs:1-120`). Direct
@@ -389,11 +421,12 @@
   as the mutation correctness boundary.
 - **[ASSUMED — recommended design]**
   `RepositoryStateStore::open_mutation_session(layout)` is the mandatory recovered
-  boundary for every affected caller. It acquires the worktree bootstrap guard,
-  recovers all external journals, and verifies/cleans committed residue before
-  re-evaluating selected data-root existence. When the data root exists, it then
-  acquires data-root repository and event guards in canonical
-  bootstrap → repository → events order, recovers internal journals, and
+  boundary for every affected caller. It acquires the worktree bootstrap guard and
+  then the layout's shared data-root-publication guard before any root-existence
+  check, recovers all external journals, and verifies/cleans committed residue
+  before re-evaluating selected data-root existence. When the data root exists, it
+  then acquires data-root repository and event guards in canonical
+  bootstrap → data-root-publication → repository → events order, recovers internal journals, and
   verifies/cleans their committed residue. Capture cannot begin until both stages
   succeed. An ordinary command may consume/reuse a matching retained CLI
   `RecoverySession`; a claim command must acquire its coordinator guard before any
@@ -410,16 +443,18 @@
   durable record connecting the two control planes, so a crash can leave the lease
   and repository assignment/event disagreeing.
 - **[ASSUMED — recommended design]** Claims remain explicitly Git-required and use
-  one global lock order: claim coordinator → worktree bootstrap → data-root
-  repository → events. Acquire takes and retains the coordinator lock, creates a
+  one global lock order: claim coordinator → worktree bootstrap →
+  data-root-publication → data-root repository → events. Acquire takes and retains the coordinator lock, creates a
   durable `pending_repository_sync` lease with desired transition `acquire`, stable
   coordination ID, monotonically increasing `attempt_generation`, and a fresh
   `attempt_owner`, then opens the recovered repository session while still holding
-  the coordinator guard. The idempotent issue-plus-event delta carries that exact
-  coordination/generation/owner fencing token. After the repository transaction
-  converges and its guards are released, conditional finalization changes the
-  pending lease to `active` only if desired transition, coordination ID, generation,
-  and owner are unchanged; the coordinator lock is released last. A definite
+  the coordinator guard. The idempotent issue/event transition carries only its
+  public `lease_key`, coordination ID, generation, `acquire|release` operation, and
+  migration marker; `attempt_owner` remains non-public internal coordinator state.
+  After the repository transaction converges and its guards are
+  released, conditional finalization changes the pending lease to `active` only if
+  desired transition, coordination ID, generation, and internal owner are
+  unchanged; the coordinator lock is released last. A definite
   pre-journal failure conditionally deletes the same pending attempt under the
   retained guard. An uncertain/recovery-required publication or conditional-
   finalization failure retains pending state and returns typed
@@ -428,25 +463,131 @@
 - **[ASSUMED — recommended design]** Startup/claim recovery and every subsequent
   claim acquire/release/status operation reconcile under the identical coordinator
   → repository-session lock order. Repository journal recovery runs before event
-  evidence is interpreted. An event matching coordination ID, desired transition,
-  attempt generation, and attempt owner conditionally finalizes that exact pending
-  attempt; proven absence of its transaction compensates it. Retry recognizes the
-  same complete event token and emits no duplicate. After the configured grace, a
+  evidence is interpreted. An event matching lease key, coordination ID,
+  generation, expected `acquire|release` operation, and migration marker, together
+  with an unchanged internal `attempt_owner`, conditionally finalizes that exact pending attempt; proven absence of its
+  transaction compensates it. Retry recognizes the same non-secret event identity
+  and emits no duplicate. After the configured grace, a
   stale or abandoned pending attempt may be taken over only while holding the
   coordinator lock and after recovered evidence has not established its commit:
   takeover increments `attempt_generation` and installs a new `attempt_owner`
   before any repository work. Every delayed prior event/finalizer then fails with
   `FencedClaimAttempt`; issue/event finalization and heartbeat, renew, release, and
   retry paths likewise reject a generation/owner that has lost the fence. Release
-  mirrors the same pending record, event token, ordering, conditional finalization,
+  mirrors the same pending record, event identity, ordering, conditional finalization,
   and fenced-takeover rules before durable lease removal or compensation back to
   active. Pending records retain the requested lease TTL, use the runtime-defaults
   SSOT for the default and the configured indefinite-lease stale grace when TTL is
-  zero, and expose state, desired transition, coordination ID, generation/owner,
-  created/expiry/last-attempt times, stale flag, and reconciliation warning in
-  status/list output. Lock-order APIs and tests reject any path that acquires the
-  coordinator after bootstrap/repository/events. Non-Git claim calls retain
+  zero, and expose state, desired transition, coordination ID, generation,
+  redacted lease key, created/expiry/last-attempt times, stale flag, and
+  reconciliation warning in status/list output. Lock-order APIs and tests reject
+  any path that acquires the coordinator after
+  bootstrap/data-root-publication/repository/events. Non-Git claim calls retain
   `ClaimRequiresGitError`; no saga makes Git mandatory for unrelated core commands.
+
+### Claim v2 migration and credential closure
+
+- **[VERIFIED]** Current coordination persists a raw string `lease_id` in `Lease`,
+  embeds the complete lease in `ClaimOp::Acquire`, stores active leases in a
+  schema-versioned `ClaimsIndex`, and rebuilds that index by replaying
+  `.git/jit/claims.jsonl` (`crates/jit/src/storage/claim_coordinator.rs:31-181,943-1008`).
+  The current `IssueClaimed` event carries only issue, timestamp, and assignee, so
+  it cannot prove which lease attempt produced repository state
+  (`crates/jit/src/domain/types.rs:1200-1215`).
+- **[VERIFIED]** The current CLI's ordinary release resolves an issue's active
+  lease and force-evicts it without any owner credential; its own documentation
+  calls this an owner bypass (`crates/jit/src/cli.rs:2634-2668`;
+  `crates/jit/src/commands/claim.rs:205-360`). Current force-evict also accepts the
+  raw lease ID rather than a public lookup key
+  (`crates/jit/src/cli.rs:2743-2765`;
+  `crates/jit/src/commands/claim.rs:600-642`). Both surfaces must change rather
+  than be retained as compatibility aliases.
+- **[ASSUMED — recommended design]** Make the live coordinator format
+  `record_version: 2`, with `LeaseV2`, `ClaimOpV2`, and v2-only current index/read
+  APIs. `LeaseState` is exactly `pending_repository_sync`, `active`,
+  `legacy_unverified`, `released`, `expired`, or `reconciliation_required`; the v2
+  log operation vocabulary is exactly `migrated_legacy`, `pending`, `activated`,
+  `released`, `expired`, or `reconciliation_required`. One isolated migration
+  boundary exactly decodes v1 index/lease records.
+  The append-only claims log permanently retains a decode-only v1-history decoder
+  so its audit sequence remains readable, but no ordinary reader/writer accepts a
+  mixed or serde-defaulted v1 shape. New writes are v2 only. Index rewrite and the
+  corresponding log append are recoverable, idempotent coordinator publications
+  under its retained lock; migration is one-way and preserves sequence/history.
+- **[ASSUMED — recommended design]** An active v1 lease migrates to
+  `legacy_unverified` at generation zero without fabricating repository evidence;
+  an already expired v1 lease migrates terminal. On its first heartbeat, renew,
+  release, or reconciliation, coordinator-first recovered capture must match both
+  the legacy assignee and historical `IssueClaimed` evidence. A match may append
+  exactly one idempotent v2 `issue_claim_lease_changed` event with
+  `operation: acquire` and `migration: v1_to_v2`; a
+  mismatch fails `LegacyClaimReconciliationConflict`. Release may close a matching
+  legacy lease directly. Heartbeat or renew upgrades it to fully fenced v2 and
+  returns a rotated handle; the consumed v1 alias can never be reused. There is no
+  v1 writer, dual-format current index, default-filled compatibility record, or
+  invented event.
+- **[ASSUMED — recommended design]** Freeze new claim audit writes on event tag
+  `issue_claim_lease_changed` with exactly `{id, timestamp, issue_id, assignee,
+  operation, lease_key, coordination_id, generation, migration}`. `operation` is
+  exactly `acquire|release`; `migration` is exactly `null|v1_to_v2`. The event has
+  no `worktree_id`, `attempt_generation`, `change`, or `lease_id`, and carries no
+  bearer secret, salt/hash, or internal `attempt_owner`. Historical `IssueClaimed`
+  remains decode/fold-only. Lifecycle reconstruction uses the earliest historical
+  `IssueClaimed` or v2 `operation: acquire` as `claimed_at`; `operation: release`
+  updates current claim/assignee state without rewriting first-claim time. Renew
+  remains a coordinator-log operation and emits no alternate repository event.
+- **[ASSUMED — recommended design]** Public `lease_id` remains the single opaque
+  CLI/JSON credential name, but a v2 bearer handle is exactly
+  `lk_<public-key>.<secret>`: a 128-bit lowercase-hex lookup key and an unpadded
+  base64url 256-bit secret matching
+  `^lk_[0-9a-f]{32}\.[A-Za-z0-9_-]{43}$`. The v2 index stores only the lookup key,
+  a fresh 128-bit salt, and a constant-time-checked
+  `SHA-256("jit-claim-v2" || salt || secret)`; plaintext never enters the index,
+  claim log, repository event, or journal. A stale or consumed handle fails
+  `FencedClaimAttempt` even for the same agent/worktree, and internal
+  `attempt_owner` is never a public credential. A v1 ID is accepted only at the
+  isolated migration boundary described below, after which its alias is consumed.
+- **[ASSUMED — recommended design]** The command/credential/event matrix is fixed:
+
+  | Operation | Authoritative credential and rotation | One-time secret output | Frozen repository event |
+  |---|---|---|---|
+  | `acquire(issue_id)` | No input credential. Fresh acquire creates generation/key/secret. Grace takeover is internal to this path, increments generation, and creates a new key/secret; there is no takeover command. | Full replacement `lease_id` once through the acquire response. | `operation: acquire`, `migration: null` (including takeover). |
+  | `renew(full lease_id)` | Owner bearer required; successful renew increments generation and rotates key/secret. | Full replacement `lease_id` once. The prior handle is fenced. | None; rotation is coordinator state, not another repository event taxonomy. |
+  | `heartbeat(full lease_id)` | Owner bearer required. Normal v2 heartbeat does not rotate. A v1 legacy heartbeat at the isolated migration boundary upgrades the lease and rotates generation/key/secret. | None normally; the legacy-upgrade response returns its replacement once. | None normally; legacy upgrade emits `operation: acquire`, `migration: v1_to_v2`. |
+  | `release(full lease_id)` | Owner bearer required; no rotation. The current release-by-issue owner bypass and handler are deleted with no alias. | None. | `operation: release`, `migration: null`. |
+  | `force-evict(lease_key, reason)` | Admin operation accepts only the public 128-bit lowercase-hex `lease_key`; never a bearer. No rotation. | None. | `operation: release`, `migration: null`. |
+  | `status` / `list` | No bearer input or output; projected handles are redacted. | None. | None. |
+  | recovery / reconciliation | Internal fencing evidence only; never accepts, reconstructs, or returns a bearer secret. | None. | Only the idempotent acquire/release event required to converge an already recorded operation. |
+
+- **[ASSUMED — recommended design]** Reveal a complete bearer only in the
+  successful acquire, renew, or legacy-upgrade response cells above. Status/list/
+  index project `lease_id` as `lk_<public-key>.REDACTED` with non-secret
+  coordination/generation/state data and can never be used as credentials. Errors,
+  warnings, `Debug`/`Display`, tracing,
+  events, journals, findings, crash reports, and MCP never echo a secret or raw
+  input; they use the redacted key or a generic invalid-credential message.
+  CLI/schema/MCP mark inputs and one-time outputs sensitive/write-only where
+  applicable and distinguish full-handle from redacted-output patterns. Secret
+  wrappers implement neither general serialization nor display; only the
+  acquire/rotation response adapter may consume them.
+- **[ASSUMED — recommended design]** Generated CLI/JSON/schema/MCP surfaces and
+  tests freeze the matrix rather than exposing a generic credential shape:
+  acquire accepts `issue_id` and returns one sensitive full handle; renew accepts a
+  full handle and returns one sensitive replacement; heartbeat accepts a full
+  handle and returns a replacement only for the typed legacy-upgrade result;
+  release accepts a full handle and has no secret result; force-evict accepts the
+  public `lease_key` plus reason; status/list use only the redacted-output pattern;
+  recovery/reconciliation have no secret fields. Structural tests prove the
+  release-by-issue argument, handler, schema, MCP route, and aliases are absent.
+
+## Latest plan-review findings resolution (F1–F4)
+
+| Finding | Resolved contract |
+|---|---|
+| F1 — absent disjoint-root publication | Open the existing parent capability; take the canonical parent/leaf `DataRootPublicationLock` before existence checks; stage, verify, and fsync the complete root; publish atomically no-replace; fsync/reopen/verify the final root; and rollback/recover only matching recorded identities. |
+| F2 — claim-state compatibility | Current state is v2-only `LeaseV2`/`ClaimOpV2`/index. One exact one-way boundary migrates active v1 records to generation-zero `legacy_unverified`, preserves v1 log/event history as decode/fold-only, and requires coordinator-first repository reconciliation before upgrade or release. |
+| F3 — fencing credential propagation | `lease_id` is the exact opaque bearer handle; only key/salt/domain-separated hash persist, frozen operations rotate it, status and diagnostics redact it, and current `issue_claim_lease_changed` carries only the frozen acquire/release, lease-key, coordination, generation, and migration fields. |
+| F4 — actionable cutover | Five bounded cumulative final-form packages live only on `integration/cdc840ad`; each runs targeted plus prior tests and adds no adapter/flag/temporary API. Only the fully rebased, clean, gated stack lands on main, after consumer migration and predecessor deletion are complete. |
 
 ## Question 1 — Where should the shared pure planner live?
 
@@ -504,9 +645,9 @@
   validation and mode-aware profile planning from seeing different repositories.
 - **[ASSUMED — recommended design]** Remove the profile-only
   `RepositorySnapshot` entry hierarchy and validation-only repository view in the
-  same cutover after all consumers use the crate-root types. Do not retain a
-  second path under the old modules. The risk is test migration volume; retaining
-  both would leave two safety and identity contracts to drift.
+  cumulative package that moves their final consumers to crate-root types. Do not
+  retain a second path under the old modules. The risk is test migration volume;
+  retaining both would leave two safety and identity contracts to drift.
 - **[ASSUMED — recommended design]** Make producer ownership acyclic and explicit.
   Move the declarative `GateRegistry`/`GateDefinition` and `RuleSet`/`Rule` models
   from `storage` and `validation` into the neutral, pure crate-root `declarations`
@@ -516,8 +657,8 @@
   plus `repository_state` for derive/compare, and storage imports the declarations
   for persistence. `repository_state` never imports `validation`, `storage`, or
   `profile`; validation-specific rule evaluation remains in `validation`. Delete
-  the former definitions and exports in the same cutover, with no re-exports or
-  compatibility aliases. This preserves `derive -> compare -> validate`; the risk
+  the former definitions and exports in the same cumulative package, with no
+  re-exports or compatibility aliases. This preserves `derive -> compare -> validate`; the risk
   is a broad source-file move, but leaving materialization producers behind a
   validation or storage facade would preserve the dependency cycle.
 - **[ASSUMED — recommended design]** Define a neutral seed/delta API, conceptually:
@@ -556,7 +697,7 @@
   gate-registry semantic changes. The risk of leaving one raw gate-registry or
   issue/event save path public is a bypass that recreates split publication.
 
-### Required same-change disposition
+### Required cumulative-cutover disposition
 
 - **[VERIFIED inventory, ASSUMED disposition]** Delete the profile-local final-byte
   vocabulary `PackageProjection`, `ProjectedFile`, `ProjectedFileMode`, and
@@ -578,10 +719,11 @@
 - **[VERIFIED inventory, ASSUMED disposition]** Remove `IssueStore::init` from the
   production trait and every forwarding implementation
   (`crates/jit/src/storage/mod.rs:92-100`). Repository bootstrap is a
-  `RepositoryStateStore` mutation: an absent selected data root uses the
-  worktree-bootstrap-only session, while an existing selected data root uses
-  bootstrap-to-data-root repository/event serialization. Tests use the canonical
-  in-memory bootstrap path or explicit fixture builders; they do not keep
+  `RepositoryStateStore` mutation: an absent disjoint selected data root uses
+  bootstrap plus the shared parent-sibling publication guard and stages a complete
+  root, while an existing selected data root uses publication-to-repository/event
+  serialization. Tests use the canonical in-memory bootstrap path or explicit
+  fixture builders; they do not keep
   `IssueStore::init` as a test convenience. Claim-coordinator initialization is a
   separate Git-backed concern and is not renamed into repository bootstrap.
 - **[VERIFIED inventory, ASSUMED disposition]** Remove repository-owned mutation
@@ -610,10 +752,12 @@
   `pending_repository_sync` saga; lease storage remains the only separate
   Git-required control-plane publisher.
 - **[ASSUMED — recommended design]** Delete former declaration definitions,
-  materialization producers, repository writers, final-byte maps, exports, and
-  test doubles in the same change. Do not re-export old names from their former
-  modules, add aliases, retain wrapper writers, or leave a provider/callback
-  registry. A live-tree structural scan is part of the acceptance evidence.
+  materialization producers, repository writers, final-byte maps, exports, and test
+  doubles in the cumulative staging package that moves their final consumers. Do
+  not re-export old names from their former modules, add aliases, retain wrapper
+  writers, or leave a provider/callback registry. The predecessor inventory is
+  already empty before final integration, and each later package reruns the
+  cumulative live-tree structural scan.
 
 ## Question 2 — How should several projections share one target?
 
@@ -890,19 +1034,20 @@
   transaction test that cannot reproduce JSON-backed projection drift.
 - **[ASSUMED — recommended design]** Make recovery and root-state selection the
   opening protocol of the JSON `RepositoryStateStore` session. Acquire the
-  worktree-root bootstrap guard, recover and verify/clean every external journal,
-  then decide selected data-root presence while that guard is held. For an absent
-  data root, retain only bootstrap as repository and event authority, capture an
-  absent `Data(...)` image, and publish with `ExternalBootstrap`; never create an
-  inner lock as a side effect of checking absence. For an existing or partial data
-  root, acquire repository serialization and then events, recover and verify/clean
-  every internal journal, and retain bootstrap → repository → events through
+  worktree-root bootstrap guard and the layout's shared parent-sibling
+  `DataRootPublicationLock`, recover and verify/clean every external journal, then
+  decide selected data-root presence. For an absent disjoint data root, retain both
+  guards, capture an absent `Data(...)` image, stage the complete root through the
+  existing-parent capability, and publish it atomically no-replace; never create an
+  inner lock as a side effect of checking absence. For an existing root, acquire
+  repository serialization and then events, recover and verify/clean every internal
+  journal, and retain bootstrap → data-root-publication → repository → events through
   capture/rebuild/revalidation/publication with `InternalRepository`. Recovery or
   committed-residue verification failure prevents capture. A matching retained
   CLI recovery session may be consumed reentrantly, but is never the only
   correctness path; direct callers and post-checker publication use the same open
   protocol. Claim/release/reconciliation acquires the coordinator first and opens
-  this session beneath it, never by inheriting a pre-held repository guard.
+  this session beneath it, never by inheriting a pre-held later guard.
   Commands choose neither root modes nor journal locations, and the claim
   orchestrator chooses only its required outer coordinator guard.
 - **[ASSUMED — recommended design]** Carry each planned target's expected preimage
@@ -991,7 +1136,8 @@
   typed command/profile/issue/registry/audit seed changes
       -> globally validated RepositoryLayout + canonical physical identities
       -> claim only: retain coordinator guard; persist fenced pending attempt
-      -> open_mutation_session: external recovery, then internal recovery
+      -> open_mutation_session: bootstrap + publication guard; external recovery
+      -> existing root: repository/events guards + internal recovery
       -> one session MutationContext (IdAuthority + MutationClock)
       -> typed Worktree/Data roots + bounded CaptureSpec closure
       -> RepositoryImage + listing fingerprints + PinnedDocumentEvidence
@@ -1003,7 +1149,7 @@
       -> compare expected versus base/final state
       -> final repository_state overlay validation
       -> captured read-set revalidation
-      -> recoverable JSON publication or atomic in-memory publication
+      -> recoverable JSON publication (staged complete absent root) or memory swap
       -> claim only: conditional attempt finalization/reconciliation; release guard
       -> command-specific public result projection
   ```
@@ -1023,10 +1169,13 @@
   Retain distinct producer policies (profile/static versus registry/dynamic) and
   distinct public command results. The risk of consolidating policy and reporting
   as well as mechanics is a single oversized abstraction that obscures ownership.
-- **[ASSUMED — recommended design]** Land the managed-document engine, planner,
+- **[ASSUMED — recommended design]** Build the managed-document engine, planner,
   `RepositoryStateStore`, typed finalizer, all affected consumers, and all old-path
-  deletions as one vertical cutover. Only coherence enforcement/repair and evidence
-  may follow; there is no adapter-bearing intermediate architecture.
+  deletions as the five bounded cumulative packages on `integration/cdc840ad`, then
+  rebase, gate, and land the complete stack as the sole vertical transition on
+  main. Only independent coherence/release assurance follows. No staging package
+  is shipped, and no adapter-bearing or selectable intermediate architecture exists
+  on either branch.
 - **[VERIFIED]** No external dependency is required by the recommended design: the
   repository already has deterministic maps, SHA-256 hashing, byte-exact views,
   TOML editing, capability-confined storage, locking, and transaction recovery in
@@ -1046,18 +1195,22 @@
 | A pinned read silently borrows working-tree bytes or makes Git mandatory | Hash typed commit/tree/blob evidence at the capture boundary and carry a stable unavailable diagnostic; pure derivation performs no Git I/O or fallback. | **[VERIFIED basis]** `crates/jit/src/domain/artifact_inventory.rs:29-67,205-265` |
 | A manual editor races a locked JIT mutation | Add expected-preimage checks to the transaction action, in addition to existing publication checks. | **[VERIFIED basis]** `crates/jit/src/storage/transaction_action.rs:5-31`; `crates/jit/src/storage/file_transaction.rs:428-503` |
 | Repair deletes user-owned files by convention | Delete only explicitly generator-owned targets; otherwise report an unrepairable or review-required finding. | **[ASSUMED]** |
-| Validation and profile see different entry kinds or modes | Replace both existing read models with `repository_state::RepositoryImage` and migrate consumers in the same cutover. | **[VERIFIED basis]** `crates/jit/src/validation/repository.rs:119-138`; `crates/jit/src/profile/snapshot.rs:7-40` |
+| Validation and profile see different entry kinds or modes | Replace both read models with `repository_state::RepositoryImage` in the first cumulative package and keep the integration branch on final interfaces thereafter. | **[VERIFIED basis]** `crates/jit/src/validation/repository.rs:119-138`; `crates/jit/src/profile/snapshot.rs:7-40` |
 | JSON and in-memory backends implement different transaction semantics | Put expected-preimage, action ordering, conflicts, and outcomes in the `RepositoryStateStore` contract; run the same conformance suite against both implementations. | **[ASSUMED]** |
 | A custom `JIT_DATA_DIR` is normalized back to `.jit`, aliases a worktree spelling, or escapes through physical topology | Accept only strict data-within-worktree nesting or disjoint roots; reject `OverlappingRepositoryRoots`, symlink/escape, and identity changes; canonicalize physical input with Data precedence, reject `DataRootAlias` at canonical APIs, and prove injectivity through capture, hashing, exports, journals, recovery, and publication. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:145-205,718-736`; `crates/jit/src/commands/profile.rs:457-466` |
 | A direct caller captures prepared or committed residue before recovery | Make external-then-internal recovery and residue verification mandatory inside `open_mutation_session`; retain startup recovery only as a reusable session/reporting facility. | **[VERIFIED basis]** `crates/jit/src/storage/recovery_coordinator.rs:1-120` |
+| Two repositories race to initialize the same absent disjoint data root, or rollback deletes a competing occupant | Open the existing parent capability, share `DataRootPublicationLock` by canonical parent identity/leaf, stage and fsync the complete sibling root, publish atomically no-replace, fsync/reopen/verify, and mutate stage/final paths during recovery only when recorded identities match. | **[ASSUMED]** |
 | Storage and commands assign different timestamps or event bytes | Sample one `MutationClock` after non-noop capture and let `repository_state` finalize all issue/event/gate-run/provenance bytes; delete storage stamping and command-local image helpers. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:899-904,1084-1112`; `crates/jit/src/profile/application.rs:180-198` |
 | Capture rebuild or backend choice changes generated IDs | Reuse one session `MutationContext`; deterministically derive issue, record, then canonically ordered event IDs from one `IdAuthority` seed and hash every allocation. | **[VERIFIED basis]** current constructors call `Uuid::new_v4` throughout `crates/jit/src/domain/types.rs:1497-1651` |
-| Exact event-log replacement races an ordinary append | Make `RepositoryStateStore` the only repository event publisher and hold bootstrap → repository → events for the full existing-root session; absent-root bootstrap is the event authority. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:261-267,1084-1089` |
-| An absent-root transaction acquires a guard that creates the selected data root | Recover external journals under the worktree bootstrap guard, re-evaluate data-root existence, and use only bootstrap authority until a delta deliberately creates the root. | **[VERIFIED basis]** `crates/jit/src/commands/init.rs:226-245`; `crates/jit/src/storage/repo_lock.rs:80-121` |
+| Exact event-log replacement races an ordinary append | Make `RepositoryStateStore` the sole event publisher and hold bootstrap → data-root-publication → repository → events for an existing root; absent-root bootstrap plus shared publication lock owns the staged complete event image. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:261-267,1084-1089` |
+| An absent-root transaction acquires a guard that incrementally exposes the selected data root | Take bootstrap then the shared sibling publication lock before checking existence; direct every `Data(...)` action into a complete staged root and publish only with synchronized no-replace directory rename and identity verification. | **[VERIFIED basis]** `crates/jit/src/commands/init.rs:226-245`; `crates/jit/src/storage/repo_lock.rs:80-121` |
 | A repair deletion cannot roll back | Implement `DeleteFile` as a journaled rename-to-verified-backup with prepared rollback and committed absence verification; never call an unjournaled remove. | **[ASSUMED]** |
 | A gate command bypasses materialization | Route gate definition add/define/update/remove, issue gate add/remove, and preset apply through `SemanticMutation`; remove raw command-level registry/issue/event saves that split their coupled state. | **[VERIFIED basis]** `crates/jit/src/commands/gate.rs:232-352,653-677,966-990,1020-1103` |
 | Init or export retains a quiet raw repository writer | For an eligible same-worktree data root, put `.gitattributes` line-set composition in init's delta with exact status/error semantics; otherwise report `not_applicable`. Route repository-contained graph/snapshot destinations through the explicit export intent; stdout and proven external outputs remain non-repository sinks. | **[VERIFIED basis]** `crates/jit/src/storage/gitattributes.rs:42-80`; `crates/jit/src/main.rs:4923-4932` |
-| Claim lease state and repository assignment/event diverge, or a stale worker finalizes a replacement attempt | Hold the coordinator guard across the recovered repository transaction in global coordinator → bootstrap → repository → events order; persist attempt generation/owner token, carry them into the idempotent event, finalize conditionally, and fence takeover by incrementing generation before new repository work. | **[VERIFIED basis]** `crates/jit/src/commands/claim.rs:100-156` |
+| Claim lease state and repository assignment/event diverge, or a stale worker finalizes a replacement attempt | Hold coordinator across coordinator → bootstrap → data-root-publication → repository → events; keep internal owner out of the event, emit only the frozen acquire/release + lease-key/coordination/generation/migration wire, finalize conditionally, and fence takeover. | **[VERIFIED basis]** `crates/jit/src/commands/claim.rs:100-156` |
+| Existing v1 claims are silently treated as proven v2 leases or audit history is rewritten | Use one exact v1 decoder and one-way v2 index migration; retain v1 log/event decode-only history, mark active records `legacy_unverified`, reconcile under coordinator-first recovery, and fail mismatches with `LegacyClaimReconciliationConflict`. | **[VERIFIED basis]** `crates/jit/src/storage/claim_coordinator.rs:31-181,943-1008`; `crates/jit/src/domain/types.rs:1200-1215` |
+| A bearer secret leaks or command-specific rotation drifts | Store only key/salt/domain-separated hash; rotate only for acquire/takeover, renew, or legacy upgrade; never rotate for normal heartbeat, owner release, force-evict, status/list, or recovery; reveal replacements only in the frozen responses; redact all other surfaces; and reject stale handles. | **[VERIFIED basis]** current raw `Lease.lease_id` at `crates/jit/src/storage/claim_coordinator.rs:31-38` |
+| Bounded implementation work is mistaken for mergeable partial architecture | Keep five cumulative final-form packages only on `integration/cdc840ad`; run targeted plus prior tests each time, forbid flags/adapters/temporary APIs, delete predecessors before integration, and let only the fully gated rebased stack land on main. | **[ASSUMED]** |
 | Preset creation, asset rescan, migration, or archive keeps a less-visible publisher | Include each in the typed-mutation inventory and delete `save_gate_preset`, rescan `save_issue`, per-issue migration saves, and archive staging/relink/event writers in the vertical cutover. | **[VERIFIED basis]** `crates/jit/src/commands/gate.rs:1170-1190`; `crates/jit/src/commands/document.rs:689-723`; `crates/jit/src/commands/migrate.rs:1-78`; `crates/jit/src/commands/archive.rs:370-854` |
 | Generic result unification breaks automation | Keep current top-level envelopes and generated schemas; share only internal delta and additive nested change records. | **[VERIFIED basis]** existing result types cited in Question 5 |
 | The v1 planner becomes a profile lifecycle engine | Accept profile-produced seed changes but import no profile types; profile removal remains out of scope per container D-06. | **[VERIFIED basis]** `jit issue show cdc840ad` |

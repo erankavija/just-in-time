@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "run_id": "37b9b270-d57d-4713-85e7-26af29962547",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab",
+  "commit": "74f7c4f8015d55191c7542febb386d8a6e9d062a",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T12:17:42.005913785Z",
+  "completed_at": "2026-07-18T12:23:52.520658204Z",
+  "duration_ms": 370514,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nThe required design document exists at `dev/active/cdc840ad-plan.md`, is non-empty, and is linked from planning issue `dc266cb6` as a design document. Both linked research documents were also reviewed completely.\n\n## Completeness against the criteria\n\nThe plan explicitly addresses REQ-01 through REQ-09, including the prior custom-root, recovery, Git-attributes, and claim-coordination concerns. However, REQ-03, REQ-08, and REQ-09 remain incomplete because absent disjoint-root initialization and migration of existing claim/event data are not fully designed.\n\n## Technical soundness and architectural fit\n\nThe proposed `declarations` and `repository_state` ownership boundaries fit the repository’s layering. The canonical `RepositoryLayout`, closed capture, expected-preimage delta, mandatory recovery, and pure derive/compare pipeline correctly replace the current split abstractions.\n\nTwo load-bearing transaction details remain unresolved. First, the absent disjoint-data-root transition lacks a shared capability and serialization protocol. Second, the fenced claim saga does not define compatible handling of existing durable leases and `IssueClaimed` events or how callers retain fencing credentials.\n\n## Decomposition and dependencies\n\nThe dependency order between cutover and assurance is correct, and no criterion is obviously omitted. The first leaf, however, encompasses virtually every mutating command, both storage backends, transaction recovery, declarations, validation, profiles, exports, claims, fixtures, and tests. REQ-09 requires one final landing, but it does not require all development to be represented by one unbounded leaf. The plan does not provide independently testable work packages or an integration strategy that preserves the single-landing constraint.\n\n## Risks and actionability\n\nThe documented risk table is extensive, but it incorrectly concludes that all load-bearing choices are resolved (`dev/active/cdc840ad-plan.md:144`). The missing root-transition protocol, durable-format migration policy, and fencing-token ownership model would require implementers to make architectural decisions during execution.\n\n## Prior review feedback\n\nThe previous F1–F3 concerns are substantially addressed: virtual-to-physical mapping is explicit, recovery precedes capture, and Git-attributes behavior is transactionally defined. Previous F4 is only partially resolved because the saga’s new-state behavior is detailed while compatibility and credential propagation remain unspecified.\n\n1. **F1 — Blocking, high:** Fresh initialization of an absent disjoint `JIT_DATA_DIR` has no shared serialization and capability-transition protocol. The plan says only the worktree bootstrap is held until the selected root commits (`dev/active/cdc840ad-plan.md:30-31,133`), but it does not define how storage securely anchors and creates a nonexistent external root or prevents another layout from observing that root after directory creation but before transaction completion. The existing kernel publishes directory creation incrementally (`crates/jit/src/storage/file_transaction.rs:492-512`), while the current bootstrap lock is tied to one repository-side path (`crates/jit/src/storage/repo_lock.rs:110-120`). Specify the no-follow parent capability, no-replace root publication/rollback protocol, and common lock identity spanning the absent-to-existing transition.\n\n2. **F2 — Blocking, high:** The claim saga does not define migration or backward-compatible decoding for existing durable state. It requires coordination ID, generation, owner, desired transition, and token-bearing repository events (`dev/active/cdc840ad-plan.md:41`), but existing `Lease` and `ClaimOp` records lack those fields (`crates/jit/src/storage/claim_coordinator.rs:29-170`), and existing `IssueClaimed` events have a fixed four-field shape (`crates/jit/src/domain/types.rs:1205-1215`). Known events that no longer deserialize are fatal (`crates/jit/src/domain/event_log.rs:66-72`). The plan must choose versioned new variants or defaulted fields and define how pre-cutover active leases, historical events, indexes, and logs reconcile without fabricating commit evidence.\n\n3. **F3 — Blocking, high:** Fencing-token ownership and propagation are unspecified. The plan requires heartbeat, renew, release, retry, and finalization to reject stale generation/owner credentials (`dev/active/cdc840ad-plan.md:41`), while current public operations identify a claim primarily by lease ID and configured agent identity (`crates/jit/src/commands/claim.rs:170-430`). It does not say where an attempt owner token is retained, how a later CLI invocation proves possession, whether acquire output changes, or how same-agent/same-worktree stale processes are fenced. This is necessary for the promised stale-owner rejection and stable public contracts.\n\n4. **F4 — Blocking, high:** The breakdown’s main leaf is not a well-scoped executable task. “Replace repository mutation architecture” owns six epic requirements and the entire production/test consumer inventory (`dev/active/cdc840ad-plan.md:66-76`), leaving no independently implementable or testable packages for the team. The single final landing required by REQ-09 can be preserved through staged component work and a final integration/cutover leaf; the plan must define those work packages, their dependency order, and which intermediate artifacts remain unmerged until integration.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior blockers are substantially addressed, but absent disjoint-root initialization, claim-state compatibility, fencing credential propagation, and the monolithic cutover decomposition remain unresolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Absent disjoint data-root initialization lacks a shared serialization, capability-acquisition, and root-publication protocol.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":30,\"references\":[\"@/issue/cdc840ad/requirement/REQ-03\",\"@/issue/cdc840ad/requirement/REQ-08\",\"@/inv/atomic-writes\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The fenced claim saga does not define backward-compatible migration of existing lease, claim-log, index, and IssueClaimed event records.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":41,\"references\":[\"@/issue/cdc840ad/requirement/REQ-08\",\"@/issue/cdc840ad/requirement/REQ-09\",\"@/inv/event-log\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan requires stale-owner fencing but does not define how attempt generation and owner credentials are retained and presented by later claim operations.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":41,\"references\":[\"@/issue/cdc840ad/requirement/REQ-08\",\"@/issue/cdc840ad/requirement/REQ-09\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The architecture cutover leaf spans nearly the entire mutation system and provides no independently implementable work packages or final-integration strategy.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":73,\"references\":[\"@/issue/cdc840ad/requirement/REQ-09\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8072 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7529-332e-7f82-9941-c10bf8e773be\n--------\nuser\n--- 8059 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior blockers are substantially addressed, but absent disjoint-root initialization, claim-state compatibility, fencing credential propagation, and the monolithic cutover decomposition remain unresolved.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Absent disjoint data-root initialization lacks a shared serialization, capability-acquisition, and root-publication protocol.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 30,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-03",
+          "@/issue/cdc840ad/requirement/REQ-08",
+          "@/inv/atomic-writes"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The fenced claim saga does not define backward-compatible migration of existing lease, claim-log, index, and IssueClaimed event records.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 41,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-08",
+          "@/issue/cdc840ad/requirement/REQ-09",
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The plan requires stale-owner fencing but does not define how attempt generation and owner credentials are retained and presented by later claim operations.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 41,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-08",
+          "@/issue/cdc840ad/requirement/REQ-09"
+        ]
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The architecture cutover leaf spans nearly the entire mutation system and provides no independently implementable work packages or final-integration strategy.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 73,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-09"
+        ]
+      }
+    ]
+  }
+}
