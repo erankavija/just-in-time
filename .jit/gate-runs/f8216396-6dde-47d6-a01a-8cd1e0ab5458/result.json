@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "f8216396-6dde-47d6-a01a-8cd1e0ab5458",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab",
+  "commit": "4ced9fb73054f631739f2340f04c413ea0a0b983",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "passed",
+  "started_at": "2026-07-18T15:30:07.506060727Z",
+  "completed_at": "2026-07-18T15:35:53.530270678Z",
+  "duration_ms": 346024,
+  "exit_code": 0,
+  "stdout": "## Plan document present and linked\n\n`dev/active/cdc840ad-plan.md` exists, is substantive, and is linked as the planning issue’s design document at the required path. The linked research and investigation documents also exist and clearly defer to the plan where their historical scope differs.\n\n## Completeness against the criteria\n\nAll nine hard container criteria are explicitly mapped at `dev/active/cdc840ad-plan.md:9-17`. The technical design then supplies concrete contracts for capture, derivation, profile/init/config/render integration, managed regions, drift repair, the project invariant, verification, and direct cutover. No stated scope is silently dropped.\n\n## Technical soundness and architectural fit\n\nThe proposed `declarations → repository_state → validation` dependency direction at `dev/active/cdc840ad-plan.md:21-30` fits the repository’s separation of concerns.\n\nThe design accurately identifies and replaces current defects:\n\n- Competing repository models in `crates/jit/src/validation/repository.rs` and `crates/jit/src/profile/snapshot.rs`.\n- Split config publication in `crates/jit/src/commands/config.rs:253-268`.\n- Per-target project rendering in `crates/jit/src/commands/project.rs:109-175`.\n- Planner/preparation preimage separation in `crates/jit/src/storage/transaction_action.rs` and `crates/jit/src/storage/file_transaction.rs`.\n- Independent claim issue/event writes in `crates/jit/src/commands/claim.rs:130-153`.\n\nThe revised absent-root protocol at `dev/active/cdc840ad-plan.md:31` resolves the most recent blocking feedback: recoverable worktree actions publish first, their preimages can still be rolled back, and the no-replace root rename occurs last as the irreversible commit point. This ordering is compatible with the kernel’s sequential publication and reverse rollback model in `crates/jit/src/storage/file_transaction.rs:492-593`.\n\n## Decomposition and dependencies\n\nThe five cumulative cutover packages at `dev/active/cdc840ad-plan.md:74-102` have coherent, sequential prerequisites: canonical state types precede storage, storage precedes typed mutation, typed mutation precedes materializers, and consumer migration precedes final integration.\n\nThe assurance tasks at `dev/active/cdc840ad-plan.md:111-124` correctly depend on the integrated implementation, with repair and invariant verification converging before public-contract and release evidence. The graph summarized at line 140 is consistent and transitively reduced. The planning issue itself has no unmet dependencies.\n\n## Risks and actionability\n\nThe ownership matrix at `dev/active/cdc840ad-plan.md:51-59`, exact predecessor inventories at lines 44-48, package acceptance criteria at lines 74-124, and mitigations at lines 153-181 make the work executable without requiring implementers to redesign subsystem boundaries.\n\nMaterial risks—including aliasing, capture incompleteness, recovery-before-read, root-creation races, manual writers, mixed-authority rules, delete recovery, backend divergence, and public-contract stability—have explicit decisions or mitigations.\n\n## Prior review feedback\n\nThe prior blocking finding is resolved by the amended ordering at `dev/active/cdc840ad-plan.md:31`. No irreversible data-root publication now precedes a potentially conflicting semantic worktree action.\n\n## Findings\n\nThe numbered findings list is empty.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The plan is complete and executable, and the revised absent-root ordering resolves the prior blocking publication race.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The plan is complete and executable, and the revised absent-root ordering resolves the prior blocking publication race.",
+    "findings": []
+  }
+}

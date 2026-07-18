@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "73a4cf59-4a20-437c-a49f-ea6799cb34cd",
+  "gate_key": "breakdown-review",
+  "stage": "postcheck",
+  "issue_id": "1e37988a-ae20-424e-be4d-f9fa6efed060",
+  "commit": "4ced9fb73054f631739f2340f04c413ea0a0b983",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-18T15:35:58.465702417Z",
+  "completed_at": "2026-07-18T15:39:33.113927264Z",
+  "duration_ms": 214648,
+  "exit_code": 0,
+  "stdout": "## Content standards\n\nPASS. All 11 created work items have clean titles, locally verifiable `## Success Criteria`, self-contained scope, and valid labels. Both stories carry meaningful identifying labels:\n\n- `a3a788f3`: `story:repository-state-cutover`\n- `7f0ac1b0`: `story:coherence-release-assurance`\n\nNo strategic slug uses a JIT short ID. References to the approved plan add detail but do not substitute for locally stated requirements.\n\n## Coverage versus design\n\nThe instantiated breakdown matches the exact decomposition in [§3 of the approved plan](/home/vkaskivuo/Projects/just-in-time/dev/active/cdc840ad-plan.md:63).\n\n| Design item | Issue | Matches? |\n|---|---|---|\n| Direct repository-state cutover story | `a3a788f3` | Yes |\n| Establish declarations, image, capture, and managed documents | `cbc3a7e5` | Yes |\n| Implement layout-aware store, kernel, and recovery | `bacf2cd4` | Yes |\n| Implement typed mutation, audit, and claim synchronization | `a6a9b964` | Yes |\n| Implement materializers, drift, and repair | `44d318ab` | Yes |\n| Migrate all consumers and delete predecessors | `49adf23b` | Yes |\n| Integrate repository-state cutover | `661d6be2` | Yes |\n| Coherence and release assurance story | `7f0ac1b0` | Yes |\n| Validate drift diagnosis and transactional repair | `b1621508` | Yes |\n| Author the derived-state-coherence project invariant | `ed3e773c` | Yes |\n| Document public contracts and complete release evidence | `c73c7618` | Yes |\n\nNo work item is missing, extra, merged incorrectly, or mis-scoped.\n\n## Dependency DAG correctness\n\nPASS. The direct ordering is the plan’s transitively reduced graph:\n\n- Group A: `cbc3a7e5 → bacf2cd4 → a6a9b964 → 44d318ab → 49adf23b → 661d6be2 → a3a788f3`\n- Group B branches after integration: `661d6be2 → {b1621508, ed3e773c} → c73c7618 → 7f0ac1b0`\n\nHere arrows indicate prerequisite-before-dependent ordering. `b1621508` and `ed3e773c` remain parallel, and Group B does not falsely wait for the Group A story rollup. There are no missing prerequisites or over-constraints.\n\nAfter the breakdown gate passes, `cbc3a7e5` is the sole implementation root. It can begin in a fresh repository workspace because it creates its crate-root modules inside the existing `crates/jit` skeleton and requires no sibling-produced structure.\n\n## Structural integrity\n\nPASS. The epic has appropriate epic → story → task depth. Group A’s five cumulative architecture packages plus integration leaf match plan decision D16; Group B now has three cohesive assurance leaves. Every created issue reaches `cdc840ad`; none is isolated or dangling.\n\n## Prior review feedback\n\nAll previous blockers are addressed:\n\n- Prior F1: `7f0ac1b0` REQ-02 now states a locally defined outcome: “All assurance suites pass on main, repository validation reports no derived-state drift … and the documented public contracts match the landed behavior.”\n- Prior F2: `a3a788f3` REQ-02 no longer refers to undefined package E and now requires final-form commits, affected-crate test suites, and completed predecessor deletion.\n- Prior F3: the former bundled assurance scope is split into `b1621508` for repair acceptance, `ed3e773c` for the invariant, and `c73c7618` for public contracts and release evidence. The join dependencies on [c73c7618](/home/vkaskivuo/Projects/just-in-time/.jit/issues/c73c7618-0b79-422b-9227-bfcc99e6f345.json:4) enforce the approved ordering.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All 11 design work items, their content, and the reduced dependency graph match the approved plan; all prior blockers are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All 11 design work items, their content, and the reduced dependency graph match the approved plan; all prior blockers are resolved.",
+    "findings": []
+  }
+}
