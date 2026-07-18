@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "run_id": "ad355cbe-722d-40e1-be10-8fb2d55dc301",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab",
+  "commit": "52cf362724658170b7ec47cb3ecd7503e3df594e",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-18T11:04:22.768657174Z",
+  "completed_at": "2026-07-18T11:12:14.861125889Z",
+  "duration_ms": 472092,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. `dev/active/cdc840ad-plan.md` exists, is substantive, and is linked as the planning issue’s design document.\n\n## Completeness against criteria\n\nFail. The plan addresses all nine hard requirements at a high level, but Findings 1 and 2 leave load-bearing parts of REQ-01, REQ-02, REQ-03, REQ-08, and REQ-09 unresolved.\n\n## Technical soundness and architectural fit\n\nFail. The canonical image capture boundary is underspecified, and authoritative issue/audit persistence lacks a complete ownership and migration design.\n\n## Decomposition and dependencies\n\nFail. Group A requires a green intermediate state that conflicts with the direct-cutover constraint, as detailed in Finding 3.\n\n## Risks and actionability\n\nFail. The capture scope and audit-log migration are major risks absent from §4. Implementers would have to re-derive these designs.\n\n## Prior review feedback\n\nThe previous run produced no review output because its agent failed to initialize. Therefore, there is no substantive prior feedback to resolve.\n\n## Findings\n\n1. **F1 — Blocking/high: The canonical `RepositoryImage` capture contract has no bounded discovery or read-set design.** The storage API at `dev/active/cdc840ad-plan.md:26` exposes parameterless image capture, while the planner requires an immutable, complete image containing exact bytes and entry metadata (`dev/active/cdc840ad-plan.md:23-25`). Today, `RepositoryView` performs targeted reads and directory listings (`crates/jit/src/validation/repository.rs:119-127`), and profile capture explicitly accepts selected paths so unrelated trees such as `target` and `node_modules` are not loaded (`crates/jit/src/storage/json.rs:277-300`). Configured projection sources and targets may also live outside `.jit`. The proposed API therefore must either recursively ingest the entire repository under the mutation lock or risk omitting dynamically discovered inputs. The plan must define a bounded, deterministic discovery/capture protocol—including directory-listing completeness, config-declared external sources, profile targets, and expected-preimage coverage—and corresponding tests.\n\n2. **F2 — Blocking/high: Transactional issue, provenance, and audit-event materialization is not completely designed or inventoried.** The direct cutover requires exact issue, event, provenance, and registry bytes in one delta (`dev/active/cdc840ad-plan.md:32,85-88`), but neither the seed model nor `RepositoryStateStore` assigns ownership for issue timestamping, serialization, append-only event composition, torn-tail preservation, and fine-grained event locking. Those responsibilities currently matter: `IssueStore::save_issue` owns `updated_at` stamping (`crates/jit/src/storage/mod.rs:141-171`), JSON event append repairs unterminated tails (`crates/jit/src/storage/json.rs:1084-1114`), and profile application holds the event lock and transactionally replaces a next-event image (`crates/jit/src/commands/profile.rs:160-221`). Moreover, the purported exact superseded-profile inventory at `dev/active/cdc840ad-plan.md:35` omits `append_profile_event_image`, a profile-specific final-byte producer with dedicated torn-tail behavior (`crates/jit/src/profile/application.rs:176-230`). The plan must define the canonical typed-to-byte mutation boundary, timestamp policy, event prefix/torn-tail and locking semantics, and same-change removal or relocation of this helper.\n\n3. **F3 — Blocking/high: The proposed waves require a forbidden transitional adapter or overlapping task ownership.** “One strict marker cutover” precedes the shared planner/storage boundary and requires profile application, planner, and command consumers to use canonical claims and deltas only (`dev/active/cdc840ad-plan.md:73-76`). The common `derive/compare` planner, `RepositoryStateStore`, command migration, and deletion of command-local transaction builders do not land until the dependent Group B task (`dev/active/cdc840ad-plan.md:85-88`). Current profile/init consumers require `ProfileApplicationPlan` and command-local `FileTransactionPlan` assembly. Consequently, Group A can remain green only by temporarily adapting canonical claims/deltas back into those superseded inventories, contrary to REQ-09 and D-07, or by absorbing Group B work and overlapping its ownership. The decomposition must combine these into a genuine vertical cutover or otherwise remove the intermediate compatibility boundary.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The linked plan is extensive, but canonical capture semantics, transactional audit-state ownership, and direct-cutover wave ordering remain unresolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"RepositoryImage capture lacks a bounded discovery and complete read-set contract.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":26,\"references\":[\"@/issue/cdc840ad/requirement/REQ-01\",\"@/issue/cdc840ad/requirement/REQ-08\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Issue, provenance, and append-only audit-event materialization lacks canonical ownership and omits an existing final-byte producer.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":32,\"references\":[\"@/issue/cdc840ad/requirement/REQ-02\",\"@/issue/cdc840ad/requirement/REQ-03\",\"@/issue/cdc840ad/requirement/REQ-09\",\"@/inv/event-log\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The wave ordering requires a forbidden transitional adapter or overlapping task ownership.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":73,\"references\":[\"@/issue/cdc840ad/requirement/REQ-09\",\"@/issue/cdc840ad/decision/D-07\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6595 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f74e6-12b3-77b0-84de-427972828f8f\n--------\nuser\n--- 6582 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The linked plan is extensive, but canonical capture semantics, transactional audit-state ownership, and direct-cutover wave ordering remain unresolved.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "RepositoryImage capture lacks a bounded discovery and complete read-set contract.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 26,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-01",
+          "@/issue/cdc840ad/requirement/REQ-08"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Issue, provenance, and append-only audit-event materialization lacks canonical ownership and omits an existing final-byte producer.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 32,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-02",
+          "@/issue/cdc840ad/requirement/REQ-03",
+          "@/issue/cdc840ad/requirement/REQ-09",
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The wave ordering requires a forbidden transitional adapter or overlapping task ownership.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 73,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-09",
+          "@/issue/cdc840ad/decision/D-07"
+        ]
+      }
+    ]
+  }
+}

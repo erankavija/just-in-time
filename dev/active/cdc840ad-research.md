@@ -75,6 +75,242 @@
   (`crates/jit/src/commands/gate.rs:673,742,966-986,1093`;
   `.jit/config.toml:219-226`).
 
+## Formal gate resolutions (F1–F3)
+
+### F1 — bounded discovery and capture
+
+- **[ASSUMED — recommended design]** A `RepositoryStateStore` mutation session
+  performs two-phase bounded capture without releasing its guard. Phase one reads
+  fixed declaration roots (`index.json`, config, rules, gates, templates,
+  invariants, profile provenance, exact `events.jsonl` bytes, and the command/profile typed
+  seed) plus exact command-selected issue and gate-run records. Parsing produces a
+  sorted `CaptureSpec` of normalized exact paths and explicitly complete listings:
+  `.jit/issues`, referenced gate-run/profile/schema directories, configured
+  registry/item sources, projection sources and targets outside `.jit`, profile
+  asset/region targets and parents, and every proposed target preimage. Phase two
+  executes a no-follow work queue to a fixpoint. A newly parsed declaration may
+  enqueue only an exact path or complete listing beneath a declared safe path; a
+  visited set plus path/count/byte/depth budgets returns a typed closure-limit
+  error. There is no recursive repository-root, `target`, `node_modules`, Git
+  metadata, or unrelated-tree discovery fallback.
+- **[ASSUMED — recommended design]** A complete `.jit/issues` listing enqueues
+  every ordinary issue entry required by repository validation. Parsing those
+  issues then enqueues every unpinned `Issue.documents[].path`, each document's
+  validation-read local assets and parent entry preimages, and every plan-document
+  path derived for a planning node from configured template/documentation roots,
+  including a derived plan not yet linked in `Issue.documents`. These working-tree
+  documents/assets/plan paths receive exact identities and listing revalidation.
+  A missing entry is still captured absence; a producer asking for one omitted
+  from the spec fails with `UndiscoveredRepositoryPath`. Current document inventory
+  and asset rescan must consume this closed image rather than opening their own
+  filesystem traversal (`crates/jit/src/domain/artifact_inventory.rs:161-265`;
+  `crates/jit/src/commands/document.rs:689-723`).
+- **[ASSUMED — recommended design]** Pinned document and validation-read asset
+  requests never enqueue or borrow the working-tree entry with the same path. The
+  capture boundary resolves them into typed `PinnedDocumentEvidence`. Available
+  evidence records requested revision/path, canonical commit OID, object/tree
+  identity, blob OID, existence, exact bytes, size, and SHA-256. Unavailable
+  evidence records the requested identity plus a stable Git-unavailable,
+  not-found, or read-failed diagnostic. Evidence requests may add pinned asset
+  requests during the same bounded fixpoint; request/result identity and content
+  hash enter `CaptureSpec` and the plan hash. Pure `repository_state` code performs
+  no Git I/O and never falls back to working-tree bytes. Git remains optional: an
+  unavailable object surfaces the existing typed pinned-read diagnostic only where
+  that evidence is required (`crates/jit/src/domain/artifact_inventory.rs:29-67,205-265`;
+  `crates/jit/src/storage/git_revision.rs:111-163`).
+- **[ASSUMED — recommended design]** Capture every exact entry and complete listing
+  with no-follow traversal. `RepositoryImage` records exact file bytes/mode,
+  directory identity, symlink payload, unsupported kind, or absence; a complete
+  listing additionally records a stable fingerprint over its sorted child
+  name/kind/mode identities. This lets validation prove both “the named source is
+  unchanged” and “no source appeared or disappeared in a consumed directory.”
+  External configured sources and targets are repository-relative capabilities,
+  never unconstrained host paths.
+- **[ASSUMED — recommended design]** A pure producer requesting a path outside the
+  closed `CaptureSpec` fails with `UndiscoveredRepositoryPath`; it cannot perform
+  I/O or silently interpret that path as absent. The plan hash covers normalized
+  `CaptureSpec`, every entry identity, every complete-listing fingerprint, the
+  typed seed, and the exact `RepositoryDelta`. Immediately before durable journal
+  preparation, `RepositoryStateStore::apply` revalidates the whole captured read
+  set; delta actions recheck target preimages again before publication. Any source,
+  target, or listing mismatch is a typed retryable capture conflict. If a
+  declaration edit changes the closure, discard the image and repeat both phases
+  under the same session until one unchanged bounded fixpoint is planned. Fresh
+  init starts from an absent `.jit` declaration image plus exact existing external
+  profile/projection targets and parent listings.
+
+### F2 — canonical typed records become canonical bytes once
+
+- **[VERIFIED]** Current issue persistence stamps `updated_at` inside
+  `IssueStore::save_issue`, writes the issue, and separately updates the index
+  (`crates/jit/src/storage/json.rs:400-430,899-904`). Current event append takes a
+  second path that holds repository then event locks and isolates a non-newline
+  tail before appending (`crates/jit/src/storage/json.rs:1084-1112`), while profile
+  init/apply construct a competing complete event-log image through
+  `append_profile_event_image` (`crates/jit/src/profile/application.rs:180-198`;
+  `crates/jit/src/commands/init.rs:396`;
+  `crates/jit/src/commands/profile.rs:277`). Gate-run results are yet another
+  repository-owned direct writer (`crates/jit/src/storage/json.rs:1168-1188`).
+- **[ASSUMED — recommended design]** `repository_state` is the single typed-to-byte
+  finalizer for repository-owned mutations. A `RepositorySeed` carries neutral
+  typed issue upsert/delete intent, registry declarations, event records,
+  gate-run/audit records, and profile provenance; commands submit semantic values
+  with neither serialized bytes, IDs, nor mutation timestamps. Exactly once after
+  canonical session acquisition, create a `MutationContext` containing injected
+  `IdAuthority` and `MutationClock`; reuse that unchanged context when capture
+  expansion or conflict recovery rebuilds the operation. Production samples its
+  UUID/random source once into the context and deterministically derives operation
+  identifiers; memory/tests inject a deterministic seed. Allocation order is
+  frozen: new issue IDs first in canonical request order so expected-absent issue
+  paths enter `CaptureSpec` before closure capture; transaction-visible gate-run,
+  profile, and other record IDs next in `(target, key)` order; event IDs last after
+  canonical event ordering. Every allocated ID and the context seed identity enter
+  the semantic plan hash; neither a retry nor a backend may resample them.
+  Machine-local journal IDs remain store-internal. After the bounded non-noop
+  closure is complete, `MutationClock` yields one `MutationTimestamp`. A no-op
+  allocates no persistent IDs or mutation time. Domain/event constructors perform
+  no `Uuid::new_v4` or `Utc::now` calls. The finalizer applies the timestamp to every
+  changed issue and committed audit event field whose contract denotes the mutation
+  instant. No-ops neither sample a publication timestamp nor bump an issue or emit
+  an event; capture expansion and conflict recovery reuse the same context and
+  timestamp. Pure
+  declaration serializers retain their format authority in
+  `declarations`; `repository_state` alone assigns their repository paths, composes
+  them with issue/index/provenance/audit changes, and emits final claims/delta.
+  Storage does not stamp timestamps or serialize semantic records, and commands do
+  not construct complete repository file images. One timestamp value is applied to
+  every issue upsert that the semantic operation says changed; verbatim restore is
+  an explicit typed policy, not a second writer.
+- **[ASSUMED — recommended design]** Lifecycle timestamps obey one rule set. Issue
+  creation receives its allocated ID and sets `created_at == updated_at` to the
+  operation `MutationTimestamp`; creation initially entering Ready also sets
+  `first_ready_at` to that value. A semantic update sets `updated_at` once. The
+  first transition into Ready, first claim/assignment, and first transition into
+  Done set still-absent `first_ready_at`, `claimed_at`, and `done_at` respectively
+  to that same value and never overwrite them on later cycles. Archive/revive
+  changes `archived_from` under the same issue timestamp without inventing a second
+  lifecycle time. Every changed `GateState.updated_at` uses the operation timestamp;
+  every committed audit event uses it; an unchanged gate status does not bump the
+  issue or gate state. Storage journal timestamps remain machine-local recovery
+  metadata outside semantic plans/deltas.
+- **[ASSUMED — recommended design]** Checker execution is typed external evidence,
+  not permission for command-local persistence. The checker boundary records its
+  start/completion observations and monotonic duration as evidence; the checker
+  semantic outcome itself carries no self-generated ID or mutation timestamp.
+  `IdAuthority` allocates the gate-run ID, the stored run preserves
+  those observed checker times, and the later repository publication uses its one
+  `MutationTimestamp` for the issue `updated_at`, `GateState.updated_at`, and audit
+  event. External checker execution remains outside `RepositoryStateStore`, but its
+  gate-run/issue/event bytes publish only in the resulting delta.
+- **[ASSUMED — recommended design]** Lifecycle migration derives missing
+  `first_ready_at`, `claimed_at`, and `done_at` only from each earliest matching
+  historical event, preserves every existing stamp, and leaves an unrecoverable
+  field `None`. The migration's actual issue rewrites use one new
+  `MutationTimestamp` for `updated_at`; the single
+  `LifecycleTimestampsBackfilled` event uses that timestamp and an allocated event
+  ID. All issue rewrites and the event publish in one delta. A rerun with nothing
+  to fill allocates no ID/time and emits no event
+  (`crates/jit/src/commands/migrate.rs:1-78`).
+- **[ASSUMED — recommended design]** Canonical audit composition consumes the exact
+  captured `events.jsonl` preimage and typed events. It preserves every prefix byte,
+  including a malformed/torn final record, and adds exactly one separator newline
+  only when a non-empty prefix lacks one. New events sort by the stable key
+  `(mutation phase, event tag, primary identity, secondary identity,
+  command-local ordinal)`, serialize once in canonical form, and each receives one
+  trailing newline. Exact preimage/final bytes and the listing identity enter the
+  same plan hash and delta. Delete `append_profile_event_image`, its
+  export/tests/calls, and command-local
+  issue/index/registry/provenance/gate-run/event byte producers.
+- **[ASSUMED — recommended design]** Torn-tail classification belongs exclusively
+  to canonical audit composition. It distinguishes empty/newline-terminated,
+  complete-but-unterminated JSON, and malformed unterminated final bytes while
+  preserving the prefix exactly and inserting only the required separator.
+  `ProfileApplied.isolated_torn_tail` is set by this finalizer—never profile command
+  code—and is true exactly when that profile event immediately follows a preserved
+  malformed unterminated tail. A complete JSON record missing only its newline is
+  separated but reports `false`. Delete `has_malformed_unterminated_event_tail`
+  and every command-owned assignment of this field
+  (`crates/jit/src/commands/profile.rs:268-281`;
+  `crates/jit/src/domain/types.rs:1472-1489`).
+- **[ASSUMED — recommended design]** For an existing root, one JSON mutation
+  session holds locks in the fixed order bootstrap → repository → events for its
+  complete capture/plan/revalidate/publish lifetime; no append or repair path may
+  acquire them in reverse. For an absent `.jit`, bootstrap is both repository and
+  event-append serialization authority and the session neither creates nor
+  acquires an events lock inside the absent root. Gate-run and provenance targets
+  publish under the same session and exact-delta preconditions, without an
+  independent semantic writer.
+- **[ASSUMED — recommended design]** `RepositoryStateStore` is the sole publication
+  capability for repository-owned issue/index, gate/rule/config registry,
+  `events.jsonl`, gate-run/audit artifact, and profile-provenance mutations, as well
+  as their derived targets. Remove the corresponding mutation methods from
+  `IssueStore`; it may remain a read/query capability. The only exclusions are
+  machine-local coordination/recovery files owned internally by the store,
+  Git-backed claim leases under `.git/jit`, explicitly user-global config, and
+  unrelated external-process artifacts. Those are different authorities and do
+  not publish repository-owned project state.
+- **[ASSUMED — recommended design]** Fresh/re-init treats `.gitattributes` as one
+  semantic line-set `TargetClaim` in the init `RepositoryDelta`, not a post-init
+  storage helper. The claim deterministically ensures the JIT comment/rule set
+  (including `.jit/events.jsonl merge=union`) exactly once, preserves every
+  unrelated line and byte, and rejects a conflicting claim for the same attribute
+  pattern. It requires no Git process or repository detection, so Git-optional init
+  has the same repository image. Exact
+  `.gitattributes` bytes and its parent listing are captured/revalidated under the
+  bootstrap-only or existing-root session. Delete
+  `storage::gitattributes::setup_gitattributes` and the `main.rs` after-init writer
+  (`crates/jit/src/storage/gitattributes.rs:42-80`;
+  `crates/jit/src/main.rs:1938-1947`).
+- **[ASSUMED — recommended design]** Graph and snapshot exports classify their
+  destination before publication. An output path within the repository root is a
+  constrained `RepositoryStateStore` export intent: graph's file or snapshot's complete
+  file/tree claims, target ancestors, and preimages join `CaptureSpec` and publish
+  once through `RepositoryStateStore`. Stdout is an ephemeral presentation sink and
+  receives pure rendered bytes without a repository delta. An explicitly selected
+  path outside the repository uses a separate external-export sink with staging and
+  no authority to change repository-owned state. Shell redirection remains stdout
+  from JIT's perspective. Delete graph's direct atomic path writer and snapshot's
+  in-repository rename/tar writers; retain external sink mechanics only for proven
+  external destinations (`crates/jit/src/main.rs:4923-4932`;
+  `crates/jit/src/commands/snapshot.rs:528-599`).
+- **[ASSUMED — recommended design]** Gate preset creation is a typed declaration
+  mutation of `.jit/config/gate-presets/<name>.json`: capture the complete preset
+  directory and target preimage, serialize through the canonical declarations
+  format, publish it with any audit/derived changes through `RepositoryStateStore`,
+  and delete `IssueStore::save_gate_preset` plus its JSON/memory implementations
+  (`crates/jit/src/commands/gate.rs:1170-1190`;
+  `crates/jit/src/storage/json.rs:1335-1356`). Preset apply consumes the same
+  declaration and mutation boundary.
+- **[ASSUMED — recommended design]** Document asset `--rescan` consumes the
+  unpinned document/asset closure, produces an id/time-free issue-document metadata
+  intent, and publishes the changed issue plus its typed update event in one delta;
+  a failed scan or identical asset set is a warning/no-op with no ID/time. Archive
+  execution likewise captures every unpinned source/destination, issue reference,
+  asset, and event preimage, then expresses relocations as recoverable create/write/
+  delete actions plus issue upserts and one typed archive event in the same delta.
+  Pinned historical artifacts remain non-relocatable. Delete rescan's direct
+  `save_issue` and archive's stage/relink/compensating repository publishers; a
+  legacy partial archive is reconciled by a fresh canonical intent over captured
+  state, not by reviving the parallel writer
+  (`crates/jit/src/commands/document.rs:689-723`;
+  `crates/jit/src/commands/archive.rs:370-611,771-854`).
+
+### F3 — one vertical cutover, then enforcement
+
+- **[ASSUMED — recommended design]** After the canonical declarations/image and
+  exact recoverable delta foundations exist, land one vertical cutover containing
+  the `repository_state` managed-document engine and fixed producers, the complete
+  planner, both `RepositoryStateStore` implementations, every affected command and
+  profile consumer, typed-record serialization, and deletion of every superseded
+  marker/planner/profile/publisher/`IssueStore` mutation path. No adapter, wrapper,
+  alias, dual write, fallback, or command-by-command migration is a permissible
+  merge boundary.
+- **[ASSUMED — recommended design]** Only derived-state enforcement and evidence
+  follow that cutover: the `derived-state-coherence` finding/repair/invariant,
+  conformance/failure/concurrency tests, structural absence scans, and stable public
+  contract evidence. Later “cleanup” work must not be used to remove a competing
+  engine or publisher that the vertical cutover should have deleted.
+
 ## Question 1 — Where should the shared pure planner live?
 
 ### Why this blocks the plan
@@ -136,10 +372,10 @@
   both would leave two safety and identity contracts to drift.
 - **[ASSUMED — recommended design]** Make producer ownership acyclic and explicit.
   Move the declarative `GateRegistry`/`GateDefinition` and `RuleSet`/`Rule` models
-  from `storage` and `validation` into one neutral, pure domain/config declarations
+  from `storage` and `validation` into the neutral, pure crate-root `declarations`
   module. Move materialization-only default derivation and serialization, generated
   schema rendering, configured project-projection rendering, and managed-document
-  composition into `repository_state`. Validation imports the neutral declarations
+  composition into `repository_state`. Validation imports `declarations`
   plus `repository_state` for derive/compare, and storage imports the declarations
   for persistence. `repository_state` never imports `validation`, `storage`, or
   `profile`; validation-specific rule evaluation remains in `validation`. Delete
@@ -210,6 +446,21 @@
   canonical in-memory bootstrap path or explicit fixture builders; they do not keep
   `IssueStore::init` as a test convenience. Claim-coordinator initialization is a
   separate Git-backed concern and is not renamed into repository bootstrap.
+- **[VERIFIED inventory, ASSUMED disposition]** Remove repository-owned mutation
+  methods from `IssueStore`, including issue/index save/delete/restore, registry
+  save, gate-preset save, event append, and gate-run result save, after their consumers submit one
+  neutral `RepositorySeed` through `RepositoryStateStore`. Delete
+  `append_profile_event_image`, `AppliedProfileRecord::to_bytes`, and every
+  command/profile complete-byte producer for events or provenance
+  (`crates/jit/src/profile/application.rs:23-28,180-198`). Retain only read/query
+  methods on `IssueStore`; machine-local recovery, Git claim leases, and
+  user-global config remain explicitly outside this repository-owned mutation
+  boundary.
+- **[VERIFIED inventory, ASSUMED disposition]** Delete ID/time-producing
+  `Issue::new`, `Issue::new_with_labels`, and production `Event::new_*` seed paths,
+  plus command-local `Utc::now`/`Uuid::new_v4` construction for repository-owned
+  records. Commands submit id/time-free intents through one `MutationContext`;
+  deterministic fixture builders replace compatibility constructors in tests.
 - **[ASSUMED — recommended design]** Delete former declaration definitions,
   materialization producers, repository writers, final-byte maps, exports, and
   test doubles in the same change. Do not re-export old names from their former
@@ -263,7 +514,7 @@
   managed-document engine under `repository_state`, with explicit inputs:
   target bytes, region identity, begin/end bytes, replacement bytes, and placement
   policy (`RequireExisting` or `AppendIfAbsent`). The risk is error-mapping churn;
-  retain command/profile-specific error wrappers while sharing the parser error
+  preserve command/profile error context while sharing the canonical parser error
   details.
 - **[ASSUMED — recommended design]** For each target, collect all claims before
   rendering. Reject partial pairs, duplicate same-identity pairs, reversed pairs,
@@ -328,7 +579,7 @@
 | Validate only effective behavior | This is the current default-rule behavior and prevents stale files from becoming authoritative, but the verified profile-init repository passes validation while an addressable rule is absent. | **[VERIFIED] rejected** |
 | Load persisted derived files as validation authority | This would detect disagreement by changing behavior, but it reverses the chosen SSOT decision and recreates the stale-schema failure documented by `af4c901a`. | **[VERIFIED] rejected** |
 | Invoke the full mutation planner recursively from `validate_repository` | It would reuse code, but if the planner validates its final overlay by calling `validate_repository`, the dependency becomes recursive and obscures which stage owns failure. | **[ASSUMED] rejected; risk is recursion or special-case flags** |
-| Split derivation, comparison, and final validation | Pure derivation computes expected managed fragments/targets; comparison emits drift; mutation planning overlays the expected delta and then invokes ordinary whole-repository validation. | **[ASSUMED] recommended** |
+| Split derivation, comparison, and final validation | Pure derivation computes expected managed fragments/targets; comparison emits drift; mutation planning overlays the expected delta and then invokes ordinary semantic/structural validation over the closed captured image. | **[ASSUMED] recommended** |
 
 ### Recommendation
 
@@ -363,11 +614,12 @@
   built-in validation pass unless a real addressable rule is also declared.
 - **[ASSUMED — recommended design]** `jit validate --fix` should request
   `RepairDerived`, publish the complete repair delta in one transaction, and rerun
-  whole-repository validation. It must preserve unrelated prose, custom rules,
-  editable default-policy fields, comments where the existing pure transform can
-  preserve them, and non-owned schema files. The risk of deleting an unexpected
-  file by filename convention alone is data loss; only delete a target whose
-  ownership is explicit in the generator contract or recorded provenance.
+  semantic/structural validation over the closed captured image. It must preserve
+  unrelated prose, custom rules, editable default-policy fields, comments where the
+  existing pure transform can preserve them, and non-owned schema files. The risk
+  of deleting an unexpected file by filename convention alone is data loss; only
+  delete a target whose ownership is explicit in the generator contract or recorded
+  provenance.
 - **[ASSUMED — recommended design]** Add the registry-first
   `derived-state-coherence` invariant as a separate project invariant and project
   it through the existing `invariants` projection. Do not broaden
@@ -435,39 +687,45 @@
   repository-dependent package collision state; keep the pre-session API incapable
   of accepting a `RepositoryImage`.
 - **[ASSUMED — recommended design]** Within the opaque `RepositoryStateStore`
-  mutation session, capture/re-read every repository-dependent input, rebuild the
-  complete `RepositoryDelta`, construct the exact final overlay including
-  provenance/audit records, run whole-repository validation, and apply that delta
-  once through the same session. Report the session-built plan hash, not a preview
-  hash. The risk is session duration; the affected inputs are local files and pure
+  mutation session, execute the fixed-root plus `CaptureSpec` closure, finalize
+  typed timestamps/records, rebuild the complete `RepositoryDelta`, construct the
+  exact final overlay, validate the closed image, revalidate the read set, and apply
+  that delta once. Report the session-built plan hash, not a preview hash. The risk
+  is session duration; the affected inputs are bounded local paths and pure
   transforms, so correctness should take precedence for v1.0.
 - **[ASSUMED — recommended design]** Add the separate `RepositoryStateStore`
-  capability beside `IssueStore`, and require it for every affected generic
-  command. It exposes one associated opaque mutation-session type and only session
-  acquisition, `RepositoryImage` capture through that session, and application of
-  one finalized `RepositoryDelta` through that session. It exposes no per-file or
+  capability beside read/query-only `IssueStore`, and require it for every command
+  that publishes repository-owned issue/index, registry, event, gate-run/audit,
+  provenance, or materialized state. It exposes one associated opaque
+  mutation-session type and only session acquisition, bounded `RepositoryImage`
+  capture through a `CaptureSpec`, and application of one finalized
+  `RepositoryDelta` through that session. It exposes no per-file or
   command-semantic writer. `JsonFileStorage` implements it through
   `FileTransactionKernel`; `InMemoryStorage` implements identical
   preimage/conflict/action semantics with a copy-on-write state image swapped under
   its process-local lock. No implementation forwards to old
-  `save_gate_registry`, `write_repo_file`, or config/ruleset writers. The risk is
+  `save_issue`, `append_event`, `save_gate_registry`, `save_gate_run_result`,
+  `write_repo_file`, or config/ruleset writers. The risk is
   enlarging the backend contract, but it makes in-process tests evidence for the
   same semantic transaction rather than a separate write loop.
 - **[ASSUMED — recommended design]** Both storage implementations capture the same
-  crate-root `RepositoryImage`. The in-memory backend must not keep a gate-registry map and
-  a disagreeing `.jit/gates.toml` shadow as independent truths: its canonical
-  serializers/accessors and transaction clone must make typed gate reads and
-  repository-entry reads observe the same prospective state before the atomic
-  swap. Apply the same rule to every semantic record included in a transaction.
+  crate-root `RepositoryImage`. The in-memory backend must not keep issue,
+  gate-registry, event, gate-run, or provenance maps and disagreeing repository-byte
+  shadows as independent truths: its canonical accessors and transaction clone must
+  make typed reads and repository-entry reads observe the same prospective state
+  before the atomic swap. Apply the same rule to every semantic record included in
+  a transaction.
   The risk of retaining independent typed/file maps is a passing in-memory
   transaction test that cannot reproduce JSON-backed projection drift.
 - **[ASSUMED — recommended design]** Make root-state selection an internal protocol
   of the JSON `RepositoryStateStore` session. Acquire the repository-sibling
   bootstrap guard first and decide root presence while it is held. For absent
-  `.jit`, retain only bootstrap, capture an absent image, and publish with
-  `ExternalBootstrap`; never create or acquire `.jit/.repo-write.lock`. For an
+  `.jit`, retain only bootstrap as repository and event authority, capture an
+  absent image, and publish with `ExternalBootstrap`; never create or acquire
+  `.jit/.repo-write.lock` or `.jit/.events.lock`. For an
   existing or partial `.jit`, acquire repository serialization after bootstrap,
-  then capture/rebuild and publish with `InternalRepository`. Commands choose
+  then the events lock, and retain bootstrap → repository → events through
+  capture/rebuild/revalidation/publication with `InternalRepository`. Commands choose
   neither guards, root modes, nor journal locations. The risk of acquiring the
   inner repository lock for an absent root is creating `.jit` before absence
   validation and changing the very preimage being protected.
@@ -481,8 +739,9 @@
   and have that newer file become the rollback preimage while still being overwritten.
 - **[ASSUMED — recommended design]** If an expected preimage mismatch occurs, fail
   before publication with a typed retryable conflict rather than silently rebuilding
-  inside the kernel. Commands may reacquire/replan once at a higher level, but an
-  unbounded retry loop could starve under an active external editor.
+  inside the kernel. Higher-level conflict recovery reuses the same
+  `MutationContext`, IDs, and `MutationTimestamp`; neither backend resamples them.
+  Bound recovery attempts so an active external editor cannot starve the command.
 - **[ASSUMED — recommended design]** Add `DeleteFile` to the exact delta and durable
   journal protocol. It requires an expected regular-file identity, stages/records a
   verified backup, renames the target aside and synchronizes the parent, and treats
@@ -553,16 +812,21 @@
 - **[ASSUMED — recommended design]** The common pipeline should be:
 
   ```text
-  command/profile/gate-registry seed changes
-      -> repository_state::RepositoryImage
+  typed command/profile/issue/registry/audit seed changes
+      -> one session MutationContext (IdAuthority + MutationClock)
+      -> fixed roots + bounded CaptureSpec document/asset/plan closure
+      -> RepositoryImage + listing fingerprints + PinnedDocumentEvidence
+      -> frozen issue/record/event ID allocation + one MutationTimestamp
+      -> canonical typed-record and exact-prefix audit bytes
       -> repository_state::derive_materializations
       -> repository_state managed-document/ownership composition
       -> exact deterministic RepositoryDelta
       -> compare expected versus base/final state
       -> final repository_state overlay validation
+      -> captured read-set revalidation
       -> one RepositoryStateStore mutation session
       -> recoverable JSON publication or atomic in-memory publication
-      -> command-specific result adapter
+      -> command-specific public result projection
   ```
 
   The risk is that provenance/audit bytes computed after validation could escape
@@ -576,10 +840,14 @@
   in the five question sections above.
 - **[ASSUMED — recommended design]** Consolidate the delta, derivation order,
   managed-document engine, drift comparator, session/rebuild protocol, and
-  publication adapter.
+  publication boundary.
   Retain distinct producer policies (profile/static versus registry/dynamic) and
   distinct public command results. The risk of consolidating policy and reporting
   as well as mechanics is a single oversized abstraction that obscures ownership.
+- **[ASSUMED — recommended design]** Land the managed-document engine, planner,
+  `RepositoryStateStore`, typed finalizer, all affected consumers, and all old-path
+  deletions as one vertical cutover. Only coherence enforcement/repair and evidence
+  may follow; there is no adapter-bearing intermediate architecture.
 - **[VERIFIED]** No external dependency is required by the recommended design: the
   repository already has deterministic maps, SHA-256 hashing, byte-exact views,
   TOML editing, capability-confined storage, locking, and transaction recovery in
@@ -594,12 +862,20 @@
 | Mixed-authority `rules.toml` is rewritten as if it were wholly derived | Specify owned fragments: config owns default assertions/membership; the file owns custom rules and editable policy. Require preservation tests. | **[VERIFIED basis]** `dev/active/af4c901a-derive-default-rules-at-load.md:25-63` |
 | A materialization producer calls full validation and creates recursion | Keep derivation and comparison lower-level than `validate_repository`; enforce with module API and an overlay test. | **[ASSUMED]** |
 | Several writers claim one target | Group claims, build a containment tree, allow well-formed distinct-ID nesting, and reject crossing intervals, ambiguous ownership, or incompatible base writers before producing bytes. | **[ASSUMED]** |
+| A producer discovers an uncaptured path or a directory changes after planning | Fail with `UndiscoveredRepositoryPath` or a typed capture conflict; close a bounded no-follow `CaptureSpec`, hash complete listings, and revalidate the entire read set before journal preparation. | **[ASSUMED]** |
+| Validation reads an issue-linked document/asset or derived plan outside capture | Enqueue every unpinned issue document, validation-read asset/parent, and configured derived plan path during the bounded fixpoint; pinned requests use only `PinnedDocumentEvidence`. | **[VERIFIED basis]** `crates/jit/src/domain/artifact_inventory.rs:161-265`; `crates/jit/src/commands/validate.rs:746-794` |
+| A pinned read silently borrows working-tree bytes or makes Git mandatory | Hash typed commit/tree/blob evidence at the capture boundary and carry a stable unavailable diagnostic; pure derivation performs no Git I/O or fallback. | **[VERIFIED basis]** `crates/jit/src/domain/artifact_inventory.rs:29-67,205-265` |
 | A manual editor races a locked JIT mutation | Add expected-preimage checks to the transaction action, in addition to existing publication checks. | **[VERIFIED basis]** `crates/jit/src/storage/transaction_action.rs:5-31`; `crates/jit/src/storage/file_transaction.rs:428-503` |
 | Repair deletes user-owned files by convention | Delete only explicitly generator-owned targets; otherwise report an unrepairable or review-required finding. | **[ASSUMED]** |
 | Validation and profile see different entry kinds or modes | Replace both existing read models with `repository_state::RepositoryImage` and migrate consumers in the same cutover. | **[VERIFIED basis]** `crates/jit/src/validation/repository.rs:119-138`; `crates/jit/src/profile/snapshot.rs:7-40` |
 | JSON and in-memory backends implement different transaction semantics | Put expected-preimage, action ordering, conflicts, and outcomes in the `RepositoryStateStore` contract; run the same conformance suite against both implementations. | **[ASSUMED]** |
+| Storage and commands assign different timestamps or event bytes | Sample one `MutationClock` after non-noop capture and let `repository_state` finalize all issue/event/gate-run/provenance bytes; delete storage stamping and command-local image helpers. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:899-904,1084-1112`; `crates/jit/src/profile/application.rs:180-198` |
+| Capture rebuild or backend choice changes generated IDs | Reuse one session `MutationContext`; deterministically derive issue, record, then canonically ordered event IDs from one `IdAuthority` seed and hash every allocation. | **[VERIFIED basis]** current constructors call `Uuid::new_v4` throughout `crates/jit/src/domain/types.rs:1497-1651` |
+| Exact event-log replacement races an ordinary append | Make `RepositoryStateStore` the only repository event publisher and hold bootstrap → repository → events for the full existing-root session; absent-root bootstrap is the event authority. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:261-267,1084-1089` |
 | An absent-root transaction acquires a guard that creates `.jit` | Keep bootstrap-versus-existing-root selection inside JSON transaction storage and verify root state after the correct outer guard is held. | **[VERIFIED basis]** `crates/jit/src/commands/init.rs:226-245`; `crates/jit/src/storage/repo_lock.rs:80-121` |
 | A repair deletion cannot roll back | Implement `DeleteFile` as a journaled rename-to-verified-backup with prepared rollback and committed absence verification; never call an unjournaled remove. | **[ASSUMED]** |
 | A gate command bypasses materialization | Route gate definition add/define/update/remove, issue gate add/remove, and preset apply through `SemanticMutation`; remove raw command-level registry/issue/event saves that split their coupled state. | **[VERIFIED basis]** `crates/jit/src/commands/gate.rs:232-352,653-677,966-990,1020-1103` |
+| Init or export retains a quiet raw repository writer | Put `.gitattributes` line-set composition in init's delta and route repository-contained graph/snapshot destinations through the explicit export intent; stdout and proven external outputs remain classified non-repository sinks. | **[VERIFIED basis]** `crates/jit/src/storage/gitattributes.rs:42-80`; `crates/jit/src/main.rs:4923-4932` |
+| Preset creation, asset rescan, migration, or archive keeps a less-visible publisher | Include each in the typed-mutation inventory and delete `save_gate_preset`, rescan `save_issue`, per-issue migration saves, and archive staging/relink/event writers in the vertical cutover. | **[VERIFIED basis]** `crates/jit/src/commands/gate.rs:1170-1190`; `crates/jit/src/commands/document.rs:689-723`; `crates/jit/src/commands/migrate.rs:1-78`; `crates/jit/src/commands/archive.rs:370-854` |
 | Generic result unification breaks automation | Keep current top-level envelopes and generated schemas; share only internal delta and additive nested change records. | **[VERIFIED basis]** existing result types cited in Question 5 |
 | The v1 planner becomes a profile lifecycle engine | Accept profile-produced seed changes but import no profile types; profile removal remains out of scope per container D-06. | **[VERIFIED basis]** `jit issue show cdc840ad` |
