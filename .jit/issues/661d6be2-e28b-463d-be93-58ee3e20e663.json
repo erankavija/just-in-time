@@ -1,0 +1,38 @@
+{
+  "id": "661d6be2-e28b-463d-be93-58ee3e20e663",
+  "title": "Integrate repository-state cutover",
+  "description": "Rebase the complete Group A staging stack on current main, resolve conflicts only with the final architecture, run the full gate and structural-scan suite on the exact merge candidate, and merge the entire stack to main as one clean transition from the old to the complete new architecture. This is the sole product transition for the repository-materialization consolidation.\n\n## Background\n\nGroup A's work packages accumulate cumulative, final-form code on branch `integration/cdc840ad` and are never merged to main individually, so main retains the old architecture until this leaf lands the whole stack at once. This integration leaf carries sole accountability for the container criteria REQ-01 through REQ-05 and REQ-09.\n\n## What to build\n\n- Rebase the complete staging stack on current main and resolve every conflict only with the final architecture — no adapter, feature flag, re-export, temporary API, old publisher, alias, partial-root path, or deferred cleanup may be reintroduced during conflict resolution.\n- Run full Rust, web, MCP, docs, schema, and security gates plus every §2 structural absence scan on the exact merge candidate (predecessor deletion, no command-local publisher or duplicate renderer, no compatibility seam, no independently merged staging package).\n- Merge the entire stack to main as one clean transition: main observes exactly one change from the old architecture to the complete new architecture (shared materialization planner, canonical layout/image/capture, typed mutation and audit, storage/kernel and recovery, materializers, drift, and every migrated consumer with all predecessors deleted). No package commit was merged or released independently.\n\nThe landed architecture must satisfy the container's accountable criteria: a domain-agnostic side-effect-free materialization planner producing one deterministic delta without publishing it (REQ-01); profile init/apply through the shared planner (REQ-02); ordinary init/config through one recoverable transaction leaving complete old or new state (REQ-03); `jit project render` planning every target against one snapshot with deterministic shared-target composition (REQ-04); one strict marker parser/splice primitive (REQ-05); and direct same-change cutover with no adapter, dual-write, fallback engine, temporary compatibility surface, or duplicated source-of-truth inventory remaining (REQ-09).\n\nDistilled §2 contracts: research-to-final vocabulary and the staged one-landing execution discipline; the complete cumulative stack and final main integration. See `dev/active/cdc840ad-plan.md` §2 and §4, and plan decisions D1, D10, D16 for full detail.\n\n## Success Criteria\n\n- [hard] REQ-01: The rebased stack contains no adapter/flag/re-export/temporary API, old publisher, alias, partial-root path, or deferred cleanup.\n- [hard] REQ-02: Full Rust/web/MCP/docs/schema/security gates and all §2 structural scans pass on the exact merge candidate.\n- [hard] REQ-03: Main observes one transition from old to complete new architecture; no package commit was merged or released independently.\n\n## Constraints\n\n- Rebase on current main; one clean transition. No Group A package is merged or released independently.\n- Full gates and all §2 structural scans pass on the exact merge candidate.\n- This leaf alone carries accountability for container criteria REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, and REQ-09.\n- Out of scope (plan D19/D20): lease credential/claim-log/claim-command redesign and worktree/data-root binding redesign — the claim and lease surface lands unchanged apart from repository-side issue/event synchronization.\n\nBlast radius: the complete cumulative stack and final main integration; this leaf alone owns REQ-01..05/09 accountability.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "npm-ci",
+    "mcp-ci",
+    "docs-mechanical",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:repository-materialization",
+    "satisfies:REQ-01",
+    "satisfies:REQ-02",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05",
+    "satisfies:REQ-09",
+    "component:cli",
+    "component:storage",
+    "component:validation"
+  ],
+  "created_at": "2026-07-18T14:38:31.957278678Z",
+  "updated_at": "2026-07-18T14:38:32.097771940Z",
+  "first_ready_at": "2026-07-18T14:38:31.957279398Z"
+}
