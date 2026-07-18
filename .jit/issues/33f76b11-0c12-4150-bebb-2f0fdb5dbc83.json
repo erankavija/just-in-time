@@ -19,7 +19,29 @@
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/c639cfb5-investigation.md",
+      "commit": null,
+      "label": "Current-system investigation",
+      "doc_type": "research",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/active/c639cfb5-research.md",
+      "commit": null,
+      "label": null,
+      "doc_type": "research",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/active/c639cfb5-plan.md",
+      "commit": null,
+      "label": "Implementation plan",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "epic:jit-profiles-complete",
     "milestone:v1.1",
@@ -29,6 +51,6 @@
     "type:planning"
   ],
   "created_at": "2026-07-18T09:28:56.124408965Z",
-  "updated_at": "2026-07-18T09:28:56.227843251Z",
+  "updated_at": "2026-07-18T09:58:25.950776761Z",
   "first_ready_at": "2026-07-18T09:28:56.124409415Z"
 }
