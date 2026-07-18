@@ -1,6 +1,6 @@
 //! Closed repository images, bounded capture declarations, and exact deltas.
 
-use super::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
+use super::{RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, VirtualPath};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -459,6 +459,16 @@ impl CaptureSpec {
     }
 
     fn validate(&self) -> Result<(), CaptureError> {
+        // Phase one reads only fixed `Data(...)` declaration roots; every Worktree
+        // path (documents, projection targets, linked-worktree reads) is enqueued
+        // in phase two, never in the fixed set.
+        if let Some(path) = self
+            .fixed
+            .iter()
+            .find(|path| path.root_class() != RepositoryRootClass::Data)
+        {
+            return Err(CaptureError::PhaseOneRequiresDataPath(path.clone()));
+        }
         if self.discovered.iter().any(|path| self.fixed.contains(path)) {
             return Err(CaptureError::DuplicateCapturePath);
         }
@@ -831,12 +841,77 @@ impl TargetClaim {
 }
 
 /// Exact expected preimage for a delta action.
+///
+/// Mirrors the captured [`RepositoryEntry`] kinds so a preimage distinguishes an
+/// absent path, an ordinary file (identity + mode), a directory, a symlink
+/// (identity + payload), and an occupant unsafe for mutation — the kinds the plan
+/// delta vocabulary enumerates. A later publication boundary verifies this
+/// preimage against the live occupant before applying the action.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum ExpectedPreimage {
     /// Path must remain absent.
     Absent,
-    /// Exact captured occupant identity.
-    Present(EntryIdentity),
+    /// An ordinary file with exact identity and mode.
+    File {
+        /// Exact entry identity (object, content hash, byte size).
+        identity: EntryIdentity,
+        /// Normalized file mode.
+        mode: FileMode,
+    },
+    /// A directory occupant.
+    Directory {
+        /// Exact directory identity.
+        identity: EntryIdentity,
+    },
+    /// A symbolic link with exact payload, never followed.
+    Symlink {
+        /// Exact link identity.
+        identity: EntryIdentity,
+        /// Exact link payload.
+        target: Vec<u8>,
+    },
+    /// An occupant unsafe for semantic mutation.
+    Unsupported {
+        /// Exact occupant identity.
+        identity: EntryIdentity,
+        /// Stable diagnostic.
+        reason: String,
+    },
+}
+
+impl ExpectedPreimage {
+    /// The expected preimage matching a captured occupant, kind for kind.
+    pub fn of(entry: &RepositoryEntry) -> Self {
+        match entry {
+            RepositoryEntry::Absent => Self::Absent,
+            RepositoryEntry::File { identity, mode, .. } => Self::File {
+                identity: identity.clone(),
+                mode: *mode,
+            },
+            RepositoryEntry::Directory { identity } => Self::Directory {
+                identity: identity.clone(),
+            },
+            RepositoryEntry::Symlink { identity, target } => Self::Symlink {
+                identity: identity.clone(),
+                target: target.clone(),
+            },
+            RepositoryEntry::Unsupported { identity, reason } => Self::Unsupported {
+                identity: identity.clone(),
+                reason: reason.clone(),
+            },
+        }
+    }
+
+    /// Exact identity when the preimage expects an occupant (`None` for absent).
+    pub fn identity(&self) -> Option<&EntryIdentity> {
+        match self {
+            Self::Absent => None,
+            Self::File { identity, .. }
+            | Self::Directory { identity }
+            | Self::Symlink { identity, .. }
+            | Self::Unsupported { identity, .. } => Some(identity),
+        }
+    }
 }
 
 /// One exact repository-state action.
@@ -930,7 +1005,7 @@ fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
         } => (owner, expected),
     };
     validate_owner(owner)?;
-    if let ExpectedPreimage::Present(identity) = expected {
+    if let Some(identity) = expected.identity() {
         identity
             .validate()
             .map_err(|error| DeltaError::InvalidAction(error.to_string()))?;
@@ -940,23 +1015,29 @@ fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
             expected: ExpectedPreimage::Absent,
             ..
         }
-        | RepositoryAction::WriteFile { .. }
+        | RepositoryAction::WriteFile {
+            expected: ExpectedPreimage::Absent | ExpectedPreimage::File { .. },
+            ..
+        }
         | RepositoryAction::SetMode {
-            expected: ExpectedPreimage::Present(_),
+            expected: ExpectedPreimage::File { .. },
             ..
         }
         | RepositoryAction::DeleteFile {
-            expected: ExpectedPreimage::Present(_),
+            expected: ExpectedPreimage::File { .. },
             ..
         } => Ok(()),
         RepositoryAction::CreateDirectory { .. } => Err(DeltaError::InvalidAction(
             "directory creation requires an absent preimage".into(),
         )),
+        RepositoryAction::WriteFile { .. } => Err(DeltaError::InvalidAction(
+            "file write requires an absent or file preimage".into(),
+        )),
         RepositoryAction::SetMode { .. } => Err(DeltaError::InvalidAction(
-            "mode changes require a present preimage".into(),
+            "mode changes require a file preimage".into(),
         )),
         RepositoryAction::DeleteFile { .. } => Err(DeltaError::InvalidAction(
-            "file deletion requires a present preimage".into(),
+            "file deletion requires a file preimage".into(),
         )),
     }
 }
@@ -1019,6 +1100,8 @@ pub enum CaptureError {
     DepthBudgetExceeded(VirtualPath),
     #[error("capture spec contains the same path in fixed and discovered sets")]
     DuplicateCapturePath,
+    #[error("phase-one fixed capture requires a Data path, got {0:?}")]
+    PhaseOneRequiresDataPath(VirtualPath),
     #[error("capture did not provide requested path {0:?}")]
     IncompleteCapture(VirtualPath),
     #[error("capture provided unrequested path {0:?}")]
@@ -1355,6 +1438,89 @@ mod tests {
     }
 
     #[test]
+    fn test_phase_one_requires_data_fixed_paths() {
+        let budget = CaptureBudget {
+            max_paths: 8,
+            max_listings: 2,
+            max_bytes: 64,
+            max_depth: 4,
+        };
+        // A Worktree path in the phase-one fixed set is rejected: only Data
+        // declaration roots are read in phase one; Worktree paths enter phase two.
+        assert!(matches!(
+            CaptureSpec::phase_one([VirtualPath::worktree("docs/plan.md").unwrap()], budget),
+            Err(CaptureError::PhaseOneRequiresDataPath(_))
+        ));
+        // A Data fixed path is accepted.
+        assert!(
+            CaptureSpec::phase_one([VirtualPath::data("config.toml").unwrap()], budget).is_ok()
+        );
+    }
+
+    #[test]
+    fn test_expected_preimage_distinguishes_kinds_and_gates_actions() {
+        let identity = EntryIdentity::for_bytes("occupant", b"bytes").unwrap();
+        // The preimage mirrors the captured entry kind for kind.
+        assert_eq!(
+            ExpectedPreimage::of(&RepositoryEntry::Directory {
+                identity: identity.clone(),
+            }),
+            ExpectedPreimage::Directory {
+                identity: identity.clone(),
+            }
+        );
+        assert!(ExpectedPreimage::Absent.identity().is_none());
+        assert!(ExpectedPreimage::Directory {
+            identity: identity.clone(),
+        }
+        .identity()
+        .is_some());
+
+        // SetMode and DeleteFile require a File preimage; a Directory preimage is
+        // rejected, so the delta vocabulary distinguishes the kinds.
+        let target = VirtualPath::data("occupant").unwrap();
+        let directory = ExpectedPreimage::Directory {
+            identity: identity.clone(),
+        };
+        assert!(matches!(
+            RepositoryDelta::new(
+                &layout(),
+                vec![RepositoryAction::DeleteFile {
+                    path: target.clone(),
+                    owner: "delete".into(),
+                    expected: directory.clone(),
+                }],
+            ),
+            Err(DeltaError::InvalidAction(_))
+        ));
+        assert!(matches!(
+            RepositoryDelta::new(
+                &layout(),
+                vec![RepositoryAction::SetMode {
+                    path: target.clone(),
+                    owner: "mode".into(),
+                    expected: directory,
+                    mode: FileMode::Executable,
+                }],
+            ),
+            Err(DeltaError::InvalidAction(_))
+        ));
+        // A File preimage is accepted.
+        assert!(RepositoryDelta::new(
+            &layout(),
+            vec![RepositoryAction::DeleteFile {
+                path: target,
+                owner: "delete".into(),
+                expected: ExpectedPreimage::File {
+                    identity,
+                    mode: FileMode::Regular,
+                },
+            }],
+        )
+        .is_ok());
+    }
+
+    #[test]
     fn test_evidence_seed_and_delta_constructors_reject_invalid_state() {
         assert!(matches!(
             EntryIdentity::for_bytes("", b"bytes"),
@@ -1411,9 +1577,10 @@ mod tests {
                 vec![RepositoryAction::CreateDirectory {
                     path,
                     owner: "producer".into(),
-                    expected: ExpectedPreimage::Present(
-                        EntryIdentity::for_bytes("occupant", b"metadata").unwrap(),
-                    ),
+                    expected: ExpectedPreimage::File {
+                        identity: EntryIdentity::for_bytes("occupant", b"metadata").unwrap(),
+                        mode: FileMode::Regular,
+                    },
                 }],
             ),
             Err(DeltaError::InvalidAction(_))

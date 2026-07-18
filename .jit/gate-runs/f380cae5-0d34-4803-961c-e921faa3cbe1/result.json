@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_id": "f380cae5-0d34-4803-961c-e921faa3cbe1",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
+  "commit": "6f4f11ac9bf52c2588495bbfee335345b16489f1",
+  "branch": "integration/cdc840ad",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T19:57:10.005126776Z",
+  "completed_at": "2026-07-18T20:00:52.632185695Z",
+  "duration_ms": 222627,
+  "exit_code": 1,
+  "stdout": "--- incremental-state output ---\nnon-empty incremental directories under /home/vkaskivuo/.cache/jit-cdc840ad-verify:\n/home/vkaskivuo/.cache/jit-cdc840ad-verify/debug/incremental\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✓ test: 3631 passed, 0 failed, 14 ignored\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1151 bytes=19440221)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1062973520/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✗ incremental-state: FAILED (exit 1)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}

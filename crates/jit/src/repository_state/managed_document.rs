@@ -128,7 +128,7 @@ struct LocatedRegion<'a> {
 fn validate_regions<'a>(
     base: &[u8],
     regions: &'a [RegionClaim<'a>],
-) -> Result<Vec<RegionClaim<'a>>, ManagedDocumentError> {
+) -> Result<Vec<LocatedRegion<'a>>, ManagedDocumentError> {
     let mut identities = BTreeMap::<&str, &str>::new();
     let mut delimiter_owners = BTreeMap::<Vec<u8>, &str>::new();
     let located = regions
@@ -227,17 +227,23 @@ fn validate_regions<'a>(
         (None, Some(_)) => std::cmp::Ordering::Greater,
         (None, None) => left.claim.region_id.cmp(right.claim.region_id),
     });
-    Ok(ordered.into_iter().map(|region| region.claim).collect())
+    Ok(ordered)
 }
 
 fn apply_region(
     mut bytes: Vec<u8>,
-    claim: RegionClaim<'_>,
+    located: LocatedRegion<'_>,
 ) -> Result<Vec<u8>, ManagedDocumentError> {
+    let claim = located.claim;
+    // Whether the claim resolved to a region in the ORIGINAL base (validated by
+    // `validate_regions`), as opposed to being absent then. Positions may have
+    // shifted under earlier splices, but this presence fact is fixed.
+    let was_present = located.begin.is_some();
     let begins = find_all(&bytes, claim.begin);
     let ends = find_all(&bytes, claim.end);
     match (begins.as_slice(), ends.as_slice()) {
-        ([], []) if claim.placement == RegionPlacement::AppendIfAbsent => {
+        // Absent in the original base under an append policy: append at the tail.
+        ([], []) if !was_present && claim.placement == RegionPlacement::AppendIfAbsent => {
             if !bytes.is_empty() && !bytes.ends_with(b"\n") {
                 bytes.push(b'\n');
             }
@@ -247,6 +253,14 @@ fn apply_region(
             append_region(&mut bytes, claim);
             Ok(bytes)
         }
+        // Present in the original base but gone now: an already-applied outer
+        // region's replacement removed this claimed child. Reject the removal
+        // rather than silently re-appending the child as a top-level sibling
+        // (plan §2: "reject an outer replacement that removes a claimed child").
+        ([], []) if was_present => Err(ManagedDocumentError::ClaimedChildRemoved(
+            claim.region_id.to_string(),
+        )),
+        // Absent under a require-existing policy.
         ([], []) => Err(ManagedDocumentError::RequiredRegionAbsent(
             claim.region_id.to_string(),
         )),
@@ -325,6 +339,8 @@ pub enum ManagedDocumentError {
     CrossingRegions { first: String, second: String },
     #[error("managed region '{0}' changed containment during composition")]
     StructureChangedDuringComposition(String),
+    #[error("outer managed region removed claimed child region '{0}'")]
+    ClaimedChildRemoved(String),
 }
 
 #[cfg(test)]
@@ -422,6 +438,36 @@ mod tests {
         assert!(matches!(
             render_managed_document(b"", &bases),
             Err(ManagedDocumentError::CompetingBaseClaims(_))
+        ));
+    }
+
+    #[test]
+    fn test_outer_region_removing_claimed_child_is_rejected() {
+        // The inner child is PRESENT in the base but nested inside the outer
+        // region. The outer's replacement content omits the child's markers, so
+        // applying it deletes the child. An AppendIfAbsent child must NOT be
+        // silently re-appended as a top-level sibling — the removal is rejected
+        // (plan §2: reject an outer replacement that removes a claimed child).
+        let existing = b"<O>\nouter <I>old</I> tail\n</O>\n";
+        let outer = ManagedDocumentClaim::Region {
+            owner: "profile".into(),
+            region_id: "outer".into(),
+            begin: b"<O>".to_vec(),
+            end: b"</O>".to_vec(),
+            content: b"outer tail".to_vec(),
+            placement: RegionPlacement::RequireExisting,
+        };
+        let inner = ManagedDocumentClaim::Region {
+            owner: "project".into(),
+            region_id: "inner".into(),
+            begin: b"<I>".to_vec(),
+            end: b"</I>".to_vec(),
+            content: b"new".to_vec(),
+            placement: RegionPlacement::AppendIfAbsent,
+        };
+        assert!(matches!(
+            render_managed_document(existing, &[outer, inner]),
+            Err(ManagedDocumentError::ClaimedChildRemoved(_))
         ));
     }
 }

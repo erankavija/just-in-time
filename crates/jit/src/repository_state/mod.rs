@@ -225,13 +225,19 @@ mod tests {
             RepositoryAction::SetMode {
                 path: target.clone(),
                 owner: "mode".into(),
-                expected: ExpectedPreimage::Present(occupant.clone()),
+                expected: ExpectedPreimage::File {
+                    identity: occupant.clone(),
+                    mode: FileMode::Regular,
+                },
                 mode: FileMode::Executable,
             },
             RepositoryAction::DeleteFile {
                 path: target.clone(),
                 owner: "delete".into(),
-                expected: ExpectedPreimage::Present(occupant),
+                expected: ExpectedPreimage::File {
+                    identity: occupant,
+                    mode: FileMode::Regular,
+                },
             },
         ];
 
@@ -310,12 +316,18 @@ mod tests {
                 RepositoryAction::DeleteFile {
                     path: delete.clone(),
                     owner: "delete".into(),
-                    expected: ExpectedPreimage::Present(delete_identity),
+                    expected: ExpectedPreimage::File {
+                        identity: delete_identity,
+                        mode: FileMode::Regular,
+                    },
                 },
                 RepositoryAction::SetMode {
                     path: set_mode.clone(),
                     owner: "mode".into(),
-                    expected: ExpectedPreimage::Present(mode_identity),
+                    expected: ExpectedPreimage::File {
+                        identity: mode_identity,
+                        mode: FileMode::Regular,
+                    },
                     mode: FileMode::Executable,
                 },
                 RepositoryAction::WriteFile {

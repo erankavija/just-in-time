@@ -20,10 +20,12 @@ use crate::config::{
 use std::collections::{BTreeMap, HashMap};
 
 /// Configuration components used by capture and materialization.
+///
+/// Exactly the plan-enumerated narrowed components — hierarchy, namespaces, item
+/// kinds, projections, documentation roots — and no whole-`JitConfig` field:
+/// every consumer takes the one component it needs.
 #[derive(Debug, Clone)]
 pub struct ConfigurationDeclarations {
-    /// Complete parsed config for consumers not yet narrowed to one component.
-    pub config: JitConfig,
     /// Type hierarchy declaration.
     pub hierarchy: Option<HierarchyConfigToml>,
     /// Label namespace declarations.
@@ -48,7 +50,6 @@ pub fn parse_configuration(
         item_kinds: config.item_kinds.clone().unwrap_or_default(),
         projections: config.projection.clone().unwrap_or_default(),
         documentation: config.documentation.clone(),
-        config,
     })
 }
 

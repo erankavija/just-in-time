@@ -4,15 +4,31 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::path::{Component, Path, PathBuf};
 
 /// A normalized path relative to one selected repository root.
+///
+/// [`Root`](RootRelativePath::Root) denotes the selected root itself;
+/// [`Descendant`](RootRelativePath::Descendant) holds a normalized, non-empty
+/// path strictly below it (no parent, prefix, control, or alternate-separator
+/// component). The root is a distinct variant, never an empty-string sentinel,
+/// so root-vs-descendant is a type-level distinction rather than a value test.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct RootRelativePath(String);
+pub enum RootRelativePath {
+    /// The selected repository root itself.
+    Root,
+    /// A normalized, non-empty path strictly below the selected root.
+    Descendant(String),
+}
 
 impl RootRelativePath {
     /// Parse a root-relative path without consulting the filesystem.
+    ///
+    /// Empty input denotes the root and yields [`RootRelativePath::Root`] through
+    /// its own branch; any other input is validated as a normalized
+    /// [`Descendant`](RootRelativePath::Descendant). The root is never minted as
+    /// an empty descendant.
     pub fn parse(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
         let path = path.as_ref();
         if path.as_os_str().is_empty() {
-            return Ok(Self(String::new()));
+            return Ok(Self::Root);
         }
         let text = path
             .to_str()
@@ -30,22 +46,31 @@ impl RootRelativePath {
         {
             return Err(RepositoryLayoutError::LexicalEscape(text.to_owned()));
         }
-        Ok(Self(text.to_owned()))
+        Ok(Self::Descendant(text.to_owned()))
     }
 
-    /// Return this identity as a relative filesystem path.
+    /// Return this identity as a relative filesystem path (empty for the root).
     pub fn as_path(&self) -> &Path {
-        Path::new(&self.0)
+        Path::new(self.as_str())
     }
 
-    /// Number of path components below the selected root.
+    /// This identity as a string. The root is the empty string, which is also
+    /// its stable serialized wire form.
+    pub(crate) fn as_str(&self) -> &str {
+        match self {
+            Self::Root => "",
+            Self::Descendant(text) => text,
+        }
+    }
+
+    /// Number of path components below the selected root (0 for the root).
     pub fn depth(&self) -> usize {
         self.as_path().components().count()
     }
 
     /// Whether this identity denotes the selected root itself.
     pub fn is_root(&self) -> bool {
-        self.0.is_empty()
+        matches!(self, Self::Root)
     }
 }
 
@@ -54,7 +79,7 @@ impl Serialize for RootRelativePath {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.0)
+        serializer.serialize_str(self.as_str())
     }
 }
 
@@ -117,7 +142,7 @@ impl VirtualPath {
     }
 
     fn checked(self) -> Result<Self, RepositoryLayoutError> {
-        let path = &self.relative.0;
+        let path = self.relative.as_str();
         let reserved = match self.root {
             RepositoryRootClass::Worktree => {
                 path == ".jit-bootstrap" || path.starts_with(".jit-bootstrap/")
@@ -210,7 +235,7 @@ impl RepositoryLayout {
             .map(RootRelativePath::parse)
             .transpose()?;
         if let Some(relative) = &nested_data_relative {
-            let path = relative.0.as_str();
+            let path = relative.as_str();
             if path == ".jit-bootstrap" || path.starts_with(".jit-bootstrap/") {
                 return Err(RepositoryLayoutError::ReservedTransactionPath(
                     VirtualPath::worktree(path)?,
@@ -303,8 +328,8 @@ impl RepositoryLayout {
         path.ensure_semantic()?;
         if path.root_class() == RepositoryRootClass::Worktree {
             if let Some(prefix) = &self.nested_data_relative {
-                let prefix = &prefix.0;
-                let relative = &path.relative.0;
+                let prefix = prefix.as_str();
+                let relative = path.relative.as_str();
                 if relative == prefix || relative.starts_with(&format!("{prefix}/")) {
                     return Err(RepositoryLayoutError::DataRootAlias(path.clone()));
                 }
@@ -548,5 +573,32 @@ mod tests {
         });
         let error = deserialize_path(&layout, encoded).unwrap_err();
         assert!(error.to_string().contains("aliases the selected data root"));
+    }
+
+    #[test]
+    fn test_root_relative_path_uses_variant_not_empty_string_sentinel() {
+        // Empty input is the root, built as the distinct `Root` variant, not an
+        // empty descendant string; a non-empty path is a `Descendant`.
+        assert_eq!(RootRelativePath::parse("").unwrap(), RootRelativePath::Root);
+        assert!(RootRelativePath::parse("").unwrap().is_root());
+        match RootRelativePath::parse("issues/one.json").unwrap() {
+            RootRelativePath::Descendant(text) => assert_eq!(text, "issues/one.json"),
+            RootRelativePath::Root => panic!("a non-empty path must be a descendant"),
+        }
+        assert!(!RootRelativePath::parse("issues/one.json")
+            .unwrap()
+            .is_root());
+        // Depth is 0 for the root and the component count for a descendant.
+        assert_eq!(RootRelativePath::Root.depth(), 0);
+        assert_eq!(RootRelativePath::parse("a/b").unwrap().depth(), 2);
+        // The root's stable serialized wire form remains the empty string.
+        assert_eq!(
+            serde_json::to_string(&RootRelativePath::Root).unwrap(),
+            "\"\""
+        );
+        assert_eq!(
+            serde_json::from_str::<RootRelativePath>("\"\"").unwrap(),
+            RootRelativePath::Root
+        );
     }
 }
