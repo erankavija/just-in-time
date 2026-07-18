@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use jit::commands::CommandExecutor;
-use jit::domain::{Gate, Issue, Priority, State as IssueState};
+use jit::declarations::GateDefinition as Gate;
+use jit::domain::{Issue, Priority, State as IssueState};
 use jit::graph::hierarchy::NodeHierarchy;
 use jit::output::GateRunSummary;
 use jit::search::{SearchOptions, SearchResult};

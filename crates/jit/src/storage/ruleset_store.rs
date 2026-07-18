@@ -7,8 +7,8 @@
 //! through the shared atomic writer ([`crate::storage::atomic_write`]),
 //! preserving the temp-file + rename invariant.
 
+use crate::declarations::rules::DEFAULT_ORIGIN;
 use crate::storage::atomic_write::write_file_atomic;
-use crate::validation::rules::DEFAULT_ORIGIN;
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::path::Path;
@@ -197,7 +197,7 @@ pub fn rewrite_rules_header(jit_root: &Path, header: &str) -> Result<bool> {
 /// Minimal per-rule identity read off a `[[rules]]` block: just enough
 /// (`name`, `origin`) to compute the membership diff that drives
 /// [`sync_namespace_unique_rules`], without pulling in the full `assert`-table
-/// deserialization [`crate::validation::rules::RuleSet`] performs (which
+/// deserialization [`crate::declarations::rules::RuleSet`] performs (which
 /// resolves schema files and is unnecessary — and unnecessarily fragile — for a
 /// membership sync that never inspects a rule's assertion).
 #[derive(Debug, Deserialize)]
@@ -218,7 +218,7 @@ struct RuleIdentitiesFile {
 ///
 /// Identity-only parsing: assertion tables are never deserialized and schema
 /// references never resolved, so this succeeds on a file whose full
-/// [`RuleSet`](crate::validation::rules::RuleSet) load would fail on a custom
+/// [`RuleSet`](crate::declarations::rules::RuleSet) load would fail on a custom
 /// rule — the membership write-through must not be strandable by an unrelated
 /// rule's defect (jit:d74a9ed1 review F1). Returns an empty list when the file
 /// is absent.

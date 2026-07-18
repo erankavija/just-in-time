@@ -1,9 +1,9 @@
 //! Gate checking and execution operations
 
 use super::*;
+use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
 use crate::domain::{
-    GateContext, GateFinding, GateFindings, GateMode, GateRunResult, GateRunStatus, GateStage,
-    GateStatus, REVIEW_PLACEHOLDER_WARNING,
+    GateContext, GateFinding, GateFindings, GateRunResult, GateRunStatus, GateStatus,
 };
 use crate::errors::TransitionBlockedError;
 use crate::gate_execution;
@@ -49,7 +49,7 @@ fn omit_current_gate_projection(issue: &mut serde_json::Value, gate_key: &str) {
 fn gate_findings_from_rule_report(
     report: &crate::validation::report::RuleReport,
 ) -> Vec<GateFinding> {
-    use crate::validation::rules::Severity;
+    use crate::declarations::rules::Severity;
 
     report
         .findings
@@ -260,7 +260,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // via `JIT_GATE_RUN` (see `gate_execution::execute_gate_checker_with_context`
         // and the binary crate's startup dispatch). See `domain::build_provenance`
         // for the identity predicate (REQ-03) and the warn-vs-fail rationale.
-        if matches!(checker, crate::domain::GateChecker::Exec { .. }) {
+        if matches!(checker, crate::declarations::GateChecker::Exec { .. }) {
             if let Some(reason) = self.stale_binary_reason() {
                 return Err(
                     crate::errors::StaleBinaryError::new(&full_id, gate_key, &reason).into(),
@@ -269,7 +269,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         let working_dir = match checker {
-            crate::domain::GateChecker::Exec {
+            crate::declarations::GateChecker::Exec {
                 working_dir: Some(subdir),
                 ..
             } => repo_root.join(subdir),
@@ -280,17 +280,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         let context = self.build_gate_context(checker, &full_id, gate_key, gate, &repo_root)?;
 
         let result = match checker {
-            crate::domain::GateChecker::Exec { .. } => self.storage.run_external_process(|| {
-                gate_execution::execute_gate_checker_with_context(
-                    gate_key,
-                    &full_id,
-                    gate.stage,
-                    checker,
-                    &working_dir,
-                    context.as_ref(),
-                    &issue.documents,
-                )
-            })?,
+            crate::declarations::GateChecker::Exec { .. } => {
+                self.storage.run_external_process(|| {
+                    gate_execution::execute_gate_checker_with_context(
+                        gate_key,
+                        &full_id,
+                        gate.stage,
+                        checker,
+                        &working_dir,
+                        context.as_ref(),
+                        &issue.documents,
+                    )
+                })?
+            }
             _ => self.execute_builtin_checker(gate_key, &full_id, gate.stage, checker)?,
         };
 
@@ -339,7 +341,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         gate_key: &str,
         issue_id: &str,
         stage: GateStage,
-        checker: &crate::domain::GateChecker,
+        checker: &crate::declarations::GateChecker,
     ) -> Result<GateRunResult> {
         self.execute_builtin_checker_with_repository_view(gate_key, issue_id, stage, checker, None)
     }
@@ -356,10 +358,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         gate_key: &str,
         issue_id: &str,
         stage: GateStage,
-        checker: &crate::domain::GateChecker,
+        checker: &crate::declarations::GateChecker,
         repository_view: Option<&dyn crate::validation::repository::RepositoryView>,
     ) -> Result<GateRunResult> {
-        use crate::domain::GateChecker;
+        use crate::declarations::GateChecker;
         use crate::validation::report::RuleReport;
 
         if repository_view.is_some() && !matches!(checker, GateChecker::RepositoryValidation) {
@@ -572,14 +574,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns `None` if the checker does not request context.
     fn build_gate_context(
         &self,
-        checker: &crate::domain::GateChecker,
+        checker: &crate::declarations::GateChecker,
         issue_id: &str,
         gate_key: &str,
-        gate: &crate::domain::Gate,
+        gate: &crate::declarations::GateDefinition,
         repo_root: &std::path::Path,
     ) -> Result<Option<GateContext>> {
         let (pass_context, prompt, prompt_file) = match checker {
-            crate::domain::GateChecker::Exec {
+            crate::declarations::GateChecker::Exec {
                 pass_context,
                 prompt,
                 prompt_file,
@@ -848,9 +850,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 mod tests {
     use super::{compact_run_history_for_context, omit_current_gate_projection};
     use crate::commands::CommandExecutor;
+    use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::domain::{
-        GateChecker, GateFindings, GateMode, GateRunResult, GateRunStatus, GateStage, State,
-        GATE_RUN_SCHEMA_VERSION,
+        GateFindings, GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION,
     };
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage};
     use crate::validation::repository::{FilesystemRepositoryView, OverlayRepositoryView};
@@ -868,7 +870,7 @@ mod tests {
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             gate_key.to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: gate_key.to_string(),
                 title: "Portable check".to_string(),
@@ -1008,7 +1010,7 @@ enforce_leases = "off"
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "test-gate".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "test-gate".to_string(),
                 title: "Test Gate".to_string(),
@@ -1315,7 +1317,7 @@ assert = { require-section = { heading = "Summary" } }
         assert_eq!(findings[0].rule, crate::commands::REVIEW_PLACEHOLDER_RULE);
         assert_eq!(
             findings[0].severity,
-            crate::validation::rules::Severity::Warn
+            crate::declarations::rules::Severity::Warn
         );
         assert!(findings[0].message.contains("a-review, z-review"));
     }
@@ -1383,7 +1385,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "failing-gate".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "failing-gate".to_string(),
                 title: "Failing Gate".to_string(),
@@ -1435,7 +1437,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "manual-gate".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "manual-gate".to_string(),
                 title: "Manual Gate".to_string(),
@@ -1474,7 +1476,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "auto-gate".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "auto-gate".to_string(),
                 title: "Auto".to_string(),
@@ -1498,7 +1500,7 @@ assert = { require-section = { heading = "Summary" } }
         );
         registry.gates.insert(
             "manual-gate".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "manual-gate".to_string(),
                 title: "Manual".to_string(),
@@ -1573,7 +1575,7 @@ assert = { require-section = { heading = "Summary" } }
         for (key, exit_code) in [("gate-1", 0), ("gate-2", 0)] {
             registry.gates.insert(
                 key.to_string(),
-                crate::domain::Gate {
+                crate::declarations::GateDefinition {
                     version: 1,
                     key: key.to_string(),
                     title: format!("Gate {}", key),
@@ -1650,7 +1652,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "precheck".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "precheck".to_string(),
                 title: "Precheck".to_string(),
@@ -1704,7 +1706,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "precheck-fail".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "precheck-fail".to_string(),
                 title: "Precheck".to_string(),
@@ -1755,7 +1757,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "postcheck".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "postcheck".to_string(),
                 title: "Postcheck".to_string(),
@@ -1809,7 +1811,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "postcheck-fail".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "postcheck-fail".to_string(),
                 title: "Postcheck".to_string(),
@@ -1863,7 +1865,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "review".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "review".to_string(),
                 title: "Code Review".to_string(),
@@ -1941,7 +1943,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "review".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "review".to_string(),
                 title: "Code Review".to_string(),
@@ -1993,7 +1995,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "review".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "review".to_string(),
                 title: "Code Review".to_string(),
@@ -2069,7 +2071,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "review".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "review".to_string(),
                 title: "Review".to_string(),
@@ -2116,7 +2118,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "review".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "review".to_string(),
                 title: "Review".to_string(),
@@ -2174,7 +2176,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "review".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "review".to_string(),
                 title: "Review".to_string(),
@@ -2223,7 +2225,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "test-gate".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "test-gate".to_string(),
                 title: "Test Gate".to_string(),
@@ -2270,7 +2272,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "test-gate".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "test-gate".to_string(),
                 title: "Test Gate".to_string(),
@@ -2334,7 +2336,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "test-gate".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "test-gate".to_string(),
                 title: "Test Gate".to_string(),
@@ -2404,7 +2406,7 @@ assert = { require-section = { heading = "Summary" } }
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "review".to_string(),
-            crate::domain::Gate {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: "review".to_string(),
                 title: "Code Review".to_string(),
@@ -2453,7 +2455,7 @@ assert = { require-section = { heading = "Summary" } }
         for (key, priority) in [("gate-p30", 30u32), ("gate-p10", 10), ("gate-p20", 20)] {
             registry.gates.insert(
                 key.to_string(),
-                crate::domain::Gate {
+                crate::declarations::GateDefinition {
                     version: 1,
                     key: key.to_string(),
                     title: format!("Gate {}", key),
@@ -2514,7 +2516,7 @@ assert = { require-section = { heading = "Summary" } }
         for key in ["alpha", "beta", "gamma"] {
             registry.gates.insert(
                 key.to_string(),
-                crate::domain::Gate {
+                crate::declarations::GateDefinition {
                     version: 1,
                     key: key.to_string(),
                     title: format!("Gate {}", key),
@@ -2574,12 +2576,12 @@ assert = { require-section = { heading = "Summary" } }
             "example_integration": null
         }"#;
 
-        let gate: crate::domain::Gate = serde_json::from_str(json).unwrap();
+        let gate: crate::declarations::GateDefinition = serde_json::from_str(json).unwrap();
         assert_eq!(gate.priority, 100);
     }
 
-    fn make_auto_gate(key: &str, command: &str) -> crate::domain::Gate {
-        crate::domain::Gate {
+    fn make_auto_gate(key: &str, command: &str) -> crate::declarations::GateDefinition {
+        crate::declarations::GateDefinition {
             version: 1,
             key: key.to_string(),
             title: key.to_string(),

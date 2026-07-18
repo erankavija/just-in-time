@@ -1,7 +1,7 @@
 //! Global validation strictness: the enforcement modulator layered on top of
 //! each rule's per-rule `enforce` flag and `severity`.
 //!
-//! A rule already carries a [`Severity`](crate::validation::rules::Severity) and
+//! A rule already carries a [`Severity`](crate::declarations::rules::Severity) and
 //! an `enforce` flag; together they decide, per rule, whether a violation blocks
 //! a write or transition (only an `enforce = true` / `error` finding blocks). The
 //! repository-wide `[validation].strictness` key ([`Strictness`]) modulates that
@@ -23,8 +23,8 @@
 
 use std::str::FromStr;
 
+use crate::declarations::rules::Severity;
 use crate::errors::InvalidArgumentError;
-use crate::validation::rules::Severity;
 
 /// Repository-wide enforcement modulator from `[validation].strictness`.
 ///

@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use crate::commands::CommandExecutor;
-    use crate::domain::{GateChecker, GateMode, GateStage};
+    use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::storage::{InMemoryStorage, IssueStore};
     use std::collections::HashMap;
 

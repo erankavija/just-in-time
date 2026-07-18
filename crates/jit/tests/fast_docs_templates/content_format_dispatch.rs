@@ -21,11 +21,11 @@
 //!   absent->markdown cases.
 //! - `--features xml`: the XML analogue.
 
+use jit::declarations::rules::RuleSet;
 use jit::domain::{ContentFormat, Issue};
 use jit::validation::local::evaluate_local;
 #[cfg(any(not(feature = "html"), not(feature = "xml")))]
 use jit::validation::local::LocalEvalError;
-use jit::validation::rules::RuleSet;
 use std::path::Path;
 
 /// A `require-section` rule (enforce/error) keyed on epics: the issue MUST have a

@@ -14,7 +14,7 @@
 //!   ANY item kind with no dedicated code;
 //! - [`render_invariants_markdown`] — the built-in `full` render of the invariant
 //!   registry (the rule + gate `full` render lives in
-//!   [`rules_gates_projection`](crate::validation::rules_gates_projection));
+//!   [`rules_gates_projection`](crate::declarations::rules_gates_projection));
 //! - [`splice_region`] — the PURE region splice; and
 //! - [`require_target`] — resolve a projection's REQUIRED `target`, naming the
 //!   projection on omission (no default is applied, REQ-07).

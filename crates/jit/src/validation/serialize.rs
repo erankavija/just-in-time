@@ -1,7 +1,7 @@
 //! Serialize a [`RuleSet`] back to `.jit/rules.toml` text plus its referenced
 //! `.jit/schemas/*.json` files (DR §8.2, decision D4).
 //!
-//! This is the inverse of the [`rules`](crate::validation::rules) loader: it
+//! This is the inverse of the [`rules`](crate::declarations::rules) loader: it
 //! renders an arbitrary in-memory [`RuleSet`] (typically the built-in
 //! [`default_ruleset`](crate::validation::defaults::default_ruleset)) into a
 //! complete, reloadable `rules.toml`. This module produces CONTENT only and
@@ -28,14 +28,14 @@
 //!
 //! # Round-trip contract
 //!
-//! Re-loading the emitted file with [`RuleSet::load`](crate::validation::rules::RuleSet::load)
+//! Re-loading the emitted file with [`RuleSet::load`](crate::declarations::rules::RuleSet::load)
 //! reproduces every rule field — name, origin, selector, severity, enforce,
 //! assertion kind, and (for JSON Schema) the parsed schema VALUE — EXCEPT the
-//! [`SchemaSource`](crate::validation::rules::SchemaSource) `reference`/`path`,
+//! [`SchemaSource`](crate::declarations::rules::SchemaSource) `reference`/`path`,
 //! which necessarily change from the in-code placeholder to the on-disk file
 //! reference. The round-trip test compares field-wise, excluding those two.
 
-use crate::validation::rules::{Assertion, Rule, RuleSet, Selector, TypeHierarchyKind};
+use crate::declarations::rules::{Assertion, Rule, RuleSet, Selector, TypeHierarchyKind};
 use std::collections::HashSet;
 
 /// A `rules.toml` body together with the schema files it references.
@@ -477,9 +477,9 @@ pub(crate) fn toml_literal_string(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::declarations::rules::{RuleScope, RuleSet, Severity};
     use crate::domain::{LabelNamespace, LabelNamespaces};
     use crate::validation::defaults::default_ruleset;
-    use crate::validation::rules::{RuleScope, RuleSet, Severity};
     use std::collections::HashMap;
     use std::path::Path;
 

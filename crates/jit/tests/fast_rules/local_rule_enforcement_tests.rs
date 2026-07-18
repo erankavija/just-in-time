@@ -815,11 +815,11 @@ impl IssueStore for FailingSaveStorage {
         self.inner.list_issues()
     }
 
-    fn load_gate_registry(&self) -> anyhow::Result<jit::storage::GateRegistry> {
+    fn load_gate_registry(&self) -> anyhow::Result<jit::declarations::GateRegistry> {
         self.inner.load_gate_registry()
     }
 
-    fn save_gate_registry(&self, registry: &jit::storage::GateRegistry) -> anyhow::Result<()> {
+    fn save_gate_registry(&self, registry: &jit::declarations::GateRegistry) -> anyhow::Result<()> {
         self.inner.save_gate_registry(registry)
     }
 

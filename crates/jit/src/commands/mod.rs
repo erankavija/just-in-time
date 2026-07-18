@@ -97,14 +97,14 @@ pub use crate::storage::worktree_identity::WorktreeIdentity;
 // Common imports used across modules
 use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
+use crate::declarations::rules::{RuleConfigError, RuleSet};
+use crate::declarations::{GateDefinition as Gate, GateMode};
 use crate::domain::{
-    is_dependency_met, Event, Gate, GateMode, GateState, GateStatus, Issue, LabelNamespaces,
-    Priority, State,
+    is_dependency_met, Event, GateState, GateStatus, Issue, LabelNamespaces, Priority, State,
 };
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
 use crate::storage::IssueStore;
-use crate::validation::rules::{RuleConfigError, RuleSet};
 // Type hierarchy validation (currently only validates type labels)
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
@@ -125,7 +125,7 @@ use std::sync::OnceLock;
 /// REQ-03).
 fn unpassed_gate_blockers(
     issue: &Issue,
-    registry: &crate::storage::GateRegistry,
+    registry: &crate::declarations::GateRegistry,
 ) -> Vec<(String, GateStatus, GateMode)> {
     issue
         .get_unpassed_gates()
@@ -870,14 +870,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         target: State,
         force: bool,
     ) -> Result<Vec<String>> {
+        use crate::declarations::rules::{RuleScope, Severity};
         use crate::validation::graph::evaluate_graph;
-        use crate::validation::rules::{RuleScope, Severity};
 
         let ruleset = self.effective_rules()?;
 
         // Graph rules that apply to THIS issue in its target state, minus the
         // repo-wide ones that cannot be evaluated correctly on a slice.
-        let rules: Vec<&crate::validation::rules::Rule> = ruleset
+        let rules: Vec<&crate::declarations::rules::Rule> = ruleset
             .rules
             .iter()
             .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
@@ -1456,8 +1456,8 @@ mod tests {
 
     #[test]
     fn test_rules_are_parsed_once_and_cached() {
+        use crate::declarations::rules::Assertion;
         use crate::storage::InMemoryStorage;
-        use crate::validation::rules::Assertion;
 
         let storage = InMemoryStorage::new();
         storage.init().unwrap();

@@ -48,7 +48,7 @@ use jsonschema::paths::Location;
 use jsonschema::{Draft, Keyword, ValidationError, Validator};
 use thiserror::Error;
 
-use crate::validation::rules::{Rule, Severity};
+use crate::declarations::rules::{Rule, Severity};
 
 /// Factory closure that constructs a custom-keyword [`Keyword`] validator.
 ///
@@ -141,7 +141,7 @@ pub struct SchemaCompileError {
 ///
 /// ```
 /// use jit::validation::engine::SchemaEngine;
-/// use jit::validation::rules::RuleSet;
+/// use jit::declarations::rules::RuleSet;
 ///
 /// // A schema requiring a `state` property; a projection missing it fails.
 /// let dir = tempfile::tempdir().unwrap();
@@ -234,7 +234,7 @@ impl SchemaEngine {
     ///
     /// ```
     /// use jit::validation::engine::SchemaEngine;
-    /// use jit::validation::rules::RuleSet;
+    /// use jit::declarations::rules::RuleSet;
     /// use jsonschema::{Keyword, ValidationError};
     ///
     /// // A custom keyword: the annotated string must not be empty.
@@ -318,8 +318,8 @@ impl SchemaEngine {
     /// compile surfaces as [`SchemaCompileError`]; a valid projection yields an
     /// empty `Vec`.
     ///
-    /// Only the schema embedded in a [`Rule::assert`](crate::validation::rules::Rule)
-    /// of kind [`Assertion::JsonSchema`](crate::validation::rules::Assertion::JsonSchema)
+    /// Only the schema embedded in a [`Rule::assert`](crate::declarations::rules::Rule)
+    /// of kind [`Assertion::JsonSchema`](crate::declarations::rules::Assertion::JsonSchema)
     /// is evaluated. Shorthand and graph assertion kinds carry no schema here and
     /// yield no findings; they are evaluated by their own downstream tasks.
     ///
@@ -327,7 +327,7 @@ impl SchemaEngine {
     ///
     /// ```
     /// use jit::validation::engine::SchemaEngine;
-    /// use jit::validation::rules::RuleSet;
+    /// use jit::declarations::rules::RuleSet;
     ///
     /// let dir = tempfile::tempdir().unwrap();
     /// let schemas = dir.path().join("schemas");
@@ -446,11 +446,11 @@ pub fn schema_key(schema: &serde_json::Value) -> String {
 
 /// Extract the JSON Schema a rule validates against, if it carries one.
 ///
-/// Only [`Assertion::JsonSchema`](crate::validation::rules::Assertion::JsonSchema)
+/// Only [`Assertion::JsonSchema`](crate::declarations::rules::Assertion::JsonSchema)
 /// carries a raw schema at this layer; shorthand kinds desugar to schemas in a
 /// downstream task, and graph kinds have no schema at all.
 fn rule_schema(rule: &Rule) -> Option<&serde_json::Value> {
-    use crate::validation::rules::Assertion;
+    use crate::declarations::rules::Assertion;
     match &rule.assert {
         Assertion::JsonSchema(source) => Some(&source.schema),
         _ => None,
@@ -906,8 +906,8 @@ pub(crate) const SECTION_HEADING_ANNOTATION: &str = "x-jit-section-heading";
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::declarations::rules::RuleSet;
     use crate::domain::State;
-    use crate::validation::rules::RuleSet;
     use std::path::Path;
     use tempfile::TempDir;
 
@@ -1066,7 +1066,7 @@ assert = { require-label = { label = "type:*" } }
         );
         let engine = SchemaEngine::new();
         let schema = match &set.rules[0].assert {
-            crate::validation::rules::Assertion::JsonSchema(s) => &s.schema,
+            crate::declarations::rules::Assertion::JsonSchema(s) => &s.schema,
             other => panic!("expected JsonSchema, got {other:?}"),
         };
 
@@ -1163,7 +1163,7 @@ assert = { json-schema = "schemas/b.json" }
         // bypassing the TOML loader (which would reject the duplicate name). Each
         // rule must validate against ITS OWN schema — no validator reuse across
         // the two schemas.
-        use crate::validation::rules::{Assertion, Rule, SchemaSource, Selector};
+        use crate::declarations::rules::{Assertion, Rule, SchemaSource, Selector};
         use std::path::PathBuf;
 
         // Rule one requires property "alpha"; rule two requires property "beta".
@@ -1180,7 +1180,7 @@ assert = { json-schema = "schemas/b.json" }
                 path: PathBuf::from("inline"),
                 schema: serde_json::json!({ "type": "object", "required": ["alpha"] }),
             }),
-            scope: crate::validation::rules::RuleScope::Local,
+            scope: crate::declarations::rules::RuleScope::Local,
         };
         let rule_beta = Rule {
             name: "dup".to_string(),
@@ -1194,7 +1194,7 @@ assert = { json-schema = "schemas/b.json" }
                 path: PathBuf::from("inline"),
                 schema: serde_json::json!({ "type": "object", "required": ["beta"] }),
             }),
-            scope: crate::validation::rules::RuleScope::Local,
+            scope: crate::declarations::rules::RuleScope::Local,
         };
         let set = RuleSet {
             rules: vec![rule_alpha, rule_beta],
@@ -1464,17 +1464,17 @@ assert = { json-schema = "schemas/b.json" }
             name: "title-non-empty".to_string(),
             origin: None,
             description: None,
-            when: crate::validation::rules::Selector::default(),
+            when: crate::declarations::rules::Selector::default(),
             severity: Severity::Error,
             enforce: false,
-            assert: crate::validation::rules::Assertion::JsonSchema(
-                crate::validation::rules::SchemaSource {
+            assert: crate::declarations::rules::Assertion::JsonSchema(
+                crate::declarations::rules::SchemaSource {
                     reference: "inline".to_string(),
                     path: std::path::PathBuf::from("inline"),
                     schema,
                 },
             ),
-            scope: crate::validation::rules::RuleScope::Local,
+            scope: crate::declarations::rules::RuleScope::Local,
         };
         let set = RuleSet { rules: vec![rule] };
 
@@ -1534,17 +1534,17 @@ assert = { json-schema = "schemas/b.json" }
             name: "title-non-empty".to_string(),
             origin: None,
             description: None,
-            when: crate::validation::rules::Selector::default(),
+            when: crate::declarations::rules::Selector::default(),
             severity: Severity::Error,
             enforce: false,
-            assert: crate::validation::rules::Assertion::JsonSchema(
-                crate::validation::rules::SchemaSource {
+            assert: crate::declarations::rules::Assertion::JsonSchema(
+                crate::declarations::rules::SchemaSource {
                     reference: "inline".to_string(),
                     path: std::path::PathBuf::from("inline"),
                     schema,
                 },
             ),
-            scope: crate::validation::rules::RuleScope::Local,
+            scope: crate::declarations::rules::RuleScope::Local,
         };
 
         // Warm the cache on an engine with NO custom keyword: the unknown
@@ -1611,7 +1611,7 @@ assert = { json-schema = "schemas/b.json" }
     }
 
     fn rule_for(schema: serde_json::Value) -> Rule {
-        use crate::validation::rules::{Assertion, SchemaSource, Selector};
+        use crate::declarations::rules::{Assertion, SchemaSource, Selector};
         Rule {
             name: "spec".to_string(),
             origin: None,
@@ -1624,7 +1624,7 @@ assert = { json-schema = "schemas/b.json" }
                 path: std::path::PathBuf::from("inline"),
                 schema,
             }),
-            scope: crate::validation::rules::RuleScope::Local,
+            scope: crate::declarations::rules::RuleScope::Local,
         }
     }
 

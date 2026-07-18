@@ -9,7 +9,8 @@
 
 use std::fmt;
 
-use crate::domain::{GateMode, GateStatus, Issue, State, SHORT_ID_LENGTH};
+use crate::declarations::GateMode;
+use crate::domain::{GateStatus, Issue, State, SHORT_ID_LENGTH};
 
 /// An error with diagnostic context and remediation steps.
 ///

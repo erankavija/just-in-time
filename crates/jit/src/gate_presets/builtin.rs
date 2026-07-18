@@ -55,7 +55,7 @@ impl BuiltinPresets {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::GateMode;
+    use crate::declarations::GateMode;
 
     #[test]
     fn test_load_builtin_presets() {

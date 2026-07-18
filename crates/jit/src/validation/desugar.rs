@@ -31,9 +31,9 @@
 
 use serde_json::{json, Value};
 
+use crate::declarations::rules::Assertion;
 use crate::document::slugify_heading;
 use crate::validation::engine::SECTION_HEADING_ANNOTATION;
-use crate::validation::rules::Assertion;
 
 /// Lower a shorthand [`Assertion`] to its equivalent JSON Schema (Draft 2020-12).
 ///
@@ -250,8 +250,10 @@ fn desugar_require_doc_type(doc_type: &str) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::declarations::rules::{
+        Assertion, Rule, RuleScope, SchemaSource, Selector, Severity,
+    };
     use crate::validation::engine::SchemaEngine;
-    use crate::validation::rules::{Assertion, Rule, RuleScope, SchemaSource, Selector, Severity};
     use serde_json::Value;
     use std::path::PathBuf;
 

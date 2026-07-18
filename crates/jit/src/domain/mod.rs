@@ -1,7 +1,8 @@
 //! Core domain types and operations for the issue tracker.
 //!
 //! This module provides the domain layer containing:
-//! - **types**: Core data structures (Issue, State, Priority, Gate, Event, etc.)
+//! - **types**: Core runtime records (Issue, State, Priority, GateState, Event, etc.);
+//!   authored gate/rule declarations live in crate-root [`crate::declarations`]
 //! - **projection**: Pure normalization of an Issue into the canonical validation shape
 //! - **item**: Addressable structured items (qualified ids, item kinds) projected
 //!   from issue descriptions

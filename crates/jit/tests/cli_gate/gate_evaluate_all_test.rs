@@ -194,7 +194,7 @@ fn test_evaluate_all_json_includes_native_placeholder_warning_per_gate() {
     assert_eq!(gates[0]["key"], "review-any-key");
     assert_eq!(
         gates[0]["warnings"],
-        serde_json::json!([jit::domain::REVIEW_PLACEHOLDER_WARNING])
+        serde_json::json!([jit::declarations::REVIEW_PLACEHOLDER_WARNING])
     );
 }
 

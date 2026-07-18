@@ -354,7 +354,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// plus the `satisfies-namespace` and `container-from-label` values of every
     /// `label-coverage` rule in the effective ruleset.
     fn identity_bound_namespaces(&self) -> Result<HashSet<String>> {
-        use crate::validation::rules::Assertion;
+        use crate::declarations::rules::Assertion;
 
         let mut namespaces: HashSet<String> = HashSet::new();
 

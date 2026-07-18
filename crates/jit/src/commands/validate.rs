@@ -286,7 +286,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// qualified id; a resolvable candidate (and a legacy unqualified label, and a
     /// non-link namespace) yields nothing.
     ///
-    /// The finding severity is [`Severity::Error`](crate::validation::rules::Severity::Error)
+    /// The finding severity is [`Severity::Error`](crate::declarations::rules::Severity::Error)
     /// so a dangling link fails `jit validate`. The rule name is the constant
     /// [`DANGLING_LINK_RULE`]. This pass touches no `.jit/` ruleset: it runs
     /// unconditionally as part of the validate path.
@@ -294,9 +294,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issues: &[Issue],
     ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
+        use crate::declarations::rules::Severity;
         use crate::validation::engine::Finding;
         use crate::validation::graph::GraphFinding;
-        use crate::validation::rules::Severity;
         use std::collections::BTreeSet;
 
         // Derive the link-namespace set generically from the configured kinds — no
@@ -362,7 +362,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`check_invariants`](crate::commands::CommandExecutor::check_invariants). The
     /// sole direction is **declared-but-unenforced** — an invariant whose
     /// `enforced-by` names a missing/unloadable rule or gate — emitted at
-    /// [`Severity::Error`](crate::validation::rules::Severity::Error), so it FAILS
+    /// [`Severity::Error`](crate::declarations::rules::Severity::Error), so it FAILS
     /// `jit validate` (the broken binding is a real defect). An unclaimed rule or
     /// gate is NOT drift (the enforced-but-undeclared direction was removed in
     /// REQ-05).
@@ -377,9 +377,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn enforcement_drift_findings(
         &self,
     ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
+        use crate::declarations::rules::Severity;
         use crate::validation::engine::Finding;
         use crate::validation::graph::GraphFinding;
-        use crate::validation::rules::Severity;
 
         let findings = self
             .compute_drift_findings()?
@@ -470,7 +470,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if rules_path.exists() {
             // Present: parse it directly (do NOT go through the cached
             // `effective_rules`, which `?`-errors). A parse failure -> unloadable.
-            crate::validation::rules::RuleSet::load(self.storage.root())
+            crate::declarations::rules::RuleSet::load(self.storage.root())
                 .ok()
                 .map(|set| set.rules.into_iter().map(|r| r.name).collect())
         } else {
@@ -493,7 +493,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// hard-rejected on a violation, so any `error` finding here fails validation.
     /// `warn` findings are never fatal.
     fn local_rules_error_message(&self, issues: &[Issue]) -> Result<Option<String>> {
-        use crate::validation::rules::Severity;
+        use crate::declarations::rules::Severity;
 
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
@@ -645,12 +645,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issues: &[Issue],
     ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
-        use crate::validation::rules::RuleScope;
+        use crate::declarations::rules::RuleScope;
 
         // Surface a misconfigured rules.toml instead of swallowing it.
         let ruleset = self.effective_rules()?;
 
-        let graph_rules: Vec<&crate::validation::rules::Rule> = ruleset
+        let graph_rules: Vec<&crate::declarations::rules::Rule> = ruleset
             .rules
             .iter()
             .filter(|rule| rule.scope == RuleScope::Graph)
@@ -859,7 +859,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     None,
                     &crate::validation::engine::Finding {
                         rule: "rules-file".to_string(),
-                        severity: crate::validation::rules::Severity::Error,
+                        severity: crate::declarations::rules::Severity::Error,
                         message: format!("config error: {e}"),
                     },
                 ));
@@ -959,10 +959,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn review_placeholder_findings(
         &self,
     ) -> Result<Vec<crate::validation::report::ReportedFinding>> {
-        use crate::domain::GateChecker;
+        use crate::declarations::rules::Severity;
+        use crate::declarations::GateChecker;
         use crate::validation::engine::Finding;
         use crate::validation::report::ReportedFinding;
-        use crate::validation::rules::Severity;
 
         let registry = self.storage.load_gate_registry()?;
         let mut keys: Vec<&str> = registry
@@ -1027,8 +1027,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         container_id: &str,
     ) -> Result<crate::validation::report::RuleReport> {
+        use crate::declarations::rules::{RuleScope, Severity};
         use crate::validation::report::{ReportedFinding, RuleReport};
-        use crate::validation::rules::{RuleScope, Severity};
 
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
@@ -1088,7 +1088,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // This mirrors `enforce_transition_graph_rules`' select-then-slice
         // precision, but membership here is the bracket subtree, not a
         // transition neighborhood.
-        let graph_rules: Vec<&crate::validation::rules::Rule> = ruleset
+        let graph_rules: Vec<&crate::declarations::rules::Rule> = ruleset
             .rules
             .iter()
             .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
@@ -1161,8 +1161,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns an error if `.jit/rules.toml` is malformed, the issue id cannot be
     /// resolved, or a matching local rule's schema fails to compile.
     pub fn explain_rules(&self, id: &str) -> Result<crate::validation::report::ExplainReport> {
+        use crate::declarations::rules::RuleScope;
         use crate::validation::report::{ExplainReport, RuleOutcome};
-        use crate::validation::rules::RuleScope;
 
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
@@ -1761,7 +1761,7 @@ pub(crate) fn planning_node_plan_path(planning: &Issue) -> Option<String> {
 fn graph_findings_error_message(
     findings: &[crate::validation::graph::GraphFinding],
 ) -> Option<String> {
-    use crate::validation::rules::Severity;
+    use crate::declarations::rules::Severity;
 
     let errors: Vec<&crate::validation::graph::GraphFinding> = findings
         .iter()
@@ -1803,7 +1803,7 @@ fn group_messages(
 ///
 /// An empty selector (matches everything) renders as `"*"`; otherwise the
 /// present dimensions are joined with `", "` (e.g. `"type=epic, state=ready"`).
-fn render_selector(selector: &crate::validation::rules::Selector) -> String {
+fn render_selector(selector: &crate::declarations::rules::Selector) -> String {
     let mut parts: Vec<String> = Vec::new();
     if let Some(t) = &selector.type_ {
         parts.push(format!("type={t}"));
@@ -2006,7 +2006,7 @@ mod tests {
 
     #[test]
     fn test_render_selector_state_single() {
-        use crate::validation::rules::{Selector, StatePredicate};
+        use crate::declarations::rules::{Selector, StatePredicate};
         let sel = Selector {
             type_: Some("epic".to_string()),
             state: Some(StatePredicate::single("in_progress")),
@@ -2017,7 +2017,7 @@ mod tests {
 
     #[test]
     fn test_render_selector_state_list_joins_with_pipe() {
-        use crate::validation::rules::{Selector, StatePredicate};
+        use crate::declarations::rules::{Selector, StatePredicate};
         let sel = Selector {
             state: Some(StatePredicate::list(["ready", "in_progress"])),
             ..Default::default()
@@ -2270,7 +2270,7 @@ description = \"Full Rust CI pipeline must pass.\"
         assert_eq!(findings[0].finding.rule, DANGLING_LINK_RULE);
         assert_eq!(
             findings[0].finding.severity,
-            crate::validation::rules::Severity::Error
+            crate::declarations::rules::Severity::Error
         );
         assert!(findings[0].finding.message.contains("BOGUS"));
         assert!(findings[0].finding.message.contains("dangling item link"));

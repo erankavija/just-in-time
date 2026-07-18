@@ -27,9 +27,9 @@
 
 use std::path::{Path, PathBuf};
 
+use jit::declarations::rules::{Rule, RuleScope, RuleSet};
 use jit::domain::{ContentFormat, Issue, State};
 use jit::validation::graph::{evaluate_graph, GraphFinding};
-use jit::validation::rules::{Rule, RuleScope, RuleSet};
 
 /// Absolute path to a `docs/examples/<name>` directory, resolved from the crate
 /// manifest dir so the test is independent of the working directory.
@@ -118,7 +118,7 @@ fn test_sdd_example_declares_preview_coverage_rule() {
         .find(|r| r.name == "sdd-coverage-preview")
         .expect("sdd example must define the preview coverage rule sdd-coverage-preview");
     assert_eq!(preview.scope, RuleScope::Graph);
-    assert_eq!(preview.severity, jit::validation::rules::Severity::Error);
+    assert_eq!(preview.severity, jit::declarations::rules::Severity::Error);
 
     // Structural assertions on the authored TOML: the preview rule is keyed on
     // the breakdown node and resolves its container via the brackets: label,

@@ -4,10 +4,9 @@
 //! allowing different backends (JSON files, SQLite, in-memory, etc.) to be used
 //! interchangeably.
 
+use crate::declarations::GateRegistry;
 use crate::domain::{Event, Issue};
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub mod artifact_discovery;
 pub mod artifact_mutation;
@@ -80,13 +79,6 @@ pub use warnings::StorageWarning;
 
 #[allow(unused_imports)] // Public API used only in tests, not in binary
 pub use memory::InMemoryStorage;
-
-/// Registry of all gate definitions
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GateRegistry {
-    /// Map of gate key to gate definition
-    pub gates: HashMap<String, crate::domain::Gate>,
-}
 
 /// Trait for storage backends that persist issues, gates, and events.
 ///
@@ -560,13 +552,13 @@ mod tests {
             assert_eq!(registry.gates.len(), 0);
 
             let mut new_registry = GateRegistry::default();
-            let gate = crate::domain::Gate {
+            let gate = crate::declarations::GateDefinition {
                 version: 1,
                 key: "test-gate".to_string(),
                 title: "Test Gate".to_string(),
                 description: "A test gate".to_string(),
-                stage: crate::domain::GateStage::Postcheck,
-                mode: crate::domain::GateMode::Manual,
+                stage: crate::declarations::GateStage::Postcheck,
+                mode: crate::declarations::GateMode::Manual,
                 checker: None,
                 priority: 100,
                 reserved: std::collections::HashMap::new(),

@@ -20,7 +20,7 @@
 //! - each transform `kind` is a supported [`TransformKind`];
 //! - the internal `depends_on` edges form a DAG (no cycle).
 //!
-//! Following the [`RuleSet::load`](crate::validation::rules::RuleSet::load)
+//! Following the [`RuleSet::load`](crate::declarations::rules::RuleSet::load)
 //! precedent: an absent `templates.toml` loads as an empty registry, and an
 //! invalid file fails at load with a descriptive [`TemplateConfigError`].
 //!

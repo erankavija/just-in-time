@@ -8,21 +8,22 @@
 
 use crate::config::{JitConfig, ProjectionMode};
 use crate::config_manager::ConfigManager;
+use crate::declarations::rules::{RuleConfigError, RuleSet, SchemaSource, Severity};
+use crate::declarations::GateChecker;
+use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressScope,
     ProjectSource, RawScopeItem,
 };
-use crate::domain::{parse_known_events, GateChecker, Issue, SHORT_ID_LENGTH};
+use crate::domain::{parse_known_events, Issue, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
-use crate::storage::GateRegistry;
 use crate::validation::engine::Finding;
 use crate::validation::invariants::InvariantRegistry;
 use crate::validation::project_render::{render_projection_body, ProjectionInputs};
 use crate::validation::projection::{compose_projection, require_target, splice_region};
 use crate::validation::report::{ReportedFinding, RuleReport};
-use crate::validation::rules::{RuleConfigError, RuleSet, SchemaSource, Severity};
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -622,7 +623,7 @@ fn load_rules(
 #[derive(Deserialize)]
 struct GatesFile {
     #[serde(default)]
-    gates: Vec<crate::domain::Gate>,
+    gates: Vec<crate::declarations::GateDefinition>,
 }
 
 fn load_gates(view: &dyn RepositoryView) -> Result<GateRegistry> {
@@ -897,7 +898,7 @@ fn collect_rule_findings(
     let graph_rules: Vec<_> = rules
         .rules
         .iter()
-        .filter(|rule| rule.scope == crate::validation::rules::RuleScope::Graph)
+        .filter(|rule| rule.scope == crate::declarations::rules::RuleScope::Graph)
         .collect();
     let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
     let plan_content = resolve_plan_content(view, issues, config)?;

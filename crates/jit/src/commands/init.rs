@@ -1,6 +1,7 @@
 use super::CommandExecutor;
 use crate::config::{slugify_project_name, JitConfig, ProjectName};
 use crate::config_manager::ConfigManager;
+use crate::declarations::GateRegistry;
 use crate::domain::Event;
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
@@ -9,8 +10,8 @@ use crate::profile::{
     ProjectedFileMode, RepositorySnapshot, SnapshotEntry, SnapshotFile,
 };
 use crate::storage::{
-    FileTransactionKernel, FileTransactionPlan, GateRegistry, IssueStore, JsonFileStorage,
-    RecoveryCoordinator, RecoveryRequiredError, RecoveryState, TransactionAction,
+    FileTransactionKernel, FileTransactionPlan, IssueStore, JsonFileStorage, RecoveryCoordinator,
+    RecoveryRequiredError, RecoveryState, TransactionAction,
 };
 use crate::validation::repository::{
     validate_repository, FilesystemRepositoryView, OverlayRepositoryView, RepositoryView,

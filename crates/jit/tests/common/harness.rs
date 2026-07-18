@@ -185,7 +185,7 @@ source-of-truth = \"registry-first\"
                 description.to_string(),
                 auto,
                 None,
-                jit::domain::GateStage::Postcheck,
+                jit::declarations::GateStage::Postcheck,
             )
             .unwrap();
     }

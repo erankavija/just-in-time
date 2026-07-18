@@ -111,7 +111,7 @@ fn test_sync_survives_custom_rule_that_fails_full_load() {
     );
     fs::write(jit_dir.join("rules.toml"), &rules).unwrap();
     assert!(
-        jit::validation::rules::RuleSet::load(&jit_dir).is_err(),
+        jit::declarations::rules::RuleSet::load(&jit_dir).is_err(),
         "premise: the broken custom rule must fail a full RuleSet load"
     );
 

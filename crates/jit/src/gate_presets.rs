@@ -26,7 +26,8 @@ pub use planning::{
 };
 pub use reference::{render_reference_markdown, REFERENCE_PATH};
 
-use crate::domain::{Gate, GateChecker, GateMode, GateStage};
+use crate::declarations::GateDefinition as Gate;
+use crate::declarations::{GateChecker, GateMode, GateStage};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

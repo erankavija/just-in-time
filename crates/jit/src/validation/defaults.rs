@@ -45,12 +45,12 @@
 //! `label-format-custom`, and the per-namespace `values`/`pattern`/`required`
 //! rules. A repo wanting those authors them directly in `rules.toml`.
 
-use crate::domain::type_taxonomy::HierarchyConfig;
-use crate::domain::LabelNamespaces;
-use crate::validation::rules::{
+use crate::declarations::rules::{
     Assertion, Rule, RuleScope, RuleSet, SchemaSource, Selector, Severity, TypeHierarchyKind,
     DEFAULT_ORIGIN,
 };
+use crate::domain::type_taxonomy::HierarchyConfig;
+use crate::domain::LabelNamespaces;
 use std::collections::{HashMap, HashSet};
 
 /// The canonical `namespace:value` label format, mirroring the regex the legacy
@@ -343,7 +343,7 @@ const NAMESPACE_UNIQUE_PREFIX: &str = "namespace-unique-";
 
 /// The `namespace-unique-*` file-membership delta between the rules currently
 /// authored on disk (`loaded`, i.e. `.jit/rules.toml` as parsed by
-/// [`RuleSet::load`](crate::validation::rules::RuleSet::load) — NOT the
+/// [`RuleSet::load`](crate::declarations::rules::RuleSet::load) — NOT the
 /// in-memory-reconciled set [`reconcile_default_rules_with_config`] produces)
 /// and the CURRENT `namespaces` registry.
 ///

@@ -699,7 +699,8 @@ impl CommandSchema {
     }
 
     fn generate_types() -> HashMap<String, Value> {
-        use crate::domain::{GateChecker, State};
+        use crate::declarations::GateChecker;
+        use crate::domain::State;
 
         let mut types = HashMap::new();
 

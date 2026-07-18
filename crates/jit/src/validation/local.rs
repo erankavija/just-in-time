@@ -31,13 +31,13 @@
 //! `--force`, in which case a bypass event is logged) live in the command layer
 //! so this module stays free of I/O.
 
+use crate::declarations::rules::{Assertion, Rule, RuleScope, RuleSet, Severity};
 use crate::document::{content_parser_for, ContentParserError};
 use crate::domain::{project, ContentFormat, Issue, Projection};
 use crate::validation::desugar::desugar;
 use crate::validation::engine::{
     render_finding_message, Finding, SchemaCompileError, SchemaEngine,
 };
-use crate::validation::rules::{Assertion, Rule, RuleScope, RuleSet, Severity};
 use crate::validation::strictness::Strictness;
 
 /// Error raised while evaluating local rules against an issue.
@@ -77,7 +77,7 @@ pub enum LocalEvalError {
 /// ```
 /// use jit::domain::{ContentFormat, Issue};
 /// use jit::validation::local::evaluate_local;
-/// use jit::validation::rules::RuleSet;
+/// use jit::declarations::rules::RuleSet;
 /// use std::path::Path;
 ///
 /// // A rule set with one enforce rule that requires a `req:*` label.
@@ -235,7 +235,7 @@ impl LocalEvaluation {
 /// ```
 /// use jit::domain::{ContentFormat, Issue};
 /// use jit::validation::local::evaluate_local;
-/// use jit::validation::rules::RuleSet;
+/// use jit::declarations::rules::RuleSet;
 /// use std::path::Path;
 ///
 /// let toml = r#"

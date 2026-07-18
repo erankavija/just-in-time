@@ -211,10 +211,10 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         .downcast_ref::<jit::errors::InvalidArgumentError>()
         .is_some()
         || error
-            .downcast_ref::<jit::domain::GateStageParseError>()
+            .downcast_ref::<jit::declarations::GateStageParseError>()
             .is_some()
         || error
-            .downcast_ref::<jit::domain::GateModeParseError>()
+            .downcast_ref::<jit::declarations::GateModeParseError>()
             .is_some()
         || error
             .downcast_ref::<jit::document::DocumentScopeParseError>()
@@ -983,8 +983,9 @@ fn render_gate_findings_text(result: &GateRunResult) -> String {
 mod gate_findings_text_tests {
     use super::render_gate_findings_text;
     use chrono::Utc;
+    use jit::declarations::GateStage;
     use jit::domain::{
-        GateFinding, GateFindings, GateRunResult, GateRunStatus, GateStage, GATE_RUN_SCHEMA_VERSION,
+        GateFinding, GateFindings, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
     };
 
     fn run_with(references: Vec<String>) -> GateRunResult {
@@ -3456,7 +3457,7 @@ fn run() -> Result<()> {
                 priority,
                 json,
             } => {
-                use jit::domain::GateChecker;
+                use jit::declarations::GateChecker;
 
                 // `--auto` is a convenience spelling of `--mode auto`; it wins
                 // over `--mode` when both are supplied. Otherwise resolve the
@@ -3468,10 +3469,10 @@ fn run() -> Result<()> {
                 // manual gate cannot carry a checker.
                 let has_checker_command = checker_command.is_some();
                 let mode = if auto {
-                    jit::domain::GateMode::Auto
+                    jit::declarations::GateMode::Auto
                 } else {
                     match mode {
-                        Some(jit::domain::GateMode::Manual) if has_checker_command => {
+                        Some(jit::declarations::GateMode::Manual) if has_checker_command => {
                             return Err(invalid_argument(
                                 format!(
                                     "--mode manual conflicts with --checker-command for gate '{}': a manual gate cannot have a checker. Drop --checker-command, or omit --mode to define an automated gate.",
@@ -3482,8 +3483,8 @@ fn run() -> Result<()> {
                             ));
                         }
                         Some(explicit) => explicit,
-                        None if has_checker_command => jit::domain::GateMode::Auto,
-                        None => jit::domain::GateMode::Manual,
+                        None if has_checker_command => jit::declarations::GateMode::Auto,
+                        None => jit::declarations::GateMode::Manual,
                     }
                 };
 
@@ -3582,7 +3583,7 @@ fn run() -> Result<()> {
                 // `--auto` is a convenience spelling of `--mode auto`; it wins
                 // over `--mode` when both are supplied.
                 let mode = if auto {
-                    Some(jit::domain::GateMode::Auto)
+                    Some(jit::declarations::GateMode::Auto)
                 } else {
                     mode
                 };
@@ -3758,7 +3759,7 @@ fn run() -> Result<()> {
                         }
                         if let Some(checker) = gate.checker {
                             match checker {
-                                jit::domain::GateChecker::Exec {
+                                jit::declarations::GateChecker::Exec {
                                     command,
                                     timeout_seconds,
                                     working_dir,
@@ -3771,13 +3772,13 @@ fn run() -> Result<()> {
                                         println!("    Working dir: {}", wd);
                                     }
                                 }
-                                jit::domain::GateChecker::RepositoryValidation => {
+                                jit::declarations::GateChecker::RepositoryValidation => {
                                     println!("  Checker: repository validation (built-in)");
                                 }
-                                jit::domain::GateChecker::IssueValidation => {
+                                jit::declarations::GateChecker::IssueValidation => {
                                     println!("  Checker: issue validation (built-in)");
                                 }
-                                jit::domain::GateChecker::LabelTargetValidation {
+                                jit::declarations::GateChecker::LabelTargetValidation {
                                     label_namespace,
                                 } => {
                                     println!(
@@ -3785,7 +3786,7 @@ fn run() -> Result<()> {
                                         label_namespace
                                     );
                                 }
-                                jit::domain::GateChecker::ReviewPlaceholder => {
+                                jit::declarations::GateChecker::ReviewPlaceholder => {
                                     println!("  Checker: WARNING — external review placeholder");
                                 }
                             }
@@ -4568,7 +4569,7 @@ fn run() -> Result<()> {
                                     );
                                     if let Some(checker) = &gate.checker {
                                         match checker {
-                                            jit::domain::GateChecker::Exec {
+                                            jit::declarations::GateChecker::Exec {
                                                 command,
                                                 timeout_seconds,
                                                 ..
@@ -4576,20 +4577,20 @@ fn run() -> Result<()> {
                                                 println!("    Command: {}", command);
                                                 println!("    Timeout: {}s", timeout_seconds);
                                             }
-                                            jit::domain::GateChecker::RepositoryValidation => {
+                                            jit::declarations::GateChecker::RepositoryValidation => {
                                                 println!("    Built-in: repository validation");
                                             }
-                                            jit::domain::GateChecker::IssueValidation => {
+                                            jit::declarations::GateChecker::IssueValidation => {
                                                 println!("    Built-in: issue validation");
                                             }
-                                            jit::domain::GateChecker::LabelTargetValidation {
+                                            jit::declarations::GateChecker::LabelTargetValidation {
                                                 label_namespace,
                                             } => {
                                                 println!(
                                                     "    Built-in: label-target validation ({label_namespace}:)"
                                                 );
                                             }
-                                            jit::domain::GateChecker::ReviewPlaceholder => {
+                                            jit::declarations::GateChecker::ReviewPlaceholder => {
                                                 println!(
                                                     "    Built-in: WARNING — external review placeholder"
                                                 );
@@ -7844,7 +7845,8 @@ mod exit_code_projection_tests {
     //! fails — so the projection cannot silently drift from runtime behavior.
 
     use super::error_to_exit_code;
-    use jit::domain::{GateRunResult, GateRunStatus, GateStage};
+    use jit::declarations::GateStage;
+    use jit::domain::{GateRunResult, GateRunStatus};
     use jit::schema::CommandSchema;
 
     /// Build a `gate evaluate` checker failure carrying `status`, so the

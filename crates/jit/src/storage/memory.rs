@@ -3,10 +3,11 @@
 //! This backend stores all data in RAM using HashMaps, providing 10-100x faster
 //! test execution compared to JSON file I/O. Thread-safe for concurrent access.
 
+use crate::declarations::GateRegistry;
 use crate::domain::{Event, Issue};
 use crate::storage::{
-    AmbiguousIdError, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
-    IssueStore, PresetNotFoundError, RepoWriteGuard, RepoWriteLock, MIN_ID_PREFIX_LENGTH,
+    AmbiguousIdError, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError, IssueStore,
+    PresetNotFoundError, RepoWriteGuard, RepoWriteLock, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -354,7 +355,8 @@ impl IssueStore for InMemoryStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Gate, Priority, State};
+    use crate::declarations::GateDefinition as Gate;
+    use crate::domain::{Priority, State};
 
     #[test]
     fn test_init_is_noop() {
@@ -500,8 +502,8 @@ mod tests {
             key: "test-gate".to_string(),
             title: "Test Gate".to_string(),
             description: "A test gate".to_string(),
-            stage: crate::domain::GateStage::Postcheck,
-            mode: crate::domain::GateMode::Manual,
+            stage: crate::declarations::GateStage::Postcheck,
+            mode: crate::declarations::GateMode::Manual,
             checker: None,
             priority: 100,
             reserved: std::collections::HashMap::new(),

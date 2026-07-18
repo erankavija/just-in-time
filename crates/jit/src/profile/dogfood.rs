@@ -4,7 +4,7 @@ use super::{
     derive_preset_projection, project_package, EmbeddedProfilePackage, PackageProjection,
     ProfilePackageError, ProjectionError,
 };
-use crate::domain::Gate;
+use crate::declarations::GateDefinition as Gate;
 use include_dir::{include_dir, Dir};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -193,10 +193,11 @@ mod tests {
     use super::*;
     use crate::commands::CommandExecutor;
     use crate::config::ProjectionStyle;
+    use crate::declarations::rules::RuleSet;
+    use crate::declarations::GateRegistry;
     use crate::hierarchy_templates::HierarchyTemplate;
     use crate::profile::{Contribution, KeyedArrayTarget, MapEntryTarget};
-    use crate::storage::{GateRegistry, IssueStore, JsonFileStorage};
-    use crate::validation::rules::RuleSet;
+    use crate::storage::{IssueStore, JsonFileStorage};
     use crate::validation::rules_gates_projection::render_rules_and_gates_markdown;
     use std::fs;
     use std::path::Path;
@@ -479,10 +480,10 @@ mod tests {
                 matches!(
                     gate.checker,
                     Some(
-                        crate::domain::GateChecker::RepositoryValidation
-                            | crate::domain::GateChecker::IssueValidation
-                            | crate::domain::GateChecker::LabelTargetValidation { .. }
-                            | crate::domain::GateChecker::ReviewPlaceholder
+                        crate::declarations::GateChecker::RepositoryValidation
+                            | crate::declarations::GateChecker::IssueValidation
+                            | crate::declarations::GateChecker::LabelTargetValidation { .. }
+                            | crate::declarations::GateChecker::ReviewPlaceholder
                     )
                 ),
                 "{key} must remain an in-process portable checker"

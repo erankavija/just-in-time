@@ -11,9 +11,10 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use thiserror::Error;
 
+use crate::declarations::{GateMode, GateStage};
 use crate::domain::{
-    GateFindings, GateMode, GateRunResult, GateRunStatus, GateStage, GateState, GateStatus, Issue,
-    MinimalBlockedIssue, MinimalIssue, Priority, State,
+    GateFindings, GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue,
+    MinimalIssue, Priority, State,
 };
 use crate::errors::{
     gate_status_name, short_id, state_name, TransitionBlockedError, TransitionBlocker,
@@ -1999,7 +2000,8 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///
 /// ```
 /// use chrono::Utc;
-/// use jit::domain::{GateRunResult, GateRunStatus, GateStage};
+/// use jit::declarations::GateStage;
+/// use jit::domain::{GateRunResult, GateRunStatus};
 /// use jit::output::GateRunSummary;
 ///
 /// let run = GateRunResult {
@@ -2243,11 +2245,11 @@ pub struct GateDefinition {
     pub mode: GateMode,
     /// Checker configuration for automated gates.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub checker: Option<crate::domain::GateChecker>,
+    pub checker: Option<crate::declarations::GateChecker>,
 }
 
-impl From<crate::domain::Gate> for GateDefinition {
-    fn from(gate: crate::domain::Gate) -> Self {
+impl From<crate::declarations::GateDefinition> for GateDefinition {
+    fn from(gate: crate::declarations::GateDefinition) -> Self {
         Self {
             key: gate.key,
             title: gate.title,
@@ -2350,14 +2352,14 @@ mod tests {
 
     #[test]
     fn test_gate_definition_json_includes_builtin_checker_configuration() {
-        let gate = crate::domain::Gate {
+        let gate = crate::declarations::GateDefinition {
             version: 1,
             key: "anything".to_string(),
             title: "Coverage".to_string(),
             description: "Configured indirection".to_string(),
             stage: GateStage::Postcheck,
             mode: GateMode::Auto,
-            checker: Some(crate::domain::GateChecker::LabelTargetValidation {
+            checker: Some(crate::declarations::GateChecker::LabelTargetValidation {
                 label_namespace: "owner".to_string(),
             }),
             priority: 100,
@@ -2533,9 +2535,8 @@ mod tests {
 
     #[test]
     fn test_show_response_gate_with_run_is_enriched() {
-        use crate::domain::{
-            GateRunResult, GateRunStatus, GateStage, GateState, GateStatus, Issue,
-        };
+        use crate::declarations::GateStage;
+        use crate::domain::{GateRunResult, GateRunStatus, GateState, GateStatus, Issue};
         use chrono::Utc;
 
         // A gate that has run: status from GateState, last_run_at/exit_code from
@@ -2874,7 +2875,7 @@ mod tests {
 
     #[test]
     fn test_gate_definition_serializes_stage_and_mode_as_snake_case() {
-        use crate::domain::{GateMode, GateStage};
+        use crate::declarations::{GateMode, GateStage};
         // --json gate output must remain snake_case regardless of enum Debug repr.
         let def = GateDefinition {
             key: "ci".to_string(),
@@ -2907,7 +2908,8 @@ mod tests {
 
     #[test]
     fn test_gate_definition_from_gate_round_trips_stage_mode() {
-        use crate::domain::{Gate, GateMode, GateStage};
+        use crate::declarations::GateDefinition as Gate;
+        use crate::declarations::{GateMode, GateStage};
         let gate = Gate {
             version: 1,
             key: "tests".to_string(),
