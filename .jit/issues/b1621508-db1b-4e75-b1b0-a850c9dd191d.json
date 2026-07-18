@@ -1,0 +1,27 @@
+{
+  "id": "b1621508-db1b-4e75-b1b0-a850c9dd191d",
+  "title": "Validate drift diagnosis and transactional repair",
+  "description": "Complete and prove the derived-state drift diagnosis and transactional repair surface on the landed repository-state engine. The repair mechanism itself lands with Group A's materializers package; this task completes its validation behavior, hardens the ownership boundaries, and supplies the proof. This is the sole leaf accountable for container criterion REQ-06.\n\n## Background\n\nPersisted derived state (default rule membership, default schemas, rendered projections, managed regions) is reproducible materialization, never authority. `jit validate` must report missing or stale persisted derived state as an error without treating it as authoritative, and `jit validate --fix` must transactionally restore the exact derived state from declared configuration while preserving unrelated content.\n\n## What to build\n\n- `jit validate` reports missing, stale, or unexpected explicitly owned materializations as deterministic errors while effective rules remain declaration-derived; expected bytes are always recomputed from declared authorities, never read back from persisted state.\n- `jit validate --fix` requests one repair delta from the shared planner, applies it through the shared storage capability, and reruns validation. It obeys the repair ownership-source matrix: authored rule content (custom rows, comments, header, order, editable policy fields) is preserved unconditionally; ambiguous ownership returns a non-repairable error, never a whole-file rewrite; obsolete generated schemas are deleted only with proven generation ownership (filename convention alone is insufficient); profile asset/region repair requires resolvable applied package/version/hash provenance.\n- Idempotence: a second `--fix` after a clean repair is a no-op that samples neither identifiers nor time.\n\n## Success Criteria\n\n- [hard] REQ-01: Validation derives expected state from declarations and reports deterministic drift errors for missing, stale, or unexpected explicitly owned materializations on both backends, while effective rules remain declaration-derived.\n- [hard] REQ-02: validate --fix applies one ownership-safe idempotent repair delta through the shared storage capability, reruns validation clean, preserves authored rule content unconditionally, and returns non-repairable errors for ambiguous ownership instead of any whole-file rewrite.\n\n## Constraints\n\n- Sole engine only: no alternate renderer, serializer, capture path, or publisher; all drift and repair uses the landed `repository_state` primitives.\n- Out of scope (plan D19/D20): lease credential/claim-log/claim-command redesign and worktree/data-root binding redesign.\n\nBlast radius: repository comparison/validation/fix and the ownership-matrix suites. See `dev/active/cdc840ad-plan.md` §2 (drift error and transactional repair; repair ownership-source matrix) and plan decisions D7 and D16.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "661d6be2-e28b-463d-be93-58ee3e20e663"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:repository-materialization",
+    "satisfies:REQ-06",
+    "component:validation"
+  ],
+  "created_at": "2026-07-18T15:06:44.274970031Z",
+  "updated_at": "2026-07-18T15:07:08.796799413Z",
+  "first_ready_at": "2026-07-18T15:06:44.274972391Z"
+}
