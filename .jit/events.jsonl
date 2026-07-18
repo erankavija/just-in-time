@@ -8475,3 +8475,4 @@
 {"type":"issue_state_changed","id":"57838f59-703a-460a-bcca-6478551fbecd","issue_id":"1e37988a-ae20-424e-be4d-f9fa6efed060","timestamp":"2026-07-18T15:39:45.269031742Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"8ae86be8-f6be-48c4-944c-bb4d408a1be2","issue_id":"1e37988a-ae20-424e-be4d-f9fa6efed060","timestamp":"2026-07-18T15:39:45.269054692Z"}
 {"type":"issue_state_changed","id":"d449427c-fefd-494d-8fb7-aac8b1255def","issue_id":"cbc3a7e5-813c-4aea-be95-3408bc74413d","timestamp":"2026-07-18T15:39:46.125149515Z","from":"backlog","to":"ready"}
+{"type":"issue_claimed","id":"2fba907c-b167-49ad-9dfc-6449e85a8281","issue_id":"cdc840ad-9332-4936-9381-772318967f0f","timestamp":"2026-07-18T16:22:26.890118352Z","assignee":"agent:jit-execution-lead"}
