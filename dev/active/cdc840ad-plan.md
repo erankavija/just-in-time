@@ -108,7 +108,7 @@ Stories are rollups and carry no coverage label. Group A uses one dedicated work
   Own criteria: `[hard] REQ-01: Assurance adds no alternate renderer, serializer, capture path, publisher, or compatibility layer.` `[hard] REQ-02: v1.0 source-freeze evidence is complete and canonical.`
   Blast radius: validate/fix, project invariant/projection, public docs/schema/MCP/scripts, and comprehensive conformance/recovery/structural suites.
 
-  - **Complete derived-state and release assurance**  `type: task`  `satisfies: REQ-06, REQ-07, REQ-08`  `depends-on: Direct repository-state cutover`
+  - **Complete derived-state and release assurance**  `type: task`  `satisfies: REQ-06, REQ-07, REQ-08`  `depends-on: Integrate repository-state cutover`
     Outcome: Derived-state errors and transactional repair, the registry-first project invariant, public contract updates, and comprehensive behavioral/structural evidence complete on the sole repository-state engine.
     Own criteria: `[hard] REQ-01: Validation derives expected state from declarations, reports deterministic drift, and fix applies one ownership-safe idempotent delta without crossing authored boundaries.` `[hard] REQ-02: derived-state-coherence exists only in this project registry/projection, while single-source-prose and adopter scaffolding remain unchanged.` `[hard] REQ-03: Human/JSON/schema/MCP docs encode recoverable multi-target publication, drift diagnosis and repair, managed-region semantics, and absent-root publication; the claim and lease surface is documented unchanged.` `[hard] REQ-04: In-process and CLI/MCP/schema tests cover profile/config integration, multi-target rendering, shared-target composition, marker failures, manual derived-state drift, transactional repair, idempotence, concurrent mutation serialization, interruption recovery, Git-free operation, root-publication races, and stable human and JSON contracts.` `[hard] REQ-05: Structural guards prove predecessor deletion, no command-local publisher or duplicate renderer, no compatibility seam, and no independently merged staging package.`
     Blast radius: repository comparison/validation/fix, invariant registry/projection, canonical docs and public adapters, all cohesive release suites, and source-tree absence checks.
@@ -127,7 +127,7 @@ Stories are rollups and carry no coverage label. Group A uses one dedicated work
 | REQ-08 | Complete derived-state and release assurance |
 | REQ-09 | Integrate repository-state cutover |
 
-The reduced graph is epic → assurance story → assurance task → cutover story → integration → consumer deletion → materializers → mutation/claim sync → store/kernel → declarations/image. There are no redundant edges. Work packages are cumulative commits on `integration/cdc840ad`, never independently shipped architectures; consumer deletion is complete before integration, and neither integration nor assurance may defer cleanup.
+The reduced graph keeps the two stories as sibling epic-level rollups: epic → cutover story → integration → consumer deletion → materializers → mutation/claim sync → store/kernel → declarations/image, and epic → assurance story → assurance task → integration. There are no redundant edges. Work packages are cumulative commits on `integration/cdc840ad`, never independently shipped architectures; consumer deletion is complete before integration, and neither integration nor assurance may defer cleanup.
 
 ## 4. Risks and actionability
 

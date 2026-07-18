@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "run_id": "c8dc1e80-8105-4f06-a49b-6055aa5072fe",
+  "gate_key": "breakdown-review",
+  "stage": "postcheck",
+  "issue_id": "1e37988a-ae20-424e-be4d-f9fa6efed060",
+  "commit": "2f4fb2dde572459201f17dc31a7b430b5a73a1e4",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-18T14:39:43.756040788Z",
+  "completed_at": "2026-07-18T14:47:34.263146570Z",
+  "duration_ms": 470507,
+  "exit_code": 1,
+  "stdout": "## Content standards\n\nAll nine implementation issues have clean titles, required membership labels, self-contained descriptions, and marked `## Success Criteria`. Two criteria are not sufficiently verifiable under the [content standards](/home/vkaskivuo/Projects/just-in-time/.jit/reference/content-standards.md:27): F1 and F2 below.\n\n## Coverage versus design\n\nEvery work item in [plan §3](/home/vkaskivuo/Projects/just-in-time/dev/active/cdc840ad-plan.md:63) exists with the specified type and scope.\n\n| Design item | Issue | Matches? |\n|---|---|---|\n| Direct repository-state cutover | `a3a788f3` | Yes |\n| Establish declarations, image, capture, and managed documents | `cbc3a7e5` | Yes |\n| Implement layout-aware store, kernel, and recovery | `bacf2cd4` | Yes |\n| Implement typed mutation, audit, and claim synchronization | `a6a9b964` | Yes |\n| Implement materializers, drift, and repair | `44d318ab` | Yes |\n| Migrate all consumers and delete predecessors | `49adf23b` | Yes |\n| Integrate repository-state cutover | `661d6be2` | Yes |\n| Coherence and release assurance | `7f0ac1b0` | Yes |\n| Complete derived-state and release assurance | `c73c7618` | Yes |\n\nThe `satisfies:` allocation also matches the plan: `661d6be2` owns container REQ-01–05 and REQ-09; `c73c7618` owns REQ-06–08.\n\n## Dependency DAG correctness\n\nThe implemented reachability matches the plan’s reduced chain. The five Group A packages are intentionally serialized because they are cumulative commits on `integration/cdc840ad`; this is not an accidental over-constraint.\n\nThe blank-workspace root, `cbc3a7e5`, depends only on the breakdown bracket. Once that bracket completes, it can begin in the existing crate without sibling-created scaffolding.\n\nThe requested depth-8 traversal omits `cbc3a7e5` at level 9, but following `bacf2cd4.dependencies` confirms it is present and connected. There is no missing work item or dangling edge. The hierarchy side effect of the cross-story ordering is nevertheless blocking under structural integrity; see F3.\n\n## Structural integrity\n\nThe implementation packages have a meaningful story/task tier, but the resolved hierarchy does not preserve the plan’s two Group A/Group B rollups. In addition, the sole Group B task bundles several independently ownable deliverables without a sufficient one-leaf rationale. See F3 and F4.\n\n## Prior review feedback\n\n`run_history` is empty; there is no prior feedback to recheck.\n\n## Findings\n\n1. **F1 — High, blocking: `cbc3a7e5` has an ambiguous root-package success criterion.** Its REQ-01 says, “Final APIs and pure tests cover closure, aliases, ownership, marker topology, and hashes.” “Cover” does not state the expected behavior, and the criterion omits several independently reviewable outcomes from `## What to build`, including root-overlap rejection, bounded capture, uncaptured-path failure, physical injectivity, and exact unmanaged-byte preservation. A reviewer could not determine completion from this criterion without inventing a test matrix. Replace its success criteria with:\n   - `[hard] REQ-01: declarations and repository_state are crate-root, filesystem-free modules with no imports from storage, validation, commands, or profile, and the superseded declaration/image definitions are neither defined nor re-exported from their former modules.`\n   - `[hard] REQ-02: Layout and capture tests reject overlapping or aliased roots, reserved namespaces, lexical escapes, duplicate physical identities, and uncaptured reads; bounded closure, pinned evidence, listing identities, and deterministic plan hashes pass for every specified path class.`\n   - `[hard] REQ-03: Managed-document tests reject duplicate, reversed, crossing, multiply owned, competing-base, and ambiguous claims while preserving valid nested regions and every unmanaged byte exactly.`\n   - `[hard] REQ-04: No bridge, compatibility alias, provider/callback seam, ambient read, whole-repository recursion, or selectable second engine remains.`\n   The offending text is in [`cbc3a7e5`’s description](/home/vkaskivuo/Projects/just-in-time/.jit/issues/cbc3a7e5-813c-4aea-be95-3408bc74413d.json:4).\n\n2. **F2 — Medium, blocking: `7f0ac1b0` has an unverifiable rollup criterion.** REQ-02 is only “v1.0 source-freeze evidence is complete and canonical.” Neither “complete” nor “canonical” identifies an observable result. Replace it with: `[hard] REQ-02: The release candidate passes the in-process, CLI/MCP/schema, recovery, concurrency, Git-free, root-publication, and structural-absence suites listed under What to build, and the canonical human, JSON, schema, and MCP documentation encodes the resulting public contracts.` The offending text is in [`7f0ac1b0`’s description](/home/vkaskivuo/Projects/just-in-time/.jit/issues/7f0ac1b0-b976-44ca-a9e1-9cad27878140.json:4).\n\n3. **F3 — High, blocking: the dependency spine miscontains the two planned stories.** The design presents Group A (`a3a788f3`) and Group B (`7f0ac1b0`) as separate rollups, with Group B following Group A. The actual edges are `cdc840ad → 7f0ac1b0 → c73c7618 → a3a788f3`, so `jit graph tree` resolves `a3a788f3.parent = 7f0ac1b0` and `cdc840ad` has only one story child. Group B therefore structurally contains Group A even though its scope is assurance only. The final graph should make both stories direct children of the epic and place the ordering barrier at the integration task:\n   - `jit dep rm c73c7618 a3a788f3`\n   - `jit dep add cdc840ad a3a788f3`\n   - Make the Group B implementation leaves depend on `661d6be2`, the Group A integration barrier, as detailed in F4.\n   This preserves “assurance after the landed cutover” without nesting one rollup story under the other.\n\n4. **F4 — High, blocking: `c73c7618` is too broad for one coherent leaf.** Its `## What to build` combines four distinct deliverables: validation/fix implementation, project-invariant authoring and projection, public human/JSON/schema/MCP contract work, and exhaustive behavioral/structural release evidence. Its blast radius spans validation, repository configuration, project guidance, public adapters, documentation, and all release suites. The plan merely declares it the “sole leaf”; it does not explain why these distinct deliverables require one owner or cannot be independently landed. Split it as follows:\n   - Create `Implement derived-state diagnosis and transactional repair`, `type:task`, `satisfies:REQ-06`, depending on `661d6be2`. Its criteria must require deterministic missing/stale diagnostics, declarations-derived effective behavior, one ownership-safe idempotent repair delta, authored-content preservation, refusal of ambiguous ownership, and both-backend tests.\n   - Create `Project derived-state coherence`, `type:task`, `satisfies:REQ-07`, depending on `661d6be2`. Its criteria must require the invariant only in this repository’s registry/projection, unchanged `single-source-prose`, unchanged adopter scaffolding and dogfood-owned registry, and advisory classification unless a real binding exists.\n   - Narrow `c73c7618` to `Complete repository-state release assurance`, retain only `satisfies:REQ-08`, and scope it to public-contract updates plus the complete release-evidence matrix. Make it depend on both new tasks.\n   - Keep `7f0ac1b0 → c73c7618`. Together with F3, this yields two epic-level stories, parallel REQ-06/REQ-07 work after `661d6be2`, and one final REQ-08 assurance barrier.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Four blocking defects: two unverifiable success criteria, incorrect story containment, and an over-broad assurance leaf.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"cbc3a7e5 REQ-01 does not state observable expected behavior for the root implementation package.\",\"file\":\".jit/issues/cbc3a7e5-813c-4aea-be95-3408bc74413d.json\",\"line\":4},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"7f0ac1b0 REQ-02 uses undefined complete-and-canonical language and is not independently verifiable.\",\"file\":\".jit/issues/7f0ac1b0-b976-44ca-a9e1-9cad27878140.json\",\"line\":4},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The dependency spine resolves the Group A story beneath the Group B story instead of preserving two epic-level rollups.\"},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"c73c7618 bundles repair implementation, invariant projection, public contracts, and release evidence into one oversized leaf.\",\"file\":\".jit/issues/c73c7618-0b79-422b-9227-bfcc99e6f345.json\",\"line\":4}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1816 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f75ab-3b4c-7290-9b24-79cb29bd5eb8\n--------\nuser\n--- 1803 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Four blocking defects: two unverifiable success criteria, incorrect story containment, and an over-broad assurance leaf.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "cbc3a7e5 REQ-01 does not state observable expected behavior for the root implementation package.",
+        "file": ".jit/issues/cbc3a7e5-813c-4aea-be95-3408bc74413d.json",
+        "line": 4
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "7f0ac1b0 REQ-02 uses undefined complete-and-canonical language and is not independently verifiable.",
+        "file": ".jit/issues/7f0ac1b0-b976-44ca-a9e1-9cad27878140.json",
+        "line": 4
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The dependency spine resolves the Group A story beneath the Group B story instead of preserving two epic-level rollups."
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "c73c7618 bundles repair implementation, invariant projection, public contracts, and release evidence into one oversized leaf.",
+        "file": ".jit/issues/c73c7618-0b79-422b-9227-bfcc99e6f345.json",
+        "line": 4
+      }
+    ]
+  }
+}
