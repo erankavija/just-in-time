@@ -65,14 +65,16 @@
     {
       "category": "rework-exceeded",
       "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-18T20:43:55+03:00",
+      "resolved_at": "2026-07-18T20:47:00+03:00",
+      "resolution": "Invoker authorized one targeted guided retry and reset the rework counter.",
       "situation": "After two rework cycles, code-review run acd90fcb-ef67-4070-97cc-8bd9bb13f9cd found compare_materializations masks UndiscoveredRepositoryPath as drift.",
       "recommendation": "Authorize one targeted retry with explicit guidance to propagate every RepositoryImage::entry error and sweep all pure image consumers for the same matches!/ok-to-drift pattern."
     }
   ],
   "rework_counts": {
-    "cbc3a7e5": 2
+    "cbc3a7e5": 0
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
