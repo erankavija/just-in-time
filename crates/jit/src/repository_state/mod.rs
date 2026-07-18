@@ -120,43 +120,234 @@ pub fn compare_materializations(
         .delta
         .actions()
         .iter()
-        .filter_map(|action| {
-            let (path, drift) = match action {
-                RepositoryAction::CreateDirectory { path, .. } => {
-                    let stale = !matches!(image.entry(path), Ok(RepositoryEntry::Directory { .. }));
-                    (path, stale.then_some(MaterializationDriftKind::Missing))
+        .try_fold(Vec::new(), |mut drifts, action| {
+            let path = match action {
+                RepositoryAction::CreateDirectory { path, .. }
+                | RepositoryAction::WriteFile { path, .. }
+                | RepositoryAction::SetMode { path, .. }
+                | RepositoryAction::DeleteFile { path, .. } => path,
+            };
+            let captured = image.entry(path)?;
+            let drift = match (action, captured) {
+                (RepositoryAction::CreateDirectory { .. }, RepositoryEntry::Directory { .. }) => {
+                    None
                 }
-                RepositoryAction::WriteFile {
-                    path, bytes, mode, ..
-                } => {
-                    let stale = !matches!(
-                        image.entry(path),
-                        Ok(RepositoryEntry::File { bytes: actual, mode: actual_mode, .. })
-                            if actual == bytes && actual_mode == mode
-                    );
-                    (path, stale.then_some(MaterializationDriftKind::Stale))
+                (RepositoryAction::CreateDirectory { .. }, _) => {
+                    Some(MaterializationDriftKind::Missing)
                 }
-                RepositoryAction::SetMode { path, mode, .. } => {
-                    let stale = !matches!(
-                        image.entry(path),
-                        Ok(RepositoryEntry::File { mode: actual, .. }) if actual == mode
-                    );
-                    (path, stale.then_some(MaterializationDriftKind::Stale))
-                }
-                RepositoryAction::DeleteFile { path, .. } => {
-                    let unexpected = !matches!(image.entry(path), Ok(RepositoryEntry::Absent));
-                    (
-                        path,
-                        unexpected.then_some(MaterializationDriftKind::Unexpected),
-                    )
+                (
+                    RepositoryAction::WriteFile { bytes, mode, .. },
+                    RepositoryEntry::File {
+                        bytes: actual,
+                        mode: actual_mode,
+                        ..
+                    },
+                ) if actual == bytes && actual_mode == mode => None,
+                (RepositoryAction::WriteFile { .. }, _) => Some(MaterializationDriftKind::Stale),
+                (
+                    RepositoryAction::SetMode { mode, .. },
+                    RepositoryEntry::File {
+                        mode: actual_mode, ..
+                    },
+                ) if actual_mode == mode => None,
+                (RepositoryAction::SetMode { .. }, _) => Some(MaterializationDriftKind::Stale),
+                (RepositoryAction::DeleteFile { .. }, RepositoryEntry::Absent) => None,
+                (RepositoryAction::DeleteFile { .. }, _) => {
+                    Some(MaterializationDriftKind::Unexpected)
                 }
             };
-            drift.map(|kind| {
-                Ok(MaterializationDrift {
+            if let Some(kind) = drift {
+                drifts.push(MaterializationDrift {
                     path: path.clone(),
                     kind,
-                })
-            })
+                });
+            }
+            Ok(drifts)
         })
-        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    fn layout() -> RepositoryLayout {
+        RepositoryLayout::new(
+            RepositoryRootEvidence::new("/repo", "worktree", true),
+            RepositoryRootEvidence::new("/repo/.jit", "data", true),
+        )
+        .unwrap()
+    }
+
+    fn budget() -> CaptureBudget {
+        CaptureBudget {
+            max_paths: 8,
+            max_listings: 0,
+            max_bytes: 128,
+            max_depth: 4,
+        }
+    }
+
+    fn plan(layout: &RepositoryLayout, actions: Vec<RepositoryAction>) -> MaterializationPlan {
+        MaterializationPlan {
+            delta: RepositoryDelta::new(layout, actions).unwrap(),
+            hash: "test-plan".into(),
+        }
+    }
+
+    #[test]
+    fn test_compare_materializations_propagates_undiscovered_for_every_action() {
+        let layout = layout();
+        let image = RepositoryImage::close(
+            layout.clone(),
+            CaptureSpec::phase_one(Vec::<VirtualPath>::new(), budget()).unwrap(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap();
+        let target = VirtualPath::data("unrequested.json").unwrap();
+        let occupant = EntryIdentity::for_bytes("occupant", b"captured").unwrap();
+        let actions = [
+            RepositoryAction::CreateDirectory {
+                path: target.clone(),
+                owner: "directory".into(),
+                expected: ExpectedPreimage::Absent,
+            },
+            RepositoryAction::WriteFile {
+                path: target.clone(),
+                owner: "writer".into(),
+                expected: ExpectedPreimage::Absent,
+                bytes: b"expected".to_vec(),
+                mode: FileMode::Regular,
+            },
+            RepositoryAction::SetMode {
+                path: target.clone(),
+                owner: "mode".into(),
+                expected: ExpectedPreimage::Present(occupant.clone()),
+                mode: FileMode::Executable,
+            },
+            RepositoryAction::DeleteFile {
+                path: target.clone(),
+                owner: "delete".into(),
+                expected: ExpectedPreimage::Present(occupant),
+            },
+        ];
+
+        for action in actions {
+            assert_eq!(
+                compare_materializations(&image, &plan(&layout, vec![action])),
+                Err(CaptureError::UndiscoveredRepositoryPath(target.clone()))
+            );
+        }
+    }
+
+    #[test]
+    fn test_compare_materializations_classifies_captured_mismatches() {
+        let layout = layout();
+        let create = VirtualPath::data("create").unwrap();
+        let delete = VirtualPath::data("delete").unwrap();
+        let set_mode = VirtualPath::data("set-mode").unwrap();
+        let write = VirtualPath::data("write").unwrap();
+        let delete_bytes = b"delete me".to_vec();
+        let mode_bytes = b"mode".to_vec();
+        let write_bytes = b"old".to_vec();
+        let delete_identity = EntryIdentity::for_bytes("delete", &delete_bytes).unwrap();
+        let mode_identity = EntryIdentity::for_bytes("mode", &mode_bytes).unwrap();
+        let image = RepositoryImage::close(
+            layout.clone(),
+            CaptureSpec::phase_one(
+                [
+                    create.clone(),
+                    delete.clone(),
+                    set_mode.clone(),
+                    write.clone(),
+                ],
+                budget(),
+            )
+            .unwrap(),
+            BTreeMap::from([
+                (create.clone(), RepositoryEntry::Absent),
+                (
+                    delete.clone(),
+                    RepositoryEntry::File {
+                        identity: delete_identity.clone(),
+                        bytes: delete_bytes,
+                        mode: FileMode::Regular,
+                    },
+                ),
+                (
+                    set_mode.clone(),
+                    RepositoryEntry::File {
+                        identity: mode_identity.clone(),
+                        bytes: mode_bytes,
+                        mode: FileMode::Regular,
+                    },
+                ),
+                (
+                    write.clone(),
+                    RepositoryEntry::File {
+                        identity: EntryIdentity::for_bytes("write", &write_bytes).unwrap(),
+                        bytes: write_bytes,
+                        mode: FileMode::Regular,
+                    },
+                ),
+            ]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap();
+        let expected = plan(
+            &layout,
+            vec![
+                RepositoryAction::CreateDirectory {
+                    path: create.clone(),
+                    owner: "directory".into(),
+                    expected: ExpectedPreimage::Absent,
+                },
+                RepositoryAction::DeleteFile {
+                    path: delete.clone(),
+                    owner: "delete".into(),
+                    expected: ExpectedPreimage::Present(delete_identity),
+                },
+                RepositoryAction::SetMode {
+                    path: set_mode.clone(),
+                    owner: "mode".into(),
+                    expected: ExpectedPreimage::Present(mode_identity),
+                    mode: FileMode::Executable,
+                },
+                RepositoryAction::WriteFile {
+                    path: write.clone(),
+                    owner: "writer".into(),
+                    expected: ExpectedPreimage::Absent,
+                    bytes: b"new".to_vec(),
+                    mode: FileMode::Regular,
+                },
+            ],
+        );
+
+        assert_eq!(
+            compare_materializations(&image, &expected).unwrap(),
+            vec![
+                MaterializationDrift {
+                    path: create,
+                    kind: MaterializationDriftKind::Missing,
+                },
+                MaterializationDrift {
+                    path: delete,
+                    kind: MaterializationDriftKind::Unexpected,
+                },
+                MaterializationDrift {
+                    path: set_mode,
+                    kind: MaterializationDriftKind::Stale,
+                },
+                MaterializationDrift {
+                    path: write,
+                    kind: MaterializationDriftKind::Stale,
+                },
+            ]
+        );
+    }
 }
