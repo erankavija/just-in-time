@@ -87,7 +87,7 @@ Stories are rollups and carry no coverage label. Group A uses one dedicated work
     Blast radius: domain events/queries, claim coordinator repository-sync path, mutation producers, conformance tests.
 
   - **Implement materializers, drift, and repair**  `type: task`  `depends-on: Implement typed mutation, audit, and claim synchronization`
-    Outcome: Default rules/schemas, configured projections, profile assets/regions, compare/drift, and ownership-safe transactional repair use only final repository_state primitives.
+    Outcome: Default rules/schemas, configured projections, profile assets/regions, compare/drift, and ownership-safe transactional repair use only final repository_state primitives. This package owns the complete REQ-06 mechanism — drift comparison, validation errors, and ownership-safe `--fix` — together with its unit and harness tests; post-integration acceptance evidence belongs to the assurance leaf.
     Own criteria: `[hard] REQ-01: Every materialization derives from declared authority and composes shared targets deterministically.` `[hard] REQ-02: Drift/fix and authored-content preservation pass targeted plus full cumulative backend tests without a second renderer.`
     Blast radius: default/schema/projection/profile producers, validation comparison/fix, ownership matrix tests.
 
@@ -109,9 +109,9 @@ Stories are rollups and carry no coverage label. Group A uses one dedicated work
   Blast radius: validate/fix, project invariant/projection, public docs/schema/MCP/scripts, and comprehensive conformance/recovery/structural suites.
 
   - **Validate drift diagnosis and transactional repair**  `type: task`  `satisfies: REQ-06`  `depends-on: Integrate repository-state cutover`
-    Outcome: The landed engine's drift diagnosis and transactional repair are completed and proven: deterministic errors for stale derived state, ownership-safe idempotent `--fix`, and unconditional authored-content preservation.
-    Own criteria: `[hard] REQ-01: Validation derives expected state from declarations and reports deterministic drift errors for missing, stale, or unexpected explicitly owned materializations on both backends, while effective rules remain declaration-derived.` `[hard] REQ-02: validate --fix applies one ownership-safe idempotent repair delta through the shared storage capability, reruns validation clean, preserves authored rule content unconditionally, and returns non-repairable errors for ambiguous ownership instead of any whole-file rewrite.`
-    Blast radius: repository comparison/validation/fix and the ownership-matrix suites.
+    Outcome: Post-integration acceptance evidence proves the landed drift diagnosis and repair on main: end-to-end CLI drift injection and repair across both backends and every ownership class, idempotence, and authored-content preservation, with no change to the mechanism itself.
+    Own criteria: `[hard] REQ-01: End-to-end CLI scenarios on main inject manual drift into each ownership class of the repair matrix and prove that validate reports deterministic errors and validate --fix restores exact derived state while preserving authored content, on both backends.` `[hard] REQ-02: The acceptance suite proves --fix idempotence (a second run is a no-op) and non-repairable ambiguous-ownership behavior, and changes no production drift/repair code.`
+    Blast radius: post-integration acceptance suites over validate/fix; no production mechanism change.
 
   - **Author the derived-state-coherence project invariant**  `type: task`  `satisfies: REQ-07`  `depends-on: Integrate repository-state cutover`
     Outcome: The registry-first project invariant exists in this repository's registry and renders through the existing projection into project guidance, leaving adopter surfaces untouched.

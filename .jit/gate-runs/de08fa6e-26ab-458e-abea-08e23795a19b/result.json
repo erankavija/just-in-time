@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "de08fa6e-26ab-458e-abea-08e23795a19b",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab",
+  "commit": "d96ba6cac7d5c53c5e834f9965c7a97f0e0c88d8",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T15:07:51.262766473Z",
+  "completed_at": "2026-07-18T15:13:50.433784703Z",
+  "duration_ms": 359171,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required design document exists at `dev/active/cdc840ad-plan.md` and is linked as the planning issue’s “Implementation plan.” The linked research and investigation documents also exist and clearly mark their superseded claim-v2/root-binding material as historical rather than authoritative.\n\n## Completeness against the criteria\n\nPass. The criteria matrix at `dev/active/cdc840ad-plan.md:5` addresses all nine hard container criteria without silently narrowing scope. The ownership matrix at line 51, exhaustive publisher-removal inventory at lines 44–47, and evidence task at lines 121–124 make the repair, direct-cutover, and testing requirements concrete.\n\n## Technical soundness and architectural fit\n\nPass. The plan accurately reflects the current implementation:\n\n- Competing repository images exist in `crates/jit/src/validation/repository.rs:119` and `crates/jit/src/profile/snapshot.rs:7`.\n- Profile planning omits coupled default materializations in `crates/jit/src/profile/planner.rs:147`.\n- Configuration publication precedes schema/membership refresh in `crates/jit/src/commands/config.rs:253`.\n- Project render publishes targets individually in `crates/jit/src/commands/project.rs:160`.\n- `TransactionAction` lacks recoverable deletion and planner-carried preimages in `crates/jit/src/storage/transaction_action.rs:7`.\n- The two marker implementations have materially different strictness and placement semantics in `crates/jit/src/profile/render.rs:131` and `crates/jit/src/validation/projection.rs:279`.\n\nThe proposed `declarations` → `repository_state` → validation direction, with storage limited to capture/publication, fits the repository’s separation-of-concerns rules.\n\n## Decomposition and dependencies\n\nBlocking failure. The revised assurance split duplicates REQ-06 implementation work already assigned to the Group A materializers package.\n\nAt `dev/active/cdc840ad-plan.md:89`, “Implement materializers, drift, and repair” is responsible for implementing drift comparison, deterministic validation errors, transactional repair, authored-content preservation, and tests. At line 111, “Validate drift diagnosis and transactional repair” again says that the same validation behavior and repair mechanism will be completed, hardened, and proven after integration, using substantially identical acceptance criteria.\n\nThis leaves no executable boundary between the tasks: if Group A satisfies its criteria, the later REQ-06 task has no defined implementation work; if the later task is necessary to complete the behavior, Group A cannot satisfy its own criteria before integration. The graph ordering is otherwise coherent and transitively reduced, but this overlap violates the requirement that each task be independently implementable and testable.\n\n## Risks and actionability\n\nPass apart from the decomposition defect above. The plan resolves the material risks around path aliasing, capture closure, preimage races, absent-root publication, recovery ordering, typed identity/time authority, audit preservation, deletion rollback, and mixed-authority repair at `dev/active/cdc840ad-plan.md:153–180`. The scope reductions for root binding and claim-v2 are explicit and consistent across all linked documents.\n\n## Prior review feedback\n\nThe prior recorded plan review passed with no findings. Its reviewed revision used one combined assurance task; the current post-review revision introduced the overlapping REQ-06 split described above, so the prior pass does not establish that the current decomposition is sound.\n\n## Findings\n\n1. **F1 — High, blocking:** REQ-06 drift diagnosis and transactional repair are assigned to both the Group A materializers package and the post-integration assurance task. Define a non-overlapping boundary—either Group A implements the mechanism while assurance only verifies it, or Group A supplies primitives and the later task owns the CLI validation/fix behavior—and make each task’s criteria reflect that boundary.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The architecture is sound and complete, but the revised decomposition assigns REQ-06 implementation and testing to two overlapping tasks.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-06 drift diagnosis and transactional repair are assigned to both the Group A materializers package and the post-integration assurance task, leaving no independently executable boundary.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":111}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 7898 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f75c4-fb2c-7d80-b30e-16be838b436f\n--------\nuser\n--- 7885 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The architecture is sound and complete, but the revised decomposition assigns REQ-06 implementation and testing to two overlapping tasks.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "REQ-06 drift diagnosis and transactional repair are assigned to both the Group A materializers package and the post-integration assurance task, leaving no independently executable boundary.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 111
+      }
+    ]
+  }
+}
