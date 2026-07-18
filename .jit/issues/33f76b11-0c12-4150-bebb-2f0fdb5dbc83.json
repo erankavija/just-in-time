@@ -1,0 +1,34 @@
+{
+  "id": "33f76b11-0c12-4150-bebb-2f0fdb5dbc83",
+  "title": "planning: Complete profile lifecycle, composition, and upgrades",
+  "description": "Planning node for Complete profile lifecycle, composition, and upgrades (c639cfb5). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/c639cfb5-plan.md and link it to this node once written.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f"
+  ],
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-18T09:28:56.133684642Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "component:cli",
+    "component:storage",
+    "type:planning"
+  ],
+  "created_at": "2026-07-18T09:28:56.124408965Z",
+  "updated_at": "2026-07-18T09:28:56.227843251Z",
+  "first_ready_at": "2026-07-18T09:28:56.124409415Z"
+}

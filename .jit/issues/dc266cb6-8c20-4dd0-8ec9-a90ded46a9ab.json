@@ -1,0 +1,33 @@
+{
+  "id": "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab",
+  "title": "planning: Transactional repository materialization and derived-state coherence",
+  "description": "Planning node for Transactional repository materialization and derived-state coherence (cdc840ad). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/cdc840ad-plan.md and link it to this node once written.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-18T09:28:48.217564166Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:repository-materialization",
+    "milestone:v1.0",
+    "component:storage",
+    "component:validation",
+    "component:cli",
+    "per:@/charter/D-6",
+    "type:planning"
+  ],
+  "created_at": "2026-07-18T09:28:48.208550579Z",
+  "updated_at": "2026-07-18T09:28:48.217585506Z",
+  "first_ready_at": "2026-07-18T09:28:48.208551119Z"
+}

@@ -6,9 +6,10 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "080e54c6-8b70-40c5-9bbe-6a9f720a09ce",
+    "cdc840ad-9332-4936-9381-772318967f0f",
     "6eb585bc-998d-4778-906d-415fcdc1916e",
-    "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f"
+    "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f",
+    "080e54c6-8b70-40c5-9bbe-6a9f720a09ce"
   ],
   "gates_required": [
     "cargo-ci",
@@ -34,6 +35,6 @@
     "satisfies:REQ-11"
   ],
   "created_at": "2026-07-15T09:12:53.177775002Z",
-  "updated_at": "2026-07-15T11:20:53.818037880Z",
+  "updated_at": "2026-07-18T09:29:13.417074620Z",
   "first_ready_at": "2026-07-15T09:12:53.177775272Z"
 }

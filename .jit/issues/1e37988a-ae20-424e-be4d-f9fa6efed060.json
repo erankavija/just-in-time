@@ -1,0 +1,42 @@
+{
+  "id": "1e37988a-ae20-424e-be4d-f9fa6efed060",
+  "title": "breakdown: Transactional repository materialization and derived-state coherence",
+  "description": "Breakdown node bracketing Transactional repository materialization and derived-state coherence (cdc840ad). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab"
+  ],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "coverage-preview": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-18T09:28:48.226321772Z"
+    },
+    "breakdown-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-18T09:28:48.234569148Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:repository-materialization",
+    "milestone:v1.0",
+    "component:storage",
+    "component:validation",
+    "component:cli",
+    "per:@/charter/D-6",
+    "type:breakdown",
+    "brackets:cdc840ad"
+  ],
+  "created_at": "2026-07-18T09:28:48.217710536Z",
+  "updated_at": "2026-07-18T09:28:48.259662826Z",
+  "first_ready_at": "2026-07-18T09:28:48.217710976Z"
+}
