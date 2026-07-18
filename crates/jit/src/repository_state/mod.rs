@@ -14,15 +14,15 @@ pub use image::{
     ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
     ListingFingerprint, MaterializationIntent, PinnedDocumentEvidence, PinnedSourceClass,
     PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
-    RepositorySeed, RepositorySeedKind, TargetClaim,
+    RepositorySeed, RepositorySeedKind, SeedError, TargetClaim,
 };
 pub use managed_document::{
     compose_managed_documents, render_managed_document, ManagedDocumentClaim, ManagedDocumentError,
     RegionPlacement,
 };
 pub use path::{
-    InjectivityProof, RepositoryLayout, RepositoryLayoutError, RepositoryRootEvidence,
-    RootRelativePath, VirtualPath,
+    InjectivityProof, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
+    RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
 
 use crate::declarations::rules::RuleSet;
