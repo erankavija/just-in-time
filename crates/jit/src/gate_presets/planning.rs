@@ -153,7 +153,7 @@ pub(crate) fn package_gate_preset(key: &str) -> Result<GatePresetDefinition> {
 /// enforce = true
 /// assert = { label-coverage = { marker = "[hard]", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependencies" } }
 /// "#;
-/// let set = RuleSet::from_toml_str(toml, Path::new("/x")).unwrap();
+/// let set = RuleSet::parse(toml, None, []).unwrap();
 /// let preview = preview_coverage_rule(&set.rules[0], "breakdown").unwrap();
 ///
 /// // Keyed on the breakdown type, not epic+done.
@@ -239,7 +239,6 @@ mod tests {
     use super::*;
     use crate::declarations::rules::RuleSet;
     use crate::declarations::{GateMode, GateStage};
-    use std::path::Path;
 
     fn closure_ruleset() -> RuleSet {
         // Mirrors the SDD/research closure `label-coverage` instance.
@@ -251,7 +250,7 @@ severity = "error"
 enforce = true
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"] } }
 "#;
-        RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap()
+        RuleSet::parse(toml, None, []).unwrap()
     }
 
     #[test]
@@ -395,7 +394,7 @@ name = "needs-criteria"
 when = { state = "ready" }
 assert = { require-section = { heading = "Success Criteria" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/x")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         let err = preview_coverage_rule(&set.rules[0], "breakdown").unwrap_err();
         assert!(err.to_string().contains("label-coverage"));
     }

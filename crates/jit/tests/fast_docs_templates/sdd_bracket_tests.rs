@@ -44,8 +44,11 @@ fn example_dir(name: &str) -> PathBuf {
 /// `example_rulesets_tests.rs`, kept here so this file owns its dependencies.)
 fn load_example(name: &str) -> RuleSet {
     let dir = example_dir(name);
-    RuleSet::load(&dir)
-        .unwrap_or_else(|e| panic!("example '{name}' rules.toml must load cleanly: {e}"))
+    jit::validation::rule_loader::load_ruleset(
+        &dir,
+        &toml::from_str::<jit::config::JitConfig>("").unwrap(),
+    )
+    .unwrap_or_else(|e| panic!("example '{name}' rules.toml must load cleanly: {e}"))
 }
 
 /// The graph-scope rules of a set, as the slice [`evaluate_graph`] expects.

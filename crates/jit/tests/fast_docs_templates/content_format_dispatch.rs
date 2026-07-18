@@ -26,14 +26,13 @@ use jit::domain::{ContentFormat, Issue};
 use jit::validation::local::evaluate_local;
 #[cfg(any(not(feature = "html"), not(feature = "xml")))]
 use jit::validation::local::LocalEvalError;
-use std::path::Path;
 
 /// A `require-section` rule (enforce/error) keyed on epics: the issue MUST have a
 /// parsed `Success Criteria` section. Whether the section is found depends ENTIRELY
 /// on which parser ran over the body, which is exactly the dispatch we want to
 /// observe.
 fn require_criteria_rule() -> RuleSet {
-    RuleSet::from_toml_str(
+    RuleSet::parse(
         r#"
 [[rules]]
 name = "epic-needs-criteria"
@@ -42,7 +41,8 @@ severity = "error"
 enforce = true
 assert = { require-section = { heading = "Success Criteria" } }
 "#,
-        Path::new("/nonexistent"),
+        None,
+        [],
     )
     .unwrap()
 }
@@ -179,10 +179,11 @@ fn test_html_graph_label_coverage_uses_html_parser_in_production() {
     use jit::domain::type_taxonomy::HierarchyConfig;
     use jit::validation::graph::evaluate_graph;
 
-    let rule = RuleSet::from_toml_str(
+    let rule = RuleSet::parse(
         "[[rules]]\nname = \"coverage\"\nwhen = { type = \"epic\" }\n\
          severity = \"error\"\nassert = { label-coverage = { child-state = \"done\" } }\n",
-        Path::new("/nonexistent"),
+        None,
+        [],
     )
     .unwrap()
     .rules

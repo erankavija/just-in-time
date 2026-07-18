@@ -68,13 +68,13 @@ fn gate_address(key: &str) -> String {
 /// use jit::declarations::GateRegistry;
 /// use jit::declarations::rules::RuleSet;
 /// use jit::validation::rules_gates_projection::render_rules_and_gates_markdown;
-/// use std::path::Path;
 ///
-/// let rules = RuleSet::from_toml_str(
+/// let rules = RuleSet::parse(
 ///     "[[rules]]\nname = \"label-format\"\ndescription = \"Labels are namespace:value.\"\n\
 ///      severity = \"error\"\nenforce = true\n\
 ///      assert = { require-label = { label = \"type:*\" } }\n",
-///     Path::new("/nonexistent"),
+///     None,
+///     [],
 /// )
 /// .unwrap();
 /// let gates = GateRegistry::default();
@@ -203,15 +203,14 @@ fn render_id_anchor(rules: &RuleSet, gates: &GateRegistry) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::declarations::GateDefinition as Gate;
+    use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
     use std::collections::HashMap;
-    use std::path::Path;
 
     fn ruleset() -> RuleSet {
         // `label-format` carries a description (rendered verbatim); `orphan-leaf`
         // has none (exercises the name fallback), so one fixture covers both.
-        RuleSet::from_toml_str(
+        RuleSet::parse(
             r#"
 [[rules]]
 name = "label-format"
@@ -226,13 +225,14 @@ severity = "warn"
 enforce = false
 assert = { require-section = { heading = "Goal" } }
 "#,
-            Path::new("/nonexistent"),
+            None,
+            [],
         )
         .unwrap()
     }
 
-    fn gate(key: &str, title: &str, description: &str) -> Gate {
-        Gate {
+    fn gate(key: &str, title: &str, description: &str) -> GateDefinition {
+        GateDefinition {
             version: 1,
             key: key.to_string(),
             title: title.to_string(),
@@ -296,7 +296,7 @@ assert = { require-section = { heading = "Goal" } }
         // REQ-04: a described rule renders its description then the prose suffix;
         // a description-less rule falls back to its name. The suffix is prose
         // (`error, enforced` / `warn, advisory`), never `severity: …, enforce: …`.
-        let rules = RuleSet::from_toml_str(
+        let rules = RuleSet::parse(
             r#"
 [[rules]]
 name = "described"
@@ -311,7 +311,8 @@ severity = "warn"
 enforce = false
 assert = { require-section = { heading = "Goal" } }
 "#,
-            Path::new("/nonexistent"),
+            None,
+            [],
         )
         .unwrap();
         let md = render_rules_and_gates_markdown(

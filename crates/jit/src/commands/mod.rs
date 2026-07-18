@@ -98,7 +98,7 @@ pub use crate::storage::worktree_identity::WorktreeIdentity;
 use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
-use crate::declarations::{GateDefinition as Gate, GateMode};
+use crate::declarations::{GateDefinition, GateMode};
 use crate::domain::{
     is_dependency_met, Event, GateState, GateStatus, Issue, LabelNamespaces, Priority, State,
 };
@@ -398,7 +398,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// and the outcome (success or failure) is cached.
     pub fn rules(&self) -> Result<&RuleSet, &RuleConfigError> {
         self.rules
-            .get_or_init(|| RuleSet::load(self.storage.root()))
+            .get_or_init(|| {
+                let config =
+                    self.config_manager
+                        .load()
+                        .map_err(|error| RuleConfigError::Configuration {
+                            message: error.to_string(),
+                        })?;
+                crate::validation::rule_loader::load_ruleset(self.storage.root(), &config)
+            })
             .as_ref()
     }
 

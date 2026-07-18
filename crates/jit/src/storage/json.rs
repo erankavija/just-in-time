@@ -1492,7 +1492,7 @@ fn assert_canonical_contained(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::declarations::GateDefinition as Gate;
+    use crate::declarations::GateDefinition;
     use crate::storage::IssueStore;
     use tempfile::TempDir;
 
@@ -1956,7 +1956,7 @@ mod tests {
         let mut registry = storage.load_gate_registry().unwrap();
         assert!(registry.gates.is_empty());
 
-        let gate = Gate {
+        let gate = GateDefinition {
             version: 1,
             key: "review".to_string(),
             title: "Code Review".to_string(),

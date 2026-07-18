@@ -1241,7 +1241,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::declarations::GateDefinition as Gate;
+    use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
     use crate::domain::State;
     use crate::storage::InMemoryStorage;
@@ -1270,7 +1270,7 @@ enforce_leases = "off"
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "tdd-reminder".to_string(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: "tdd-reminder".to_string(),
                 title: "TDD Reminder".to_string(),
@@ -1327,7 +1327,7 @@ enforce_leases = "off"
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "tdd-reminder".to_string(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: "tdd-reminder".to_string(),
                 title: "TDD Reminder".to_string(),

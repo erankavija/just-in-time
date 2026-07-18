@@ -4,7 +4,7 @@ use super::{
     derive_preset_projection, project_package, EmbeddedProfilePackage, PackageProjection,
     ProfilePackageError, ProjectionError,
 };
-use crate::declarations::GateDefinition as Gate;
+use crate::declarations::GateDefinition;
 use include_dir::{include_dir, Dir};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -45,7 +45,7 @@ pub fn jit_dogfood_package() -> Result<EmbeddedProfilePackage<'static>, DogfoodP
 }
 
 /// Deserialize one gate definition from the package's authored gate inventory.
-pub fn jit_dogfood_gate(key: &str) -> Result<Gate, DogfoodProfileError> {
+pub fn jit_dogfood_gate(key: &str) -> Result<GateDefinition, DogfoodProfileError> {
     let package = jit_dogfood_package()?;
     let value = derive_preset_projection(&package)
         .gates
@@ -193,7 +193,6 @@ mod tests {
     use super::*;
     use crate::commands::CommandExecutor;
     use crate::config::ProjectionStyle;
-    use crate::declarations::rules::RuleSet;
     use crate::declarations::GateRegistry;
     use crate::hierarchy_templates::HierarchyTemplate;
     use crate::profile::{Contribution, KeyedArrayTarget, MapEntryTarget};
@@ -609,7 +608,12 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        let rules = RuleSet::from_toml_str(&rules_toml, temp.path()).unwrap();
+        let rules = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
+            &rules_toml,
+            temp.path(),
+            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        )
+        .unwrap();
         let mut gates = GateRegistry::default();
         for key in [
             "plan-review",

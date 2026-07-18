@@ -8,7 +8,7 @@
 
 use crate::config::{JitConfig, ProjectionMode};
 use crate::config_manager::ConfigManager;
-use crate::declarations::rules::{RuleConfigError, RuleSet, SchemaSource, Severity};
+use crate::declarations::rules::{RuleConfigError, RuleSet, Severity};
 use crate::declarations::GateChecker;
 use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
@@ -585,38 +585,39 @@ fn load_rules(
         return Ok(crate::validation::defaults::default_ruleset(namespaces));
     };
     let jit_root = view.repository_root().join(".jit");
-    let parsed = RuleSet::from_toml_str_with_loaders(
-        &content,
-        &jit_root,
-        Some(config),
-        |rule, reference| {
-            let path = format!(".jit/{reference}");
-            let synthetic_path = jit_root.join(&reference);
-            let bytes =
-                view.read_file(Path::new(&path))
-                    .map_err(|error| RuleConfigError::SchemaIo {
-                        rule: rule.to_string(),
-                        path: synthetic_path.clone(),
+    let schemas = RuleSet::schema_requests(&content)?.into_iter().try_fold(
+        BTreeMap::new(),
+        |mut schemas, request| {
+            let path = format!(".jit/{}", request.reference);
+            let synthetic_path = jit_root.join(&request.reference);
+            match view.read_file(Path::new(&path)) {
+                Ok(Some(bytes)) => {
+                    schemas.insert(request.reference, bytes);
+                }
+                Ok(None) if !request.required => {}
+                Ok(None) => {
+                    return Err(RuleConfigError::SchemaIo {
+                        rule: request.rule,
+                        path: synthetic_path,
+                        source: IoError::new(
+                            ErrorKind::NotFound,
+                            "schema absent from repository view",
+                        ),
+                    });
+                }
+                Err(_) if !request.required => {}
+                Err(error) => {
+                    return Err(RuleConfigError::SchemaIo {
+                        rule: request.rule,
+                        path: synthetic_path,
                         source: IoError::other(error.to_string()),
-                    })?;
-            let content = bytes.ok_or_else(|| RuleConfigError::SchemaIo {
-                rule: rule.to_string(),
-                path: synthetic_path.clone(),
-                source: IoError::new(ErrorKind::NotFound, "schema absent from repository view"),
-            })?;
-            let schema =
-                serde_json::from_slice(&content).map_err(|source| RuleConfigError::SchemaJson {
-                    rule: rule.to_string(),
-                    path: synthetic_path.clone(),
-                    source,
-                })?;
-            Ok(SchemaSource {
-                reference,
-                path: synthetic_path,
-                schema,
-            })
+                    });
+                }
+            }
+            Ok(schemas)
         },
     )?;
+    let parsed = RuleSet::parse(&content, Some(config), schemas)?;
     Ok(crate::validation::defaults::reconcile_default_rules_with_config(parsed, namespaces))
 }
 

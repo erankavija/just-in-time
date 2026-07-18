@@ -89,7 +89,7 @@ pub enum LocalEvalError {
 /// enforce = true
 /// assert = { require-label = { label = "req:*", min = 1 } }
 /// "#;
-/// let rules = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+/// let rules = RuleSet::parse(toml, None, []).unwrap();
 ///
 /// // An epic with no `req:*` label violates the enforce rule.
 /// let mut epic = Issue::new("An epic".to_string(), String::new());
@@ -245,7 +245,7 @@ impl LocalEvaluation {
 /// severity = "warn"
 /// assert = { require-doc-type = { doc-type = "design" } }
 /// "#;
-/// let rules = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+/// let rules = RuleSet::parse(toml, None, []).unwrap();
 ///
 /// let mut task = Issue::new("A task".to_string(), String::new());
 /// task.labels = vec!["type:task".to_string()];
@@ -414,10 +414,9 @@ fn schema_needs_sections(schema: &serde_json::Value) -> bool {
 mod tests {
     use super::*;
     use crate::domain::{DocumentReference, Issue};
-    use std::path::Path;
 
     fn rules_from(toml: &str) -> RuleSet {
-        RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap()
+        RuleSet::parse(toml, None, []).unwrap()
     }
 
     fn epic_without_req() -> Issue {
@@ -872,7 +871,12 @@ severity = "error"
 enforce = true
 assert = { json-schema = "schemas/bad.json" }
 "#;
-        let rules = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+        let rules = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
+            toml,
+            dir.path(),
+            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        )
+        .unwrap();
         let err = evaluate_local(&epic_without_req(), &rules, ContentFormat::Markdown).unwrap_err();
         assert!(matches!(err, LocalEvalError::Compile(_)));
     }

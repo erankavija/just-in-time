@@ -16,9 +16,7 @@
 //! transparently. [`save_gate_registry`] strips null-valued `reserved` entries
 //! before writing so a gate carrying one still persists successfully.
 
-use crate::declarations::{
-    parse_gate_registry, serialize_gate_registry as serialize_declaration_registry, GateRegistry,
-};
+use crate::declarations::{parse_gate_registry, serialize_gate_registry, GateRegistry};
 use crate::storage::atomic_write::write_file_atomic;
 use anyhow::{Context, Result};
 use std::path::Path;
@@ -55,13 +53,13 @@ pub fn load_gate_registry(jit_root: &Path) -> Result<GateRegistry> {
 /// # Examples
 ///
 /// ```
-/// use jit::declarations::{GateDefinition as Gate, GateMode, GateStage};
+/// use jit::declarations::{GateDefinition, GateMode, GateStage};
 /// use jit::storage::gate_store::{load_gate_registry, save_gate_registry};
 /// use jit::declarations::GateRegistry;
 /// use std::collections::HashMap;
 ///
 /// let dir = tempfile::tempdir().unwrap();
-/// let gate = Gate {
+/// let gate = GateDefinition {
 ///     version: 1,
 ///     key: "review".to_string(),
 ///     title: "Code Review".to_string(),
@@ -88,29 +86,20 @@ pub fn load_gate_registry(jit_root: &Path) -> Result<GateRegistry> {
 /// );
 /// ```
 pub fn save_gate_registry(jit_root: &Path, registry: &GateRegistry) -> Result<()> {
-    let toml_str = serialize_gate_registry(registry)?;
+    let bytes = serialize_gate_registry(registry).context("Failed to serialize gate registry")?;
+    let toml_str = String::from_utf8(bytes).context("serialized gate registry was not UTF-8")?;
     write_file_atomic(&jit_root.join(GATES_FILE), &toml_str)
-}
-
-/// Serialize a gate registry into its deterministic on-disk image without I/O.
-///
-/// Fresh initialization uses this alongside [`save_gate_registry`] so ordinary
-/// and transactional scaffold publication share one byte constructor.
-pub fn serialize_gate_registry(registry: &GateRegistry) -> Result<String> {
-    let bytes =
-        serialize_declaration_registry(registry).context("Failed to serialize gate registry")?;
-    String::from_utf8(bytes).context("serialized gate registry was not UTF-8")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::declarations::GateDefinition as Gate;
+    use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
     use std::collections::HashMap;
 
-    fn sample_gate(key: &str) -> Gate {
-        Gate {
+    fn sample_gate(key: &str) -> GateDefinition {
+        GateDefinition {
             version: 1,
             key: key.to_string(),
             title: format!("{key} title"),
@@ -140,7 +129,7 @@ mod tests {
         let mut env = HashMap::new();
         env.insert("KEY".to_string(), "value".to_string());
 
-        let gate = Gate {
+        let gate = GateDefinition {
             version: 2,
             key: "clippy".to_string(),
             title: "Clippy".to_string(),
@@ -239,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_save_gate_registry_strips_null_reserved_entry() {
-        // REQ-03: `Gate.reserved` may carry a `serde_json::Value::Null` (e.g.
+        // REQ-03: `GateDefinition.reserved` may carry a `serde_json::Value::Null` (e.g.
         // round-tripped from a JSON-authored gate). TOML cannot represent it, so
         // the store must strip it rather than fail the write.
         let dir = tempfile::tempdir().unwrap();

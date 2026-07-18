@@ -2908,9 +2908,8 @@ mod tests {
 
     #[test]
     fn test_gate_definition_from_gate_round_trips_stage_mode() {
-        use crate::declarations::GateDefinition as Gate;
         use crate::declarations::{GateMode, GateStage};
-        let gate = Gate {
+        let gate = crate::declarations::GateDefinition {
             version: 1,
             key: "tests".to_string(),
             title: "Tests".to_string(),

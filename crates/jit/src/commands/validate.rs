@@ -470,8 +470,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         if rules_path.exists() {
             // Present: parse it directly (do NOT go through the cached
             // `effective_rules`, which `?`-errors). A parse failure -> unloadable.
-            crate::declarations::rules::RuleSet::load(self.storage.root())
+            self.config_manager
+                .load()
                 .ok()
+                .and_then(|config| {
+                    crate::validation::rule_loader::load_ruleset(self.storage.root(), &config).ok()
+                })
                 .map(|set| set.rules.into_iter().map(|r| r.name).collect())
         } else {
             // Absent: the in-memory defaults are loadable. A namespace-registry

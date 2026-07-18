@@ -343,7 +343,7 @@ const NAMESPACE_UNIQUE_PREFIX: &str = "namespace-unique-";
 
 /// The `namespace-unique-*` file-membership delta between the rules currently
 /// authored on disk (`loaded`, i.e. `.jit/rules.toml` as parsed by
-/// [`RuleSet::load`](crate::declarations::rules::RuleSet::load) — NOT the
+/// the production rules loader — NOT the
 /// in-memory-reconciled set [`reconcile_default_rules_with_config`] produces)
 /// and the CURRENT `namespaces` registry.
 ///
@@ -390,7 +390,7 @@ impl DefaultRuleMembershipDiff {
 /// (a custom rule shadowing the default name) is never counted as "existing"
 /// here, never targeted for drop, and SUPPRESSES the append of the derived
 /// default row — the shadowing rule keeps the name, so the sync never writes a
-/// duplicate-name file that `RuleSet::load` would reject. This matches how
+/// duplicate-name file that the production rules loader would reject. This matches how
 /// [`reconcile_default_rules_with_config`] only ever touches `origin =
 /// "default"` rows and skips a derived default whose name is already present.
 ///
@@ -479,7 +479,7 @@ pub fn default_rule_membership_diff_from_identities(
         .collect();
     // EVERY existing rule name, regardless of origin: a custom rule shadowing a
     // derived default name must suppress the append, or the sync would write a
-    // duplicate-name file that `RuleSet::load` rejects (jit:d74a9ed1 review F1,
+    // duplicate-name file that the production rules loader rejects (jit:d74a9ed1 review F1,
     // round 10).
     let taken: HashSet<&str> = existing_rules
         .iter()
@@ -1303,7 +1303,7 @@ mod tests {
         // `namespace-unique-team`. It is never counted as "existing" for this
         // family, never a drop target, and OWNS the name: the derived default
         // row is suppressed rather than appended beside it, so the sync can
-        // never write a duplicate-name file that `RuleSet::load` rejects
+        // never write a duplicate-name file that the production rules loader rejects
         // (jit:d74a9ed1 review F1, round 10).
         let loaded = RuleSet {
             rules: vec![custom_json_rule("namespace-unique-team")],

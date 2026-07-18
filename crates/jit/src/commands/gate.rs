@@ -627,7 +627,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(warnings)
     }
 
-    pub fn list_gates(&self) -> Result<Vec<Gate>> {
+    pub fn list_gates(&self) -> Result<Vec<GateDefinition>> {
         let registry = self.storage.load_gate_registry()?;
         Ok(registry.gates.into_values().collect())
     }
@@ -652,7 +652,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         registry.gates.insert(
             key.clone(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: key.clone(),
                 title,
@@ -725,7 +725,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         registry.gates.insert(
             key.clone(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: key.clone(),
                 title,
@@ -766,13 +766,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// automated mode must have a configured checker (and an exec checker must
     /// have a non-empty command), while a manual gate carries no checker.
     ///
-    /// Returns the updated [`Gate`] so callers can render it.
+    /// Returns the updated [`GateDefinition`] so callers can render it.
     ///
     /// # Examples
     ///
     /// ```
     /// use jit::commands::{CommandExecutor, GateUpdate};
-    /// use jit::declarations::{GateDefinition as Gate, GateMode, GateStage};
+    /// use jit::declarations::{GateDefinition, GateMode, GateStage};
     /// use jit::{InMemoryStorage, IssueStore};
     ///
     /// std::env::set_var("JIT_TEST_MODE", "1"); // skip the main-history guard
@@ -782,7 +782,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let mut registry = executor.storage().load_gate_registry().unwrap();
     /// registry.gates.insert(
     ///     "tests".to_string(),
-    ///     Gate {
+    ///     GateDefinition {
     ///         version: 1,
     ///         key: "tests".to_string(),
     ///         title: "Old title".to_string(),
@@ -811,7 +811,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// assert_eq!(updated.title, "All Tests Pass");
     /// assert_eq!(updated.description, "Desc");
     /// ```
-    pub fn update_gate(&self, key: &str, update: GateUpdate) -> Result<Gate> {
+    pub fn update_gate(&self, key: &str, update: GateUpdate) -> Result<GateDefinition> {
         use crate::declarations::{GateChecker, GateMode};
 
         // Global operation - enforce common history with main (mirrors define_gate).
@@ -949,7 +949,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             ));
         }
 
-        let updated = Gate {
+        let updated = GateDefinition {
             version: current.version,
             key: current.key.clone(),
             title: update.title.unwrap_or(current.title),
@@ -993,7 +993,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    pub fn show_gate_definition(&self, key: &str) -> Result<Gate> {
+    pub fn show_gate_definition(&self, key: &str) -> Result<GateDefinition> {
         let registry = self.storage.load_gate_registry()?;
         registry
             .gates
@@ -1195,7 +1195,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::declarations::GateDefinition as Gate;
+    use crate::declarations::GateDefinition;
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
@@ -1223,7 +1223,7 @@ enforce_leases = "off"
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "auto-gate".to_string(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: "auto-gate".to_string(),
                 title: "Automated Gate".to_string(),
@@ -1281,7 +1281,7 @@ enforce_leases = "off"
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             key.to_string(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: key.to_string(),
                 title: key.to_string(),
@@ -1354,7 +1354,7 @@ enforce_leases = "off"
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "auto-gate".to_string(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: "auto-gate".to_string(),
                 title: "Automated Gate".to_string(),
@@ -1415,7 +1415,7 @@ enforce_leases = "off"
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "manual-gate".to_string(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: "manual-gate".to_string(),
                 title: "Manual Gate".to_string(),

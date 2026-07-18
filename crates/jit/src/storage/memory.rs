@@ -355,7 +355,7 @@ impl IssueStore for InMemoryStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::declarations::GateDefinition as Gate;
+    use crate::declarations::GateDefinition;
     use crate::domain::{Priority, State};
 
     #[test]
@@ -497,7 +497,7 @@ mod tests {
         assert_eq!(registry.gates.len(), 0);
 
         let mut new_registry = GateRegistry::default();
-        let gate = Gate {
+        let gate = GateDefinition {
             version: 1,
             key: "test-gate".to_string(),
             title: "Test Gate".to_string(),

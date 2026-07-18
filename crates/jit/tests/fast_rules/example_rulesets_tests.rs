@@ -2,7 +2,7 @@
 //!
 //! These prove the examples are REAL, not illustrative-only:
 //!
-//! 1. Every example `rules.toml` parses through the production [`RuleSet::load`]
+//! 1. Every example `rules.toml` parses through the production filesystem boundary
 //!    loader (with the schema root pointed at the example directory, so any
 //!    referenced `schemas/*.json` is read and compiled).
 //! 2. For each methodology, a sample COMPLIANT issue passes and a sample
@@ -37,8 +37,11 @@ fn example_dir(name: &str) -> PathBuf {
 /// the example directory itself.
 fn load_example(name: &str) -> RuleSet {
     let dir = example_dir(name);
-    RuleSet::load(&dir)
-        .unwrap_or_else(|e| panic!("example '{name}' rules.toml must load cleanly: {e}"))
+    jit::validation::rule_loader::load_ruleset(
+        &dir,
+        &toml::from_str::<jit::config::JitConfig>("").unwrap(),
+    )
+    .unwrap_or_else(|e| panic!("example '{name}' rules.toml must load cleanly: {e}"))
 }
 
 /// The graph-scope rules of a set, as the slice [`evaluate_graph`] expects.

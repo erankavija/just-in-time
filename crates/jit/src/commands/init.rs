@@ -71,8 +71,7 @@ impl InitScaffold {
             ),
             (
                 ".jit/gates.toml".to_string(),
-                crate::storage::gate_store::serialize_gate_registry(&GateRegistry::default())?
-                    .into_bytes(),
+                crate::declarations::serialize_gate_registry(&GateRegistry::default())?,
             ),
             (".jit/events.jsonl".to_string(), Vec::new()),
             (".jit/config.toml".to_string(), config.into_bytes()),

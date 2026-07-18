@@ -28,7 +28,7 @@
 //!
 //! # Round-trip contract
 //!
-//! Re-loading the emitted file with [`RuleSet::load`](crate::declarations::rules::RuleSet::load)
+//! Re-loading the emitted file through the validation filesystem boundary
 //! reproduces every rule field — name, origin, selector, severity, enforce,
 //! assertion kind, and (for JSON Schema) the parsed schema VALUE — EXCEPT the
 //! [`SchemaSource`](crate::declarations::rules::SchemaSource) `reference`/`path`,
@@ -481,7 +481,6 @@ mod tests {
     use crate::domain::{LabelNamespace, LabelNamespaces};
     use crate::validation::defaults::default_ruleset;
     use std::collections::HashMap;
-    use std::path::Path;
 
     fn registry(entries: Vec<(&str, LabelNamespace)>) -> LabelNamespaces {
         let mut namespaces = HashMap::new();
@@ -507,7 +506,11 @@ mod tests {
             std::fs::write(schemas.join(&f.name), &f.content).unwrap();
         }
         std::fs::write(dir.path().join("rules.toml"), &out.rules_toml).unwrap();
-        let reloaded = RuleSet::load(dir.path()).expect("serialized rules.toml must reload");
+        let reloaded = crate::validation::rule_loader::load_ruleset(
+            dir.path(),
+            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        )
+        .expect("serialized rules.toml must reload");
         (dir, reloaded)
     }
 
@@ -622,7 +625,7 @@ name = "muted"
 severity = "off"
 assert = { require-section = { heading = "Goals" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         assert_eq!(set.rules[0].severity, Severity::Off);
         assert_round_trips(&set);
     }
@@ -643,7 +646,7 @@ name = "without-origin"
 severity = "warn"
 assert = { require-section = { heading = "Goals" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         assert_eq!(set.rules[0].origin.as_deref(), Some("bracket"));
         assert_eq!(set.rules[1].origin, None);
         let out = serialize_ruleset(&set);
@@ -667,7 +670,7 @@ name = "without-description"
 severity = "warn"
 assert = { require-section = { heading = "Goals" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         assert_eq!(
             set.rules[0].description.as_deref(),
             Some("Every label must be namespace:value.")
@@ -731,7 +734,7 @@ name = "ctc-custom-section"
 severity = "warn"
 assert = { criteria-to-check = { criteria-section = "acceptance_criteria", gate-prefix = "gate:" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         assert_round_trips(&set);
     }
 
@@ -756,7 +759,7 @@ when = { type = "task" }
 severity = "error"
 assert = { dependency-shape = { target = { type = "design" }, mode = "must", transitive = true } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         assert_round_trips(&set);
     }
 
@@ -768,7 +771,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must", tra
 name = "marker"
 assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         let out = serialize_ruleset(&set);
         // Rendered as a literal string (single quotes), backslashes intact.
         assert!(out.rules_toml.contains(r"regex = '^\[hard\]\s+\w+'"));
@@ -797,7 +800,7 @@ name = "list-state"
 when = { state = ["ready", "in_progress", "gated"] }
 assert = { require-section = { heading = "Plan" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         let out = serialize_ruleset(&set);
         assert!(out.rules_toml.contains(r#"state = "in_progress""#));
         assert!(out
@@ -823,7 +826,7 @@ when = { type = "epic" }
 severity = "warn"
 assert = { criteria-label-match = { namespace = "req", criteria-section = "hard_requirements", id-pattern = 'REQ-[0-9]+' } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         assert_eq!(set.rules.len(), 2);
         assert_eq!(set.rules[0].scope, RuleScope::Graph);
         assert_round_trips(&set);
@@ -863,7 +866,11 @@ assert = { json-schema = "schemas/second.json" }
         std::fs::write(schemas.join("first.json"), "{\"const\": 1}\n").unwrap();
         std::fs::write(schemas.join("second.json"), "{\"const\": 2}\n").unwrap();
         std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
-        let set = RuleSet::load(dir.path()).unwrap();
+        let set = crate::validation::rule_loader::load_ruleset(
+            dir.path(),
+            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        )
+        .unwrap();
 
         let out = serialize_ruleset(&set);
         // Both rules carry a JsonSchema, so two schema files are emitted.
@@ -941,7 +948,11 @@ assert = { json-schema = "schemas/second.json" }
 
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("rules.toml"), &block).unwrap();
-        let reloaded = RuleSet::load(dir.path()).unwrap();
+        let reloaded = crate::validation::rule_loader::load_ruleset(
+            dir.path(),
+            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        )
+        .unwrap();
         assert_eq!(reloaded.rules.len(), 1);
         assert_rules_equivalent(rule, &reloaded.rules[0]);
     }
@@ -956,7 +967,7 @@ when = { type = "epic" }
 severity = "error"
 assert = { label-uniqueness = { namespace = "req", scope = "all" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, std::path::Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         let out = serialize_ruleset(&set);
         // The rendered form must contain the namespace and scope.
         assert!(

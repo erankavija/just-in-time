@@ -217,7 +217,7 @@ pub enum ChildLink {
 /// severity = "error"
 /// assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 /// "#;
-/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+/// let set = RuleSet::parse(toml, None, []).unwrap();
 /// let rules: Vec<&_> = set.rules.iter().collect();
 ///
 /// let mut task = Issue::new("a task".into(), String::new());
@@ -327,7 +327,7 @@ impl ChildLink {
 /// severity = "error"
 /// assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 /// "#;
-/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+/// let set = RuleSet::parse(toml, None, []).unwrap();
 /// let rules: Vec<&_> = set.rules.iter().collect();
 ///
 /// let mut task = Issue::new("a task".into(), String::new());
@@ -1721,10 +1721,9 @@ mod tests {
     use super::*;
     use crate::declarations::rules::RuleSet;
     use crate::domain::State;
-    use std::path::Path;
 
     fn rule_from(toml: &str) -> Rule {
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         set.rules.into_iter().next().unwrap()
     }
 
@@ -1877,9 +1876,7 @@ mod tests {
     /// `kind = "requirement"` rule can expand.
     fn rule_from_repo(rule_toml: &str) -> Rule {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
-            dir.path().join("config.toml"),
-            r#"
+        let config_toml = r#"
 [item_kinds.requirement]
 section = "success_criteria"
 id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
@@ -1887,10 +1884,15 @@ markers = ["[hard]"]
 link-namespaces = ["satisfies"]
 scope = "issue"
 source-of-truth = "markdown-first"
-"#,
+"#;
+        std::fs::write(dir.path().join("config.toml"), config_toml).unwrap();
+        let config = toml::from_str::<crate::config::JitConfig>(config_toml).unwrap();
+        let set = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
+            rule_toml,
+            dir.path(),
+            &config,
         )
         .unwrap();
-        let set = RuleSet::from_toml_str(rule_toml, dir.path()).unwrap();
         set.rules.into_iter().next().unwrap()
     }
 
@@ -3510,7 +3512,7 @@ source-of-truth = "markdown-first"
         // The loader enforces this; we verify it surfaces as a load error.
         let toml = "[[rules]]\nname = \"bad\"\n\
                    assert = { criteria-to-check = {} }\n";
-        let err = RuleSet::from_toml_str(toml, std::path::Path::new("/x")).unwrap_err();
+        let err = RuleSet::parse(toml, None, []).unwrap_err();
         match err {
             crate::declarations::rules::RuleConfigError::InvalidAssertion { rule, message } => {
                 assert_eq!(rule, "bad");

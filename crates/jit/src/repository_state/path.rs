@@ -196,6 +196,13 @@ impl RepositoryLayout {
                 data: data.path,
             });
         }
+        if worktree.identity == data.identity {
+            return Err(RepositoryLayoutError::AliasedRepositoryRoots {
+                worktree: worktree.path,
+                data: data.path,
+                identity: worktree.identity,
+            });
+        }
         let nested_data_relative = data
             .path
             .strip_prefix(&worktree.path)
@@ -310,6 +317,18 @@ impl RepositoryLayout {
 /// Invalid root or virtual-path construction.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum RepositoryLayoutError {
+    /// Lexically distinct roots resolve to the same no-follow boundary object.
+    #[error(
+        "worktree root '{worktree}' and data root '{data}' share physical identity '{identity}'"
+    )]
+    AliasedRepositoryRoots {
+        /// Selected worktree root.
+        worktree: PathBuf,
+        /// Selected data root.
+        data: PathBuf,
+        /// Colliding no-follow boundary identity.
+        identity: String,
+    },
     /// Roots are equal or data contains worktree.
     #[error("worktree root '{worktree}' and data root '{data}' overlap ambiguously")]
     OverlappingRepositoryRoots { worktree: PathBuf, data: PathBuf },
@@ -420,6 +439,38 @@ mod tests {
             RepositoryLayout::new(root("/repo"), root("/repo/.jit-bootstrap/data")),
             Err(RepositoryLayoutError::ReservedTransactionPath(_))
         ));
+    }
+
+    #[test]
+    fn test_layout_rejects_lexically_disjoint_roots_with_same_identity() {
+        assert!(matches!(
+            RepositoryLayout::new(
+                RepositoryRootEvidence::new("/repo", "same-object", true),
+                RepositoryRootEvidence::new("/external/data", "same-object", true),
+            ),
+            Err(RepositoryLayoutError::AliasedRepositoryRoots {
+                worktree,
+                data,
+                identity,
+            }) if worktree == Path::new("/repo")
+                && data == Path::new("/external/data")
+                && identity == "same-object"
+        ));
+    }
+
+    #[test]
+    fn test_layout_accepts_distinct_identity_external_and_nested_data_roots() {
+        let external = RepositoryLayout::new(root("/repo"), root("/external/data")).unwrap();
+        assert_eq!(external.worktree_root(), Path::new("/repo"));
+        assert_eq!(external.data_root(), Path::new("/external/data"));
+
+        let nested = RepositoryLayout::new(root("/repo"), root("/repo/.jit")).unwrap();
+        assert_eq!(
+            nested
+                .classify_and_canonicalize("/repo/.jit/index.json")
+                .unwrap(),
+            VirtualPath::data("index.json").unwrap()
+        );
     }
 
     #[test]

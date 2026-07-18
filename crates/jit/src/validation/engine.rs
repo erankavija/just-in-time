@@ -158,7 +158,12 @@ pub struct SchemaCompileError {
 /// severity = "error"
 /// assert = { json-schema = "schemas/needs-state.json" }
 /// "#;
-/// let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+/// let set = jit::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
+///     toml,
+///     dir.path(),
+///     &toml::from_str::<jit::config::JitConfig>("").unwrap(),
+/// )
+/// .unwrap();
 ///
 /// let engine = SchemaEngine::new();
 /// let bad = serde_json::json!({ "priority": "high" });
@@ -270,7 +275,12 @@ impl SchemaEngine {
     /// name = "title-non-empty"
     /// assert = { json-schema = "schemas/t.json" }
     /// "#;
-    /// let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+    /// let set = jit::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
+    ///     toml,
+    ///     dir.path(),
+    ///     &toml::from_str::<jit::config::JitConfig>("").unwrap(),
+    /// )
+    /// .unwrap();
     ///
     /// // An empty title now violates the registered keyword.
     /// let bad = serde_json::json!({ "title": "" });
@@ -342,7 +352,12 @@ impl SchemaEngine {
     /// name = "state-is-string"
     /// assert = { json-schema = "schemas/string-state.json" }
     /// "#;
-    /// let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+    /// let set = jit::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
+    ///     toml,
+    ///     dir.path(),
+    ///     &toml::from_str::<jit::config::JitConfig>("").unwrap(),
+    /// )
+    /// .unwrap();
     /// let engine = SchemaEngine::new();
     ///
     /// // `state` as a number violates the schema.
@@ -908,7 +923,6 @@ mod tests {
     use super::*;
     use crate::declarations::rules::RuleSet;
     use crate::domain::State;
-    use std::path::Path;
     use tempfile::TempDir;
 
     /// Build a `RuleSet` from a single `json-schema` rule whose schema file holds
@@ -921,7 +935,12 @@ mod tests {
         let toml = format!(
             "[[rules]]\nname = \"{name}\"\nseverity = \"{severity}\"\nassert = {{ json-schema = \"schemas/s.json\" }}\n"
         );
-        let set = RuleSet::from_toml_str(&toml, dir.path()).unwrap();
+        let set = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
+            &toml,
+            dir.path(),
+            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        )
+        .unwrap();
         (dir, set)
     }
 
@@ -1035,7 +1054,7 @@ mod tests {
 name = "shorthand"
 assert = { require-label = { label = "type:*" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         let engine = SchemaEngine::new();
         let findings = engine
             .validate(&set.rules[0], &serde_json::json!({}))
@@ -1116,7 +1135,12 @@ assert = { json-schema = "schemas/a.json" }
 name = "rule-b"
 assert = { json-schema = "schemas/b.json" }
 "#;
-        let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+        let set = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
+            toml,
+            dir.path(),
+            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        )
+        .unwrap();
         let engine = SchemaEngine::new();
         let projection = serde_json::json!({});
         engine.validate(&set.rules[0], &projection).unwrap();
@@ -1143,7 +1167,12 @@ assert = { json-schema = "schemas/a.json" }
 name = "rule-b"
 assert = { json-schema = "schemas/b.json" }
 "#;
-        let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+        let set = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
+            toml,
+            dir.path(),
+            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        )
+        .unwrap();
         let engine = SchemaEngine::new();
         let projection = serde_json::json!({});
         engine.validate(&set.rules[0], &projection).unwrap();
