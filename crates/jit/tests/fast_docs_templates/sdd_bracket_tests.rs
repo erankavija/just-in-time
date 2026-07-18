@@ -44,7 +44,7 @@ fn example_dir(name: &str) -> PathBuf {
 /// `example_rulesets_tests.rs`, kept here so this file owns its dependencies.)
 fn load_example(name: &str) -> RuleSet {
     let dir = example_dir(name);
-    jit::validation::rule_loader::load_ruleset(
+    jit::storage::ruleset_store::load_ruleset(
         &dir,
         &toml::from_str::<jit::config::JitConfig>("").unwrap(),
     )

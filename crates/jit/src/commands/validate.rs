@@ -474,7 +474,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .load()
                 .ok()
                 .and_then(|config| {
-                    crate::validation::rule_loader::load_ruleset(self.storage.root(), &config).ok()
+                    crate::storage::ruleset_store::load_ruleset(self.storage.root(), &config).ok()
                 })
                 .map(|set| set.rules.into_iter().map(|r| r.name).collect())
         } else {

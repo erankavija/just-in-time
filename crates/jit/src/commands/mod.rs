@@ -405,7 +405,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .map_err(|error| RuleConfigError::Configuration {
                             message: error.to_string(),
                         })?;
-                crate::validation::rule_loader::load_ruleset(self.storage.root(), &config)
+                crate::storage::ruleset_store::load_ruleset(self.storage.root(), &config)
             })
             .as_ref()
     }

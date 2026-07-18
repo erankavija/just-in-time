@@ -1871,11 +1871,12 @@ mod tests {
         epic
     }
 
-    /// Load a single rule from `rule_toml` against a repo root whose `config.toml`
-    /// declares a `requirement` item kind matching the coverage defaults, so a
-    /// `kind = "requirement"` rule can expand.
+    /// Load a single rule from `rule_toml` against a config that declares a
+    /// `requirement` item kind matching the coverage defaults, so a
+    /// `kind = "requirement"` rule can expand. The rule carries no schema
+    /// reference, so parse purely over an empty captured schema set with the
+    /// explicit config.
     fn rule_from_repo(rule_toml: &str) -> Rule {
-        let dir = tempfile::tempdir().unwrap();
         let config_toml = r#"
 [item_kinds.requirement]
 section = "success_criteria"
@@ -1885,14 +1886,8 @@ link-namespaces = ["satisfies"]
 scope = "issue"
 source-of-truth = "markdown-first"
 "#;
-        std::fs::write(dir.path().join("config.toml"), config_toml).unwrap();
         let config = toml::from_str::<crate::config::JitConfig>(config_toml).unwrap();
-        let set = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
-            rule_toml,
-            dir.path(),
-            &config,
-        )
-        .unwrap();
+        let set = crate::declarations::rules::RuleSet::parse(rule_toml, Some(&config), []).unwrap();
         set.rules.into_iter().next().unwrap()
     }
 

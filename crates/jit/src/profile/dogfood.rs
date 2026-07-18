@@ -608,8 +608,8 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        let rules = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
-            &rules_toml,
+        std::fs::write(temp.path().join("rules.toml"), &rules_toml).unwrap();
+        let rules = crate::storage::ruleset_store::load_ruleset(
             temp.path(),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )

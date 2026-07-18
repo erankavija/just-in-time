@@ -871,8 +871,8 @@ severity = "error"
 enforce = true
 assert = { json-schema = "schemas/bad.json" }
 "#;
-        let rules = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
-            toml,
+        std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
+        let rules = crate::storage::ruleset_store::load_ruleset(
             dir.path(),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )

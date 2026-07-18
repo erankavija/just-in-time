@@ -2,7 +2,10 @@
 //!
 //! This module defines the declarative validation rule model and pure parsing
 //! of already-captured `rules.toml`, configuration, and schema bytes into a
-//! [`RuleSet`]. Filesystem loading belongs to the validation boundary. It also implements
+//! [`RuleSet`]. Filesystem loading of the ruleset belongs to the storage boundary
+//! ([`load_ruleset`](crate::storage::ruleset_store::load_ruleset)); validation only
+//! evaluates the parsed declarations, and captured-view flows parse pre-resolved
+//! bytes. This module also implements
 //! selector matching (the union of rules applicable to a given issue) and the
 //! config-level guards required by the design record:
 //!
@@ -508,7 +511,10 @@ pub struct SchemaSource {
     /// The reference string as authored in `rules.toml` (e.g.
     /// `"schemas/epic-body.json"`).
     pub reference: String,
-    /// The schema file's path, resolved relative to the `.jit` root.
+    /// A diagnostic-only path identifying the schema, formed by joining the
+    /// reference onto a synthetic `<captured>` base. The schema bytes come from
+    /// the captured (or storage-loaded) schema set, so this path is never re-read
+    /// and is not a live `.jit`-root filesystem path.
     pub path: PathBuf,
     /// The parsed JSON Schema document.
     pub schema: serde_json::Value,

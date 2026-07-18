@@ -141,7 +141,6 @@ pub struct SchemaCompileError {
 ///
 /// ```
 /// use jit::validation::engine::SchemaEngine;
-/// use jit::declarations::rules::RuleSet;
 ///
 /// // A schema requiring a `state` property; a projection missing it fails.
 /// let dir = tempfile::tempdir().unwrap();
@@ -158,8 +157,8 @@ pub struct SchemaCompileError {
 /// severity = "error"
 /// assert = { json-schema = "schemas/needs-state.json" }
 /// "#;
-/// let set = jit::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
-///     toml,
+/// std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
+/// let set = jit::storage::ruleset_store::load_ruleset(
 ///     dir.path(),
 ///     &toml::from_str::<jit::config::JitConfig>("").unwrap(),
 /// )
@@ -239,7 +238,6 @@ impl SchemaEngine {
     ///
     /// ```
     /// use jit::validation::engine::SchemaEngine;
-    /// use jit::declarations::rules::RuleSet;
     /// use jsonschema::{Keyword, ValidationError};
     ///
     /// // A custom keyword: the annotated string must not be empty.
@@ -275,8 +273,8 @@ impl SchemaEngine {
     /// name = "title-non-empty"
     /// assert = { json-schema = "schemas/t.json" }
     /// "#;
-    /// let set = jit::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
-    ///     toml,
+    /// std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
+    /// let set = jit::storage::ruleset_store::load_ruleset(
     ///     dir.path(),
     ///     &toml::from_str::<jit::config::JitConfig>("").unwrap(),
     /// )
@@ -337,7 +335,6 @@ impl SchemaEngine {
     ///
     /// ```
     /// use jit::validation::engine::SchemaEngine;
-    /// use jit::declarations::rules::RuleSet;
     ///
     /// let dir = tempfile::tempdir().unwrap();
     /// let schemas = dir.path().join("schemas");
@@ -352,8 +349,8 @@ impl SchemaEngine {
     /// name = "state-is-string"
     /// assert = { json-schema = "schemas/string-state.json" }
     /// "#;
-    /// let set = jit::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
-    ///     toml,
+    /// std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
+    /// let set = jit::storage::ruleset_store::load_ruleset(
     ///     dir.path(),
     ///     &toml::from_str::<jit::config::JitConfig>("").unwrap(),
     /// )
@@ -935,8 +932,8 @@ mod tests {
         let toml = format!(
             "[[rules]]\nname = \"{name}\"\nseverity = \"{severity}\"\nassert = {{ json-schema = \"schemas/s.json\" }}\n"
         );
-        let set = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
-            &toml,
+        std::fs::write(dir.path().join("rules.toml"), &toml).unwrap();
+        let set = crate::storage::ruleset_store::load_ruleset(
             dir.path(),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
@@ -1135,8 +1132,8 @@ assert = { json-schema = "schemas/a.json" }
 name = "rule-b"
 assert = { json-schema = "schemas/b.json" }
 "#;
-        let set = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
-            toml,
+        std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
+        let set = crate::storage::ruleset_store::load_ruleset(
             dir.path(),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
@@ -1167,8 +1164,8 @@ assert = { json-schema = "schemas/a.json" }
 name = "rule-b"
 assert = { json-schema = "schemas/b.json" }
 "#;
-        let set = crate::validation::rule_loader::parse_ruleset_with_filesystem_schemas(
-            toml,
+        std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
+        let set = crate::storage::ruleset_store::load_ruleset(
             dir.path(),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )

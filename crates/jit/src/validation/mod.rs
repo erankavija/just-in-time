@@ -43,7 +43,6 @@ pub mod project_render;
 pub mod projection;
 pub mod report;
 pub mod repository;
-pub mod rule_loader;
 pub mod rules_gates_projection;
 pub mod serialize;
 pub mod strictness;

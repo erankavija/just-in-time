@@ -506,7 +506,7 @@ mod tests {
             std::fs::write(schemas.join(&f.name), &f.content).unwrap();
         }
         std::fs::write(dir.path().join("rules.toml"), &out.rules_toml).unwrap();
-        let reloaded = crate::validation::rule_loader::load_ruleset(
+        let reloaded = crate::storage::ruleset_store::load_ruleset(
             dir.path(),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
@@ -866,7 +866,7 @@ assert = { json-schema = "schemas/second.json" }
         std::fs::write(schemas.join("first.json"), "{\"const\": 1}\n").unwrap();
         std::fs::write(schemas.join("second.json"), "{\"const\": 2}\n").unwrap();
         std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
-        let set = crate::validation::rule_loader::load_ruleset(
+        let set = crate::storage::ruleset_store::load_ruleset(
             dir.path(),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
@@ -948,7 +948,7 @@ assert = { json-schema = "schemas/second.json" }
 
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("rules.toml"), &block).unwrap();
-        let reloaded = crate::validation::rule_loader::load_ruleset(
+        let reloaded = crate::storage::ruleset_store::load_ruleset(
             dir.path(),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )

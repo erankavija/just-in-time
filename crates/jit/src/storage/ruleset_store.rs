@@ -6,11 +6,21 @@
 //! writes, so those storage paths live only in the storage layer. All writes go
 //! through the shared atomic writer ([`crate::storage::atomic_write`]),
 //! preserving the temp-file + rename invariant.
+//!
+//! Storage also owns the read-only side of this boundary: [`load_ruleset`] reads
+//! `rules.toml` and its referenced schemas from one live root as a coherent
+//! snapshot for non-mutation query paths. Validation evaluates the resulting
+//! declarations but never reads the filesystem itself, and mutation/captured-view
+//! flows resolve their bytes from a closed repository image and parse them through
+//! pure [`RuleSet::parse`](crate::declarations::rules::RuleSet::parse), so no
+//! caller mixes captured content with live schema reads.
 
-use crate::declarations::rules::DEFAULT_ORIGIN;
+use crate::config::JitConfig;
+use crate::declarations::rules::{RuleConfigError, RuleSet, DEFAULT_ORIGIN};
 use crate::storage::atomic_write::write_file_atomic;
 use anyhow::{Context, Result};
 use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 /// The operative validation ruleset file, relative to the `.jit` root.
@@ -25,6 +35,55 @@ const SCHEMAS_DIR: &str = "schemas";
 /// present, user-edited `rules.toml` is never clobbered.
 pub fn has_validation_ruleset(jit_root: &Path) -> bool {
     jit_root.join(RULES_FILE).exists()
+}
+
+/// Load `.jit/rules.toml` and its referenced schema files from one selected data
+/// root, returning the parsed [`RuleSet`].
+///
+/// This is the storage read boundary for non-mutation query paths (`jit validate`,
+/// effective-ruleset lookups): it reads the rules body and every schema it
+/// references from the SAME live root, so they form one coherent snapshot, then
+/// parses them purely. A missing `rules.toml` yields an empty declaration set. A
+/// missing OR unreadable REQUIRED schema is a [`RuleConfigError::SchemaIo`]; an
+/// optional (non-required) schema that is absent is skipped. `config` is supplied
+/// explicitly, so item-kind expansion parses only that configuration and never
+/// reopens ambient repository state.
+///
+/// Schema resolution is bound to the just-read `content` and is never exposed as a
+/// standalone content-taking helper: a captured-view flow must resolve its bytes
+/// from a closed repository image and call
+/// [`RuleSet::parse`](RuleSet::parse) directly, so no path mixes caller-supplied
+/// rules bytes with live schema reads.
+pub fn load_ruleset(jit_root: &Path, config: &JitConfig) -> Result<RuleSet, RuleConfigError> {
+    let path = jit_root.join(RULES_FILE);
+    let content = match std::fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(RuleSet::empty());
+        }
+        Err(source) => return Err(RuleConfigError::Io { path, source }),
+    };
+    let schemas = RuleSet::schema_requests(&content)?.into_iter().try_fold(
+        BTreeMap::new(),
+        |mut schemas, request| {
+            let schema_path = jit_root.join(&request.reference);
+            match std::fs::read(&schema_path) {
+                Ok(bytes) => {
+                    schemas.insert(request.reference, bytes);
+                }
+                Err(_) if !request.required => {}
+                Err(source) => {
+                    return Err(RuleConfigError::SchemaIo {
+                        rule: request.rule,
+                        path: schema_path,
+                        source,
+                    });
+                }
+            }
+            Ok(schemas)
+        },
+    )?;
+    RuleSet::parse(&content, Some(config), schemas)
 }
 
 /// Persist a serialized validation ruleset: `rules.toml` plus the
@@ -524,6 +583,158 @@ mod tests {
         .unwrap();
 
         assert_eq!(scaffolded, regenerated, "scaffold and regen must agree");
+    }
+
+    // -- load_ruleset read boundary (jit:cbc3a7e5) ---------------------------
+
+    fn empty_config() -> JitConfig {
+        toml::from_str::<JitConfig>("").unwrap()
+    }
+
+    #[test]
+    fn test_load_ruleset_missing_file_is_empty() {
+        // No `rules.toml` yields an empty declaration set, not an error.
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(
+            load_ruleset(dir.path(), &empty_config()).unwrap(),
+            RuleSet::empty()
+        );
+    }
+
+    #[test]
+    fn test_load_ruleset_reads_rules_and_referenced_schema_bytes() {
+        // The rules body and its referenced schema are read from the SAME root as
+        // one coherent snapshot; a present custom schema resolves.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("schemas")).unwrap();
+        std::fs::write(
+            dir.path().join("rules.toml"),
+            "[[rules]]\nname = \"schema\"\nassert = { json-schema = \"schemas/body.json\" }\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("schemas/body.json"),
+            br#"{"type":"object"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            load_ruleset(dir.path(), &empty_config())
+                .unwrap()
+                .rules
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_load_ruleset_required_schema_missing_or_invalid_errors() {
+        // A CUSTOM (non-default, required) rule's missing schema is a typed
+        // SchemaIo error, and a present-but-malformed one is a SchemaJson error:
+        // custom rules keep strict read semantics at this boundary.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("rules.toml"),
+            "[[rules]]\nname = \"schema\"\nassert = { json-schema = \"schemas/body.json\" }\n",
+        )
+        .unwrap();
+        assert!(matches!(
+            load_ruleset(dir.path(), &empty_config()),
+            Err(RuleConfigError::SchemaIo { .. })
+        ));
+
+        std::fs::create_dir_all(dir.path().join("schemas")).unwrap();
+        std::fs::write(dir.path().join("schemas/body.json"), b"{not json").unwrap();
+        assert!(matches!(
+            load_ruleset(dir.path(), &empty_config()),
+            Err(RuleConfigError::SchemaJson { .. })
+        ));
+    }
+
+    #[test]
+    fn test_load_ruleset_default_origin_missing_schema_loads_placeholder() {
+        // A DEFAULT-origin rule's `schemas/default-*.json` projection is
+        // rebuildable, not the authority: an ABSENT projection must not fail the
+        // load. The boundary skips the optional read and parsing falls back to a
+        // permissive placeholder that reconciliation replaces from config.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("rules.toml"),
+            "[[rules]]\nname = \"namespace-registry\"\norigin = \"default\"\n\
+             assert = { json-schema = \"schemas/default-namespace-registry.json\" }\n",
+        )
+        .unwrap();
+        let set = load_ruleset(dir.path(), &empty_config()).unwrap();
+        assert_eq!(set.rules.len(), 1, "default-origin rule still loads");
+        match &set.rules[0].assert {
+            crate::declarations::rules::Assertion::JsonSchema(src) => {
+                assert_eq!(src.schema, serde_json::json!({}), "permissive placeholder");
+            }
+            other => panic!("expected a JsonSchema placeholder, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_load_ruleset_default_origin_unreadable_schema_loads_placeholder() {
+        // An UNREADABLE (not merely absent) default projection is likewise
+        // tolerated: the optional read fails, the boundary skips it, and the rule
+        // loads with the placeholder. A directory where the schema file is
+        // expected makes `std::fs::read` fail without being NotFound.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("schemas/default-namespace-registry.json"))
+            .unwrap();
+        std::fs::write(
+            dir.path().join("rules.toml"),
+            "[[rules]]\nname = \"namespace-registry\"\norigin = \"default\"\n\
+             assert = { json-schema = \"schemas/default-namespace-registry.json\" }\n",
+        )
+        .unwrap();
+        let set = load_ruleset(dir.path(), &empty_config()).unwrap();
+        assert_eq!(
+            set.rules.len(),
+            1,
+            "default-origin rule loads despite unreadable schema"
+        );
+        assert!(matches!(
+            set.rules[0].assert,
+            crate::declarations::rules::Assertion::JsonSchema(_)
+        ));
+    }
+
+    #[test]
+    fn test_load_ruleset_kind_expansion_uses_explicit_config() {
+        // The boundary threads the EXPLICIT config into parsing so item-kind sugar
+        // expands. A `kind = "requirement"` coverage rule loads only when the
+        // supplied config declares that kind; loading it under an empty config
+        // fails to expand — proving the config the boundary passes is what reaches
+        // parsing, never ambient repository state.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("rules.toml"),
+            "[[rules]]\nname = \"coverage\"\nwhen = { type = \"epic\" }\nseverity = \"error\"\n\
+             assert = { label-coverage = { kind = \"requirement\", child-state = \"done\" } }\n",
+        )
+        .unwrap();
+        let config_toml = r#"
+[item_kinds.requirement]
+section = "success_criteria"
+id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+markers = ["[hard]"]
+link-namespaces = ["satisfies"]
+scope = "issue"
+source-of-truth = "markdown-first"
+"#;
+        let config = toml::from_str::<JitConfig>(config_toml).unwrap();
+        let set = load_ruleset(dir.path(), &config).unwrap();
+        assert_eq!(
+            set.rules.len(),
+            1,
+            "kind sugar expands under explicit config"
+        );
+
+        assert!(
+            load_ruleset(dir.path(), &empty_config()).is_err(),
+            "kind sugar cannot expand when the config omits the declared kind"
+        );
     }
 
     #[test]
