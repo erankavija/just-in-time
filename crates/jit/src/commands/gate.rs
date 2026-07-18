@@ -1,7 +1,8 @@
 //! Quality gate operations
 
 use super::*;
-use crate::domain::{GateMode, GateRunResult, GateRunStatus};
+use crate::declarations::GateMode;
+use crate::domain::{GateRunResult, GateRunStatus};
 
 /// Error returned when `jit gate evaluate` runs an automated checker that does not pass.
 ///
@@ -164,9 +165,9 @@ pub struct GateUpdate {
     /// New description.
     pub description: Option<String>,
     /// New gate stage.
-    pub stage: Option<crate::domain::GateStage>,
+    pub stage: Option<crate::declarations::GateStage>,
     /// New gate mode (manual or auto).
-    pub mode: Option<crate::domain::GateMode>,
+    pub mode: Option<crate::declarations::GateMode>,
     /// New execution priority.
     pub priority: Option<u32>,
     /// New checker command.
@@ -626,7 +627,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(warnings)
     }
 
-    pub fn list_gates(&self) -> Result<Vec<Gate>> {
+    pub fn list_gates(&self) -> Result<Vec<GateDefinition>> {
         let registry = self.storage.load_gate_registry()?;
         Ok(registry.gates.into_values().collect())
     }
@@ -638,7 +639,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         description: String,
         auto: bool,
         example_integration: Option<String>,
-        stage: crate::domain::GateStage,
+        stage: crate::declarations::GateStage,
     ) -> Result<()> {
         // Global operation - enforce common history with main
         crate::commands::worktree::enforce_main_only_operations()?;
@@ -651,16 +652,16 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         registry.gates.insert(
             key.clone(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: key.clone(),
                 title,
                 description,
                 stage,
                 mode: if auto {
-                    crate::domain::GateMode::Auto
+                    crate::declarations::GateMode::Auto
                 } else {
-                    crate::domain::GateMode::Manual
+                    crate::declarations::GateMode::Manual
                 },
                 checker: None,
                 priority: 100,
@@ -683,7 +684,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// `example_integration` is an optional usage snippet stored on the gate
     /// definition (surfaced by `jit gate show`). Returns an error if `key` is
-    /// already registered, or if `mode` is [`GateMode::Auto`](crate::domain::GateMode)
+    /// already registered, or if `mode` is [`GateMode::Auto`](crate::declarations::GateMode)
     /// without a `checker`. A `gate_definition_created` event is appended
     /// (@/inv/event-log), mirroring [`update_gate`](Self::update_gate)'s
     /// `gate_definition_updated` event.
@@ -693,9 +694,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         key: String,
         title: String,
         description: String,
-        stage: crate::domain::GateStage,
-        mode: crate::domain::GateMode,
-        checker: Option<crate::domain::GateChecker>,
+        stage: crate::declarations::GateStage,
+        mode: crate::declarations::GateMode,
+        checker: Option<crate::declarations::GateChecker>,
         priority: u32,
         example_integration: Option<String>,
     ) -> Result<()> {
@@ -709,14 +710,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Validate: auto gates must have checker
-        if mode == crate::domain::GateMode::Auto && checker.is_none() {
+        if mode == crate::declarations::GateMode::Auto && checker.is_none() {
             return Err(anyhow!(
                 "Automated gates must have a checker configured. Add --checker-command or use --mode manual"
             ));
         }
 
         // For manual gates, ignore any provided checker
-        let final_checker = if mode == crate::domain::GateMode::Manual {
+        let final_checker = if mode == crate::declarations::GateMode::Manual {
             None
         } else {
             checker
@@ -724,7 +725,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         registry.gates.insert(
             key.clone(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: key.clone(),
                 title,
@@ -734,7 +735,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 checker: final_checker,
                 priority,
                 reserved: std::collections::HashMap::new(),
-                auto: mode == crate::domain::GateMode::Auto,
+                auto: mode == crate::declarations::GateMode::Auto,
                 example_integration,
             },
         );
@@ -765,13 +766,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// automated mode must have a configured checker (and an exec checker must
     /// have a non-empty command), while a manual gate carries no checker.
     ///
-    /// Returns the updated [`Gate`] so callers can render it.
+    /// Returns the updated [`GateDefinition`] so callers can render it.
     ///
     /// # Examples
     ///
     /// ```
     /// use jit::commands::{CommandExecutor, GateUpdate};
-    /// use jit::domain::{Gate, GateMode, GateStage};
+    /// use jit::declarations::{GateDefinition, GateMode, GateStage};
     /// use jit::{InMemoryStorage, IssueStore};
     ///
     /// std::env::set_var("JIT_TEST_MODE", "1"); // skip the main-history guard
@@ -781,7 +782,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let mut registry = executor.storage().load_gate_registry().unwrap();
     /// registry.gates.insert(
     ///     "tests".to_string(),
-    ///     Gate {
+    ///     GateDefinition {
     ///         version: 1,
     ///         key: "tests".to_string(),
     ///         title: "Old title".to_string(),
@@ -810,8 +811,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// assert_eq!(updated.title, "All Tests Pass");
     /// assert_eq!(updated.description, "Desc");
     /// ```
-    pub fn update_gate(&self, key: &str, update: GateUpdate) -> Result<Gate> {
-        use crate::domain::{GateChecker, GateMode};
+    pub fn update_gate(&self, key: &str, update: GateUpdate) -> Result<GateDefinition> {
+        use crate::declarations::{GateChecker, GateMode};
 
         // Global operation - enforce common history with main (mirrors define_gate).
         crate::commands::worktree::enforce_main_only_operations()?;
@@ -948,7 +949,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             ));
         }
 
-        let updated = Gate {
+        let updated = GateDefinition {
             version: current.version,
             key: current.key.clone(),
             title: update.title.unwrap_or(current.title),
@@ -992,7 +993,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    pub fn show_gate_definition(&self, key: &str) -> Result<Gate> {
+    pub fn show_gate_definition(&self, key: &str) -> Result<GateDefinition> {
         let registry = self.storage.load_gate_registry()?;
         registry
             .gates
@@ -1026,7 +1027,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         skip_postcheck: bool,
         except_gates: &[String],
     ) -> Result<(GateAddResult, Vec<String>)> {
-        use crate::domain::{GateChecker, GateStage};
+        use crate::declarations::{GateChecker, GateStage};
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
@@ -1194,7 +1195,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Gate, GateChecker, GateMode, GateStage};
+    use crate::declarations::GateDefinition;
+    use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
 
@@ -1221,7 +1223,7 @@ enforce_leases = "off"
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "auto-gate".to_string(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: "auto-gate".to_string(),
                 title: "Automated Gate".to_string(),
@@ -1279,7 +1281,7 @@ enforce_leases = "off"
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             key.to_string(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: key.to_string(),
                 title: key.to_string(),
@@ -1352,7 +1354,7 @@ enforce_leases = "off"
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "auto-gate".to_string(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: "auto-gate".to_string(),
                 title: "Automated Gate".to_string(),
@@ -1413,7 +1415,7 @@ enforce_leases = "off"
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "manual-gate".to_string(),
-            Gate {
+            GateDefinition {
                 version: 1,
                 key: "manual-gate".to_string(),
                 title: "Manual Gate".to_string(),

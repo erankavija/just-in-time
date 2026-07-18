@@ -1,6 +1,7 @@
 use super::CommandExecutor;
 use crate::config::{slugify_project_name, JitConfig, ProjectName};
 use crate::config_manager::ConfigManager;
+use crate::declarations::GateRegistry;
 use crate::domain::Event;
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
@@ -9,8 +10,8 @@ use crate::profile::{
     ProjectedFileMode, RepositorySnapshot, SnapshotEntry, SnapshotFile,
 };
 use crate::storage::{
-    FileTransactionKernel, FileTransactionPlan, GateRegistry, IssueStore, JsonFileStorage,
-    RecoveryCoordinator, RecoveryRequiredError, RecoveryState, TransactionAction,
+    FileTransactionKernel, FileTransactionPlan, IssueStore, JsonFileStorage, RecoveryCoordinator,
+    RecoveryRequiredError, RecoveryState, TransactionAction,
 };
 use crate::validation::repository::{
     validate_repository, FilesystemRepositoryView, OverlayRepositoryView, RepositoryView,
@@ -70,8 +71,7 @@ impl InitScaffold {
             ),
             (
                 ".jit/gates.toml".to_string(),
-                crate::storage::gate_store::serialize_gate_registry(&GateRegistry::default())?
-                    .into_bytes(),
+                crate::declarations::serialize_gate_registry(&GateRegistry::default())?,
             ),
             (".jit/events.jsonl".to_string(), Vec::new()),
             (".jit/config.toml".to_string(), config.into_bytes()),

@@ -29,9 +29,10 @@
 //!   the page documents it, and a golden test asserts the committed page equals
 //!   the projection.
 
+use crate::declarations::GateStage;
 use crate::domain::{
-    EventTag, GateFinding, GateFindings, GateRunResult, GateRunStatus, GateStage,
-    GATE_RUN_SCHEMA_VERSION, SHORT_ID_LENGTH,
+    EventTag, GateFinding, GateFindings, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
+    SHORT_ID_LENGTH,
 };
 use crate::storage::{JsonFileStorage, MIN_ID_PREFIX_LENGTH};
 use anyhow::Result;

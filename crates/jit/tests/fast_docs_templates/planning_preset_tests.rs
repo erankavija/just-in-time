@@ -6,7 +6,8 @@
 //! to a breakdown node.
 
 use crate::harness::TestHarness;
-use jit::domain::{GateChecker, GateMode, GateStage, Priority};
+use jit::declarations::{GateChecker, GateMode, GateStage};
+use jit::domain::Priority;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit::CommandExecutor;
 use tempfile::TempDir;

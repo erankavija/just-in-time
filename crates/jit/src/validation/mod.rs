@@ -10,8 +10,9 @@
 //! registry at load, so their assertion and `namespace-unique-*` membership never
 //! lag a hand edit of the registry.
 //!
+//! Rule declarations and parsing live in crate-root [`crate::declarations`].
+//!
 //! Submodules:
-//! - [`rules`] — the rule data model and `.jit/rules.toml` loader;
 //! - [`defaults`] — the fixed built-in default rule set derived from the namespace
 //!   registry + type hierarchy;
 //! - [`desugar`] — shorthand assertion kinds lowered to JSON Schema;
@@ -27,7 +28,7 @@
 //!   invariants and loadable rules/gates), reporting the sole
 //!   declared-but-unenforced direction;
 //! - [`report`] — structured rule reports for `jit validate [--explain]`;
-//! - [`serialize`] — render a [`rules::RuleSet`] to `rules.toml` + schema file
+//! - [`serialize`] — render a [`crate::declarations::rules::RuleSet`] to `rules.toml` + schema file
 //!   CONTENT (no I/O); the storage layer
 //!   ([`crate::storage::ruleset_store`]) persists it for `jit init`.
 
@@ -42,7 +43,6 @@ pub mod project_render;
 pub mod projection;
 pub mod report;
 pub mod repository;
-pub mod rules;
 pub mod rules_gates_projection;
 pub mod serialize;
 pub mod strictness;

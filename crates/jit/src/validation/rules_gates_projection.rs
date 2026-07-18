@@ -24,8 +24,8 @@
 //! Rendering is PURE and unit-testable.
 
 use crate::config::ProjectionStyle;
-use crate::storage::GateRegistry;
-use crate::validation::rules::RuleSet;
+use crate::declarations::rules::RuleSet;
+use crate::declarations::GateRegistry;
 
 /// The canonical kind-segmented address of a rule (`@/rule/<name>`).
 fn rule_address(name: &str) -> String {
@@ -65,16 +65,16 @@ fn gate_address(key: &str) -> String {
 ///
 /// ```
 /// use jit::config::ProjectionStyle;
-/// use jit::storage::GateRegistry;
-/// use jit::validation::rules::RuleSet;
+/// use jit::declarations::GateRegistry;
+/// use jit::declarations::rules::RuleSet;
 /// use jit::validation::rules_gates_projection::render_rules_and_gates_markdown;
-/// use std::path::Path;
 ///
-/// let rules = RuleSet::from_toml_str(
+/// let rules = RuleSet::parse(
 ///     "[[rules]]\nname = \"label-format\"\ndescription = \"Labels are namespace:value.\"\n\
 ///      severity = \"error\"\nenforce = true\n\
 ///      assert = { require-label = { label = \"type:*\" } }\n",
-///     Path::new("/nonexistent"),
+///     None,
+///     [],
 /// )
 /// .unwrap();
 /// let gates = GateRegistry::default();
@@ -105,7 +105,7 @@ pub fn render_rules_and_gates_markdown(
 /// A rule's display text: its `description`, falling back to its `name` (the
 /// rule kind's registry text-field fallback) when no description is authored, so
 /// a description-less rule never trails a bare em-dash.
-fn rule_display_text(rule: &crate::validation::rules::Rule) -> &str {
+fn rule_display_text(rule: &crate::declarations::rules::Rule) -> &str {
     rule.description.as_deref().unwrap_or(&rule.name)
 }
 
@@ -113,13 +113,13 @@ fn rule_display_text(rule: &crate::validation::rules::Rule) -> &str {
 /// mirroring the gate line's framing instead of the raw `severity: …, enforce: …`
 /// key/value form. The severity token is rendered as-is; `enforce` becomes
 /// `enforced` (blocks writes) or `advisory` (never blocks).
-fn rule_metadata_suffix(rule: &crate::validation::rules::Rule) -> String {
+fn rule_metadata_suffix(rule: &crate::declarations::rules::Rule) -> String {
     let enforcement = if rule.enforce { "enforced" } else { "advisory" };
     format!("({}, {})", rule.severity.token(), enforcement)
 }
 
 /// Gate `(key, gate)` pairs in ascending key order (deterministic).
-fn gates_sorted(gates: &GateRegistry) -> Vec<(&String, &crate::domain::Gate)> {
+fn gates_sorted(gates: &GateRegistry) -> Vec<(&String, &crate::declarations::GateDefinition)> {
     let mut pairs: Vec<_> = gates.gates.iter().collect();
     pairs.sort_by_key(|(key, _)| *key);
     pairs
@@ -127,7 +127,7 @@ fn gates_sorted(gates: &GateRegistry) -> Vec<(&String, &crate::domain::Gate)> {
 
 /// The gate's display text: its description, falling back to its title when the
 /// description is empty (so a bullet never trails a bare em-dash).
-fn gate_display_text(gate: &crate::domain::Gate) -> &str {
+fn gate_display_text(gate: &crate::declarations::GateDefinition) -> &str {
     if gate.description.is_empty() {
         &gate.title
     } else {
@@ -203,14 +203,14 @@ fn render_id_anchor(rules: &RuleSet, gates: &GateRegistry) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Gate, GateMode, GateStage};
+    use crate::declarations::GateDefinition;
+    use crate::declarations::{GateMode, GateStage};
     use std::collections::HashMap;
-    use std::path::Path;
 
     fn ruleset() -> RuleSet {
         // `label-format` carries a description (rendered verbatim); `orphan-leaf`
         // has none (exercises the name fallback), so one fixture covers both.
-        RuleSet::from_toml_str(
+        RuleSet::parse(
             r#"
 [[rules]]
 name = "label-format"
@@ -225,13 +225,14 @@ severity = "warn"
 enforce = false
 assert = { require-section = { heading = "Goal" } }
 "#,
-            Path::new("/nonexistent"),
+            None,
+            [],
         )
         .unwrap()
     }
 
-    fn gate(key: &str, title: &str, description: &str) -> Gate {
-        Gate {
+    fn gate(key: &str, title: &str, description: &str) -> GateDefinition {
+        GateDefinition {
             version: 1,
             key: key.to_string(),
             title: title.to_string(),
@@ -295,7 +296,7 @@ assert = { require-section = { heading = "Goal" } }
         // REQ-04: a described rule renders its description then the prose suffix;
         // a description-less rule falls back to its name. The suffix is prose
         // (`error, enforced` / `warn, advisory`), never `severity: …, enforce: …`.
-        let rules = RuleSet::from_toml_str(
+        let rules = RuleSet::parse(
             r#"
 [[rules]]
 name = "described"
@@ -310,7 +311,8 @@ severity = "warn"
 enforce = false
 assert = { require-section = { heading = "Goal" } }
 "#,
-            Path::new("/nonexistent"),
+            None,
+            [],
         )
         .unwrap();
         let md = render_rules_and_gates_markdown(

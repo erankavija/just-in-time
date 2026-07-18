@@ -39,7 +39,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let warnings: Vec<String> = evaluation
             .findings()
             .into_iter()
-            .filter(|f| f.severity != crate::validation::rules::Severity::Off)
+            .filter(|f| f.severity != crate::declarations::rules::Severity::Off)
             .map(|f| format!("[{}] {}", f.rule, f.message))
             .collect();
 

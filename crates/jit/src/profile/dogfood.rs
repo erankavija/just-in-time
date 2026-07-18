@@ -4,7 +4,7 @@ use super::{
     derive_preset_projection, project_package, EmbeddedProfilePackage, PackageProjection,
     ProfilePackageError, ProjectionError,
 };
-use crate::domain::Gate;
+use crate::declarations::GateDefinition;
 use include_dir::{include_dir, Dir};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -45,7 +45,7 @@ pub fn jit_dogfood_package() -> Result<EmbeddedProfilePackage<'static>, DogfoodP
 }
 
 /// Deserialize one gate definition from the package's authored gate inventory.
-pub fn jit_dogfood_gate(key: &str) -> Result<Gate, DogfoodProfileError> {
+pub fn jit_dogfood_gate(key: &str) -> Result<GateDefinition, DogfoodProfileError> {
     let package = jit_dogfood_package()?;
     let value = derive_preset_projection(&package)
         .gates
@@ -193,10 +193,10 @@ mod tests {
     use super::*;
     use crate::commands::CommandExecutor;
     use crate::config::ProjectionStyle;
+    use crate::declarations::GateRegistry;
     use crate::hierarchy_templates::HierarchyTemplate;
     use crate::profile::{Contribution, KeyedArrayTarget, MapEntryTarget};
-    use crate::storage::{GateRegistry, IssueStore, JsonFileStorage};
-    use crate::validation::rules::RuleSet;
+    use crate::storage::{IssueStore, JsonFileStorage};
     use crate::validation::rules_gates_projection::render_rules_and_gates_markdown;
     use std::fs;
     use std::path::Path;
@@ -479,10 +479,10 @@ mod tests {
                 matches!(
                     gate.checker,
                     Some(
-                        crate::domain::GateChecker::RepositoryValidation
-                            | crate::domain::GateChecker::IssueValidation
-                            | crate::domain::GateChecker::LabelTargetValidation { .. }
-                            | crate::domain::GateChecker::ReviewPlaceholder
+                        crate::declarations::GateChecker::RepositoryValidation
+                            | crate::declarations::GateChecker::IssueValidation
+                            | crate::declarations::GateChecker::LabelTargetValidation { .. }
+                            | crate::declarations::GateChecker::ReviewPlaceholder
                     )
                 ),
                 "{key} must remain an in-process portable checker"
@@ -608,7 +608,12 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        let rules = RuleSet::from_toml_str(&rules_toml, temp.path()).unwrap();
+        std::fs::write(temp.path().join("rules.toml"), &rules_toml).unwrap();
+        let rules = crate::storage::ruleset_store::load_ruleset(
+            temp.path(),
+            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        )
+        .unwrap();
         let mut gates = GateRegistry::default();
         for key in [
             "plan-review",

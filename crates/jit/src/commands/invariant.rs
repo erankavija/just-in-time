@@ -68,7 +68,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::{GateRegistry, InMemoryStorage, IssueStore};
+    use crate::declarations::GateRegistry;
+    use crate::storage::{InMemoryStorage, IssueStore};
 
     /// Build an executor over an in-memory `.jit` carrying the given
     /// `invariants.toml`, `rules.toml`, and a gate registry with `gate_keys`.
@@ -86,13 +87,13 @@ mod tests {
         for key in gate_keys {
             registry.gates.insert(
                 (*key).to_string(),
-                crate::domain::Gate {
+                crate::declarations::GateDefinition {
                     version: 1,
                     key: (*key).to_string(),
                     title: (*key).to_string(),
                     description: String::new(),
-                    stage: crate::domain::GateStage::Postcheck,
-                    mode: crate::domain::GateMode::Manual,
+                    stage: crate::declarations::GateStage::Postcheck,
+                    mode: crate::declarations::GateMode::Manual,
                     checker: None,
                     priority: 100,
                     reserved: std::collections::HashMap::new(),

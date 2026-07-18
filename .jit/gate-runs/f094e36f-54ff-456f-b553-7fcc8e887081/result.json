@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "f094e36f-54ff-456f-b553-7fcc8e887081",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
+  "commit": "6f4f11ac9bf52c2588495bbfee335345b16489f1",
+  "branch": "integration/cdc840ad",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-18T20:04:12.956710036Z",
+  "completed_at": "2026-07-18T20:07:55.334243104Z",
+  "duration_ms": 222377,
+  "exit_code": 1,
+  "stdout": "Attribution: aef6dd26, 57e50a8c, 7443fd0e, 6dc5af3c, cc72431b, 6f4f11ac\nPolicy sources: AGENTS.md; dev/active/cdc840ad-plan.md\nResolved items: @/charter/D-6 — dev/vision/9db27a3a-charter.md; @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci passed (exit 0, 2026-07-18T20:01:19Z)\nTruncation recovery: bounded rereads of AGENTS.md, plan §2, repository_state sources, and tagged patches\n\n1. **[blocking][issue-impact][high]** `RootRelativePath` is a private string wrapper that encodes the root as `\"\"`, rather than the required `RootRelativePath::{Root, Descendant}` representation. This retains the prohibited empty-string sentinel and weakens the canonical virtual-path contract. [crates/jit/src/repository_state/path.rs:8](/tmp/jit-cdc840ad-integration/crates/jit/src/repository_state/path.rs:8)\n\n2. **[blocking][issue-impact][high]** `CaptureSpec::phase_one` accepts any `VirtualPath`; neither it nor `validate` requires fixed phase-one paths to be `Data(...)`. Callers can therefore create an invalid phase-one worktree capture, so the model does not enforce the required fixed-Data declaration phase. [crates/jit/src/repository_state/image.rs:371](/tmp/jit-cdc840ad-integration/crates/jit/src/repository_state/image.rs:371)\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The canonical root-path representation and phase-one capture boundary do not meet the specified contracts.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"RootRelativePath uses an empty-string root sentinel instead of the required Root/Descendant representation.\",\"file\":\"crates/jit/src/repository_state/path.rs\",\"line\":8,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"CaptureSpec permits Worktree paths in phase one rather than enforcing fixed Data declaration roots.\",\"file\":\"crates/jit/src/repository_state/image.rs\",\"line\":371,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 20067 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /tmp/jit-cdc840ad-integration\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f76d4-5051-79e0-8691-9699b0fa15b3\n--------\nuser\n--- 20054 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The canonical root-path representation and phase-one capture boundary do not meet the specified contracts.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "RootRelativePath uses an empty-string root sentinel instead of the required Root/Descendant representation.",
+        "file": "crates/jit/src/repository_state/path.rs",
+        "line": 8
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "CaptureSpec permits Worktree paths in phase one rather than enforcing fixed Data declaration roots.",
+        "file": "crates/jit/src/repository_state/image.rs",
+        "line": 371
+      }
+    ]
+  }
+}

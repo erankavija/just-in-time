@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "1b332a0e-5060-448a-9417-089b168b16c3",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
+  "commit": "abcbdcb06460dbc619229c0684f158b95bcdb434",
+  "branch": "integration/cdc840ad",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T17:11:20.199195755Z",
+  "completed_at": "2026-07-18T17:15:14.829206832Z",
+  "duration_ms": 234630,
+  "exit_code": 1,
+  "stdout": "Attribution: aef6dd26, 57e50a8c (tag `jit:cbc3a7e5`)\nPolicy sources: AGENTS.md; dev/active/cdc840ad-plan.md §2\nResolved items: @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-18T17:06:00Z)\nTruncation recovery: per-file and unified-zero patch reads; complete bounded reads of new state modules and affected legacy views\n\n1. **[blocking][issue-impact]** `RepositoryImage::close` accepts entries not requested by `CaptureSpec`, and `entry()` returns them. A capture can therefore include an arbitrary unrequested path and allow a pure producer to read it without `UndiscoveredRepositoryPath`, defeating the required closed capture boundary. [crates/jit/src/repository_state/image.rs:299](</tmp/jit-cdc840ad-integration/crates/jit/src/repository_state/image.rs:299>)\n\n2. **[blocking][issue-impact]** Canonical path validation can be bypassed by constructing the public `VirtualPath`/`RootRelativePath` enum variants directly (or deserializing them). `ensure_semantic` only rejects reserved prefixes, so `Descendant(\"../outside\")` reaches `resolve()` and escapes the root; non-normal spellings such as `a//b` can also produce distinct virtual identities for one physical path. This breaks the required lexical confinement and injectivity guarantee. [crates/jit/src/repository_state/path.rs:94](</tmp/jit-cdc840ad-integration/crates/jit/src/repository_state/path.rs:94>)\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Capture closure and virtual-path confinement are bypassable.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"RepositoryImage accepts and exposes entries outside CaptureSpec, allowing uncaptured reads.\",\"file\":\"crates/jit/src/repository_state/image.rs\",\"line\":299,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Public virtual-path variants bypass lexical normalization and can escape repository roots.\",\"file\":\"crates/jit/src/repository_state/path.rs\",\"line\":94,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 19088 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /tmp/jit-cdc840ad-integration\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7636-0a05-7190-b832-598cf03c1e17\n--------\nuser\n--- 19075 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Capture closure and virtual-path confinement are bypassable.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "RepositoryImage accepts and exposes entries outside CaptureSpec, allowing uncaptured reads.",
+        "file": "crates/jit/src/repository_state/image.rs",
+        "line": 299
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Public virtual-path variants bypass lexical normalization and can escape repository roots.",
+        "file": "crates/jit/src/repository_state/path.rs",
+        "line": 94
+      }
+    ]
+  }
+}

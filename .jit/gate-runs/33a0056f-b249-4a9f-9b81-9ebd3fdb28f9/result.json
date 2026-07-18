@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "33a0056f-b249-4a9f-9b81-9ebd3fdb28f9",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
+  "commit": "9bc0652394cdda39a7e475f15163f96914a40db4",
+  "branch": "integration/cdc840ad",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T18:38:14.877270994Z",
+  "completed_at": "2026-07-18T18:42:55.590321282Z",
+  "duration_ms": 280713,
+  "exit_code": 1,
+  "stdout": "Attribution: aef6dd26, 57e50a8c, 2b28275b, d344356d, 7443fd0e, 343e591b, 6dc5af3c (tag `jit:cbc3a7e5`)\nPolicy sources: AGENTS.md; dev/active/cdc840ad-plan.md §2\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6 (dev/vision/9db27a3a-charter.md); @/invariant/dag-acyclic,atomic-writes,event-log (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, commit 6dc5af3c); prior code-review failed (exit 1), and its uncaptured-read finding is fixed in 6dc5af3c\nTruncation recovery: split tagged patches by commit/path; reread current path, image, managed-document, declaration, and comparison ranges after truncated aggregate output\n\n1. [blocking][issue-impact][high] `RepositoryLayout::new` never compares the no-follow root identities. Lexically disjoint aliases (for example, a bind-mounted worktree and data root) with the same physical identity are accepted and merely recorded in `InjectivityProof`, so distinct `Worktree` and `Data` paths can resolve to the same repository object. This violates the required virtual-to-physical injectivity and alias rejection. `crates/jit/src/repository_state/path.rs:193`\n\n2. [blocking][issue-impact][high] The new `declarations` subsystem is not filesystem-free: `RuleSet::load` reads `rules.toml` and referenced schemas, while `from_toml_str_with_loaders` falls back to `JitConfig::load` when no config is supplied. Live command paths call this loader directly, leaving declaration parsing able to reopen ambient repository state instead of requiring captured inputs. `crates/jit/src/declarations/rules.rs:775`\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Root-identity aliases remain accepted, and declarations retain ambient filesystem reads.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"RepositoryLayout accepts lexically disjoint roots with the same physical identity, so virtual-path injectivity is not guaranteed.\",\"file\":\"crates/jit/src/repository_state/path.rs\",\"line\":193,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The declarations rules API still performs ambient filesystem/config reads instead of requiring captured inputs.\",\"file\":\"crates/jit/src/declarations/rules.rs\",\"line\":775,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 16983 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /tmp/jit-cdc840ad-integration\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7685-9a3c-7742-b54f-f8613432d5b9\n--------\nuser\n--- 16970 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Root-identity aliases remain accepted, and declarations retain ambient filesystem reads.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "RepositoryLayout accepts lexically disjoint roots with the same physical identity, so virtual-path injectivity is not guaranteed.",
+        "file": "crates/jit/src/repository_state/path.rs",
+        "line": 193
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The declarations rules API still performs ambient filesystem/config reads instead of requiring captured inputs.",
+        "file": "crates/jit/src/declarations/rules.rs",
+        "line": 775
+      }
+    ]
+  }
+}

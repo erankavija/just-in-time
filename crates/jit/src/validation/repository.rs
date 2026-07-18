@@ -8,21 +8,22 @@
 
 use crate::config::{JitConfig, ProjectionMode};
 use crate::config_manager::ConfigManager;
+use crate::declarations::rules::{RuleConfigError, RuleSet, Severity};
+use crate::declarations::GateChecker;
+use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressScope,
     ProjectSource, RawScopeItem,
 };
-use crate::domain::{parse_known_events, GateChecker, Issue, SHORT_ID_LENGTH};
+use crate::domain::{parse_known_events, Issue, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
-use crate::storage::GateRegistry;
 use crate::validation::engine::Finding;
 use crate::validation::invariants::InvariantRegistry;
 use crate::validation::project_render::{render_projection_body, ProjectionInputs};
 use crate::validation::projection::{compose_projection, require_target, splice_region};
 use crate::validation::report::{ReportedFinding, RuleReport};
-use crate::validation::rules::{RuleConfigError, RuleSet, SchemaSource, Severity};
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -584,45 +585,46 @@ fn load_rules(
         return Ok(crate::validation::defaults::default_ruleset(namespaces));
     };
     let jit_root = view.repository_root().join(".jit");
-    let parsed = RuleSet::from_toml_str_with_loaders(
-        &content,
-        &jit_root,
-        Some(config),
-        |rule, reference| {
-            let path = format!(".jit/{reference}");
-            let synthetic_path = jit_root.join(&reference);
-            let bytes =
-                view.read_file(Path::new(&path))
-                    .map_err(|error| RuleConfigError::SchemaIo {
-                        rule: rule.to_string(),
-                        path: synthetic_path.clone(),
+    let schemas = RuleSet::schema_requests(&content)?.into_iter().try_fold(
+        BTreeMap::new(),
+        |mut schemas, request| {
+            let path = format!(".jit/{}", request.reference);
+            let synthetic_path = jit_root.join(&request.reference);
+            match view.read_file(Path::new(&path)) {
+                Ok(Some(bytes)) => {
+                    schemas.insert(request.reference, bytes);
+                }
+                Ok(None) if !request.required => {}
+                Ok(None) => {
+                    return Err(RuleConfigError::SchemaIo {
+                        rule: request.rule,
+                        path: synthetic_path,
+                        source: IoError::new(
+                            ErrorKind::NotFound,
+                            "schema absent from repository view",
+                        ),
+                    });
+                }
+                Err(_) if !request.required => {}
+                Err(error) => {
+                    return Err(RuleConfigError::SchemaIo {
+                        rule: request.rule,
+                        path: synthetic_path,
                         source: IoError::other(error.to_string()),
-                    })?;
-            let content = bytes.ok_or_else(|| RuleConfigError::SchemaIo {
-                rule: rule.to_string(),
-                path: synthetic_path.clone(),
-                source: IoError::new(ErrorKind::NotFound, "schema absent from repository view"),
-            })?;
-            let schema =
-                serde_json::from_slice(&content).map_err(|source| RuleConfigError::SchemaJson {
-                    rule: rule.to_string(),
-                    path: synthetic_path.clone(),
-                    source,
-                })?;
-            Ok(SchemaSource {
-                reference,
-                path: synthetic_path,
-                schema,
-            })
+                    });
+                }
+            }
+            Ok(schemas)
         },
     )?;
+    let parsed = RuleSet::parse(&content, Some(config), schemas)?;
     Ok(crate::validation::defaults::reconcile_default_rules_with_config(parsed, namespaces))
 }
 
 #[derive(Deserialize)]
 struct GatesFile {
     #[serde(default)]
-    gates: Vec<crate::domain::Gate>,
+    gates: Vec<crate::declarations::GateDefinition>,
 }
 
 fn load_gates(view: &dyn RepositoryView) -> Result<GateRegistry> {
@@ -897,7 +899,7 @@ fn collect_rule_findings(
     let graph_rules: Vec<_> = rules
         .rules
         .iter()
-        .filter(|rule| rule.scope == crate::validation::rules::RuleScope::Graph)
+        .filter(|rule| rule.scope == crate::declarations::rules::RuleScope::Graph)
         .collect();
     let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
     let plan_content = resolve_plan_content(view, issues, config)?;

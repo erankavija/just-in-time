@@ -9,7 +9,7 @@
 //! and indexing/querying invariants as addressable items (`@/invariant/<self-id>`)
 //! is built on top of this registry by a later layer.
 //!
-//! The loader mirrors [`RuleSet::load`](crate::validation::rules::RuleSet::load):
+//! The loader mirrors the production rules filesystem boundary:
 //! an absent file is graceful (an empty registry, NOT an error), and each entry
 //! is keyed by its `id` field — the entry's SELF-ID, from which the project-scoped
 //! qualified id `@/invariant/<self-id>` is derived.
@@ -23,7 +23,7 @@ use thiserror::Error;
 ///
 /// Every variant carries enough context (path, entry id, or the underlying
 /// parse error) to point an author at the offending entry. Mirrors
-/// [`RuleConfigError`](crate::validation::rules::RuleConfigError).
+/// [`RuleConfigError`](crate::declarations::rules::RuleConfigError).
 #[derive(Debug, Error)]
 pub enum InvariantConfigError {
     /// The invariants file could not be read from disk.
@@ -112,7 +112,7 @@ impl InvariantRegistry {
     ///
     /// Returns an empty [`InvariantRegistry`] when the file does not exist
     /// (graceful, NOT an error), mirroring
-    /// [`RuleSet::load`](crate::validation::rules::RuleSet::load).
+    /// the production rules filesystem boundary.
     pub fn load(jit_root: &Path) -> Result<Self, InvariantConfigError> {
         let path = jit_root.join("invariants.toml");
         if !path.exists() {

@@ -23,9 +23,11 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
-use jit::domain::{Event, GateStage, Issue, Priority};
+use jit::declarations::GateRegistry;
+use jit::declarations::GateStage;
+use jit::domain::{Event, Issue, Priority};
 use jit::gate_presets::{GatePresetDefinition, PresetInfo};
-use jit::storage::{GateRegistry, InMemoryStorage, IssueStore, JsonFileStorage, PathReadError};
+use jit::storage::{InMemoryStorage, IssueStore, JsonFileStorage, PathReadError};
 use jit::templates::{GraphTemplate, TemplateRegistry};
 use jit::CommandExecutor;
 use tempfile::TempDir;

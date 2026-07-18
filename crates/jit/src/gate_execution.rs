@@ -6,9 +6,9 @@
 //! - Git commit/branch tracking
 //! - Result storage for audit trail
 
+use crate::declarations::{GateChecker, GateStage};
 use crate::domain::{
-    DocumentReference, GateChecker, GateContext, GateRunResult, GateRunStatus, GateStage,
-    GATE_RUN_SCHEMA_VERSION,
+    DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
 };
 use anyhow::{Context, Result};
 use std::io::Write;

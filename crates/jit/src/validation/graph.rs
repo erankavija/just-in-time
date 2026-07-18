@@ -55,10 +55,10 @@ use crate::domain::{project, ContentFormat, Issue};
 use crate::graph::DependencyGraph;
 use std::collections::HashMap;
 
-use crate::validation::engine::Finding;
-use crate::validation::rules::{
+use crate::declarations::rules::{
     Assertion, Rule, RuleScope, Selector, Severity, StatePredicate, TypeHierarchyKind,
 };
+use crate::validation::engine::Finding;
 
 /// Default label namespace whose values are criterion ids a child claims to
 /// satisfy (e.g. `satisfies:REQ-01`).
@@ -207,7 +207,7 @@ pub enum ChildLink {
 /// use jit::domain::{ContentFormat, Issue};
 /// use jit::domain::type_taxonomy::HierarchyConfig;
 /// use jit::validation::graph::{evaluate_graph, GraphFinding};
-/// use jit::validation::rules::RuleSet;
+/// use jit::declarations::rules::RuleSet;
 /// use std::path::Path;
 ///
 /// let toml = r#"
@@ -217,7 +217,7 @@ pub enum ChildLink {
 /// severity = "error"
 /// assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 /// "#;
-/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+/// let set = RuleSet::parse(toml, None, []).unwrap();
 /// let rules: Vec<&_> = set.rules.iter().collect();
 ///
 /// let mut task = Issue::new("a task".into(), String::new());
@@ -316,7 +316,7 @@ impl ChildLink {
 /// use jit::domain::Issue;
 /// use jit::domain::type_taxonomy::HierarchyConfig;
 /// use jit::validation::graph::evaluate_graph;
-/// use jit::validation::rules::RuleSet;
+/// use jit::declarations::rules::RuleSet;
 /// use std::path::Path;
 ///
 /// // A dependency-shape rule: every `type:task` must depend on a `type:design`.
@@ -327,7 +327,7 @@ impl ChildLink {
 /// severity = "error"
 /// assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 /// "#;
-/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+/// let set = RuleSet::parse(toml, None, []).unwrap();
 /// let rules: Vec<&_> = set.rules.iter().collect();
 ///
 /// let mut task = Issue::new("a task".into(), String::new());
@@ -1719,12 +1719,11 @@ fn warning_message(warning: &ValidationWarning) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::declarations::rules::RuleSet;
     use crate::domain::State;
-    use crate::validation::rules::RuleSet;
-    use std::path::Path;
 
     fn rule_from(toml: &str) -> Rule {
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         set.rules.into_iter().next().unwrap()
     }
 
@@ -1872,14 +1871,13 @@ mod tests {
         epic
     }
 
-    /// Load a single rule from `rule_toml` against a repo root whose `config.toml`
-    /// declares a `requirement` item kind matching the coverage defaults, so a
-    /// `kind = "requirement"` rule can expand.
+    /// Load a single rule from `rule_toml` against a config that declares a
+    /// `requirement` item kind matching the coverage defaults, so a
+    /// `kind = "requirement"` rule can expand. The rule carries no schema
+    /// reference, so parse purely over an empty captured schema set with the
+    /// explicit config.
     fn rule_from_repo(rule_toml: &str) -> Rule {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
-            dir.path().join("config.toml"),
-            r#"
+        let config_toml = r#"
 [item_kinds.requirement]
 section = "success_criteria"
 id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
@@ -1887,10 +1885,9 @@ markers = ["[hard]"]
 link-namespaces = ["satisfies"]
 scope = "issue"
 source-of-truth = "markdown-first"
-"#,
-        )
-        .unwrap();
-        let set = RuleSet::from_toml_str(rule_toml, dir.path()).unwrap();
+"#;
+        let config = toml::from_str::<crate::config::JitConfig>(config_toml).unwrap();
+        let set = crate::declarations::rules::RuleSet::parse(rule_toml, Some(&config), []).unwrap();
         set.rules.into_iter().next().unwrap()
     }
 
@@ -3510,9 +3507,9 @@ source-of-truth = "markdown-first"
         // The loader enforces this; we verify it surfaces as a load error.
         let toml = "[[rules]]\nname = \"bad\"\n\
                    assert = { criteria-to-check = {} }\n";
-        let err = RuleSet::from_toml_str(toml, std::path::Path::new("/x")).unwrap_err();
+        let err = RuleSet::parse(toml, None, []).unwrap_err();
         match err {
-            crate::validation::rules::RuleConfigError::InvalidAssertion { rule, message } => {
+            crate::declarations::rules::RuleConfigError::InvalidAssertion { rule, message } => {
                 assert_eq!(rule, "bad");
                 assert!(
                     message.contains("gate-prefix") && message.contains("check-namespace"),

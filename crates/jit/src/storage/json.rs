@@ -6,11 +6,12 @@
 //! layout). The directory location can be overridden with the `JIT_DATA_DIR`
 //! environment variable.
 
+use crate::declarations::GateRegistry;
 use crate::domain::{parse_known_events, Event, Issue};
 use crate::storage::{
-    AmbiguousIdError, FileLocker, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError,
-    IssueNotFoundError, IssueStore, RecoveryCoordinator, RecoverySession, RepoWriteGuard,
-    RepoWriteLock, RepositoryFormatTooNewError, RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
+    AmbiguousIdError, FileLocker, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
+    IssueStore, RecoveryCoordinator, RecoverySession, RepoWriteGuard, RepoWriteLock,
+    RepositoryFormatTooNewError, RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use cap_std::{ambient_authority, fs::Dir};
@@ -1491,7 +1492,7 @@ fn assert_canonical_contained(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::Gate;
+    use crate::declarations::GateDefinition;
     use crate::storage::IssueStore;
     use tempfile::TempDir;
 
@@ -1736,7 +1737,8 @@ mod tests {
     #[test]
     fn test_save_gate_run_result_is_atomic_no_tmp_left() {
         // The atomic write must leave only result.json (no .json.tmp residue).
-        use crate::domain::{GateRunResult, GateRunStatus, GateStage};
+        use crate::declarations::GateStage;
+        use crate::domain::{GateRunResult, GateRunStatus};
         use chrono::Utc;
 
         let (_temp, storage) = setup_storage();
@@ -1785,7 +1787,8 @@ mod tests {
 
     #[test]
     fn test_save_gate_run_result_waits_for_repository_guard() {
-        use crate::domain::{GateRunResult, GateRunStatus, GateStage};
+        use crate::declarations::GateStage;
+        use crate::domain::{GateRunResult, GateRunStatus};
         use chrono::Utc;
 
         let temp = TempDir::new().unwrap();
@@ -1826,7 +1829,7 @@ mod tests {
 
     #[test]
     fn test_save_gate_preset_waits_for_repository_guard() {
-        use crate::domain::{GateMode, GateStage};
+        use crate::declarations::{GateMode, GateStage};
         use crate::gate_presets::{GatePresetDefinition, GateTemplate};
 
         let temp = TempDir::new().unwrap();
@@ -1953,13 +1956,13 @@ mod tests {
         let mut registry = storage.load_gate_registry().unwrap();
         assert!(registry.gates.is_empty());
 
-        let gate = Gate {
+        let gate = GateDefinition {
             version: 1,
             key: "review".to_string(),
             title: "Code Review".to_string(),
             description: "Manual code review".to_string(),
-            stage: crate::domain::GateStage::Postcheck,
-            mode: crate::domain::GateMode::Manual,
+            stage: crate::declarations::GateStage::Postcheck,
+            mode: crate::declarations::GateMode::Manual,
             checker: None,
             priority: 100,
             reserved: std::collections::HashMap::new(),

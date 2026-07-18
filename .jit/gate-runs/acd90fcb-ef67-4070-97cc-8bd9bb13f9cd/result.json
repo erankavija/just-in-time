@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "acd90fcb-ef67-4070-97cc-8bd9bb13f9cd",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
+  "commit": "b34d209b5ac9e5427ae909c7bd771c8eb2a90c90",
+  "branch": "integration/cdc840ad",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T17:40:11.079338159Z",
+  "completed_at": "2026-07-18T17:43:00.995552748Z",
+  "duration_ms": 169916,
+  "exit_code": 1,
+  "stdout": "Attribution: aef6dd26, 2b28275b, 57e50a8c, d344356d, 7443fd0e\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-07-18T17:34:55Z)\nTruncation recovery: narrowed aggregate patch reads to individual rework patches and bounded current-module line ranges\n\n1. [blocking][issue-impact][high] `compare_materializations` suppresses `RepositoryImage::entry` errors by using `matches!`; an expected action for an uncaptured path is reported as drift instead of returning `UndiscoveredRepositoryPath`. This bypasses the closed-capture contract for a pure image consumer. [crates/jit/src/repository_state/mod.rs:126](/tmp/jit-cdc840ad-integration/crates/jit/src/repository_state/mod.rs:126)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Materialization comparison masks uncaptured repository reads as drift.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"compare_materializations converts RepositoryImage::entry errors, including UndiscoveredRepositoryPath, into drift findings instead of propagating them.\",\"file\":\"crates/jit/src/repository_state/mod.rs\",\"line\":126}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 24381 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /tmp/jit-cdc840ad-integration\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7650-7298-7512-9714-ff198dc55309\n--------\nuser\n--- 24368 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Materialization comparison masks uncaptured repository reads as drift.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "compare_materializations converts RepositoryImage::entry errors, including UndiscoveredRepositoryPath, into drift findings instead of propagating them.",
+        "file": "crates/jit/src/repository_state/mod.rs",
+        "line": 126
+      }
+    ]
+  }
+}

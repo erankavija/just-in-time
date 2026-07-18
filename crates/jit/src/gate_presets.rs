@@ -26,7 +26,8 @@ pub use planning::{
 };
 pub use reference::{render_reference_markdown, REFERENCE_PATH};
 
-use crate::domain::{Gate, GateChecker, GateMode, GateStage};
+use crate::declarations::GateDefinition;
+use crate::declarations::{GateChecker, GateMode, GateStage};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -51,8 +52,8 @@ pub struct GateTemplate {
 
 impl GateTemplate {
     /// Convert template to full Gate definition
-    pub fn to_gate(&self) -> Gate {
-        Gate {
+    pub fn to_gate(&self) -> GateDefinition {
+        GateDefinition {
             version: 1,
             key: self.key.clone(),
             title: self.title.clone(),

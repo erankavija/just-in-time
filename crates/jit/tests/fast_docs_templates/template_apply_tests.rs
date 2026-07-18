@@ -716,7 +716,7 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
             "Whole-repository validation".to_string(),
             true,
             None,
-            jit::domain::GateStage::Postcheck,
+            jit::declarations::GateStage::Postcheck,
         )
         .unwrap();
 

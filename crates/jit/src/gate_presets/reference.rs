@@ -15,7 +15,7 @@
 //! output.
 
 use super::{BuiltinPresets, GatePresetDefinition, GateTemplate};
-use crate::domain::GateChecker;
+use crate::declarations::GateChecker;
 use anyhow::Result;
 
 /// Repo-relative path of the committed reference that projects the built-in
@@ -128,7 +128,7 @@ fn checker_cell(gate: &GateTemplate) -> String {
             ),
             GateChecker::ReviewPlaceholder => format!(
                 "`review_placeholder` — {}",
-                crate::domain::REVIEW_PLACEHOLDER_WARNING
+                crate::declarations::REVIEW_PLACEHOLDER_WARNING
             ),
             GateChecker::Exec { .. } => unreachable!(),
         };
@@ -308,7 +308,7 @@ pub fn render_reference_markdown() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::GateMode;
+    use crate::declarations::GateMode;
     use std::collections::HashSet;
     use std::path::PathBuf;
 
@@ -466,7 +466,7 @@ mod tests {
             key: "k".to_string(),
             title: "t".to_string(),
             description: "d".to_string(),
-            stage: crate::domain::GateStage::Postcheck,
+            stage: crate::declarations::GateStage::Postcheck,
             mode: GateMode::Auto,
             checker: Some(GateChecker::Exec {
                 command: "run.sh".to_string(),
@@ -517,7 +517,7 @@ mod tests {
             key: "k".to_string(),
             title: "t".to_string(),
             description: "d".to_string(),
-            stage: crate::domain::GateStage::Precheck,
+            stage: crate::declarations::GateStage::Precheck,
             mode: GateMode::Manual,
             checker: None,
         };

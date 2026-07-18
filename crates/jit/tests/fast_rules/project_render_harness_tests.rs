@@ -8,8 +8,9 @@
 //! each bound to the live renderer code rather than a committed mirror.
 
 use jit::commands::CommandExecutor;
-use jit::domain::{Gate, GateMode, GateStage};
-use jit::storage::{GateRegistry, InMemoryStorage, IssueStore};
+use jit::declarations::GateRegistry;
+use jit::declarations::{GateDefinition, GateMode, GateStage};
+use jit::storage::{InMemoryStorage, IssueStore};
 use jit::validation::invariants::InvariantRegistry;
 use jit::validation::projection::render_invariants_markdown;
 use jit::validation::rules_gates_projection::render_rules_and_gates_markdown;
@@ -85,8 +86,8 @@ fn storage_with(config_toml: &str, registries: &[(&str, &str)]) -> InMemoryStora
     storage
 }
 
-fn manual_gate(key: &str, title: &str, description: &str) -> Gate {
-    Gate {
+fn manual_gate(key: &str, title: &str, description: &str) -> GateDefinition {
+    GateDefinition {
         version: 1,
         key: key.to_string(),
         title: title.to_string(),

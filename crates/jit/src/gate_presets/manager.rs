@@ -112,7 +112,7 @@ impl PresetManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{GateMode, GateStage};
+    use crate::declarations::{GateMode, GateStage};
     use crate::gate_presets::GateTemplate;
     use tempfile::TempDir;
 

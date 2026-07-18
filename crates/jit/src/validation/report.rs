@@ -10,8 +10,8 @@
 
 use serde::Serialize;
 
+use crate::declarations::rules::{RuleScope, Severity};
 use crate::validation::engine::Finding;
-use crate::validation::rules::{RuleScope, Severity};
 
 /// One reported finding, scoped to the issue it concerns (if any).
 ///
@@ -141,8 +141,8 @@ impl ExplainReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::declarations::rules::{RuleScope, Severity};
     use crate::validation::engine::Finding;
-    use crate::validation::rules::{RuleScope, Severity};
 
     // --- ReportedFinding JSON byte-identical round-trip ----------------------
 

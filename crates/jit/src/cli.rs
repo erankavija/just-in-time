@@ -1300,14 +1300,14 @@ pub enum GateCommands {
         description: String,
 
         /// Gate stage: precheck or postcheck (long-only; `-s` is reserved for `--state`)
-        #[arg(long, value_enum, default_value_t = crate::domain::GateStage::Postcheck)]
-        stage: crate::domain::GateStage,
+        #[arg(long, value_enum, default_value_t = crate::declarations::GateStage::Postcheck)]
+        stage: crate::declarations::GateStage,
 
         /// Gate mode: manual or auto. Defaults to auto when --checker-command
         /// is given, manual otherwise. Explicit `--mode manual` with
         /// --checker-command is a usage error (exit 2).
         #[arg(short, long, value_enum)]
-        mode: Option<crate::domain::GateMode>,
+        mode: Option<crate::declarations::GateMode>,
 
         /// Convenience flag for `--mode auto`: define the gate as automated.
         /// When set it overrides `--mode`.
@@ -1377,11 +1377,11 @@ pub enum GateCommands {
 
         /// New gate stage: precheck or postcheck (long-only; `-s` is reserved for `--state`)
         #[arg(long, value_enum)]
-        stage: Option<crate::domain::GateStage>,
+        stage: Option<crate::declarations::GateStage>,
 
         /// New gate mode: manual or auto
         #[arg(short, long, value_enum)]
-        mode: Option<crate::domain::GateMode>,
+        mode: Option<crate::declarations::GateMode>,
 
         /// Convenience flag for `--mode auto`: switch the gate to automated.
         /// When set it overrides `--mode`.

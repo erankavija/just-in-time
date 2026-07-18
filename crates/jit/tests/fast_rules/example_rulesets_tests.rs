@@ -2,7 +2,7 @@
 //!
 //! These prove the examples are REAL, not illustrative-only:
 //!
-//! 1. Every example `rules.toml` parses through the production [`RuleSet::load`]
+//! 1. Every example `rules.toml` parses through the production filesystem boundary
 //!    loader (with the schema root pointed at the example directory, so any
 //!    referenced `schemas/*.json` is read and compiled).
 //! 2. For each methodology, a sample COMPLIANT issue passes and a sample
@@ -15,10 +15,10 @@
 
 use std::path::{Path, PathBuf};
 
+use jit::declarations::rules::{Rule, RuleScope, RuleSet};
 use jit::domain::{ContentFormat, DocumentReference, Issue, State};
 use jit::validation::graph::{evaluate_graph, GraphFinding};
 use jit::validation::local::evaluate_local;
-use jit::validation::rules::{Rule, RuleScope, RuleSet};
 
 // Transition-enforcement tests (research module) drive the executor directly.
 use jit::commands::CommandExecutor;
@@ -37,8 +37,11 @@ fn example_dir(name: &str) -> PathBuf {
 /// the example directory itself.
 fn load_example(name: &str) -> RuleSet {
     let dir = example_dir(name);
-    RuleSet::load(&dir)
-        .unwrap_or_else(|e| panic!("example '{name}' rules.toml must load cleanly: {e}"))
+    jit::storage::ruleset_store::load_ruleset(
+        &dir,
+        &toml::from_str::<jit::config::JitConfig>("").unwrap(),
+    )
+    .unwrap_or_else(|e| panic!("example '{name}' rules.toml must load cleanly: {e}"))
 }
 
 /// The graph-scope rules of a set, as the slice [`evaluate_graph`] expects.
@@ -573,7 +576,7 @@ mod sdd_criteria_label_match {
             .find(|r| r.name == "sdd-req-matches-a-criterion")
             .expect("sdd example must define sdd-req-matches-a-criterion");
         assert_eq!(rule.scope, RuleScope::Graph);
-        assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
+        assert_eq!(rule.severity, jit::declarations::rules::Severity::Error);
     }
 
     #[test]
@@ -726,7 +729,7 @@ mod sdd_lifecycle {
         let findings = issue_graph_findings(&rules, &[epic, child]);
         let error_findings: Vec<_> = findings
             .iter()
-            .filter(|f| f.finding.severity == jit::validation::rules::Severity::Error)
+            .filter(|f| f.finding.severity == jit::declarations::rules::Severity::Error)
             .collect();
         assert!(
             error_findings.is_empty(),
@@ -980,7 +983,7 @@ mod fresh_evidence {
             .iter()
             .find(|r| r.name == "fresh-evidence-before-done")
             .expect("example must define fresh-evidence-before-done");
-        assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
+        assert_eq!(rule.severity, jit::declarations::rules::Severity::Error);
         assert!(rule.enforce, "the example deliberately enforces at done");
         assert_eq!(rule.scope, RuleScope::Graph);
     }
@@ -1131,7 +1134,7 @@ mod nyquist {
             .iter()
             .find(|r| r.name == "nyquist-criteria-verified-at-done")
             .expect("example must define nyquist-criteria-verified-at-done");
-        assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
+        assert_eq!(rule.severity, jit::declarations::rules::Severity::Error);
         assert!(rule.enforce, "the done-scoped rule must enforce");
         assert_eq!(rule.scope, RuleScope::Graph);
     }
@@ -1554,7 +1557,7 @@ mod research {
         let findings = issue_graph_findings(&rules, std::slice::from_ref(&goal));
         let error_findings: Vec<_> = findings
             .iter()
-            .filter(|f| f.finding.severity == jit::validation::rules::Severity::Error)
+            .filter(|f| f.finding.severity == jit::declarations::rules::Severity::Error)
             .collect();
         assert!(
             error_findings.is_empty(),
@@ -1677,7 +1680,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
         let findings = issue_graph_findings(&rules, &[goal.clone(), exp]);
         let error_findings: Vec<_> = findings
             .iter()
-            .filter(|f| f.finding.severity == jit::validation::rules::Severity::Error)
+            .filter(|f| f.finding.severity == jit::declarations::rules::Severity::Error)
             .collect();
         assert!(
             error_findings.is_empty(),
@@ -1718,7 +1721,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
             .expect("dangling tests: finding must exist");
         assert_eq!(
             dangling.finding.severity,
-            jit::validation::rules::Severity::Warn,
+            jit::declarations::rules::Severity::Warn,
             "dangling tests: reference must be a warning, not an error"
         );
     }
@@ -1733,7 +1736,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
             .iter()
             .find(|r| r.name == "research-hard-hypotheses-covered-at-done")
             .expect("research example must define research-hard-hypotheses-covered-at-done");
-        assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
+        assert_eq!(rule.severity, jit::declarations::rules::Severity::Error);
         assert!(rule.enforce, "the done-scoped coverage rule must enforce");
         assert_eq!(rule.scope, RuleScope::Graph);
     }

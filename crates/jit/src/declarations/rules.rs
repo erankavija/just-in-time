@@ -1,7 +1,11 @@
-//! Rule data model and `.jit/rules.toml` loader.
+//! Pure rule declarations and `.jit/rules.toml` parsing.
 //!
-//! This module defines the declarative validation rule model and the loader
-//! that parses `.jit/rules.toml` into a [`RuleSet`]. It also implements
+//! This module defines the declarative validation rule model and pure parsing
+//! of already-captured `rules.toml`, configuration, and schema bytes into a
+//! [`RuleSet`]. Filesystem loading of the ruleset belongs to the storage boundary
+//! ([`load_ruleset`](crate::storage::ruleset_store::load_ruleset)); validation only
+//! evaluates the parsed declarations, and captured-view flows parse pre-resolved
+//! bytes. This module also implements
 //! selector matching (the union of rules applicable to a given issue) and the
 //! config-level guards required by the design record:
 //!
@@ -13,12 +17,12 @@
 //!   `json-schema` reference cannot coexist in one rule (shorthand XOR file).
 //! - `enforce` absent defaults to `false` (warn only, DR §7.2).
 //!
-//! This module only defines the MODEL, the LOADER, selector matching, and the
+//! This module only defines the model, pure parser, selector matching, and the
 //! guards. Actual JSON Schema validation, shorthand desugaring, and graph rule
 //! evaluation are filled in by downstream tasks; assertion payloads are parsed
 //! and stored here without being evaluated.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -64,6 +68,31 @@ pub enum RuleConfigError {
         path: PathBuf,
         /// Underlying JSON parse error.
         source: serde_json::Error,
+    },
+
+    /// Pure parsing required schema bytes that were not supplied.
+    #[error("rule '{rule}': schema bytes for '{reference}' were not supplied")]
+    MissingSchema {
+        /// Name of the offending rule.
+        rule: String,
+        /// Safe schema reference requested by the declaration.
+        reference: String,
+    },
+
+    /// Kind-based coverage expansion requires an explicit parsed configuration.
+    #[error("rule '{rule}': explicit JitConfig is required for {purpose}")]
+    MissingConfiguration {
+        /// Name of the offending rule.
+        rule: String,
+        /// Pure expansion that required configuration.
+        purpose: &'static str,
+    },
+
+    /// The boundary could not supply a valid explicit repository configuration.
+    #[error("failed to load explicit rule configuration: {message}")]
+    Configuration {
+        /// Boundary configuration failure.
+        message: String,
     },
 
     /// A rule's `assert` table is invalid (no kind, multiple kinds, or a
@@ -482,10 +511,24 @@ pub struct SchemaSource {
     /// The reference string as authored in `rules.toml` (e.g.
     /// `"schemas/epic-body.json"`).
     pub reference: String,
-    /// The schema file's path, resolved relative to the `.jit` root.
+    /// A diagnostic-only path identifying the schema, formed by joining the
+    /// reference onto a synthetic `<captured>` base. The schema bytes come from
+    /// the captured (or storage-loaded) schema set, so this path is never re-read
+    /// and is not a live `.jit`-root filesystem path.
     pub path: PathBuf,
     /// The parsed JSON Schema document.
     pub schema: serde_json::Value,
+}
+
+/// One schema file required by captured rule declarations.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SchemaRequest {
+    /// Owning rule name for typed boundary errors.
+    pub rule: String,
+    /// Safe repository-data-relative schema reference.
+    pub reference: String,
+    /// Whether a missing/malformed source is fatal at the boundary.
+    pub required: bool,
 }
 
 /// A single assertion kind. Exactly one kind is present per rule.
@@ -768,47 +811,18 @@ impl RuleSet {
         Self::default()
     }
 
-    /// Load and parse `.jit/rules.toml` relative to the given `.jit` root.
-    ///
-    /// Returns an empty [`RuleSet`] when the file does not exist. Referenced
-    /// schema files are read relative to `jit_root` and transcoded to JSON.
-    pub fn load(jit_root: &Path) -> Result<Self, RuleConfigError> {
-        let path = jit_root.join("rules.toml");
-        if !path.exists() {
-            return Ok(Self::empty());
-        }
-        let content = std::fs::read_to_string(&path).map_err(|source| RuleConfigError::Io {
-            path: path.clone(),
-            source,
-        })?;
-        Self::from_toml_str(&content, jit_root)
-    }
-
-    /// Parse a `rules.toml` string. `jit_root` resolves schema file references.
-    pub fn from_toml_str(content: &str, jit_root: &Path) -> Result<Self, RuleConfigError> {
-        Self::from_toml_str_with_loaders(content, jit_root, None, |rule, reference| {
-            load_schema_source(rule, jit_root, reference)
-        })
-    }
-
-    /// Parse rules from bytes while resolving every dependent input through
-    /// injected, already-selected repository data.
-    ///
-    /// Repository overlays use this entry point so `json-schema` files and
-    /// `label-coverage kind = ...` expansion cannot reopen the live storage
-    /// root. Ordinary filesystem loading remains available through
-    /// [`Self::from_toml_str`].
-    pub fn from_toml_str_with_loaders(
+    /// Parse captured rules using explicit configuration and schema bytes.
+    pub fn parse(
         content: &str,
-        jit_root: &Path,
         config: Option<&JitConfig>,
-        mut load_schema: impl FnMut(&str, String) -> Result<SchemaSource, RuleConfigError>,
+        schemas: impl IntoIterator<Item = (String, Vec<u8>)>,
     ) -> Result<Self, RuleConfigError> {
+        let schemas = schemas.into_iter().collect::<BTreeMap<_, _>>();
         let raw: RawRulesFile = toml::from_str(content)?;
         let rules = raw
             .rules
             .into_iter()
-            .map(|r| r.into_rule(jit_root, config, &mut load_schema))
+            .map(|r| r.into_rule(config, &schemas))
             .collect::<Result<Vec<_>, _>>()?;
 
         // Enforce the documented "Unique" invariant on `Rule::name` so every
@@ -824,6 +838,24 @@ impl RuleSet {
         }
 
         Ok(Self { rules })
+    }
+
+    /// Discover safe schema-byte requests without reading them.
+    pub fn schema_requests(content: &str) -> Result<Vec<SchemaRequest>, RuleConfigError> {
+        let raw: RawRulesFile = toml::from_str(content)?;
+        raw.rules
+            .into_iter()
+            .filter_map(|rule| {
+                rule.assert.json_schema.map(|reference| {
+                    validate_schema_reference(&rule.name, &reference)?;
+                    Ok(SchemaRequest {
+                        rule: rule.name,
+                        reference,
+                        required: rule.origin.as_deref() != Some(DEFAULT_ORIGIN),
+                    })
+                })
+            })
+            .collect()
     }
 
     /// Returns the union of rules whose selector matches the issue.
@@ -1089,9 +1121,8 @@ struct RawLabelValuePattern {
 impl RawRule {
     fn into_rule(
         self,
-        jit_root: &Path,
         config: Option<&JitConfig>,
-        load_schema: &mut impl FnMut(&str, String) -> Result<SchemaSource, RuleConfigError>,
+        schemas: &BTreeMap<String, Vec<u8>>,
     ) -> Result<Rule, RuleConfigError> {
         // A rule's name is its addressable self-id (`@/rule/<name>`); colon is
         // reserved for the label namespace:value separator, so a colon-bearing
@@ -1119,16 +1150,16 @@ impl RawRule {
         } else {
             None
         };
-        let assert = match self
-            .assert
-            .into_assertion(&self.name, jit_root, config, load_schema)
-        {
+        let assert = match self.assert.into_assertion(&self.name, config, schemas) {
             Ok(assert) => assert,
             Err(err) => match (default_schema_ref, &err) {
                 (
                     Some(reference),
                     RuleConfigError::SchemaIo { .. } | RuleConfigError::SchemaJson { .. },
-                ) => placeholder_default_schema_assertion(jit_root, reference),
+                ) => placeholder_default_schema_assertion(reference),
+                (Some(reference), RuleConfigError::MissingSchema { .. }) => {
+                    placeholder_default_schema_assertion(reference)
+                }
                 _ => return Err(err),
             },
         };
@@ -1193,7 +1224,6 @@ const COVERAGE_INLINE_TRIPLE_KEYS: [&str; 3] = ["criteria-section", "marker", "i
 fn expand_kind_sugar(
     rule: &str,
     config: &mut toml::value::Table,
-    jit_root: &Path,
     loaded_config: Option<&JitConfig>,
 ) -> Result<(), RuleConfigError> {
     // An inline triple wins: leave the table byte-for-byte as authored, leaving
@@ -1222,19 +1252,13 @@ fn expand_kind_sugar(
 
     // Resolve the kind through the shared pure resolver against the repo's
     // `[item_kinds]` registry. An undeclared kind is a typed config error.
-    let owned;
-    let registry = match loaded_config {
-        Some(config) => config.item_kinds.as_ref(),
-        None => {
-            owned = JitConfig::load(jit_root).map_err(|e| RuleConfigError::InvalidAssertion {
-                rule: rule.to_string(),
-                message: format!(
-                    "failed to load [item_kinds] registry for 'kind' expansion: {e:#}"
-                ),
-            })?;
-            owned.item_kinds.as_ref()
-        }
-    };
+    let registry = loaded_config
+        .ok_or_else(|| RuleConfigError::MissingConfiguration {
+            rule: rule.to_string(),
+            purpose: "label-coverage kind expansion",
+        })?
+        .item_kinds
+        .as_ref();
     let triple = crate::domain::item::expand_kind_triple(registry, &kind_name).map_err(|e| {
         RuleConfigError::InvalidAssertion {
             rule: rule.to_string(),
@@ -1263,9 +1287,8 @@ impl RawAssert {
     fn into_assertion(
         self,
         rule: &str,
-        jit_root: &Path,
         loaded_config: Option<&JitConfig>,
-        load_schema: &mut impl FnMut(&str, String) -> Result<SchemaSource, RuleConfigError>,
+        schemas: &BTreeMap<String, Vec<u8>>,
     ) -> Result<Assertion, RuleConfigError> {
         // Collect which kinds were provided, partitioned into shorthand vs raw.
         let shorthand_present = self.require_label.is_some()
@@ -1358,7 +1381,15 @@ impl RawAssert {
         }
         if let Some(reference) = self.json_schema {
             validate_schema_reference(rule, &reference)?;
-            return load_schema(rule, reference).map(Assertion::JsonSchema);
+            let bytes = schemas
+                .get(&reference)
+                .ok_or_else(|| RuleConfigError::MissingSchema {
+                    rule: rule.to_string(),
+                    reference: reference.clone(),
+                })?;
+            let path = PathBuf::from("<captured>").join(&reference);
+            return schema_source_from_bytes(rule, reference, path, bytes)
+                .map(Assertion::JsonSchema);
         }
         if let Some(cmd) = self.checker_command {
             return Ok(Assertion::CheckerCommand(cmd));
@@ -1369,7 +1400,7 @@ impl RawAssert {
             // the table BEFORE evaluation, so the engine consumes the triple and
             // never sees a kind NAME (REQ-05). Inline-triple rules carry no `kind`
             // key and are left untouched (REQ-03).
-            expand_kind_sugar(rule, &mut config, jit_root, loaded_config)?;
+            expand_kind_sugar(rule, &mut config, loaded_config)?;
             // Validate `child-state` at load so a typo'd state (which would
             // otherwise silently never match any child, producing spurious
             // "criterion not satisfied" findings) is caught immediately.
@@ -1508,8 +1539,8 @@ fn validate_schema_reference(rule: &str, reference: &str) -> Result<(), RuleConf
 /// replaces it with the config-derived assertion at load, so the rebuildable
 /// projection is never load-bearing for a default rule's validation and this
 /// placeholder is not evaluated once reconciliation has run.
-fn placeholder_default_schema_assertion(jit_root: &Path, reference: String) -> Assertion {
-    let path = jit_root.join(&reference);
+fn placeholder_default_schema_assertion(reference: String) -> Assertion {
+    let path = PathBuf::from("<captured>").join(&reference);
     Assertion::JsonSchema(SchemaSource {
         reference,
         path,
@@ -1517,22 +1548,16 @@ fn placeholder_default_schema_assertion(jit_root: &Path, reference: String) -> A
     })
 }
 
-/// Load a `.jit/schemas/<name>.json` file referenced by a `json-schema` rule and
-/// transcode it into a `serde_json::Value`.
-fn load_schema_source(
+/// Parse injected JSON Schema bytes without consulting ambient state.
+fn schema_source_from_bytes(
     rule: &str,
-    jit_root: &Path,
     reference: String,
+    path: PathBuf,
+    content: &[u8],
 ) -> Result<SchemaSource, RuleConfigError> {
     validate_schema_reference(rule, &reference)?;
-    let path = jit_root.join(&reference);
-    let content = std::fs::read_to_string(&path).map_err(|source| RuleConfigError::SchemaIo {
-        rule: rule.to_string(),
-        path: path.clone(),
-        source,
-    })?;
     let schema: serde_json::Value =
-        serde_json::from_str(&content).map_err(|source| RuleConfigError::SchemaJson {
+        serde_json::from_slice(content).map_err(|source| RuleConfigError::SchemaJson {
             rule: rule.to_string(),
             path: path.clone(),
             source,
@@ -1548,6 +1573,14 @@ fn load_schema_source(
 mod tests {
     use super::*;
     use crate::domain::{DocumentReference, Issue, State};
+
+    fn parse(content: &str) -> Result<RuleSet, RuleConfigError> {
+        RuleSet::parse(content, None, [])
+    }
+
+    fn parse_with_config(content: &str, config: &JitConfig) -> Result<RuleSet, RuleConfigError> {
+        RuleSet::parse(content, Some(config), [])
+    }
 
     fn issue_with(labels: &[&str], state: State) -> Issue {
         let mut issue = Issue::new("t".to_string(), String::new());
@@ -1617,7 +1650,7 @@ name = "single"
 when = { state = "in_progress" }
 assert = { require-section = { heading = "Plan" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         let sel = &set.rules[0].when;
         assert!(sel.matches(&issue_with(&[], State::InProgress)));
         assert!(!sel.matches(&issue_with(&[], State::Ready)));
@@ -1632,7 +1665,7 @@ name = "list"
 when = { state = ["ready", "in_progress", "gated"] }
 assert = { require-section = { heading = "Plan" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         let sel = &set.rules[0].when;
         assert!(sel.matches(&issue_with(&[], State::Ready)));
         assert!(sel.matches(&issue_with(&[], State::InProgress)));
@@ -1651,7 +1684,7 @@ name = "epic-lifecycle"
 when = { type = "epic", state = ["ready", "in_progress"] }
 assert = { require-section = { heading = "Plan" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         let sel = &set.rules[0].when;
         // type + state both match.
         assert!(sel.matches(&issue_with(&["type:epic"], State::InProgress)));
@@ -1671,7 +1704,7 @@ name = "typo"
 when = { state = ["ready", "in_progres"] }
 assert = { require-section = { heading = "Plan" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidState { rule, value, valid } => {
                 assert_eq!(rule, "typo");
@@ -1704,7 +1737,7 @@ name = "typo-single"
 when = { state = "nope" }
 assert = { require-section = { heading = "Plan" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidState { rule, value, .. } => {
                 assert_eq!(rule, "typo-single");
@@ -1724,7 +1757,7 @@ name = "empty-list"
 when = { state = [] }
 assert = { require-section = { heading = "Plan" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidState { rule, value, valid } => {
                 assert_eq!(rule, "empty-list");
@@ -1792,7 +1825,7 @@ name = "typo-child-state"
 when = { type = "epic" }
 assert = { label-coverage = { source = "req", child-state = "don" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidState { rule, value, valid } => {
                 assert_eq!(rule, "typo-child-state");
@@ -1818,7 +1851,7 @@ name = "coverage"
 when = { type = "epic" }
 assert = { label-coverage = { child-state = "done" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert_eq!(set.rules.len(), 1);
         assert_eq!(set.rules[0].name, "coverage");
     }
@@ -1872,7 +1905,7 @@ name = "task-rule"
 when = { type = "task" }
 assert = { require-doc-type = { doc-type = "design" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         let issue = issue_with(&["type:epic"], State::Ready);
         let matched: Vec<&str> = set
             .matching_rules(&issue)
@@ -1893,7 +1926,7 @@ name = "r"
 when = { type = "epic" }
 assert = { require-section = { heading = "Goals" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert_eq!(set.rules.len(), 1);
         assert!(!set.rules[0].enforce);
     }
@@ -1916,18 +1949,11 @@ name = "off-sev"
 severity = "off"
 assert = { require-section = { heading = "C" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert_eq!(set.rules[0].severity, Severity::Warn);
         assert_eq!(set.rules[1].severity, Severity::Error);
         assert!(set.rules[1].enforce);
         assert_eq!(set.rules[2].severity, Severity::Off);
-    }
-
-    #[test]
-    fn test_load_missing_file_returns_empty() {
-        let dir = tempfile::tempdir().unwrap();
-        let set = RuleSet::load(dir.path()).unwrap();
-        assert!(set.rules.is_empty());
     }
 
     #[test]
@@ -1941,7 +1967,7 @@ assert = { require-label = { label = "type:*" } }
 name = "graph"
 assert = { label-coverage = { source = "req", child-state = "done" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert_eq!(set.rules[0].scope, RuleScope::Local);
         assert_eq!(set.rules[1].scope, RuleScope::Graph);
     }
@@ -1955,7 +1981,7 @@ assert = { label-coverage = { source = "req", child-state = "done" } }
 name = "mixed"
 assert = { require-label = { label = "req:*" }, json-schema = "schemas/x.json" }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { rule, message } => {
                 assert_eq!(rule, "mixed");
@@ -1978,7 +2004,7 @@ severity = "error"
 enforce = true
 assert = { checker-command = "scripts/check.sh" }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { rule, message } => {
                 assert_eq!(rule, "escape");
@@ -2001,7 +2027,7 @@ severity = "warn"
 enforce = false
 assert = { checker-command = "scripts/check.sh" }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert_eq!(set.rules.len(), 1);
         assert!(!set.rules[0].enforce);
         assert!(matches!(set.rules[0].assert, Assertion::CheckerCommand(_)));
@@ -2014,7 +2040,7 @@ assert = { checker-command = "scripts/check.sh" }
 name = "empty"
 assert = {}
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { message, .. } => {
                 assert!(message.contains("exactly one"));
@@ -2031,7 +2057,7 @@ assert = {}
 name = "two"
 assert = { require-section = { heading = "A" }, require-doc-type = { doc-type = "design" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { message, .. } => {
                 assert!(message.contains("exactly one"));
@@ -2050,7 +2076,7 @@ assert = { require-section = { heading = "A" }, require-doc-type = { doc-type = 
 name = "inline"
 assert = { json-schema = { type = "object" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         assert!(matches!(err, RuleConfigError::Toml(_)));
     }
 
@@ -2068,7 +2094,7 @@ assert = { require-section = { heading = "A" } }
 name = "dup"
 assert = { require-doc-type = { doc-type = "design" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::DuplicateRuleName { name } => assert_eq!(name, "dup"),
             other => panic!("expected DuplicateRuleName, got {other:?}"),
@@ -2090,7 +2116,7 @@ assert = { require-section = { heading = "A" } }
 name = "without-origin"
 assert = { require-section = { heading = "A" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert_eq!(set.rules[0].origin.as_deref(), Some("bracket"));
         assert_eq!(set.rules[1].origin, None);
     }
@@ -2107,7 +2133,7 @@ assert = { require-section = { heading = "A" } }
 name = "my:rule"
 assert = { require-section = { heading = "A" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidRuleName { name } => assert_eq!(name, "my:rule"),
             other => panic!("expected InvalidRuleName, got {other:?}"),
@@ -2123,7 +2149,7 @@ assert = { require-section = { heading = "A" } }
 name = "orphan-leaf-fixture"
 assert = { type-hierarchy = { kind = "orphan-leaf" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert_eq!(set.rules[0].scope, RuleScope::Graph);
         assert!(matches!(
             set.rules[0].assert,
@@ -2140,7 +2166,7 @@ assert = { type-hierarchy = { kind = "orphan-leaf" } }
 name = "strategic-consistency-fixture"
 assert = { type-hierarchy = { kind = "strategic-consistency" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert!(matches!(
             set.rules[0].assert,
             Assertion::TypeHierarchy {
@@ -2156,7 +2182,7 @@ assert = { type-hierarchy = { kind = "strategic-consistency" } }
 name = "bad"
 assert = { type-hierarchy = { kind = "not-a-kind" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { rule, message } => {
                 assert_eq!(rule, "bad");
@@ -2175,7 +2201,7 @@ assert = { type-hierarchy = { kind = "not-a-kind" } }
 name = "bad"
 assert = { type-hierarchy = { kind = "orphan-leaf", extra = 1 } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         assert!(matches!(err, RuleConfigError::Toml(_)));
     }
 
@@ -2191,7 +2217,7 @@ severity = "error"
 enforce = true
 assert = { gate-recency = { max-age-days = 7, gates = ["code-review"] } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert_eq!(set.rules[0].scope, RuleScope::Graph);
         match &set.rules[0].assert {
             Assertion::GateRecency {
@@ -2212,7 +2238,7 @@ assert = { gate-recency = { max-age-days = 7, gates = ["code-review"] } }
 name = "fresh"
 assert = { gate-recency = { max-age-hours = 12 } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         match &set.rules[0].assert {
             Assertion::GateRecency {
                 max_age_hours,
@@ -2233,7 +2259,7 @@ assert = { gate-recency = { max-age-hours = 12 } }
 name = "ambiguous"
 assert = { gate-recency = { max-age-days = 1, max-age-hours = 1 } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { rule, message } => {
                 assert_eq!(rule, "ambiguous");
@@ -2250,7 +2276,7 @@ assert = { gate-recency = { max-age-days = 1, max-age-hours = 1 } }
 name = "no-age"
 assert = { gate-recency = { gates = ["code-review"] } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { rule, message } => {
                 assert_eq!(rule, "no-age");
@@ -2270,7 +2296,7 @@ assert = { gate-recency = { gates = ["code-review"] } }
 name = "zero"
 assert = { gate-recency = { max-age-days = 0 } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { message, .. } => {
                 assert!(
@@ -2294,7 +2320,7 @@ assert = { gate-recency = { max-age-days = 0 } }
 name = "huge"
 assert = { gate-recency = { max-age-days = 384307168202282326 } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { message, .. } => {
                 assert!(message.contains("too large"), "message was: {message}");
@@ -2310,7 +2336,7 @@ assert = { gate-recency = { max-age-days = 384307168202282326 } }
 name = "bad"
 assert = { gate-recency = { max-age-days = 7, extra = 1 } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         assert!(matches!(err, RuleConfigError::Toml(_)));
     }
 
@@ -2326,7 +2352,7 @@ when = { type = "epic" }
 severity = "error"
 assert = { criteria-label-match = { namespace = "req" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert_eq!(set.rules[0].scope, RuleScope::Graph);
         match &set.rules[0].assert {
             Assertion::CriteriaLabelMatch {
@@ -2353,7 +2379,7 @@ when = { type = "epic" }
 severity = "error"
 assert = { criteria-label-match = { namespace = "req", criteria-section = "success_criteria", marker = "[hard]", id-pattern = 'REQ-[0-9]+' } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         match &set.rules[0].assert {
             Assertion::CriteriaLabelMatch {
                 namespace,
@@ -2377,7 +2403,7 @@ assert = { criteria-label-match = { namespace = "req", criteria-section = "succe
 name = "bad"
 assert = { criteria-label-match = { namespace = "" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { rule, message } => {
                 assert_eq!(rule, "bad");
@@ -2395,7 +2421,7 @@ assert = { criteria-label-match = { namespace = "" } }
 name = "bad"
 assert = { criteria-label-match = { namespace = "req", bogus-key = 1 } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         assert!(matches!(err, RuleConfigError::Toml(_)));
     }
 
@@ -2406,30 +2432,29 @@ assert = { criteria-label-match = { namespace = "req", bogus-key = 1 } }
 name = "bogus"
 assert = { not-a-real-kind = { x = 1 } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         assert!(matches!(err, RuleConfigError::Toml(_)));
     }
 
     // --- File-schema loading -----------------------------------------------
 
     #[test]
-    fn test_json_schema_file_is_loaded_and_transcoded() {
-        let dir = tempfile::tempdir().unwrap();
-        let schemas = dir.path().join("schemas");
-        std::fs::create_dir_all(&schemas).unwrap();
-        std::fs::write(
-            schemas.join("epic-body.json"),
-            r#"{ "type": "object", "required": ["sections"] }"#,
-        )
-        .unwrap();
-
+    fn test_json_schema_bytes_are_injected_and_transcoded() {
         let toml = r#"
 [[rules]]
 name = "epic-body"
 when = { type = "epic" }
 assert = { json-schema = "schemas/epic-body.json" }
 "#;
-        let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+        let set = RuleSet::parse(
+            toml,
+            None,
+            [(
+                "schemas/epic-body.json".into(),
+                br#"{ "type": "object", "required": ["sections"] }"#.to_vec(),
+            )],
+        )
+        .unwrap();
         match &set.rules[0].assert {
             Assertion::JsonSchema(src) => {
                 assert_eq!(src.reference, "schemas/epic-body.json");
@@ -2441,29 +2466,29 @@ assert = { json-schema = "schemas/epic-body.json" }
     }
 
     #[test]
-    fn test_missing_json_schema_file_errors() {
-        let dir = tempfile::tempdir().unwrap();
+    fn test_missing_injected_json_schema_errors() {
         let toml = r#"
 [[rules]]
 name = "epic-body"
 assert = { json-schema = "schemas/does-not-exist.json" }
 "#;
-        let err = RuleSet::from_toml_str(toml, dir.path()).unwrap_err();
-        assert!(matches!(err, RuleConfigError::SchemaIo { .. }));
+        let err = parse(toml).unwrap_err();
+        assert!(matches!(err, RuleConfigError::MissingSchema { .. }));
     }
 
     #[test]
-    fn test_invalid_json_schema_file_errors() {
-        let dir = tempfile::tempdir().unwrap();
-        let schemas = dir.path().join("schemas");
-        std::fs::create_dir_all(&schemas).unwrap();
-        std::fs::write(schemas.join("bad.json"), "{ not valid json").unwrap();
+    fn test_invalid_injected_json_schema_errors() {
         let toml = r#"
 [[rules]]
 name = "epic-body"
 assert = { json-schema = "schemas/bad.json" }
 "#;
-        let err = RuleSet::from_toml_str(toml, dir.path()).unwrap_err();
+        let err = RuleSet::parse(
+            toml,
+            None,
+            [("schemas/bad.json".into(), b"{ not valid json".to_vec())],
+        )
+        .unwrap_err();
         assert!(matches!(err, RuleConfigError::SchemaJson { .. }));
     }
 
@@ -2472,14 +2497,13 @@ assert = { json-schema = "schemas/bad.json" }
         // A default-origin rule whose `schemas/default-*.json` projection is ABSENT
         // must still load (the projection is not the authority): the assertion
         // becomes a placeholder that reconciliation replaces from config.
-        let dir = tempfile::tempdir().unwrap();
         let toml = r#"
 [[rules]]
 name = "namespace-registry"
 origin = "default"
 assert = { json-schema = "schemas/default-namespace-registry.json" }
 "#;
-        let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+        let set = parse(toml).unwrap();
         match &set.rules[0].assert {
             Assertion::JsonSchema(src) => {
                 assert_eq!(src.reference, "schemas/default-namespace-registry.json");
@@ -2493,17 +2517,21 @@ assert = { json-schema = "schemas/default-namespace-registry.json" }
     fn test_default_origin_malformed_schema_falls_back_to_placeholder() {
         // A default-origin rule whose projection is present but MALFORMED likewise
         // falls back rather than failing the load.
-        let dir = tempfile::tempdir().unwrap();
-        let schemas = dir.path().join("schemas");
-        std::fs::create_dir_all(&schemas).unwrap();
-        std::fs::write(schemas.join("default-label-format.json"), "{ not json").unwrap();
         let toml = r#"
 [[rules]]
 name = "label-format"
 origin = "default"
 assert = { json-schema = "schemas/default-label-format.json" }
 "#;
-        let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+        let set = RuleSet::parse(
+            toml,
+            None,
+            [(
+                "schemas/default-label-format.json".into(),
+                b"{ not json".to_vec(),
+            )],
+        )
+        .unwrap();
         match &set.rules[0].assert {
             Assertion::JsonSchema(src) => assert_eq!(src.schema, serde_json::json!({})),
             other => panic!("expected a JsonSchema placeholder, got {other:?}"),
@@ -2514,29 +2542,27 @@ assert = { json-schema = "schemas/default-label-format.json" }
     fn test_custom_origin_missing_schema_still_errors() {
         // REQ-03: a non-default rule keeps strict file-read semantics — a missing
         // schema is a hard load error, exactly as before.
-        let dir = tempfile::tempdir().unwrap();
         let toml = r#"
 [[rules]]
 name = "custom-shape"
 origin = "bracket"
 assert = { json-schema = "schemas/missing.json" }
 "#;
-        let err = RuleSet::from_toml_str(toml, dir.path()).unwrap_err();
-        assert!(matches!(err, RuleConfigError::SchemaIo { .. }));
+        let err = parse(toml).unwrap_err();
+        assert!(matches!(err, RuleConfigError::MissingSchema { .. }));
     }
 
     #[test]
     fn test_default_origin_bad_schema_reference_still_errors() {
         // Tolerance is scoped to a read/parse failure: a default rule with an
         // UNSAFE reference (outside `schemas/`) is still rejected, not placeheld.
-        let dir = tempfile::tempdir().unwrap();
         let toml = r#"
 [[rules]]
 name = "namespace-registry"
 origin = "default"
 assert = { json-schema = "/etc/passwd.json" }
 "#;
-        let err = RuleSet::from_toml_str(toml, dir.path()).unwrap_err();
+        let err = parse(toml).unwrap_err();
         assert!(matches!(
             err,
             RuleConfigError::InvalidSchemaReference { .. }
@@ -2551,9 +2577,8 @@ assert = { json-schema = "/etc/passwd.json" }
 
     #[test]
     fn test_schema_reference_absolute_path_is_rejected() {
-        let dir = tempfile::tempdir().unwrap();
         let toml = schema_rule_toml("/etc/passwd.json");
-        let err = RuleSet::from_toml_str(&toml, dir.path()).unwrap_err();
+        let err = parse(&toml).unwrap_err();
         match err {
             RuleConfigError::InvalidSchemaReference {
                 rule, reference, ..
@@ -2567,9 +2592,8 @@ assert = { json-schema = "/etc/passwd.json" }
 
     #[test]
     fn test_schema_reference_parent_traversal_is_rejected() {
-        let dir = tempfile::tempdir().unwrap();
         let toml = schema_rule_toml("schemas/../escape.json");
-        let err = RuleSet::from_toml_str(&toml, dir.path()).unwrap_err();
+        let err = parse(&toml).unwrap_err();
         assert!(matches!(
             err,
             RuleConfigError::InvalidSchemaReference { .. }
@@ -2578,9 +2602,8 @@ assert = { json-schema = "/etc/passwd.json" }
 
     #[test]
     fn test_schema_reference_not_under_schemas_is_rejected() {
-        let dir = tempfile::tempdir().unwrap();
         let toml = schema_rule_toml("other/x.json");
-        let err = RuleSet::from_toml_str(&toml, dir.path()).unwrap_err();
+        let err = parse(&toml).unwrap_err();
         match err {
             RuleConfigError::InvalidSchemaReference { message, .. } => {
                 assert!(message.contains("schemas/"));
@@ -2591,9 +2614,8 @@ assert = { json-schema = "/etc/passwd.json" }
 
     #[test]
     fn test_schema_reference_non_json_extension_is_rejected() {
-        let dir = tempfile::tempdir().unwrap();
         let toml = schema_rule_toml("schemas/x.txt");
-        let err = RuleSet::from_toml_str(&toml, dir.path()).unwrap_err();
+        let err = parse(&toml).unwrap_err();
         match err {
             RuleConfigError::InvalidSchemaReference { message, .. } => {
                 assert!(message.contains(".json"));
@@ -2604,13 +2626,13 @@ assert = { json-schema = "/etc/passwd.json" }
 
     #[test]
     fn test_schema_reference_valid_under_schemas_is_accepted() {
-        let dir = tempfile::tempdir().unwrap();
-        let schemas = dir.path().join("schemas");
-        std::fs::create_dir_all(&schemas).unwrap();
-        std::fs::write(schemas.join("x.json"), r#"{ "type": "object" }"#).unwrap();
-
         let toml = schema_rule_toml("schemas/x.json");
-        let set = RuleSet::from_toml_str(&toml, dir.path()).unwrap();
+        let set = RuleSet::parse(
+            &toml,
+            None,
+            [("schemas/x.json".into(), br#"{ "type": "object" }"#.to_vec())],
+        )
+        .unwrap();
         match &set.rules[0].assert {
             Assertion::JsonSchema(src) => assert_eq!(src.reference, "schemas/x.json"),
             other => panic!("expected JsonSchema, got {other:?}"),
@@ -2634,7 +2656,7 @@ assert = { require-section = { heading = "Goals" } }
 name = "bare"
 assert = { require-section = { heading = "Goals" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert_eq!(
             set.rules[0].description.as_deref(),
             Some("Every label must be namespace:value.")
@@ -2659,7 +2681,7 @@ name = "req-format"
 when = { label = "req:*" }
 assert = { label-value-pattern = { namespace = "req", regex = '^REQ-[0-9]+$' } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         let regex = match &set.rules[0].assert {
             Assertion::LabelValuePattern { namespace, regex } => {
                 assert_eq!(namespace, "req");
@@ -2685,7 +2707,7 @@ assert = { label-value-pattern = { namespace = "req", regex = '^REQ-[0-9]+$' } }
 name = "marker"
 assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         let regex = match &set.rules[0].assert {
             Assertion::LabelValuePattern { regex, .. } => regex.clone(),
             other => panic!("expected LabelValuePattern, got {other:?}"),
@@ -2704,7 +2726,7 @@ when = { type = "epic" }
 severity = "error"
 assert = { label-uniqueness = { namespace = "req", scope = "all" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert_eq!(set.rules[0].scope, RuleScope::Graph);
         match &set.rules[0].assert {
             Assertion::LabelUniqueness { namespace } => {
@@ -2722,7 +2744,7 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
 name = "no-scope"
 assert = { label-uniqueness = { namespace = "req" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         // Missing required field "scope" is a TOML parse error (deny_unknown_fields
         // does not apply here, but the missing field surfaces via serde).
         assert!(
@@ -2739,7 +2761,7 @@ assert = { label-uniqueness = { namespace = "req" } }
 name = "linked-scope"
 assert = { label-uniqueness = { namespace = "req", scope = "linked" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { rule, message } => {
                 assert_eq!(rule, "linked-scope");
@@ -2759,7 +2781,7 @@ assert = { label-uniqueness = { namespace = "req", scope = "linked" } }
 name = "bad-scope"
 assert = { label-uniqueness = { namespace = "req", scope = "global" } }
 "#;
-        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        let err = parse(toml).unwrap_err();
         match err {
             RuleConfigError::InvalidAssertion { rule, message } => {
                 assert_eq!(rule, "bad-scope");
@@ -2779,7 +2801,7 @@ assert = { label-uniqueness = { namespace = "req", scope = "global" } }
 name = "unique-req"
 assert = { label-uniqueness = { namespace = "req", scope = "all" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        let set = parse(toml).unwrap();
         assert!(
             set.rules[0].assert.is_repo_wide_at_transition(),
             "label-uniqueness must be skipped at transition time"
@@ -2788,13 +2810,9 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
 
     // --- label-coverage `kind =` sugar (REQ-02, REQ-03) --------------------
 
-    /// Build a repo root with a `config.toml` declaring a `requirement` item kind
-    /// whose triple matches the `label-coverage` defaults, then load the single
-    /// rule authored in `rule_toml` from it.
-    fn rule_from_repo(rule_toml: &str) -> Rule {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
-            dir.path().join("config.toml"),
+    /// Build explicit captured configuration for `kind =` expansion.
+    fn item_kind_config() -> JitConfig {
+        toml::from_str(
             r#"
 [item_kinds.requirement]
 section = "success_criteria"
@@ -2805,8 +2823,12 @@ scope = "issue"
 source-of-truth = "markdown-first"
 "#,
         )
-        .unwrap();
-        let set = RuleSet::from_toml_str(rule_toml, dir.path()).unwrap();
+        .unwrap()
+    }
+
+    fn rule_from_config(rule_toml: &str) -> Rule {
+        let config = item_kind_config();
+        let set = parse_with_config(rule_toml, &config).unwrap();
         set.rules.into_iter().next().unwrap()
     }
 
@@ -2822,7 +2844,7 @@ source-of-truth = "markdown-first"
     fn test_label_coverage_kind_sugar_expands_to_inline_triple() {
         // REQ-02: a `kind = "requirement"` rule lowers to exactly the table an
         // equivalent inline `(section, marker, id-pattern)` rule carries.
-        let sugared = rule_from_repo(
+        let sugared = rule_from_config(
             r#"
 [[rules]]
 name = "coverage"
@@ -2830,7 +2852,7 @@ when = { type = "epic" }
 assert = { label-coverage = { kind = "requirement", child-state = "done" } }
 "#,
         );
-        let inline = rule_from_repo(
+        let inline = rule_from_config(
             r#"
 [[rules]]
 name = "coverage"
@@ -2847,7 +2869,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
     fn test_label_coverage_inline_rule_unchanged_with_extra_unknown_key() {
         // REQ-03: an inline-triple rule is left byte-for-byte as authored,
         // including any unrecognized extra key that round-trips untouched.
-        let inline = rule_from_repo(
+        let inline = rule_from_config(
             r#"
 [[rules]]
 name = "coverage"
@@ -2874,7 +2896,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
         // an inert `kind` key evaluates IDENTICALLY to the same rule without it. The
         // `kind` key stays untouched (inert), exactly as an unrecognized key behaved
         // before this feature — the sugar does NOT fire when inline keys are present.
-        let with_kind = rule_from_repo(
+        let with_kind = rule_from_config(
             r#"
 [[rules]]
 name = "coverage"
@@ -2882,7 +2904,7 @@ when = { type = "epic" }
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "[A-Z][A-Z0-9]*-[0-9]+", kind = "anything-goes-here" } }
 "#,
         );
-        let without_kind = rule_from_repo(
+        let without_kind = rule_from_config(
             r#"
 [[rules]]
 name = "coverage"
@@ -2911,7 +2933,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
     #[test]
     fn test_label_coverage_kind_only_rule_expands() {
         // A kind-ONLY rule (no inline triple key) expands to that kind's triple.
-        let sugared = rule_from_repo(
+        let sugared = rule_from_config(
             r#"
 [[rules]]
 name = "coverage"
@@ -2939,28 +2961,16 @@ assert = { label-coverage = { kind = "requirement", child-state = "done" } }
         // The constraint: an undeclared `kind` used as the sole triple source is a
         // typed config error. The registry declares `requirement` completely (so it
         // loads), but `decision` is absent.
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
-            dir.path().join("config.toml"),
-            r#"
-[item_kinds.requirement]
-section = "success_criteria"
-id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
-markers = ["[hard]"]
-link-namespaces = ["satisfies"]
-scope = "issue"
-source-of-truth = "markdown-first"
-"#,
-        )
-        .unwrap();
-        let err = RuleSet::from_toml_str(
+        let config = item_kind_config();
+        let err = RuleSet::parse(
             r#"
 [[rules]]
 name = "coverage"
 when = { type = "epic" }
 assert = { label-coverage = { kind = "decision" } }
 "#,
-            dir.path(),
+            Some(&config),
+            [],
         )
         .unwrap_err();
         match err {
@@ -2976,20 +2986,25 @@ assert = { label-coverage = { kind = "decision" } }
     }
 
     #[test]
-    fn test_label_coverage_kind_sugar_no_registry_is_error() {
-        // A `kind`-only reference with no `[item_kinds]` at all is unknown, not a
-        // silent pass.
-        let err = RuleSet::from_toml_str(
+    fn test_label_coverage_kind_sugar_requires_explicit_config() {
+        let err = RuleSet::parse(
             r#"
 [[rules]]
 name = "coverage"
 when = { type = "epic" }
 assert = { label-coverage = { kind = "requirement" } }
 "#,
-            Path::new("/nonexistent"),
+            None,
+            [],
         )
         .unwrap_err();
-        assert!(matches!(err, RuleConfigError::InvalidAssertion { .. }));
+        assert!(matches!(
+            err,
+            RuleConfigError::MissingConfiguration {
+                rule,
+                purpose: "label-coverage kind expansion",
+            } if rule == "coverage"
+        ));
     }
 
     #[test]
@@ -2997,14 +3012,15 @@ assert = { label-coverage = { kind = "requirement" } }
         // REQ-03 (non-regression): when inline keys are present, the `kind` value is
         // never inspected, so even an undeclared `kind` name is inert (no error) and
         // the inline triple drives evaluation.
-        let rule = RuleSet::from_toml_str(
+        let rule = RuleSet::parse(
             r#"
 [[rules]]
 name = "coverage"
 when = { type = "epic" }
 assert = { label-coverage = { criteria-section = "success_criteria", kind = "never-declared" } }
 "#,
-            Path::new("/nonexistent"),
+            None,
+            [],
         )
         .unwrap();
         let cfg = coverage_config(&rule.rules[0]);
@@ -3018,14 +3034,15 @@ assert = { label-coverage = { criteria-section = "success_criteria", kind = "nev
     #[test]
     fn test_label_coverage_kind_only_non_string_is_error() {
         // A non-string `kind` used as the SOLE triple source cannot be resolved.
-        let err = RuleSet::from_toml_str(
+        let err = RuleSet::parse(
             r#"
 [[rules]]
 name = "coverage"
 when = { type = "epic" }
 assert = { label-coverage = { kind = 42 } }
 "#,
-            Path::new("/nonexistent"),
+            None,
+            [],
         )
         .unwrap_err();
         assert!(matches!(err, RuleConfigError::InvalidAssertion { .. }));

@@ -10,12 +10,12 @@
 
 #![cfg(all(feature = "html", feature = "xml"))]
 
+use jit::declarations::rules::{Assertion, Rule, RuleScope, SchemaSource, Selector, Severity};
 use jit::document::{
     ContentParser, HtmlContentParser, MarkdownContentParser, ParsedContent, XmlContentParser,
 };
 use jit::domain::{project, Issue};
 use jit::validation::engine::{Finding, SchemaEngine};
-use jit::validation::rules::{Assertion, Rule, RuleScope, SchemaSource, Selector, Severity};
 use serde_json::Value;
 use std::path::PathBuf;
 

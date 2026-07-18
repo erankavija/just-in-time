@@ -1,44 +1,28 @@
 //! Persistence for the gate registry (`.jit/gates.toml`).
 //!
-//! Mirrors [`crate::storage::ruleset_store`]'s atomic-write pattern: this store
-//! is the sole source of truth for the gate registry, replacing the prior
-//! JSON-based gate registry file. `Gate` already derives `Serialize`/`Deserialize` (unlike
-//! [`Rule`](crate::validation::rules::Rule), which needed a hand-rolled
-//! renderer), so this module serializes/deserializes it directly through a
-//! thin `[[gates]]` array-of-tables wrapper — the same shape
-//! `rules.toml`/`invariants.toml` use (`RawRulesFile`/`RawInvariantsFile`'s
-//! `Vec<T>` pattern) — converting to/from [`GateRegistry`]'s in-memory
-//! `HashMap<String, Gate>` at this boundary. All writes go through the shared
-//! atomic writer ([`crate::storage::atomic_write`]), preserving the
+//! Authored semantics and pure parsing live in [`crate::declarations`]. This
+//! module owns only the `.jit/gates.toml` filesystem boundary and delegates its
+//! byte parser/serializer to that neutral owner. All writes go through the
+//! shared atomic writer ([`crate::storage::atomic_write`]), preserving the
 //! temp-file + rename invariant.
 //!
 //! # TOML cannot carry a JSON `null`
 //!
-//! `Gate.reserved` is a `HashMap<String, serde_json::Value>` and may hold a
+//! `GateDefinition.reserved` may hold a
 //! `serde_json::Value::Null` entry (round-tripped from JSON-authored gates).
 //! TOML has no `null`, and the `toml` crate errors when asked to serialize
-//! one — unlike a top-level `Option::None` field (e.g. `Gate.checker`,
+//! one — unlike a top-level `Option::None` field (e.g. `GateDefinition.checker`,
 //! `GateChecker::Exec::working_dir`), which the toml serializer omits
 //! transparently. [`save_gate_registry`] strips null-valued `reserved` entries
 //! before writing so a gate carrying one still persists successfully.
 
-use crate::domain::Gate;
+use crate::declarations::{parse_gate_registry, serialize_gate_registry, GateRegistry};
 use crate::storage::atomic_write::write_file_atomic;
-use crate::storage::GateRegistry;
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// The gate registry file, relative to the `.jit` root.
 const GATES_FILE: &str = "gates.toml";
-
-/// On-disk shape of `.jit/gates.toml`: a `[[gates]]` array-of-tables, mirroring
-/// `RawRulesFile`/`RawInvariantsFile`'s `Vec<T>` wrapper pattern.
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct GatesFile {
-    #[serde(default)]
-    gates: Vec<Gate>,
-}
 
 /// Load the gate registry from `<jit_root>/gates.toml`.
 ///
@@ -54,22 +38,9 @@ pub fn load_gate_registry(jit_root: &Path) -> Result<GateRegistry> {
     if !path.exists() {
         return Ok(GateRegistry::default());
     }
-    let content = std::fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read file: {}", path.display()))?;
-    let file: GatesFile =
-        toml::from_str(&content).context("Failed to deserialize gate registry")?;
-    let mut gates = std::collections::HashMap::with_capacity(file.gates.len());
-    for gate in file.gates {
-        let key = gate.key.clone();
-        if gates.insert(key.clone(), gate).is_some() {
-            return Err(anyhow::anyhow!(
-                "duplicate gate key '{key}' in {}: the key is the registry identity; \
-                 merge or rename the duplicate [[gates]] entry",
-                path.display()
-            ));
-        }
-    }
-    Ok(GateRegistry { gates })
+    let content =
+        std::fs::read(&path).with_context(|| format!("Failed to read file: {}", path.display()))?;
+    parse_gate_registry(&content).context("Failed to deserialize gate registry")
 }
 
 /// Persist the gate registry to `<jit_root>/gates.toml` as a `[[gates]]`
@@ -82,13 +53,13 @@ pub fn load_gate_registry(jit_root: &Path) -> Result<GateRegistry> {
 /// # Examples
 ///
 /// ```
-/// use jit::domain::{Gate, GateMode, GateStage};
+/// use jit::declarations::{GateDefinition, GateMode, GateStage};
 /// use jit::storage::gate_store::{load_gate_registry, save_gate_registry};
-/// use jit::storage::GateRegistry;
+/// use jit::declarations::GateRegistry;
 /// use std::collections::HashMap;
 ///
 /// let dir = tempfile::tempdir().unwrap();
-/// let gate = Gate {
+/// let gate = GateDefinition {
 ///     version: 1,
 ///     key: "review".to_string(),
 ///     title: "Code Review".to_string(),
@@ -115,32 +86,20 @@ pub fn load_gate_registry(jit_root: &Path) -> Result<GateRegistry> {
 /// );
 /// ```
 pub fn save_gate_registry(jit_root: &Path, registry: &GateRegistry) -> Result<()> {
-    let toml_str = serialize_gate_registry(registry)?;
+    let bytes = serialize_gate_registry(registry).context("Failed to serialize gate registry")?;
+    let toml_str = String::from_utf8(bytes).context("serialized gate registry was not UTF-8")?;
     write_file_atomic(&jit_root.join(GATES_FILE), &toml_str)
-}
-
-/// Serialize a gate registry into its deterministic on-disk image without I/O.
-///
-/// Fresh initialization uses this alongside [`save_gate_registry`] so ordinary
-/// and transactional scaffold publication share one byte constructor.
-pub fn serialize_gate_registry(registry: &GateRegistry) -> Result<String> {
-    let mut gates: Vec<Gate> = registry.gates.values().cloned().collect();
-    gates.sort_by(|a, b| a.key.cmp(&b.key));
-    for gate in &mut gates {
-        gate.reserved.retain(|_, value| !value.is_null());
-    }
-    let file = GatesFile { gates };
-    toml::to_string_pretty(&file).context("Failed to serialize gate registry")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{GateMode, GateStage};
+    use crate::declarations::GateDefinition;
+    use crate::declarations::{GateMode, GateStage};
     use std::collections::HashMap;
 
-    fn sample_gate(key: &str) -> Gate {
-        Gate {
+    fn sample_gate(key: &str) -> GateDefinition {
+        GateDefinition {
             version: 1,
             key: key.to_string(),
             title: format!("{key} title"),
@@ -170,14 +129,14 @@ mod tests {
         let mut env = HashMap::new();
         env.insert("KEY".to_string(), "value".to_string());
 
-        let gate = Gate {
+        let gate = GateDefinition {
             version: 2,
             key: "clippy".to_string(),
             title: "Clippy".to_string(),
             description: "Lints".to_string(),
             stage: GateStage::Precheck,
             mode: GateMode::Auto,
-            checker: Some(crate::domain::GateChecker::Exec {
+            checker: Some(crate::declarations::GateChecker::Exec {
                 command: "cargo clippy --workspace --all-targets -- -D warnings".to_string(),
                 timeout_seconds: 300,
                 working_dir: Some("crates/jit".to_string()),
@@ -207,18 +166,21 @@ mod tests {
         let checkers = [
             (
                 "repo-any-key",
-                crate::domain::GateChecker::RepositoryValidation,
+                crate::declarations::GateChecker::RepositoryValidation,
             ),
-            ("issue-any-key", crate::domain::GateChecker::IssueValidation),
+            (
+                "issue-any-key",
+                crate::declarations::GateChecker::IssueValidation,
+            ),
             (
                 "coverage-any-key",
-                crate::domain::GateChecker::LabelTargetValidation {
+                crate::declarations::GateChecker::LabelTargetValidation {
                     label_namespace: "parent-pointer".to_string(),
                 },
             ),
             (
                 "review-any-key",
-                crate::domain::GateChecker::ReviewPlaceholder,
+                crate::declarations::GateChecker::ReviewPlaceholder,
             ),
         ];
         let mut registry = GateRegistry::default();
@@ -266,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_save_gate_registry_strips_null_reserved_entry() {
-        // REQ-03: `Gate.reserved` may carry a `serde_json::Value::Null` (e.g.
+        // REQ-03: `GateDefinition.reserved` may carry a `serde_json::Value::Null` (e.g.
         // round-tripped from a JSON-authored gate). TOML cannot represent it, so
         // the store must strip it rather than fail the write.
         let dir = tempfile::tempdir().unwrap();

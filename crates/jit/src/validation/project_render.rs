@@ -27,17 +27,17 @@
 //! writes a partial or empty-by-accident block (REQ-07).
 
 use crate::config::{JitConfig, ProjectionConfig, ProjectionStyle, SourceOfTruth};
+use crate::declarations::rules::RuleSet;
+use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
 use crate::domain::item::{
     derive_scope_items, index_markdown_items, load_toml_scope_items, resolve_item_kinds,
     AddressableItem, ItemKind, Scope,
 };
 use crate::domain::ContentFormat;
-use crate::storage::GateRegistry;
 use crate::validation::projection::{
     render_id_anchor_rows, render_invariants_markdown, ProjectionError,
 };
-use crate::validation::rules::RuleSet;
 use crate::validation::rules_gates_projection::render_rules_and_gates_markdown;
 use anyhow::Result;
 use std::collections::BTreeSet;

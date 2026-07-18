@@ -3,6 +3,7 @@
 //! This module defines the fundamental data structures used throughout the system:
 //! issues, gates, events, and their associated states and priorities.
 
+use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
 use crate::errors::InvalidArgumentError;
 use anyhow::Result;
@@ -865,208 +866,6 @@ impl DocumentReference {
         self
     }
 }
-
-/// A quality gate definition in the registry
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Gate {
-    /// Schema version for future evolution
-    #[serde(default = "default_gate_version")]
-    pub version: u32,
-    /// Unique identifier for this gate type
-    pub key: String,
-    /// Human-readable name
-    pub title: String,
-    /// Explanation of what this gate checks
-    pub description: String,
-    /// Gate execution stage
-    pub stage: GateStage,
-    /// Gate mode (manual or automated)
-    pub mode: GateMode,
-    /// Checker configuration for automated gates
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub checker: Option<GateChecker>,
-    /// Execution priority (lower runs first, default 100)
-    #[serde(default = "default_gate_priority")]
-    pub priority: u32,
-    /// Reserved for future extensions
-    #[serde(default)]
-    pub reserved: HashMap<String, serde_json::Value>,
-    /// Deprecated: kept for backwards compatibility
-    #[serde(default)]
-    pub auto: bool,
-    /// Deprecated: kept for backwards compatibility
-    pub example_integration: Option<String>,
-}
-
-fn default_gate_version() -> u32 {
-    1
-}
-
-fn default_gate_priority() -> u32 {
-    100
-}
-
-/// Error returned when a string cannot be parsed as a [`GateStage`].
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum GateStageParseError {
-    /// The input did not match any known gate stage.
-    #[error("Invalid gate stage: '{0}' (expected 'precheck' or 'postcheck')")]
-    UnknownStage(String),
-}
-
-/// Gate execution stage
-///
-/// Serialized as `snake_case` (`"precheck"`, `"postcheck"`); the same names are
-/// used as CLI argument values and as the `JIT_STAGE` environment variable passed
-/// to gate checker processes.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum GateStage {
-    /// Runs before work starts (ready → in_progress)
-    Precheck,
-    /// Runs after work completes (in_progress → gated)
-    Postcheck,
-}
-
-impl GateStage {
-    /// The canonical snake_case string for this stage.
-    ///
-    /// Identical to [`Display`](std::fmt::Display) output and the JSON
-    /// serialization; use this when a `&'static str` is needed (e.g. to set an
-    /// environment variable) without a heap allocation.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            GateStage::Precheck => "precheck",
-            GateStage::Postcheck => "postcheck",
-        }
-    }
-}
-
-impl FromStr for GateStage {
-    type Err = GateStageParseError;
-
-    /// Parse a snake_case stage name.
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "precheck" => Ok(GateStage::Precheck),
-            "postcheck" => Ok(GateStage::Postcheck),
-            _ => Err(GateStageParseError::UnknownStage(s.to_string())),
-        }
-    }
-}
-
-impl std::fmt::Display for GateStage {
-    /// Format as the canonical snake_case string.
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-/// Error returned when a string cannot be parsed as a [`GateMode`].
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum GateModeParseError {
-    /// The input did not match any known gate mode.
-    #[error("Invalid gate mode: '{0}' (expected 'manual' or 'auto')")]
-    UnknownMode(String),
-}
-
-/// Gate execution mode
-///
-/// Serialized as `snake_case` (`"manual"`, `"auto"`); the same names are used as
-/// CLI argument values.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum GateMode {
-    /// Requires manual pass/fail
-    Manual,
-    /// Can be automatically checked
-    Auto,
-}
-
-impl GateMode {
-    /// The canonical snake_case string for this mode.
-    ///
-    /// Identical to [`Display`](std::fmt::Display) output and the JSON
-    /// serialization; use this when a `&'static str` is needed without a heap
-    /// allocation.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            GateMode::Manual => "manual",
-            GateMode::Auto => "auto",
-        }
-    }
-}
-
-impl FromStr for GateMode {
-    type Err = GateModeParseError;
-
-    /// Parse a snake_case mode name.
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "manual" => Ok(GateMode::Manual),
-            "auto" => Ok(GateMode::Auto),
-            _ => Err(GateModeParseError::UnknownMode(s.to_string())),
-        }
-    }
-}
-
-impl std::fmt::Display for GateMode {
-    /// Format as the canonical snake_case string.
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-/// Gate checker configuration
-///
-/// The built-in variants execute inside the current process and therefore do
-/// not depend on a `jit` executable, shell, or JSON command-line parser. Their
-/// behavior is independent of the gate key that selects them.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum GateChecker {
-    /// Execute a shell command
-    Exec {
-        /// Command to execute
-        command: String,
-        /// Timeout in seconds
-        timeout_seconds: u64,
-        /// Optional working directory (relative to repo root)
-        working_dir: Option<String>,
-        /// Environment variables
-        #[serde(default)]
-        env: HashMap<String, String>,
-        /// Whether to pass structured context to the checker process
-        #[serde(default)]
-        pass_context: bool,
-        /// Inline prompt/instructions for the checker
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        prompt: Option<String>,
-        /// Path to a prompt file (relative to repo root), read at check time
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        prompt_file: Option<String>,
-    },
-    /// Run the repository's structural and declarative validation in-process.
-    RepositoryValidation,
-    /// Run the repository's declarative validation for the gated issue in-process.
-    IssueValidation,
-    /// Resolve a validation target from a label on the gated issue, then run
-    /// scoped validation for that target in-process.
-    LabelTargetValidation {
-        /// Namespace of the `namespace:<target-id>` label carrying the target.
-        label_namespace: String,
-    },
-    /// Passing placeholder for an external review integration that has not yet
-    /// been configured. The run always carries a visible advisory warning.
-    ReviewPlaceholder,
-}
-
-/// Human and structured warning emitted by [`GateChecker::ReviewPlaceholder`].
-pub const REVIEW_PLACEHOLDER_WARNING: &str = "WARNING: EXTERNAL REVIEW PLACEHOLDER PASSED WITHOUT RUNNING A REVIEWER. Replace this checker with a real external review integration before relying on this gate.";
 
 /// Structured context passed to gate checker processes
 ///
@@ -2480,6 +2279,7 @@ mod tests {
     // FromStr trait tests
     mod fromstr_tests {
         use super::*;
+        use crate::declarations::GateMode;
         use std::str::FromStr;
 
         #[test]

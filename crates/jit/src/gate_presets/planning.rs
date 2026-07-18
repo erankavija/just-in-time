@@ -27,8 +27,8 @@
 //! runs on.
 
 use super::{GatePresetDefinition, GateTemplate};
+use crate::declarations::rules::{Assertion, Rule, Selector};
 use crate::profile::jit_dogfood_gate;
-use crate::validation::rules::{Assertion, Rule, Selector};
 use anyhow::{anyhow, Result};
 
 /// Preset name for the agent plan-quality gate (planning node `P`).
@@ -142,7 +142,7 @@ pub(crate) fn package_gate_preset(key: &str) -> Result<GatePresetDefinition> {
 ///
 /// ```
 /// use jit::gate_presets::preview_coverage_rule;
-/// use jit::validation::rules::RuleSet;
+/// use jit::declarations::rules::RuleSet;
 /// use std::path::Path;
 ///
 /// let toml = r#"
@@ -153,7 +153,7 @@ pub(crate) fn package_gate_preset(key: &str) -> Result<GatePresetDefinition> {
 /// enforce = true
 /// assert = { label-coverage = { marker = "[hard]", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependencies" } }
 /// "#;
-/// let set = RuleSet::from_toml_str(toml, Path::new("/x")).unwrap();
+/// let set = RuleSet::parse(toml, None, []).unwrap();
 /// let preview = preview_coverage_rule(&set.rules[0], "breakdown").unwrap();
 ///
 /// // Keyed on the breakdown type, not epic+done.
@@ -163,8 +163,8 @@ pub(crate) fn package_gate_preset(key: &str) -> Result<GatePresetDefinition> {
 /// // Omits child-state (closure had "done"); resolves container via brackets:.
 /// match (&set.rules[0].assert, &preview.assert) {
 ///     (
-///         jit::validation::rules::Assertion::LabelCoverage { config: closure_cfg },
-///         jit::validation::rules::Assertion::LabelCoverage { config: preview_cfg },
+///         jit::declarations::rules::Assertion::LabelCoverage { config: closure_cfg },
+///         jit::declarations::rules::Assertion::LabelCoverage { config: preview_cfg },
 ///     ) => {
 ///         assert_eq!(closure_cfg.get("child-state").unwrap().as_str(), Some("done"));
 ///         assert!(preview_cfg.get("child-state").is_none());
@@ -237,9 +237,8 @@ pub fn preview_coverage_rule(closure: &Rule, breakdown_type: &str) -> Result<Rul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{GateMode, GateStage};
-    use crate::validation::rules::RuleSet;
-    use std::path::Path;
+    use crate::declarations::rules::RuleSet;
+    use crate::declarations::{GateMode, GateStage};
 
     fn closure_ruleset() -> RuleSet {
         // Mirrors the SDD/research closure `label-coverage` instance.
@@ -251,7 +250,7 @@ severity = "error"
 enforce = true
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"] } }
 "#;
-        RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap()
+        RuleSet::parse(toml, None, []).unwrap()
     }
 
     #[test]
@@ -267,7 +266,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 
         assert_eq!(
             gate.checker,
-            Some(crate::domain::GateChecker::ReviewPlaceholder)
+            Some(crate::declarations::GateChecker::ReviewPlaceholder)
         );
         assert!(preset.validate().is_ok());
     }
@@ -285,7 +284,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 
         assert_eq!(
             gate.checker,
-            Some(crate::domain::GateChecker::ReviewPlaceholder)
+            Some(crate::declarations::GateChecker::ReviewPlaceholder)
         );
         assert!(preset.validate().is_ok());
     }
@@ -301,7 +300,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
         assert_eq!(gate.mode, GateMode::Auto);
 
         match gate.checker.as_ref().expect("coverage gate has a checker") {
-            crate::domain::GateChecker::LabelTargetValidation { label_namespace } => {
+            crate::declarations::GateChecker::LabelTargetValidation { label_namespace } => {
                 assert_eq!(label_namespace, "brackets");
             }
             other => panic!("expected label-target checker, got {other:?}"),
@@ -395,7 +394,7 @@ name = "needs-criteria"
 when = { state = "ready" }
 assert = { require-section = { heading = "Success Criteria" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/x")).unwrap();
+        let set = RuleSet::parse(toml, None, []).unwrap();
         let err = preview_coverage_rule(&set.rules[0], "breakdown").unwrap_err();
         assert!(err.to_string().contains("label-coverage"));
     }

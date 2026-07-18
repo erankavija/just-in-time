@@ -2,7 +2,8 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::{GateFinding, GateFindings, GateRunResult, GateRunStatus, GateStage};
+    use crate::declarations::GateStage;
+    use crate::domain::{GateFinding, GateFindings, GateRunResult, GateRunStatus};
     use crate::storage::{IssueStore, JsonFileStorage};
     use chrono::Utc;
     use tempfile::TempDir;

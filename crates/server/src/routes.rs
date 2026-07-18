@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use jit::commands::CommandExecutor;
-use jit::domain::{Gate, Issue, Priority, State as IssueState};
+use jit::declarations::GateDefinition;
+use jit::domain::{Issue, Priority, State as IssueState};
 use jit::graph::hierarchy::NodeHierarchy;
 use jit::output::GateRunSummary;
 use jit::search::{SearchOptions, SearchResult};
@@ -834,7 +835,7 @@ async fn get_document_diff<S: IssueStore>(
 /// List all gate definitions from the registry
 async fn list_gates<S: IssueStore>(
     State(state): State<AppState<S>>,
-) -> Result<Json<Vec<Gate>>, StatusCode> {
+) -> Result<Json<Vec<GateDefinition>>, StatusCode> {
     state.executor.list_gates().map(Json).map_err(|e| {
         tracing::error!("Failed to list gates: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
@@ -845,7 +846,7 @@ async fn list_gates<S: IssueStore>(
 async fn get_gate_definition<S: IssueStore>(
     Path(key): Path<String>,
     State(state): State<AppState<S>>,
-) -> Result<Json<Gate>, StatusCode> {
+) -> Result<Json<GateDefinition>, StatusCode> {
     state
         .executor
         .show_gate_definition(&key)
