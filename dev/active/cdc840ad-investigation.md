@@ -1,5 +1,7 @@
 # Investigation: transactional repository materialization and derived-state coherence
 
+> **Scope status (2026-07-18):** Owner decision reduced cdc840ad's scope after this investigation was written: lease credential/claim-log/claim-command redesign and worktree/data-root binding are out of scope. The section **F4: claim acquisition is an explicit reconciliation saga** overstates the surviving requirement — only claim acquire's repository-side issue/event publication moves into the shared transaction, and the lease surface is otherwise unchanged. The implementation plan (`dev/active/cdc840ad-plan.md`, decisions D19–D20) is authoritative wherever this document proposes wider contracts. The code-level findings (current publishers, file:line citations, consumer sweep) remain valid grounding.
+
 ## Scope and method
 
 This report investigates `cdc840ad` against the current implementation. It treats the

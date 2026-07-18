@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "run_id": "4703c665-1d40-476b-a248-431fe2bd3176",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab",
+  "commit": "73157c1ad2eb6fd5e2a67d550598cc371863e103",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T13:38:12.688428192Z",
+  "completed_at": "2026-07-18T13:49:47.917882016Z",
+  "duration_ms": 695229,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at `dev/active/cdc840ad-plan.md`, is non-empty, and is linked as the planning issue’s design document.\n\n## Completeness against the criteria\n\nMost hard criteria are addressed in detail, including materialization ownership, managed regions, transactional repair, direct cutover, and testing. However, REQ-01/03/08/09 remain incomplete because the plan omits the `index.json` mutation contract and the existing multi-source issue-resolution contract. Both are required inputs or outputs of affected issue mutations.\n\n## Technical soundness and architectural fit\n\nThe proposed crate boundaries and derive → compare → validate flow fit the architecture. Four technical gaps are blocking:\n\n- Worktree-local external journals cannot safely govern a data root that another worktree may adopt.\n- Claim acquisition lacks a crash-surviving retry/reconciliation protocol.\n- Issue upsert/delete does not specify the coupled `index.json` delta.\n- The closed capture model omits Git-HEAD and main-worktree issue sources used by current public behavior.\n\n## Decomposition and dependencies\n\nThe staged package sequence is coherent and transitively ordered. The tasks are substantially more actionable than the previous monolithic breakdown. Nevertheless, the storage, typed-mutation, and consumer-migration packages cannot be implemented without re-deriving the four missing contracts above.\n\n## Risks and actionability\n\nThe plan’s mitigations do not close the external-root recovery race or claim crash window. Additionally, the linked research and investigation still present the rejected binding and claims-v2 designs as current mandatory architecture. The plan declares itself authoritative, which limits this to advisory severity, but those documents should be marked superseded or reconciled before fan-out.\n\n## Prior review feedback\n\nPrior F2 and F3 concerned an optional claims-v2 credential/log redesign that has now been explicitly removed from scope; those findings no longer apply. Prior F1 is not resolved: removing ownership binding and shared recovery coordination while allowing a later invocation to open the winner’s root creates a concrete recovery race, rather than merely reducing scope.\n\n## Findings\n\n1. **F1 — Blocking, high: worktree-local recovery can delete a root after another worktree adopts and modifies it.** The absent-root protocol stores its durable external journal under the initiating worktree’s `.jit-bootstrap`, permits a no-replace loser to retry through the ordinary existing-root path, and allows prepared recovery to remove the published root when its parent/leaf/object identity still matches ([plan line 31](/home/vkaskivuo/Projects/just-in-time/dev/active/cdc840ad-plan.md:31)). A second worktree cannot discover the first journal and can mutate the root before that journal is committed or recovered; modifying children does not change the directory object identity, so the first worktree can later remove the second worktree’s state. No-replace protects only the rename instant. REQ-03/08 require shared recovery authority, durable ownership rejection, or another protocol preventing adoption while an external transaction can still roll back.\n\n2. **F2 — Blocking, high: coordinator-held claim acquisition has no crash-surviving idempotent retry contract.** The plan requires crash tests and idempotent retry while retaining the current lease format and command surface ([plan line 42](/home/vkaskivuo/Projects/just-in-time/dev/active/cdc840ad-plan.md:42)). Today the coordinator durably appends the lease and updates its index before returning, then repository issue/event writes occur afterward (`crates/jit/src/commands/claim.rs:129-153`; `crates/jit/src/storage/claim_coordinator.rs:433-523`). Holding the OS lock longer prevents concurrency during a live call but does not encode whether repository synchronization committed after a crash; a retry encounters an existing lease and is rejected. The plan must define how the unchanged record identifies and resumes the same attempt, handles canonical short/full issue identity, deduplicates the event, and distinguishes compensation from uncertain commit.\n\n3. **F3 — Blocking, high: issue mutation finalization omits the coupled `index.json` update and tombstone semantics.** The canonical finalizer enumerates issue upserts/deletes, events, provenance, and gate-run records but never assigns ownership for ongoing `index.json` derivation ([plan line 33](/home/vkaskivuo/Projects/just-in-time/dev/active/cdc840ad-plan.md:33)). Current creation updates `all_ids` (`crates/jit/src/storage/json.rs:397-423`), while deletion removes the ID and appends it to `deleted_ids` (`crates/jit/src/storage/json.rs:1023-1046`). Capturing the index and including it during fresh init is insufficient. The plan must specify deterministic preservation/update of both lists and require the issue file, index, and event to enter the same delta.\n\n4. **F4 — Blocking, high: the closed capture model does not represent existing Git-HEAD and main-worktree issue sources.** Phase one captures the selected data root’s index/issues plus command-selected records, but defines typed Git evidence only for pinned documents ([plan line 24](/home/vkaskivuo/Projects/just-in-time/dev/active/cdc840ad-plan.md:24)). Current issue resolution and listing aggregate local state, Git `HEAD`, and the main worktree (`crates/jit/src/storage/json.rs:458-517`, `crates/jit/src/storage/json.rs:909-935`), and this three-tier visibility is documented at `docs/tutorials/parallel-work-worktrees.md:81-95`. A mutation of a fallback-resolved issue therefore either imports state read outside the closed image or silently loses established behavior. The plan must capture these sources as typed immutable evidence with revalidation, or explicitly redesign and test the public worktree contract.\n\n5. **F5 — Advisory, medium: the linked research documents contradict the authoritative plan’s reduced scope.** The research still labels permanent root binding and claims-v2/handoff as the “Latest plan-review findings resolution” ([research line 652](/home/vkaskivuo/Projects/just-in-time/dev/active/cdc840ad-research.md:652)), while the investigation’s acceptance checks and test gaps still mandate those designs (`dev/active/cdc840ad-investigation.md:182-226`, `634-793`, `1285-1324`). The plan’s explicit supersession prevents this alone from blocking, but breakdown agents could reasonably treat the linked evidence as current. Mark those sections superseded or reconcile them with D19/D20.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Four blocking contracts remain missing or unsafe: external-root recovery ownership, claim crash retry, issue-index coupling, and multi-source issue capture; linked research is also stale.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Worktree-local external recovery can remove a published data root after another worktree has adopted and modified it.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":31,\"references\":[\"@/issue/cdc840ad/requirement/REQ-03\",\"@/issue/cdc840ad/requirement/REQ-08\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Coordinator-held claim acquisition lacks a crash-surviving protocol for recognizing and resuming an idempotent repository synchronization retry.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":42,\"references\":[\"@/issue/cdc840ad/requirement/REQ-08\",\"@/issue/cdc840ad/requirement/REQ-09\",\"@/inv/event-log\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The typed issue finalizer omits deterministic index.json all_ids and deleted_ids updates from the same delta.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":33,\"references\":[\"@/issue/cdc840ad/requirement/REQ-01\",\"@/issue/cdc840ad/requirement/REQ-03\",\"@/issue/cdc840ad/requirement/REQ-09\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The closed CaptureSpec does not represent the documented Git-HEAD and main-worktree issue sources used by mutation-time resolution.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":24,\"references\":[\"@/issue/cdc840ad/requirement/REQ-01\",\"@/issue/cdc840ad/requirement/REQ-08\",\"@/issue/cdc840ad/requirement/REQ-09\"]},{\"id\":\"F5\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Linked research and investigation still present the rejected root-binding and claims-v2 architectures as current mandatory guidance.\",\"file\":\"dev/active/cdc840ad-research.md\",\"line\":652}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 7203 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7572-e90d-7c61-b38c-5f6781e3176d\n--------\nuser\n--- 7190 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Four blocking contracts remain missing or unsafe: external-root recovery ownership, claim crash retry, issue-index coupling, and multi-source issue capture; linked research is also stale.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Worktree-local external recovery can remove a published data root after another worktree has adopted and modified it.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 31,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-03",
+          "@/issue/cdc840ad/requirement/REQ-08"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Coordinator-held claim acquisition lacks a crash-surviving protocol for recognizing and resuming an idempotent repository synchronization retry.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 42,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-08",
+          "@/issue/cdc840ad/requirement/REQ-09",
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The typed issue finalizer omits deterministic index.json all_ids and deleted_ids updates from the same delta.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 33,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-01",
+          "@/issue/cdc840ad/requirement/REQ-03",
+          "@/issue/cdc840ad/requirement/REQ-09"
+        ]
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The closed CaptureSpec does not represent the documented Git-HEAD and main-worktree issue sources used by mutation-time resolution.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 24,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-01",
+          "@/issue/cdc840ad/requirement/REQ-08",
+          "@/issue/cdc840ad/requirement/REQ-09"
+        ]
+      },
+      {
+        "id": "F5",
+        "severity": "medium",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "Linked research and investigation still present the rejected root-binding and claims-v2 architectures as current mandatory guidance.",
+        "file": "dev/active/cdc840ad-research.md",
+        "line": 652
+      }
+    ]
+  }
+}
