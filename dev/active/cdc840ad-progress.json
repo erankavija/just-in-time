@@ -1,0 +1,67 @@
+{
+  "epic_id": "cdc840ad-9332-4936-9381-772318967f0f",
+  "epic_short_id": "cdc840ad",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {"id": "cbc3a7e5-813c-4aea-be95-3408bc74413d", "short_id": "cbc3a7e5", "title": "Establish declarations, image, capture, and managed documents", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"id": "bacf2cd4-c4c7-421e-83ff-4ebc44925008", "short_id": "bacf2cd4", "title": "Implement layout-aware store, kernel, and recovery", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"id": "a6a9b964-d944-4d7f-a7e7-7fb88dcee13b", "short_id": "a6a9b964", "title": "Implement typed mutation, audit, and claim synchronization", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {"id": "44d318ab-7270-4c94-aa60-2569c7d8f2d6", "short_id": "44d318ab", "title": "Implement materializers, drift, and repair", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {"id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9", "short_id": "49adf23b", "title": "Migrate all consumers and delete predecessors", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {"id": "661d6be2-e28b-463d-be93-58ee3e20e663", "short_id": "661d6be2", "title": "Integrate repository-state cutover", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {"id": "a3a788f3-39c2-4218-adaa-1cc5112b30f4", "short_id": "a3a788f3", "title": "Direct repository-state cutover", "classification": "implementation", "status": "pending"},
+        {"id": "b1621508-db1b-4e75-b1b0-a850c9dd191d", "short_id": "b1621508", "title": "Validate drift diagnosis and transactional repair", "classification": "implementation", "status": "pending"},
+        {"id": "ed3e773c-df1c-4a03-aed1-487b6498fd38", "short_id": "ed3e773c", "title": "Author the derived-state-coherence project invariant", "classification": "documentation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {"id": "c73c7618-0b79-422b-9227-bfcc99e6f345", "short_id": "c73c7618", "title": "Document public contracts and complete release evidence", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {"id": "7f0ac1b0-b976-44ca-a9e1-9cad27878140", "short_id": "7f0ac1b0", "title": "Coherence and release assurance", "classification": "implementation", "status": "pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-07-18T16:22:26Z"
+}
