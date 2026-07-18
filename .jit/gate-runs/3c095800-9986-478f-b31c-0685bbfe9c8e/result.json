@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "3c095800-9986-478f-b31c-0685bbfe9c8e",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab",
+  "commit": "8ac55b67f99e39b181839651503668dba315e90e",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T15:22:25.040554903Z",
+  "completed_at": "2026-07-18T15:28:54.509355526Z",
+  "duration_ms": 389468,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required [implementation plan](dev/active/cdc840ad-plan.md) exists, is substantive, and is linked as a design document. Both supporting research documents are also linked and explicitly mark superseded scope.\n\n## Completeness against the criteria\n\nAll nine hard criteria are addressed in the coverage table at plan lines 7–17 and assigned to accountable leaves at lines 126–138. The plan does not silently omit profile, configuration, rendering, repair, invariant, testing, or direct-cutover scope.\n\n## Technical soundness and architectural fit\n\nThe proposed `declarations` → `repository_state` → validation dependency direction fits the repository’s separation of concerns. The plan correctly identifies the current competing repository views, split configuration publication, per-target project-render writes, and distinct marker engines.\n\nHowever, the absent-root transaction protocol has a blocking convergence defect, detailed as F1 below.\n\n## Decomposition and dependencies\n\nThe five cumulative cutover packages are coherently ordered, with consumer migration and predecessor deletion preceding the sole integration landing. Assurance follows integration, and REQ-06, REQ-07, and REQ-08 have distinct accountable leaves. No dependency inversion or obvious coverage gap was found.\n\n## Risks and actionability\n\nThe plan is unusually detailed and resolves most material risks. The unresolved post-commit race in F1 is nevertheless load-bearing: it contradicts both the plan’s expected-preimage policy and REQ-03’s complete-old/complete-new failure guarantee.\n\n## Prior review feedback\n\nThe previous blocker is resolved. Plan line 113 now correctly requires CLI scenarios only for the JSON backend and in-process harness scenarios for the memory backend, matching the actual architecture: production CLI construction uses `JsonFileStorage`, while `InMemoryStorage` is exercised through generic `CommandExecutor` harnesses.\n\n## Findings\n\n1. **F1 — High, blocking:** The absent-root commit ordering cannot converge after a worktree target races following root publication. Plan line 31 makes the staged data-root rename the irreversible commit point and deliberately schedules every semantic `Worktree(...)` action afterward; eligible init includes `.gitattributes` as such an action at line 41. Yet lines 27–29 and 176 require exact preimages to be rechecked and a non-cooperating edit to produce a typed conflict. If an editor changes `.gitattributes` after the root rename but before its publication action, the transaction cannot restore all-old because the plan forbids unpublishing the root, and it cannot safely complete all-new because the worktree preimage no longer matches. Committed recovery would remain unable to proceed without overwriting the external edit. This is consistent with the current kernel’s per-action identity check immediately before sequential publication at `crates/jit/src/storage/file_transaction.rs:492-556`. The plan must choose a recoverable ordering—such as applying rollback-capable worktree actions before making the root rename the final commit action—or specify another protocol that safely resolves post-commit preimage conflicts.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Absent-root publication becomes irreversible before later worktree actions, so a post-rename preimage race cannot converge to complete old or new state.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The irreversible data-root rename precedes worktree actions whose preimages may conflict, leaving no safe all-old or all-new recovery path.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":31}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8805 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f75d2-5059-7561-a777-460f3a1c24ae\n--------\nuser\n--- 8792 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Absent-root publication becomes irreversible before later worktree actions, so a post-rename preimage race cannot converge to complete old or new state.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The irreversible data-root rename precedes worktree actions whose preimages may conflict, leaving no safe all-old or all-new recovery path.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 31
+      }
+    ]
+  }
+}
