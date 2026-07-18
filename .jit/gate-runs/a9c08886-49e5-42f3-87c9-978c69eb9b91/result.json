@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "a9c08886-49e5-42f3-87c9-978c69eb9b91",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
+  "commit": "ff542ec1bda26b5f960050ac0c1e4be8c7a12514",
+  "branch": "integration/cdc840ad",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-18T20:51:46.520576270Z",
+  "completed_at": "2026-07-18T20:55:01.031316173Z",
+  "duration_ms": 194510,
+  "exit_code": 0,
+  "stdout": "Attribution: aef6dd26, 57e50a8c, 2b28275b, 7443fd0e, d344356d, 6dc5af3c, 343e591b, cc72431b, 65273b24, 6f4f11ac, f06d4b34, ff542ec1\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-18T20:48:07Z)\nTruncation recovery: narrowed final-path, capture, managed-document, test, and per-commit patch reads\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact defects found; the current tree resolves the prior root-path and phase-one capture findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "No issue-impact defects found; the current tree resolves the prior root-path and phase-one capture findings.",
+    "findings": []
+  }
+}
