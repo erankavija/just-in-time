@@ -29,7 +29,7 @@
 
 - [ ] **Reinstall jit from main first**: the installed binary is `ff542ec1`, but main HEAD is now `0d224f35`. Run `scripts/install-jit.sh --force` from a clean main worktree before any `jit gate evaluate`, or the stale-binary guard rejects it.
 - [ ] Begin **wave 2**: `bacf2cd4` "Implement layout-aware store, kernel, and recovery" (ready, gates cargo-ci + code-review). Dispatch a worker (Terra) per Section 6.
-- [ ] Decide the branch model going forward with the invoker: waves now land on `main` (per this session's consolidation) rather than staging on `integration/cdc840ad`. Confirm before dispatching wave 2 so worker commits target the right branch.
+- [ ] **Branch model is decided: waves land directly on `main`.** The `integration/cdc840ad` staging branch is retired — the split-brain JIT-state divergence it caused is not worth it. Wave-2+ worker commits target `main` (branch off main, land back on main). If cross-workstream JIT-state propagation is needed later, use a mechanism other than a long-lived staging branch.
 - [ ] Run cargo-ci + code-review on each wave-2 leaf; complete through gates.
 
 ## Traps — do not repeat these
@@ -42,7 +42,7 @@
 
 ## Open questions needing invoker input
 
-- Branch model for waves 2–9: continue landing on `main` (this session's consolidation) or resume staging on `integration/cdc840ad`? Confirm before wave-2 dispatch.
+- None. Branch model resolved (waves land on `main`); invoker paused execution at the wave-1/wave-2 boundary. Resume by dispatching `bacf2cd4` on `main`.
 
 ## Reference artefacts
 
