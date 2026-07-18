@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "run_id": "bdf56440-8020-4ad5-a8f3-d3e985a02e36",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab",
+  "commit": "0b14640e5145c0a7323217057a432d7700334dbb",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T11:40:28.776248614Z",
+  "completed_at": "2026-07-18T11:48:18.865246421Z",
+  "duration_ms": 470088,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\n`dev/active/cdc840ad-plan.md` exists, is substantive, and is linked as the planning issue’s design document. Both research documents are also present and linked. This area passes.\n\n## Completeness against the criteria\n\nThe plan explicitly addresses all nine hard criteria in §1 and assigns each criterion to one implementation leaf in §3. It does not silently drop profile, config, rendering, marker, repair, invariant, testing, or direct-cutover scope.\n\nThe three prior blocking findings are substantially addressed:\n\n- F1: §2 lines 24–27 defines bounded fixpoint discovery and complete read-set revalidation.\n- F2: §2 lines 32–44 centralizes typed serialization, identities, timestamps, events, and publishers.\n- F3: §3 lines 60–102 replaces transitional waves with one cutover followed by assurance.\n\nCompleteness nevertheless fails because two existing supported boundaries—custom data roots and recovery before direct in-process mutation—lack executable designs, as detailed below.\n\n## Technical soundness and architectural fit\n\nThe `declarations` → `repository_state` → validation direction is architecturally sound, and the storage capability remains appropriately mechanical. Managed-region composition, expected-preimage handling, and typed audit finalization fit the existing separation of concerns.\n\nTwo blocking integration defects remain:\n\n- The plan treats `.jit` as the physical data-root identity throughout capture, locking, journaling, and rollback, while the product supports arbitrary `JIT_DATA_DIR` roots.\n- The proposed mutation session does not explicitly recover pending journals before capturing its repository image, despite rejecting reliance on CLI-only recovery.\n\nThese are not implementation details: both affect which repository is captured and whether the supposedly final view is safe to plan against.\n\n## Decomposition and dependencies\n\nThe reduced dependency chain is coherent:\n\n`cutover task → cutover story → assurance task → assurance story → epic`\n\nThe assurance work correctly depends on the completed cutover story, and criterion ownership is unique. The unusually large cutover leaf is justified by REQ-09’s prohibition on landed transitional engines; no separate decomposition finding is raised.\n\nThe breakdown should not be instantiated until the four blocking policies below are incorporated into that cutover task.\n\n## Risks and actionability\n\nMost material risks have explicit mitigations in §4. Two cross-boundary behaviors remain unresolved:\n\n- Whether `.gitattributes` remains Git-conditional and warning-only or becomes an unconditional, transaction-blocking init target.\n- How `jit claim acquire` reconciles a durable `.git/jit` lease when the subsequent repository-state transaction fails.\n\nBoth choices affect observable command behavior and cannot be left for the implementation worker to infer.\n\n## Prior review feedback\n\nAll three findings from run `ad355cbe-722d-40e1-be10-8fb2d55dc301` are addressed in the revised plan. None of the findings below repeats those defects; they concern integration boundaries exposed by the expanded direct-cutover inventory.\n\n## Findings\n\n1. **F1 — High, blocking: custom `JIT_DATA_DIR` mapping is absent from the canonical path and transaction design.** The plan hard-codes absent/existing `.jit` semantics in `dev/active/cdc840ad-plan.md:31` and deletes the current `transaction_path` adapter in line 42 without specifying its final replacement. The CLI accepts an arbitrary selected data directory at `crates/jit/src/main.rs:1840-1842`; the current repository view deliberately maps canonical virtual `.jit/...` paths to that selected root at `crates/jit/src/validation/repository.rs:155-176`, and profile publication performs the corresponding mapping at `crates/jit/src/commands/profile.rs:457-465`. More importantly, the retained kernel physically hard-codes `.jit` when choosing control location and recovery roots at `crates/jit/src/storage/file_transaction.rs:104`, `366-395`, and `849-852`. The plan must define a single virtual-to-physical data-root mapping and parameterize capture, root-presence checks, internal journal placement, rollback, event locking, and `.gitattributes` rendering accordingly, with custom-root init/profile/config/recovery tests.\n\n2. **F2 — High, blocking: the canonical mutation session has no defined pre-capture recovery step.** Section §2 line 31 describes lock acquisition and notes the existing recovery distinction, while D5 at line 145 explicitly rejects relying only on CLI recovery, but `RepositoryStateStore` is specified only to acquire, capture, and apply. The retained `FileTransactionKernel::execute` does not recover earlier journals (`crates/jit/src/storage/file_transaction.rs:84-177`); recovery is a separate operation performed by `RecoveryCoordinator` at `crates/jit/src/storage/recovery_coordinator.rs:59-102`. CLI startup currently supplies that boundary at `crates/jit/src/main.rs:1852-1867`, but direct `CommandExecutor` callers do not inherently do so. The plan must state that JSON session acquisition recovers external then internal journals under bootstrap → repository before image capture, explain how this reuses a retained CLI session and external-checker reacquisition, and test direct in-process mutation after prepared and committed interruption residue.\n\n3. **F3 — Medium, blocking: `.gitattributes` Git-free and failure semantics are contradictory and unresolved.** The final plan makes the line-set part of the init delta at `dev/active/cdc840ad-plan.md:39`, `123`, and `157`. The linked research says it requires no Git detection and produces the same image without Git (`dev/active/cdc840ad-research.md:252-258`), whereas the linked investigation says Git-free init emits no claim (`dev/active/cdc840ad-investigation.md:89`, `571`, and `792-796`). Current behavior is explicitly Git-conditional and returns `NotGitRepo` at `crates/jit/src/storage/gitattributes.rs:25-55`; setup failure is warning-only after initialization at `crates/jit/src/main.rs:1938-1949`. The plan must choose whether this behavior changes, specify the human/JSON created/modified-path results, and decide whether detection, malformed content, or conflicting claims abort the whole init transaction or remain warnings.\n\n4. **F4 — Medium, blocking: claim-lease reconciliation is missing from the sole-store cutover.** The plan migrates claim-visible issue/event state through `RepositoryStateStore` at `dev/active/cdc840ad-plan.md:39` while excluding `.git/jit` leases at line 40. Current `jit claim acquire` durably acquires the lease first and only then saves the assignee and event at `crates/jit/src/commands/claim.rs:129-153`. The investigation correctly states that cross-substrate atomicity is not promised but that failure/reconciliation behavior must be explicit (`dev/active/cdc840ad-investigation.md:567`). The final plan supplies no ordering, compensation, retained-lease response, or retry/idempotence policy if the repository transaction conflicts or requires recovery after lease acquisition. That decision and its failure tests must be included before the task is actionable.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior blockers are addressed, but custom data-root mapping and pre-capture recovery are unspecified, while init .gitattributes and claim-lease cross-boundary behavior remain unresolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The canonical path, transaction, and recovery design omits arbitrary JIT_DATA_DIR virtual-to-physical mapping.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":31,\"references\":[\"@/issue/cdc840ad/requirement/REQ-03\",\"@/issue/cdc840ad/requirement/REQ-08\",\"@/issue/cdc840ad/requirement/REQ-09\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"RepositoryStateStore session acquisition does not define recovery of pending journals before canonical image capture.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":31,\"references\":[\"@/issue/cdc840ad/requirement/REQ-03\",\"@/issue/cdc840ad/requirement/REQ-08\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan does not resolve whether .gitattributes remains Git-conditional and warning-only or becomes an unconditional transaction-blocking init claim.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":39,\"references\":[\"@/issue/cdc840ad/requirement/REQ-03\",\"@/issue/cdc840ad/requirement/REQ-08\",\"@/charter/D-4\"]},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Claim acquisition lacks an ordering and reconciliation policy between durable .git/jit leases and the repository-state transaction.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":39,\"references\":[\"@/issue/cdc840ad/requirement/REQ-09\",\"@/inv/event-log\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6405 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7507-1f9c-7662-8962-573d961f3414\n--------\nuser\n--- 6392 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior blockers are addressed, but custom data-root mapping and pre-capture recovery are unspecified, while init .gitattributes and claim-lease cross-boundary behavior remain unresolved.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The canonical path, transaction, and recovery design omits arbitrary JIT_DATA_DIR virtual-to-physical mapping.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 31,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-03",
+          "@/issue/cdc840ad/requirement/REQ-08",
+          "@/issue/cdc840ad/requirement/REQ-09"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "RepositoryStateStore session acquisition does not define recovery of pending journals before canonical image capture.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 31,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-03",
+          "@/issue/cdc840ad/requirement/REQ-08"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The plan does not resolve whether .gitattributes remains Git-conditional and warning-only or becomes an unconditional transaction-blocking init claim.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 39,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-03",
+          "@/issue/cdc840ad/requirement/REQ-08",
+          "@/charter/D-4"
+        ]
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Claim acquisition lacks an ordering and reconciliation policy between durable .git/jit leases and the repository-state transaction.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 39,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-09",
+          "@/inv/event-log"
+        ]
+      }
+    ]
+  }
+}

@@ -72,7 +72,7 @@ boundaries. The following are the exact superseded constructs and their consumer
 
 | Superseded construct | Current consumers | Clean-cutover implication |
 |---|---|---|
-| Validation's `RepositoryView`/`FilesystemRepositoryView`/`OverlayRepositoryView` and profile's `RepositorySnapshot`/`SnapshotEntry`/`SnapshotFile` (`crates/jit/src/validation/repository.rs:114-292`, `crates/jit/src/profile/snapshot.rs:7-124`) | Validation, gate checks, profile planner/apply, init, and their tests import the narrow view; profile commands/planner/init and JSON capture import the rich snapshot (`crates/jit/src/commands/validate.rs:191-218`, `crates/jit/src/commands/gate_check.rs:1-20`, `crates/jit/src/commands/profile.rs:8-29`, `crates/jit/src/commands/init.rs:9-12`, `crates/jit/src/storage/json.rs:283-300`). `RepositorySnapshot` itself implements `RepositoryView`, proving the adaptation between competing models (`crates/jit/src/profile/snapshot.rs:90-124`). | Delete both old type families, exports, filesystem loaders, overlays, capture helpers, and direct tests. Crate-root `repository_state::{RepositoryPath, RepositoryEntry, RepositoryImage}` becomes the only rich image/overlay vocabulary; storage captures it through the canonical state-store session, while validation and profile consume it without a re-export bridge. |
+| Validation's `RepositoryView`/`FilesystemRepositoryView`/`OverlayRepositoryView` and profile's `RepositorySnapshot`/`SnapshotEntry`/`SnapshotFile` (`crates/jit/src/validation/repository.rs:114-292`, `crates/jit/src/profile/snapshot.rs:7-124`) | Validation, gate checks, profile planner/apply, init, and their tests import the narrow view; profile commands/planner/init and JSON capture import the rich snapshot (`crates/jit/src/commands/validate.rs:191-218`, `crates/jit/src/commands/gate_check.rs:1-20`, `crates/jit/src/commands/profile.rs:8-29`, `crates/jit/src/commands/init.rs:9-12`, `crates/jit/src/storage/json.rs:283-300`). `RepositorySnapshot` itself implements `RepositoryView`, proving the adaptation between competing models (`crates/jit/src/profile/snapshot.rs:90-124`). | Delete both old type families, exports, filesystem loaders, overlays, capture helpers, and direct tests. Crate-root `repository_state::{RepositoryLayout, VirtualPath, RepositoryEntry, RepositoryImage}` becomes the only rich image/overlay vocabulary; storage captures it through the canonical state-store session, while validation and profile consume it without a re-export bridge. |
 | `CommandExecutor::refresh_default_schema_projections`, `CommandExecutor::sync_default_rule_membership`, and `RuleMembershipSync` (`crates/jit/src/commands/mod.rs:322-334`, `crates/jit/src/commands/mod.rs:1165-1265`) | Repository `config set` calls both after saving config (`crates/jit/src/commands/config.rs:253-268`); `scaffold_default_rules` calls both on re-init (`crates/jit/src/commands/mod.rs:1129-1145`). Direct tests call them in `crates/jit/tests/fast_rules/namespace_unique_writethrough_tests.rs:83-256` and `crates/jit/tests/fast_rules/type_hierarchy_schema_regen_tests.rs:159-207`. | Remove these command APIs and rewrite their behavioral tests against the shared materialization plan/application. Keeping thin wrappers would preserve callable partial-publication paths and violate D-07. |
 | `IssueStore::init`, both implementations, `CommandExecutor::init`'s call-through, and `scaffold_default_rules` (`crates/jit/src/storage/mod.rs:91-100`, `crates/jit/src/storage/json.rs:813-855`, `crates/jit/src/storage/memory.rs:91-95`, `crates/jit/src/commands/mod.rs:1032-1053`, `crates/jit/src/commands/mod.rs:1105-1163`) | `main` invokes `executor.init`, `seed_project_config`, and `scaffold_default_rules` as separate mutations (`crates/jit/src/main.rs:1905-1970`). Direct `storage.init()` fixture setup is spread through command/storage unit modules, cohesive integration suites, shared harnesses, and server tests; representative central consumers are `crates/jit/src/test_utils.rs:38`, `crates/jit/src/commands/test_helpers.rs:15`, `crates/jit/tests/common/harness.rs`, `crates/server/src/lib.rs:82-100`, and `crates/server/src/routes.rs`. | Delete `IssueStore::init` from the trait and JSON/memory implementations, delete the command call-through and every forwarding test double/doc example, and migrate all tests to canonical `RepositoryStateStore` bootstrap or explicit repository-state fixtures. Fresh/partial bootstrap exists only as a state-store mutation; the no-op memory implementation is not retained as test convenience. Claim-coordinator `init` is a separate Git-backed API and is unaffected. |
 | Ruleset storage publishers `write_validation_ruleset`, `write_baked_schema`, `rewrite_rules_header`, `read_rule_identities`, and `sync_namespace_unique_rules` (`crates/jit/src/storage/ruleset_store.rs:30-75`, `crates/jit/src/storage/ruleset_store.rs:158-278`) | Their only production callers are the command-local scaffold/refresh/sync functions (`crates/jit/src/commands/mod.rs:1129-1260`); the remainder of their consumers are unit tests in `storage/ruleset_store.rs` and stale intra-doc references in `validation/serialize.rs` (`crates/jit/src/validation/serialize.rs:9-10`, `crates/jit/src/validation/serialize.rs:91-105`, `crates/jit/src/validation/serialize.rs:150-153`). | Delete the independently publishing storage functions, their direct tests, and stale references. Preserve/extract authored rule parse/preservation and declaration serialization under `declarations`; move default-family/generated-fragment/schema materialization behavior from current `validation::serialize/defaults` into `repository_state`. The old validation/storage definitions do not survive as wrappers (`crates/jit/src/validation/serialize.rs:64-85`, `crates/jit/src/validation/defaults.rs:434-459`). |
@@ -82,21 +82,25 @@ boundaries. The following are the exact superseded constructs and their consumer
 | Profile-local projection/drift/mode inventories: `PackageProjection`, `ProjectedFile`, `ProjectedFileMode`, `project_package`, `write_projection_tree`, `compare_projection_tree`, `jit_dogfood_live_projection`/`preserve_nested_region`, and `PresetProjection`/`PresetInventory` (`crates/jit/src/profile/render.rs:10-128`, `crates/jit/src/profile/render.rs:188-268`, `crates/jit/src/profile/drift.rs:1-158`, `crates/jit/src/profile/dogfood.rs:120-185`, `crates/jit/src/profile/preset.rs:1-112`) | They are exported together from `profile/mod.rs`, consumed by planner, dogfood/preset checks, application result adaptation, command init/profile helpers, JSON snapshot capture, and direct unit tests (`crates/jit/src/profile/mod.rs:19-49`, `crates/jit/src/profile/application.rs:118-150`, `crates/jit/src/commands/init.rs:9-164`, `crates/jit/src/commands/profile.rs:5-29`, `crates/jit/src/storage/json.rs:768-797`). | Delete the full vocabulary, exports, filesystem projection/drift path, special dogfood preservation function, compatibility inventory, and direct tests. Package parsing survives only as declarations plus canonical `repository_state` seeds/claims/entries/modes; public profile response metadata derives from `RepositoryDelta`. |
 | Profile `render_managed_region` and generic `splice_region` marker engines (`crates/jit/src/profile/render.rs:131-181`, `crates/jit/src/validation/projection.rs:279-328`) | The profile function is called by `project_package`, exported by `profile/mod.rs`, and directly tested (`crates/jit/src/profile/render.rs:86-128`, `crates/jit/src/profile/mod.rs:46`, `crates/jit/src/profile/render.rs:289-341`). The generic function is called by `compose_projection`, validation freshness, and its unit tests (`crates/jit/src/validation/projection.rs:330-365`, `crates/jit/src/validation/repository.rs:1142-1156`, `crates/jit/src/validation/projection.rs:471-518`). | Remove both old parser implementations and route profile package rendering and configured projection rendering through one strict byte-oriented managed-document primitive. Command/profile-specific placement and error presentation may remain policy/output concerns; retaining an old parser as a fallback is not acceptable. |
 | Command-local conversion to `FileTransactionPlan` in profile and init, including `commands::profile::{transaction_path, unix_mode}` (`crates/jit/src/commands/profile.rs:184-220`, `crates/jit/src/commands/profile.rs:450-465`, `crates/jit/src/commands/init.rs:265-297`) | These are the only production `FileTransactionKernel::execute` call sites outside storage; init also reaches into profile helpers for path/mode conversion (`crates/jit/src/commands/init.rs:274-287`). | The shared application boundary must be the sole production converter from the common delta to transaction actions and the sole affected-command caller of `execute`. Remove both command-local action builders and the cross-command profile helpers. Kernel and recovery tests continue to construct raw plans because they test the storage protocol itself (`crates/jit/src/storage/file_transaction.rs:84-176`). |
+| Physical `.jit`/storage-parent layout and independent recovery entrypoints | Main passes only `jit_dir`; JSON storage, validation, commands, and recovery repeatedly infer the worktree as its parent, while `FileTransactionKernel` hardcodes `.jit` freshness/internal journals/rollback/reserved paths and `RecoveryCoordinator::recover_before_services` is called independently by CLI/server (`crates/jit/src/main.rs:1829-1868`, `crates/jit/src/storage/json.rs:183-203`, `crates/jit/src/storage/file_transaction.rs:104-105`, `crates/jit/src/storage/file_transaction.rs:196-247`, `crates/jit/src/storage/recovery_coordinator.rs:59-118`). | Delete parent inference, `.jit` prefix translation/control literals, absolute/string transaction adapters, and the independent coordinator route. One `RepositoryLayout` and root-tagged `VirtualPath` reach a layout-driven kernel; recovery implementation is private to `open_mutation_session(layout)` and completes before capture for CLI, server, direct executor, checker return, JSON, and memory. |
 | Repo-local direct config publication in `set_config`, `seed_project_config`, `config_store::seed_repo_config`, and the generic `save_config_document` (`crates/jit/src/commands/config.rs:253-310`, `crates/jit/src/storage/config_store.rs:31-89`) | `set_config` owns both user-global and repo-local modes; `main` calls seeding during ordinary init (`crates/jit/src/main.rs:1952-1969`); config-store unit tests call both generic writers. | Repo-local changes become seed inputs to `repository_state` and publish only through `RepositoryStateStore`. Delete `seed_repo_config` and the generic writer name/API. The user-global branch moves to an explicitly user-global-only store/capability that cannot accept a repository-local target; it is not a fallback repository materializer. |
 | Storage-owned gate/rule declaration types and raw gate publishers: `storage::GateRegistry`, `domain::Gate`, `validation::rules::{RuleSet, Rule}`, `gate_store::save_gate_registry`, and `IssueStore::save_gate_registry` (`crates/jit/src/storage/mod.rs:84-89`, `crates/jit/src/storage/mod.rs:230-242`, `crates/jit/src/storage/gate_store.rs:117-133`, `crates/jit/src/validation/rules.rs:730-778`) | Gate commands save registry, issue, and audit events independently for add/remove, definition add/define/update/remove, and preset apply (`crates/jit/src/commands/gate.rs:232-355`, `crates/jit/src/commands/gate.rs:640-748`, `crates/jit/src/commands/gate.rs:950-1108`). Gate presets, profile manifests, storage loaders, validation, commands, and tests import the declarations from their current owners. | Move declaration definitions and authored parse/preservation into crate-root `declarations::{GateRegistry, GateDefinition, RuleSet, Rule}` with no aliases/re-exports. Delete raw gate save APIs; all affected gate operations produce one semantic seed containing exact registry/issue/audit changes and configured projections. Materialization-only default/schema/projection serialization moves to `repository_state`, not with validation or storage. |
 | Raw typed-record mutation APIs `IssueStore::{save_issue, restore_issue_verbatim, delete_issue, append_event, save_gate_run_result, save_gate_preset}` and JSON/memory implementations (`crates/jit/src/storage/mod.rs:141-171`, `crates/jit/src/storage/mod.rs:216-280`, `crates/jit/src/storage/mod.rs:381-391`) | Every issue/graph/document/bulk/template/migration/fix/claim/gate command ultimately reaches one or more of these methods; JSON stamps/serializes/writes issue and index separately, event append has its own byte path, and gate-run/preset records have independent writers (`crates/jit/src/storage/json.rs:397-455`, `crates/jit/src/storage/json.rs:899-906`, `crates/jit/src/storage/json.rs:1023-1114`, `crates/jit/src/storage/json.rs:1168-1188`, `crates/jit/src/storage/json.rs:1335-1354`). | Delete the production raw mutators and migrate commands plus fixtures to typed semantic mutations over one session/image/delta. Read APIs and explicit aggregate fixture builders may remain. Gate-run/profile/event audit bytes are produced inside the complete mutation even though they are not authored declaration registries. |
 | Archive's `stage_artifact*`, `publish_staged_artifact`, and `delete_artifact_if_identity` publication path (`crates/jit/src/storage/artifact_mutation.rs:140-200`, `crates/jit/src/storage/artifact_mutation.rs:235-342`) | `commands/archive.rs` is the only production consumer and combines destination publication, issue relinking, event append, and source deletion with compensation/reconciliation (`crates/jit/src/commands/archive.rs:398-636`, `crates/jit/src/commands/archive.rs:733-856`). | Preserve identity/no-replace policy as repository-state claims and expected preimages, but delete the alternate publication/deletion capability after the archive mutation moves through the sole store. A configured source or projection target cannot be exempt merely because archive selected it. |
-| Init's direct `.gitattributes` setup (`crates/jit/src/storage/gitattributes.rs:42-79`) | `main` runs it separately from the init scaffold/transaction and folds its result into init output (`crates/jit/src/main.rs:1938-1947`, `crates/jit/src/main.rs:2009-2017`). | Retain the behavior as a canonical managed **line-set claim** on `.gitattributes` in the same init delta. The claim preserves unrelated lines and idempotently ensures the exact JIT marker/merge line; it is neither a whole-file managed region nor a separate writer. Git-free init produces no claim. |
+| Init's direct `.gitattributes` setup (`crates/jit/src/storage/gitattributes.rs:42-79`) | `main` runs it separately from the init scaffold/transaction, treats Git absence as a no-op, downgrades setup errors to warnings, and folds successful create/modify outcomes into init output (`crates/jit/src/main.rs:1938-1947`, `crates/jit/src/main.rs:2009-2017`). | Delete the warning writer. Typed Git evidence yields `not_applicable` when no containing Git worktree exists or the selected data root is outside it. Otherwise one Git-escaped events-path line-set claim on `Worktree(".gitattributes")` lands in the init delta and reports `unchanged|created|modified`; unsafe eligible occupants/content or competing claims abort preflight. |
+| Claim acquire's lease-first raw repository writes | Acquire durably creates the `.git/jit` lease, then calls `save_issue` and `append_event`; no persisted cross-substrate phase records whether repository sync began or committed (`crates/jit/src/commands/claim.rs:72-156`). | Delete the raw issue/event tail. Extend lease/log/index/status and issue-event contracts with desired transition, coordination identity, monotonic attempt generation, and owner token. Acquire/release/reconcile hold the coordinator lock while nesting one recovered state-store mutation in global coordinator → bootstrap → repository → events order; conditional finalize/delete plus takeover fencing prevents stale owners, while the product still makes no cross-substrate atomicity claim. |
 
 The retained behavior must also move to its final SSOT owner. Crate-root `declarations`
 retains authored gate/rule parsing, preservation, and declaration serialization.
-Crate-root `repository_state` owns the single canonical path/entry/image/overlay,
-default-family and generated-fragment derivation, default schema rendering, configured
-projection rendering, managed composition, and derive/compare functions. Validation
+Crate-root `repository_state` owns the single canonical `RepositoryLayout`,
+`VirtualPath::{Worktree, Data}`, entry/image/overlay, default-family and
+generated-fragment derivation, default schema rendering, configured projection rendering,
+managed composition, and derive/compare functions. Validation
 retains rule execution/reporting and whole-repository policy checks, importing the root
 declarations and state results; it retains no repository loader or materialization
-renderer. Storage retains read-only declaration loaders and `FileTransactionKernel`
-plus recovery, and adds only the canonical session/capture/apply capability. Profile
+renderer. Storage retains read-only declaration loaders and a layout-driven
+`FileTransactionKernel` plus private recovery mechanics, and adds only the canonical
+recovered-session/capture/apply capability. Profile
 retains immutable manifest/source parsing and public provenance/response envelopes, not
 its image, mode, projection, drift, preset inventory, or final-byte types. This replaces,
 rather than wraps or re-exports, the current validation/profile implementations.
@@ -154,12 +158,32 @@ following checks are grounded in the current consumer set:
   `stage_artifact`, `publish_staged_artifact`, `delete_artifact_if_identity`, compensation,
   or reconciliation publication path. Each is covered by the same sole-store conformance
   and failure-boundary tests as ordinary issue mutations.
-- `jit init` has no direct `.gitattributes` writer outside its repository-state delta;
-  its Git-aware line-set claim lands in the same delta as all other init state. Graph
-  export to stdout is non-mutating, and graph/snapshot destinations outside the
-  repository are external-artifact capabilities. A destination inside the repository is
-  an explicit repository-state export intent with captured preimage, complete parent
-  listings, and collision checks; it never uses the direct external publisher.
+- `jit init` has no direct `.gitattributes` writer or warning-only setup path. Typed
+  eligibility reports exact `not_applicable` for no-Git/outside-worktree cases; only an eligible
+  worktree-relative events path produces a `Worktree(".gitattributes")` line-set claim,
+  and that claim lands in the same delta as all other init state. Graph export to stdout
+  is non-mutating. Graph/snapshot destination canonicalization checks the selected data
+  root first, then worktree, then external; every Data/Worktree destination is an
+  explicit repository-state export intent with captured preimage, complete parent
+  listings, and collision checks and never uses the direct external publisher.
+- `rg` finds no storage/kernel/command path that derives the worktree from
+  `data_root.parent()`, strips a virtual `.jit` prefix, or hardcodes `.jit` for selected
+  data-root existence, internal locks/journals, rollback cleanup, or target conversion.
+  All mutation/recovery callers supply one `RepositoryLayout`, journal actions store a
+  `Worktree`/`Data` root tag plus relative path, and layout mismatch fails closed.
+- Layout construction rejects equal/aliased roots, worktree-beneath-data topology,
+  symlinked components, lexical escape, and root-identity change. When data is nested in worktree, tree-wide scans and tests
+  prove Data precedence for every physical→virtual conversion and reject typed Worktree
+  aliases beneath data before capture, collision analysis, hashing, journal creation,
+  export classification, and recovery.
+- No mutation-capable `CommandExecutor` call can capture before recovered-session open.
+  CLI/server retained startup sessions are reusable optimizations only; direct calls and
+  post-checker persistence exercise the same recovery-before-first-read contract.
+- Claim lease/index/log schemas and coordination events carry canonical issue identity,
+  pending desired transition, monotonic attempt generation, and owner token. Conditional
+  finalize/delete, crash recovery, fenced takeover, and delayed-owner tests replace every
+  lease-first/raw-`save_issue`/`append_event` gap under the sole coordinator → bootstrap
+  → repository → events order.
 - A source review confirms that only the common plan type owns complete final bytes and
   modes. Init/profile command context and human/JSON report types may carry paths,
   classifications, hashes, and metadata, but no second `BTreeMap`/list of final bytes or
@@ -240,9 +264,9 @@ therefore leave a partially refreshed repository.
 | JSON and memory currently expose equivalent atomic state application | **Contradicted.** In-memory state is split across separate mutexes for issues, gate registry, events, runs, and repository files (`crates/jit/src/storage/memory.rs:21-54`). The canonical `RepositoryStateStore` needs native JSON capture/journaled apply and native memory aggregate clone/apply/validate/swap implementations with a shared conformance suite; a memory wrapper around old setters would preserve different semantics. |
 | Gate/rule declarations have a neutral SSOT owner | **Contradicted.** `GateRegistry` is defined in storage and contains `domain::Gate` (`crates/jit/src/storage/mod.rs:84-89`), while `RuleSet`/`Rule` are validation-owned (`crates/jit/src/validation/rules.rs:730-778`). Their final declaration semantics belong together in crate-root `declarations`; storage loads/persists them and validation evaluates them, but neither consumer remains the definition owner. |
 
-## Formal gate F1–F3 findings
+## Retained consolidation findings
 
-### F1: bounded discovery must produce a complete read set
+### Bounded discovery must produce a complete read set
 
 The proposed store does not need to copy the whole working tree into memory, but the
 current selected-path capture is not a complete alternative. `capture_profile_snapshot`
@@ -260,9 +284,9 @@ The current `RepositoryView` access pattern defines the minimum discoverer contr
 
 | Read-set class | Complete bounded inventory | Why it is a dependency |
 |---|---|---|
-| Fixed repository authorities | `.jit/config.toml`, `.jit/templates.toml`, `.jit/invariants.toml`, `.jit/rules.toml`, `.jit/gates.toml`, `.jit/index.json`, and `.jit/events.jsonl` (`crates/jit/src/validation/repository.rs:547-638`, `crates/jit/src/validation/repository.rs:655-715`) | They select declarations, hierarchy, rules, audit history, and every later dynamic path. Absence and non-file occupants are part of the image, not equivalent to empty bytes. |
-| Rule-selected schema inputs | Every `.jit/{reference}` named by an authored schema assertion (`crates/jit/src/validation/repository.rs:578-617`) | Rule loading performs these dynamic reads after parsing `rules.toml`; capturing only the rules file permits a schema race. |
-| Complete live issue set | Every `.jit/issues/{id}.json` named by `index.json` **and** recursive enumeration of `.jit/issues` (`crates/jit/src/validation/repository.rs:678-707`) | The listing is itself a read dependency: validation rejects unindexed extra JSON and missing indexed JSON. A digest of named issue files alone is incomplete. |
+| Fixed repository authorities | Logical adopter paths `.jit/config.toml`, `.jit/templates.toml`, `.jit/invariants.toml`, `.jit/rules.toml`, `.jit/gates.toml`, `.jit/index.json`, and `.jit/events.jsonl` currently select declarations and audit history (`crates/jit/src/validation/repository.rs:547-638`, `crates/jit/src/validation/repository.rs:655-715`). | In the final vocabulary these are `Data("config.toml")`, `Data("templates.toml")`, and so on, resolved through `RepositoryLayout`, never by assuming a physical `.jit` prefix. Absence and non-file occupants are part of the image, not equivalent to empty bytes. |
+| Rule-selected schema inputs | Every logical `.jit/{reference}` named by an authored schema assertion (`crates/jit/src/validation/repository.rs:578-617`) | Rule loading performs these dynamic reads after parsing `rules.toml`; each becomes a typed `Data(reference)` read. Capturing only the rules file permits a schema race. |
+| Complete live issue set | Every logical `.jit/issues/{id}.json` named by `index.json` **and** recursive enumeration of the selected data root's `issues` directory (`crates/jit/src/validation/repository.rs:678-707`) | The `Data("issues")` listing is itself a read dependency: validation rejects unindexed extra JSON and missing indexed JSON. A digest of named issue files alone is incomplete. |
 | Issue-selected validation inputs | Every issue-linked **unpinned** document path; every repository-local resolved asset carried by that document; any additional local asset path discovered by rescanning the captured document bytes; and every template/issue-derived completed-plan path (`crates/jit/src/domain/types.rs:791-811`, `crates/jit/src/document/assets.rs:14-29`, `crates/jit/src/commands/document.rs:32-55`, `crates/jit/src/validation/repository.rs:749-805`, `crates/jit/src/validation/repository.rs:990-1013`) | Parsing issues expands the closure. The document and its local assets are exact image entries, while the asset scan is a pure consumer of captured document bytes and can enqueue newly discovered local paths to the fixpoint. Completed planning-node documents are derived from the configured template plus issue graph, so they cannot be omitted merely because no command argument named them. |
 | Configured item sources | Every project-scoped markdown `source` and registry-first `source.toml` declared under `[item_kinds]` (`crates/jit/src/validation/repository.rs:1017-1068`, `crates/jit/src/domain/item.rs:694-719`) | These external repository paths are authored item SSOTs. They may live outside `.jit`, so a `.jit`-only capture is incomplete. |
 | Configured projection inputs and targets | Every item source selected by each configured projection, each configured target, and target ancestors/entry kinds (`crates/jit/src/validation/project_render.rs:93-150`, `crates/jit/src/validation/repository.rs:475-519`, `crates/jit/src/validation/repository.rs:1142-1195`) | Separate-file rendering reads sources and compares targets; region rendering additionally preserves current target bytes. Shared targets must be captured once with mode and occupant identity so composition and expected preimages refer to one entry. |
@@ -282,18 +306,19 @@ Git repository yields typed unavailable evidence rather than silently switching 
 working tree.
 
 Discovery is consequently a bounded fixpoint, not a caller-maintained path list: capture
-the fixed authorities; parse config/index/issues/rules; add every discovered schema,
-issue-directory listing, item source, projection target, unpinned linked document/local
-asset, derived plan document, and intent target; then capture the added entries and
-ancestors under the same opaque
-store session. The resulting sorted read-set identities belong in `RepositoryImage` and
-the delta's expected preimages. Immutable embedded profile-package bytes and
+the fixed `Data` authorities; parse config/index/issues/rules; add every discovered
+typed schema, issue-directory listing, item source, projection target, unpinned linked
+document/local asset, derived plan document, and intent target; then capture the added
+entries and ancestors under the same opaque store session. `RepositoryLayout` and the
+root class of every `VirtualPath` belong in the resulting sorted read-set identity,
+`RepositoryImage`, plan hash, and delta expected preimages. Immutable embedded
+profile-package bytes and
 `PinnedGitEvidence` are explicit typed inputs/evidence. Machine-local locks, transaction journals,
 server PID/log files, and the Git claim control plane are deliberately outside the
 semantic image (`crates/jit/src/storage/repo_lock.rs:40-44`,
 `crates/jit/src/storage/claim_coordinator.rs:312-321`).
 
-### F2: typed-to-byte production and lock ownership are part of the SSOT
+### Typed-to-byte production and lock ownership are part of the SSOT
 
 The current split is not only several file writers; several timestamps, UUIDs, audit
 records, and final byte images are created at different layers and at different points
@@ -318,8 +343,9 @@ construct authoritative bytes or storage silently changes typed state after plan
 `RepositoryStateStore` receives injected `IdAuthority` and `MutationClock`
 capabilities. Commands submit identity-free and persistence-time-free drafts/intents;
 they do not reserve persisted UUIDs, sample mutation time, or construct final audit
-bytes. Under one opaque mutation session, finalization is binding and ordered as
-follows:
+bytes. One `MutationContext` is created after the recovered mutation session opens and
+is reused unchanged through capture-closure expansion and retryable capture conflicts.
+Under that session/context, finalization is binding and ordered as follows:
 
 1. Capture the closed image/evidence, derive the proposed semantic state, and determine
    whether the operation is a semantic no-op. A no-op samples no mutation clock and
@@ -327,14 +353,15 @@ follows:
 2. For an accepted non-noop, sample `MutationClock` exactly once to obtain the
    `MutationTimestamp`.
 3. Allocate persisted identities in a documented deterministic order: new issue IDs in
-   stable command-local input order; gate-run and provenance-record IDs where applicable;
+   stable canonical request order, so their expected-absent `Data("issues/<id>.json")`
+   paths enter `CaptureSpec`; gate-run and provenance-record IDs in `(target, key)` order;
    then event IDs after sorting event intents by `(mutation phase, event tag, primary
-   identity, secondary identity, command-local ordinal)`. Any newly allocated path
-   absence and parent listing is verified inside the same session and included in the
-   expected preimages before publication.
-4. A failed attempt or conflict does not make its identities reusable; a retry is a new
-   attempt and receives new identities and a new mutation instant. Fixed authorities in
-   tests make both ordering and images reproducible.
+   identity, secondary identity, command-local ordinal)`. The context seed and every
+   allocation enter the semantic plan hash.
+4. Closure expansion, expected-preimage conflict recovery, and backend execution reuse
+   the same context, IDs, and mutation instant; they never resample. A fully abandoned
+   command invocation does not publish those allocations. Fixed authorities in tests
+   make ordering and JSON/memory images reproducible.
 
 The one `MutationTimestamp` supplies `Issue.created_at` for new issues, every changed
 issue's `updated_at`, an initial or newly established `first_ready_at`/`claimed_at`/
@@ -363,7 +390,7 @@ after direct cutover the opaque state-store session is the only public repositor
 serialization capability and finer locks are private implementation details rather than
 callable partial-write boundaries.
 
-### F3: the landing must be one indivisible vertical cutover
+### The landing must be one indivisible vertical cutover
 
 The decomposition cannot land a marker parser first and temporarily adapt the profile
 and generic renderers to it. That would preserve both old repository images, both target
@@ -380,6 +407,179 @@ consumers and old owners are inseparable evidence for this constraint
 (`crates/jit/src/profile/render.rs:86-181`,
 `crates/jit/src/validation/projection.rs:279-365`,
 `crates/jit/src/profile/snapshot.rs:90-124`).
+
+## Formal gate F1–F4 findings
+
+### F1: arbitrary `JIT_DATA_DIR` is not represented end to end
+
+`JIT_DATA_DIR` is currently only a physical storage-root override, not a complete
+repository layout. The CLI resolves it as `current_dir.join(custom_dir)` and passes only
+that path to `JsonFileStorage` (`crates/jit/src/main.rs:1829-1852`). Storage constructs
+its bootstrap lock beside that root, while validation, document commands, and recovery
+infer the working-tree root as `data_root.parent()`
+(`crates/jit/src/storage/json.rs:183-203`,
+`crates/jit/src/validation/repository.rs:146-171`,
+`crates/jit/src/commands/document.rs:476-527`,
+`crates/jit/src/storage/recovery_coordinator.rs:59-118`). That inference happens to fit
+the default `<worktree>/.jit`; it maps a sibling or absolute external data directory's
+parent as the working tree and therefore cannot identify both roots correctly.
+
+The transaction kernel independently hardcodes `.jit` as the data-root occupant. It
+tests freshness at the physical `.jit` occupant, locates internal journals through the
+literal string ".jit/tmp/transactions", opens
+recovery controls through that spelling, removes `.jit` after fresh rollback, and
+reserves that same literal during normalization
+(`crates/jit/src/storage/file_transaction.rs:31-58`,
+`crates/jit/src/storage/file_transaction.rs:104-105`,
+`crates/jit/src/storage/file_transaction.rs:196-247`,
+`crates/jit/src/storage/file_transaction.rs:355-395`,
+`crates/jit/src/storage/file_transaction.rs:849-871`). Thus the present kernel and
+recovery coordinator do not actually make arbitrary `JIT_DATA_DIR` equivalent to the
+default layout even though higher layers virtually strip `.jit` and redirect it to the
+selected root.
+
+The same split creates aliases when a custom data root is nested in the worktree.
+`FilesystemRepositoryView::resolve` maps paths beginning with the literal ".jit/" prefix through `jit_root` and
+every other spelling through `root`, while profile's `transaction_path` repeats that
+prefix switch (`crates/jit/src/validation/repository.rs:165-175`,
+`crates/jit/src/commands/profile.rs:450-465`). One physical occupant can therefore be
+named once through the data mapping and once through its worktree-relative location.
+Current transaction/journal actions persist only an unqualified string path, so hashing,
+duplicate detection, recovery, and final-identity checks cannot retain which root was
+intended (`crates/jit/src/storage/transaction_action.rs:5-31`,
+`crates/jit/src/storage/transaction_action.rs:61-84`). Graph and snapshot exporters also
+accept physical destinations independently of that virtual mapping
+(`crates/jit/src/main.rs:4905-4931`,
+`crates/jit/src/commands/snapshot.rs:443-490`). Alias resolution must therefore cover all
+mapping, capture, claim, journal, and export consumers rather than only the new path type.
+
+The binding layout decision is one immutable `RepositoryLayout { worktree_root,
+data_root }`, constructed at command/server repository resolution and passed through
+storage, capture, planning, kernel, journal, and recovery. `VirtualPath` has exactly two
+root-qualified forms: `Worktree(rel)` for authored documents, projections, exports, and
+`.gitattributes`; `Data(rel)` for index/config/rules/gates/issues/events/provenance/runs.
+Their typed `RootRelativePath::{Root, Descendant}` represents the selected root itself
+without an empty-string sentinel, or a normalized safe nonempty descendant; root class
+is never inferred from `.jit` string syntax. Logical adopter-facing `.jit/events.jsonl` means
+`Data("events.jsonl")` under default, relative custom, in-worktree custom, sibling, and
+absolute external data roots. Journal actions persist root class plus relative path and
+a layout identity, never an absolute physical path; a mismatched layout fails recovery.
+External fresh-root controls remain at `Worktree(".jit-bootstrap")`, while internal
+controls are `Data("tmp/transactions")`. All parent inference, `.jit` prefix stripping,
+kernel literals, and command-local `transaction_path` adapters are deleted.
+
+Canonicalization is global, not exporter-specific. `RepositoryLayout` first validates
+the canonical/no-follow physical roots and rejects unsafe overlap: equal/aliased roots,
+a worktree nested beneath its data root, symlinked components, lexical escape, or root
+identity change during capability acquisition. A data root nested beneath its worktree remains supported, but any
+physical path under that selected data root canonicalizes to `Data(...)` **before**
+testing worktree containment. Every seed, configured source/target, document/asset,
+claim, capture/listing key, delta action, journal action, recovery lookup, report path,
+and graph/snapshot destination passes through that one Data-precedence canonicalizer.
+Physical-path inputs beneath `data_root` become `Data(...)`; an already typed
+`Worktree(...)` that resolves there is rejected as a noncanonical alias before hashing.
+Unsafe root topology returns typed `OverlappingRepositoryRoots`; an already-typed alias
+returns `DataRootAlias`. Two virtual spellings can never survive as separate
+claims/preimages/actions for one occupant. Export classification is
+therefore Data first, then Worktree, then external, and journals round-trip the same
+canonical root tag rather than reclassifying on recovery.
+
+### F2: recovery must be part of opening a mutation session
+
+CLI mutation dispatch currently recovers before constructing `CommandExecutor` and
+retains that `RecoverySession` through dispatch; the HTTP server separately recovers
+before validating services (`crates/jit/src/main.rs:1824-1868`,
+`crates/server/src/lib.rs:66-79`). In contrast, `CommandExecutor::new` only builds config
+caches and performs no recovery, so direct in-process callers can read state that a
+prepared or committed journal still owns (`crates/jit/src/commands/mod.rs:371-385`). The
+checker path demonstrates a partial bridge by dropping a retained startup session for
+the subprocess and calling `RecoveryCoordinator` again before verdict persistence
+(`crates/jit/src/storage/json.rs:862-899`). Startup orchestration is useful evidence, but
+it cannot remain the correctness boundary.
+
+The binding decision is that `RepositoryStateStore::open_mutation_session(layout)` is
+the only mutation entry and returns an already-recovered opaque session. It acquires the
+worktree bootstrap guard, recovers/verifies/cleans all external prepared and committed
+residue, then, when `data_root` exists, acquires the selected data-root repository and
+events guards in bootstrap → repository → events order and recovers/verifies/cleans all
+internal residue **before the first capture read**. A matching CLI/server startup session
+is consumed or reused reentrantly; it never authorizes skipping recovery. Direct
+`CommandExecutor` mutations and post-checker persistence use the identical entrypoint.
+Any recovery or committed-residue verification error prevents capture and returns a
+typed recovery failure. The old standalone coordinator may survive only as private
+session-opening mechanics; it is not a caller-selected alternative boundary.
+`InMemoryStorage` models prepared/committed residue and injected recovery failure behind
+the same open-session-before-capture contract rather than treating recovery as a
+filesystem-only concern.
+
+### F3: eligible Git `.gitattributes` behavior must be exact
+
+The current helper uses `git rev-parse --show-toplevel`, silently returns `NotGitRepo`,
+considers the marker comment alone sufficient for idempotence, writes the hardcoded
+`.jit/events.jsonl merge=union` rule, and lets main downgrade setup errors to a warning
+after other init writes have already occurred (`crates/jit/src/storage/gitattributes.rs:25-79`,
+`crates/jit/src/main.rs:1938-1947`). The binding policy replaces both ambiguity and the
+warning-only split writer:
+
+- Before capture, boundary code resolves typed Git evidence. No containing Git worktree
+  or a selected data root outside that same worktree yields exact status
+  `not_applicable`, captures no `.gitattributes` target, and init succeeds.
+- When eligible, the actual worktree-relative physical path for
+  `Data("events.jsonl")` is Git-escaped and determines the merge-rule line. Init
+  contributes one semantic line-set claim for `Worktree(".gitattributes")`; capture
+  includes the exact file and parent listing. Composition preserves every unrelated byte,
+  ensures the canonical JIT marker/rule exactly once, and reports exactly `unchanged`,
+  `created`, or `modified` plus matching created/modified path lists.
+- The eligible claim lands in the same init delta. Once included, a preimage conflict or
+  publication failure fails/rolls back the complete init transaction. A symlink,
+  directory, unsupported occupant, unsafe malformed content, or competing semantic claim
+  is a typed preflight error before journaling, never a warning/skip. The standalone setup
+  API, CLI warning merge, and outcome-driven direct writer disappear.
+
+### F4: claim acquisition is an explicit reconciliation saga
+
+`jit claim acquire` resolves and loads the issue, then durably acquires the Git-backed
+lease; only afterward does it reload/mutate the issue, call `save_issue`, and append the
+`IssueClaimed` event (`crates/jit/src/commands/claim.rs:72-156`). A failure in either
+repository write leaves a live exclusive lease with missing or split repository-visible
+assignment/audit. The lease control plane cannot join the repository file transaction,
+so merely migrating the last two calls to `RepositoryStateStore` would still leave this
+crash window.
+
+The binding decision keeps the lease control plane authoritative and lease-first, but
+makes the cross-substrate transition a fenced durable saga. The global claim-operation
+lock order is coordinator → bootstrap → repository → events. Acquire holds the
+coordinator lock while it writes canonical issue identity and
+`pending_repository_sync { desired: acquire, attempt_generation, attempt_owner }` with
+stable `lease_id`/`coordination_id`, opens the recovered repository session, and submits
+one issue-plus-event mutation. `IssueClaimed` carries the coordination ID, attempt
+generation, and attempt-owner token. Still under the same coordinator guard, completion
+conditionally marks the lease active only if desired transition, generation, and owner
+token still match; definite pre-journal failure conditionally deletes that exact pending
+attempt. Release is symmetric and conditionally removes the matching pending-release
+attempt after its issue/event mutation, or restores active on a definite pre-journal
+failure. Every claim path obeys this one global order; no repository-first path may later
+take the coordinator lock.
+
+An uncertain/recovery-required result retains the exact pending attempt and returns typed
+`reconciliation_required`, never false atomic success. After a crash the OS releases all
+guards but the pending generation/token remains durable. A reconciler or takeover first
+acquires the coordinator lock, then opens/recovers the repository session while still
+holding it. If the matching fenced event exists, it conditionally finalizes without a
+duplicate. If recovery proves no transaction/event, takeover conditionally increments
+`attempt_generation` after the configured grace, installs a new `attempt_owner` token,
+and retries under the same guard;
+any delayed result from the old owner fails its conditional finalize/delete and cannot
+erase or activate the newer attempt; such stale work returns typed
+`FencedClaimAttempt`. Ambiguous evidence remains pending. Pending records
+retain requested TTL; finite records expire only through fenced reconciliation, while
+TTL-zero uses configured stale grace and is never removed by age alone. Status/list
+exposes desired transition, coordination identity, generation, owner token/owner state,
+timestamps, stale/takeover state, and reconciliation warning. Control-plane logs/indexes
+remain outside `RepositoryStateStore`; repository-visible correction always uses the
+nested recovered state-store session under the global coordinator-first order. Issue/event
+finalization, heartbeat, renew, release, and eviction reject a generation/owner that has
+lost the fence.
 
 ## Complete live consumer sweep
 
@@ -527,6 +727,13 @@ snapshot, drift, preset compatibility, and final-plan inventories listed above d
 
 ### Transaction, recovery, and concurrency boundary
 
+- Layout/root inference consumers that must move together:
+  `crates/jit/src/main.rs`, `crates/server/src/main.rs`,
+  `crates/server/src/lib.rs`, `crates/jit/src/storage/json.rs`,
+  `crates/jit/src/storage/discovery.rs`,
+  `crates/jit/src/validation/repository.rs`, and command paths that currently use
+  `storage.root().parent()` for working-tree documents/exports. They construct or consume
+  one `RepositoryLayout`; no layer reconstructs one root from the other.
 - Kernel and protocol:
   `crates/jit/src/storage/file_transaction.rs`,
   `crates/jit/src/storage/transaction_action.rs`,
@@ -542,10 +749,18 @@ snapshot, drift, preset compatibility, and final-plan inventories listed above d
 - Recovery classification/startup consumers:
   `crates/jit/src/cli.rs`, `crates/jit/src/main.rs`,
   `crates/server/src/lib.rs` (server recovery is invoked at
-  `crates/server/src/lib.rs:18-69`).
+  `crates/server/src/lib.rs:18-69`), `CommandExecutor` direct mutation entrypoints, and
+  `IssueStore::run_external_process`/checker persistence. Startup coordinator calls are
+  folded into `open_mutation_session`; they do not remain an alternative prerequisite.
+- Cross-substrate claim-saga consumers:
+  `crates/jit/src/commands/claim.rs`, `crates/jit/src/storage/claim_coordinator.rs`,
+  claim status/heartbeat/renew/release/eviction and worktree views, claim schemas/log
+  rebuild, CLI output/error mapping, and claim validation. All must understand pending
+  repository sync and use the lease ID as reconciliation identity.
 - Tests:
   unit tests in the transaction and init/profile modules and
-  `crates/jit/tests/cli_issue/recover_command_tests.rs`.
+  `crates/jit/tests/cli_issue/recover_command_tests.rs`, plus server recovery, claim
+  coordinator/property, claim CLI, custom-data-root, and direct-executor suites.
 - Documentation:
   `docs/reference/profiles.md`, `docs/reference/cli-commands.md`,
   `docs/reference/storage-format.md`, and `docs/concepts/guarantees.md`.
@@ -564,22 +779,24 @@ publisher.
 | Dependency, label, document-reference, bulk, batch/template, and validation-fix writes | `commands/dependency.rs:133-263`, `commands/dependency.rs:554-740`, `commands/labels.rs:20-46`, `commands/document.rs:7-176`, `commands/bulk_update.rs:162-390`, `commands/batch_create.rs:275-355`, `commands/template.rs:208-588`, and `commands/validate.rs:37-185`. | **State-store owned.** These all change issue item text/links, graph-visible records, timestamps, or audit. Batch/template rollback helpers and `restore_issue_verbatim` are replaced by prevalidated aggregate deltas, not retained as compensating escape hatches. |
 | Document asset rescan | Rescan reads the current linked document, replaces the stored asset inventory, and calls `save_issue` without appending an event (`crates/jit/src/commands/document.rs:672-759`). | **State-store owned.** Rescanned asset discovery consumes captured document bytes. A changed inventory is one typed mutation containing the issue update, `MutationTimestamp`, canonical audit event, and all affected item/validation/projection effects; the current unaudited direct save disappears. |
 | Lifecycle timestamp migration | Migration derives first historical lifecycle occurrences from event history, then independently saves changed issues and appends one migration event (`crates/jit/src/domain/queries.rs:11-99`, `crates/jit/src/commands/migrate.rs:19-80`). | **State-store owned.** Historical lifecycle values retain their captured event timestamps. The current mutation instant applies only to rewritten `updated_at` values and the one migration audit record, and all bytes land in one delta. |
-| Claim acquisition's repository-visible assignment | Claim acquisition first mutates the Git-backed lease control plane, then separately saves the issue assignment and event (`crates/jit/src/commands/claim.rs:72-156`). Claim release/heartbeat/renew/force-evict mutate only the claim control plane (`crates/jit/src/commands/claim.rs:172-643`). | **Split by substrate.** Acquisition's issue/event portion is state-store owned. `.git/jit` lease/index/log mutation remains claim-control-plane owned because it is machine coordination, not repository semantic state; cross-substrate all-or-nothing is not promised, so failure/reconciliation behavior must be explicit. |
+| Claim acquire/release repository synchronization | Claim acquisition first mutates the Git-backed lease control plane, then separately saves the issue assignment and event (`crates/jit/src/commands/claim.rs:72-156`). Claim release/heartbeat/renew/force-evict currently mutate only the claim control plane (`crates/jit/src/commands/claim.rs:172-643`). | **Split substrate, fenced saga.** Acquire/release persist pending desired transition, lease/coordination IDs, attempt generation, and owner token, then retain the coordinator guard while opening/applying the recovered state-store issue/event mutation. Conditional finalize/compensation checks the complete fence; uncertain state remains pending, and takeover recovers/inspects before incrementing generation/token. Every path uses coordinator → bootstrap → repository → events. |
 | Gate assignment/status/definition/preset application and checker recording | `commands/gate.rs` changes issue gates, gate declarations, and events (`crates/jit/src/commands/gate.rs:211-355`, `crates/jit/src/commands/gate.rs:370-624`, `crates/jit/src/commands/gate.rs:634-990`, `crates/jit/src/commands/gate.rs:1020-1108`); `commands/gate_check.rs` writes run/issue/event (`crates/jit/src/commands/gate_check.rs:282-331`). | **State-store owned.** Gate declarations are registry-first item SSOT, issue statuses affect lifecycle, and run/event records are the audit of the same verdict. One post-checker mutation owns all affected bytes and projections. |
 | Custom gate-preset creation | `create_gate_preset` serializes a new `.jit/config/gate-presets/<name>.json` through `IssueStore::save_gate_preset` (`crates/jit/src/commands/gate.rs:1135-1190`, `crates/jit/src/storage/json.rs:1335-1354`). | **State-store owned.** A custom preset is a repository-authored future mutation input. Its typed definition and target claim join the image/delta; the raw trait writer is deleted. |
 | Repository config mutation, default rule/schema refresh, gate/rule declaration publication, project render, profile apply, and init | `commands/config.rs:177-310`, `commands/mod.rs:1105-1265`, `commands/project.rs:87-170`, `commands/profile.rs:122-245`, `commands/init.rs:173-452`, plus the storage writers inventoried above. | **State-store owned.** These are the core declared→derived materialization paths. The cutover deletes every independent publisher/action builder, including ordinary init's separate `IssueStore::init` path. User-global config is the explicit exception below. |
-| Git-aware `.gitattributes` setup performed by init | `main` calls the helper separately from repository initialization (`crates/jit/src/main.rs:1938-1947`); the helper reads/appends/creates the versioned root file directly (`crates/jit/src/storage/gitattributes.rs:42-79`). | **State-store owned as a same-delta line-set claim.** Git detection yields an init intent that preserves unrelated lines and idempotently ensures the exact JIT marker/merge line in `.gitattributes`. It lands with the rest of init and cannot remain a separate writer; Git-free init emits no claim. |
+| Eligible Git `.gitattributes` setup performed by init | `main` calls the helper separately from repository initialization, warns on helper errors, and reports create/modify outcomes (`crates/jit/src/main.rs:1938-1947`, `crates/jit/src/main.rs:2009-2017`); the helper detects Git and directly writes the versioned root file (`crates/jit/src/storage/gitattributes.rs:42-79`). | **Conditionally state-store owned.** No-Git/outside-worktree is exact `not_applicable`. Otherwise the Git-escaped relative selected-data events path produces a same-delta `Worktree(".gitattributes")` line-set claim and exact `unchanged|created|modified`; unsafe eligible targets abort before journaling. The direct helper and CLI warning merge are deleted. |
 | Dependency-aware document/container archive | Archive publishes destination documents/markers, relinks issue documents, appends audit, and deletes sources (`crates/jit/src/commands/archive.rs:398-636`, `crates/jit/src/commands/archive.rs:733-856`). | **State-store owned.** Any archived path may be a linked document or config-selected item/projection source/target. Identity/no-replace checks survive as policy and expected preimages; alternate artifact publication/deletion and reconciliation writers do not. |
-| User-directed graph and snapshot exports | Graph export writes an arbitrary requested output path or stdout (`crates/jit/src/main.rs:4905-4931`); snapshot export assembles and publishes an arbitrary directory/archive, often beneath the current directory (`crates/jit/src/commands/snapshot.rs:443-490`, `crates/jit/src/commands/snapshot.rs:553-638`). | **Classified by destination.** Graph stdout is non-mutating. Graph/snapshot output outside the repository is an external-artifact capability. Every output file, archive, directory, or tree inside the repository is an explicit state-store export intent with exact preimages, complete parent listings, and collision checks; it cannot use the direct external publisher. |
+| User-directed graph and snapshot exports | Graph export writes an arbitrary requested output path or stdout (`crates/jit/src/main.rs:4905-4931`); snapshot export assembles and publishes an arbitrary directory/archive, often beneath the current directory (`crates/jit/src/commands/snapshot.rs:443-490`, `crates/jit/src/commands/snapshot.rs:553-638`). | **Classified canonically by destination.** Graph stdout is non-mutating. Physical output under selected data is `Data` even when data nests in worktree; otherwise output under worktree is `Worktree`; only outside both is external. Every virtual output file/archive/tree is one state-store export intent with exact preimages, complete parent listings, canonical collision/alias checks, and no direct publisher. |
 | Manual editor/build-tool changes to versioned repository files | External tools can always edit config, registries, issues, sources, or targets; git-versioned plain files are a product requirement (`@/charter/D-1`). | **Not capturable as a command cutover.** The store does not monopolize the filesystem. It owns all JIT-originated publication and uses complete under-lock preimages; external edits before session capture become input, and edits racing after capture fail expected-preimage checks. Validation reports their derived drift. |
 | User-global config, Git hooks/claim control plane, worktree identity, server PID/logs, locks/temp files, recovery journals, and snapshot/export destinations outside the repository | User-global config branches at `commands/config.rs:253-275`; hooks and claims write Git control paths; worktree/server/lock/recovery files are machine-local (`crates/jit/src/storage/worktree_identity.rs:243-251`, `crates/jit/src/commands/serve.rs:83-101`, `crates/jit/src/storage/repo_lock.rs:40-44`). | **Excluded from semantic state.** Each keeps its substrate-specific capability. The API must make this exclusion structural, so none can accept an arbitrary live repository target. Recovery journals remain the private implementation of state-store apply. |
 
 This inventory means the final “sole store” claim is broader than deleting the five
-obvious config/profile/project writers. Every JIT-originated write whose resolved target
-is inside the repository enters `RepositoryStateStore`; capabilities excluded from
-semantic state are structurally constrained to their non-repository substrate. Otherwise
-a configured source/target can still change outside the captured read-set and SSOT
-boundary.
+obvious config/profile/project writers. Every JIT-originated `Worktree` target and every
+`Data` target enters `RepositoryStateStore` regardless of whether the physical selected
+data root is inside, beside, or outside the worktree. Only an explicitly classified
+external-export target outside both layout roots or a machine/control-plane substrate is
+excluded, and that capability is structurally unable to publish through a virtual
+repository path. Otherwise a configured source/target can still change outside the
+captured read-set and SSOT boundary.
 
 ### Repository bootstrap and fixture consumers
 
@@ -686,18 +903,21 @@ The final ownership that preserves those boundaries is:
 - crate-root `declarations` owns neutral authored `GateRegistry`/`GateDefinition` and
   `RuleSet`/`Rule` declaration semantics, parsing, and preservation. Storage and
   validation are consumers, not competing definition owners;
-- crate-root `repository_state` owns `RepositoryPath`, rich `RepositoryEntry`,
-  `RepositoryImage`, overlay, seed, intent, target claim, exact delta, managed-document
-  engine, all materialization producers, and pure derive/compare functions. It depends
-  on declarations/config, never validation, storage, commands, or profile;
+- crate-root `repository_state` owns immutable `RepositoryLayout`, root-qualified
+  `VirtualPath::{Worktree, Data}`, rich `RepositoryEntry`, `RepositoryImage`, overlay,
+  seed, intent, target claim, exact delta, managed-document engine, all materialization
+  producers, and pure derive/compare functions. It depends on declarations/config, never
+  validation, storage, commands, or profile;
 - validation imports declarations plus repository-state images and derive/compare
   results, evaluates rules and whole-repository policy, and validates final images. It
   owns no filesystem capture, alternate image/overlay, default/schema/projection
   materializer, target composer, or marker engine;
-- storage implements `RepositoryStateStore`: acquire the canonical opaque mutation
-  session, capture one `RepositoryImage`, and apply one finalized `RepositoryDelta`.
-  JSON uses the file-transaction kernel; memory uses an aggregate clone/apply/validate/
-  swap boundary. Storage owns no command semantic or materialization renderer; and
+- storage implements `RepositoryStateStore`: open the canonical already-recovered opaque
+  mutation session for one layout, capture one `RepositoryImage`, and apply one finalized
+  `RepositoryDelta`. JSON gives the file-transaction kernel capabilities for both typed
+  roots; memory models both roots and recovery residue behind an aggregate
+  clone/apply/validate/swap boundary. Storage owns no command semantic or materialization
+  renderer; and
 - commands and profile parse use cases/packages into declarations and neutral seeds,
   rebuild under the state-store session, ask root derivation/comparison for the exact
   result, validate its final image, and apply once. Public response adapters carry
@@ -743,17 +963,25 @@ invariant must not be copied into that shipped adopter template.
 ### Lock and recovery implications
 
 The epic risk about lock duration is real. A speculative preview can be computed outside
-the session, but application acquires the `RepositoryStateStore` session, captures the
-canonical image, rebuilds the delta with exact expected preimages, validates the final
-image, and applies once before releasing it. Profile apply already replans under its
-repository guard (`crates/jit/src/commands/profile.rs:122-147`), and CLI startup holds the
-recovery session through dispatch (`crates/jit/src/main.rs:1852-1868`), but neither is a
-substitute for the new backend contract. Session acquisition takes the repository-sibling
-bootstrap guard first: an absent `.jit` retains bootstrap only and uses external control;
-an existing root then acquires repository serialization and uses internal control. The
-recovery coordinator already demonstrates that conditional order
-(`crates/jit/src/storage/recovery_coordinator.rs:59-102`). Fresh init must not create or
-acquire a lock inside the absent `.jit` root.
+the session, but application opens the `RepositoryStateStore` session for its explicit
+`RepositoryLayout`, completes mandatory recovery before capture, rebuilds the delta with
+exact expected preimages, validates the final image, and applies once before releasing
+it. Profile apply already replans under its repository guard
+(`crates/jit/src/commands/profile.rs:122-147`), and CLI startup holds a recovery session
+through dispatch (`crates/jit/src/main.rs:1852-1868`), but neither is a substitute for
+the new backend contract. Session acquisition takes the worktree bootstrap guard first:
+an absent selected `data_root` retains bootstrap only and uses
+`Worktree(".jit-bootstrap")` external control; an existing selected root then acquires
+repository/events serialization and uses `Data("tmp/transactions")` internal control.
+The recovery coordinator demonstrates external-before-internal order
+(`crates/jit/src/storage/recovery_coordinator.rs:59-102`), while the kernel's current
+hardcoded `.jit` locations are evidence to replace, not preserve. Fresh init must not
+create or acquire a lock inside an absent selected data root, and direct executor capture
+must not precede recovery. Ordinary mutations enter at bootstrap; claim acquire/release,
+status reconciliation, heartbeat, renew, and eviction enter with the coordinator guard
+already held and may then nest the recovered session. The state store never acquires the
+coordinator, and lock APIs/runtime checks reject any coordinator acquisition while a
+bootstrap/repository/events guard is held.
 
 ## Test gaps that the planned work must close
 
@@ -767,6 +995,17 @@ The missing evidence is:
 - one conformance suite over JSON and memory `RepositoryStateStore` images/deltas,
   including absence, bytes/mode, directory, symlink payload, unsupported kind, expected
   preimage conflicts, create/write/mode/delete, failure, and no-swap/rollback behavior;
+- `RepositoryLayout` conformance for default `.jit`, relative/in-worktree custom,
+  sibling, and absolute outside-worktree data roots: identical `Data` semantics, distinct
+  `Worktree` semantics, root-tagged journal round trips, mismatch rejection, selected-root
+  locks/control cleanup, and structural absence of `.jit`/parent-inference adapters.
+  Equal/physical-alias roots, worktree-beneath-data, symlinked components, lexical escape,
+  and root-identity change reject; supported data-beneath-worktree topology proves global Data precedence
+  across configured sources/targets, documents/assets, capture/listings, deltas, journals,
+  collision detection, reports, exports, and recovery, with typed Worktree aliases rejected;
+- prepared and committed external/internal residue tests proving CLI, server, direct
+  `CommandExecutor`, and post-checker mutation all recover/verify before the first capture
+  read, including injected recovery failure that prevents capture;
 - bounded-discovery tests proving the captured read set expands through schema
   references, indexed issues plus issue-directory enumeration, working-tree linked/plan
   documents, configured item sources, projection sources/targets, and intent targets;
@@ -789,11 +1028,20 @@ The missing evidence is:
 - gate checker recording, custom preset creation, lifecycle migration, document asset
   rescan, and archive publication/relink/deletion proving each complete mutation lands in
   one delta with audit and has no alternate publisher;
-- Git-aware init proving the `.gitattributes` line-set claim preserves unrelated lines,
-  is idempotent, lands in the same init delta, and is absent without Git; graph stdout
-  proving no mutation; graph/snapshot destinations outside the repository proving the
-  external-artifact boundary; and in-repository files/archives/trees proving state-store
-  preimage, complete-parent-listing, and collision behavior;
+- Git-aware init proving eligibility for default and worktree-contained custom data
+  paths, the actual events-relative rule, unrelated-byte preservation, idempotence,
+  same-delta rollback, exact four-state reporting, `not_applicable` for no-Git and
+  outside-worktree roots, and preflight rejection of unsafe eligible occupants/content;
+  graph stdout proving no mutation; graph/snapshot destinations under nested data proving
+  `Data`, elsewhere under worktree proving `Worktree`, and outside both proving external,
+  with state-store preimage, complete-parent-listing, alias collision, and recovery behavior;
+- claim-saga tests at every boundary: pending acquire/release before repository
+  publication, definite pre-journal compensation, uncertain recovery, commit-before-
+  conditional-finalization, retry/event dedupe, startup and every claim-entry
+  reconciliation, TTL-zero grace/finite expiry, status fields, monotonic takeover
+  generation/new owner token, delayed stale-owner finalize/delete rejection, matching
+  fence in lease plus event, and the enforced coordinator → bootstrap → repository →
+  events lock order with repository-first coordinator acquisition structurally absent;
 - fixture migration proving no production/test/doc consumer retains `IssueStore::init`,
   the validation view, profile snapshot/projection/drift types, old declaration owners,
   raw gate/config/rules/project writers, or compatibility re-exports;

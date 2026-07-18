@@ -75,25 +75,27 @@
   (`crates/jit/src/commands/gate.rs:673,742,966-986,1093`;
   `.jit/config.toml:219-226`).
 
-## Formal gate resolutions (F1–F3)
+## Formal gate resolutions (F1–F4)
 
 ### F1 — bounded discovery and capture
 
 - **[ASSUMED — recommended design]** A `RepositoryStateStore` mutation session
   performs two-phase bounded capture without releasing its guard. Phase one reads
-  fixed declaration roots (`index.json`, config, rules, gates, templates,
-  invariants, profile provenance, exact `events.jsonl` bytes, and the command/profile typed
-  seed) plus exact command-selected issue and gate-run records. Parsing produces a
-  sorted `CaptureSpec` of normalized exact paths and explicitly complete listings:
-  `.jit/issues`, referenced gate-run/profile/schema directories, configured
-  registry/item sources, projection sources and targets outside `.jit`, profile
-  asset/region targets and parents, and every proposed target preimage. Phase two
-  executes a no-follow work queue to a fixpoint. A newly parsed declaration may
-  enqueue only an exact path or complete listing beneath a declared safe path; a
-  visited set plus path/count/byte/depth budgets returns a typed closure-limit
-  error. There is no recursive repository-root, `target`, `node_modules`, Git
-  metadata, or unrelated-tree discovery fallback.
-- **[ASSUMED — recommended design]** A complete `.jit/issues` listing enqueues
+  fixed `Data(...)` declaration roots (`Data(Descendant("index.json"))`, config,
+  rules, gates, templates, invariants, profile provenance, exact
+  `Data(Descendant("events.jsonl"))` bytes, and the command/profile typed seed)
+  plus exact command-selected issue and gate-run records. Parsing produces a sorted
+  `CaptureSpec` of validated `VirtualPath` values and explicitly complete
+  listings: `Data(Descendant("issues"))`, referenced gate-run/profile/schema
+  directories, configured registry/item sources, projection sources and targets
+  under either declared root, profile asset/region targets and parents, and every
+  proposed target preimage. Phase two executes a no-follow work queue to a fixpoint. A newly
+  parsed declaration may enqueue only an exact path or complete listing beneath a
+  declared safe path; a visited set plus path/count/byte/depth budgets returns a
+  typed closure-limit error. There is no recursive worktree-root or data-root,
+  `target`, `node_modules`, Git metadata, or unrelated-tree discovery fallback.
+- **[ASSUMED — recommended design]** A complete
+  `Data(Descendant("issues"))` listing enqueues
   every ordinary issue entry required by repository validation. Parsing those
   issues then enqueues every unpinned `Issue.documents[].path`, each document's
   validation-read local assets and parent entry preimages, and every plan-document
@@ -124,20 +126,26 @@
   listing additionally records a stable fingerprint over its sorted child
   name/kind/mode identities. This lets validation prove both “the named source is
   unchanged” and “no source appeared or disappeared in a consumed directory.”
-  External configured sources and targets are repository-relative capabilities,
-  never unconstrained host paths.
+  External configured sources and targets are layout-confined capabilities, never
+  unconstrained host paths. Capture indexes entries by the layout's canonical
+  physical identity as well as `VirtualPath`; physical-boundary input is first
+  canonicalized with data-root precedence, while an API requiring an already
+  canonical virtual path rejects `DataRootAlias`. Thus two requested spellings can
+  never reach the image, listing fingerprint, plan hash, delta, or journal as
+  separate identities.
 - **[ASSUMED — recommended design]** A pure producer requesting a path outside the
   closed `CaptureSpec` fails with `UndiscoveredRepositoryPath`; it cannot perform
   I/O or silently interpret that path as absent. The plan hash covers normalized
-  `CaptureSpec`, every entry identity, every complete-listing fingerprint, the
-  typed seed, and the exact `RepositoryDelta`. Immediately before durable journal
-  preparation, `RepositoryStateStore::apply` revalidates the whole captured read
-  set; delta actions recheck target preimages again before publication. Any source,
-  target, or listing mismatch is a typed retryable capture conflict. If a
-  declaration edit changes the closure, discard the image and repeat both phases
-  under the same session until one unchanged bounded fixpoint is planned. Fresh
-  init starts from an absent `.jit` declaration image plus exact existing external
-  profile/projection targets and parent listings.
+  `RepositoryLayout` identity, `CaptureSpec`, every typed path/entry identity,
+  every complete-listing fingerprint, the typed seed, pinned evidence, and the
+  exact `RepositoryDelta`. Immediately before durable journal preparation,
+  `RepositoryStateStore::apply` revalidates the whole captured read set; delta
+  actions recheck target preimages again before publication. Any source, target,
+  or listing mismatch is a typed retryable capture conflict. If a declaration edit
+  changes the closure, discard the image and repeat both phases under the same
+  session until one unchanged bounded fixpoint is planned. Fresh init starts from
+  an absent selected data-root image plus exact existing `Worktree(...)` targets
+  and parent listings.
 
 ### F2 — canonical typed records become canonical bytes once
 
@@ -235,8 +243,10 @@
 - **[ASSUMED — recommended design]** For an existing root, one JSON mutation
   session holds locks in the fixed order bootstrap → repository → events for its
   complete capture/plan/revalidate/publish lifetime; no append or repair path may
-  acquire them in reverse. For an absent `.jit`, bootstrap is both repository and
-  event-append serialization authority and the session neither creates nor
+  acquire them in reverse. Claim mutations prepend and retain the coordinator lock,
+  making their complete order coordinator → bootstrap → repository → events.
+  For an absent selected data root, the worktree bootstrap guard is both repository
+  and event-append serialization authority and the session neither creates nor
   acquires an events lock inside the absent root. Gate-run and provenance targets
   publish under the same session and exact-delta preconditions, without an
   independent semantic writer.
@@ -249,29 +259,40 @@
   Git-backed claim leases under `.git/jit`, explicitly user-global config, and
   unrelated external-process artifacts. Those are different authorities and do
   not publish repository-owned project state.
-- **[ASSUMED — recommended design]** Fresh/re-init treats `.gitattributes` as one
-  semantic line-set `TargetClaim` in the init `RepositoryDelta`, not a post-init
-  storage helper. The claim deterministically ensures the JIT comment/rule set
-  (including `.jit/events.jsonl merge=union`) exactly once, preserves every
-  unrelated line and byte, and rejects a conflicting claim for the same attribute
-  pattern. It requires no Git process or repository detection, so Git-optional init
-  has the same repository image. Exact
-  `.gitattributes` bytes and its parent listing are captured/revalidated under the
-  bootstrap-only or existing-root session. Delete
+- **[ASSUMED — recommended design]** Fresh/re-init acquires typed Git evidence
+  before capture and contributes a `Worktree(Descendant(".gitattributes"))` line-set
+  `TargetClaim` only when Git identifies a containing worktree and the selected
+  data root lies inside that same worktree. The canonical line is the Git-escaped,
+  worktree-relative selected-data-root path followed by
+  `/events.jsonl merge=union`; the default therefore remains
+  `.jit/events.jsonl merge=union`. Eligible composition preserves every unrelated
+  line and byte and reports exactly `unchanged`, `created`, or `modified`, with the
+  corresponding created/modified path lists. When Git cannot identify such an
+  eligible same-worktree root, status is exactly `not_applicable`, no
+  `.gitattributes` target is captured, and init succeeds. An eligible target that
+  is a symlink, directory, or unsupported kind, malformed content that cannot be
+  safely preserved, or a competing semantic claim is a typed preflight error that
+  aborts the whole init before journaling. This preserves Git-optional core use
+  without pretending an outside-worktree data root has a Git attribute. Delete
   `storage::gitattributes::setup_gitattributes` and the `main.rs` after-init writer
   (`crates/jit/src/storage/gitattributes.rs:42-80`;
   `crates/jit/src/main.rs:1938-1947`).
 - **[ASSUMED — recommended design]** Graph and snapshot exports classify their
-  destination before publication. An output path within the repository root is a
-  constrained `RepositoryStateStore` export intent: graph's file or snapshot's complete
+  destination through the globally validated physical `RepositoryLayout` before
+  publication. A destination beneath the selected data root is `Data(...)` even
+  when that root is nested inside the worktree; otherwise a destination beneath
+  the worktree is `Worktree(...)`; any other destination is external. A virtual
+  destination is canonicalized to that exclusive classification, and an
+  already-canonical API rejects an alias rather than hashing or publishing it
+  twice. Worktree/data destinations become constrained
+  `RepositoryStateStore` export intents: graph's file or snapshot's complete
   file/tree claims, target ancestors, and preimages join `CaptureSpec` and publish
-  once through `RepositoryStateStore`. Stdout is an ephemeral presentation sink and
-  receives pure rendered bytes without a repository delta. An explicitly selected
-  path outside the repository uses a separate external-export sink with staging and
-  no authority to change repository-owned state. Shell redirection remains stdout
-  from JIT's perspective. Delete graph's direct atomic path writer and snapshot's
-  in-repository rename/tar writers; retain external sink mechanics only for proven
-  external destinations (`crates/jit/src/main.rs:4923-4932`;
+  once. Stdout is an ephemeral presentation sink and receives pure rendered bytes
+  without a repository delta. An explicitly external path uses a separate staged
+  export sink with no authority to change repository-owned state. Shell redirection
+  remains stdout from JIT's perspective. Delete graph's direct atomic path writer
+  and snapshot's in-repository rename/tar writers; retain external sink mechanics
+  only for proven external destinations (`crates/jit/src/main.rs:4923-4932`;
   `crates/jit/src/commands/snapshot.rs:528-599`).
 - **[ASSUMED — recommended design]** Gate preset creation is a typed declaration
   mutation of `.jit/config/gate-presets/<name>.json`: capture the complete preset
@@ -311,6 +332,122 @@
   contract evidence. Later “cleanup” work must not be used to remove a competing
   engine or publisher that the vertical cutover should have deleted.
 
+### F4 — explicit layout, recovered sessions, and claim reconciliation
+
+- **[VERIFIED]** `JsonFileStorage` currently retains only its selected storage root,
+  derives bootstrap/repository context from that root's parent, and profile
+  transaction planning strips a literal `.jit` prefix before rewriting the path
+  for the selected storage directory
+  (`crates/jit/src/storage/json.rs:145-205,718-736`;
+  `crates/jit/src/commands/profile.rs:457-466`). Those rules conflate logical data
+  identity with one physical layout and cannot faithfully represent supported
+  relative, strictly nested in-worktree, sibling, or absolute disjoint
+  `JIT_DATA_DIR` placement.
+- **[ASSUMED — recommended design]** Construct one `RepositoryLayout` from the
+  no-follow, lexically normalized worktree root and selected data root and pass it
+  to every storage/session/kernel/export boundary. A data root strictly nested
+  beneath the worktree or physically disjoint from it is allowed. Equal roots or a
+  data root containing the worktree fail as typed
+  `OverlappingRepositoryRoots`; symlinked root components, unresolved lexical
+  escape, and root identity changes during capability acquisition are rejected
+  rather than silently canonicalized through. These checks precede recovery and
+  capture and apply when the selected data root is absent as well as present.
+- **[ASSUMED — recommended design]** The layout's only semantic path type is
+  `VirtualPath`, with `Worktree(RootRelativePath)` and
+  `Data(RootRelativePath)` variants; the relative component explicitly represents
+  either the selected root itself or a normalized non-empty descendant and rejects
+  parent, prefix, control, and alternate separators. Thus the logical
+  `.jit/index.json` and `.jit/events.jsonl` contracts are always data descendants
+  `index.json` and `events.jsonl`, while authored documents and `.gitattributes`
+  are worktree descendants, regardless of the physical data root. When the data
+  root is strictly inside the worktree, physical classification always gives the
+  more-specific data root precedence. The sole physical conversion,
+  `RepositoryLayout::classify_and_canonicalize`, maps a submitted worktree spelling
+  beneath that subtree to its exclusive `Data(...)` identity before insertion;
+  APIs that require an already canonical virtual path reject the same input as
+  `DataRootAlias`. Every discovery queue, `CaptureSpec`, claim/target set, delta
+  duplicate check, plan hash, journal action, export/attributes classifier,
+  validation lookup, and recovery operation uses the canonical value and verifies
+  virtual-to-physical injectivity. No two virtual identities for one physical
+  target survive. Delete
+  storage-root-parent discovery, physical `.jit` translation, prefix stripping,
+  `transaction_path`, and every string/absolute-path adapter between semantic
+  deltas and the kernel.
+- **[ASSUMED — recommended design]** Parameterize `FileTransactionKernel` with
+  root-confined capabilities for both layout roots and explicit transaction control
+  roots. Before the selected data root exists, external journals live under the
+  worktree control root `.jit-bootstrap/transactions`; afterward internal journals
+  live at `Data(Descendant("tmp/transactions"))`. Every journal action stores only
+  its root class and normalized relative path. Recovery binds the journal to the complete
+  `RepositoryLayout` identity, resolves each action through that layout, and rejects
+  a mismatch; it never persists an absolute physical target or a synthetic
+  `.jit`-prefixed surrogate.
+- **[VERIFIED]** Startup recovery already orders external before internal journals,
+  but it is a CLI/service boundary and infers repository context from the data-root
+  parent (`crates/jit/src/storage/recovery_coordinator.rs:1-120`). Direct
+  `CommandExecutor`, HTTP, test, and post-checker callers therefore cannot treat it
+  as the mutation correctness boundary.
+- **[ASSUMED — recommended design]**
+  `RepositoryStateStore::open_mutation_session(layout)` is the mandatory recovered
+  boundary for every affected caller. It acquires the worktree bootstrap guard,
+  recovers all external journals, and verifies/cleans committed residue before
+  re-evaluating selected data-root existence. When the data root exists, it then
+  acquires data-root repository and event guards in canonical
+  bootstrap → repository → events order, recovers internal journals, and
+  verifies/cleans their committed residue. Capture cannot begin until both stages
+  succeed. An ordinary command may consume/reuse a matching retained CLI
+  `RecoverySession`; a claim command must acquire its coordinator guard before any
+  repository guard and therefore cannot inherit a pre-held repository session.
+  Startup can schedule claim reconciliation, but the claim path opens/re-enters its
+  recovered session only beneath the coordinator guard. Direct callers enter the
+  same boundary. External checker subprocesses run after retained repository guards
+  are released and their result publication reacquires the recovered session. Any
+  unresolved recovery or residue failure is a typed error that prevents capture
+  and planning.
+- **[VERIFIED]** Claim acquisition currently commits a Git-backed lease under
+  `.git/jit`, then independently calls issue save and event append with a newly
+  sampled timestamp (`crates/jit/src/commands/claim.rs:100-156`). There is no
+  durable record connecting the two control planes, so a crash can leave the lease
+  and repository assignment/event disagreeing.
+- **[ASSUMED — recommended design]** Claims remain explicitly Git-required and use
+  one global lock order: claim coordinator → worktree bootstrap → data-root
+  repository → events. Acquire takes and retains the coordinator lock, creates a
+  durable `pending_repository_sync` lease with desired transition `acquire`, stable
+  coordination ID, monotonically increasing `attempt_generation`, and a fresh
+  `attempt_owner`, then opens the recovered repository session while still holding
+  the coordinator guard. The idempotent issue-plus-event delta carries that exact
+  coordination/generation/owner fencing token. After the repository transaction
+  converges and its guards are released, conditional finalization changes the
+  pending lease to `active` only if desired transition, coordination ID, generation,
+  and owner are unchanged; the coordinator lock is released last. A definite
+  pre-journal failure conditionally deletes the same pending attempt under the
+  retained guard. An uncertain/recovery-required publication or conditional-
+  finalization failure retains pending state and returns typed
+  `reconciliation_required`, never a false atomic-success result. A crash releases
+  the OS locks but leaves that durable pending attempt for fenced reconciliation.
+- **[ASSUMED — recommended design]** Startup/claim recovery and every subsequent
+  claim acquire/release/status operation reconcile under the identical coordinator
+  → repository-session lock order. Repository journal recovery runs before event
+  evidence is interpreted. An event matching coordination ID, desired transition,
+  attempt generation, and attempt owner conditionally finalizes that exact pending
+  attempt; proven absence of its transaction compensates it. Retry recognizes the
+  same complete event token and emits no duplicate. After the configured grace, a
+  stale or abandoned pending attempt may be taken over only while holding the
+  coordinator lock and after recovered evidence has not established its commit:
+  takeover increments `attempt_generation` and installs a new `attempt_owner`
+  before any repository work. Every delayed prior event/finalizer then fails with
+  `FencedClaimAttempt`; issue/event finalization and heartbeat, renew, release, and
+  retry paths likewise reject a generation/owner that has lost the fence. Release
+  mirrors the same pending record, event token, ordering, conditional finalization,
+  and fenced-takeover rules before durable lease removal or compensation back to
+  active. Pending records retain the requested lease TTL, use the runtime-defaults
+  SSOT for the default and the configured indefinite-lease stale grace when TTL is
+  zero, and expose state, desired transition, coordination ID, generation/owner,
+  created/expiry/last-attempt times, stale flag, and reconciliation warning in
+  status/list output. Lock-order APIs and tests reject any path that acquires the
+  coordinator after bootstrap/repository/events. Non-Git claim calls retain
+  `ClaimRequiresGitError`; no saga makes Git mandatory for unrelated core commands.
+
 ## Question 1 — Where should the shared pure planner live?
 
 ### Why this blocks the plan
@@ -348,14 +485,14 @@
 ### Recommendation
 
 - **[ASSUMED — recommended design]** Add the final crate-root `repository_state`
-  subsystem now. It owns `RepositoryPath`, `RepositoryEntry`, `RepositoryImage`,
-  `RepositorySeed`, `MaterializationIntent`, `TargetClaim`, `RepositoryDelta`, the
-  canonical overlay, managed-document topology, materialization derivation, and
-  drift comparison. Validation owns semantic/rule evaluation over the resulting
-  image; commands own use-case orchestration; profile owns package parsing; storage
-  owns transactional publication. The risk is a broader cutover, but retaining a
-  transitional owner would preserve competing abstractions inside the v1.0
-  correctness boundary.
+  subsystem now. It owns `RepositoryLayout`, `VirtualPath`, `RepositoryEntry`,
+  `RepositoryImage`, `RepositorySeed`, `MaterializationIntent`, `TargetClaim`,
+  `RepositoryDelta`, the canonical overlay, managed-document topology,
+  materialization derivation, and drift comparison. Validation owns semantic/rule
+  evaluation over the resulting image; commands own use-case orchestration;
+  profile owns package parsing; storage owns transactional publication. The risk
+  is a broader cutover, but retaining a transitional owner would preserve competing
+  abstractions inside the v1.0 correctness boundary.
 - **[ASSUMED — recommended design]** Define exactly one entry API on
   `RepositoryImage` whose result distinguishes
   absence, regular file (exact bytes, normalized mode, identity), directory,
@@ -398,8 +535,8 @@
   under a shared type name.
 - **[ASSUMED — recommended design]** Profile remains responsible for package
   parsing and package validation, then emits only neutral `RepositorySeed`,
-  `TargetClaim`, `RepositoryEntry`, mode, and `RepositoryDelta` vocabulary into the
-  shared path. Delete profile-local `PackageProjection`, `ProjectedFile`,
+  `TargetClaim`, `VirtualPath`, `RepositoryEntry`, mode, and `RepositoryDelta`
+  vocabulary into the shared path. Delete profile-local `PackageProjection`, `ProjectedFile`,
   `ProjectedFileMode`, `project_package`, and their exports; delete the profile
   snapshot/capture helpers as the canonical image replaces them. Generic
   projections, default membership, default schemas, and final overlay validation
@@ -441,9 +578,10 @@
 - **[VERIFIED inventory, ASSUMED disposition]** Remove `IssueStore::init` from the
   production trait and every forwarding implementation
   (`crates/jit/src/storage/mod.rs:92-100`). Repository bootstrap is a
-  `RepositoryStateStore` mutation: absent `.jit` uses the bootstrap-only session,
-  while an existing root uses bootstrap-to-repository serialization. Tests use the
-  canonical in-memory bootstrap path or explicit fixture builders; they do not keep
+  `RepositoryStateStore` mutation: an absent selected data root uses the
+  worktree-bootstrap-only session, while an existing selected data root uses
+  bootstrap-to-data-root repository/event serialization. Tests use the canonical
+  in-memory bootstrap path or explicit fixture builders; they do not keep
   `IssueStore::init` as a test convenience. Claim-coordinator initialization is a
   separate Git-backed concern and is not renamed into repository bootstrap.
 - **[VERIFIED inventory, ASSUMED disposition]** Remove repository-owned mutation
@@ -461,6 +599,16 @@
   plus command-local `Utc::now`/`Uuid::new_v4` construction for repository-owned
   records. Commands submit id/time-free intents through one `MutationContext`;
   deterministic fixture builders replace compatibility constructors in tests.
+- **[VERIFIED inventory, ASSUMED disposition]** Delete
+  `commands::profile::transaction_path`, storage-root-parent repository discovery,
+  every physical `.jit` prefix translator, and any kernel/journal API that accepts
+  an untyped repository-relative or absolute semantic target. Replace them directly
+  with `RepositoryLayout` plus `VirtualPath`; do not leave a compatibility adapter.
+  Delete standalone `.gitattributes` warning/write code after its eligible line-set
+  claim and exact status/error contract are part of init's main delta. Replace
+  direct claim `save_issue`/`append_event` synchronization with the durable
+  `pending_repository_sync` saga; lease storage remains the only separate
+  Git-required control-plane publisher.
 - **[ASSUMED — recommended design]** Delete former declaration definitions,
   materialization producers, repository writers, final-byte maps, exports, and
   test doubles in the same change. Do not re-export old names from their former
@@ -659,10 +807,18 @@
   issue/gate/event maps, and a string-only repository-file map, but no implementation
   of the file-set transaction plan (`crates/jit/src/storage/memory.rs:15-55,91-105,190-203`).
 - **[VERIFIED]** Fresh init manually selects a repository-sibling bootstrap guard
-  when `.jit` is absent and an inner repository guard when it exists; the transaction
-  kernel separately selects external versus internal journal control from root
-  existence (`crates/jit/src/commands/init.rs:226-245`;
-  `crates/jit/src/storage/file_transaction.rs:84-107,383-396`).
+  when the selected data root is absent and an inner repository guard when it
+  exists; the transaction kernel separately selects external versus internal
+  journal control from root existence (`crates/jit/src/commands/init.rs:226-245`;
+  `crates/jit/src/storage/file_transaction.rs:84-107,383-396`). Current storage
+  nevertheless derives repository context from the storage root's parent, and
+  profile translates semantic targets by stripping a literal `.jit` prefix
+  (`crates/jit/src/storage/json.rs:145-205,718-736`;
+  `crates/jit/src/commands/profile.rs:457-466`).
+- **[VERIFIED]** Recovery is currently coordinated at CLI/service startup rather
+  than at the generic mutation capability, so a direct `CommandExecutor` caller is
+  not independently guaranteed external-then-internal recovery before its first
+  capture (`crates/jit/src/storage/recovery_coordinator.rs:1-120`).
 - **[VERIFIED]** `TransactionAction` can create directories, write files, and set
   mode, but cannot delete a file recoverably
   (`crates/jit/src/storage/transaction_action.rs:5-31`).
@@ -708,6 +864,21 @@
   `write_repo_file`, or config/ruleset writers. The risk is
   enlarging the backend contract, but it makes in-process tests evidence for the
   same semantic transaction rather than a separate write loop.
+- **[ASSUMED — recommended design]** Pass one explicit `RepositoryLayout` to
+  `open_mutation_session`, capture, revalidation, the transaction kernel, and
+  repository export classification. Construct it only after no-follow lexical and
+  capability-identity validation accepts either a data root strictly inside the
+  worktree or a disjoint data root; reject equal, data-ancestor, symlinked,
+  escaping, or identity-changing roots.
+  The session resolves only typed `VirtualPath::{Worktree, Data}` values through
+  root-confined capabilities. `classify_and_canonicalize` gives data-root
+  precedence for nested physical destinations; canonical-only APIs reject
+  `DataRootAlias`, and every set proves one virtual identity per physical target.
+  Journal entries retain the canonical variant plus normalized relative path and
+  bind to the full layout identity. The kernel receives explicit external and
+  internal transaction control roots. No session or kernel discovers a worktree by
+  taking the selected data root's parent, interprets a `.jit` prefix, adapts an
+  absolute semantic path, or accepts a virtual alias.
 - **[ASSUMED — recommended design]** Both storage implementations capture the same
   crate-root `RepositoryImage`. The in-memory backend must not keep issue,
   gate-registry, event, gate-run, or provenance maps and disagreeing repository-byte
@@ -717,18 +888,23 @@
   a transaction.
   The risk of retaining independent typed/file maps is a passing in-memory
   transaction test that cannot reproduce JSON-backed projection drift.
-- **[ASSUMED — recommended design]** Make root-state selection an internal protocol
-  of the JSON `RepositoryStateStore` session. Acquire the repository-sibling
-  bootstrap guard first and decide root presence while it is held. For absent
-  `.jit`, retain only bootstrap as repository and event authority, capture an
-  absent image, and publish with `ExternalBootstrap`; never create or acquire
-  `.jit/.repo-write.lock` or `.jit/.events.lock`. For an
-  existing or partial `.jit`, acquire repository serialization after bootstrap,
-  then the events lock, and retain bootstrap → repository → events through
-  capture/rebuild/revalidation/publication with `InternalRepository`. Commands choose
-  neither guards, root modes, nor journal locations. The risk of acquiring the
-  inner repository lock for an absent root is creating `.jit` before absence
-  validation and changing the very preimage being protected.
+- **[ASSUMED — recommended design]** Make recovery and root-state selection the
+  opening protocol of the JSON `RepositoryStateStore` session. Acquire the
+  worktree-root bootstrap guard, recover and verify/clean every external journal,
+  then decide selected data-root presence while that guard is held. For an absent
+  data root, retain only bootstrap as repository and event authority, capture an
+  absent `Data(...)` image, and publish with `ExternalBootstrap`; never create an
+  inner lock as a side effect of checking absence. For an existing or partial data
+  root, acquire repository serialization and then events, recover and verify/clean
+  every internal journal, and retain bootstrap → repository → events through
+  capture/rebuild/revalidation/publication with `InternalRepository`. Recovery or
+  committed-residue verification failure prevents capture. A matching retained
+  CLI recovery session may be consumed reentrantly, but is never the only
+  correctness path; direct callers and post-checker publication use the same open
+  protocol. Claim/release/reconciliation acquires the coordinator first and opens
+  this session beneath it, never by inheriting a pre-held repository guard.
+  Commands choose neither root modes nor journal locations, and the claim
+  orchestrator chooses only its required outer coordinator guard.
 - **[ASSUMED — recommended design]** Carry each planned target's expected preimage
   (absent/directory/file hash+size+mode, with symlinks/unsupported entries rejected)
   into the storage transaction action and
@@ -813,8 +989,11 @@
 
   ```text
   typed command/profile/issue/registry/audit seed changes
+      -> globally validated RepositoryLayout + canonical physical identities
+      -> claim only: retain coordinator guard; persist fenced pending attempt
+      -> open_mutation_session: external recovery, then internal recovery
       -> one session MutationContext (IdAuthority + MutationClock)
-      -> fixed roots + bounded CaptureSpec document/asset/plan closure
+      -> typed Worktree/Data roots + bounded CaptureSpec closure
       -> RepositoryImage + listing fingerprints + PinnedDocumentEvidence
       -> frozen issue/record/event ID allocation + one MutationTimestamp
       -> canonical typed-record and exact-prefix audit bytes
@@ -824,8 +1003,8 @@
       -> compare expected versus base/final state
       -> final repository_state overlay validation
       -> captured read-set revalidation
-      -> one RepositoryStateStore mutation session
       -> recoverable JSON publication or atomic in-memory publication
+      -> claim only: conditional attempt finalization/reconciliation; release guard
       -> command-specific public result projection
   ```
 
@@ -869,13 +1048,16 @@
 | Repair deletes user-owned files by convention | Delete only explicitly generator-owned targets; otherwise report an unrepairable or review-required finding. | **[ASSUMED]** |
 | Validation and profile see different entry kinds or modes | Replace both existing read models with `repository_state::RepositoryImage` and migrate consumers in the same cutover. | **[VERIFIED basis]** `crates/jit/src/validation/repository.rs:119-138`; `crates/jit/src/profile/snapshot.rs:7-40` |
 | JSON and in-memory backends implement different transaction semantics | Put expected-preimage, action ordering, conflicts, and outcomes in the `RepositoryStateStore` contract; run the same conformance suite against both implementations. | **[ASSUMED]** |
+| A custom `JIT_DATA_DIR` is normalized back to `.jit`, aliases a worktree spelling, or escapes through physical topology | Accept only strict data-within-worktree nesting or disjoint roots; reject `OverlappingRepositoryRoots`, symlink/escape, and identity changes; canonicalize physical input with Data precedence, reject `DataRootAlias` at canonical APIs, and prove injectivity through capture, hashing, exports, journals, recovery, and publication. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:145-205,718-736`; `crates/jit/src/commands/profile.rs:457-466` |
+| A direct caller captures prepared or committed residue before recovery | Make external-then-internal recovery and residue verification mandatory inside `open_mutation_session`; retain startup recovery only as a reusable session/reporting facility. | **[VERIFIED basis]** `crates/jit/src/storage/recovery_coordinator.rs:1-120` |
 | Storage and commands assign different timestamps or event bytes | Sample one `MutationClock` after non-noop capture and let `repository_state` finalize all issue/event/gate-run/provenance bytes; delete storage stamping and command-local image helpers. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:899-904,1084-1112`; `crates/jit/src/profile/application.rs:180-198` |
 | Capture rebuild or backend choice changes generated IDs | Reuse one session `MutationContext`; deterministically derive issue, record, then canonically ordered event IDs from one `IdAuthority` seed and hash every allocation. | **[VERIFIED basis]** current constructors call `Uuid::new_v4` throughout `crates/jit/src/domain/types.rs:1497-1651` |
 | Exact event-log replacement races an ordinary append | Make `RepositoryStateStore` the only repository event publisher and hold bootstrap → repository → events for the full existing-root session; absent-root bootstrap is the event authority. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:261-267,1084-1089` |
-| An absent-root transaction acquires a guard that creates `.jit` | Keep bootstrap-versus-existing-root selection inside JSON transaction storage and verify root state after the correct outer guard is held. | **[VERIFIED basis]** `crates/jit/src/commands/init.rs:226-245`; `crates/jit/src/storage/repo_lock.rs:80-121` |
+| An absent-root transaction acquires a guard that creates the selected data root | Recover external journals under the worktree bootstrap guard, re-evaluate data-root existence, and use only bootstrap authority until a delta deliberately creates the root. | **[VERIFIED basis]** `crates/jit/src/commands/init.rs:226-245`; `crates/jit/src/storage/repo_lock.rs:80-121` |
 | A repair deletion cannot roll back | Implement `DeleteFile` as a journaled rename-to-verified-backup with prepared rollback and committed absence verification; never call an unjournaled remove. | **[ASSUMED]** |
 | A gate command bypasses materialization | Route gate definition add/define/update/remove, issue gate add/remove, and preset apply through `SemanticMutation`; remove raw command-level registry/issue/event saves that split their coupled state. | **[VERIFIED basis]** `crates/jit/src/commands/gate.rs:232-352,653-677,966-990,1020-1103` |
-| Init or export retains a quiet raw repository writer | Put `.gitattributes` line-set composition in init's delta and route repository-contained graph/snapshot destinations through the explicit export intent; stdout and proven external outputs remain classified non-repository sinks. | **[VERIFIED basis]** `crates/jit/src/storage/gitattributes.rs:42-80`; `crates/jit/src/main.rs:4923-4932` |
+| Init or export retains a quiet raw repository writer | For an eligible same-worktree data root, put `.gitattributes` line-set composition in init's delta with exact status/error semantics; otherwise report `not_applicable`. Route repository-contained graph/snapshot destinations through the explicit export intent; stdout and proven external outputs remain non-repository sinks. | **[VERIFIED basis]** `crates/jit/src/storage/gitattributes.rs:42-80`; `crates/jit/src/main.rs:4923-4932` |
+| Claim lease state and repository assignment/event diverge, or a stale worker finalizes a replacement attempt | Hold the coordinator guard across the recovered repository transaction in global coordinator → bootstrap → repository → events order; persist attempt generation/owner token, carry them into the idempotent event, finalize conditionally, and fence takeover by incrementing generation before new repository work. | **[VERIFIED basis]** `crates/jit/src/commands/claim.rs:100-156` |
 | Preset creation, asset rescan, migration, or archive keeps a less-visible publisher | Include each in the typed-mutation inventory and delete `save_gate_preset`, rescan `save_issue`, per-issue migration saves, and archive staging/relink/event writers in the vertical cutover. | **[VERIFIED basis]** `crates/jit/src/commands/gate.rs:1170-1190`; `crates/jit/src/commands/document.rs:689-723`; `crates/jit/src/commands/migrate.rs:1-78`; `crates/jit/src/commands/archive.rs:370-854` |
 | Generic result unification breaks automation | Keep current top-level envelopes and generated schemas; share only internal delta and additive nested change records. | **[VERIFIED basis]** existing result types cited in Question 5 |
 | The v1 planner becomes a profile lifecycle engine | Accept profile-produced seed changes but import no profile types; profile removal remains out of scope per container D-06. | **[VERIFIED basis]** `jit issue show cdc840ad` |
