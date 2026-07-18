@@ -67,7 +67,7 @@ fn gate_address(key: &str) -> String {
 /// use jit::config::ProjectionStyle;
 /// use jit::declarations::GateRegistry;
 /// use jit::declarations::rules::RuleSet;
-/// use jit::declarations::rules_gates_projection::render_rules_and_gates_markdown;
+/// use jit::validation::rules_gates_projection::render_rules_and_gates_markdown;
 /// use std::path::Path;
 ///
 /// let rules = RuleSet::from_toml_str(
