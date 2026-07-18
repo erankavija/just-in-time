@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_id": "a6a81f94-fc64-4e59-9b9c-447074a9be19",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
+  "commit": "aef6dd26f48d2b714b20a7660e884cade5038b9e",
+  "branch": "integration/cdc840ad",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-18T16:57:57.374682880Z",
+  "completed_at": "2026-07-18T17:02:38.060483668Z",
+  "duration_ms": 280685,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest crates/jit/src/validation/rules_gates_projection.rs - validation::rules_gates_projection::render_rules_and_gates_markdown (line 66) ... FAILED\ntest result: FAILED. 63 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.97s\n---- crates/jit/src/validation/rules_gates_projection.rs - validation::rules_gates_projection::render_rules_and_gates_markdown (line 66) stdout ----\nerror[E0432]: unresolved import `jit::declarations::rules_gates_projection`\n  --> crates/jit/src/validation/rules_gates_projection.rs:71:24\n   |\n71 | ...jit::declarations::rules_gates_projection::render_rules_and_gates_mar...\n   |                       ^^^^^^^^^^^^^^^^^^^^^^ could not find `rules_gates_projection` in `declarations`\n\nerror: aborting due to 1 previous error\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1151 bytes=19391328)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1059972736/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}

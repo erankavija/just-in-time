@@ -8478,3 +8478,5 @@
 {"type":"issue_claimed","id":"2fba907c-b167-49ad-9dfc-6449e85a8281","issue_id":"cdc840ad-9332-4936-9381-772318967f0f","timestamp":"2026-07-18T16:22:26.890118352Z","assignee":"agent:jit-execution-lead"}
 {"type":"issue_state_changed","id":"451b42a7-d94f-4f69-a790-efb3d69943a1","issue_id":"cbc3a7e5-813c-4aea-be95-3408bc74413d","timestamp":"2026-07-18T16:23:52.118614508Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"9755fdcb-3568-47f0-a750-892c3281102e","issue_id":"cbc3a7e5-813c-4aea-be95-3408bc74413d","timestamp":"2026-07-18T16:23:52.119827069Z","assignee":"agent:terra"}
+{"type":"gate_failed","id":"e0e49b05-1e21-4fd0-b369-b1adb0627848","issue_id":"cbc3a7e5-813c-4aea-be95-3408bc74413d","timestamp":"2026-07-18T16:57:26.803449279Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"0ab97a07-9c40-4d13-bae6-61f34915df97","issue_id":"cbc3a7e5-813c-4aea-be95-3408bc74413d","timestamp":"2026-07-18T17:02:38.060783198Z","gate_key":"cargo-ci","updated_by":"auto:executor"}

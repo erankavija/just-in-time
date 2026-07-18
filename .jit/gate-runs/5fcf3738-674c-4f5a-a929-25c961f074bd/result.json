@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_id": "5fcf3738-674c-4f5a-a929-25c961f074bd",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
+  "commit": "aef6dd26f48d2b714b20a7660e884cade5038b9e",
+  "branch": "integration/cdc840ad",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T16:55:44.359093174Z",
+  "completed_at": "2026-07-18T16:57:26.803111419Z",
+  "duration_ms": 102444,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\n--- provenance failures ---\n--- budget output ---\nrust-build-budget: 'cargo test --workspace --no-run' failed under /tmp/jit-cdc840ad-integration\n--- incremental-state output ---\nnon-empty incremental directories under /tmp/jit-cdc840ad-integration/target:\n/tmp/jit-cdc840ad-integration/target/jit-stale-child-test-cache/debug/incremental\n/tmp/jit-cdc840ad-integration/target/debug/incremental\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✗ provenance: FAILED (exit 101)\n  ✗ budget: FAILED (exit 2)\n  ✗ incremental-state: FAILED (exit 1)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
