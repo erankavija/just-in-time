@@ -71,6 +71,14 @@
       "resolution": "Invoker authorized one targeted guided retry and reset the rework counter.",
       "situation": "After two rework cycles, code-review run acd90fcb-ef67-4070-97cc-8bd9bb13f9cd found compare_materializations masks UndiscoveredRepositoryPath as drift.",
       "recommendation": "Authorize one targeted retry with explicit guidance to propagate every RepositoryImage::entry error and sweep all pure image consumers for the same matches!/ok-to-drift pattern."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "cbc3a7e5-813c-4aea-be95-3408bc74413d",
+      "status": "open",
+      "opened_at": "2026-07-18T22:10:30+03:00",
+      "situation": "After the two invoker-authorized guided attempts, independent lead review found that the new public validation::rule_loader owns ambient filesystem reads and exposes a mixed caller-bytes/live-schema API, contrary to approved plan section 2 and D14.",
+      "recommendation": "Authorize one narrow correction that moves the non-mutation loader to storage, deletes the mixed-snapshot helper, routes captured paths through pure parsing only, fixes stale prose, and adds boundary coverage."
     }
   ],
   "rework_counts": {

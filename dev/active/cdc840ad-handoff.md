@@ -1,57 +1,54 @@
-# Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 1
+# Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 2
 
-**Date:** 2026-07-18T20:43:55+03:00
-**Session number:** 1
-**Prior handoffs:** None.
+**Date:** 2026-07-18T22:10:30+03:00
+**Session number:** 2
+**Prior handoff:** session 1 in this file's history (`2f6cab16`).
 
 ## Current state
 
-- Epic: `cdc840ad` — state: backlog, assigned to `agent:jit-execution-lead`
-- Wave in progress: wave 1 of 9
-- Children summary: 0 implementation children done, 1 in_progress (`cbc3a7e5`), 10 backlog; planning and breakdown bracket nodes are done
-- Active claims: `cbc3a7e5` assigned to `agent:terra`; epic `cdc840ad` assigned-only to `agent:jit-execution-lead`
-- Open escalations: `cbc3a7e5` exceeded two rework cycles; invoker decision required before another retry
-- Progress file: `dev/active/cdc840ad-progress.json` (reflects the above)
+- Epic: `cdc840ad` — assigned to `agent:jit-execution-lead`; wave 1 of 9 remains active.
+- Active issue: `cbc3a7e5` — InProgress, assigned to `agent:terra`; rework count 2 after the invoker-authorized reset.
+- Integration checkout: `/tmp/jit-cdc840ad-integration`, branch `integration/cdc840ad`, clean at `cc72431b`.
+- No implementation package has merged to main.
+- Open escalation: the second guided retry closed the two recorded gate findings but independent lead review found one new high-severity boundary violation. Another repair requires invoker authorization.
 
 ## What just happened
 
-- Reconciled the approved bracket and persisted a nine-wave topological execution plan.
-- Claimed `cdc840ad` and wave-1 issue `cbc3a7e5`; created dedicated worktree `/tmp/jit-cdc840ad-integration` on `integration/cdc840ad`.
-- Dispatched Terra for the wave-1 declarations/repository-state foundation; committed implementation as `aef6dd26`.
-- Rework 1 fixed two stale rustdoc/module links after Cargo CI found the doctest failure; committed as `57e50a8c`.
-- First AI review found uncaptured-map and public-path construction/deserialization bypasses; rework 2 hardened capture, path, serde, identity, evidence, seed, claim, and delta invariants; committed as `7443fd0e`.
-- Final Cargo CI passed in run `d17e2460-d512-47d1-aece-7fa2eb937b74`.
-- Final AI review run `acd90fcb-ef67-4070-97cc-8bd9bb13f9cd` failed on one new high-severity finding: `compare_materializations` converts `RepositoryImage::entry` errors, including `UndiscoveredRepositoryPath`, into drift via `matches!` instead of propagating them.
-- Committed all integration-branch gate evidence separately through `bc3cfac5`; no product package has merged to main.
-- Pruned generated `/tmp` targets twice (9.3 GiB and 4.4 GiB); only the active source worktree remains under `/tmp`.
+- The invoker chose option 1 at the prior escalation, authorizing one guided retry and resetting the counter.
+- Guided attempt 1 fixed masked `RepositoryImage::entry` errors in `compare_materializations` (`6dc5af3c`), then code-review run `33a0056f-b249-4a9f-9b81-9ebd3fdb28f9` found two new high findings: physical root identity aliases and ambient rule/config loading in declarations.
+- Guided attempt 2 fixed both: lexically disjoint same-identity roots now fail typed; declarations now parse only explicit config and captured schema bytes; old `RuleSet` loader APIs, `GateDefinition as Gate` aliases, and the storage serializer forwarder are gone. The result is committed as `cc72431b`.
+- Terra verification passed focused declaration/path/boundary/overlay tests, 64 doctests, the full JIT library suite (1906 passed, 4 ignored), workspace Clippy with `-D warnings`, formatting, and structural sweeps. The full workspace test link hit the `/tmp` quota rather than a code failure.
+- Lead verification independently passed 74 declaration tests, 8 path tests, and 3 boundary-loader tests.
+- Luna's independent final diff review found one blocking architectural defect: new public `validation::rule_loader` performs filesystem reads, and `parse_ruleset_with_filesystem_schemas(content, root, config)` mixes caller-supplied rules bytes with live schema reads. Approved plan §2 assigns non-mutation read-only loading to storage, makes validation evaluation-only, and D14 rejects mixed snapshots.
+- All `/tmp` build output was pruned. The active source checkout is about 43 MiB. The 2.9 GiB lead verification target was also cleaned.
 
-## What to do next
+## Required next action
 
-- [ ] Resolve the open escalation for `cbc3a7e5`: guidance/reset, manual takeover, or rejection.
-- [ ] If guidance/reset is chosen, dispatch a targeted retry that replaces error-masking comparisons with error propagation and sweeps every pure `RepositoryImage` consumer for the same root cause.
-- [ ] Re-run focused tests, Cargo CI, cumulative prior-finding audit, and code-review; no prior F1/F2 regression is acceptable.
-- [ ] On PASS, complete `cbc3a7e5`, propagate its JIT-only state to main and back to the integration branch, prune generated caches, and begin wave 2 (`bacf2cd4`) with Terra.
+- Obtain invoker direction for the exhausted retry budget.
+- Recommended option: authorize one narrowly scoped architecture correction without resetting prior closed findings:
+  1. Move the non-mutation filesystem loader into `storage::ruleset_store` (or an equally explicit storage read boundary).
+  2. Delete the public mixed-content/live-schema helper rather than relocate it.
+  3. Route commands to the storage loader; captured repository-view paths must call only pure `RuleSet::{schema_requests, parse}` over one captured byte set.
+  4. Correct stale declaration prose about validation ownership and synthetic schema paths.
+  5. Add default-origin missing/unreadable boundary coverage and a live explicit-config kind-expansion test.
+- After repair: rerun focused tests, doctests, workspace Clippy, Cargo CI and code-review gates, then perform the cumulative prior-finding audit before completing `cbc3a7e5`.
 
-## Traps — do not repeat these
+## Closed findings that must not regress
 
-- **Do not create worker worktrees under `.agents/` in this sandbox.** Terra's first edit failed because `.agents/worktrees/...` is read-only; the writable checkout is `/tmp/jit-cdc840ad-integration` on the same branch.
-- **Do not retain Cargo build output in `/tmp`.** The first install/gate hit tmpfs quota with an 8+ GiB target. Use the disk-backed gate target under the repository, then prune it after the gate; run `cargo clean` in the active temporary checkout after worker verification.
-- **Do not run a gate with a stale installed JIT.** The repository's guard rejects any binary whose embedded commit differs from the worktree HEAD. Reinstall with `scripts/install-jit.sh` after each code or gate-evidence commit before the next gate.
-- **Do not trust workspace tests to cover rustdoc.** Terra's first full workspace run passed, but Cargo CI caught a stale rustdoc import. Run `cargo test -p jit --doc` explicitly after public ownership moves.
-- **Do not treat closed capture as only a constructor property.** The second review found a pure consumer masking `UndiscoveredRepositoryPath` after constructor hardening. Sweep all consumers for `matches!`, `ok()`, `unwrap_or`, or defaulting over image read errors.
-- **Do not touch the unrelated dirty main-checkout changes.** At handoff, `.jit/events.jsonl`, issues `0735879a`/`13c69884`, and `crates/jit/src/graph/hierarchy.rs` have external uncommitted edits; stage only this handoff and progress file.
+- Closed-image comparison propagates `UndiscoveredRepositoryPath` for every action kind.
+- Repository image closure rejects extra/missing maps and constructor/serde path bypasses.
+- Equal lexical roots remain `OverlappingRepositoryRoots`; lexically distinct roots with equal no-follow identity are typed alias errors.
+- `declarations` contains no ambient filesystem/config loading and exposes no callback/provider parser seam.
+- No `GateDefinition as Gate` name aliases or storage declaration-serializer forwarder remain.
 
-## Open questions needing invoker input
+## Deferred cumulative deletion debt
 
-- Question: How should `cbc3a7e5` proceed after exceeding the two-retry limit?
-  - Context: Prior high-severity path/capture findings are closed and Cargo CI passes, but the final review found one local error-propagation defect in `compare_materializations`.
-  - Options: authorize guidance and reset the retry counter; take over the fix manually; reject `cbc3a7e5` and stop this dependency chain.
-  - Recommendation: authorize one targeted guided retry because the remaining finding is concrete and local, while rejection blocks every later epic wave.
+- `validation::repository::{RepositoryView, FilesystemRepositoryView, OverlayRepositoryView}` and `profile::snapshot` remain because their final consumers migrate in later store/materializer/consumer packages B–E. No adapter was added. They must be deleted before integration leaf `661d6be2` can pass.
 
 ## Reference artefacts
 
-- Epic: `jit issue show cdc840ad`
-- Design docs: `dev/active/cdc840ad-plan.md`
-- Planning docs: `dev/active/cdc840ad-research.md`, `dev/active/cdc840ad-investigation.md`
-- Benchmark/result artefacts: Cargo CI gate run `d17e2460-d512-47d1-aece-7fa2eb937b74`; code-review runs `1b332a0e-5060-448a-9417-089b168b16c3` and `acd90fcb-ef67-4070-97cc-8bd9bb13f9cd`
-- External references: None.
+- Epic and issue: `jit issue show cdc840ad`, `jit issue show cbc3a7e5`
+- Approved design: `dev/active/cdc840ad-plan.md`
+- Latest failed code-review evidence: run `33a0056f-b249-4a9f-9b81-9ebd3fdb28f9`
+- Current implementation commit: `cc72431b`
+- Progress: `dev/active/cdc840ad-progress.json`
