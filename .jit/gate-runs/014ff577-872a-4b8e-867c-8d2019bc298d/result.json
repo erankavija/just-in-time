@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "run_id": "014ff577-872a-4b8e-867c-8d2019bc298d",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab",
+  "commit": "1a1cbcf9c00bdcb3fa11462c7b374624ad02ee6b",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T12:49:40.510744096Z",
+  "completed_at": "2026-07-18T12:55:48.870931509Z",
+  "duration_ms": 368360,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required design document exists at `dev/active/cdc840ad-plan.md`, is substantive, and is linked from planning issue `dc266cb6`. Both supporting research documents are also linked. The planning issue has no dependencies.\n\n## Completeness against the criteria\n\nThe plan explicitly maps REQ-01 through REQ-09 in §1 and does not silently narrow the epic. The claim-v2 migration, bearer propagation, exact command matrix, derived-state repair, Git-free behavior, and direct-cutover requirements are substantially specified.\n\nHowever, REQ-03 and REQ-08 remain incomplete because the absent-root recovery protocol does not work across distinct worktrees sharing a data root. REQ-09 also lacks an executable decomposition.\n\n## Technical soundness and architectural fit\n\nThe proposed `declarations` and `repository_state` ownership generally fits the project’s separation of concerns. The pure derivation boundary, storage-owned publication, expected-preimage checks, managed-region containment model, and JSON/memory conformance contract are sound.\n\nBlocking issue F1 remains in the absent-root protocol. Section “Absent disjoint data-root publication” makes the publication lock common across repositories but keeps the durable journal at worktree-local `.jit-bootstrap/transactions` (`dev/active/cdc840ad-plan.md:31`). The current recovery model enumerates external journals only from the repository-specific kernel root (`crates/jit/src/storage/recovery_coordinator.rs:65-77`). If worktree A crashes after publishing the root but before marking its journal committed, worktree B can acquire the shared lock but cannot discover A’s prepared journal; it can treat the root as an ordinary existing repository and mutate it. A can then no longer guarantee prepared rollback or convergence. Identity-fenced cleanup prevents deletion of B’s data but does not supply recovery.\n\nThe plan needs a durable recovery authority discoverable by every contender for the parent/leaf key—or another explicit cross-worktree handoff/forward-recovery protocol—before existence is interpreted.\n\n## Decomposition and dependencies\n\nThe reduced dependency chain is stated clearly, but its package boundaries are not executable as written.\n\nPackage A promises canonical images, capture, managed documents, and removal of old definitions (`dev/active/cdc840ad-plan.md:80-83`). Yet the state store arrives in package B, materializers in package D, and their command consumers in package E. Existing validation/profile/init consumers cannot compile after the old view, snapshot, and marker definitions are removed without temporary adapters or parallel paths, which the plan forbids. Leaving the old types in place instead creates the temporary duplicate inventories prohibited by D-07 and REQ-09.\n\nPackage E also remains effectively monolithic: one task migrates every init, profile, config, project, issue, gate, template, document, archive, export, checker, server, and MCP consumer and deletes every predecessor (`dev/active/cdc840ad-plan.md:100-103`). That is not a bounded, independently testable work package and preserves the substance of prior F4. It should be divided into coherent cumulative vertical slices, each migrating a defined consumer family and deleting the predecessors it makes obsolete, while retaining one final main-branch integration leaf.\n\n## Risks and actionability\n\nMost material risks have specific mitigations, including capture closure, aliasing, deletion recovery, credential leakage, and authored-content preservation.\n\nThe cross-worktree prepared-journal handoff is absent from the risk table and tests. The package-order contradiction is likewise declared resolved rather than mitigated. Both are load-bearing and require design changes before breakdown.\n\n## Prior review feedback\n\n- Prior F2, claim-state compatibility, is addressed by the v2-only current format, isolated one-way migration, and decode-only historical support.\n- Prior F3, fencing credential propagation, is addressed by the bearer/key distinction, verifier storage, rotation matrix, and redacted surfaces.\n- Prior F1 is only partially addressed: shared locking and staged publication are specified, but shared crash-recovery discovery is not.\n- Prior F4 remains unresolved: five packages are named, but their ordering requires forbidden intermediate seams and package E still spans nearly the entire mutation system.\n\n## Findings\n\n1. **[High, blocking] Cross-worktree recovery cannot discover the journal that owns a shared absent data root.** The shared parent/leaf publication lock does not make the worktree-local external journal shared. A second worktree can acquire the lock after a crash, miss the first worktree’s prepared journal, and mutate the published root before recovery establishes rollback or commit. Define shared durable recovery discovery or an explicit cross-worktree handoff protocol and test crash takeover by a different worktree. (`dev/active/cdc840ad-plan.md:31`; `crates/jit/src/storage/recovery_coordinator.rs:65-84`; `@/issue/cdc840ad/requirement/REQ-03`, `@/issue/cdc840ad/requirement/REQ-08`, `@/inv/atomic-writes`)\n\n2. **[High, blocking] The cumulative package ordering cannot remain both buildable and free of prohibited temporary paths.** Package A removes canonical-view and marker predecessors before packages B/D provide the final store/materializers and before package E migrates their consumers. It must either retain duplicate old inventories, introduce adapters, or leave a non-compiling staging commit—all contrary to the plan’s own hard constraints. Recast the packages as coherent vertical slices that migrate consumers and delete their specific predecessors together. (`dev/active/cdc840ad-plan.md:80`; `@/issue/cdc840ad/requirement/REQ-09`)\n\n3. **[High, blocking] The consumer cutover remains a monolithic work item.** “Migrate all consumers and delete predecessors” spans every repository mutation family, public adapter, fixture, server/MCP surface, and structural scan. It is not independently scoped or testable and leaves engineers to re-derive the actual work partition, so prior F4 is not resolved. Split it into ordered consumer-family packages while preserving the single final integration landing. (`dev/active/cdc840ad-plan.md:100`; `@/issue/cdc840ad/requirement/REQ-08`, `@/issue/cdc840ad/requirement/REQ-09`)\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Shared absent-root crash recovery and the cumulative consumer-cutover decomposition remain blocking.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Worktree-local external journals are not discoverable by every contender for a shared absent data root after a crash.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":31,\"references\":[\"@/issue/cdc840ad/requirement/REQ-03\",\"@/issue/cdc840ad/requirement/REQ-08\",\"@/inv/atomic-writes\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Package ordering requires duplicate predecessors, temporary adapters, or a non-compiling staging commit.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":80,\"references\":[\"@/issue/cdc840ad/requirement/REQ-09\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The all-consumer migration package still spans nearly the entire mutation system and is not a bounded executable task.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":100,\"references\":[\"@/issue/cdc840ad/requirement/REQ-08\",\"@/issue/cdc840ad/requirement/REQ-09\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8606 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7546-7957-7293-97cd-60b04b1300e8\n--------\nuser\n--- 8593 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Shared absent-root crash recovery and the cumulative consumer-cutover decomposition remain blocking.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Worktree-local external journals are not discoverable by every contender for a shared absent data root after a crash.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 31,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-03",
+          "@/issue/cdc840ad/requirement/REQ-08",
+          "@/inv/atomic-writes"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Package ordering requires duplicate predecessors, temporary adapters, or a non-compiling staging commit.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 80,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-09"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The all-consumer migration package still spans nearly the entire mutation system and is not a bounded executable task.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 100,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-08",
+          "@/issue/cdc840ad/requirement/REQ-09"
+        ]
+      }
+    ]
+  }
+}

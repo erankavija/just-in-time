@@ -392,6 +392,13 @@
   `RepositoryLayout` identity, resolves each action through that layout, and rejects
   a mismatch; it never persists an absolute physical target or a synthetic
   `.jit`-prefixed surrogate.
+- **[ASSUMED — recommended design]** Give root ownership one permanent binding
+  SSOT. `Worktree(Descendant(".jit-bootstrap/binding.json"))` stores a random
+  `worktree_binding_id` plus the worktree root's no-follow filesystem object
+  identity. `Data(Descendant("index.json"))` carries `RepositoryBindingV1` with
+  exactly that binding ID and root identity. Layout/session hashes, recovery, and
+  root publication compare both fields; canonical path equality alone never proves
+  that a worktree owns an existing data root.
 - **[ASSUMED — recommended design]** An absent disjoint data root is published
   through an existing-parent capability, never by incrementally creating the final
   directory. Layout acquisition opens that parent no-follow, rejects symlink or
@@ -405,15 +412,29 @@
   `Data(...)` actions resolve against the staging capability while the durable
   journal remains a canonical worktree action beneath
   `Worktree(Descendant(".jit-bootstrap/transactions/..."))`. The kernel verifies
-  and synchronizes every staged byte, mode, and directory, atomically publishes the
+  that the staged `RepositoryBindingV1` matches the permanent worktree binding and
+  synchronizes every staged byte, mode, and directory, atomically publishes the
   complete root with a no-replace rename, fsyncs the parent, opens the final root
-  no-follow, and verifies its recorded identity. A competing final occupant is a
-  typed root-publication conflict. Rollback and prepared/committed recovery may
+  no-follow, and verifies its recorded identity and binding. Under the shared
+  parent/leaf lock, a no-replace loser may use the winner only when binding and
+  complete canonical layout match exactly, making it a retry by the same worktree.
+  Any other winner fails `DataRootOwnedByDifferentWorktree`; the loser never adopts
+  it. Rollback and prepared/committed recovery may
   rename or remove a stage or published root only when recorded parent, leaf, and
   object identities still match; ambiguous identity preserves evidence and requires
   recovery. Other processes can therefore observe only absence or the complete
   root, never a partially populated data directory. Existing roots continue to use
   internal `Data(Descendant("tmp/transactions/..."))` journals.
+- **[ASSUMED — recommended design]** A nested legacy data root without binding may
+  be bound once under the canonical guards because strict physical containment
+  proves worktree ownership. An unbound legacy disjoint root fails closed; no
+  compatibility reader or automatic adoption may infer its owner. Its only path is
+  the permanent explicit command
+  `jit migrate bind-data-root --confirm-worktree --confirm-data-root`, which holds
+  bootstrap, shared publication, and data-root guards while verifying both user-
+  confirmed identities and writing the matching permanent binding. The same
+  explicit command is required for a legitimate root recreation or rebind, so
+  exceptional ownership changes remain intentional and auditable.
 - **[VERIFIED]** Startup recovery already orders external before internal journals,
   but it is a CLI/service boundary and infers repository context from the data-root
   parent (`crates/jit/src/storage/recovery_coordinator.rs:1-120`). Direct
@@ -507,13 +528,30 @@
   APIs. `LeaseState` is exactly `pending_repository_sync`, `active`,
   `legacy_unverified`, `released`, `expired`, or `reconciliation_required`; the v2
   log operation vocabulary is exactly `migrated_legacy`, `pending`, `activated`,
-  `released`, `expired`, or `reconciliation_required`. One isolated migration
+  `released`, `expired`, `reconciliation_required`, or `handoff_confirmed`. One isolated migration
   boundary exactly decodes v1 index/lease records.
   The append-only claims log permanently retains a decode-only v1-history decoder
   so its audit sequence remains readable, but no ordinary reader/writer accepts a
-  mixed or serde-defaulted v1 shape. New writes are v2 only. Index rewrite and the
-  corresponding log append are recoverable, idempotent coordinator publications
-  under its retained lock; migration is one-way and preserves sequence/history.
+  mixed or serde-defaulted v1 shape. New writes are v2 only.
+- **[ASSUMED — recommended design]** The append-only v2 claims log is the sole
+  current control-plane authority; `claims.index.json` is only a replay-derived
+  projection. Every v2 operation contains a complete non-secret `LeaseV2`
+  snapshot, including lookup key, salts/verifiers, handoff state,
+  lifecycle state, coordination ID, generation, issue/agent/worktree identities,
+  TTL/timestamps, and internal owner fields as relevant. Under the coordinator
+  lock, mutation appends and fsyncs the authoritative log record first, then writes
+  the rebuilt index atomically. A crash before index publication is repaired by
+  replay; a missing, stale, or corrupt index is never treated as authority.
+- **[ASSUMED — recommended design]** `migrated_legacy` carries the complete
+  generation-zero `legacy_unverified` snapshot plus a salted hash verifier for its
+  v1 alias; no raw legacy ID is copied forward. Every acquire/renew/upgrade rotation
+  record carries the complete new snapshot, including
+  `credential_handoff_pending`. `handoff_confirmed` carries the complete current
+  snapshot after removing old-credential and handoff verifiers. Consequently every
+  verifier needed for authentication is reconstructible from the append-only log;
+  no verifier, handoff state, fence, or current lease fact exists only in the
+  derived index. Migration and retry remain one-way and idempotent while preserving
+  the decode-only v1 history.
 - **[ASSUMED — recommended design]** An active v1 lease migrates to
   `legacy_unverified` at generation zero without fabricating repository evidence;
   an already expired v1 lease migrates terminal. On its first heartbeat, renew,
@@ -523,8 +561,10 @@
   `operation: acquire` and `migration: v1_to_v2`; a
   mismatch fails `LegacyClaimReconciliationConflict`. Release may close a matching
   legacy lease directly. Heartbeat or renew upgrades it to fully fenced v2 and
-  returns a rotated handle; the consumed v1 alias can never be reused. There is no
-  v1 writer, dual-format current index, default-filled compatibility record, or
+  starts a durable handoff for the rotated handle; the salted v1-alias verifier may
+  authenticate only replay of that same pending handoff and disappears on
+  confirmation. The consumed alias can never perform another mutation. There is
+  no v1 writer, dual-format current index, default-filled compatibility record, or
   invented event.
 - **[ASSUMED — recommended design]** Freeze new claim audit writes on event tag
   `issue_claim_lease_changed` with exactly `{id, timestamp, issue_id, assignee,
@@ -547,47 +587,75 @@
   `FencedClaimAttempt` even for the same agent/worktree, and internal
   `attempt_owner` is never a public credential. A v1 ID is accepted only at the
   isolated migration boundary described below, after which its alias is consumed.
+- **[ASSUMED — recommended design]** Credential issuance uses a permanent durable
+  client-handoff protocol rather than assuming the first response reaches its
+  caller. Before acquire, renew, or legacy upgrade, the client generates and
+  durably retains a `handoff_id` plus 256-bit `handoff_secret`, then supplies them
+  through a sensitive stdin/file/API field. The coordinator generates a nonce and
+  derives the bearer lookup key and secret with HKDF over the handoff secret,
+  coordinator nonce, fixed domain, coordination ID, and generation. It persists no
+  plaintext bearer or handoff secret: `credential_handoff_pending` contains only
+  the handoff ID, nonce, normal salted bearer verifier, and a separately salted
+  handoff-secret verifier.
+- **[ASSUMED — recommended design]** An authenticated retry with the same handoff
+  ID/secret deterministically returns the same bearer. Acquire retry authenticates
+  with the handoff secret because it has no prior credential. During renew or
+  legacy rotation, the old credential can only replay that same pending handoff; it
+  cannot heartbeat, release, start another rotation, or mutate lease state. The
+  first successful use of the new bearer appends `handoff_confirmed`; replay then
+  removes the old-credential and handoff verifiers from the current projection.
+  Thus a response crash strands neither the lease nor its client, while an attacker
+  with only an old credential cannot choose replacement key material.
+- **[ASSUMED — recommended design]** Unless the caller supplies another durable
+  sensitive source, the CLI atomically creates a caller-owned mode-`0600` handoff
+  file before invoking the mutation, reuses it for authenticated retry, and deletes
+  it only after handoff confirmation. This file/protocol is a permanent client-side
+  recovery surface, not a temporary implementation API. Schema/MCP mark handoff
+  secret input write-only and sensitive; human/JSON output never prints it, and no
+  server-side diagnostic, event, log, journal, or index contains it.
 - **[ASSUMED — recommended design]** The command/credential/event matrix is fixed:
 
-  | Operation | Authoritative credential and rotation | One-time secret output | Frozen repository event |
+  | Operation | Authoritative credential, handoff, and rotation | Credential output/replay | Frozen repository event |
   |---|---|---|---|
-  | `acquire(issue_id)` | No input credential. Fresh acquire creates generation/key/secret. Grace takeover is internal to this path, increments generation, and creates a new key/secret; there is no takeover command. | Full replacement `lease_id` once through the acquire response. | `operation: acquire`, `migration: null` (including takeover). |
-  | `renew(full lease_id)` | Owner bearer required; successful renew increments generation and rotates key/secret. | Full replacement `lease_id` once. The prior handle is fenced. | None; rotation is coordinator state, not another repository event taxonomy. |
-  | `heartbeat(full lease_id)` | Owner bearer required. Normal v2 heartbeat does not rotate. A v1 legacy heartbeat at the isolated migration boundary upgrades the lease and rotates generation/key/secret. | None normally; the legacy-upgrade response returns its replacement once. | None normally; legacy upgrade emits `operation: acquire`, `migration: v1_to_v2`. |
+  | `acquire(issue_id)` | No input lease credential; durable client handoff is required. Fresh acquire creates generation/key/secret. Grace takeover is internal to this path, increments generation, and uses a new handoff; there is no takeover command. | Returns the derived full `lease_id`; the same authenticated handoff retry replays that value until confirmation. | `operation: acquire`, `migration: null` (including takeover). |
+  | `renew(full lease_id)` | Owner bearer plus new durable handoff required; successful renew increments generation and rotates key/secret. During pending handoff the old bearer may only replay this issuance. | Returns the derived replacement; the same authenticated handoff retry replays it until confirmation. | None; rotation is coordinator state, not another repository event taxonomy. |
+  | `heartbeat(full lease_id)` | Owner bearer required. Normal v2 heartbeat does not rotate. A v1 legacy heartbeat at the isolated migration boundary requires handoff and upgrades generation/key/secret. | None normally; legacy upgrade returns/replays its derived replacement until confirmation. | None normally; legacy upgrade emits `operation: acquire`, `migration: v1_to_v2`. |
   | `release(full lease_id)` | Owner bearer required; no rotation. The current release-by-issue owner bypass and handler are deleted with no alias. | None. | `operation: release`, `migration: null`. |
   | `force-evict(lease_key, reason)` | Admin operation accepts only the public 128-bit lowercase-hex `lease_key`; never a bearer. No rotation. | None. | `operation: release`, `migration: null`. |
   | `status` / `list` | No bearer input or output; projected handles are redacted. | None. | None. |
-  | recovery / reconciliation | Internal fencing evidence only; never accepts, reconstructs, or returns a bearer secret. | None. | Only the idempotent acquire/release event required to converge an already recorded operation. |
+  | recovery / reconciliation | Internal fencing/handoff verifiers only; never reconstructs plaintext. Authenticated issuance replay remains a client command responsibility. | No unauthenticated secret output. | Only the idempotent acquire/release event required to converge an already recorded operation. |
 
 - **[ASSUMED — recommended design]** Reveal a complete bearer only in the
-  successful acquire, renew, or legacy-upgrade response cells above. Status/list/
+  successful acquire, renew, or legacy-upgrade response cells above or their
+  authenticated same-handoff replay. Status/list/
   index project `lease_id` as `lk_<public-key>.REDACTED` with non-secret
   coordination/generation/state data and can never be used as credentials. Errors,
   warnings, `Debug`/`Display`, tracing,
   events, journals, findings, crash reports, and MCP never echo a secret or raw
   input; they use the redacted key or a generic invalid-credential message.
-  CLI/schema/MCP mark inputs and one-time outputs sensitive/write-only where
+  CLI/schema/MCP mark inputs and credential-issuance/replay outputs sensitive and
+  write-only where
   applicable and distinguish full-handle from redacted-output patterns. Secret
   wrappers implement neither general serialization nor display; only the
   acquire/rotation response adapter may consume them.
 - **[ASSUMED — recommended design]** Generated CLI/JSON/schema/MCP surfaces and
   tests freeze the matrix rather than exposing a generic credential shape:
-  acquire accepts `issue_id` and returns one sensitive full handle; renew accepts a
-  full handle and returns one sensitive replacement; heartbeat accepts a full
-  handle and returns a replacement only for the typed legacy-upgrade result;
+  acquire accepts `issue_id` plus sensitive handoff input and returns/replays one
+  derived full handle; renew accepts a full handle plus new handoff and returns/
+  replays one replacement; heartbeat accepts a full handle and returns/replays a
+  replacement only for the typed legacy-upgrade result with handoff;
   release accepts a full handle and has no secret result; force-evict accepts the
   public `lease_key` plus reason; status/list use only the redacted-output pattern;
   recovery/reconciliation have no secret fields. Structural tests prove the
   release-by-issue argument, handler, schema, MCP route, and aliases are absent.
 
-## Latest plan-review findings resolution (F1–F4)
+## Latest plan-review findings resolution (`2bd35931`, F1–F3)
 
 | Finding | Resolved contract |
 |---|---|
-| F1 — absent disjoint-root publication | Open the existing parent capability; take the canonical parent/leaf `DataRootPublicationLock` before existence checks; stage, verify, and fsync the complete root; publish atomically no-replace; fsync/reopen/verify the final root; and rollback/recover only matching recorded identities. |
-| F2 — claim-state compatibility | Current state is v2-only `LeaseV2`/`ClaimOpV2`/index. One exact one-way boundary migrates active v1 records to generation-zero `legacy_unverified`, preserves v1 log/event history as decode/fold-only, and requires coordinator-first repository reconciliation before upgrade or release. |
-| F3 — fencing credential propagation | `lease_id` is the exact opaque bearer handle; only key/salt/domain-separated hash persist, frozen operations rotate it, status and diagnostics redact it, and current `issue_claim_lease_changed` carries only the frozen acquire/release, lease-key, coordination, generation, and migration fields. |
-| F4 — actionable cutover | Five bounded cumulative final-form packages live only on `integration/cdc840ad`; each runs targeted plus prior tests and adds no adapter/flag/temporary API. Only the fully rebased, clean, gated stack lands on main, after consumer migration and predecessor deletion are complete. |
+| F1 — external-root ownership | Permanent worktree/data-root binding records prove ownership. A no-replace loser reuses only an exact same-worktree binding/layout; other ownership fails `DataRootOwnedByDifferentWorktree`. Nested unbound roots bind once by containment, while disjoint unbound/recreated roots require the permanent explicit confirmed migration command. |
+| F2 — crash-safe credential delivery | Client-generated durable handoff ID/secret plus coordinator nonce deterministically derive each issued bearer. Salted handoff/verifier state permits authenticated same-result replay until first new-bearer use confirms it; no plaintext server persistence or unauthenticated recovery exists. |
+| F3 — claim control-plane SSOT | The fsynced append-only v2 log is authoritative and every operation carries a complete `LeaseV2` snapshot. The index is replay-derived and atomically refreshed afterward; migration, rotation, pending handoff, and confirmation verifiers are never index-only. |
 
 ## Question 1 — Where should the shared pure planner live?
 
@@ -1134,8 +1202,9 @@
 
   ```text
   typed command/profile/issue/registry/audit seed changes
-      -> globally validated RepositoryLayout + canonical physical identities
-      -> claim only: retain coordinator guard; persist fenced pending attempt
+      -> globally validated RepositoryLayout + permanent binding proof
+      -> credential issuance only: caller-durable authenticated handoff
+      -> claim only: retain coordinator; fsync complete v2 log snapshot
       -> open_mutation_session: bootstrap + publication guard; external recovery
       -> existing root: repository/events guards + internal recovery
       -> one session MutationContext (IdAuthority + MutationClock)
@@ -1199,7 +1268,7 @@
 | JSON and in-memory backends implement different transaction semantics | Put expected-preimage, action ordering, conflicts, and outcomes in the `RepositoryStateStore` contract; run the same conformance suite against both implementations. | **[ASSUMED]** |
 | A custom `JIT_DATA_DIR` is normalized back to `.jit`, aliases a worktree spelling, or escapes through physical topology | Accept only strict data-within-worktree nesting or disjoint roots; reject `OverlappingRepositoryRoots`, symlink/escape, and identity changes; canonicalize physical input with Data precedence, reject `DataRootAlias` at canonical APIs, and prove injectivity through capture, hashing, exports, journals, recovery, and publication. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:145-205,718-736`; `crates/jit/src/commands/profile.rs:457-466` |
 | A direct caller captures prepared or committed residue before recovery | Make external-then-internal recovery and residue verification mandatory inside `open_mutation_session`; retain startup recovery only as a reusable session/reporting facility. | **[VERIFIED basis]** `crates/jit/src/storage/recovery_coordinator.rs:1-120` |
-| Two repositories race to initialize the same absent disjoint data root, or rollback deletes a competing occupant | Open the existing parent capability, share `DataRootPublicationLock` by canonical parent identity/leaf, stage and fsync the complete sibling root, publish atomically no-replace, fsync/reopen/verify, and mutate stage/final paths during recovery only when recorded identities match. | **[ASSUMED]** |
+| Two worktrees race for one absent disjoint root or a loser adopts the winner | Publish under the shared parent/leaf lock with staged `RepositoryBindingV1`; permit only exact same-binding/layout retry, fail other ownership as `DataRootOwnedByDifferentWorktree`, and require explicit confirmed migration for unbound disjoint or recreated roots. | **[ASSUMED]** |
 | Storage and commands assign different timestamps or event bytes | Sample one `MutationClock` after non-noop capture and let `repository_state` finalize all issue/event/gate-run/provenance bytes; delete storage stamping and command-local image helpers. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:899-904,1084-1112`; `crates/jit/src/profile/application.rs:180-198` |
 | Capture rebuild or backend choice changes generated IDs | Reuse one session `MutationContext`; deterministically derive issue, record, then canonically ordered event IDs from one `IdAuthority` seed and hash every allocation. | **[VERIFIED basis]** current constructors call `Uuid::new_v4` throughout `crates/jit/src/domain/types.rs:1497-1651` |
 | Exact event-log replacement races an ordinary append | Make `RepositoryStateStore` the sole event publisher and hold bootstrap → data-root-publication → repository → events for an existing root; absent-root bootstrap plus shared publication lock owns the staged complete event image. | **[VERIFIED basis]** `crates/jit/src/storage/json.rs:261-267,1084-1089` |
@@ -1208,8 +1277,10 @@
 | A gate command bypasses materialization | Route gate definition add/define/update/remove, issue gate add/remove, and preset apply through `SemanticMutation`; remove raw command-level registry/issue/event saves that split their coupled state. | **[VERIFIED basis]** `crates/jit/src/commands/gate.rs:232-352,653-677,966-990,1020-1103` |
 | Init or export retains a quiet raw repository writer | For an eligible same-worktree data root, put `.gitattributes` line-set composition in init's delta with exact status/error semantics; otherwise report `not_applicable`. Route repository-contained graph/snapshot destinations through the explicit export intent; stdout and proven external outputs remain non-repository sinks. | **[VERIFIED basis]** `crates/jit/src/storage/gitattributes.rs:42-80`; `crates/jit/src/main.rs:4923-4932` |
 | Claim lease state and repository assignment/event diverge, or a stale worker finalizes a replacement attempt | Hold coordinator across coordinator → bootstrap → data-root-publication → repository → events; keep internal owner out of the event, emit only the frozen acquire/release + lease-key/coordination/generation/migration wire, finalize conditionally, and fence takeover. | **[VERIFIED basis]** `crates/jit/src/commands/claim.rs:100-156` |
-| Existing v1 claims are silently treated as proven v2 leases or audit history is rewritten | Use one exact v1 decoder and one-way v2 index migration; retain v1 log/event decode-only history, mark active records `legacy_unverified`, reconcile under coordinator-first recovery, and fail mismatches with `LegacyClaimReconciliationConflict`. | **[VERIFIED basis]** `crates/jit/src/storage/claim_coordinator.rs:31-181,943-1008`; `crates/jit/src/domain/types.rs:1200-1215` |
-| A bearer secret leaks or command-specific rotation drifts | Store only key/salt/domain-separated hash; rotate only for acquire/takeover, renew, or legacy upgrade; never rotate for normal heartbeat, owner release, force-evict, status/list, or recovery; reveal replacements only in the frozen responses; redact all other surfaces; and reject stale handles. | **[VERIFIED basis]** current raw `Lease.lease_id` at `crates/jit/src/storage/claim_coordinator.rs:31-38` |
+| Existing v1 claims are silently treated as proven v2 leases or audit history is rewritten | Decode v1 history only, append a complete hashed-alias `migrated_legacy` snapshot, mark active records `legacy_unverified`, reconcile coordinator-first, and fail mismatches with `LegacyClaimReconciliationConflict`. | **[VERIFIED basis]** `crates/jit/src/storage/claim_coordinator.rs:31-181,943-1008`; `crates/jit/src/domain/types.rs:1200-1215` |
+| A credential rotation commits but its response is lost | Require caller-durable handoff ID/secret before issuance, derive deterministically with coordinator nonce/domain/fence, persist only salted verifiers in the authoritative log, replay the same result after authentication, and remove replay authority only after new-bearer confirmation. | **[ASSUMED]** |
+| A bearer secret leaks or command-specific rotation drifts | Store only key/salt/domain-separated hash; rotate only for acquire/takeover, renew, or legacy upgrade; never rotate for normal heartbeat, owner release, force-evict, status/list, or recovery; reveal only through authenticated issuance/replay; redact every other surface; and reject stale handles. | **[VERIFIED basis]** current raw `Lease.lease_id` at `crates/jit/src/storage/claim_coordinator.rs:31-38` |
+| The claims index contains the only copy of a verifier or handoff fence | Make the fsynced append-only v2 log authoritative with a complete non-secret `LeaseV2` snapshot per operation; publish the derived index second and repair any missing/stale/corrupt index by replay. | **[VERIFIED basis]** current rebuild path at `crates/jit/src/storage/claim_coordinator.rs:943-1008` |
 | Bounded implementation work is mistaken for mergeable partial architecture | Keep five cumulative final-form packages only on `integration/cdc840ad`; run targeted plus prior tests each time, forbid flags/adapters/temporary APIs, delete predecessors before integration, and let only the fully gated rebased stack land on main. | **[ASSUMED]** |
 | Preset creation, asset rescan, migration, or archive keeps a less-visible publisher | Include each in the typed-mutation inventory and delete `save_gate_preset`, rescan `save_issue`, per-issue migration saves, and archive staging/relink/event writers in the vertical cutover. | **[VERIFIED basis]** `crates/jit/src/commands/gate.rs:1170-1190`; `crates/jit/src/commands/document.rs:689-723`; `crates/jit/src/commands/migrate.rs:1-78`; `crates/jit/src/commands/archive.rs:370-854` |
 | Generic result unification breaks automation | Keep current top-level envelopes and generated schemas; share only internal delta and additive nested change records. | **[VERIFIED basis]** existing result types cited in Question 5 |

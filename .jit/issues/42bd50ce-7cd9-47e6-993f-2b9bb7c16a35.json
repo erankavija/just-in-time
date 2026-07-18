@@ -11,28 +11,27 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T08:13:20.085091408Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-04-23T22:32:30.874518871Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-24T08:13:20.085091408Z"
     }
   },
   "context": {},
   "documents": [],
   "labels": [
     "epic:docs-lifecycle-p2",
-    "milestone:v1.1",
     "component:docs",
     "type:task",
     "component:web"
   ],
   "created_at": "2026-04-23T21:20:52.816918968Z",
-  "updated_at": "2026-07-05T19:51:12.954863012Z",
+  "updated_at": "2026-07-18T12:56:16.155682519Z",
   "first_ready_at": "2026-04-23T22:15:17.547694854Z",
   "claimed_at": "2026-04-23T21:32:11.474989743Z",
   "done_at": "2026-04-24T08:19:41.220028401Z"

@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T02:15:43.149512381Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-04-24T02:14:58.122790129Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-24T02:15:43.149512381Z"
     }
   },
   "context": {},
@@ -28,11 +28,10 @@
     "type:bug",
     "component:core",
     "component:server",
-    "epic:docs-lifecycle-p2",
-    "milestone:v1.1"
+    "epic:docs-lifecycle-p2"
   ],
   "created_at": "2026-04-24T01:54:11.051856469Z",
-  "updated_at": "2026-07-05T19:51:12.897335920Z",
+  "updated_at": "2026-07-18T12:56:16.073574750Z",
   "claimed_at": "2026-04-24T01:54:17.111296113Z",
   "done_at": "2026-04-24T02:23:53.171153467Z"
 }

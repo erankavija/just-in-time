@@ -25,11 +25,10 @@
   "labels": [
     "type:epic",
     "epic:docs-lifecycle-p2",
-    "milestone:v1.1",
     "component:docs",
     "resolution:obsolete"
   ],
   "created_at": "2025-12-21T19:44:16.802990482Z",
-  "updated_at": "2026-07-11T19:05:42.850621095Z",
+  "updated_at": "2026-07-18T12:56:16.543857882Z",
   "first_ready_at": "2026-04-24T14:16:45.138521622Z"
 }

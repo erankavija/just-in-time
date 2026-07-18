@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "run_id": "2bd35931-ad52-433c-a73a-587dd796aa39",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab",
+  "commit": "1a1cbcf9c00bdcb3fa11462c7b374624ad02ee6b",
+  "branch": "main",
+  "tree_dirty": false,
+  "status": "failed",
+  "started_at": "2026-07-18T12:50:34.022497038Z",
+  "completed_at": "2026-07-18T12:56:02.716215816Z",
+  "duration_ms": 328693,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required `dev/active/cdc840ad-plan.md` exists, is substantive, and is linked as the planning issue’s design document. Both research documents are also linked. The planning issue has no dependencies.\n\n## Completeness against the criteria\n\nThe plan explicitly maps all nine hard criteria in §1. REQ-01 through REQ-07 and REQ-09 receive concrete architectural ownership, cutover, and accountability decisions.\n\nREQ-08 remains incomplete because interruption recovery is not fully specified for rotated bearer credentials or reconstruction of the claim index. REQ-03/REQ-08 also lack a disposition for two different repository layouts converging on the same external data root after publication.\n\n## Technical soundness and architectural fit\n\nThe proposed `declarations` and `repository_state` boundaries fit the repository’s separation of concerns. The plan accurately identifies and replaces the competing validation/profile images, split publishers, command-local serialization, and startup-only recovery boundary.\n\nThree blocking defects remain:\n\n- The shared external-root lock prevents simultaneous publication but does not establish which repository owns the resulting root.\n- One-time credential rotation can durably invalidate the caller’s old credential before the replacement reaches the caller.\n- The v2 claim log does not have a defined verifier-bearing record sufficient to rebuild the derived index.\n\n## Decomposition and dependencies\n\nPass. The former monolithic cutover is now divided into five ordered cumulative packages, a final integration leaf, and a separate assurance leaf. Their dependency chain is coherent and transitively reduced. Package E is large, but its consumer inventory and structural acceptance checks make its scope executable.\n\n## Risks and actionability\n\nFail. The risk table covers stale-owner fencing and external-root publication mechanics, but it does not mitigate credential loss during response interruption or cross-layout adoption of a newly published external root. The claim migration also leaves the log/index authority boundary under-specified.\n\n## Prior review feedback\n\n- Prior F1 is substantially addressed for serialization, staging, and publication visibility, but the post-publication ownership/adoption decision remains unresolved.\n- Prior F2 is substantially addressed by the one-way v1→v2 migration, but the v2 log still lacks a specified verifier/rebuild contract.\n- Prior F3 remains partially unresolved because durable rotation and later credential presentation are not crash-safe.\n- Prior F4 is addressed by the cumulative five-package decomposition and final integration leaf.\n\n## Findings\n\n1. **High, blocking — The absent external-root protocol does not decide whether a losing layout may adopt the winner’s root.** The plan acquires the shared parent/leaf lock before checking existence and tests “two repositories racing the same absent disjoint root” (`dev/active/cdc840ad-plan.md:31-32,154`). Once the first repository publishes and releases the lock, the second observes an existing root and follows the existing-root path; nothing binds that data root to the first `Worktree(...)` identity or requires the second layout to fail. The current index contains only schema and issue IDs (`crates/jit/src/storage/json.rs:43-53`), and the plan adds no persistent repository/layout binding. Two worktrees can therefore alternately derive the shared data state from different authored sources and projection targets. The plan must either forbid cross-worktree data-root reuse with a persistent identity check or define coherent shared-root semantics and the expected race outcome. References: `@/issue/cdc840ad/requirement/REQ-03`, `@/issue/cdc840ad/requirement/REQ-08`.\n\n2. **High, blocking — One-time bearer rotation is not crash-safe.** The command matrix durably invalidates the old handle during renew and returns the replacement only once (`dev/active/cdc840ad-plan.md:45-47`). If the process, transport, or output adapter fails after the new verifier is committed but before the replacement is delivered, the caller has neither a valid old handle nor the new secret. Recovery is expressly secret-free, status is redacted, and the persisted hash cannot reconstruct the replacement. Acquire and legacy upgrade have the same last-mile ambiguity. “Dedupe retries” at `dev/active/cdc840ad-plan.md:162` does not define how a retry authenticates or obtains the already-issued credential. A client-supplied rotation secret/idempotency protocol, a narrowly scoped retry verifier, or another explicit crash-safe handoff is required. References: `@/issue/cdc840ad/requirement/REQ-08`, `@/issue/cdc840ad/requirement/REQ-09`.\n\n3. **High, blocking — The v2 claims log cannot yet be shown to reconstruct the credential-verifying index.** The current index is explicitly derived by replaying `claims.jsonl` (`crates/jit/src/storage/claim_coordinator.rs:943-1018`). The plan specifies that the v2 index stores `lease_key`, salt, and verifier (`dev/active/cdc840ad-plan.md:46`), but its exact `ClaimOpV2` contract lists only operation names and never states which log record durably carries the salt/verifier across acquire and rotation (`dev/active/cdc840ad-plan.md:43`). Nor does it declare the index authoritative instead of derived. Consequently, index loss/rebuild could produce leases that cannot authenticate, while “index rewrite/log append are recoverable and idempotent” remains non-executable without ordering and replay semantics. Define the verifier-bearing v2 log payload and crash behavior for each rotation/migration operation. References: `@/issue/cdc840ad/requirement/REQ-08`, `@/issue/cdc840ad/requirement/REQ-09`.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The revised plan resolves most prior concerns, but external-root ownership and two claim credential durability/recovery contracts remain blocking.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The absent external-root race protocol serializes publication but does not bind the published root to one worktree or define whether a losing layout may adopt it.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":31,\"references\":[\"@/issue/cdc840ad/requirement/REQ-03\",\"@/issue/cdc840ad/requirement/REQ-08\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"One-time bearer rotation can durably invalidate the old credential before the replacement reaches the caller, with no authenticated retry or recovery protocol.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":45,\"references\":[\"@/issue/cdc840ad/requirement/REQ-08\",\"@/issue/cdc840ad/requirement/REQ-09\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The v2 claim log payload and replay protocol do not specify how the verifier-bearing derived index can be reconstructed after acquire, rotation, or migration.\",\"file\":\"dev/active/cdc840ad-plan.md\",\"line\":43,\"references\":[\"@/issue/cdc840ad/requirement/REQ-08\",\"@/issue/cdc840ad/requirement/REQ-09\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4915 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7547-4a6f-79d0-bb09-2bf154083e31\n--------\nuser\n--- 4902 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The revised plan resolves most prior concerns, but external-root ownership and two claim credential durability/recovery contracts remain blocking.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The absent external-root race protocol serializes publication but does not bind the published root to one worktree or define whether a losing layout may adopt it.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 31,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-03",
+          "@/issue/cdc840ad/requirement/REQ-08"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "One-time bearer rotation can durably invalidate the old credential before the replacement reaches the caller, with no authenticated retry or recovery protocol.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 45,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-08",
+          "@/issue/cdc840ad/requirement/REQ-09"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The v2 claim log payload and replay protocol do not specify how the verifier-bearing derived index can be reconstructed after acquire, rotation, or migration.",
+        "file": "dev/active/cdc840ad-plan.md",
+        "line": 43,
+        "references": [
+          "@/issue/cdc840ad/requirement/REQ-08",
+          "@/issue/cdc840ad/requirement/REQ-09"
+        ]
+      }
+    ]
+  }
+}

@@ -28,11 +28,10 @@
     "type:bug",
     "component:core",
     "component:server",
-    "epic:docs-lifecycle-p2",
-    "milestone:v1.1"
+    "epic:docs-lifecycle-p2"
   ],
   "created_at": "2026-04-24T07:07:52.472622639Z",
-  "updated_at": "2026-07-05T19:51:13.037131222Z",
+  "updated_at": "2026-07-18T12:56:16.468528327Z",
   "claimed_at": "2026-04-24T07:08:01.320449380Z",
   "done_at": "2026-04-24T08:13:19.878368829Z"
 }
