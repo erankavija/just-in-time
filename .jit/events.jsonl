@@ -8406,3 +8406,4 @@
 {"type":"issue_updated","id":"a9370249-02b1-46c8-9648-d5f39aef1126","issue_id":"abfd6016-a79d-4a5c-9d1d-d5393e7acb2d","timestamp":"2026-07-18T12:56:16.622196689Z","updated_by":"issue-update","fields":["labels"]}
 {"type":"issue_updated","id":"5ff08daa-c55f-4681-9ee9-33a7637d2f46","issue_id":"eeafaa78-290d-4390-9097-4d29ff48ef82","timestamp":"2026-07-18T12:56:16.700858256Z","updated_by":"issue-update","fields":["labels"]}
 {"type":"gate_failed","id":"b694fcc7-26ed-4081-89f7-2ef1bb884379","issue_id":"dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab","timestamp":"2026-07-18T13:49:47.918337736Z","gate_key":"plan-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"dd3205f9-63b9-4315-9941-d674729ba771","issue_id":"dc266cb6-8c20-4dd0-8ec9-a90ded46a9ab","timestamp":"2026-07-18T14:05:29.680646474Z","gate_key":"plan-review","updated_by":"auto:executor"}
