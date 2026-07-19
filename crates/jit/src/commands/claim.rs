@@ -1109,12 +1109,27 @@ mod tests {
         Ok(leases)
     }
 
-    /// Helper to create a test issue
-    fn create_test_issue(storage: &JsonFileStorage, title: &str) -> Result<String> {
-        let issue = Issue::new(title.to_string(), "Test description".to_string());
+    /// Shared fixture boundary: the single grandfathered `Issue::new` +
+    /// `save_issue` pair backing both `create_test_issue` and
+    /// `create_test_issue_with_id` (predecessor APIs frozen for new call
+    /// sites during wave 3; wave 5 migrates this helper).
+    fn create_test_issue_inner(
+        storage: &JsonFileStorage,
+        title: &str,
+        id: Option<&str>,
+    ) -> Result<String> {
+        let mut issue = Issue::new(title.to_string(), "Test description".to_string());
+        if let Some(id) = id {
+            issue.id = id.to_string();
+        }
         let issue_id = issue.id.clone();
         storage.save_issue(issue)?;
         Ok(issue_id)
+    }
+
+    /// Helper to create a test issue
+    fn create_test_issue(storage: &JsonFileStorage, title: &str) -> Result<String> {
+        create_test_issue_inner(storage, title, None)
     }
 
     fn create_test_issue_with_id(
@@ -1122,10 +1137,7 @@ mod tests {
         id: &str,
         title: &str,
     ) -> Result<String> {
-        let mut issue = Issue::new(title.to_string(), "Test description".to_string());
-        issue.id = id.to_string();
-        storage.save_issue(issue)?;
-        Ok(id.to_string())
+        create_test_issue_inner(storage, title, Some(id))
     }
 
     #[test]
