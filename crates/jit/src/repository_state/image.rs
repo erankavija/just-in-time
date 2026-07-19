@@ -565,7 +565,7 @@ impl CaptureSpec {
         Ok(())
     }
 
-    fn contains_path(&self, path: &VirtualPath) -> bool {
+    pub(crate) fn contains_path(&self, path: &VirtualPath) -> bool {
         self.fixed.contains(path) || self.discovered.contains(path)
     }
 }

@@ -13,6 +13,41 @@
 
 use crate::declarations::rules::DEFAULT_ORIGIN;
 use anyhow::{Context, Result};
+use serde::Deserialize;
+
+/// Minimal per-rule identity read off a `[[rules]]` block: just enough
+/// (`name`, `origin`) to compute the default-family membership diff, without the
+/// full `assert`-table deserialization (which resolves schema files and is
+/// unnecessarily fragile for a membership sync that never inspects assertions).
+#[derive(Debug, Deserialize)]
+struct RuleIdentity {
+    name: String,
+    #[serde(default)]
+    origin: Option<String>,
+}
+
+/// Top-level shape of `rules.toml` for [`RuleIdentity`] extraction.
+#[derive(Debug, Default, Deserialize)]
+struct RuleIdentitiesFile {
+    #[serde(default)]
+    rules: Vec<RuleIdentity>,
+}
+
+/// Read every rule's `(name, origin)` identity from `rules.toml` `content`.
+///
+/// Identity-only parsing: assertion tables are never deserialized and schema
+/// references never resolved, so this succeeds on a file whose full
+/// [`RuleSet`](crate::declarations::rules::RuleSet) load would fail on a custom
+/// rule — the membership diff must not be strandable by an unrelated rule's defect.
+pub fn parse_rule_identities(content: &str) -> Result<Vec<(String, Option<String>)>> {
+    let identities: RuleIdentitiesFile =
+        toml::from_str(content).context("parsing rule identities from rules.toml")?;
+    Ok(identities
+        .rules
+        .into_iter()
+        .map(|r| (r.name, r.origin))
+        .collect())
+}
 
 /// The `rules.toml` array-of-tables key holding every `[[rules]]` block.
 const RULES_ARRAY_KEY: &str = "rules";

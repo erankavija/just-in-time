@@ -10,12 +10,15 @@
 //! captured occupant; an unchanged target contributes no action.
 
 use super::{
-    compose_managed_documents, render_projection_body, ExpectedPreimage, FileMode,
-    ManagedDocumentClaim, ProjectionInputs, RegionPlacement, RepositoryAction,
-    RepositoryDeclarations, RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
+    compose_managed_documents, default_ruleset, parse_rule_identities, render_projection_body,
+    render_rule_block, rewrite_header, rules_file_header, serialize_ruleset,
+    splice_default_membership, ExpectedPreimage, FileMode, ManagedDocumentClaim, ProjectionInputs,
+    RegionPlacement, RepositoryAction, RepositoryDeclarations, RepositoryEntry, RepositoryImage,
+    RepositoryStateError, VirtualPath,
 };
 use crate::config::{JitConfig, ProjectionMode};
 use crate::declarations::invariants::InvariantRegistry;
+use crate::repository_state::default_rule_membership_diff_from_identities;
 
 /// Map a repo-relative producer path onto its canonical [`VirtualPath`].
 ///
@@ -49,13 +52,20 @@ fn read_text(image: &RepositoryImage, repo_relative: &str) -> anyhow::Result<Opt
 /// validation settings; the sibling `invariants.toml` populates the `#[serde(skip)]`
 /// invariant registry the `full` invariant view renders. An absent `invariants.toml`
 /// is an empty registry, matching the on-disk load boundary.
-fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConfig> {
+pub(crate) fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConfig> {
     let config_text = read_text(image, ".jit/config.toml")?
         .ok_or_else(|| anyhow::anyhow!("captured image has no .jit/config.toml"))?;
     let mut config: JitConfig = toml::from_str(&config_text)?;
-    config.invariants = match read_text(image, ".jit/invariants.toml")? {
-        Some(text) => InvariantRegistry::from_toml_str(&text)?,
-        None => InvariantRegistry::empty(),
+    // An invariants.toml outside the captured closure (or captured absent) is an
+    // empty registry, matching the on-disk load boundary.
+    let invariants_path = image_path(".jit/invariants.toml")?;
+    config.invariants = if image.capture_spec().contains_path(&invariants_path) {
+        match read_text(image, ".jit/invariants.toml")? {
+            Some(text) => InvariantRegistry::from_toml_str(&text)?,
+            None => InvariantRegistry::empty(),
+        }
+    } else {
+        InvariantRegistry::empty()
     };
     Ok(config)
 }
@@ -71,15 +81,15 @@ fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConfig> {
 /// action.
 pub(crate) fn compose_configured_projections(
     image: &RepositoryImage,
+    config: &JitConfig,
     declarations: &RepositoryDeclarations<'_>,
 ) -> anyhow::Result<Vec<RepositoryAction>> {
-    let config = assemble_config(image)?;
     let Some(projections) = config.projection.as_ref() else {
         return Ok(Vec::new());
     };
 
     let inputs = ProjectionInputs {
-        config: &config,
+        config,
         rules: declarations.rules,
         gates: declarations.gates,
     };
@@ -127,6 +137,80 @@ pub(crate) fn compose_configured_projections(
             owner: "configured-projection".to_string(),
             expected: ExpectedPreimage::of(entry),
             bytes: expected_bytes,
+            mode: FileMode::Regular,
+        });
+    }
+    Ok(actions)
+}
+
+/// Materialize the default-rule family (`rules.toml`) and its baked schema files
+/// from the captured registry, obeying the rules.toml ownership matrix.
+///
+/// `rules.toml` is the authored file: the default-family membership (the
+/// `namespace-unique-*` rows the registry generates) and the generated header are
+/// spliced in place — via the one span-level
+/// [`splice_default_membership`]/[`rewrite_header`] primitive — while custom rows,
+/// comments, block order, and the editable policy fields of default rules are
+/// preserved unconditionally. Config owns the default schema CONTENT
+/// (`schemas/default-*.json`), whose expected bytes are written to each captured
+/// target. An absent `rules.toml` is the in-memory-defaults case: nothing is
+/// materialized (the read path builds the defaults without writing), so this
+/// contributes no action.
+pub(crate) fn compose_default_ruleset(
+    image: &RepositoryImage,
+    config: &JitConfig,
+) -> anyhow::Result<Vec<RepositoryAction>> {
+    // A ruleset outside the captured closure (or captured absent) is not an owned
+    // materialization: defaults live only in memory, nothing on disk to keep
+    // coherent, so no rules/schema targets are owned.
+    let rules_path = image_path(".jit/rules.toml")?;
+    if !image.capture_spec().contains_path(&rules_path) {
+        return Ok(Vec::new());
+    }
+    let Some(current_rules) = read_text(image, ".jit/rules.toml")? else {
+        return Ok(Vec::new());
+    };
+    let namespaces = crate::config_manager::namespaces_from_config(config);
+    let mut actions = Vec::new();
+
+    // rules.toml: splice only the generated default-family membership + header,
+    // preserving every authored byte outside those proven-generated spans.
+    let identities = parse_rule_identities(&current_rules)?;
+    let diff = default_rule_membership_diff_from_identities(&identities, &namespaces);
+    let rendered_add: Vec<String> = diff.to_add.iter().map(render_rule_block).collect();
+    let spliced = splice_default_membership(&current_rules, &rendered_add, &diff.to_drop)?;
+    let expected_rules = rewrite_header(&spliced, rules_file_header())?;
+    if expected_rules != current_rules {
+        let vpath = image_path(".jit/rules.toml")?;
+        actions.push(RepositoryAction::WriteFile {
+            path: vpath.clone(),
+            owner: "default-rule-membership".to_string(),
+            expected: ExpectedPreimage::of(image.entry(&vpath)?),
+            bytes: expected_rules.into_bytes(),
+            mode: FileMode::Regular,
+        });
+    }
+
+    // schemas/default-*.json: config/default-rule generator owns the content.
+    // Write each expected target the image actually captured (a target outside
+    // the closure is not owned here and never fabricated).
+    let serialized = serialize_ruleset(&default_ruleset(&namespaces));
+    for schema in &serialized.schema_files {
+        let vpath = image_path(&format!(".jit/schemas/{}", schema.name))?;
+        if !image.capture_spec().contains_path(&vpath) {
+            continue;
+        }
+        let entry = image.entry(&vpath)?;
+        if let RepositoryEntry::File { bytes, mode, .. } = entry {
+            if bytes == schema.content.as_bytes() && *mode == FileMode::Regular {
+                continue;
+            }
+        }
+        actions.push(RepositoryAction::WriteFile {
+            path: vpath.clone(),
+            owner: "default-schema".to_string(),
+            expected: ExpectedPreimage::of(entry),
+            bytes: schema.content.clone().into_bytes(),
             mode: FileMode::Regular,
         });
     }
@@ -460,6 +544,127 @@ kind = "advisory"
         assert!(repaired.ends_with(authored_suffix));
         assert!(!repaired.contains("MANUALLY EDITED"));
         assert!(repaired.contains(EXPECTED_ROWS.trim_end()));
+    }
+
+    fn ns_config(namespaces: &[&str]) -> String {
+        let mut out = String::from("[project]\nname = \"ruleset-test\"\n");
+        for ns in namespaces {
+            out.push_str(&format!(
+                "[namespaces.{ns}]\ndescription = \"{ns}\"\nunique = true\n"
+            ));
+        }
+        out
+    }
+
+    /// A coherent scaffolded ruleset (config and rules.toml agree) derives no
+    /// rules/schema action.
+    #[test]
+    fn test_derive_default_ruleset_coherent_scaffold_emits_no_action() {
+        let config = ns_config(&["component", "team"]);
+        let jc: JitConfig = toml::from_str(&config).unwrap();
+        let ns = crate::config_manager::namespaces_from_config(&jc);
+        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+
+        let schema_paths: Vec<(String, String)> = scaffold
+            .schema_files
+            .iter()
+            .map(|f| (format!(".jit/schemas/{}", f.name), f.content.clone()))
+            .collect();
+        let mut files: Vec<(&str, Option<&str>)> = vec![
+            (".jit/config.toml", Some(&config)),
+            (".jit/rules.toml", Some(&scaffold.rules_toml)),
+        ];
+        for (p, c) in &schema_paths {
+            files.push((p, Some(c)));
+        }
+        let img = image(&files);
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let plan = derive_materializations(
+            &img,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::SemanticMutation,
+        )
+        .unwrap();
+        assert!(
+            plan.delta().actions().is_empty(),
+            "a coherent scaffold has no drift: {:?}",
+            plan.delta().actions()
+        );
+    }
+
+    /// A newly-declared unique namespace drifts the on-disk ruleset: derive adds
+    /// exactly the missing `namespace-unique-*` membership row (preserving authored
+    /// custom rows and comments) and rewrites the namespace-registry schema.
+    #[test]
+    fn test_derive_default_ruleset_adds_membership_and_schema_preserving_authored() {
+        let config_full = ns_config(&["component", "team", "squad"]);
+        let config_partial = ns_config(&["component", "team"]);
+        let jc_partial: JitConfig = toml::from_str(&config_partial).unwrap();
+        let ns_partial = crate::config_manager::namespaces_from_config(&jc_partial);
+        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial));
+        // Authored content the repair must preserve unconditionally.
+        let authored_rules = format!(
+            "{}\n[[rules]]\nname = \"custom-shape\"\n# hand-authored comment\nseverity = \"warn\"\nassert = {{ require-section = {{ heading = \"Goals\" }} }}\n",
+            scaffold.rules_toml
+        );
+        let schema_paths: Vec<(String, String)> = scaffold
+            .schema_files
+            .iter()
+            .map(|f| (format!(".jit/schemas/{}", f.name), f.content.clone()))
+            .collect();
+        let mut files: Vec<(&str, Option<&str>)> = vec![
+            (".jit/config.toml", Some(&config_full)),
+            (".jit/rules.toml", Some(&authored_rules)),
+        ];
+        for (p, c) in &schema_paths {
+            files.push((p, Some(c)));
+        }
+        let img = image(&files);
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let plan = derive_materializations(
+            &img,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::SemanticMutation,
+        )
+        .unwrap();
+
+        let rules_write = plan
+            .delta()
+            .actions()
+            .iter()
+            .find_map(|a| match a {
+                RepositoryAction::WriteFile { path, bytes, .. }
+                    if path == &VirtualPath::data("rules.toml").unwrap() =>
+                {
+                    Some(String::from_utf8(bytes.clone()).unwrap())
+                }
+                _ => None,
+            })
+            .expect("rules.toml membership add");
+        assert!(
+            rules_write.contains("namespace-unique-squad"),
+            "squad added"
+        );
+        assert!(
+            rules_write.contains("name = \"custom-shape\"")
+                && rules_write.contains("# hand-authored comment"),
+            "authored custom rule and comment preserved:\n{rules_write}"
+        );
+        // The namespace-registry schema (its enum of registered namespaces) drifts
+        // with the new namespace, so its target is rewritten too.
+        assert!(
+            plan.delta().actions().iter().any(|a| matches!(
+                a,
+                RepositoryAction::WriteFile { path, .. }
+                    if path == &VirtualPath::data("schemas/default-namespace-registry.json").unwrap()
+            )),
+            "namespace-registry schema rewritten: {:?}",
+            plan.delta().actions()
+        );
     }
 
     #[test]

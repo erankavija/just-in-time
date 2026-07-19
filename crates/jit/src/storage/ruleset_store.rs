@@ -19,7 +19,6 @@ use crate::config::JitConfig;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::storage::atomic_write::write_file_atomic;
 use anyhow::{Context, Result};
-use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -158,30 +157,12 @@ pub fn rewrite_rules_header(jit_root: &Path, header: &str) -> Result<bool> {
     Ok(true)
 }
 
-/// Minimal per-rule identity read off a `[[rules]]` block: just enough
-/// (`name`, `origin`) to compute the membership diff that drives
-/// [`sync_namespace_unique_rules`], without pulling in the full `assert`-table
-/// deserialization [`crate::declarations::rules::RuleSet`] performs (which
-/// resolves schema files and is unnecessary — and unnecessarily fragile — for a
-/// membership sync that never inspects a rule's assertion).
-#[derive(Debug, Deserialize)]
-struct RuleIdentity {
-    name: String,
-    #[serde(default)]
-    origin: Option<String>,
-}
-
-/// Top-level shape of `rules.toml` for [`RuleIdentity`] extraction.
-#[derive(Debug, Default, Deserialize)]
-struct RuleIdentitiesFile {
-    #[serde(default)]
-    rules: Vec<RuleIdentity>,
-}
-
 /// Read every rule's `(name, origin)` identity from `<jit_root>/rules.toml`.
 ///
-/// Identity-only parsing: assertion tables are never deserialized and schema
-/// references never resolved, so this succeeds on a file whose full
+/// Identity-only parsing (the pure
+/// [`parse_rule_identities`](crate::repository_state::parse_rule_identities)):
+/// assertion tables are never deserialized and schema references never resolved,
+/// so this succeeds on a file whose full
 /// [`RuleSet`](crate::declarations::rules::RuleSet) load would fail on a custom
 /// rule — the membership write-through must not be strandable by an unrelated
 /// rule's defect (jit:d74a9ed1 review F1). Returns an empty list when the file
@@ -193,13 +174,8 @@ pub fn read_rule_identities(jit_root: &Path) -> Result<Vec<(String, Option<Strin
     }
     let content = std::fs::read_to_string(&path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
-    let identities: RuleIdentitiesFile = toml::from_str(&content)
-        .with_context(|| format!("Failed to parse rule identities from {}", path.display()))?;
-    Ok(identities
-        .rules
-        .into_iter()
-        .map(|r| (r.name, r.origin))
-        .collect())
+    crate::repository_state::parse_rule_identities(&content)
+        .with_context(|| format!("Failed to parse rule identities from {}", path.display()))
 }
 
 /// Apply a `namespace-unique-*` DEFAULT-rule membership delta to

@@ -63,12 +63,7 @@ impl ConfigManager {
     /// should use this instead of [`get_namespaces`](Self::get_namespaces) so a
     /// single write command parses `config.toml` at most once.
     pub fn namespaces_from_config(&self, config: &JitConfig) -> LabelNamespaces {
-        // If config has namespaces, build from those; otherwise return defaults.
-        if let Some(ref namespaces_config) = config.namespaces {
-            self.build_namespaces_from_config(config, namespaces_config.clone())
-        } else {
-            self.default_namespaces()
-        }
+        namespaces_from_config(config)
     }
 
     /// Get the enforcement mode for lease requirements.
@@ -165,48 +160,53 @@ impl ConfigManager {
         // Resolve icons for all types
         Ok(resolve_icons_for_hierarchy(&types, &icon_config))
     }
+}
 
-    /// Build LabelNamespaces from configuration.
-    fn build_namespaces_from_config(
-        &self,
-        config: &JitConfig,
-        namespaces_config: HashMap<String, NamespaceConfig>,
-    ) -> LabelNamespaces {
-        let mut namespaces = HashMap::new();
-        for (name, ns_config) in namespaces_config {
-            // Only the taxonomy (description/unique) crosses into the domain
-            // registry; per-namespace constraints (values/pattern/required) were
-            // removed when validation became rule-driven.
-            let ns = LabelNamespace::new(ns_config.description, ns_config.unique);
-            namespaces.insert(name, ns);
-        }
+/// Build the namespace registry from an already-parsed [`JitConfig`], without
+/// filesystem access.
+///
+/// The single pure `config -> LabelNamespaces` conversion shared by the config
+/// manager's cached-config read path and the mutation derive pipeline, which
+/// derives the default rule family from this same registry. Configured namespaces
+/// build the registry; an absent `[namespaces]` table yields the defaults.
+pub fn namespaces_from_config(config: &JitConfig) -> LabelNamespaces {
+    match config.namespaces.as_ref() {
+        Some(namespaces_config) => build_namespaces_from_config(config, namespaces_config.clone()),
+        None => LabelNamespaces::default(),
+    }
+}
 
-        let mut result = LabelNamespaces {
-            schema_version: config.version.as_ref().map(|v| v.schema).unwrap_or(2),
-            namespaces,
-            type_hierarchy: config.type_hierarchy.as_ref().map(|h| h.types.clone()),
-            label_associations: config
-                .type_hierarchy
-                .as_ref()
-                .and_then(|h| h.label_associations.clone()),
-            strategic_types: config
-                .type_hierarchy
-                .as_ref()
-                .and_then(|h| h.strategic_types.clone()),
-        };
-
-        // Sync membership namespaces from label_associations
-        result.sync_membership_namespaces();
-
-        result
+fn build_namespaces_from_config(
+    config: &JitConfig,
+    namespaces_config: HashMap<String, NamespaceConfig>,
+) -> LabelNamespaces {
+    let mut namespaces = HashMap::new();
+    for (name, ns_config) in namespaces_config {
+        // Only the taxonomy (description/unique) crosses into the domain
+        // registry; per-namespace constraints (values/pattern/required) were
+        // removed when validation became rule-driven.
+        let ns = LabelNamespace::new(ns_config.description, ns_config.unique);
+        namespaces.insert(name, ns);
     }
 
-    /// Get default namespace configuration.
-    ///
-    /// Provides sensible defaults when no config.toml exists.
-    fn default_namespaces(&self) -> LabelNamespaces {
-        LabelNamespaces::default()
-    }
+    let mut result = LabelNamespaces {
+        schema_version: config.version.as_ref().map(|v| v.schema).unwrap_or(2),
+        namespaces,
+        type_hierarchy: config.type_hierarchy.as_ref().map(|h| h.types.clone()),
+        label_associations: config
+            .type_hierarchy
+            .as_ref()
+            .and_then(|h| h.label_associations.clone()),
+        strategic_types: config
+            .type_hierarchy
+            .as_ref()
+            .and_then(|h| h.strategic_types.clone()),
+    };
+
+    // Sync membership namespaces from label_associations
+    result.sync_membership_namespaces();
+
+    result
 }
 
 /// Load the type taxonomy from the repository's `config.toml`.

@@ -51,7 +51,7 @@ pub use rule_serialize::{
     render_rule_block, rules_file_header, serialize_ruleset, type_hierarchy_schema_content,
     SchemaFile, SerializedRuleSet,
 };
-pub use rules_document::{rewrite_header, splice_default_membership};
+pub use rules_document::{parse_rule_identities, rewrite_header, splice_default_membership};
 pub use rules_gates_projection::render_rules_and_gates_markdown;
 
 use crate::declarations::rules::RuleSet;
@@ -160,39 +160,62 @@ impl RepositoryStateError {
     }
 }
 
-/// Every configured projection composed from declared authority (`@/inv/single-source-prose`).
-///
-/// The complete producer set is invoked; a caller cannot select a subset. Shared
-/// targets compose through the one managed-document primitive, never last-writer-wins.
+/// The complete owned-materialization producer set: default rules and their
+/// schemas, plus every configured projection, each derived from declared authority
+/// (`@/inv/single-source-prose`). A caller cannot invoke a subset — the intent
+/// selects the whole set. Shared projection targets compose through the one
+/// managed-document primitive, never last-writer-wins; `rules.toml` splices only
+/// the generated default-family spans, preserving authored content unconditionally.
+fn compose_complete(
+    image: &RepositoryImage,
+    declarations: &RepositoryDeclarations<'_>,
+) -> Result<Vec<RepositoryAction>, RepositoryStateError> {
+    let config = materialize::assemble_config(image).map_err(RepositoryStateError::producer)?;
+    let mut actions = materialize::compose_default_ruleset(image, &config)
+        .map_err(RepositoryStateError::producer)?;
+    actions.extend(
+        materialize::compose_configured_projections(image, &config, declarations)
+            .map_err(RepositoryStateError::producer)?,
+    );
+    Ok(actions)
+}
+
+/// Semantic-mutation intent: always invokes the complete producer set.
 fn derive_semantic_mutation(
     image: &RepositoryImage,
     declarations: &RepositoryDeclarations<'_>,
 ) -> Result<RepositoryDelta, RepositoryStateError> {
-    let actions = materialize::compose_configured_projections(image, declarations)
-        .map_err(RepositoryStateError::producer)?;
-    Ok(RepositoryDelta::new(image.layout(), actions)?)
+    Ok(RepositoryDelta::new(
+        image.layout(),
+        compose_complete(image, declarations)?,
+    )?)
 }
 
-/// Render-only intent: the same constrained-complete projection composition.
+/// Render-only intent: a constrained-complete operation over the configured
+/// projections alone (it never selects individual projection families).
 fn derive_project_render(
     image: &RepositoryImage,
     declarations: &RepositoryDeclarations<'_>,
 ) -> Result<RepositoryDelta, RepositoryStateError> {
-    let actions = materialize::compose_configured_projections(image, declarations)
+    let config = materialize::assemble_config(image).map_err(RepositoryStateError::producer)?;
+    let actions = materialize::compose_configured_projections(image, &config, declarations)
         .map_err(RepositoryStateError::producer)?;
     Ok(RepositoryDelta::new(image.layout(), actions)?)
 }
 
-/// Repair intent: the same expected projection state; ownership-safe repair for
-/// registry-first projections is a full-file or single-region replacement proven by
-/// the projection declaration, so it reuses the same constrained-complete producer.
+/// Repair intent: the same complete expected state, whose per-target composition is
+/// itself ownership-safe — `rules.toml` splices only generated default spans,
+/// region projections splice only their managed region, and full-file projections
+/// replace a target the declaration proves. Ambiguous ownership fails before
+/// publication rather than rewriting an authored boundary.
 fn derive_repair(
     image: &RepositoryImage,
     declarations: &RepositoryDeclarations<'_>,
 ) -> Result<RepositoryDelta, RepositoryStateError> {
-    let actions = materialize::compose_configured_projections(image, declarations)
-        .map_err(RepositoryStateError::producer)?;
-    Ok(RepositoryDelta::new(image.layout(), actions)?)
+    Ok(RepositoryDelta::new(
+        image.layout(),
+        compose_complete(image, declarations)?,
+    )?)
 }
 
 /// Kind of mismatch between a captured image and expected materialization.
