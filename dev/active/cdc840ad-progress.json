@@ -196,6 +196,14 @@
       "situation": "code-review round 5 failed on a second backend-parity instance (absent-root Data-only delta without explicit root entry: JSON publishes the staged root, memory never materializes the Data(\"\") entry). Five rounds, five distinct findings; the last two share the delta-shape parity class that the worker's enumeration sweep failed to close.",
       "resolution": "Invoker chose a batch conformance audit (wave-1 remedy): disjoint-footprint auditors over the wave-2 surface vs the issue contract with adversarial verification, then one fix pass for all confirmed findings before re-gating.",
       "recommendation": "Lead recommended fix + property-based parity test; invoker selected the broader audit."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "a6a9b964-d944-4d7f-a7e7-7fb88dcee13b",
+      "status": "open",
+      "opened_at": "2026-07-19T16:18:29+03:00",
+      "situation": "After two rework attempts closed the original seed-omission finding, plan encapsulation, and HashMap serialization nondeterminism, final adversarial review found one ordinary API pairing defect: RepositoryMutationSession::apply accepts image and plan separately, so a plan derived from image A can be applied alongside image B when action-target preimages match, recording A's semantic hash after revalidating B.",
+      "recommendation": "Authorize one guided minimal correction: MaterializationPlan owns the captured RepositoryImage and apply accepts only the plan, structurally binding image, delta, and hash without storage-side rehashing or a validation framework."
     }
   ],
   "rework_counts": {
