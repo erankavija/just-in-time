@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "run_id": "5a931631-648d-44d5-8d85-e571cdada21d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a6a9b964-d944-4d7f-a7e7-7fb88dcee13b",
+  "commit": "1e273ff3b9d5f225e8c052c96f3bfe80f034e2a7",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-19T13:44:06.366299036Z",
+  "completed_at": "2026-07-19T13:48:20.918531691Z",
+  "duration_ms": 254552,
+  "exit_code": 1,
+  "stdout": "Attribution: 46894584, 59f535a3, 9db1dfb8, 1e273ff3 (jit:a6a9b964)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/event-log (.jit/invariants.toml); @/invariant/atomic-writes (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-07-19T13:40:31Z (current 1e273ff3); prior code-review failed, exit 1, with F1 addressed by 1e273ff3\nTruncation recovery: per-file and line-scoped reads of the finalizer, store, transaction kernel, claim path, coordinator, and tests after truncated aggregate output\n\n1. [blocking][issue-impact][high] The four attributable commits are on `main` and are not reachable from `integration/cdc840ad`, contrary to the issue’s explicit cumulative-branch constraint. This includes the two feature commits, so the package was merged to `main` independently rather than through the required integration transition.\n\n2. [blocking][issue-impact][high] Claim lease identity matching is prefix matching, not canonicalization. [`canonical_issue_match`](crates/jit/src/storage/claim_coordinator.rs:675) treats any stored ID of at least eight characters that prefixes the requested full ID as the same issue. A persisted legacy short lease can therefore falsely block a different issue sharing that short prefix; the coordinator has no resolution step to establish the stored spelling’s canonical full ID.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The package bypasses its required integration branch, and persisted short lease IDs are matched ambiguously by prefix.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"All attributable commits, including feature commits, are on main and absent from integration/cdc840ad, violating the issue’s required cumulative integration-branch delivery.\",\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Persisted lease IDs are compared by an eight-character prefix rather than resolved canonical identity, so a collision can falsely treat distinct issues as one active lease.\",\"file\":\"crates/jit/src/storage/claim_coordinator.rs\",\"line\":685,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8648 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7a9e-aade-7d83-963b-b9933a05e6f9\n--------\nuser\n--- 8635 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The package bypasses its required integration branch, and persisted short lease IDs are matched ambiguously by prefix.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "All attributable commits, including feature commits, are on main and absent from integration/cdc840ad, violating the issue’s required cumulative integration-branch delivery."
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Persisted lease IDs are compared by an eight-character prefix rather than resolved canonical identity, so a collision can falsely treat distinct issues as one active lease.",
+        "file": "crates/jit/src/storage/claim_coordinator.rs",
+        "line": 685
+      }
+    ]
+  }
+}
