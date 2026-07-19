@@ -35,7 +35,7 @@
           "short_id": "a6a9b964",
           "title": "Implement typed mutation, audit, and claim synchronization",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         }
       ]
     },
@@ -200,7 +200,8 @@
   ],
   "rework_counts": {
     "cbc3a7e5": 2,
-    "bacf2cd4": 2
+    "bacf2cd4": 2,
+    "a6a9b964": 0
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
