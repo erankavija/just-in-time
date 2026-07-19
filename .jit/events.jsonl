@@ -8529,3 +8529,10 @@
 {"type":"issue_updated","id":"f94e9f36-531e-438d-ba86-46a753c9607c","issue_id":"a6a9b964-d944-4d7f-a7e7-7fb88dcee13b","timestamp":"2026-07-19T13:50:01.882896629Z","updated_by":"issue-update","fields":["description"]}
 {"type":"gate_passed","id":"25c23128-afab-4da0-9f16-73f0f1609ffb","issue_id":"a6a9b964-d944-4d7f-a7e7-7fb88dcee13b","timestamp":"2026-07-19T14:17:59.950160650Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"13e67a0d-9973-48f1-9f5e-4a1b43faf22c","issue_id":"a6a9b964-d944-4d7f-a7e7-7fb88dcee13b","timestamp":"2026-07-19T14:21:24.695513766Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"da0745ea-ccbe-4952-b1b4-38b9946b6998","issue_id":"a6a9b964-d944-4d7f-a7e7-7fb88dcee13b","timestamp":"2026-07-19T14:40:03.543243185Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"3d28ed2a-c4d5-4cbb-8d9a-2de4c9795bbb","issue_id":"a6a9b964-d944-4d7f-a7e7-7fb88dcee13b","timestamp":"2026-07-19T14:44:13.453063834Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"8cbd02b3-1f09-4845-9d47-78344d322115","issue_id":"a6a9b964-d944-4d7f-a7e7-7fb88dcee13b","timestamp":"2026-07-19T14:56:56.183865103Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"66d6029e-74be-4975-9802-6377c10ae764","issue_id":"a6a9b964-d944-4d7f-a7e7-7fb88dcee13b","timestamp":"2026-07-19T15:00:14.692150814Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"fdfd20aa-f212-486e-8a38-6ccca2b9e586","issue_id":"a6a9b964-d944-4d7f-a7e7-7fb88dcee13b","timestamp":"2026-07-19T15:00:25.457510242Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"f7eb23b0-ff0a-46d5-be5a-43028d2be297","issue_id":"a6a9b964-d944-4d7f-a7e7-7fb88dcee13b","timestamp":"2026-07-19T15:00:25.457535692Z"}
+{"type":"issue_state_changed","id":"d3208d01-aa68-4827-9dc8-87217fb884b1","issue_id":"44d318ab-7270-4c94-aa60-2569c7d8f2d6","timestamp":"2026-07-19T15:00:25.836109037Z","from":"backlog","to":"ready"}

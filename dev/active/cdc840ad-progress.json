@@ -1,7 +1,7 @@
 {
   "epic_id": "cdc840ad-9332-4936-9381-772318967f0f",
   "epic_short_id": "cdc840ad",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -35,7 +35,7 @@
           "short_id": "a6a9b964",
           "title": "Implement typed mutation, audit, and claim synchronization",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
@@ -221,7 +221,7 @@
   "rework_counts": {
     "cbc3a7e5": 2,
     "bacf2cd4": 2,
-    "a6a9b964": 0
+    "a6a9b964": 1
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
