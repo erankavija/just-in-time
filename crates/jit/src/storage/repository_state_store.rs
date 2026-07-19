@@ -1892,6 +1892,95 @@ mod tests {
     }
 
     #[test]
+    fn test_conformance_worktree_only_absent_root_materializes_no_data_root() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit"); // absent
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        let make_spec = || {
+            let mut spec =
+                CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap();
+            spec.discover_paths([VirtualPath::worktree("note.txt").unwrap()])
+                .unwrap();
+            spec
+        };
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![RepositoryAction::write_file(
+                VirtualPath::worktree("note.txt").unwrap(),
+                "wt",
+                ExpectedPreimage::Absent,
+                b"note".to_vec(),
+                FileMode::Regular,
+            )],
+        )
+        .unwrap();
+
+        let memory = InMemoryStorage::new();
+        let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
+        let memory_image = memory_session.capture(make_spec()).unwrap();
+        let memory_outcome = memory_session.apply(&memory_image, &delta).unwrap();
+        drop(memory_session);
+
+        let json = JsonFileStorage::new(&data);
+        let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
+        let json_image = json_session.capture(make_spec()).unwrap();
+        let json_outcome = json_session.apply(&json_image, &delta).unwrap();
+        drop(json_session);
+
+        // Identical result hash/action count, and neither backend materialized a
+        // data root: a worktree-only delta over an absent root leaves it absent.
+        assert_eq!(memory_outcome, json_outcome);
+        assert!(!data.exists(), "json must not publish an empty data root");
+        assert!(!worktree.path().join(".jit-bootstrap").exists());
+        assert_eq!(
+            std::fs::read(worktree.path().join("note.txt")).unwrap(),
+            b"note"
+        );
+
+        // Post-apply capture agrees on both backends: data root absent, note present.
+        let mut memory_after = memory.open_mutation_session(layout).unwrap();
+        let memory_view = semantic_view(&memory_after.capture(make_spec()).unwrap());
+        let json_after = JsonFileStorage::new(&data);
+        let mut json_after_session = json_after
+            .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
+            .unwrap();
+        let json_view = semantic_view(&json_after_session.capture(make_spec()).unwrap());
+        assert_eq!(memory_view, json_view);
+        assert_eq!(
+            memory_view[&VirtualPath::data("").unwrap()],
+            SemanticEntry::Absent
+        );
+    }
+
+    #[test]
+    fn test_conformance_empty_delta_is_a_noop_on_both_backends() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        let spec = || CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap();
+        let delta = RepositoryDelta::new(&layout, vec![]).unwrap();
+
+        let memory = InMemoryStorage::new();
+        seed_memory_existing(&memory, &[]);
+        let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
+        let memory_image = memory_session.capture(spec()).unwrap();
+        let memory_outcome = memory_session.apply(&memory_image, &delta).unwrap();
+
+        let json = JsonFileStorage::new(&data);
+        let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
+        let json_image = json_session.capture(spec()).unwrap();
+        let json_outcome = json_session.apply(&json_image, &delta).unwrap();
+
+        // An empty delta is a no-op with an identical zero-action outcome; no
+        // control, stage, or companion residue is created on either backend.
+        assert_eq!(memory_outcome, json_outcome);
+        assert_eq!(json_outcome.actions_applied, 0);
+        assert!(!worktree.path().join(".jit-bootstrap").exists());
+        assert!(!data.join("tmp/transactions").exists());
+    }
+
+    #[test]
     fn test_conformance_rejects_worktree_data_alias() {
         let worktree = TempDir::new().unwrap();
         let data = worktree.path().join(".jit");

@@ -1181,6 +1181,13 @@ fn open_repository_transaction_dir(
     Ok(Some((base, transactions, transaction)))
 }
 
+fn delta_has_data_action(delta: &RepositoryDelta) -> bool {
+    delta
+        .actions()
+        .iter()
+        .any(|action| action.path().root_class() == RepositoryRootClass::Data)
+}
+
 fn initial_repository_journal(
     roots: &RepositoryKernelRoots,
     id: &str,
@@ -1260,9 +1267,14 @@ fn initial_repository_journal(
         owner_digest: repository_owner_digest(&roots.layout),
         plan_hash: repository_plan_hash(delta)?,
         data_root_was_absent: roots.data.is_none(),
-        data_stage: roots
-            .data
-            .is_none()
+        // Materialize an absent data root ONLY when the delta carries a Data
+        // action. A worktree-only delta over an absent root creates no staged
+        // root and no rename: publishing an empty `.jit` as a side effect would
+        // leave a present-but-contentless repository that later opens accept as a
+        // real root, and it would diverge from InMemoryStorage, which marks the
+        // data root present only when a Data action lands. Its worktree actions
+        // still commit through the ordinary external journal.
+        data_stage: (roots.data.is_none() && delta_has_data_action(delta))
             .then(|| ControlName::new(format!("jit-stage-{id}")))
             .transpose()
             .map_err(anyhow::Error::msg)?,
@@ -1614,11 +1626,11 @@ fn publish_repository_actions(
         )?;
     }
 
-    if journal.data_root_was_absent {
-        let stage_name = journal
-            .data_stage
-            .as_ref()
-            .expect("absent root has a stage");
+    // The staged data root is published only when the absent-root delta carried a
+    // Data action (a `data_stage` was allocated). A worktree-only delta over an
+    // absent root has already published its worktree actions above and commits
+    // through the external journal without materializing an empty `.jit`.
+    if let Some(stage_name) = journal.data_stage.clone() {
         let stage = open_existing_dir(&roots.data_parent, stage_name.as_str())?;
         // Reverify every staged data action against its recorded final identity
         // while the stage is still mutable and nothing is committed. A staged
