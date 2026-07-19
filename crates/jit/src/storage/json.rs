@@ -14,7 +14,6 @@ use crate::storage::{
     RepositoryFormatTooNewError, RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, bail, Context, Result};
-use cap_std::{ambient_authority, fs::Dir};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
@@ -317,13 +316,6 @@ impl JsonFileStorage {
     /// just as they are for the ordinary append path.
     pub(crate) fn acquire_events_write_lock(&self) -> Result<crate::storage::lock::LockGuard> {
         self.locker.lock_exclusive(&self.root.join(".events.lock"))
-    }
-
-    /// Open a capability for the repository containing this JIT data directory.
-    pub(crate) fn open_repository_capability(&self) -> Result<Dir> {
-        let root = repository_root_for_storage(&self.root)?;
-        Dir::open_ambient_dir(root, ambient_authority())
-            .with_context(|| format!("Failed to open repository root {}", root.display()))
     }
 
     /// Capture byte-exact profile target paths and their existing ancestors.

@@ -3,24 +3,25 @@ use crate::domain::Event;
 use crate::profile::{
     append_profile_event_image, jit_dogfood_package, plan_profile_application_against,
     AppliedProfileRecord, EmbeddedProfilePackage, PlannedTargetAction, ProfileApplicationPlan,
-    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileListResult,
-    ProfileOrigin, ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary,
-    ProfileTargetAction, ProfileTargetChange, ProjectedFileMode, RepositorySnapshot, SnapshotEntry,
+    ProfileApplicationStatus, ProfileApplyResult, ProfileListResult, ProfileOrigin,
+    ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction,
+    ProfileTargetChange, RepositorySnapshot, SnapshotEntry,
+};
+use crate::repository_state::{
+    apply_overlay, finalize_profile_application, ProfileContribution, ProfileTargetContribution,
+    VirtualPath,
 };
 use crate::storage::{
-    FileTransactionKernel, FileTransactionPlan, IssueStore, JsonFileStorage, RecoveryCoordinator,
-    RecoveryRequiredError, RecoveryState, TransactionAction,
+    IssueStore, JsonFileStorage, RepositoryStateStore, RepositoryStateStoreError,
 };
 use crate::validation::repository::{
     FilesystemRepositoryView, OverlayRepositoryView, RepositoryValidationFailure, RepositoryView,
 };
-use anyhow::Result;
-use std::path::{Path, PathBuf};
+use anyhow::{anyhow, Result};
+use std::path::PathBuf;
 use std::sync::Arc;
-use uuid::Uuid;
 
 struct PreparedProfileApplication {
-    record_path: String,
     record: AppliedProfileRecord,
     record_matches: bool,
     snapshot: RepositorySnapshot,
@@ -118,138 +119,124 @@ impl CommandExecutor<JsonFileStorage> {
         embedded_profile(id).map(|_| ())
     }
 
-    /// Apply one validated embedded profile package under a single write lock.
+    /// Apply one validated embedded profile package through the recovered session.
+    ///
+    /// Each attempt rebuilds the plan inputs, captures the whole-repository base
+    /// under the held session guard, finalizes one exact profile-application delta,
+    /// validates that delta's proposed overlay, and publishes through
+    /// `session.apply` with pre-journal revalidation. A no-op profile (plan no-op
+    /// and provenance already recorded) publishes nothing.
     pub fn apply_embedded_profile(
         &self,
         package: &EmbeddedProfilePackage<'_>,
     ) -> Result<ProfileApplyResult> {
-        // Direct library callers receive the same universal recovery boundary
-        // as CLI mutation dispatch. The retained CLI session, when present, is
-        // reentrant on this thread; otherwise this session closes the
-        // recovery-to-first-write race for the duration of application.
-        let _recovery_session = RecoveryCoordinator::recover_before_services(&self.storage)?;
-        let kernel = FileTransactionKernel::new(self.storage.open_repository_capability()?)?;
-        self.apply_embedded_profile_with_kernel(package, &kernel)
+        let metadata = &package.manifest().profile;
+        let layout = self.require_layout()?;
+        let mut session = self.storage().open_mutation_session(layout)?;
+        for _ in 0..8 {
+            let prepared = self.prepare_embedded_profile(package)?;
+            if prepared.plan.is_no_op() && prepared.record_matches {
+                return Ok(ProfileApplyResult {
+                    id: metadata.id.clone(),
+                    version: metadata.version.clone(),
+                    status: ProfileApplicationStatus::Unchanged,
+                    plan_hash: prepared.plan.identity.plan_hash,
+                    transaction_id: None,
+                    warnings: Vec::new(),
+                });
+            }
+            ensure_profile_directory(&prepared.snapshot)?;
+            let contribution = self.profile_contribution(package, &prepared)?;
+
+            // Probe capture yields a base good enough to finalize the exact delta;
+            // that delta's overlay is the authoritative proposed state for both the
+            // capture closure and validation, so a preserved file is never shadowed.
+            let extra_paths = contribution.delta_paths()?;
+            let probe_overrides = contribution.overlay_overrides()?;
+            let probe = match self.capture_proposed_base(
+                session.as_mut(),
+                &probe_overrides,
+                &extra_paths,
+            )? {
+                None => continue,
+                Some(base) => base,
+            };
+            let delta_overlay = super::validation_overlay(
+                finalize_profile_application(&probe, &contribution)?.delta(),
+            );
+
+            let base =
+                match self.capture_proposed_base(session.as_mut(), &delta_overlay, &extra_paths)? {
+                    None => continue,
+                    Some(base) => base,
+                };
+            let plan = finalize_profile_application(&base, &contribution)?;
+            let proposed = apply_overlay(&base, delta_overlay).map_err(anyhow::Error::from)?;
+            let validation = crate::validation::repository::validate_repository(&proposed)
+                .map_err(ProfileApplyError::from)?;
+            if validation.rule_report.has_errors() {
+                return Err(ProfileApplyError::FinalValidationFindings {
+                    error_count: validation.rule_report.error_count(),
+                }
+                .into());
+            }
+
+            match session.apply(&plan) {
+                Ok(outcome) => {
+                    return Ok(ProfileApplyResult {
+                        id: metadata.id.clone(),
+                        version: metadata.version.clone(),
+                        status: ProfileApplicationStatus::Applied,
+                        plan_hash: prepared.plan.identity.plan_hash,
+                        transaction_id: Some(outcome.transaction_hash),
+                        warnings: Vec::new(),
+                    });
+                }
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "profile application did not converge after repeated capture conflicts"
+        ))
     }
 
-    /// Internal test seam for deterministic interruption and cleanup failure.
-    fn apply_embedded_profile_with_kernel(
+    /// Convert one prepared profile application into its canonical contribution:
+    /// changed asset targets, provenance record, appended audit log, and the
+    /// directory requirement. Asset bytes and the `ProfileApplied` event still come
+    /// from the transitional planner/helpers (increments 6/7).
+    fn profile_contribution(
         &self,
         package: &EmbeddedProfilePackage<'_>,
-        kernel: &FileTransactionKernel,
-    ) -> Result<ProfileApplyResult> {
-        // Capture the base validation image BEFORE acquiring the repository/event
-        // locks. The event lock is a non-reentrant file lock, so a capture session
-        // opened while it is held would deadlock; the proposed overlay is validated
-        // purely below. This capture-before-locks pattern is TRANSITIONAL scaffolding
-        // for this package: increment 5 deepens the retained session so capture and
-        // publication share one held guard with pre-journal revalidation (plan §2).
-        let base_image = self.capture_validation_image_with(&std::collections::BTreeMap::new())?;
-        let repo_guard = self.storage.acquire_repo_write_lock()?;
-        let _events_guard = self.storage.acquire_events_write_lock()?;
-
-        // Rebuild all plan inputs after serialization. Nothing computed before
-        // this boundary is trusted for publication.
-        let prepared = self.prepare_embedded_profile(package)?;
+        prepared: &PreparedProfileApplication,
+    ) -> Result<ProfileContribution> {
         let metadata = &package.manifest().profile;
-        if prepared.plan.is_no_op() && prepared.record_matches {
-            return Ok(ProfileApplyResult {
-                id: metadata.id.clone(),
-                version: metadata.version.clone(),
-                status: ProfileApplicationStatus::Unchanged,
-                plan_hash: prepared.plan.identity.plan_hash,
-                transaction_id: None,
-                warnings: Vec::new(),
-            });
-        }
-
-        ensure_profile_directory(&prepared.snapshot)?;
-        let record_bytes = prepared.record.to_bytes()?;
-
-        // Proposed-state validation overlays the final profile bytes onto the base
-        // image captured before the locks and validates the result through the
-        // closed pipeline (pure; no session under the held event lock).
-        let mut overlay = prepared.plan.overlay_changes();
-        overlay.insert(
-            PathBuf::from(&prepared.record_path),
-            Some(record_bytes.clone()),
-        );
-        overlay.insert(
-            PathBuf::from(".jit/events.jsonl"),
-            Some(prepared.next_events.clone()),
-        );
-        let final_overrides = super::overrides_from_repo_changes(overlay)?;
-        let final_image = crate::repository_state::apply_overlay(&base_image, final_overrides)?;
-        let validation = crate::validation::repository::validate_repository(&final_image)
-            .map_err(ProfileApplyError::from)?;
-        if validation.rule_report.has_errors() {
-            return Err(ProfileApplyError::FinalValidationFindings {
-                error_count: validation.rule_report.error_count(),
-            }
-            .into());
-        }
-
-        let mut actions = prepared
+        let targets = prepared
             .plan
             .targets
             .values()
             .filter(|target| target.action != PlannedTargetAction::NoOp)
-            .map(|target| TransactionAction::WriteFile {
-                path: transaction_path(self.storage.root(), &target.path),
-                contents: target.bytes.clone(),
-                unix_mode: unix_mode(target.mode),
+            .map(|target| {
+                Ok(ProfileTargetContribution {
+                    path: super::repo_rel_virtual_path(&target.path)?,
+                    bytes: target.bytes.clone(),
+                    mode: super::file_mode(target.mode),
+                })
             })
-            .collect::<Vec<_>>();
-        if prepared.snapshot.entry(".jit/profiles").is_none() {
-            actions.push(TransactionAction::CreateDirectory {
-                path: transaction_path(self.storage.root(), ".jit/profiles"),
-                unix_mode: Some(0o755),
-            });
-        }
-        if !prepared.record_matches {
-            actions.push(TransactionAction::WriteFile {
-                path: transaction_path(self.storage.root(), &prepared.record_path),
-                contents: record_bytes,
-                unix_mode: Some(0o644),
-            });
-        }
-        actions.push(TransactionAction::WriteFile {
-            path: transaction_path(self.storage.root(), ".jit/events.jsonl"),
-            contents: prepared.next_events,
-            unix_mode: Some(0o644),
-        });
-
-        let transaction_id = format!("profile-{}-{}", metadata.id, Uuid::new_v4());
-        let outcome = kernel.execute(
-            &repo_guard,
-            FileTransactionPlan {
-                transaction_id: transaction_id.clone(),
-                actions,
-            },
-        );
-        let warnings = match outcome {
-            Ok(_) => Vec::new(),
-            Err(error) => {
-                let Some(recovery) = error.downcast_ref::<RecoveryRequiredError>() else {
-                    return Err(error);
-                };
-                if recovery.state != RecoveryState::Committed {
-                    return Err(error);
-                }
-                vec![ProfileApplicationWarning::TransactionCleanupPending {
-                    transaction_id: transaction_id.clone(),
-                    reason: format!("{:#}", recovery.source),
-                }]
-            }
-        };
-
-        Ok(ProfileApplyResult {
+            .collect::<Result<Vec<_>>>()?;
+        Ok(ProfileContribution {
             id: metadata.id.clone(),
             version: metadata.version.clone(),
-            status: ProfileApplicationStatus::Applied,
-            plan_hash: prepared.plan.identity.plan_hash,
-            transaction_id: Some(transaction_id),
-            warnings,
+            package_hash: package.hashes().package.clone(),
+            targets,
+            record_path: VirtualPath::data(format!("profiles/{}.json", metadata.id))?,
+            record_bytes: prepared.record.to_bytes()?,
+            record_changed: !prepared.record_matches,
+            events_bytes: prepared.next_events.clone(),
+            // The apply path is reached only when the profile changed, and it always
+            // appends exactly one `ProfileApplied` event to the captured prefix.
+            events_changed: true,
+            ensure_profiles_dir: prepared.snapshot.entry(".jit/profiles").is_none(),
         })
     }
 
@@ -299,7 +286,6 @@ impl CommandExecutor<JsonFileStorage> {
         };
         let plan = plan_profile_application_against(package, &snapshot, planning_validation_base)?;
         Ok(PreparedProfileApplication {
-            record_path,
             record,
             record_matches,
             snapshot,
@@ -455,84 +441,45 @@ pub(super) fn reject_reserved_application_targets<'a>(
     Ok(())
 }
 
-pub(super) fn unix_mode(mode: ProjectedFileMode) -> Option<u32> {
-    Some(match mode {
-        ProjectedFileMode::Regular => 0o644,
-        ProjectedFileMode::Executable => 0o755,
-    })
-}
-
-pub(super) fn transaction_path(storage_root: &Path, virtual_path: &str) -> String {
-    let storage_name = storage_root
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or(".jit");
-    virtual_path.strip_prefix(".jit").map_or_else(
-        || virtual_path.to_string(),
-        |suffix| format!("{storage_name}{suffix}"),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::hierarchy_templates::HierarchyTemplate;
-    use crate::storage::{
-        RecoveryCoordinator, TransactionFailureInjector, TransactionFailurePoint,
-    };
+    use crate::storage::discover_repository_layout;
     use include_dir::{include_dir, Dir};
-    use std::collections::{BTreeMap, HashSet};
+    use std::collections::BTreeMap;
     use std::fs;
-    use std::io;
-    use std::sync::Arc;
     use tempfile::TempDir;
 
     static PACKAGE: Dir<'_> =
         include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only");
 
-    struct SelectedFailures(HashSet<TransactionFailurePoint>);
-
-    impl TransactionFailureInjector for SelectedFailures {
-        fn check(&self, point: &TransactionFailurePoint) -> io::Result<()> {
-            if self.0.contains(point) {
-                Err(io::Error::other(format!("injected {point:?}")))
-            } else {
-                Ok(())
-            }
-        }
-    }
-
-    fn fixture() -> (TempDir, JsonFileStorage, EmbeddedProfilePackage<'static>) {
+    /// A file-backed executor over an initialized, config-seeded repository carrying
+    /// its canonical layout.
+    fn fixture() -> (
+        TempDir,
+        JsonFileStorage,
+        CommandExecutor<JsonFileStorage>,
+        EmbeddedProfilePackage<'static>,
+    ) {
         let temp = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp.path().join(".jit"));
         storage.init().unwrap();
-        CommandExecutor::new(storage.clone())
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+        executor
             .seed_project_config(
                 temp.path(),
                 &HierarchyTemplate::default().generate_config_toml(),
             )
             .unwrap();
         let package = EmbeddedProfilePackage::from_dir(&PACKAGE).unwrap();
-        (temp, storage, package)
-    }
-
-    fn kernel(
-        storage: &JsonFileStorage,
-        failures: impl IntoIterator<Item = TransactionFailurePoint>,
-    ) -> FileTransactionKernel {
-        FileTransactionKernel::with_injector(
-            storage.open_repository_capability().unwrap(),
-            Arc::new(SelectedFailures(failures.into_iter().collect())),
-        )
-        .unwrap()
+        (temp, storage, executor, package)
     }
 
     #[test]
     fn test_profile_application_commits_targets_record_event_and_exact_no_op() {
-        let (temp, storage, package) = fixture();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(
-            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
-        );
+        let (temp, storage, executor, package) = fixture();
 
         let applied = executor.apply_embedded_profile(&package).unwrap();
         assert_eq!(applied.status, ProfileApplicationStatus::Applied);
@@ -568,88 +515,9 @@ mod tests {
     }
 
     #[test]
-    fn test_profile_application_rolls_back_handled_publication_failure() {
-        let (temp, storage, package) = fixture();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(
-            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
-        );
-        let kernel = kernel(
-            &storage,
-            [TransactionFailurePoint::AfterPublish { action: 1 }],
-        );
-
-        assert!(executor
-            .apply_embedded_profile_with_kernel(&package, &kernel)
-            .is_err());
-        assert!(!temp.path().join("docs/profile.txt").exists());
-        assert!(!temp
-            .path()
-            .join(".jit/profiles/planner-asset-only.json")
-            .exists());
-        assert!(storage.read_events().unwrap().is_empty());
-    }
-
-    #[test]
-    fn test_profile_application_reports_committed_cleanup_and_recovery_cleans_it() {
-        let (temp, storage, package) = fixture();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(
-            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
-        );
-        let kernel = kernel(&storage, [TransactionFailurePoint::CleanupTerminalResidue]);
-
-        let applied = executor
-            .apply_embedded_profile_with_kernel(&package, &kernel)
-            .unwrap();
-        assert_eq!(applied.status, ProfileApplicationStatus::Applied);
-        assert_eq!(applied.warnings.len(), 1);
-        assert!(temp.path().join("docs/profile.txt").exists());
-        drop(executor);
-
-        let session = RecoveryCoordinator::recover_before_services(&storage).unwrap();
-        assert_eq!(session.report().recovered_count(), 1);
-        drop(session);
-        assert_eq!(storage.read_events().unwrap().len(), 1);
-    }
-
-    #[test]
-    fn test_profile_application_prepared_interruption_recovers_all_old_state() {
-        let (temp, storage, package) = fixture();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(
-            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
-        );
-        let kernel = kernel(
-            &storage,
-            [
-                TransactionFailurePoint::AfterPublish { action: 1 },
-                TransactionFailurePoint::ReverseAction { action: 1 },
-            ],
-        );
-
-        let error = executor
-            .apply_embedded_profile_with_kernel(&package, &kernel)
-            .unwrap_err();
-        let recovery = error.downcast_ref::<RecoveryRequiredError>().unwrap();
-        assert_eq!(recovery.state, RecoveryState::Prepared);
-        drop(executor);
-
-        let session = RecoveryCoordinator::recover_before_services(&storage).unwrap();
-        assert_eq!(session.report().recovered_count(), 1);
-        drop(session);
-        assert!(!temp.path().join("docs/profile.txt").exists());
-        assert!(!temp
-            .path()
-            .join(".jit/profiles/planner-asset-only.json")
-            .exists());
-        assert!(storage.read_events().unwrap().is_empty());
-    }
-
-    #[test]
     fn test_profile_application_revalidates_locked_snapshot_before_any_write() {
-        let (temp, storage, package) = fixture();
+        let (temp, storage, executor, package) = fixture();
         fs::write(temp.path().join(".jit/config.toml"), b"not = [valid").unwrap();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(
-            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
-        );
 
         assert!(executor.apply_embedded_profile(&package).is_err());
         assert!(!temp.path().join("docs/profile.txt").exists());
@@ -659,12 +527,9 @@ mod tests {
 
     #[test]
     fn test_profile_application_preserves_and_certifies_torn_event_tail_end_to_end() {
-        let (temp, storage, package) = fixture();
+        let (temp, storage, executor, package) = fixture();
         let torn = b"{\"torn\":";
         fs::write(temp.path().join(".jit/events.jsonl"), torn).unwrap();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(
-            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
-        );
 
         executor.apply_embedded_profile(&package).unwrap();
 
@@ -683,7 +548,7 @@ mod tests {
 
     #[test]
     fn test_profile_application_does_not_mark_valid_unterminated_event_as_torn() {
-        let (temp, storage, package) = fixture();
+        let (temp, storage, executor, package) = fixture();
         let prior_event = Event::new_profile_applied(
             "prior".to_string(),
             "1.0.0".to_string(),
@@ -697,9 +562,6 @@ mod tests {
             serde_json::to_vec(&prior_event).unwrap(),
         )
         .unwrap();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(
-            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
-        );
 
         executor.apply_embedded_profile(&package).unwrap();
 
@@ -712,36 +574,5 @@ mod tests {
                 ..
             }
         ));
-    }
-
-    #[test]
-    fn test_public_profile_application_recovers_pending_journal_before_publish() {
-        let (temp, storage, package) = fixture();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(
-            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
-        );
-        let kernel = kernel(
-            &storage,
-            [
-                TransactionFailurePoint::AfterPublish { action: 1 },
-                TransactionFailurePoint::ReverseAction { action: 1 },
-            ],
-        );
-        let error = executor
-            .apply_embedded_profile_with_kernel(&package, &kernel)
-            .unwrap_err();
-        assert_eq!(
-            error.downcast_ref::<RecoveryRequiredError>().unwrap().state,
-            RecoveryState::Prepared
-        );
-
-        let applied = executor.apply_embedded_profile(&package).unwrap();
-
-        assert_eq!(applied.status, ProfileApplicationStatus::Applied);
-        assert_eq!(
-            fs::read(temp.path().join("docs/profile.txt")).unwrap(),
-            package.source_bytes("assets/profile.txt").unwrap()
-        );
-        assert_eq!(storage.read_events().unwrap().len(), 1);
     }
 }

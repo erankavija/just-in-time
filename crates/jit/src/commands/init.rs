@@ -8,7 +8,7 @@ use crate::profile::{
     ProjectedFileMode, RepositorySnapshot, SnapshotEntry, SnapshotFile,
 };
 use crate::repository_state::{
-    apply_overlay, finalize_initialization, FileMode, InitializationScaffold, ProfileContribution,
+    apply_overlay, finalize_initialization, InitializationScaffold, ProfileContribution,
     ProfileTargetContribution, VirtualPath,
 };
 use crate::storage::{
@@ -106,7 +106,7 @@ impl CommandExecutor<JsonFileStorage> {
                 Some(base) => base,
             };
             let delta_overlay =
-                validation_overlay(finalize_initialization(&probe, &scaffold)?.delta());
+                super::validation_overlay(finalize_initialization(&probe, &scaffold)?.delta());
 
             // Re-capture the base with the exact write set so the validation closure
             // and the delta's preimages come from one coherent image, then finalize,
@@ -283,9 +283,9 @@ impl CommandExecutor<JsonFileStorage> {
             .filter(|target| target.action != PlannedTargetAction::NoOp)
             .map(|target| {
                 Ok(ProfileTargetContribution {
-                    path: repo_rel_virtual_path(&target.path)?,
+                    path: super::repo_rel_virtual_path(&target.path)?,
                     bytes: target.bytes.clone(),
-                    mode: file_mode(target.mode),
+                    mode: super::file_mode(target.mode),
                 })
             })
             .collect::<Result<Vec<_>>>()?;
@@ -320,43 +320,6 @@ impl CommandExecutor<JsonFileStorage> {
 /// Resolve one embedded profile package by stable id.
 fn embedded_profile(id: &str) -> Result<EmbeddedProfilePackage<'static>> {
     super::profile::embedded_profile(id)
-}
-
-/// Project a finalized delta to the file-overlay validation reads: each written
-/// file's bytes and each deleted file's absence, ignoring directory and mode
-/// actions. This is the exact proposed repository state — only what init writes.
-fn validation_overlay(
-    delta: &crate::repository_state::RepositoryDelta,
-) -> std::collections::BTreeMap<VirtualPath, Option<Vec<u8>>> {
-    use crate::repository_state::RepositoryAction;
-    delta
-        .actions()
-        .iter()
-        .filter_map(|action| match action {
-            RepositoryAction::WriteFile { path, bytes, .. } => {
-                Some((path.clone(), Some(bytes.clone())))
-            }
-            RepositoryAction::DeleteFile { path, .. } => Some((path.clone(), None)),
-            RepositoryAction::CreateDirectory { .. } | RepositoryAction::SetMode { .. } => None,
-        })
-        .collect()
-}
-
-/// Map a repository-relative path to its canonical virtual path (`.jit/...` is
-/// `Data`, everything else `Worktree`).
-fn repo_rel_virtual_path(path: &str) -> Result<VirtualPath> {
-    match path.strip_prefix(".jit/") {
-        Some(rest) => Ok(VirtualPath::data(rest)?),
-        None => Ok(VirtualPath::worktree(path)?),
-    }
-}
-
-/// Translate the transitional planner's mode into the canonical entry mode.
-fn file_mode(mode: ProjectedFileMode) -> FileMode {
-    match mode {
-        ProjectedFileMode::Regular => FileMode::Regular,
-        ProjectedFileMode::Executable => FileMode::Executable,
-    }
 }
 
 #[cfg(test)]

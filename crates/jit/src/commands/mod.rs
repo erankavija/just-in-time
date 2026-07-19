@@ -364,9 +364,10 @@ impl ImageDeclarations {
 /// `(VirtualPath, Some|None)` entry (`.jit/...` is `Data`, everything else
 /// `Worktree`) suitable for
 /// [`apply_overlay`](crate::repository_state::apply_overlay) and the overlaid
-/// validation capture. This adapts the transitional command-local proposal
-/// machinery (init scaffold overlay, profile plan overlay) to the delta vocabulary
-/// until increments 5/6 produce typed deltas directly.
+/// validation capture. Production init/profile now compose typed deltas directly;
+/// this remains as a proposed-overlay test helper for validation/gate-check suites
+/// (a `.jit`-prefix path adapter on the increment-8 deletion sweep).
+#[cfg(test)]
 pub(crate) fn overrides_from_repo_changes(
     changes: impl IntoIterator<Item = (std::path::PathBuf, Option<Vec<u8>>)>,
 ) -> Result<std::collections::BTreeMap<crate::repository_state::VirtualPath, Option<Vec<u8>>>> {
@@ -399,6 +400,50 @@ fn image_repo_bytes(
         None => VirtualPath::worktree(repo_rel),
     }?;
     Ok(image.file_bytes(&vpath)?.map(<[u8]>::to_vec))
+}
+
+/// Project a finalized delta to the file-overlay validation reads: each written
+/// file's bytes and each deleted file's absence, ignoring directory and mode
+/// actions. This is the exact proposed repository state — only what the delta
+/// writes — used by init/profile to validate their proposed state under one
+/// coherent captured image.
+pub(crate) fn validation_overlay(
+    delta: &crate::repository_state::RepositoryDelta,
+) -> std::collections::BTreeMap<crate::repository_state::VirtualPath, Option<Vec<u8>>> {
+    use crate::repository_state::RepositoryAction;
+    delta
+        .actions()
+        .iter()
+        .filter_map(|action| match action {
+            RepositoryAction::WriteFile { path, bytes, .. } => {
+                Some((path.clone(), Some(bytes.clone())))
+            }
+            RepositoryAction::DeleteFile { path, .. } => Some((path.clone(), None)),
+            RepositoryAction::CreateDirectory { .. } | RepositoryAction::SetMode { .. } => None,
+        })
+        .collect()
+}
+
+/// Map a repository-relative path to its canonical virtual path (`.jit/...` is
+/// `Data`, everything else `Worktree`).
+pub(crate) fn repo_rel_virtual_path(path: &str) -> Result<crate::repository_state::VirtualPath> {
+    use crate::repository_state::VirtualPath;
+    match path.strip_prefix(".jit/") {
+        Some(rest) => Ok(VirtualPath::data(rest)?),
+        None => Ok(VirtualPath::worktree(path)?),
+    }
+}
+
+/// Translate the transitional profile planner's mode into the canonical entry mode.
+pub(crate) fn file_mode(
+    mode: crate::profile::ProjectedFileMode,
+) -> crate::repository_state::FileMode {
+    match mode {
+        crate::profile::ProjectedFileMode::Regular => crate::repository_state::FileMode::Regular,
+        crate::profile::ProjectedFileMode::Executable => {
+            crate::repository_state::FileMode::Executable
+        }
+    }
 }
 
 /// Assemble the configuration, effective rule set, and gate registry from a

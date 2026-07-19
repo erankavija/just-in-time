@@ -92,6 +92,45 @@ pub struct ProfileContribution {
     pub ensure_profiles_dir: bool,
 }
 
+impl ProfileContribution {
+    /// Every path a standalone profile-application delta may touch — asset targets,
+    /// the provenance record, the audit log, the profiles directory, and every
+    /// ancestor directory — so the command discovers them into its capture spec.
+    pub fn delta_paths(&self) -> Result<Vec<VirtualPath>, InitializationError> {
+        let mut paths: Vec<VirtualPath> = self
+            .targets
+            .iter()
+            .map(|target| target.path.clone())
+            .collect();
+        paths.push(self.record_path.clone());
+        paths.push(VirtualPath::data("events.jsonl")?);
+        if self.ensure_profiles_dir {
+            paths.push(VirtualPath::data("profiles")?);
+        }
+        with_ancestor_dirs(paths)
+    }
+
+    /// The proposed bytes for every profile target, for the command's capture
+    /// closure and proposed-state validation overlay.
+    pub fn overlay_overrides(
+        &self,
+    ) -> Result<BTreeMap<VirtualPath, Option<Vec<u8>>>, InitializationError> {
+        let mut overrides: BTreeMap<VirtualPath, Option<Vec<u8>>> = self
+            .targets
+            .iter()
+            .map(|target| (target.path.clone(), Some(target.bytes.clone())))
+            .collect();
+        overrides.insert(
+            VirtualPath::data("events.jsonl")?,
+            Some(self.events_bytes.clone()),
+        );
+        if self.record_changed {
+            overrides.insert(self.record_path.clone(), Some(self.record_bytes.clone()));
+        }
+        Ok(overrides)
+    }
+}
+
 /// Failure while rendering or composing an initialization/profile delta.
 #[derive(Debug, thiserror::Error)]
 pub enum InitializationError {
