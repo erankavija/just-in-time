@@ -65,9 +65,12 @@ pub struct FileTransactionOutcome {
 /// Machine-local control location containing pending transaction journals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransactionControlLocation {
-    /// Repository-sibling `.jit-bootstrap/`, used when `.jit/` was absent.
+    /// Worktree-side control at `Worktree(.jit-bootstrap/transactions)`, used while
+    /// the selected data root does not yet exist.
     ExternalBootstrap,
-    /// Repository-local `.jit/tmp/transactions/`.
+    /// Data-root-relative control at `Data(tmp/transactions)`, used once the
+    /// selected data root exists (its physical prefix follows the data root, which
+    /// need not be a literal `.jit`).
     InternalRepository,
 }
 
@@ -1870,11 +1873,30 @@ fn rollback_repository_action(
             }
         }
         RepositoryJournalActionKind::SetMode { .. } => {
-            ensure_repository_final(&path, &action.final_identity, &current)?;
-            let ExpectedPreimage::File { mode, .. } = action.expected else {
+            let RepositoryFinalIdentity::File {
+                identity: final_identity,
+                mode: final_mode,
+            } = &action.final_identity
+            else {
+                unreachable!("SetMode has a file final identity")
+            };
+            let ExpectedPreimage::File {
+                mode: original_mode,
+                ..
+            } = action.expected
+            else {
                 unreachable!("SetMode has a file preimage")
             };
-            set_mode(&parent, &leaf, repository_unix_mode(mode))?;
+            // Verify the live target is the mode-changed file and restore the
+            // original mode on the SAME handle, so a bystander swapped in after the
+            // inspect above is never chmodded (the publication side uses the same
+            // helper, covered by test_set_mode_leaf_symlink_swap_cannot_mutate_
+            // external_target and test_set_mode_revalidates_identity_on_the_mutated_handle).
+            let expected_final = ExpectedPreimage::File {
+                identity: final_identity.clone(),
+                mode: *final_mode,
+            };
+            set_repository_mode_if_identity(&parent, &leaf, &expected_final, original_mode, &path)?;
             sync_directory(&parent)?;
         }
         RepositoryJournalActionKind::DeleteFile { backup } => {
@@ -2070,7 +2092,15 @@ fn verify_repository_restored_actions(
     journal: &RepositoryTransactionJournal,
 ) -> Result<()> {
     for action in &journal.actions {
-        if journal.data_root_was_absent && action.path.root == RepositoryRootClass::Data {
+        // A RolledBack decision is written only after every action's restore was
+        // already verified against its preimage (see rollback_repository_action).
+        // Recovery of that terminal residue must therefore only finish cleanup, not
+        // re-assert Worktree preimages — a user may have legitimately edited a
+        // restored Worktree target before the interrupted cleanup ran, exactly as
+        // the committed arm tolerates. Absent-root Data actions have no live target.
+        if action.path.root == RepositoryRootClass::Worktree
+            || (journal.data_root_was_absent && action.path.root == RepositoryRootClass::Data)
+        {
             continue;
         }
         let path = journal_virtual_path(roots, &action.path)?;

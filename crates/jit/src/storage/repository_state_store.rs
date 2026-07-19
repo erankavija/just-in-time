@@ -446,6 +446,16 @@ impl RepositoryMutationSession for MemoryMutationSession<'_> {
         let original = state.clone_without_recovery();
         let mut candidate = original.clone();
         let plan_hash = semantic_delta_hash(delta)?;
+        // Mirror the kernel short-circuit: an empty delta is a no-op that creates
+        // no control, residue, or injector boundary; return the clean zero-action
+        // outcome before any failure check or residue write.
+        if delta.actions().is_empty() {
+            self.captured = None;
+            return Ok(RepositoryApplyOutcome {
+                transaction_hash: plan_hash,
+                actions_applied: 0,
+            });
+        }
         state.recovery = Some(MemoryRecoveryResidue::Prepared {
             original: Box::new(original.clone()),
             final_state: Box::new(candidate.clone()),
@@ -472,16 +482,41 @@ impl RepositoryMutationSession for MemoryMutationSession<'_> {
                 .check(&TransactionFailurePoint::RepositorySyncPreparedAction { action: index })?;
         }
         for (index, action) in delta.actions().iter().enumerate() {
-            failures.check(&TransactionFailurePoint::RepositoryBeforeAction { action: index })?;
+            // Staged Data actions of an absent-root delta have no per-action
+            // publication boundary in the kernel (they land inside the stage and
+            // are committed by the single root rename), so skip their Before/After
+            // checks to keep the failure-point set identical across backends.
+            let staged_absent_data = !original.data_root_exists
+                && action.path().root_class() == RepositoryRootClass::Data;
+            if !staged_absent_data {
+                failures
+                    .check(&TransactionFailurePoint::RepositoryBeforeAction { action: index })?;
+            }
             apply_memory_action(&self.layout, &mut candidate, action)?;
             if let Some(MemoryRecoveryResidue::Prepared { final_state, .. }) = &mut state.recovery {
                 **final_state = candidate.clone();
             }
-            failures.check(&TransactionFailurePoint::RepositoryAfterAction { action: index })?;
+            if !staged_absent_data {
+                failures
+                    .check(&TransactionFailurePoint::RepositoryAfterAction { action: index })?;
+            }
         }
         let absent_root = !original.data_root_exists && candidate.data_root_exists;
         if absent_root {
             failures.check(&TransactionFailurePoint::RepositoryBeforeDataRootPublication)?;
+            // Publish the staged root: it becomes a real Directory entry, so a
+            // later capture of Data("") is a Directory on both backends. Idempotent
+            // with an explicit CreateDirectory Data("") (which the kernel does not
+            // require — the stage dir is the root). A worktree-only absent-root
+            // delta materializes nothing (candidate.data_root_exists stays false).
+            let published_root = RepositoryEntry::Directory {
+                identity: EntryIdentity::for_bytes("memory-directory:data-root", b"directory")?,
+                mode: FileMode::Executable,
+            };
+            candidate
+                .entries
+                .entry(VirtualPath::data("")?)
+                .or_insert(published_root);
         }
         state.entries = candidate.entries.clone();
         state.data_root_exists = candidate.data_root_exists;
@@ -724,11 +759,17 @@ fn memory_listing(
             ))
         })
         .collect();
-    match state.entries.get(path).and_then(RepositoryEntry::identity) {
-        Some(identity) => {
+    // Mirror inspect_capability_listing: a directory yields its fingerprint, an
+    // absent path yields the absent fingerprint, and any other kind (file, symlink,
+    // unsupported) is an error rather than a fabricated directory listing.
+    match state.entries.get(path) {
+        Some(RepositoryEntry::Directory { identity, .. }) => {
             ListingFingerprint::for_directory(identity.clone(), children).map_err(Into::into)
         }
-        None => ListingFingerprint::for_absent().map_err(Into::into),
+        None | Some(RepositoryEntry::Absent) => {
+            ListingFingerprint::for_absent().map_err(Into::into)
+        }
+        Some(_) => Err(RepositoryStateStoreError::UnsafeTarget(format!("{path:?}"))),
     }
 }
 
@@ -746,12 +787,43 @@ fn recover_memory_state(state: &mut MemoryRepositoryState) {
     }
 }
 
+/// Require that an action's parent directory already exists, mirroring the JSON
+/// kernel's `open_parent` (which walks every intermediate component under the root
+/// capability and fails with `MissingParent` when one is absent). Only intermediate
+/// directories are checked; the root capability itself (empty relative) always
+/// exists and is never a parent to verify. Because every `CreateDirectory` goes
+/// through this same check, a present `Directory` entry implies all its ancestors
+/// exist, so verifying the immediate parent is sufficient.
+fn ensure_memory_parent_exists(
+    state: &MemoryRepositoryState,
+    path: &VirtualPath,
+) -> Result<(), RepositoryStateStoreError> {
+    let Some(parent) = path.relative().as_path().parent() else {
+        return Ok(());
+    };
+    if parent.as_os_str().is_empty() {
+        return Ok(());
+    }
+    let parent_path = VirtualPath::from_root(path.root_class(), RootRelativePath::parse(parent)?)?;
+    if matches!(
+        state.entries.get(&parent_path),
+        Some(RepositoryEntry::Directory { .. })
+    ) {
+        Ok(())
+    } else {
+        Err(RepositoryStateStoreError::Transaction(anyhow::anyhow!(
+            "missing target parent: {parent_path:?}"
+        )))
+    }
+}
+
 fn apply_memory_action(
     layout: &RepositoryLayout,
     state: &mut MemoryRepositoryState,
     action: &RepositoryAction,
 ) -> Result<(), RepositoryStateStoreError> {
     layout.ensure_canonical(action.path())?;
+    ensure_memory_parent_exists(state, action.path())?;
     let current = state
         .entries
         .get(action.path())
@@ -1522,9 +1594,12 @@ mod tests {
         );
         let mut session = storage.open_mutation_session(layout.clone()).unwrap();
         let image = session.capture(initial_spec()).unwrap();
-        assert!(session
-            .apply(&image, &initialization_delta(&layout))
-            .is_err());
+        // The occupied destination fails with the typed occupied-data-root error,
+        // not merely some error.
+        assert!(matches!(
+            session.apply(&image, &initialization_delta(&layout)),
+            Err(RepositoryStateStoreError::OccupiedDataRoot { .. })
+        ));
         assert!(data.is_dir());
         assert!(!data.join("index.json").exists());
         assert!(!temp.path().join("note.txt").exists());
@@ -1980,6 +2055,234 @@ mod tests {
         assert!(!data.join("tmp/transactions").exists());
     }
 
+    fn apply_once<S: RepositoryStateStore>(
+        store: &S,
+        layout: &RepositoryLayout,
+        spec: CaptureSpec,
+        delta: &RepositoryDelta,
+    ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError> {
+        let mut session = store.open_mutation_session(layout.clone())?;
+        let image = session.capture(spec)?;
+        session.apply(&image, delta)
+    }
+
+    #[test]
+    fn test_conformance_parent_existence_enforced_on_both_backends() {
+        for existing_root in [false, true] {
+            let worktree = TempDir::new().unwrap();
+            let data = worktree.path().join(".jit");
+            if existing_root {
+                std::fs::create_dir(&data).unwrap();
+            }
+            let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+            let spec = || {
+                CaptureSpec::phase_one(
+                    [
+                        VirtualPath::data("").unwrap(),
+                        VirtualPath::data("nested").unwrap(),
+                        VirtualPath::data("nested/file.txt").unwrap(),
+                    ],
+                    budget(),
+                )
+                .unwrap()
+            };
+
+            // A nested WriteFile whose parent directory is not created fails on both
+            // backends (JSON: open_parent MissingParent; memory: parent-existence
+            // rule), leaving the old state untouched.
+            let missing_parent = RepositoryDelta::new(
+                &layout,
+                vec![RepositoryAction::write_file(
+                    VirtualPath::data("nested/file.txt").unwrap(),
+                    "p0",
+                    ExpectedPreimage::Absent,
+                    b"x".to_vec(),
+                    FileMode::Regular,
+                )],
+            )
+            .unwrap();
+            let json = JsonFileStorage::new(&data);
+            assert!(apply_once(&json, &layout, spec(), &missing_parent).is_err());
+            assert!(
+                !data.join("nested").exists(),
+                "existing_root={existing_root}"
+            );
+            let memory = InMemoryStorage::new();
+            if existing_root {
+                seed_memory_existing(&memory, &[]);
+            }
+            assert!(apply_once(&memory, &layout, spec(), &missing_parent).is_err());
+
+            // The same delta with the explicit CreateDirectory parent succeeds
+            // identically on both backends (fresh trees to avoid carrying residue).
+            let worktree2 = TempDir::new().unwrap();
+            let data2 = worktree2.path().join(".jit");
+            if existing_root {
+                std::fs::create_dir(&data2).unwrap();
+            }
+            let layout2 = discover_repository_layout(worktree2.path(), &data2).unwrap();
+            let with_parent = RepositoryDelta::new(
+                &layout2,
+                vec![
+                    RepositoryAction::create_directory(
+                        VirtualPath::data("nested").unwrap(),
+                        "p0",
+                        ExpectedPreimage::Absent,
+                    ),
+                    RepositoryAction::write_file(
+                        VirtualPath::data("nested/file.txt").unwrap(),
+                        "p0",
+                        ExpectedPreimage::Absent,
+                        b"x".to_vec(),
+                        FileMode::Regular,
+                    ),
+                ],
+            )
+            .unwrap();
+            let json2 = JsonFileStorage::new(&data2);
+            let json_outcome = apply_once(&json2, &layout2, spec(), &with_parent).unwrap();
+            let memory2 = InMemoryStorage::new();
+            if existing_root {
+                seed_memory_existing(&memory2, &[]);
+            }
+            let memory_outcome = apply_once(&memory2, &layout2, spec(), &with_parent).unwrap();
+            assert_eq!(
+                json_outcome, memory_outcome,
+                "existing_root={existing_root}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_conformance_listing_over_file_errors_on_both_backends() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        std::fs::write(data.join("file.txt"), b"content").unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        let spec = || {
+            let mut spec =
+                CaptureSpec::phase_one([VirtualPath::data("file.txt").unwrap()], budget()).unwrap();
+            spec.discover_listing(VirtualPath::data("file.txt").unwrap())
+                .unwrap();
+            spec
+        };
+
+        // A complete-listing request over a regular file is an error on both
+        // backends, never a fabricated directory fingerprint.
+        let json = JsonFileStorage::new(&data);
+        let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
+        assert!(json_session.capture(spec()).is_err());
+
+        let memory = InMemoryStorage::new();
+        seed_memory_existing(
+            &memory,
+            &[(VirtualPath::data("file.txt").unwrap(), b"content")],
+        );
+        let mut memory_session = memory.open_mutation_session(layout).unwrap();
+        assert!(memory_session.capture(spec()).is_err());
+    }
+
+    #[test]
+    fn test_conformance_empty_delta_ignores_armed_injectors() {
+        for point in [
+            TransactionFailurePoint::RepositoryPrepareIntent,
+            TransactionFailurePoint::RepositoryAfterCommit,
+            TransactionFailurePoint::RepositoryCleanup,
+        ] {
+            let worktree = TempDir::new().unwrap();
+            let data = worktree.path().join(".jit");
+            std::fs::create_dir(&data).unwrap();
+            let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+            let spec =
+                || CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap();
+            let delta = RepositoryDelta::new(&layout, vec![]).unwrap();
+
+            // An empty delta short-circuits before any apply-phase injector on both
+            // backends, so an armed apply-phase failure never fires.
+            let json = JsonFileStorage::with_repository_state_failures(
+                &data,
+                SelectedFailures::one(point.clone()),
+            );
+            let json_outcome = apply_once(&json, &layout, spec(), &delta).unwrap();
+
+            let memory = InMemoryStorage::with_repository_state_failures(SelectedFailures::one(
+                point.clone(),
+            ));
+            seed_memory_existing(&memory, &[]);
+            let memory_outcome = apply_once(&memory, &layout, spec(), &delta).unwrap();
+
+            assert_eq!(json_outcome, memory_outcome, "{point:?}");
+            assert_eq!(json_outcome.actions_applied, 0);
+        }
+    }
+
+    #[test]
+    fn test_conformance_absent_root_data_only_materializes_data_root_dir() {
+        // JSON publishes the staged root WITHOUT requiring an explicit
+        // CreateDirectory Data("") (staging creates the stage dir, which becomes the
+        // published root); memory materializes the Data("") Directory to match. Both
+        // spellings — with and without an explicit root-dir action — must produce
+        // identical post-apply captures on both backends.
+        for explicit_root_dir in [false, true] {
+            let worktree = TempDir::new().unwrap();
+            let data = worktree.path().join(".jit");
+            let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+            let spec = || {
+                CaptureSpec::phase_one(
+                    [
+                        VirtualPath::data("").unwrap(),
+                        VirtualPath::data("index.json").unwrap(),
+                    ],
+                    budget(),
+                )
+                .unwrap()
+            };
+            let mut actions = Vec::new();
+            if explicit_root_dir {
+                actions.push(RepositoryAction::create_directory(
+                    VirtualPath::data("").unwrap(),
+                    "g",
+                    ExpectedPreimage::Absent,
+                ));
+            }
+            actions.push(RepositoryAction::write_file(
+                VirtualPath::data("index.json").unwrap(),
+                "g",
+                ExpectedPreimage::Absent,
+                b"{}".to_vec(),
+                FileMode::Regular,
+            ));
+            let delta = RepositoryDelta::new(&layout, actions).unwrap();
+
+            let memory = InMemoryStorage::new();
+            apply_once(&memory, &layout, spec(), &delta).unwrap();
+            let mut memory_after = memory.open_mutation_session(layout.clone()).unwrap();
+            let memory_view = semantic_view(&memory_after.capture(spec()).unwrap());
+
+            let json = JsonFileStorage::new(&data);
+            apply_once(&json, &layout, spec(), &delta).unwrap();
+            let json_after_store = JsonFileStorage::new(&data);
+            let mut json_after = json_after_store
+                .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
+                .unwrap();
+            let json_view = semantic_view(&json_after.capture(spec()).unwrap());
+
+            assert_eq!(
+                memory_view, json_view,
+                "explicit_root_dir={explicit_root_dir}"
+            );
+            assert!(matches!(
+                memory_view[&VirtualPath::data("").unwrap()],
+                SemanticEntry::Directory(_)
+            ));
+            assert_eq!(
+                memory_view[&VirtualPath::data("index.json").unwrap()],
+                SemanticEntry::File(b"{}".to_vec(), FileMode::Regular)
+            );
+        }
+    }
+
     #[test]
     fn test_conformance_rejects_worktree_data_alias() {
         let worktree = TempDir::new().unwrap();
@@ -2039,28 +2342,43 @@ mod tests {
         }
     }
 
+    #[derive(Debug, Clone, Copy)]
+    enum EdgeScenario {
+        /// Absent root, worktree action at index 0 (sort puts Worktree < Data).
+        AbsentInit,
+        /// Existing root, worktree + data action (companion + recovery/sweep fire).
+        ExistingMixed,
+        /// Absent root, DATA action at index 0 — exercises the absent-root
+        /// Data-action publication boundary that AbsentInit hides behind its
+        /// index-0 worktree action.
+        AbsentDataOnly,
+    }
+
     #[test]
     fn test_conformance_failure_edges_converge_on_both_backends() {
         for point in all_repository_failure_points() {
-            for existing_root in [false, true] {
-                converge_failure_edge(&point, existing_root);
+            for scenario in [
+                EdgeScenario::AbsentInit,
+                EdgeScenario::ExistingMixed,
+                EdgeScenario::AbsentDataOnly,
+            ] {
+                converge_failure_edge(&point, scenario);
             }
         }
     }
 
-    fn converge_failure_edge(point: &TransactionFailurePoint, existing_root: bool) {
+    fn converge_failure_edge(point: &TransactionFailurePoint, scenario: EdgeScenario) {
         let worktree = TempDir::new().unwrap();
         let data = worktree.path().join(".jit");
-        if existing_root {
+        if matches!(scenario, EdgeScenario::ExistingMixed) {
             std::fs::create_dir(&data).unwrap();
         }
         let layout = discover_repository_layout(worktree.path(), &data).unwrap();
 
-        // Both scenarios use only absent-preimage actions so one shared delta is
-        // valid on both backends. The existing-root scenario carries a Worktree
-        // action so the internal companion and recovery/sweep points can fire.
-        let make_spec = || {
-            if existing_root {
+        // Every scenario uses only absent-preimage actions so one shared delta is
+        // valid on both backends.
+        let make_spec = || match scenario {
+            EdgeScenario::ExistingMixed => {
                 let mut spec =
                     CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap();
                 spec.discover_paths([
@@ -2069,12 +2387,19 @@ mod tests {
                 ])
                 .unwrap();
                 spec
-            } else {
-                initial_spec()
             }
+            EdgeScenario::AbsentInit => initial_spec(),
+            EdgeScenario::AbsentDataOnly => CaptureSpec::phase_one(
+                [
+                    VirtualPath::data("").unwrap(),
+                    VirtualPath::data("index.json").unwrap(),
+                ],
+                budget(),
+            )
+            .unwrap(),
         };
-        let delta = if existing_root {
-            RepositoryDelta::new(
+        let delta = match scenario {
+            EdgeScenario::ExistingMixed => RepositoryDelta::new(
                 &layout,
                 vec![
                     RepositoryAction::write_file(
@@ -2093,9 +2418,19 @@ mod tests {
                     ),
                 ],
             )
-            .unwrap()
-        } else {
-            initialization_delta(&layout)
+            .unwrap(),
+            EdgeScenario::AbsentInit => initialization_delta(&layout),
+            EdgeScenario::AbsentDataOnly => RepositoryDelta::new(
+                &layout,
+                vec![RepositoryAction::write_file(
+                    VirtualPath::data("index.json").unwrap(),
+                    "edge",
+                    ExpectedPreimage::Absent,
+                    b"{}".to_vec(),
+                    FileMode::Regular,
+                )],
+            )
+            .unwrap(),
         };
 
         let json = JsonFileStorage::with_repository_state_failures(
@@ -2107,15 +2442,13 @@ mod tests {
             let recovered = JsonFileStorage::new(&data);
             let mut session = recovered
                 .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
-                .unwrap_or_else(|error| {
-                    panic!("json recovery {point:?} existing={existing_root}: {error:#}")
-                });
+                .unwrap_or_else(|error| panic!("json recovery {point:?} {scenario:?}: {error:#}"));
             semantic_view(&session.capture(make_spec()).unwrap())
         };
 
         let memory =
             InMemoryStorage::with_repository_state_failures(SelectedFailures::one(point.clone()));
-        if existing_root {
+        if matches!(scenario, EdgeScenario::ExistingMixed) {
             seed_memory_existing(&memory, &[]);
         }
         let memory_outcome = drive_edge(&memory, &layout, make_spec(), &delta);
@@ -2124,7 +2457,7 @@ mod tests {
             let mut session = recovered
                 .open_mutation_session(layout.clone())
                 .unwrap_or_else(|error| {
-                    panic!("memory recovery {point:?} existing={existing_root}: {error:#}")
+                    panic!("memory recovery {point:?} {scenario:?}: {error:#}")
                 });
             semantic_view(&session.capture(make_spec()).unwrap())
         };
@@ -2133,11 +2466,11 @@ mod tests {
         // with the same outcome, and recover to the same complete old-or-new state.
         assert_eq!(
             json_outcome, memory_outcome,
-            "outcome parity at {point:?} existing={existing_root}"
+            "outcome parity at {point:?} {scenario:?}"
         );
         assert_eq!(
             json_post, memory_post,
-            "convergence parity at {point:?} existing={existing_root}"
+            "convergence parity at {point:?} {scenario:?}"
         );
     }
 
@@ -2618,5 +2951,158 @@ mod tests {
             delta,
             Err(crate::repository_state::DeltaError::PhysicalAlias { .. })
         ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_a1_rolledback_recovery_tolerates_edited_worktree_target() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        std::fs::write(worktree.path().join("attributes"), b"old").unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+
+        // 1) A worktree replace interrupted right after publication → Prepared.
+        let staged = JsonFileStorage::with_repository_state_failures(
+            &data,
+            SelectedFailures::one(TransactionFailurePoint::RepositoryAfterAction { action: 0 }),
+        );
+        let mut session = staged.open_mutation_session(layout.clone()).unwrap();
+        let mut spec = CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap();
+        spec.discover_paths([VirtualPath::worktree("attributes").unwrap()])
+            .unwrap();
+        let image = session.capture(spec).unwrap();
+        let expected = ExpectedPreimage::of(
+            image
+                .entry(&VirtualPath::worktree("attributes").unwrap())
+                .unwrap(),
+        );
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![RepositoryAction::write_file(
+                VirtualPath::worktree("attributes").unwrap(),
+                "a1",
+                expected,
+                b"new".to_vec(),
+                FileMode::Regular,
+            )],
+        )
+        .unwrap();
+        assert!(session.apply(&image, &delta).is_err());
+        drop(session);
+
+        // 2) Recovery rolls back (restoring "old" and writing the RolledBack
+        //    decision) but its cleanup is interrupted → RolledBack residue remains.
+        let interrupted_cleanup = JsonFileStorage::with_repository_state_failures(
+            &data,
+            SelectedFailures::one(TransactionFailurePoint::RepositoryCleanup),
+        );
+        assert!(interrupted_cleanup
+            .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
+            .is_err());
+        assert_eq!(
+            std::fs::read(worktree.path().join("attributes")).unwrap(),
+            b"old"
+        );
+
+        // 3) The user edits the restored worktree target.
+        std::fs::write(worktree.path().join("attributes"), b"user-edited").unwrap();
+
+        // 4) A later open recovers the RolledBack residue WITHOUT re-asserting the
+        //    worktree preimage — open succeeds, residue cleaned, edit survives.
+        JsonFileStorage::new(&data)
+            .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
+            .expect("rolledback recovery must not wedge on an edited worktree target");
+        assert!(!worktree.path().join(".jit-bootstrap").exists());
+        assert_eq!(
+            std::fs::read(worktree.path().join("attributes")).unwrap(),
+            b"user-edited"
+        );
+    }
+
+    #[test]
+    fn test_a4_memory_stale_preimage_is_a_retryable_conflict() {
+        let temp = TempDir::new().unwrap();
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new(temp.path(), "wt", true),
+            RepositoryRootEvidence::new(temp.path().join(".jit"), "data", true),
+        )
+        .unwrap();
+        let memory = InMemoryStorage::new();
+        seed_memory_existing(&memory, &[(VirtualPath::data("x").unwrap(), b"v1")]);
+
+        let mut session = memory.open_mutation_session(layout.clone()).unwrap();
+        let spec = CaptureSpec::phase_one([VirtualPath::data("x").unwrap()], budget()).unwrap();
+        let image = session.capture(spec).unwrap();
+        let expected = ExpectedPreimage::of(image.entry(&VirtualPath::data("x").unwrap()).unwrap());
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![RepositoryAction::write_file(
+                VirtualPath::data("x").unwrap(),
+                "a4",
+                expected,
+                b"v2".to_vec(),
+                FileMode::Regular,
+            )],
+        )
+        .unwrap();
+
+        // A concurrent mutation changes the read set between capture and apply, so
+        // apply must reject with the same typed retryable conflict the JSON kernel
+        // returns from its pre-journal revalidation.
+        {
+            let mut state = memory.repository_state();
+            state.entries.insert(
+                VirtualPath::data("x").unwrap(),
+                RepositoryEntry::File {
+                    identity: EntryIdentity::for_bytes("mem:x", b"changed").unwrap(),
+                    bytes: b"changed".to_vec(),
+                    mode: FileMode::Regular,
+                },
+            );
+        }
+        assert!(matches!(
+            session.apply(&image, &delta),
+            Err(RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+    }
+
+    #[test]
+    fn test_a5_prepared_delete_recovery_restores_original() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        std::fs::write(data.join("victim"), b"old").unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+
+        // Publish the DeleteFile, then interrupt before commit → Prepared residue.
+        let storage = JsonFileStorage::with_repository_state_failures(
+            &data,
+            SelectedFailures::one(TransactionFailurePoint::RepositoryAfterAction { action: 0 }),
+        );
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let spec =
+            CaptureSpec::phase_one([VirtualPath::data("victim").unwrap()], budget()).unwrap();
+        let image = session.capture(spec).unwrap();
+        let expected =
+            ExpectedPreimage::of(image.entry(&VirtualPath::data("victim").unwrap()).unwrap());
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![RepositoryAction::delete_file(
+                VirtualPath::data("victim").unwrap(),
+                "a5",
+                expected,
+            )],
+        )
+        .unwrap();
+        assert!(session.apply(&image, &delta).is_err());
+        drop(session);
+
+        // Prepared-journal recovery restores the original file from its backup.
+        JsonFileStorage::new(&data)
+            .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
+            .unwrap();
+        assert_eq!(std::fs::read(data.join("victim")).unwrap(), b"old");
+        assert!(!worktree.path().join(".jit-bootstrap").exists());
     }
 }
