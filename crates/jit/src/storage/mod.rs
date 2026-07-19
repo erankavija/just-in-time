@@ -54,7 +54,7 @@ pub use artifact_planning::{
     collect_artifact_classification_facts, resolve_container_destination,
     ResolvedContainerDestination,
 };
-pub use claim_coordinator::{ClaimCoordinator, Lease};
+pub use claim_coordinator::{ClaimAcquireLimits, ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
 pub use errors::{
     AmbiguousIdError, GateAlreadyExistsError, GateNotFoundError, GateRunNotFoundError,

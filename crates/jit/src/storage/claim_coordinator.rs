@@ -170,6 +170,23 @@ pub struct ClaimsIndex {
     pub sequence_gaps: Vec<u64>,
 }
 
+/// Policy limits applied when acquiring an indefinite claim lease.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClaimAcquireLimits {
+    max_indefinite_per_agent: u32,
+    max_indefinite_per_repo: u32,
+}
+
+impl ClaimAcquireLimits {
+    /// Build acquisition limits for one agent and for the repository overall.
+    pub const fn new(max_indefinite_per_agent: u32, max_indefinite_per_repo: u32) -> Self {
+        Self {
+            max_indefinite_per_agent,
+            max_indefinite_per_repo,
+        }
+    }
+}
+
 impl ClaimsIndex {
     /// Load the active-lease index from the shared control plane described by
     /// `paths`, returning an empty (well-formed) index when no
@@ -534,16 +551,19 @@ impl ClaimCoordinator {
     /// log before lease creation, so a lease durably appended by a crash-
     /// interrupted attempt is recognized even when its index was never published.
     /// An existing lease for the same issue, agent, and worktree is treated as a
-    /// convergent retry (the lease is reused and no second acquire is logged);
-    /// while still holding the lock, `repository_sync` runs with the resulting
-    /// lease. `issue_id` must already be canonical (resolved to its full id).
+    /// convergent retry (the lease is reused and no second acquire is logged).
+    /// Persisted issue-id spellings are resolved under the coordinator lock before
+    /// any log or index mutation; a resolution error leaves coordinator and
+    /// repository state untouched. While still holding the lock,
+    /// `repository_sync` runs with the resulting lease. `issue_id` must already be
+    /// canonical (resolved to its full id).
     pub fn acquire_claim_synchronized<T>(
         &self,
         issue_id: &str,
         ttl_secs: u64,
         reason: Option<&str>,
-        max_indefinite_per_agent: u32,
-        max_indefinite_per_repo: u32,
+        limits: ClaimAcquireLimits,
+        resolve_issue_id: impl Fn(&str) -> Result<String>,
         repository_sync: impl FnOnce(&Lease) -> Result<T>,
     ) -> Result<(Lease, T)> {
         // Enter coordination first: a repository-session holder cannot coordinate.
@@ -567,22 +587,38 @@ impl ClaimCoordinator {
             .locker
             .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
 
-        // Reconcile the derived index against the append-only log before lease
-        // creation. Neither helper locks the coordinator, so this is deadlock-free
-        // under the held lock.
-        let (consistent, _warnings) = self.verify_index_consistency()?;
-        if !consistent {
-            let rebuilt = self.rebuild_index_from_log()?;
-            self.write_index_atomic(&rebuilt)?;
-        }
-
-        let mut index = self.load_claims_index()?;
-        self.evict_expired(&mut index)?;
-
-        let existing = index
+        // The append-only log is authoritative. Always replay it under the held
+        // lock: a syntactically valid index can still be stale after a crash
+        // between the durable log append and derived-index publication. Keep
+        // expired entries in memory until normal auto-eviction has been logged.
+        let now = self.clock.now();
+        let mut index = self.rebuild_index_from_log_at(now, true)?;
+        let resolved_issue_ids = index
             .leases
             .iter()
-            .find(|lease| Self::canonical_issue_match(&lease.issue_id, issue_id))
+            .filter(|lease| !lease.is_expired(now))
+            .filter(|lease| Self::is_issue_identity_candidate(&lease.issue_id, issue_id))
+            .map(|lease| {
+                resolve_issue_id(&lease.issue_id)
+                    .with_context(|| {
+                        format!(
+                            "Failed to resolve persisted issue id '{}' for lease {}",
+                            lease.issue_id, lease.lease_id
+                        )
+                    })
+                    .map(|canonical_id| (lease.lease_id.clone(), canonical_id))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        self.evict_expired_at(&mut index, now)?;
+        self.write_index_atomic(&index)?;
+
+        let existing_lease_id = resolved_issue_ids
+            .iter()
+            .find(|(_, canonical_id)| canonical_id == issue_id)
+            .map(|(lease_id, _)| lease_id);
+        let existing = existing_lease_id
+            .and_then(|lease_id| index.find_lease_by_id(lease_id))
             .cloned();
 
         let lease = match existing {
@@ -612,25 +648,25 @@ impl ClaimCoordinator {
                         .iter()
                         .filter(|l| l.agent_id == self.agent_id && l.ttl_secs == 0)
                         .count() as u32;
-                    if agent_indefinite_count >= max_indefinite_per_agent {
+                    if agent_indefinite_count >= limits.max_indefinite_per_agent {
                         bail!(
                             "Exceeded per-agent limit for indefinite leases.\n\
                              Agent {} already has {} indefinite lease(s) (max: {}).\n\
                              Release an existing indefinite lease or use a finite TTL.",
                             self.agent_id,
                             agent_indefinite_count,
-                            max_indefinite_per_agent
+                            limits.max_indefinite_per_agent
                         );
                     }
                     let repo_indefinite_count =
                         index.leases.iter().filter(|l| l.ttl_secs == 0).count() as u32;
-                    if repo_indefinite_count >= max_indefinite_per_repo {
+                    if repo_indefinite_count >= limits.max_indefinite_per_repo {
                         bail!(
                             "Exceeded per-repository limit for indefinite leases.\n\
                              Repository has {} indefinite lease(s) (max: {}).\n\
                              Wait for leases to be released or use a finite TTL.",
                             repo_indefinite_count,
-                            max_indefinite_per_repo
+                            limits.max_indefinite_per_repo
                         );
                     }
                 }
@@ -665,24 +701,13 @@ impl ClaimCoordinator {
         Ok((lease, synced))
     }
 
-    /// Canonical issue-identity match tolerant of short-id spellings.
-    ///
-    /// Two ids are the same issue when equal, or when one is a prefix of the
-    /// other with the shorter at least `SHORT_ID_LENGTH` characters — a short-id
-    /// spelling of one full id. This lets a full-id acquire recognize a lease a
-    /// prior implementation recorded under a short-id spelling and never
-    /// duplicate it.
-    fn canonical_issue_match(stored: &str, requested: &str) -> bool {
-        const SHORT_ID_LENGTH: usize = 8;
-        if stored == requested {
-            return true;
-        }
-        let (short, long) = if stored.len() < requested.len() {
-            (stored, requested)
-        } else {
-            (requested, stored)
-        };
-        short.len() >= SHORT_ID_LENGTH && long.starts_with(short)
+    /// Return whether a persisted spelling could denote the requested canonical
+    /// issue id. This is only a resolver-call shortlist: canonical equality after
+    /// `resolve_issue_id` remains the identity decision.
+    fn is_issue_identity_candidate(stored: &str, requested: &str) -> bool {
+        let stored = stored.to_lowercase().replace('-', "");
+        let requested = requested.to_lowercase().replace('-', "");
+        stored.len() >= crate::storage::MIN_ID_PREFIX_LENGTH && requested.starts_with(&stored)
     }
 
     /// Send a heartbeat for an indefinite lease.
@@ -773,6 +798,10 @@ impl ClaimCoordinator {
     /// Evict expired leases from index
     pub fn evict_expired(&self, index: &mut ClaimsIndex) -> Result<()> {
         let now = self.clock.now();
+        self.evict_expired_at(index, now)
+    }
+
+    fn evict_expired_at(&self, index: &mut ClaimsIndex, now: DateTime<Utc>) -> Result<()> {
         let expired: Vec<_> = index
             .leases
             .iter()
@@ -1118,6 +1147,14 @@ impl ClaimCoordinator {
     ///
     /// Returns an error if the log file cannot be read or parsed
     pub fn rebuild_index_from_log(&self) -> Result<ClaimsIndex> {
+        self.rebuild_index_from_log_at(self.clock.now(), false)
+    }
+
+    fn rebuild_index_from_log_at(
+        &self,
+        now: DateTime<Utc>,
+        include_expired: bool,
+    ) -> Result<ClaimsIndex> {
         use std::collections::HashMap;
         use std::io::{BufRead, BufReader};
 
@@ -1184,9 +1221,10 @@ impl ClaimCoordinator {
         // Filter out expired finite leases. Uses the same single source of
         // truth (`Lease::is_expired`) as eviction and `worktree list`, so the
         // rebuilt index cannot diverge from those views at the TTL boundary.
-        let now = self.clock.now();
         let stale_threshold_secs = 3600u64; // 1 hour default
-        active.retain(|_, lease| !lease.is_expired(now));
+        if !include_expired {
+            active.retain(|_, lease| !lease.is_expired(now));
+        }
 
         // Compute staleness for each lease
         let leases: Vec<Lease> = active
@@ -1340,7 +1378,14 @@ mod tests {
         coordinator.acquire_claim("abcdef12", 600).unwrap();
         // A canonical full-id acquire recognizes it and never duplicates the lease.
         let (lease, ()) = coordinator
-            .acquire_claim_synchronized("abcdef1234567890", 600, None, 100, 100, |_| Ok(()))
+            .acquire_claim_synchronized(
+                "abcdef1234567890",
+                600,
+                None,
+                ClaimAcquireLimits::new(100, 100),
+                |persisted_id| Ok(format!("{persisted_id}34567890")),
+                |_| Ok(()),
+            )
             .unwrap();
         assert_eq!(lease.issue_id, "abcdef12");
         assert_eq!(coordinator.load_claims_index().unwrap().leases.len(), 1);
@@ -1359,7 +1404,14 @@ mod tests {
         // The retry reconciles the index from the append-only log, recognizes the
         // own lease, and never appends a duplicate acquire.
         let (lease, ()) = coordinator
-            .acquire_claim_synchronized("issue-recon", 600, None, 100, 100, |_| Ok(()))
+            .acquire_claim_synchronized(
+                "issue-recon",
+                600,
+                None,
+                ClaimAcquireLimits::new(100, 100),
+                |persisted_id| Ok(persisted_id.to_string()),
+                |_| Ok(()),
+            )
             .unwrap();
         assert_eq!(lease.issue_id, "issue-recon");
         assert_eq!(coordinator.load_claims_index().unwrap().leases.len(), 1);
@@ -1369,6 +1421,37 @@ mod tests {
             1,
             "reconcile must recognize the durable lease, not re-acquire"
         );
+    }
+
+    #[test]
+    fn test_acquire_synchronized_reconciles_valid_but_stale_index_from_log() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        coordinator.acquire_claim("issue-first", 600).unwrap();
+        let stale_index =
+            std::fs::read(temp_dir.path().join(".git/jit/claims.index.json")).unwrap();
+        let durable = coordinator.acquire_claim("issue-second", 600).unwrap();
+        std::fs::write(
+            temp_dir.path().join(".git/jit/claims.index.json"),
+            stale_index,
+        )
+        .unwrap();
+
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                "issue-second",
+                600,
+                None,
+                ClaimAcquireLimits::new(100, 100),
+                |persisted_id| Ok(persisted_id.to_string()),
+                |_| Ok(()),
+            )
+            .unwrap();
+
+        assert_eq!(lease.lease_id, durable.lease_id);
+        assert_eq!(coordinator.load_claims_index().unwrap().leases.len(), 2);
+        let log = std::fs::read_to_string(temp_dir.path().join(".git/jit/claims.jsonl")).unwrap();
+        assert_eq!(log.lines().count(), 2, "retry must not append a duplicate");
     }
 
     #[test]
@@ -1391,9 +1474,49 @@ mod tests {
             "wt:other".to_string(),
             "agent:other".to_string(),
         );
-        let result =
-            other.acquire_claim_synchronized("issue-owned", 600, None, 100, 100, |_| Ok(()));
+        let result = other.acquire_claim_synchronized(
+            "issue-owned",
+            600,
+            None,
+            ClaimAcquireLimits::new(100, 100),
+            |persisted_id| Ok(persisted_id.to_string()),
+            |_| Ok(()),
+        );
         assert!(result.is_err(), "another agent's lease blocks acquisition");
+    }
+
+    #[test]
+    fn test_acquire_synchronized_evicts_expired_unresolvable_lease_before_resolution() {
+        use crate::storage::clock::FixedClock;
+        use std::cell::Cell;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = Utc::now();
+        let clock = Arc::new(FixedClock::new(base));
+        let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
+        coordinator.acquire_claim("deleted-issue", 1).unwrap();
+        clock.set(base + Duration::seconds(2));
+        let repository_sync_ran = Cell::new(false);
+
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                "active-issue",
+                600,
+                None,
+                ClaimAcquireLimits::new(100, 100),
+                |_| anyhow::bail!("expired lease issue no longer resolves"),
+                |_| {
+                    repository_sync_ran.set(true);
+                    Ok(())
+                },
+            )
+            .expect("an expired unresolvable lease must not block another issue");
+
+        assert_eq!(lease.issue_id, "active-issue");
+        assert!(repository_sync_ran.get());
+        let index = coordinator.load_claims_index().unwrap();
+        assert_eq!(index.leases.len(), 1);
+        assert_eq!(index.leases[0].issue_id, "active-issue");
     }
 
     #[test]
