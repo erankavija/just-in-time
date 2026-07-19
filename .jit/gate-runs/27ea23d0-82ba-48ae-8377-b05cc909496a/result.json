@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "27ea23d0-82ba-48ae-8377-b05cc909496a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a6a9b964-d944-4d7f-a7e7-7fb88dcee13b",
+  "commit": "59f535a39d64e6017f543a38154e1a0165d7ec79",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-19T11:43:44.880090274Z",
+  "completed_at": "2026-07-19T11:46:58.757419517Z",
+  "duration_ms": 193877,
+  "exit_code": 1,
+  "stdout": "Attribution: 59f535a3, 46894584 (jit:a6a9b964)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/event-log (.jit/invariants.toml), @/invariant/atomic-writes (.jit/invariants.toml), @/charter/D-4 (dev/vision/9db27a3a-charter.md), @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-07-19T11:39:58.172227167Z\nTruncation recovery: line-scoped reads of mutation finalizer, claim synchronization, coordinator, store hashing, and embedded tests after truncated aggregate output\n\n1. [blocking][issue-impact][high] The mutation context seed is not included in the semantic plan hash. `finalize` returns only a `RepositoryDelta` at `crates/jit/src/repository_state/mutation.rs:614`, while the applied transaction hash serializes only that delta at `crates/jit/src/storage/repository_state_store.rs:894`. The established full plan-hash API accepts captured evidence and a seed, but the new mutation path never invokes it. This misses the issue’s explicit requirement that the context seed enter the semantic plan hash.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Mutation-context seed is omitted from the semantic plan hash.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"MutationContext seed is not included in the semantic plan hash; finalize returns only a delta and storage hashes only serialized delta actions.\",\"file\":\"crates/jit/src/repository_state/mutation.rs\",\"line\":614,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 14968 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7a30-79b2-7c62-b758-fac2931db6be\n--------\nuser\n--- 14955 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Mutation-context seed is omitted from the semantic plan hash.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "MutationContext seed is not included in the semantic plan hash; finalize returns only a delta and storage hashes only serialized delta actions.",
+        "file": "crates/jit/src/repository_state/mutation.rs",
+        "line": 614
+      }
+    ]
+  }
+}
