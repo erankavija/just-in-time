@@ -47,10 +47,44 @@ pub struct RepositoryDeclarations<'a> {
 /// Complete deterministic pure materialization result.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaterializationPlan {
+    /// Exact bounded repository image from which this plan was derived.
+    image: RepositoryImage,
     /// Exact normalized delta.
-    pub delta: RepositoryDelta,
+    delta: RepositoryDelta,
     /// Semantic hash covering the complete image and inputs.
-    pub hash: String,
+    hash: String,
+}
+
+impl MaterializationPlan {
+    /// The exact bounded repository image closed into this plan.
+    pub fn image(&self) -> &RepositoryImage {
+        &self.image
+    }
+
+    /// The exact normalized delta closed into this plan.
+    pub fn delta(&self) -> &RepositoryDelta {
+        &self.delta
+    }
+
+    /// The semantic identity computed from the captured image and complete plan inputs.
+    pub fn hash(&self) -> &str {
+        &self.hash
+    }
+
+    /// Close a delta into a plan whose identity is computed from all plan inputs.
+    pub(crate) fn new(
+        image: &RepositoryImage,
+        seed: &RepositorySeed,
+        intent: &MaterializationIntent,
+        delta: RepositoryDelta,
+    ) -> Result<Self, PlanHashError> {
+        let hash = plan_hash(image, seed, intent, &delta)?;
+        Ok(Self {
+            image: image.clone(),
+            delta,
+            hash,
+        })
+    }
 }
 
 /// Invoke the constrained closed producer graph for one intent.
@@ -70,8 +104,7 @@ pub fn derive_materializations(
         MaterializationIntent::RenderConfiguredProjections => derive_project_render(image)?,
         MaterializationIntent::RepairDerivedState => derive_repair(image)?,
     };
-    let hash = plan_hash(image, seed, &intent, &delta)?;
-    Ok(MaterializationPlan { delta, hash })
+    MaterializationPlan::new(image, seed, &intent, delta).map_err(Into::into)
 }
 
 /// Pure derivation failure.
@@ -123,7 +156,7 @@ pub fn compare_materializations(
     expected: &MaterializationPlan,
 ) -> Result<Vec<MaterializationDrift>, CaptureError> {
     expected
-        .delta
+        .delta()
         .actions()
         .iter()
         .try_fold(Vec::new(), |mut drifts, action| {
@@ -194,11 +227,22 @@ mod tests {
         }
     }
 
-    fn plan(layout: &RepositoryLayout, actions: Vec<RepositoryAction>) -> MaterializationPlan {
-        MaterializationPlan {
-            delta: RepositoryDelta::new(layout, actions).unwrap(),
-            hash: "test-plan".into(),
-        }
+    fn plan(image: &RepositoryImage, actions: Vec<RepositoryAction>) -> MaterializationPlan {
+        let seed = RepositorySeed::new(
+            RepositorySeedKind::Command {
+                name: "repository-state-test".into(),
+            },
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap();
+        MaterializationPlan::new(
+            image,
+            &seed,
+            &MaterializationIntent::SemanticMutation,
+            RepositoryDelta::new(image.layout(), actions).unwrap(),
+        )
+        .unwrap()
     }
 
     #[test]
@@ -249,7 +293,7 @@ mod tests {
 
         for action in actions {
             assert_eq!(
-                compare_materializations(&image, &plan(&layout, vec![action])),
+                compare_materializations(&image, &plan(&image, vec![action])),
                 Err(CaptureError::UndiscoveredRepositoryPath(target.clone()))
             );
         }
@@ -312,7 +356,7 @@ mod tests {
         )
         .unwrap();
         let expected = plan(
-            &layout,
+            &image,
             vec![
                 RepositoryAction::CreateDirectory {
                     path: create.clone(),

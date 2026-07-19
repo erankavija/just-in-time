@@ -793,12 +793,14 @@ impl FileTransactionKernel {
         _guard: &RepoWriteGuard,
         transaction_id: &str,
         delta: &RepositoryDelta,
+        plan_hash: &str,
     ) -> Result<FileTransactionOutcome> {
         validate_transaction_id(transaction_id)?;
         execute_repository_delta(
             self.repository_roots()?,
             transaction_id,
             delta,
+            plan_hash,
             &*self.injector,
         )
     }
@@ -895,10 +897,6 @@ fn canonicalize_possibly_absent(path: &Path) -> PathBuf {
             .join(leaf),
         _ => path.to_path_buf(),
     }
-}
-
-fn repository_plan_hash(delta: &RepositoryDelta) -> Result<String> {
-    Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(delta)?)))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -1195,6 +1193,7 @@ fn initial_repository_journal(
     roots: &RepositoryKernelRoots,
     id: &str,
     delta: &RepositoryDelta,
+    plan_hash: &str,
 ) -> Result<RepositoryTransactionJournal> {
     let actions = delta
         .actions()
@@ -1268,7 +1267,7 @@ fn initial_repository_journal(
         transaction_id: id.to_string(),
         layout_digest: repository_layout_digest(&roots.layout)?,
         owner_digest: repository_owner_digest(&roots.layout),
-        plan_hash: repository_plan_hash(delta)?,
+        plan_hash: plan_hash.to_string(),
         data_root_was_absent: roots.data.is_none(),
         // Materialize an absent data root ONLY when the delta carries a Data
         // action. A worktree-only delta over an absent root creates no staged
@@ -1303,6 +1302,7 @@ fn execute_repository_delta(
     roots: &RepositoryKernelRoots,
     id: &str,
     delta: &RepositoryDelta,
+    plan_hash: &str,
     injector: &dyn TransactionFailureInjector,
 ) -> Result<FileTransactionOutcome> {
     for action in delta.actions() {
@@ -1310,10 +1310,9 @@ fn execute_repository_delta(
         let actual = inspect_repository_target(roots, action.path(), None)?;
         ensure_repository_expected(action.path(), action.expected(), &actual)?;
     }
-    let plan_hash = repository_plan_hash(delta)?;
     if delta.actions().is_empty() {
         return Ok(FileTransactionOutcome {
-            plan_hash,
+            plan_hash: plan_hash.to_string(),
             recovery_state: RecoveryState::Clean,
         });
     }
@@ -1328,7 +1327,7 @@ fn execute_repository_delta(
         .any(|action| action.path().root_class() == RepositoryRootClass::Worktree);
     let control =
         create_repository_control(roots, id, location, needs_worktree_companion, injector)?;
-    let mut journal = initial_repository_journal(roots, id, delta)?;
+    let mut journal = initial_repository_journal(roots, id, delta, plan_hash)?;
     write_repository_journal(&control.transaction, &journal)?;
     repository_check(injector, FailurePoint::RepositoryPrepareIntent)?;
 
@@ -1376,7 +1375,7 @@ fn execute_repository_delta(
     repository_check(injector, FailurePoint::RepositoryCleanup)?;
     cleanup_repository_control(roots, control, location, id, &journal)?;
     Ok(FileTransactionOutcome {
-        plan_hash,
+        plan_hash: plan_hash.to_string(),
         recovery_state: RecoveryState::Clean,
     })
 }

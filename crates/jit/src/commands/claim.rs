@@ -212,8 +212,8 @@ where
             Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
             Err(error) => return Err(error.into()),
         };
-        let delta = finalize(&layout, &image, &context, &intents)?;
-        match session.apply(&image, &delta) {
+        let plan = finalize(&layout, &image, &context, &intents)?;
+        match session.apply(&plan) {
             Ok(_) => return Ok(()),
             Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
             Err(error) => return Err(error.into()),

@@ -5,10 +5,10 @@
 
 use crate::repository_state::{
     CaptureError, CaptureSpec, EntryIdentity, ExpectedPreimage, FileMode, LinkedWorktreeEvidence,
-    LinkedWorktreeSourceClass, ListingFingerprint, PinnedDocumentEvidence, PinnedSourceClass,
-    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout,
-    RepositoryLayoutError, RepositoryRootClass, RepositoryRootEvidence, RootRelativePath,
-    VirtualPath,
+    LinkedWorktreeSourceClass, ListingFingerprint, MaterializationPlan, PinnedDocumentEvidence,
+    PinnedSourceClass, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
+    RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RepositoryRootEvidence,
+    RootRelativePath, VirtualPath,
 };
 use crate::storage::memory::{MemoryRecoveryResidue, MemoryRepositoryState};
 use crate::storage::{
@@ -18,7 +18,6 @@ use crate::storage::{
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
 use cap_std::{ambient_authority, fs::MetadataExt as _};
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::io::{ErrorKind, Read};
 use std::path::{Component, Path, PathBuf};
@@ -28,7 +27,7 @@ use std::sync::{Arc, Mutex};
 /// Successful application of one exact repository delta.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RepositoryApplyOutcome {
-    /// Backend-independent hash of normalized action semantics.
+    /// Complete semantic plan hash supplied unchanged to storage and recovery.
     pub transaction_hash: String,
     /// Number of normalized actions applied.
     pub actions_applied: usize,
@@ -118,11 +117,10 @@ pub trait RepositoryMutationSession {
     fn layout(&self) -> &RepositoryLayout;
     /// Capture one complete bounded image after recovery has converged.
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError>;
-    /// Revalidate the complete image and publish one normalized exact delta.
+    /// Revalidate the complete image and publish one complete semantic plan.
     fn apply(
         &mut self,
-        image: &RepositoryImage,
-        delta: &RepositoryDelta,
+        plan: &MaterializationPlan,
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError>;
 }
 
@@ -391,9 +389,10 @@ impl RepositoryMutationSession for JsonMutationSession {
 
     fn apply(
         &mut self,
-        image: &RepositoryImage,
-        delta: &RepositoryDelta,
+        plan: &MaterializationPlan,
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError> {
+        let image = plan.image();
+        let delta = plan.delta();
         ensure_session_image(&self.layout, self.captured.as_ref(), image)?;
         ensure_delta_is_captured(image, delta)?;
         // Immediately before journal preparation, revalidate the entire read set
@@ -415,7 +414,7 @@ impl RepositoryMutationSession for JsonMutationSession {
         let transaction_id = uuid::Uuid::new_v4().simple().to_string();
         let outcome = self
             .kernel
-            .execute_repository_delta(guard, &transaction_id, delta)
+            .execute_repository_delta(guard, &transaction_id, delta, plan.hash())
             .map_err(|error| map_transaction_error(error, &self.layout))?;
         self.captured = None;
         Ok(RepositoryApplyOutcome {
@@ -439,9 +438,10 @@ impl RepositoryMutationSession for MemoryMutationSession<'_> {
 
     fn apply(
         &mut self,
-        image: &RepositoryImage,
-        delta: &RepositoryDelta,
+        plan: &MaterializationPlan,
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError> {
+        let image = plan.image();
+        let delta = plan.delta();
         ensure_session_image(&self.layout, self.captured.as_ref(), image)?;
         ensure_delta_is_captured(image, delta)?;
         let mut state = self.storage.repository_state();
@@ -453,7 +453,7 @@ impl RepositoryMutationSession for MemoryMutationSession<'_> {
         }
         let original = state.clone_without_recovery();
         let mut candidate = original.clone();
-        let plan_hash = semantic_delta_hash(delta)?;
+        let plan_hash = plan.hash().to_string();
         // Mirror the kernel short-circuit: an empty delta is a no-op that creates
         // no control, residue, or injector boundary; return the clean zero-action
         // outcome before any failure check or residue write.
@@ -889,11 +889,6 @@ fn apply_memory_action(
     }
     state.data_root_exists |= action.path().root_class() == RepositoryRootClass::Data;
     Ok(())
-}
-
-fn semantic_delta_hash(delta: &RepositoryDelta) -> Result<String, RepositoryStateStoreError> {
-    let bytes = serde_json::to_vec(delta).map_err(anyhow::Error::from)?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
 }
 
 fn inspect_capability_entry(
@@ -1390,8 +1385,11 @@ fn first_image_difference(expected: &RepositoryImage, actual: &RepositoryImage) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository_state::{CaptureBudget, RepositoryAction};
-    use std::collections::HashSet;
+    use crate::repository_state::{
+        plan_hash, CaptureBudget, MaterializationIntent, RepositoryAction, RepositorySeed,
+        RepositorySeedKind,
+    };
+    use std::collections::{BTreeMap, HashMap, HashSet};
     use std::sync::Mutex;
     use tempfile::TempDir;
 
@@ -1446,6 +1444,26 @@ mod tests {
         .unwrap()
     }
 
+    /// Close a hand-built test delta through the same complete semantic hash
+    /// contract as production materialization plans.
+    fn test_plan(image: &RepositoryImage, delta: &RepositoryDelta) -> MaterializationPlan {
+        let seed = RepositorySeed::new(
+            RepositorySeedKind::Command {
+                name: "repository-state-store-test".to_string(),
+            },
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap();
+        MaterializationPlan::new(
+            image,
+            &seed,
+            &MaterializationIntent::SemanticMutation,
+            delta.clone(),
+        )
+        .unwrap()
+    }
+
     #[derive(Default)]
     struct SelectedFailures(Mutex<HashSet<TransactionFailurePoint>>);
 
@@ -1494,12 +1512,14 @@ mod tests {
         let memory = InMemoryStorage::new();
         let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
         let memory_image = memory_session.capture(initial_spec()).unwrap();
-        let memory_outcome = memory_session.apply(&memory_image, &delta).unwrap();
+        let memory_outcome = memory_session
+            .apply(&test_plan(&memory_image, &delta))
+            .unwrap();
 
         let json = JsonFileStorage::new(&data);
         let mut json_session = json.open_mutation_session(layout).unwrap();
         let json_image = json_session.capture(initial_spec()).unwrap();
-        let json_outcome = json_session.apply(&json_image, &delta).unwrap();
+        let json_outcome = json_session.apply(&test_plan(&json_image, &delta)).unwrap();
 
         assert_eq!(memory_outcome, json_outcome);
         assert_eq!(std::fs::read(data.join("index.json")).unwrap(), b"{}");
@@ -1507,6 +1527,103 @@ mod tests {
             std::fs::read(temp.path().join("note.txt")).unwrap(),
             b"note"
         );
+    }
+
+    fn image_binding_spec() -> CaptureSpec {
+        CaptureSpec::phase_one(
+            [
+                VirtualPath::data("target.txt").unwrap(),
+                VirtualPath::data("evidence.txt").unwrap(),
+            ],
+            budget(),
+        )
+        .unwrap()
+    }
+
+    fn image_binding_delta(layout: &RepositoryLayout) -> RepositoryDelta {
+        RepositoryDelta::new(
+            layout,
+            vec![RepositoryAction::write_file(
+                VirtualPath::data("target.txt").unwrap(),
+                "image-binding-test",
+                ExpectedPreimage::Absent,
+                b"materialized".to_vec(),
+                FileMode::Regular,
+            )],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_json_plan_owns_exact_image_and_honest_plan_returns_own_hash() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        std::fs::write(data.join("evidence.txt"), b"image-a").unwrap();
+        let layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let delta = image_binding_delta(&layout);
+        let json_a = JsonFileStorage::new(&data);
+        let image_a = {
+            let mut session = json_a.open_mutation_session(layout.clone()).unwrap();
+            session.capture(image_binding_spec()).unwrap()
+        };
+        let plan_a = test_plan(&image_a, &delta);
+        assert_eq!(plan_a.image(), &image_a);
+
+        std::fs::write(data.join("evidence.txt"), b"image-b").unwrap();
+        let json = JsonFileStorage::new(&data);
+        let mut session = json.open_mutation_session(layout).unwrap();
+        let image_b = session.capture(image_binding_spec()).unwrap();
+        let target = VirtualPath::data("target.txt").unwrap();
+        assert_eq!(
+            image_a.entry(&target).unwrap(),
+            image_b.entry(&target).unwrap()
+        );
+        assert_ne!(plan_a.image(), &image_b);
+        assert!(matches!(
+            session.apply(&plan_a),
+            Err(RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+        let plan_b = test_plan(&image_b, &delta);
+        let outcome = session.apply(&plan_b).unwrap();
+        assert_eq!(outcome.transaction_hash, plan_b.hash());
+    }
+
+    #[test]
+    fn test_memory_plan_owns_exact_image_and_honest_plan_returns_own_hash() {
+        let temp = TempDir::new().unwrap();
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new(temp.path(), "wt", true),
+            RepositoryRootEvidence::new(temp.path().join(".jit"), "data", true),
+        )
+        .unwrap();
+        let evidence = VirtualPath::data("evidence.txt").unwrap();
+        let memory = InMemoryStorage::new();
+        seed_memory_existing(&memory, &[(evidence.clone(), b"image-a")]);
+        let delta = image_binding_delta(&layout);
+        let image_a = {
+            let mut session = memory.open_mutation_session(layout.clone()).unwrap();
+            session.capture(image_binding_spec()).unwrap()
+        };
+        let plan_a = test_plan(&image_a, &delta);
+        assert_eq!(plan_a.image(), &image_a);
+
+        seed_memory_existing(&memory, &[(evidence, b"image-b")]);
+        let mut session = memory.open_mutation_session(layout).unwrap();
+        let image_b = session.capture(image_binding_spec()).unwrap();
+        let target = VirtualPath::data("target.txt").unwrap();
+        assert_eq!(
+            image_a.entry(&target).unwrap(),
+            image_b.entry(&target).unwrap()
+        );
+        assert_ne!(plan_a.image(), &image_b);
+        assert!(matches!(
+            session.apply(&plan_a),
+            Err(RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+        let plan_b = test_plan(&image_b, &delta);
+        let outcome = session.apply(&plan_b).unwrap();
+        assert_eq!(outcome.transaction_hash, plan_b.hash());
     }
 
     #[test]
@@ -1532,9 +1649,8 @@ mod tests {
             );
             let mut session = storage.open_mutation_session(layout.clone()).unwrap();
             let image = session.capture(initial_spec()).unwrap();
-            assert!(session
-                .apply(&image, &initialization_delta(&layout))
-                .is_err());
+            let delta = initialization_delta(&layout);
+            assert!(session.apply(&test_plan(&image, &delta)).is_err());
             drop(session);
 
             let recovered_layout = discover_repository_layout(temp.path(), &data).unwrap();
@@ -1578,7 +1694,7 @@ mod tests {
             )],
         )
         .unwrap();
-        assert!(session.apply(&image, &delta).is_err());
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
         drop(session);
         std::fs::write(data.join("victim"), b"new occupant").unwrap();
 
@@ -1602,10 +1718,11 @@ mod tests {
         );
         let mut session = storage.open_mutation_session(layout.clone()).unwrap();
         let image = session.capture(initial_spec()).unwrap();
+        let delta = initialization_delta(&layout);
         // The occupied destination fails with the typed occupied-data-root error,
         // not merely some error.
         assert!(matches!(
-            session.apply(&image, &initialization_delta(&layout)),
+            session.apply(&test_plan(&image, &delta)),
             Err(RepositoryStateStoreError::OccupiedDataRoot { .. })
         ));
         assert!(data.is_dir());
@@ -1675,9 +1792,8 @@ mod tests {
         ));
         let mut session = storage.open_mutation_session(layout.clone()).unwrap();
         let image = session.capture(initial_spec()).unwrap();
-        assert!(session
-            .apply(&image, &initialization_delta(&layout))
-            .is_err());
+        let delta = initialization_delta(&layout);
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
         drop(session);
 
         let mut recovered = storage.open_mutation_session(layout).unwrap();
@@ -1728,7 +1844,7 @@ mod tests {
             )],
         )
         .unwrap();
-        session.apply(&image, &delta).unwrap();
+        session.apply(&test_plan(&image, &delta)).unwrap();
         drop(session);
         let state = storage.repository_state();
         assert!(matches!(
@@ -1743,7 +1859,8 @@ mod tests {
     // --- Cross-backend conformance matrix ------------------------------------
     //
     // One suite exercises identical canonical semantics on the JSON and memory
-    // backends: identical captured images, identical result hashes, every action
+    // backends: equivalent captured semantics, complete per-image result hashes,
+    // every action
     // kind, nested and disjoint existing/absent roots, aliases, and convergence
     // to a complete old/new state at every declared failure edge. Object identity
     // differs by construction (device/inode versus a synthesized memory id), so
@@ -1792,17 +1909,19 @@ mod tests {
             let memory = InMemoryStorage::new();
             let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
             let memory_image = memory_session.capture(initial_spec()).unwrap();
-            let memory_outcome = memory_session.apply(&memory_image, &delta).unwrap();
+            let memory_outcome = memory_session
+                .apply(&test_plan(&memory_image, &delta))
+                .unwrap();
             drop(memory_session);
 
             let json = JsonFileStorage::new(&data);
             let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
             let json_image = json_session.capture(initial_spec()).unwrap();
-            let json_outcome = json_session.apply(&json_image, &delta).unwrap();
+            let json_outcome = json_session.apply(&test_plan(&json_image, &delta)).unwrap();
             drop(json_session);
 
-            // Identical all-absent capture and identical result hash (both hash
-            // the same delta), for nested and disjoint absent roots alike.
+            // Identical all-absent capture and therefore identical complete plan
+            // hash, for nested and disjoint absent roots alike.
             assert_eq!(
                 semantic_view(&memory_image),
                 semantic_view(&json_image),
@@ -1912,7 +2031,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let outcome = session.apply(&image, &delta).unwrap();
+        let outcome = session.apply(&test_plan(&image, &delta)).unwrap();
         drop(session);
 
         let mut after = store.open_mutation_session(layout.clone()).unwrap();
@@ -2001,17 +2120,19 @@ mod tests {
         let memory = InMemoryStorage::new();
         let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
         let memory_image = memory_session.capture(make_spec()).unwrap();
-        let memory_outcome = memory_session.apply(&memory_image, &delta).unwrap();
+        let memory_outcome = memory_session
+            .apply(&test_plan(&memory_image, &delta))
+            .unwrap();
         drop(memory_session);
 
         let json = JsonFileStorage::new(&data);
         let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
         let json_image = json_session.capture(make_spec()).unwrap();
-        let json_outcome = json_session.apply(&json_image, &delta).unwrap();
+        let json_outcome = json_session.apply(&test_plan(&json_image, &delta)).unwrap();
         drop(json_session);
 
-        // Identical result hash/action count, and neither backend materialized a
-        // data root: a worktree-only delta over an absent root leaves it absent.
+        // Identical complete plan hash/action count for identical absent capture,
+        // and neither backend materialized a data root.
         assert_eq!(memory_outcome, json_outcome);
         assert!(!data.exists(), "json must not publish an empty data root");
         assert!(!worktree.path().join(".jit-bootstrap").exists());
@@ -2048,16 +2169,18 @@ mod tests {
         seed_memory_existing(&memory, &[]);
         let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
         let memory_image = memory_session.capture(spec()).unwrap();
-        let memory_outcome = memory_session.apply(&memory_image, &delta).unwrap();
+        let memory_outcome = memory_session
+            .apply(&test_plan(&memory_image, &delta))
+            .unwrap();
 
         let json = JsonFileStorage::new(&data);
         let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
         let json_image = json_session.capture(spec()).unwrap();
-        let json_outcome = json_session.apply(&json_image, &delta).unwrap();
+        let json_outcome = json_session.apply(&test_plan(&json_image, &delta)).unwrap();
 
-        // An empty delta is a no-op with an identical zero-action outcome; no
-        // control, stage, or companion residue is created on either backend.
-        assert_eq!(memory_outcome, json_outcome);
+        // An empty delta is a no-op with zero actions; each result still carries
+        // its complete captured-image plan hash. No residue is created.
+        assert_eq!(memory_outcome.actions_applied, json_outcome.actions_applied);
         assert_eq!(json_outcome.actions_applied, 0);
         assert!(!worktree.path().join(".jit-bootstrap").exists());
         assert!(!data.join("tmp/transactions").exists());
@@ -2071,7 +2194,7 @@ mod tests {
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError> {
         let mut session = store.open_mutation_session(layout.clone())?;
         let image = session.capture(spec)?;
-        session.apply(&image, delta)
+        session.apply(&test_plan(&image, delta))
     }
 
     #[test]
@@ -2155,8 +2278,9 @@ mod tests {
             }
             let memory_outcome = apply_once(&memory2, &layout2, spec(), &with_parent).unwrap();
             assert_eq!(
-                json_outcome, memory_outcome,
-                "existing_root={existing_root}"
+                json_outcome.actions_applied, memory_outcome.actions_applied,
+                "complete hashes may differ with backend-specific captured identities; \
+                 action counts must agree for existing_root={existing_root}"
             );
         }
     }
@@ -2220,7 +2344,10 @@ mod tests {
             seed_memory_existing(&memory, &[]);
             let memory_outcome = apply_once(&memory, &layout, spec(), &delta).unwrap();
 
-            assert_eq!(json_outcome, memory_outcome, "{point:?}");
+            assert_eq!(
+                json_outcome.actions_applied, memory_outcome.actions_applied,
+                "{point:?}"
+            );
             assert_eq!(json_outcome.actions_applied, 0);
         }
     }
@@ -2344,7 +2471,7 @@ mod tests {
             Err(_) => return EdgeOutcome::OpenFailed,
         };
         let image = session.capture(spec).unwrap();
-        match session.apply(&image, delta) {
+        match session.apply(&test_plan(&image, delta)) {
             Ok(_) => EdgeOutcome::Applied,
             Err(_) => EdgeOutcome::ApplyFailed,
         }
@@ -2523,7 +2650,7 @@ mod tests {
             )],
         )
         .unwrap();
-        assert!(session.apply(&image, &delta).is_err());
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
         drop(session);
 
         // The companion lives under the worktree, same device as worktree targets
@@ -2589,7 +2716,7 @@ mod tests {
             )],
         )
         .unwrap();
-        assert!(session.apply(&image, &delta).is_err());
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
         drop(session);
 
         // Recovery rolls the Worktree replace back to the backup held in the
@@ -2632,7 +2759,7 @@ mod tests {
             )],
         )
         .unwrap();
-        assert!(session.apply(&image, &delta).is_err());
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
         drop(session);
 
         JsonFileStorage::new(&data)
@@ -2668,7 +2795,7 @@ mod tests {
 
     // Owner digest recomputed exactly as the kernel does (worktree/data paths).
     fn owner_digest_of(layout: &RepositoryLayout) -> String {
-        use sha2::Digest;
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(layout.worktree_root().to_string_lossy().as_bytes());
         hasher.update([0u8]);
@@ -2830,7 +2957,7 @@ mod tests {
             )],
         )
         .unwrap();
-        assert!(session.apply(&image, &delta).is_err());
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
         drop(session);
 
         // The user legitimately edits the published worktree target before the
@@ -2903,7 +3030,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            session.apply(&image, &delta),
+            session.apply(&test_plan(&image, &delta)),
             Err(RepositoryStateStoreError::RetryableConflict { .. })
         ));
     }
@@ -2996,7 +3123,7 @@ mod tests {
             )],
         )
         .unwrap();
-        assert!(session.apply(&image, &delta).is_err());
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
         drop(session);
 
         // 2) Recovery rolls back (restoring "old" and writing the RolledBack
@@ -3070,7 +3197,7 @@ mod tests {
             );
         }
         assert!(matches!(
-            session.apply(&image, &delta),
+            session.apply(&test_plan(&image, &delta)),
             Err(RepositoryStateStoreError::RetryableConflict { .. })
         ));
     }
@@ -3103,7 +3230,7 @@ mod tests {
             )],
         )
         .unwrap();
-        assert!(session.apply(&image, &delta).is_err());
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
         drop(session);
 
         // Prepared-journal recovery restores the original file from its backup.
@@ -3122,7 +3249,7 @@ mod tests {
     // byte-identical results regardless of backend. No-op operations sample
     // neither an identifier nor the mutation timestamp.
 
-    use crate::domain::{Assignee, Event, Issue};
+    use crate::domain::{Assignee, Event, GateState, GateStatus, Issue};
     use crate::repository_state::{
         finalize, serialize_gate_run, serialize_issue, MutationClock, MutationContext,
         MutationIntent,
@@ -3142,6 +3269,43 @@ mod tests {
             .unwrap()
             .with_timezone(&chrono::Utc);
         issue.updated_at = issue.created_at;
+        issue
+    }
+
+    fn req01_map_issue(reverse: bool) -> Issue {
+        let mut issue = Issue::draft("Canonical backend retry".into(), "Body".into());
+        let order = if reverse { [1, 0] } else { [0, 1] };
+        let context = [("alpha", "one"), ("zeta", "two")];
+        let gates = [
+            (
+                "alpha-gate",
+                GateState {
+                    status: GateStatus::Passed,
+                    updated_by: Some("agent:alpha".parse().unwrap()),
+                    updated_at: req01_instant(),
+                },
+            ),
+            (
+                "zeta-gate",
+                GateState {
+                    status: GateStatus::Failed,
+                    updated_by: Some("agent:zeta".parse().unwrap()),
+                    updated_at: req01_instant(),
+                },
+            ),
+        ];
+        issue.context = order
+            .iter()
+            .map(|index| {
+                let (key, value) = context[*index];
+                (key.to_string(), value.to_string())
+            })
+            .collect::<HashMap<_, _>>();
+        issue.gates_status = order
+            .iter()
+            .map(|index| gates[*index].clone())
+            .map(|(key, value)| (key.to_string(), value))
+            .collect::<HashMap<_, _>>();
         issue
     }
 
@@ -3222,7 +3386,7 @@ mod tests {
             let image = session.capture(claim_spec(id)).unwrap();
             let context = MutationContext::deterministic([7u8; 32], req01_instant());
             let delta = finalize(&layout, &image, &context, &intents).unwrap();
-            let outcome = session.apply(&image, &delta).unwrap();
+            let outcome = session.apply(&delta).unwrap();
             outcome.actions_applied
         };
         let memory_actions = {
@@ -3230,7 +3394,7 @@ mod tests {
             let image = session.capture(claim_spec(id)).unwrap();
             let context = MutationContext::deterministic([7u8; 32], req01_instant());
             let delta = finalize(&layout, &image, &context, &intents).unwrap();
-            let outcome = session.apply(&image, &delta).unwrap();
+            let outcome = session.apply(&delta).unwrap();
             outcome.actions_applied
         };
         assert_eq!(json_actions, memory_actions, "identical action count");
@@ -3329,19 +3493,318 @@ mod tests {
                 let mut session = memory.open_mutation_session(layout.clone()).unwrap();
                 let image = session.capture(claim_spec(id)).unwrap();
                 let delta = finalize(&layout, &image, &context, &intents).unwrap();
-                session.apply(&image, &delta).unwrap().actions_applied
+                session.apply(&delta).unwrap().actions_applied
             } else {
                 let json = JsonFileStorage::new(&data);
                 let mut session = json.open_mutation_session(layout.clone()).unwrap();
                 let image = session.capture(claim_spec(id)).unwrap();
                 let delta = finalize(&layout, &image, &context, &intents).unwrap();
-                session.apply(&image, &delta).unwrap().actions_applied
+                session.apply(&delta).unwrap().actions_applied
             };
             assert_eq!(
                 actions, 0,
                 "no-op emits no actions (run_memory={run_memory})"
             );
         }
+    }
+
+    #[test]
+    fn test_conformance_claim_noop_transaction_hash_covers_context_seed() {
+        let temp = TempDir::new().unwrap();
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new(temp.path(), "wt", true),
+            RepositoryRootEvidence::new(temp.path().join(".jit"), "data", true),
+        )
+        .unwrap();
+        let id = "56565656-5656-4565-8565-565656565656";
+        let agent: Assignee = "agent:worker-1".parse().unwrap();
+        let issue = req01_issue(id, Some(agent.clone()));
+        let claim_event = Event::IssueClaimed {
+            id: "evt".into(),
+            issue_id: id.to_string(),
+            timestamp: req01_instant(),
+            assignee: agent.clone(),
+        };
+        let mut events = crate::repository_state::serialize_event(&claim_event).unwrap();
+        events.push(b'\n');
+        let intents = [MutationIntent::ClaimIssue {
+            issue_id: id.to_string(),
+            agent,
+        }];
+
+        let hashes = [[11u8; 32], [12u8; 32]].map(|seed| {
+            let memory = InMemoryStorage::new();
+            seed_memory_issue(&memory, id, &issue, &events);
+            let mut session = memory.open_mutation_session(layout.clone()).unwrap();
+            let image = session.capture(claim_spec(id)).unwrap();
+            let context = MutationContext::deterministic(seed, req01_instant());
+            let plan = finalize(&layout, &image, &context, &intents).unwrap();
+            assert!(plan.delta().actions().is_empty());
+            session.apply(&plan).unwrap().transaction_hash
+        });
+
+        assert_ne!(
+            hashes[0], hashes[1],
+            "the unchanged context seed identity must enter even a no-op plan hash"
+        );
+    }
+
+    #[test]
+    fn test_conformance_identical_full_finalizer_plan_hash_matches_both_backends() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        let spec =
+            CaptureSpec::phase_one([VirtualPath::data("events.jsonl").unwrap()], budget()).unwrap();
+        let event = Event::GateDefinitionCreated {
+            id: String::new(),
+            timestamp: req01_instant(),
+            gate_key: "cargo-ci".to_string(),
+        };
+        let intents = [MutationIntent::RecordEvent {
+            phase: 0,
+            event: Box::new(event),
+        }];
+
+        let json = JsonFileStorage::new(&data);
+        let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
+        let json_image = json_session.capture(spec.clone()).unwrap();
+        let json_context = MutationContext::deterministic([21u8; 32], req01_instant());
+        let json_plan = finalize(&layout, &json_image, &json_context, &intents).unwrap();
+
+        let memory = InMemoryStorage::new();
+        memory.repository_state().data_root_exists = true;
+        let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
+        let memory_image = memory_session.capture(spec).unwrap();
+        let memory_context = MutationContext::deterministic([21u8; 32], req01_instant());
+        let memory_plan = finalize(&layout, &memory_image, &memory_context, &intents).unwrap();
+
+        assert_eq!(
+            json_image, memory_image,
+            "captured evidence must be identical"
+        );
+        assert_eq!(json_plan, memory_plan);
+        let json_outcome = json_session.apply(&json_plan).unwrap();
+        let memory_outcome = memory_session.apply(&memory_plan).unwrap();
+        assert_eq!(json_outcome.transaction_hash, json_plan.hash());
+        assert_eq!(memory_outcome.transaction_hash, json_plan.hash());
+    }
+
+    #[test]
+    fn test_conformance_reconstructed_issue_maps_match_across_backends() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir_all(data.join("issues")).unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        let issue_id = crate::repository_state::IdAuthority::from_seed([31u8; 32]).uuid_at(0);
+        let spec = CaptureSpec::phase_one(
+            [
+                VirtualPath::data("index.json").unwrap(),
+                VirtualPath::data("events.jsonl").unwrap(),
+                VirtualPath::data(format!("issues/{issue_id}.json")).unwrap(),
+            ],
+            budget(),
+        )
+        .unwrap();
+        let json_draft = req01_map_issue(false);
+        let memory_draft = req01_map_issue(true);
+        assert_eq!(json_draft, memory_draft);
+        assert_eq!(
+            serialize_issue(&json_draft).unwrap(),
+            serialize_issue(&memory_draft).unwrap()
+        );
+
+        let json = JsonFileStorage::new(&data);
+        let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
+        let json_image = json_session.capture(spec.clone()).unwrap();
+        let json_plan = finalize(
+            &layout,
+            &json_image,
+            &MutationContext::deterministic([31u8; 32], req01_instant()),
+            &[MutationIntent::CreateIssue {
+                draft: Box::new(json_draft),
+            }],
+        )
+        .unwrap();
+
+        let memory = InMemoryStorage::new();
+        {
+            let mut state = memory.repository_state();
+            state.data_root_exists = true;
+            state.entries.insert(
+                VirtualPath::data("issues").unwrap(),
+                RepositoryEntry::Directory {
+                    identity: EntryIdentity::for_bytes("mem-issues", b"directory").unwrap(),
+                    mode: FileMode::Executable,
+                },
+            );
+        }
+        let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
+        let memory_image = memory_session.capture(spec).unwrap();
+        let memory_plan = finalize(
+            &layout,
+            &memory_image,
+            &MutationContext::deterministic([31u8; 32], req01_instant()),
+            &[MutationIntent::CreateIssue {
+                draft: Box::new(memory_draft),
+            }],
+        )
+        .unwrap();
+
+        assert_eq!(json_image, memory_image);
+        assert_eq!(
+            serde_json::to_vec(json_plan.delta()).unwrap(),
+            serde_json::to_vec(memory_plan.delta()).unwrap()
+        );
+        assert_eq!(json_plan.hash(), memory_plan.hash());
+        let json_outcome = json_session.apply(&json_plan).unwrap();
+        let memory_outcome = memory_session.apply(&memory_plan).unwrap();
+        assert_eq!(
+            json_outcome.transaction_hash,
+            memory_outcome.transaction_hash
+        );
+    }
+
+    #[test]
+    fn test_full_finalizer_hash_changes_with_captured_evidence() {
+        let temp = TempDir::new().unwrap();
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new(temp.path(), "wt", true),
+            RepositoryRootEvidence::new(temp.path().join(".jit"), "data", true),
+        )
+        .unwrap();
+        let id = "57575757-5757-4575-8575-575757575757";
+        let agent: Assignee = "agent:worker-1".parse().unwrap();
+        let issue = req01_issue(id, Some(agent.clone()));
+        let intents = [MutationIntent::ClaimIssue {
+            issue_id: id.to_string(),
+            agent: agent.clone(),
+        }];
+
+        let hashes = ["evidence-a", "evidence-b"].map(|event_id| {
+            let event = Event::IssueClaimed {
+                id: event_id.to_string(),
+                issue_id: id.to_string(),
+                timestamp: req01_instant(),
+                assignee: agent.clone(),
+            };
+            let mut events = crate::repository_state::serialize_event(&event).unwrap();
+            events.push(b'\n');
+            let memory = InMemoryStorage::new();
+            seed_memory_issue(&memory, id, &issue, &events);
+            let mut session = memory.open_mutation_session(layout.clone()).unwrap();
+            let image = session.capture(claim_spec(id)).unwrap();
+            let context = MutationContext::deterministic([22u8; 32], req01_instant());
+            let plan = finalize(&layout, &image, &context, &intents).unwrap();
+            assert!(plan.delta().actions().is_empty());
+            plan.hash().to_string()
+        });
+
+        assert_ne!(hashes[0], hashes[1]);
+    }
+
+    #[test]
+    fn test_full_finalizer_allocated_ids_enter_delta_and_retry_reuses_hash() {
+        let temp = TempDir::new().unwrap();
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new(temp.path(), "wt", true),
+            RepositoryRootEvidence::new(temp.path().join(".jit"), "data", true),
+        )
+        .unwrap();
+        let id = "58585858-5858-4585-8585-585858585858";
+        let agent: Assignee = "agent:worker-1".parse().unwrap();
+        let issue = req01_issue(id, None);
+        let memory = InMemoryStorage::new();
+        seed_memory_issue(&memory, id, &issue, &[]);
+        let mut session = memory.open_mutation_session(layout.clone()).unwrap();
+        let image = session.capture(claim_spec(id)).unwrap();
+        let intents = [MutationIntent::ClaimIssue {
+            issue_id: id.to_string(),
+            agent,
+        }];
+        let context = MutationContext::deterministic([23u8; 32], req01_instant());
+
+        let first = finalize(&layout, &image, &context, &intents).unwrap();
+        let retry = finalize(&layout, &image, &context, &intents).unwrap();
+        assert_eq!(first, retry, "a retry reuses the complete plan hash");
+
+        let event_bytes = first
+            .delta()
+            .actions()
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::WriteFile { path, bytes, .. }
+                    if path == &VirtualPath::data("events.jsonl").unwrap() =>
+                {
+                    Some(bytes)
+                }
+                _ => None,
+            })
+            .unwrap();
+        let events =
+            crate::domain::parse_known_events(std::str::from_utf8(event_bytes).unwrap()).unwrap();
+        let Event::IssueClaimed { id: event_id, .. } = &events[0] else {
+            panic!("expected allocated claim event");
+        };
+        assert_eq!(
+            event_id,
+            &crate::repository_state::IdAuthority::from_seed([23u8; 32]).uuid_at(0)
+        );
+        let seed = context.repository_seed(&intents).unwrap();
+        assert_eq!(
+            first.hash(),
+            plan_hash(
+                &image,
+                &seed,
+                &MaterializationIntent::SemanticMutation,
+                first.delta()
+            )
+            .unwrap(),
+            "the delta containing every allocated id is part of the hash"
+        );
+    }
+
+    #[test]
+    fn test_conformance_empty_finalizer_noop_hash_matches_without_clock_sampling() {
+        struct PanicClock;
+        impl MutationClock for PanicClock {
+            fn now(&self) -> chrono::DateTime<chrono::Utc> {
+                panic!("empty no-op must not sample time");
+            }
+        }
+
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        let spec =
+            CaptureSpec::phase_one([VirtualPath::data("events.jsonl").unwrap()], budget()).unwrap();
+        let json = JsonFileStorage::new(&data);
+        let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
+        let json_image = json_session.capture(spec.clone()).unwrap();
+        let json_context = MutationContext::new(
+            crate::repository_state::IdAuthority::from_seed([24u8; 32]),
+            Box::new(PanicClock),
+        );
+        let json_plan = finalize(&layout, &json_image, &json_context, &[]).unwrap();
+
+        let memory = InMemoryStorage::new();
+        memory.repository_state().data_root_exists = true;
+        let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
+        let memory_image = memory_session.capture(spec).unwrap();
+        let memory_context = MutationContext::new(
+            crate::repository_state::IdAuthority::from_seed([24u8; 32]),
+            Box::new(PanicClock),
+        );
+        let memory_plan = finalize(&layout, &memory_image, &memory_context, &[]).unwrap();
+
+        assert_eq!(json_plan, memory_plan);
+        assert!(json_plan.delta().actions().is_empty());
+        let json_outcome = json_session.apply(&json_plan).unwrap();
+        let memory_outcome = memory_session.apply(&memory_plan).unwrap();
+        assert_eq!(json_outcome, memory_outcome);
+        assert_eq!(json_outcome.actions_applied, 0);
     }
 
     #[test]
@@ -3378,6 +3841,8 @@ mod tests {
         let mut event_line = crate::repository_state::serialize_event(&provenance).unwrap();
         event_line.push(b'\n');
         let gate_bytes = serialize_gate_run(&result).unwrap();
+        assert!(gate_bytes.starts_with(b"{\n"));
+        assert!(!gate_bytes.ends_with(b"\n"));
 
         // Build one delta persisting the gate-run artifact plus the provenance
         // event; both backends must write byte-identical content.
@@ -3425,7 +3890,8 @@ mod tests {
         {
             let mut session = json.open_mutation_session(layout.clone()).unwrap();
             let image = session.capture(spec()).unwrap();
-            session.apply(&image, &build_delta(&layout)).unwrap();
+            let delta = build_delta(&layout);
+            session.apply(&test_plan(&image, &delta)).unwrap();
         }
 
         let memory = InMemoryStorage::new();
@@ -3446,7 +3912,8 @@ mod tests {
         {
             let mut session = memory.open_mutation_session(layout.clone()).unwrap();
             let image = session.capture(spec()).unwrap();
-            session.apply(&image, &build_delta(&layout)).unwrap();
+            let delta = build_delta(&layout);
+            session.apply(&test_plan(&image, &delta)).unwrap();
         }
 
         // Gate-run and provenance bytes are byte-identical across backends.
@@ -3484,7 +3951,7 @@ mod tests {
         let image = session.capture(spec).unwrap();
         let context = MutationContext::deterministic([7u8; 32], req01_instant());
         let delta = finalize(layout, &image, &context, intents).unwrap();
-        session.apply(&image, &delta).unwrap();
+        session.apply(&delta).unwrap();
     }
 
     fn memory_dir(name: &str) -> (VirtualPath, RepositoryEntry) {

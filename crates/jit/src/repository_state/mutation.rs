@@ -14,14 +14,18 @@
 //! and the pure `repository_state` vocabulary.
 
 use super::{
-    CaptureError, DeltaError, ExpectedPreimage, FileMode, RepositoryAction, RepositoryDelta,
-    RepositoryImage, RepositoryLayout, RepositoryLayoutError, VirtualPath,
+    CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationIntent,
+    MaterializationPlan, PlanHashError, RepositoryAction, RepositoryDelta, RepositoryImage,
+    RepositoryLayout, RepositoryLayoutError, RepositorySeed, RepositorySeedKind, SeedError,
+    VirtualPath,
 };
 use crate::domain::{Assignee, Event, GateRunResult, Issue, Priority, State};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::cell::Cell;
+use std::collections::BTreeMap;
 
 /// Injected wall-clock source for the single mutation timestamp.
 ///
@@ -168,6 +172,27 @@ impl MutationContext {
         self.next_index.set(index + 1);
         self.ids.uuid_at(index)
     }
+
+    /// Close the unchanged identity seed and exact semantic intents into the
+    /// typed seed consumed by the repository plan-hash API. Reading the seed is
+    /// not an allocation: no-op finalization still samples neither identity nor
+    /// time, while its plan remains distinct from a no-op under another context.
+    pub(crate) fn repository_seed(
+        &self,
+        intents: &[MutationIntent],
+    ) -> Result<RepositorySeed, MutationError> {
+        RepositorySeed::new(
+            RepositorySeedKind::Command {
+                name: "repository-state-mutation-v1".to_string(),
+            },
+            BTreeMap::new(),
+            BTreeMap::from([
+                ("context_seed".to_string(), self.ids.seed.to_vec()),
+                ("intents".to_string(), canonical_json(intents, false)?),
+            ]),
+        )
+        .map_err(Into::into)
+    }
 }
 
 /// Mirror of the persisted `index.json` shape, owned here so the finalizer is the
@@ -185,6 +210,8 @@ struct RepositoryIndex {
 ///
 /// The finalizer assigns identity and applies the mutation timestamp; callers
 /// never stamp either. The set is closed: a new record class extends this enum.
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum MutationIntent {
     /// Create a new issue. The finalizer assigns the id and stamps `created_at`,
     /// `updated_at`, and `first_ready_at` (when initially `Ready`); every other
@@ -257,6 +284,12 @@ pub enum MutationError {
     /// A record could not be serialized.
     #[error("failed to serialize repository record: {0}")]
     Serialize(#[from] serde_json::Error),
+    /// The closed semantic seed was invalid.
+    #[error(transparent)]
+    Seed(#[from] SeedError),
+    /// The complete semantic plan could not be hashed.
+    #[error(transparent)]
+    PlanHash(#[from] PlanHashError),
     /// A captured record could not be parsed.
     #[error("captured record at {path} is malformed: {reason}")]
     MalformedRecord {
@@ -308,17 +341,45 @@ fn issue_path(id: &str) -> Result<VirtualPath, RepositoryLayoutError> {
 
 /// Serialize an issue to its exact on-disk bytes (pretty, no trailing newline).
 pub fn serialize_issue(issue: &Issue) -> Result<Vec<u8>, MutationError> {
-    Ok(serde_json::to_string_pretty(issue)?.into_bytes())
+    canonical_json(issue, true)
 }
 
 /// Serialize a gate-run result to its exact on-disk bytes.
 pub fn serialize_gate_run(result: &GateRunResult) -> Result<Vec<u8>, MutationError> {
-    Ok(serde_json::to_string_pretty(result)?.into_bytes())
+    canonical_json(result, true)
 }
 
 /// Serialize one event to its exact single-line JSONL representation (no newline).
 pub fn serialize_event(event: &Event) -> Result<Vec<u8>, MutationError> {
-    Ok(serde_json::to_string(event)?.into_bytes())
+    canonical_json(event, false)
+}
+
+/// Serialize typed repository state after recursively sorting every JSON object.
+fn canonical_json<T: Serialize + ?Sized>(
+    value: &T,
+    pretty: bool,
+) -> Result<Vec<u8>, MutationError> {
+    let canonical = canonicalize_json(serde_json::to_value(value)?);
+    if pretty {
+        Ok(serde_json::to_vec_pretty(&canonical)?)
+    } else {
+        Ok(serde_json::to_vec(&canonical)?)
+    }
+}
+
+fn canonicalize_json(value: Value) -> Value {
+    match value {
+        Value::Array(values) => Value::Array(values.into_iter().map(canonicalize_json).collect()),
+        Value::Object(entries) => {
+            let mut entries = entries
+                .into_iter()
+                .map(|(key, value)| (key, canonicalize_json(value)))
+                .collect::<Vec<_>>();
+            entries.sort_by(|left, right| left.0.cmp(&right.0));
+            Value::Object(entries.into_iter().collect())
+        }
+        scalar => scalar,
+    }
 }
 
 /// Whether a captured `events.jsonl` prefix ends in a malformed, unterminated
@@ -411,18 +472,21 @@ fn event_tail_reflects_claim(events: &[Event], issue_id: &str, agent: &Assignee)
 /// The single typed-to-byte finalizer for repository-owned records.
 ///
 /// Given the captured `image`, the reused `context`, and closed semantic
-/// `intents`, it produces one exact [`RepositoryDelta`]. When no transition
-/// occurs it returns an empty delta having sampled neither an identifier nor the
-/// mutation timestamp, so a no-op emits no bytes. Identifiers are allocated in
-/// the frozen order — new issue ids first (creation order), gate-run/record ids
-/// next, event ids last after canonical event ordering — and one mutation
-/// timestamp is applied to every transition that occurs.
+/// `intents`, it produces one exact [`MaterializationPlan`]. Its semantic hash
+/// covers the complete captured image, the unchanged context seed, the closed
+/// intent representation, [`MaterializationIntent::SemanticMutation`], and the
+/// final delta. When no transition occurs the plan carries an empty delta having
+/// sampled neither an identifier nor the mutation timestamp, so a no-op emits no
+/// bytes. Identifiers are allocated in the frozen order — new issue ids first
+/// (creation order), gate-run/record ids next, event ids last after canonical
+/// event ordering — and one mutation timestamp is applied to every transition
+/// that occurs.
 pub fn finalize(
     layout: &RepositoryLayout,
     image: &RepositoryImage,
     context: &MutationContext,
     intents: &[MutationIntent],
-) -> Result<RepositoryDelta, MutationError> {
+) -> Result<MaterializationPlan, MutationError> {
     context.begin();
     let mut actions: Vec<RepositoryAction> = Vec::new();
     let mut pending_events: Vec<PendingEvent> = Vec::new();
@@ -611,7 +675,15 @@ pub fn finalize(
         actions.push(index_membership_action(image, &index_creations)?);
     }
 
-    RepositoryDelta::new(layout, actions).map_err(Into::into)
+    let delta = RepositoryDelta::new(layout, actions)?;
+    let seed = context.repository_seed(intents)?;
+    MaterializationPlan::new(
+        image,
+        &seed,
+        &MaterializationIntent::SemanticMutation,
+        delta,
+    )
+    .map_err(Into::into)
 }
 
 /// Build the write action for an issue, using the captured preimage so a create
@@ -668,7 +740,7 @@ fn index_membership_action(
         path,
         owner: OWNER.to_string(),
         expected,
-        bytes: serde_json::to_string_pretty(&index)?.into_bytes(),
+        bytes: canonical_json(&index, true)?,
         mode: FileMode::Regular,
     })
 }
@@ -702,11 +774,12 @@ pub fn issue_draft(title: String, description: String, priority: Priority) -> Is
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::{GateState, GateStatus};
     use crate::repository_state::{
         CaptureBudget, CaptureSpec, EntryIdentity, RepositoryEntry, RepositoryImage,
         RepositoryRootEvidence,
     };
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashMap};
 
     fn layout() -> RepositoryLayout {
         RepositoryLayout::new(
@@ -769,6 +842,116 @@ mod tests {
         issue
     }
 
+    fn map_order_draft(reverse: bool) -> Issue {
+        let mut issue = Issue::draft("Canonical".into(), "Body".into());
+        let context_entries = [("alpha", "one"), ("zeta", "two")];
+        let gate_entries = [
+            (
+                "alpha-gate",
+                GateState {
+                    status: GateStatus::Passed,
+                    updated_by: Some("agent:alpha".parse().unwrap()),
+                    updated_at: fixed_instant(),
+                },
+            ),
+            (
+                "zeta-gate",
+                GateState {
+                    status: GateStatus::Failed,
+                    updated_by: Some("agent:zeta".parse().unwrap()),
+                    updated_at: fixed_instant(),
+                },
+            ),
+        ];
+        let order = if reverse { [1, 0] } else { [0, 1] };
+        issue.context = order
+            .iter()
+            .map(|index| {
+                let (key, value) = context_entries[*index];
+                (key.to_string(), value.to_string())
+            })
+            .collect::<HashMap<_, _>>();
+        issue.gates_status = order
+            .iter()
+            .map(|index| gate_entries[*index].clone())
+            .map(|(key, value)| (key.to_string(), value))
+            .collect::<HashMap<_, _>>();
+        issue
+    }
+
+    #[test]
+    fn test_finalizer_canonicalizes_issue_maps_for_retry_bytes_and_hash() {
+        let first_draft = map_order_draft(false);
+        let retry_draft = map_order_draft(true);
+        assert_eq!(first_draft, retry_draft);
+        assert_eq!(
+            serialize_issue(&first_draft).unwrap(),
+            serialize_issue(&retry_draft).unwrap(),
+            "issue bytes must not depend on HashMap insertion order"
+        );
+
+        let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
+            schema_version: 2,
+            all_ids: Vec::new(),
+            deleted_ids: Vec::new(),
+        })
+        .unwrap();
+        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let image = image_with(vec![
+            (index_path().unwrap(), file_entry(&index_bytes)),
+            (events_path().unwrap(), RepositoryEntry::Absent),
+            (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
+        ]);
+        let first = finalize(
+            &layout(),
+            &image,
+            &ctx(),
+            &[MutationIntent::CreateIssue {
+                draft: Box::new(first_draft),
+            }],
+        )
+        .unwrap();
+        let retry = finalize(
+            &layout(),
+            &image,
+            &ctx(),
+            &[MutationIntent::CreateIssue {
+                draft: Box::new(retry_draft),
+            }],
+        )
+        .unwrap();
+
+        assert_eq!(
+            serde_json::to_vec(first.delta()).unwrap(),
+            serde_json::to_vec(retry.delta()).unwrap(),
+            "delta bytes must be stable across reconstructed values"
+        );
+        assert_eq!(
+            first.hash(),
+            retry.hash(),
+            "semantic plan hashes must be stable across retries"
+        );
+    }
+
+    #[test]
+    fn test_canonical_serialization_preserves_repository_record_shapes() {
+        let issue_bytes = serialize_issue(&map_order_draft(false)).unwrap();
+        assert!(issue_bytes.starts_with(b"{\n"));
+        assert!(!issue_bytes.ends_with(b"\n"));
+
+        let event = Event::GateDefinitionCreated {
+            id: "event-1".into(),
+            timestamp: fixed_instant(),
+            gate_key: "cargo-ci".into(),
+        };
+        let event_bytes = serialize_event(&event).unwrap();
+        assert!(event_bytes.starts_with(b"{"));
+        assert!(!event_bytes.contains(&b'\n'));
+        assert!(!event_bytes.ends_with(b"\n"));
+        let round_trip: Event = serde_json::from_slice(&event_bytes).unwrap();
+        assert_eq!(round_trip, event);
+    }
+
     #[test]
     fn test_id_authority_is_deterministic_and_ordered() {
         let ids = IdAuthority::from_seed([1u8; 32]);
@@ -817,7 +1000,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            delta.actions().is_empty(),
+            delta.delta().actions().is_empty(),
             "fully reflected claim is a no-op"
         );
     }
@@ -843,8 +1026,8 @@ mod tests {
         )
         .unwrap();
         // Exactly one action: the missing events.jsonl append. No issue rewrite.
-        assert_eq!(delta.actions().len(), 1);
-        let action = &delta.actions()[0];
+        assert_eq!(delta.delta().actions().len(), 1);
+        let action = &delta.delta().actions()[0];
         assert_eq!(action.path(), &events_path().unwrap());
     }
 
@@ -868,9 +1051,10 @@ mod tests {
         )
         .unwrap();
         // Two actions: the assigned issue and the appended claim event.
-        assert_eq!(delta.actions().len(), 2);
+        assert_eq!(delta.delta().actions().len(), 2);
         // The issue write carries the assignee and a stamped claimed_at.
         let issue_action = delta
+            .delta()
             .actions()
             .iter()
             .find(|action| action.path() == &issue_path(&issue.id).unwrap())
@@ -917,6 +1101,7 @@ mod tests {
         .unwrap();
         let expected_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
         let issue_action = delta
+            .delta()
             .actions()
             .iter()
             .find(|action| action.path() == &issue_path(&expected_id).unwrap())
@@ -930,6 +1115,7 @@ mod tests {
         assert_eq!(written.first_ready_at, Some(fixed_instant()));
         // Membership index carries the new id.
         let index_action = delta
+            .delta()
             .actions()
             .iter()
             .find(|action| action.path() == &index_path().unwrap())
@@ -1022,6 +1208,7 @@ mod tests {
         )
         .unwrap();
         let action = delta
+            .delta()
             .actions()
             .iter()
             .find(|action| action.path() == &events_path().unwrap())
@@ -1030,8 +1217,21 @@ mod tests {
             panic!("expected events write");
         };
         let text = std::str::from_utf8(bytes).unwrap();
-        // The certifier line immediately follows the torn partial `{"parti`.
-        assert!(text.contains("{\"parti\n{\"type\":\"profile_applied\""));
+        // The certifier record immediately follows the torn partial line; JSON
+        // object key order is not part of the event-log contract.
+        let certifier_follows_tail = text.lines().collect::<Vec<_>>().windows(2).any(|lines| {
+            lines[0] == "{\"parti"
+                && serde_json::from_str::<Event>(lines[1]).is_ok_and(|event| {
+                    matches!(
+                        event,
+                        Event::ProfileApplied {
+                            isolated_torn_tail: true,
+                            ..
+                        }
+                    )
+                })
+        });
+        assert!(certifier_follows_tail);
         // The reader accepts the composed log and recovers the marker.
         let events = crate::domain::parse_known_events(text).unwrap();
         assert!(events.iter().any(|event| matches!(
