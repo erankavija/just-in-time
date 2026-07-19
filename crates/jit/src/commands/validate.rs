@@ -62,6 +62,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             total_fixes += transition_fixes;
             all_messages.append(&mut messages);
 
+            // Repair derived state (default rules/schemas + configured projections)
+            // through the recovered session's transactional repair delta.
+            let (repair_fixes, mut messages) = self.repair_derived_state(dry_run)?;
+            total_fixes += repair_fixes;
+            all_messages.append(&mut messages);
+
             // Add summary message
             if dry_run {
                 all_messages.push(format!(
@@ -299,6 +305,114 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     > {
         let image = self.capture_validation_image()?;
         Ok(crate::validation::repository::validate_repository(&image))
+    }
+
+    /// Repair derived state (default rules/schemas plus every configured
+    /// projection) through the recovered session (`jit validate --fix`).
+    ///
+    /// The complete owned-materialization set is derived from declared authority
+    /// over one captured image ([`MaterializationIntent::RepairDerivedState`]) and
+    /// applied through the same session; a coherent repository yields an empty
+    /// delta (no action). Repair is ownership-safe by construction — `rules.toml`
+    /// splices only the generated default spans and region projections splice only
+    /// their managed region, so authored content is preserved. In `dry_run` the
+    /// delta is derived but not applied. Returns the number of repaired targets and
+    /// a per-target message. In-memory stores keep the legacy path and repair
+    /// nothing.
+    fn repair_derived_state(&self, dry_run: bool) -> Result<(usize, Vec<String>)> {
+        use crate::repository_state::{
+            derive_materializations, render_capture_closure, CaptureBudget, CaptureSpec,
+            MaterializationIntent, RepositoryAction, RepositorySeed, RepositorySeedKind,
+            VirtualPath,
+        };
+        use crate::storage::RepositoryStateStoreError;
+        use std::collections::BTreeMap;
+
+        if !self.storage.is_file_backed() {
+            return Ok((0, Vec::new()));
+        }
+
+        let layout = self.require_layout()?;
+        let mut session = self.storage().open_mutation_session(layout)?;
+        let budget = CaptureBudget {
+            max_paths: 1 << 16,
+            max_listings: 64,
+            max_bytes: 256 * 1024 * 1024,
+            max_depth: 16,
+        };
+        let seed = RepositorySeed::new(
+            RepositorySeedKind::Command {
+                name: "validate --fix".to_string(),
+            },
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )?;
+        let registries = || -> Result<[VirtualPath; 4]> {
+            Ok([
+                VirtualPath::data("config.toml")?,
+                VirtualPath::data("invariants.toml")?,
+                VirtualPath::data("rules.toml")?,
+                VirtualPath::data("gates.toml")?,
+            ])
+        };
+        for _ in 0..8 {
+            let image_one = match session.capture(CaptureSpec::phase_one(registries()?, budget)?) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let config_one = crate::repository_state::assemble_config(&image_one)?;
+            let rules_text = super::image_repo_bytes(&image_one, ".jit/rules.toml")?
+                .map(String::from_utf8)
+                .transpose()?;
+            let closure = render_capture_closure(&config_one, &[], rules_text.as_deref())?;
+            let mut phase_two = CaptureSpec::phase_one(registries()?, budget)?;
+            phase_two.discover_paths(closure)?;
+            let image = match session.capture(phase_two) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+
+            let declarations = super::declarations_from_image(&image)?;
+            let plan = derive_materializations(
+                &image,
+                declarations.borrowed(),
+                &seed,
+                MaterializationIntent::RepairDerivedState,
+            )?;
+            // One message per content-changing target (directory/mode actions are
+            // structural companions of a write); a coherent repository emits none.
+            let messages: Vec<String> =
+                plan.delta()
+                    .actions()
+                    .iter()
+                    .filter_map(|action| match action {
+                        RepositoryAction::WriteFile { path, .. } => {
+                            Some(format!("✓ Repaired derived-state target {path:?}"))
+                        }
+                        RepositoryAction::DeleteFile { path, .. } => {
+                            Some(format!("✓ Removed obsolete derived-state target {path:?}"))
+                        }
+                        RepositoryAction::CreateDirectory { .. }
+                        | RepositoryAction::SetMode { .. } => None,
+                    })
+                    .collect();
+            if messages.is_empty() {
+                return Ok((0, Vec::new()));
+            }
+            if dry_run {
+                return Ok((messages.len(), messages));
+            }
+            match session.apply(&plan) {
+                Ok(_) => return Ok((messages.len(), messages)),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "derived-state repair did not converge after repeated capture conflicts"
+        ))
     }
 }
 
@@ -2302,6 +2416,46 @@ mod tests {
             format!("{error:#}").contains("index.json"),
             "missing index must fail through captured-image validation: {error:#}"
         );
+    }
+
+    #[test]
+    fn test_validate_fix_repairs_stale_derived_projection_through_the_session() {
+        let repo = tempfile::tempdir().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        storage.init().unwrap();
+        let config = "[type_hierarchy.types]\ntask = 4\n\
+            [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n\
+            [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = []\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
+            [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n";
+        std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
+        std::fs::write(
+            repo.path().join(".jit/invariants.toml"),
+            "[[invariants]]\nid = \"sample\"\nstatement = \"Stay acyclic.\"\nkind = \"advisory\"\n",
+        )
+        .unwrap();
+        std::fs::write(
+            repo.path().join("AGENTS.md"),
+            "# Doc\n\n<!-- jit:invariants:begin -->\nSTALE\n<!-- jit:invariants:end -->\n",
+        )
+        .unwrap();
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        let mut executor = CommandExecutor::new(storage).with_layout(layout);
+
+        let (fixes, _messages) = executor.validate_with_fix(true, false).unwrap();
+        assert!(fixes >= 1, "the stale projection region must be repaired");
+        let agents = std::fs::read_to_string(repo.path().join("AGENTS.md")).unwrap();
+        assert!(
+            !agents.contains("STALE"),
+            "the stale region must be rewritten: {agents}"
+        );
+        assert!(
+            agents.contains("sample"),
+            "the invariant must render into the repaired region: {agents}"
+        );
+        // A second --fix run is a no-op: the derived state is already coherent.
+        let (again, _) = executor.validate_with_fix(true, false).unwrap();
+        assert_eq!(again, 0, "repair must be idempotent");
     }
 
     #[test]
