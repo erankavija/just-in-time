@@ -206,12 +206,20 @@
       "situation": "After two rework attempts closed the original seed-omission finding, plan encapsulation, and HashMap serialization nondeterminism, final adversarial review found one ordinary API pairing defect: RepositoryMutationSession::apply accepts image and plan separately, so a plan derived from image A can be applied alongside image B when action-target preimages match, recording A's semantic hash after revalidating B.",
       "resolution": "Invoker authorized option 1: one minimal guided correction that makes MaterializationPlan own its captured RepositoryImage and makes apply accept only the plan, followed by the issue gates.",
       "recommendation": "Authorize one guided minimal correction: MaterializationPlan owns the captured RepositoryImage and apply accepts only the plan, structurally binding image, delta, and hash without storage-side rehashing or a validation framework."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "a6a9b964-d944-4d7f-a7e7-7fb88dcee13b",
+      "status": "open",
+      "opened_at": "2026-07-19T17:22:37+03:00",
+      "situation": "The invoker-authorized owned-image correction and a subsequent canonical lease-identity correction passed independent review and cargo-ci, but code-review run cbee4805-53b0-400d-891d-7ded5ffcec3e found one new medium scope violation: the collision-test helper added fresh Issue::new and save_issue callers even though the approved scope amendment freezes those predecessor APIs until wave 5. The wave-3 rework counter has reached 2.",
+      "recommendation": "Authorize one narrow test-fixture-only correction: remove the new predecessor caller by extending or reusing the existing claim-test fixture boundary (or by using the typed finalizer), preserve the collision regressions, then rerun focused tests, independent review, and both issue gates."
     }
   ],
   "rework_counts": {
     "cbc3a7e5": 2,
     "bacf2cd4": 2,
-    "a6a9b964": 1
+    "a6a9b964": 2
   },
   "started_at": "2026-07-18T16:22:26Z"
 }

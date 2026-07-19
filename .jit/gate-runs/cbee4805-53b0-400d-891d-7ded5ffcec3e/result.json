@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "cbee4805-53b0-400d-891d-7ded5ffcec3e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a6a9b964-d944-4d7f-a7e7-7fb88dcee13b",
+  "commit": "e17bda300884361b73ad00be20fb507ec2a369cb",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-19T14:18:12.531409729Z",
+  "completed_at": "2026-07-19T14:21:24.695029786Z",
+  "duration_ms": 192163,
+  "exit_code": 1,
+  "stdout": "Attribution: 46894584, 59f535a3, 9db1dfb8, 1e273ff3, 6413baf5, e17bda30 (jit:a6a9b964)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/event-log (.jit/invariants.toml); @/invariant/atomic-writes (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-19T14:13:44.367648156Z); prior code-review F1/F2 are resolved by the scope amendment and e17bda30\nTruncation recovery: line-scoped reads of finalizer, session, coordinator, claim path, tests, and individual tagged patches\n\n1. [blocking][issue-impact][medium] The e17bda30 legacy-lease tests add a new use of frozen deletion debt: `Issue::new` and `storage.save_issue` at `crates/jit/src/commands/claim.rs:1125` and `:1127`. The approved scope amendment permits predecessors temporarily, but explicitly forbids new callers until wave 5; this added helper prevents the promised pure caller-swap deletion.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A new test helper adds prohibited callers of frozen predecessor APIs.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The legacy-lease test helper adds new Issue::new and save_issue callers despite the issue scope amendment freezing those predecessor APIs until wave 5.\",\"file\":\"crates/jit/src/commands/claim.rs\",\"line\":1125,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10876 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7abd-e3ad-75e2-826e-9a7f2ce09308\n--------\nuser\n--- 10863 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "A new test helper adds prohibited callers of frozen predecessor APIs.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The legacy-lease test helper adds new Issue::new and save_issue callers despite the issue scope amendment freezing those predecessor APIs until wave 5.",
+        "file": "crates/jit/src/commands/claim.rs",
+        "line": 1125
+      }
+    ]
+  }
+}
