@@ -359,9 +359,7 @@ kind = "advisory"
         let config = format!(
             "{CONFIG}\n[projection.extra]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n"
         );
-        let agents = format!(
-            "# Doc\n\n<!-- jit:invariants:begin -->\nOLD-A\n<!-- jit:invariants:end -->\n\nmiddle\n\n<!-- jit:extra:begin -->\nOLD-B\n<!-- jit:extra:end -->\n"
-        );
+        let agents = "# Doc\n\n<!-- jit:invariants:begin -->\nOLD-A\n<!-- jit:invariants:end -->\n\nmiddle\n\n<!-- jit:extra:begin -->\nOLD-B\n<!-- jit:extra:end -->\n".to_string();
         let build = || {
             image(&[
                 (".jit/config.toml", Some(&config)),
@@ -434,7 +432,8 @@ kind = "advisory"
         // matrix: configured region projection).
         let cfg = empty_config_decls();
         let (g, r) = (gates(), rules());
-        let authored_prefix = "# Hand-authored heading\n\nAuthored intro the tool must never touch.\n\n";
+        let authored_prefix =
+            "# Hand-authored heading\n\nAuthored intro the tool must never touch.\n\n";
         let authored_suffix = "\n\n## Authored trailing section\n\nMore authored prose.\n";
         let agents = format!(
             "{authored_prefix}<!-- jit:invariants:begin -->\nMANUALLY EDITED DERIVED CONTENT\n<!-- jit:invariants:end -->{authored_suffix}"
