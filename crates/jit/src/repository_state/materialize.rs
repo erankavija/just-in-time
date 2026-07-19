@@ -195,6 +195,11 @@ pub(crate) fn compose_default_ruleset(
     // Write each expected target the image actually captured (a target outside
     // the closure is not owned here and never fabricated).
     let serialized = serialize_ruleset(&default_ruleset(&namespaces));
+    let expected_names: std::collections::BTreeSet<&str> = serialized
+        .schema_files
+        .iter()
+        .map(|f| f.name.as_str())
+        .collect();
     for schema in &serialized.schema_files {
         let vpath = image_path(&format!(".jit/schemas/{}", schema.name))?;
         if !image.capture_spec().contains_path(&vpath) {
@@ -214,7 +219,56 @@ pub(crate) fn compose_default_ruleset(
             mode: FileMode::Regular,
         });
     }
+
+    // Obsolete generated schemas: delete a captured schemas/*.json ONLY when a
+    // persisted default-origin rule proves it was generated (its reference in the
+    // current rules.toml) AND it is no longer an expected target. Filename
+    // convention alone never authorizes deletion (ownership matrix, schema row).
+    let origins: std::collections::HashMap<String, Option<String>> =
+        identities.iter().cloned().collect();
+    let default_generated_refs: std::collections::BTreeSet<String> =
+        crate::declarations::rules::RuleSet::schema_requests(&current_rules)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|req| {
+                origins.get(&req.rule).and_then(Option::as_deref)
+                    == Some(crate::declarations::rules::DEFAULT_ORIGIN)
+            })
+            .map(|req| req.reference)
+            .collect();
+    for (vpath, entry) in image.entries() {
+        let RepositoryEntry::File { .. } = entry else {
+            continue;
+        };
+        let Some(name) = schema_file_name(vpath) else {
+            continue;
+        };
+        // Proven generated (a default rule references it) and no longer expected.
+        if default_generated_refs.contains(&format!("schemas/{name}"))
+            && !expected_names.contains(name)
+        {
+            actions.push(RepositoryAction::DeleteFile {
+                path: vpath.clone(),
+                owner: "default-schema".to_string(),
+                expected: ExpectedPreimage::of(entry),
+            });
+        }
+    }
     Ok(actions)
+}
+
+/// The file name of a `Data("schemas/<name>")` entry, or `None` for any other
+/// path. Used to locate obsolete generated schema targets for repair.
+fn schema_file_name(path: &VirtualPath) -> Option<&str> {
+    if path.root_class() != crate::repository_state::RepositoryRootClass::Data {
+        return None;
+    }
+    match path.relative() {
+        crate::repository_state::RootRelativePath::Descendant(rel) => rel
+            .strip_prefix("schemas/")
+            .filter(|name| !name.contains('/')),
+        crate::repository_state::RootRelativePath::Root => None,
+    }
 }
 
 #[cfg(test)]
@@ -664,6 +718,106 @@ kind = "advisory"
             )),
             "namespace-registry schema rewritten: {:?}",
             plan.delta().actions()
+        );
+    }
+
+    #[test]
+    fn test_derive_default_schema_delete_requires_proven_ownership_not_filename() {
+        // A captured schemas/default-orphan.json referenced by NO rule is NOT
+        // deleted: filename convention alone never authorizes deletion.
+        let config = ns_config(&["component", "team"]);
+        let jc: JitConfig = toml::from_str(&config).unwrap();
+        let ns = crate::config_manager::namespaces_from_config(&jc);
+        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let mut schema_paths: Vec<(String, String)> = scaffold
+            .schema_files
+            .iter()
+            .map(|f| (format!(".jit/schemas/{}", f.name), f.content.clone()))
+            .collect();
+        // An unreferenced, jit-named-looking stale schema.
+        schema_paths.push((
+            ".jit/schemas/default-orphan.json".to_string(),
+            "{}".to_string(),
+        ));
+        let mut files: Vec<(&str, Option<&str>)> = vec![
+            (".jit/config.toml", Some(&config)),
+            (".jit/rules.toml", Some(&scaffold.rules_toml)),
+        ];
+        for (p, c) in &schema_paths {
+            files.push((p, Some(c)));
+        }
+        let img = image(&files);
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let plan = derive_materializations(
+            &img,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RepairDerivedState,
+        )
+        .unwrap();
+        assert!(
+            !plan
+                .delta()
+                .actions()
+                .iter()
+                .any(|a| matches!(a, RepositoryAction::DeleteFile { .. })),
+            "an unreferenced schema is not deleted on filename alone: {:?}",
+            plan.delta().actions()
+        );
+    }
+
+    #[test]
+    fn test_derive_default_schema_deletes_obsolete_target_under_proven_ownership() {
+        // A default-origin rule proves generation of schemas/default-obsolete.json,
+        // which is no longer an expected target: repair deletes exactly it.
+        let config = ns_config(&["component", "team"]);
+        let jc: JitConfig = toml::from_str(&config).unwrap();
+        let ns = crate::config_manager::namespaces_from_config(&jc);
+        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let rules_toml = format!(
+            "{}\n[[rules]]\nname = \"obsolete-default\"\norigin = \"default\"\nassert = {{ json-schema = \"schemas/default-obsolete.json\" }}\n",
+            scaffold.rules_toml
+        );
+        let mut schema_paths: Vec<(String, String)> = scaffold
+            .schema_files
+            .iter()
+            .map(|f| (format!(".jit/schemas/{}", f.name), f.content.clone()))
+            .collect();
+        schema_paths.push((
+            ".jit/schemas/default-obsolete.json".to_string(),
+            "{}".to_string(),
+        ));
+        let mut files: Vec<(&str, Option<&str>)> = vec![
+            (".jit/config.toml", Some(&config)),
+            (".jit/rules.toml", Some(&rules_toml)),
+        ];
+        for (p, c) in &schema_paths {
+            files.push((p, Some(c)));
+        }
+        let img = image(&files);
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let plan = derive_materializations(
+            &img,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RepairDerivedState,
+        )
+        .unwrap();
+        let deletes: Vec<&VirtualPath> = plan
+            .delta()
+            .actions()
+            .iter()
+            .filter_map(|a| match a {
+                RepositoryAction::DeleteFile { path, .. } => Some(path),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            deletes,
+            vec![&VirtualPath::data("schemas/default-obsolete.json").unwrap()],
+            "exactly the proven-obsolete schema is deleted"
         );
     }
 
