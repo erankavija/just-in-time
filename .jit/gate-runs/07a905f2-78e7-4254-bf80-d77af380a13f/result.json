@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "07a905f2-78e7-4254-bf80-d77af380a13f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "44d318ab-7270-4c94-aa60-2569c7d8f2d6",
+  "commit": "d2685611ef499ec5c8d2073335daf78c5f8c41fb",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-19T16:24:45.222028772Z",
+  "completed_at": "2026-07-19T16:28:44.854895397Z",
+  "duration_ms": 239632,
+  "exit_code": 1,
+  "stdout": "Attribution: `jit:44d318ab` commits 9ecbe13b, 084e3302, 8169019d, 67241ccc, f5edd878, 877c08f7, fd7b739f, acab1373, f6df8a2a, d2685611  \nPolicy sources: AGENTS.md; dev/active/cdc840ad-plan.md  \nResolved items: @/invariant/single-source-prose and @/invariant/atomic-writes (.jit/invariants.toml); @/charter/D-1 and @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)  \nGate evidence: cargo-ci passed (exit 0, 2026-07-19T16:21:09Z); no prior review run  \nTruncation recovery: narrowed rename/modified-path reads for 084e3302 and 8169019 after truncated broad patches; inspected remaining commits and current affected code by path/line  \n\n1. **F1 — blocking, issue-impact (high):** Repair can delete a custom schema when `rules.toml` has duplicate rule names. `identities` is collapsed to a `HashMap` keyed only by rule name, while `schema_requests` retains every duplicate rule. If a custom rule precedes a same-named default-origin rule, the custom schema reference is classified as default-owned and may receive `DeleteFile`. Duplicate names are invalid and therefore ambiguous ownership; repair must reject rather than delete an unproven authored schema. [crates/jit/src/repository_state/materialize.rs:227](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/materialize.rs:227)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Repair can misclassify duplicate rule names and delete a custom schema.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Repair collapses duplicate rule identities by name, allowing a custom schema reference to be treated as default-owned and deleted.\",\"file\":\"crates/jit/src/repository_state/materialize.rs\",\"line\":227,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 14596 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7b31-be6a-7ef2-9a8b-e69230a219c5\n--------\nuser\n--- 14583 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Repair can misclassify duplicate rule names and delete a custom schema.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Repair collapses duplicate rule identities by name, allowing a custom schema reference to be treated as default-owned and deleted.",
+        "file": "crates/jit/src/repository_state/materialize.rs",
+        "line": 227
+      }
+    ]
+  }
+}

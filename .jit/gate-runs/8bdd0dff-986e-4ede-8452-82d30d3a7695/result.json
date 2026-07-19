@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "8bdd0dff-986e-4ede-8452-82d30d3a7695",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "44d318ab-7270-4c94-aa60-2569c7d8f2d6",
+  "commit": "916606eebd9997012e452211972d5343f2c39376",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "passed",
+  "started_at": "2026-07-19T16:41:12.846450549Z",
+  "completed_at": "2026-07-19T16:44:19.465177304Z",
+  "duration_ms": 186618,
+  "exit_code": 0,
+  "stdout": "Attribution: 9ecbe13b, 084e3302, 8169019d, 67241ccc, f5edd878, 877c08f, fd7b739, acab1373, f6df8a2, d2685611, 916606ee\nPolicy sources: AGENTS.md; .jit/invariants.toml; .jit/gates.toml; dev/active/cdc840ad-plan.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/charter/D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-07-19T16:37:39Z)\nTruncation recovery: narrower per-commit/path patch reads and current repository_state source/test reads performed\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "No unresolved issue-impact defects found.",
+    "findings": []
+  }
+}

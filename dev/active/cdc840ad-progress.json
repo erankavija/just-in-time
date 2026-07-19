@@ -1,7 +1,7 @@
 {
   "epic_id": "cdc840ad-9332-4936-9381-772318967f0f",
   "epic_short_id": "cdc840ad",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -47,7 +47,7 @@
           "short_id": "44d318ab",
           "title": "Implement materializers, drift, and repair",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -217,11 +217,21 @@
       "resolution": "Invoker authorized one narrow test-fixture-only guided correction and reset the rework counter.",
       "recommendation": "Authorize one narrow test-fixture-only correction: remove the new predecessor caller by extending or reusing the existing claim-test fixture boundary (or by using the typed finalizer), preserve the collision regressions, then rerun focused tests, independent review, and both issue gates."
     }
+    {
+      "category": "gate-vs-plan-scope-amendment",
+      "issue_id": "44d318ab-7270-4c94-aa60-2569c7d8f2d6",
+      "status": "resolved",
+      "opened_at": "2026-07-19T19:10:00+03:00",
+      "resolved_at": "2026-07-19T19:15:00+03:00",
+      "situation": "44d318ab's issue text described live jit validate/--fix and project-render behavior, but plan §3/D16 assigns that consumer wiring to 49adf23b and acceptance evidence to b1621508; the worker also produced concrete blocker evidence (InMemoryStorage two-store split, missing validation-closure capture planner).",
+      "resolution": "Invoker approved amending 44d318ab to the plan boundary (commit d2685611): this package owns the complete REQ-06 mechanism with unit/harness tests; the live-command sentences state the end state 49adf23b completes."
+    }
   ],
   "rework_counts": {
     "cbc3a7e5": 2,
     "bacf2cd4": 2,
-    "a6a9b964": 1
+    "a6a9b964": 1,
+    "44d318ab": 1
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
