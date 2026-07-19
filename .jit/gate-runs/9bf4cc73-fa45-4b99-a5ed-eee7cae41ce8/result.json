@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "9bf4cc73-fa45-4b99-a5ed-eee7cae41ce8",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "bacf2cd4-c4c7-421e-83ff-4ebc44925008",
+  "commit": "99e5609336e4e9691162ac106c960bc9575f1ccc",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-19T04:32:44.649592391Z",
+  "completed_at": "2026-07-19T04:36:11.611134899Z",
+  "duration_ms": 206961,
+  "exit_code": 1,
+  "stdout": "Attribution: 99e56093, e52ab07c, 438a83f6, ceb5ed1d (`jit:bacf2cd4`)\nPolicy sources: AGENTS.md; dev/active/cdc840ad-plan.md §2; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-19T04:29:04Z); prior code-review F1 was addressed by e52ab07c\nTruncation recovery: re-read AGENTS.md separately; read large ceb5ed1d patches in path/line chunks; re-read plan §2 and D4/D5/D6/D11/D20 directly\n\n1. [blocking][issue-impact][high] Recovery validates only duplicate journal paths, not pairwise physical identity. `validate_repository_journal` at [file_transaction.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/file_transaction.rs:1973) accepts distinct `Worktree`/`Data` journal targets even when their captured or live identities alias. The new delta constructor rejects this before publication, but recovery does not repeat that protection, leaving the required journal-recovery alias check unimplemented.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Repository journal recovery does not recheck pairwise physical-identity aliases.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Repository journal recovery validates duplicate paths only and does not recheck pairwise physical-identity aliases.\",\"file\":\"crates/jit/src/storage/file_transaction.rs\",\"line\":1973,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10561 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f78a5-e129-73a1-b913-980097fd1e5a\n--------\nuser\n--- 10548 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Repository journal recovery does not recheck pairwise physical-identity aliases.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Repository journal recovery validates duplicate paths only and does not recheck pairwise physical-identity aliases.",
+        "file": "crates/jit/src/storage/file_transaction.rs",
+        "line": 1973
+      }
+    ]
+  }
+}

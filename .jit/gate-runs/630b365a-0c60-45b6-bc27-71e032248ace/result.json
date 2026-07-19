@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "630b365a-0c60-45b6-bc27-71e032248ace",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "bacf2cd4-c4c7-421e-83ff-4ebc44925008",
+  "commit": "438a83f6b83efef8cb62dd80b9cd7ff005233aa8",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-19T04:15:31.404018530Z",
+  "completed_at": "2026-07-19T04:18:13.768905968Z",
+  "duration_ms": 162364,
+  "exit_code": 1,
+  "stdout": "Attribution: ceb5ed1d, 438a83f6 (jit:bacf2cd4)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-19T04:03:11Z)\nTruncation recovery: bounded per-file patches and current line-range reads\n\n1. [blocking][issue-impact] **F1 (high): Cross-root physical-identity collisions are not rejected.** `RepositoryDelta::new` validates canonical virtual paths and duplicate spellings, but never compares captured object identities across `Worktree` and `Data` actions. A hard-linked file in both roots can therefore be submitted as two distinct targets, contrary to the required virtual-to-physical injectivity and cross-root identity rejection. [crates/jit/src/repository_state/image.rs:1138](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/image.rs:1138>)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Cross-root physical-identity collisions remain accepted by delta normalization.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"RepositoryDelta normalization does not reject Worktree/Data actions that resolve to the same physical object, such as hard-linked files.\",\"file\":\"crates/jit/src/repository_state/image.rs\",\"line\":1138,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 12391 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7896-1e28-7b62-a9cb-a1319b1722a2\n--------\nuser\n--- 12378 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Cross-root physical-identity collisions remain accepted by delta normalization.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "RepositoryDelta normalization does not reject Worktree/Data actions that resolve to the same physical object, such as hard-linked files.",
+        "file": "crates/jit/src/repository_state/image.rs",
+        "line": 1138
+      }
+    ]
+  }
+}

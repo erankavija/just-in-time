@@ -1,7 +1,7 @@
 {
   "epic_id": "cdc840ad-9332-4936-9381-772318967f0f",
   "epic_short_id": "cdc840ad",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -23,7 +23,7 @@
           "short_id": "bacf2cd4",
           "title": "Implement layout-aware store, kernel, and recovery",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },

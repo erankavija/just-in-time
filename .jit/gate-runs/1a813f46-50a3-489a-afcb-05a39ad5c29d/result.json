@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "1a813f46-50a3-489a-afcb-05a39ad5c29d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "bacf2cd4-c4c7-421e-83ff-4ebc44925008",
+  "commit": "ea7fe9e132a3f3c6d806221b23e9d21ac795e31f",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-19T08:48:57.730461339Z",
+  "completed_at": "2026-07-19T08:54:33.324399445Z",
+  "duration_ms": 335593,
+  "exit_code": 1,
+  "stdout": "Attribution: ceb5ed1d, 438a83f6, e52ab07c, 99e56093, ea7fe9e (`jit:bacf2cd4`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-19T08:45:54Z); code-review failed (exit 1, prior structured run 9bf4cc73)\nTruncation recovery: Re-read the plan, patches, session/kernel, image, and conformance code in path- and line-bounded chunks.\n\n1. [blocking][issue-impact][high] An absent-data-root mutation containing only `Worktree` actions leaves the backends in different states. JSON unconditionally creates and publishes an empty staged data root at [file_transaction.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/file_transaction.rs:1376) and [file_transaction.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/file_transaction.rs:1617), while memory marks the data root present only after a `Data` action at [repository_state_store.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/repository_state_store.rs:810). Thus a subsequent capture observes a data-root directory on JSON but absence in memory, violating the required shared session contract. The existing absent-root conformance test always uses an initialization delta containing Data actions, so it misses this case at [repository_state_store.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/repository_state_store.rs:1707).\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"JSON and memory diverge when an absent-root delta changes only Worktree targets.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"JSON publishes an empty absent data root for a Worktree-only delta, while memory leaves that root absent, violating backend conformance.\",\"file\":\"crates/jit/src/storage/repository_state_store.rs\",\"line\":810,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 38063 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f7990-758e-74f1-b46b-d8d09ba17c26\n--------\nuser\n--- 38050 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "JSON and memory diverge when an absent-root delta changes only Worktree targets.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "JSON publishes an empty absent data root for a Worktree-only delta, while memory leaves that root absent, violating backend conformance.",
+        "file": "crates/jit/src/storage/repository_state_store.rs",
+        "line": 810
+      }
+    ]
+  }
+}

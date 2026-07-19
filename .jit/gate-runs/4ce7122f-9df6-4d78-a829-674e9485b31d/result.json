@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "4ce7122f-9df6-4d78-a829-674e9485b31d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "bacf2cd4-c4c7-421e-83ff-4ebc44925008",
+  "commit": "b8c05942709c5db483ff7dff1e5707b5933a42f2",
+  "branch": "main",
+  "tree_dirty": true,
+  "status": "failed",
+  "started_at": "2026-07-19T09:06:12.584202260Z",
+  "completed_at": "2026-07-19T09:09:11.339644737Z",
+  "duration_ms": 178755,
+  "exit_code": 1,
+  "stdout": "Attribution: ceb5ed1d, 438a83f6, e52ab07c, 99e56093, ea7fe9e1, b8c05942 (`jit:bacf2cd4`)\nPolicy sources: AGENTS.md; dev/active/cdc840ad-plan.md §2\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-19T09:02:29Z)\nTruncation recovery: narrowed plan §2/decisions, per-commit diffs, and session/kernel source reads\n\n1. [blocking][issue-impact][high] An absent-root delta containing only `Data(\"file\")` actions still publishes a staged data root in JSON, but memory only sets `data_root_exists` and never inserts the required `Data(\"\")` directory entry. A subsequent capture therefore reports the root absent in memory and present in JSON, violating the required backend conformance. The existing regression only covers worktree-only deltas and initialization deltas that explicitly create `Data(\"\")`. [crates/jit/src/storage/repository_state_store.rs:810] References: @/invariant/atomic-writes\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"JSON and memory diverge for absent-root Data-only deltas that omit an explicit root directory action.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Memory marks an absent data root present for a Data child action but does not materialize the Data root entry, so later captures diverge from JSON's published staged root.\",\"file\":\"crates/jit/src/storage/repository_state_store.rs\",\"line\":810,\"references\":[\"@/invariant/atomic-writes\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 13996 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f79a0-3ec8-7451-8924-197edb8fc40b\n--------\nuser\n--- 13983 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "JSON and memory diverge for absent-root Data-only deltas that omit an explicit root directory action.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Memory marks an absent data root present for a Data child action but does not materialize the Data root entry, so later captures diverge from JSON's published staged root.",
+        "file": "crates/jit/src/storage/repository_state_store.rs",
+        "line": 810,
+        "references": [
+          "@/invariant/atomic-writes"
+        ]
+      }
+    ]
+  }
+}
