@@ -146,6 +146,29 @@ impl InMemoryStorage {
         .map_err(|e| crate::storage::PathReadError::InvalidPath(e.to_string()))
     }
 
+    /// Mark the aggregate repository image as an EXISTING data root.
+    ///
+    /// Backend API semantics, NOT a test convenience: seeding any repository-owned
+    /// record or file establishes that the data root exists, so a mutation session
+    /// opened on a seeded memory store models EXISTING-root publication — matching a
+    /// [`JsonFileStorage`](crate::storage::JsonFileStorage) over an initialized
+    /// `.jit/`, which gets the same semantics from the filesystem. An UNSEEDED store
+    /// leaves `data_root_exists` false and models absent-root / fresh-init
+    /// publication, so a session on it exercises the fresh-init path.
+    fn mark_data_root_existing(state: &mut MemoryRepositoryState) {
+        use crate::repository_state::{EntryIdentity, FileMode, RepositoryEntry, VirtualPath};
+        state.data_root_exists = true;
+        let root = VirtualPath::data("").expect("data root path is canonical");
+        state
+            .entries
+            .entry(root)
+            .or_insert_with(|| RepositoryEntry::Directory {
+                identity: EntryIdentity::for_bytes("memory-directory:data-root", b"directory")
+                    .expect("directory identity is hashable"),
+                mode: FileMode::Executable,
+            });
+    }
+
     /// Store `content` as the captured `File` entry for `rel_path` in the aggregate
     /// repository image (the single store a mutation session captures and applies).
     fn insert_repo_file(
@@ -157,7 +180,9 @@ impl InMemoryStorage {
         let vpath = Self::repo_file_vpath(rel_path)?;
         let identity = EntryIdentity::for_bytes(rel_path, content.as_bytes())
             .map_err(|e| crate::storage::PathReadError::Other(anyhow!("{e}")))?;
-        self.repository_state().entries.insert(
+        let mut state = self.repository_state();
+        Self::mark_data_root_existing(&mut state);
+        state.entries.insert(
             vpath,
             RepositoryEntry::File {
                 identity,
@@ -190,6 +215,7 @@ impl InMemoryStorage {
     /// nothing about [`JsonFileStorage`](crate::storage::JsonFileStorage).
     fn persist_issue(&self, issue: Issue) -> Result<()> {
         let _repo_lock = self.repo_lock.acquire()?;
+        Self::mark_data_root_existing(&mut self.repository_state());
         self.issues.lock().unwrap().insert(issue.id.clone(), issue);
         Ok(())
     }
@@ -306,12 +332,14 @@ impl IssueStore for InMemoryStorage {
 
     fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
         let _repo_lock = self.repo_lock.acquire()?;
+        Self::mark_data_root_existing(&mut self.repository_state());
         *self.gate_registry.lock().unwrap() = registry.clone();
         Ok(())
     }
 
     fn append_event(&self, event: &Event) -> Result<()> {
         let _repo_lock = self.repo_lock.acquire()?;
+        Self::mark_data_root_existing(&mut self.repository_state());
         self.events.lock().unwrap().push(event.clone());
         Ok(())
     }
@@ -326,6 +354,7 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()> {
+        Self::mark_data_root_existing(&mut self.repository_state());
         self.gate_runs
             .lock()
             .unwrap()
@@ -477,6 +506,39 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
         storage.init().unwrap(); // Should be idempotent
+    }
+
+    #[test]
+    fn test_unseeded_store_models_absent_root_seeding_marks_existing() {
+        use crate::repository_state::{RepositoryEntry, VirtualPath};
+        // Guardrail: a fresh, unseeded store models an ABSENT data root, so a
+        // mutation session on it exercises the fresh-init path — the implicit
+        // seeded-means-existing flag must never silently flip this.
+        let storage = InMemoryStorage::new();
+        assert!(
+            !storage.repository_state().data_root_exists,
+            "an unseeded store is absent-root"
+        );
+        assert!(storage
+            .repository_state()
+            .entries
+            .get(&VirtualPath::data("").unwrap())
+            .is_none());
+
+        // Seeding any repository-owned file marks the data root as existing and
+        // publishes the Data("") directory entry.
+        storage.add_repo_file(".jit/config.toml", "[project]\nname = \"x\"\n");
+        assert!(
+            storage.repository_state().data_root_exists,
+            "a seeded store is existing-root"
+        );
+        assert!(matches!(
+            storage
+                .repository_state()
+                .entries
+                .get(&VirtualPath::data("").unwrap()),
+            Some(RepositoryEntry::Directory { .. })
+        ));
     }
 
     #[test]
