@@ -216,7 +216,7 @@
       "situation": "The invoker-authorized owned-image correction and a subsequent canonical lease-identity correction passed independent review and cargo-ci, but code-review run cbee4805-53b0-400d-891d-7ded5ffcec3e found one new medium scope violation: the collision-test helper added fresh Issue::new and save_issue callers even though the approved scope amendment freezes those predecessor APIs until wave 5. The wave-3 rework counter has reached 2.",
       "resolution": "Invoker authorized one narrow test-fixture-only guided correction and reset the rework counter.",
       "recommendation": "Authorize one narrow test-fixture-only correction: remove the new predecessor caller by extending or reusing the existing claim-test fixture boundary (or by using the typed finalizer), preserve the collision regressions, then rerun focused tests, independent review, and both issue gates."
-    }
+    },
     {
       "category": "gate-vs-plan-scope-amendment",
       "issue_id": "44d318ab-7270-4c94-aa60-2569c7d8f2d6",
