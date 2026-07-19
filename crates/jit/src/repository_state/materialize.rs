@@ -426,4 +426,66 @@ kind = "advisory"
         assert_eq!(drift[0].kind, MaterializationDriftKind::Stale);
         assert_eq!(drift[0].path, VirtualPath::worktree("AGENTS.md").unwrap());
     }
+
+    #[test]
+    fn test_repair_preserves_authored_bytes_outside_the_region() {
+        // Repair of a region projection splices ONLY the managed region; every
+        // authored byte outside the markers is preserved unconditionally (ownership
+        // matrix: configured region projection).
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let authored_prefix = "# Hand-authored heading\n\nAuthored intro the tool must never touch.\n\n";
+        let authored_suffix = "\n\n## Authored trailing section\n\nMore authored prose.\n";
+        let agents = format!(
+            "{authored_prefix}<!-- jit:invariants:begin -->\nMANUALLY EDITED DERIVED CONTENT\n<!-- jit:invariants:end -->{authored_suffix}"
+        );
+        let image = image(&[
+            (".jit/config.toml", Some(CONFIG)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            ("AGENTS.md", Some(&agents)),
+        ]);
+        let plan = derive_materializations(
+            &image,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RepairDerivedState,
+        )
+        .unwrap();
+        let RepositoryAction::WriteFile { bytes, .. } = &plan.delta().actions()[0] else {
+            panic!("expected a repair write");
+        };
+        let repaired = String::from_utf8(bytes.clone()).unwrap();
+        // Authored prefix and suffix are byte-for-byte preserved; only the region
+        // interior was replaced with the derived rows.
+        assert!(repaired.starts_with(authored_prefix));
+        assert!(repaired.ends_with(authored_suffix));
+        assert!(!repaired.contains("MANUALLY EDITED"));
+        assert!(repaired.contains(EXPECTED_ROWS.trim_end()));
+    }
+
+    #[test]
+    fn test_repair_ambiguous_markers_are_non_repairable_not_whole_file_rewrite() {
+        // A region-projection target carrying DUPLICATE begin markers has ambiguous
+        // ownership: repair fails before publication rather than serializing a
+        // whole-file fallback (ownership matrix: ambiguous ownership is non-repairable).
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let ambiguous = "# Doc\n\n<!-- jit:invariants:begin -->\nA\n<!-- jit:invariants:begin -->\nB\n<!-- jit:invariants:end -->\n";
+        let image = image(&[
+            (".jit/config.toml", Some(CONFIG)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            ("AGENTS.md", Some(ambiguous)),
+        ]);
+        let result = derive_materializations(
+            &image,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RepairDerivedState,
+        );
+        let err = result.expect_err("ambiguous markers must be non-repairable");
+        assert!(
+            matches!(err, RepositoryStateError::Producer(_)),
+            "expected a typed non-repairable producer error, got {err:?}"
+        );
+    }
 }
