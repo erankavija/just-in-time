@@ -14,6 +14,7 @@ mod path;
 mod projection;
 mod projection_render;
 mod rule_serialize;
+mod rules_document;
 mod rules_gates_projection;
 
 pub use default_rules::{
@@ -50,6 +51,7 @@ pub use rule_serialize::{
     render_rule_block, rules_file_header, serialize_ruleset, type_hierarchy_schema_content,
     SchemaFile, SerializedRuleSet,
 };
+pub use rules_document::{rewrite_header, splice_default_membership};
 pub use rules_gates_projection::render_rules_and_gates_markdown;
 
 use crate::declarations::rules::RuleSet;

@@ -16,7 +16,7 @@
 //! caller mixes captured content with live schema reads.
 
 use crate::config::JitConfig;
-use crate::declarations::rules::{RuleConfigError, RuleSet, DEFAULT_ORIGIN};
+use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::storage::atomic_write::write_file_atomic;
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -133,87 +133,15 @@ pub fn write_baked_schema(jit_root: &Path, file_name: &str, content: &str) -> Re
     Ok(true)
 }
 
-/// The `rules.toml` array-of-tables key holding every `[[rules]]` block.
-const RULES_ARRAY_KEY: &str = "rules";
-
-/// Set the leading trivia (prefix decoration) of a top-level [`toml_edit::Item`]
-/// to `prefix`, regardless of the item's shape. A table or bare value carries
-/// its own decoration; an array-of-tables stores its leading trivia on its first
-/// table. A `None` item (an unset key) has nowhere to hang trivia, so this is a
-/// no-op there.
-fn set_item_prefix(item: &mut toml_edit::Item, prefix: &str) {
-    match item {
-        toml_edit::Item::Table(table) => table.decor_mut().set_prefix(prefix),
-        toml_edit::Item::Value(value) => value.decor_mut().set_prefix(prefix),
-        toml_edit::Item::ArrayOfTables(tables) => {
-            if let Some(first) = tables.get_mut(0) {
-                first.decor_mut().set_prefix(prefix);
-            }
-        }
-        toml_edit::Item::None => {}
-    }
-}
-
-/// Read the leading trivia (prefix decoration) of a top-level [`toml_edit::Item`]
-/// as an owned string, mirroring [`set_item_prefix`]'s shape handling. Returns
-/// `None` when the item cannot carry a prefix (an empty array-of-tables or an
-/// unset key) or when it carries none.
-fn item_prefix(item: &toml_edit::Item) -> Option<String> {
-    let decor = match item {
-        toml_edit::Item::Table(table) => table.decor(),
-        toml_edit::Item::Value(value) => value.decor(),
-        toml_edit::Item::ArrayOfTables(tables) => tables.get(0)?.decor(),
-        toml_edit::Item::None => return None,
-    };
-    decor
-        .prefix()
-        .and_then(|raw| raw.as_str())
-        .map(str::to_owned)
-}
-
-/// The key of the first top-level item that is NOT the (possibly empty) `rules`
-/// array, in document order. This is the file's TOP — where the leading
-/// header/comments belong once no `[[rules]]` block remains to carry them
-/// (`rules` itself, empty, emits nothing and cannot hold the trivia).
-fn first_non_rules_key(doc: &toml_edit::DocumentMut) -> Option<String> {
-    doc.as_table()
-        .iter()
-        .find(|(key, _)| *key != RULES_ARRAY_KEY)
-        .map(|(key, _)| key.to_owned())
-}
-
-/// The key of the top-level item immediately FOLLOWING the `rules` array in
-/// document order, or `None` when `rules` is last (or absent). This is where the
-/// emptied array's orphaned leading trivia is relocated — the slot the removed
-/// rules block occupied — so it never jumps ahead of any content that preceded
-/// the array (a leading table).
-fn key_after_rules(doc: &toml_edit::DocumentMut) -> Option<String> {
-    doc.as_table()
-        .iter()
-        .skip_while(|(key, _)| *key != RULES_ARRAY_KEY)
-        .nth(1)
-        .map(|(key, _)| key.to_owned())
-}
-
 /// Rewrite the leading header region of `<jit_root>/rules.toml` to `header`,
 /// preserving every `[[rules]]` block below it (and any comments authored inside
-/// them) and all other non-generated content. As with any re-serialization
-/// through the document model, exotic-but-valid TOML syntax spellings elsewhere
-/// in the file may be canonicalized — semantically lossless (REQ-01 as amended,
-/// jit:d74a9ed1).
+/// them) and all other non-generated content.
 ///
-/// The header region is the leading trivia before the first `[[rules]]` table —
-/// a generated comment block, modelled as the prefix decoration of the first
-/// `rules` entry in a [`toml_edit::DocumentMut`]. Republishing it (setting that
-/// prefix) always states the current default-rule contract without disturbing
-/// any rule body, so a `[[rules]]` sequence inside a comment or a multiline rule
-/// description can never be mistaken for the first table. A ruleset file with no
-/// `[[rules]]` block but with other content (custom tables, comments) keeps that
-/// content: the header is republished onto the first surviving top-level item's
-/// prefix, never by replacing the whole file. Only a document with no top-level
-/// item at all is rewritten to `header` alone. A no-op when `rules.toml` is
-/// absent (the scaffold path writes a fresh file, header included) or already
-/// current. Returns `true` when the file was rewritten. Atomic (temp + rename).
+/// The span-level edit is the pure
+/// [`rewrite_header`](crate::repository_state::rewrite_header); this is the
+/// storage read/write wrapper. A no-op when `rules.toml` is absent (the scaffold
+/// path writes a fresh file, header included) or already current. Returns `true`
+/// when the file was rewritten. Atomic (temp + rename).
 pub fn rewrite_rules_header(jit_root: &Path, header: &str) -> Result<bool> {
     let path = jit_root.join(RULES_FILE);
     if !path.exists() {
@@ -221,31 +149,8 @@ pub fn rewrite_rules_header(jit_root: &Path, header: &str) -> Result<bool> {
     }
     let content =
         std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
-    let mut doc = content
-        .parse::<toml_edit::DocumentMut>()
+    let rebuilt = crate::repository_state::rewrite_header(&content, header)
         .with_context(|| format!("parsing {} as TOML", path.display()))?;
-    let rebuilt = match doc
-        .get_mut(RULES_ARRAY_KEY)
-        .and_then(toml_edit::Item::as_array_of_tables_mut)
-        .and_then(|rules| rules.get_mut(0))
-    {
-        Some(first) => {
-            first.decor_mut().set_prefix(header);
-            doc.to_string()
-        }
-        // No `[[rules]]` block. The header is the leading region before the first
-        // top-level item; republish it there, preserving every table body and all
-        // trailing content. Only a document with no item at all is header-only.
-        None => match first_non_rules_key(&doc) {
-            Some(key) => {
-                if let Some(item) = doc.get_mut(&key) {
-                    set_item_prefix(item, header);
-                }
-                doc.to_string()
-            }
-            None => header.to_string(),
-        },
-    };
     if rebuilt == content {
         return Ok(false);
     }
@@ -345,96 +250,11 @@ pub fn sync_namespace_unique_rules(
 
     let content =
         std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
-    let mut doc = content
-        .parse::<toml_edit::DocumentMut>()
+    // The span-level membership edit is the pure
+    // [`splice_default_membership`](crate::repository_state::splice_default_membership);
+    // this wrapper owns only the file read/write.
+    let rebuilt = crate::repository_state::splice_default_membership(&content, to_add, to_drop)
         .with_context(|| format!("parsing {} as TOML", path.display()))?;
-
-    // DROP through the document model: remove each `origin = "default"` rule
-    // named in `to_drop`. Matching on the model's own `name`/`origin` values can
-    // never over-reach into neighbouring or trailing content.
-    //
-    // `toml_edit` stores the file's leading header/comments as the FIRST entry's
-    // prefix decoration. If that entry is dropped, its trivia is transferred onto
-    // whatever is now first: the new first RULE when one survives, else — when the
-    // drop empties the array — `orphaned_leading_prefix` carries it out for
-    // relocation onto the rest of the document (below), so it is never lost.
-    let mut orphaned_leading_prefix: Option<String> = None;
-    let dropped_any = !to_drop.is_empty()
-        && doc
-            .get_mut(RULES_ARRAY_KEY)
-            .and_then(toml_edit::Item::as_array_of_tables_mut)
-            .is_some_and(|rules| {
-                let is_dropped = |table: &toml_edit::Table| {
-                    table.get("origin").and_then(toml_edit::Item::as_str) == Some(DEFAULT_ORIGIN)
-                        && table
-                            .get("name")
-                            .and_then(toml_edit::Item::as_str)
-                            .is_some_and(|name| to_drop.iter().any(|d| d == name))
-                };
-                let leading_prefix = rules
-                    .get(0)
-                    .filter(|first| is_dropped(first))
-                    .and_then(|first| first.decor().prefix())
-                    .and_then(|raw| raw.as_str())
-                    .map(str::to_owned);
-
-                let before = rules.len();
-                rules.retain(|table| !is_dropped(table));
-
-                if let Some(prefix) = leading_prefix {
-                    match rules.get_mut(0) {
-                        // A rule survives: transfer the trivia onto it (mirrors the
-                        // first-entry prefix handling in `rewrite_rules_header`).
-                        Some(new_first) => new_first.decor_mut().set_prefix(prefix),
-                        // The array is now empty: hand the trivia out to be
-                        // relocated onto the rest of the document.
-                        None => orphaned_leading_prefix = Some(prefix),
-                    }
-                }
-                rules.len() != before
-            });
-
-    // The drop emptied the `rules` array, orphaning the leading header/comments
-    // (the now-empty array emits nothing and cannot carry them). Relocate the
-    // trivia so it survives: prepend it to the first surviving top-level item's
-    // prefix, keeping both intact; if nothing follows, keep it as the document's
-    // trailing decor. Either way no non-rule content is lost.
-    if let Some(prefix) = orphaned_leading_prefix {
-        match key_after_rules(&doc) {
-            Some(key) => {
-                if let Some(item) = doc.get_mut(&key) {
-                    let combined = match item_prefix(item) {
-                        Some(existing) => format!("{prefix}{existing}"),
-                        None => prefix,
-                    };
-                    set_item_prefix(item, &combined);
-                }
-            }
-            None => doc.as_table_mut().decor_mut().set_suffix(prefix),
-        }
-    }
-
-    // Re-serialize only when a drop actually removed a table: `toml_edit` is
-    // lossless for retained content EXCEPT that it canonicalizes exotic-but-valid
-    // header spellings (`[[ rules ]]`, quoted keys). When nothing was dropped
-    // (an add-only sync, or a drop of an absent name), keep the original bytes so
-    // hand-authored formatting is never rewritten just to append a rule.
-    let mut rebuilt = if dropped_any {
-        doc.to_string()
-    } else {
-        content.clone()
-    };
-    // ADD by appending each already-rendered canonical block at EOF — the same
-    // text `serialize_ruleset` concatenates, so an appended rule is byte-identical
-    // to a scaffolded one. Guarantee exactly one separating newline: a source file
-    // (or serialized document) may lack a final newline, and appending a block
-    // onto an unterminated last line would fuse the tokens.
-    if !to_add.is_empty() && !rebuilt.is_empty() && !rebuilt.ends_with('\n') {
-        rebuilt.push('\n');
-    }
-    for block in to_add {
-        rebuilt.push_str(block);
-    }
 
     if rebuilt == content {
         return Ok(false);
