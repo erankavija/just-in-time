@@ -150,6 +150,12 @@ pub enum RepositoryStateError {
     /// A producer read an uncaptured path or malformed captured bytes.
     #[error("materialization producer failed: {0}")]
     Producer(String),
+    /// Ownership of a materialization boundary cannot be proven, so repair is
+    /// refused before publication rather than risk rewriting or deleting authored
+    /// content (ownership matrix: "never rewrites an authored boundary it cannot
+    /// prove"). Carries a human description of the ambiguous boundary.
+    #[error("ambiguous materialization ownership, not repairable: {0}")]
+    AmbiguousOwnership(String),
 }
 
 impl RepositoryStateError {
@@ -171,8 +177,7 @@ fn compose_complete(
     declarations: &RepositoryDeclarations<'_>,
 ) -> Result<Vec<RepositoryAction>, RepositoryStateError> {
     let config = materialize::assemble_config(image).map_err(RepositoryStateError::producer)?;
-    let mut actions = materialize::compose_default_ruleset(image, &config)
-        .map_err(RepositoryStateError::producer)?;
+    let mut actions = materialize::compose_default_ruleset(image, &config)?;
     actions.extend(
         materialize::compose_configured_projections(image, &config, declarations)
             .map_err(RepositoryStateError::producer)?,

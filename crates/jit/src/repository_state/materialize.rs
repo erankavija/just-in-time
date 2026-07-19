@@ -156,10 +156,21 @@ pub(crate) fn compose_configured_projections(
 /// target. An absent `rules.toml` is the in-memory-defaults case: nothing is
 /// materialized (the read path builds the defaults without writing), so this
 /// contributes no action.
+///
+/// Ownership throughout this pass is keyed by rule NAME — the membership diff, the
+/// span drop, and the schema-generation classification all identify a default rule
+/// by its name. A `rules.toml` carrying two rules of the same name is invalid and
+/// makes that key non-injective, so no name can be proven to belong to the default
+/// family or to a custom rule. The entire rules/schema pass is therefore poisoned
+/// (not merely the colliding boundary) and returns
+/// [`AmbiguousOwnership`](RepositoryStateError::AmbiguousOwnership) before emitting
+/// any action, so repair never rewrites or deletes an authored boundary it cannot
+/// prove (ownership matrix: "if exact ownership/spans cannot be proven, return
+/// non-repairable before publication").
 pub(crate) fn compose_default_ruleset(
     image: &RepositoryImage,
     config: &JitConfig,
-) -> anyhow::Result<Vec<RepositoryAction>> {
+) -> Result<Vec<RepositoryAction>, RepositoryStateError> {
     // A ruleset outside the captured closure (or captured absent) is not an owned
     // materialization: defaults live only in memory, nothing on disk to keep
     // coherent, so no rules/schema targets are owned.
@@ -167,25 +178,38 @@ pub(crate) fn compose_default_ruleset(
     if !image.capture_spec().contains_path(&rules_path) {
         return Ok(Vec::new());
     }
-    let Some(current_rules) = read_text(image, ".jit/rules.toml")? else {
+    let Some(current_rules) =
+        read_text(image, ".jit/rules.toml").map_err(RepositoryStateError::producer)?
+    else {
         return Ok(Vec::new());
     };
     let namespaces = crate::config_manager::namespaces_from_config(config);
     let mut actions = Vec::new();
 
+    // Name-keyed ownership requires unique rule names; a duplicate makes ownership
+    // unprovable across the whole pass, so refuse before any add/drop/delete.
+    let identities =
+        parse_rule_identities(&current_rules).map_err(RepositoryStateError::producer)?;
+    if let Some(dup) = first_duplicate_rule_name(&identities) {
+        return Err(RepositoryStateError::AmbiguousOwnership(format!(
+            "rules.toml declares more than one rule named '{dup}'; \
+             default-rule and schema ownership cannot be proven"
+        )));
+    }
+
     // rules.toml: splice only the generated default-family membership + header,
     // preserving every authored byte outside those proven-generated spans.
-    let identities = parse_rule_identities(&current_rules)?;
     let diff = default_rule_membership_diff_from_identities(&identities, &namespaces);
     let rendered_add: Vec<String> = diff.to_add.iter().map(render_rule_block).collect();
-    let spliced = splice_default_membership(&current_rules, &rendered_add, &diff.to_drop)?;
-    let expected_rules = rewrite_header(&spliced, rules_file_header())?;
+    let spliced = splice_default_membership(&current_rules, &rendered_add, &diff.to_drop)
+        .map_err(RepositoryStateError::producer)?;
+    let expected_rules =
+        rewrite_header(&spliced, rules_file_header()).map_err(RepositoryStateError::producer)?;
     if expected_rules != current_rules {
-        let vpath = image_path(".jit/rules.toml")?;
         actions.push(RepositoryAction::WriteFile {
-            path: vpath.clone(),
+            path: rules_path.clone(),
             owner: "default-rule-membership".to_string(),
-            expected: ExpectedPreimage::of(image.entry(&vpath)?),
+            expected: ExpectedPreimage::of(entry(image, &rules_path)?),
             bytes: expected_rules.into_bytes(),
             mode: FileMode::Regular,
         });
@@ -205,8 +229,8 @@ pub(crate) fn compose_default_ruleset(
         if !image.capture_spec().contains_path(&vpath) {
             continue;
         }
-        let entry = image.entry(&vpath)?;
-        if let RepositoryEntry::File { bytes, mode, .. } = entry {
+        let occupant = entry(image, &vpath)?;
+        if let RepositoryEntry::File { bytes, mode, .. } = occupant {
             if bytes == schema.content.as_bytes() && *mode == FileMode::Regular {
                 continue;
             }
@@ -214,7 +238,7 @@ pub(crate) fn compose_default_ruleset(
         actions.push(RepositoryAction::WriteFile {
             path: vpath.clone(),
             owner: "default-schema".to_string(),
-            expected: ExpectedPreimage::of(entry),
+            expected: ExpectedPreimage::of(occupant),
             bytes: schema.content.clone().into_bytes(),
             mode: FileMode::Regular,
         });
@@ -224,37 +248,74 @@ pub(crate) fn compose_default_ruleset(
     // persisted default-origin rule proves it was generated (its reference in the
     // current rules.toml) AND it is no longer an expected target. Filename
     // convention alone never authorizes deletion (ownership matrix, schema row).
-    let origins: std::collections::HashMap<String, Option<String>> =
-        identities.iter().cloned().collect();
-    let default_generated_refs: std::collections::BTreeSet<String> =
-        crate::declarations::rules::RuleSet::schema_requests(&current_rules)
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|req| {
-                origins.get(&req.rule).and_then(Option::as_deref)
-                    == Some(crate::declarations::rules::DEFAULT_ORIGIN)
-            })
-            .map(|req| req.reference)
-            .collect();
-    for (vpath, entry) in image.entries() {
-        let RepositoryEntry::File { .. } = entry else {
+    //
+    // Rule names are unique here (checked above), so name->origin is injective. A
+    // schema REFERENCE, however, is not a unique key: a default rule and a custom
+    // rule may both reference one schema path. Such a shared reference is not
+    // exclusively default-owned, so deleting it would break the custom rule — it is
+    // therefore never deleted. Deletion requires a reference owned SOLELY by
+    // default-origin rules.
+    let origins: std::collections::HashMap<&str, Option<&str>> = identities
+        .iter()
+        .map(|(name, origin)| (name.as_str(), origin.as_deref()))
+        .collect();
+    let mut default_refs = std::collections::BTreeSet::new();
+    let mut foreign_refs = std::collections::BTreeSet::new();
+    for req in
+        crate::declarations::rules::RuleSet::schema_requests(&current_rules).unwrap_or_default()
+    {
+        if origins.get(req.rule.as_str()).copied().flatten()
+            == Some(crate::declarations::rules::DEFAULT_ORIGIN)
+        {
+            default_refs.insert(req.reference);
+        } else {
+            foreign_refs.insert(req.reference);
+        }
+    }
+    for (vpath, occupant) in image.entries() {
+        let RepositoryEntry::File { .. } = occupant else {
             continue;
         };
         let Some(name) = schema_file_name(vpath) else {
             continue;
         };
-        // Proven generated (a default rule references it) and no longer expected.
-        if default_generated_refs.contains(&format!("schemas/{name}"))
+        let reference = format!("schemas/{name}");
+        // Proven generated (referenced ONLY by default rules), not shared with any
+        // custom rule, and no longer an expected target.
+        if default_refs.contains(&reference)
+            && !foreign_refs.contains(&reference)
             && !expected_names.contains(name)
         {
             actions.push(RepositoryAction::DeleteFile {
                 path: vpath.clone(),
                 owner: "default-schema".to_string(),
-                expected: ExpectedPreimage::of(entry),
+                expected: ExpectedPreimage::of(occupant),
             });
         }
     }
     Ok(actions)
+}
+
+/// The first rule name that appears more than once in `identities`, in encounter
+/// order, or `None` when every rule name is unique. Duplicate names make the
+/// name-keyed default-rule/schema ownership non-injective and are treated as
+/// ambiguous ownership.
+fn first_duplicate_rule_name(identities: &[(String, Option<String>)]) -> Option<&str> {
+    let mut seen = std::collections::HashSet::new();
+    identities
+        .iter()
+        .find(|(name, _)| !seen.insert(name.as_str()))
+        .map(|(name, _)| name.as_str())
+}
+
+/// Look up a captured entry, mapping an uncaptured path to the typed producer error.
+fn entry<'a>(
+    image: &'a RepositoryImage,
+    path: &VirtualPath,
+) -> Result<&'a RepositoryEntry, RepositoryStateError> {
+    image
+        .entry(path)
+        .map_err(|e| RepositoryStateError::producer(e.into()))
 }
 
 /// The file name of a `Data("schemas/<name>")` entry, or `None` for any other
@@ -819,6 +880,117 @@ kind = "advisory"
             vec![&VirtualPath::data("schemas/default-obsolete.json").unwrap()],
             "exactly the proven-obsolete schema is deleted"
         );
+    }
+
+    /// Build an image whose rules.toml has a custom `namespace-registry` rule
+    /// (referencing schemas/custom-namespace.json) either before or after the
+    /// scaffolded default `namespace-registry` rule, then repair over it. Both a
+    /// custom-before-default and default-before-custom collision must be a typed
+    /// non-repairable ambiguity — never a DeleteFile of the custom schema.
+    fn assert_duplicate_name_is_non_repairable(custom_first: bool) {
+        let config = ns_config(&["component", "team"]);
+        let jc: JitConfig = toml::from_str(&config).unwrap();
+        let ns = crate::config_manager::namespaces_from_config(&jc);
+        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let custom = "[[rules]]\nname = \"namespace-registry\"\nseverity = \"warn\"\nassert = { json-schema = \"schemas/custom-namespace.json\" }\n";
+        let rules_toml = if custom_first {
+            format!("{custom}\n{}", scaffold.rules_toml)
+        } else {
+            format!("{}\n{custom}", scaffold.rules_toml)
+        };
+        let mut schema_paths: Vec<(String, String)> = scaffold
+            .schema_files
+            .iter()
+            .map(|f| (format!(".jit/schemas/{}", f.name), f.content.clone()))
+            .collect();
+        // The authored custom schema the buggy classifier would have deleted.
+        schema_paths.push((
+            ".jit/schemas/custom-namespace.json".to_string(),
+            "{\"type\":\"object\"}".to_string(),
+        ));
+        let mut files: Vec<(&str, Option<&str>)> = vec![
+            (".jit/config.toml", Some(&config)),
+            (".jit/rules.toml", Some(&rules_toml)),
+        ];
+        for (p, c) in &schema_paths {
+            files.push((p, Some(c)));
+        }
+        let img = image(&files);
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let result = derive_materializations(
+            &img,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RepairDerivedState,
+        );
+        let err = result.expect_err("duplicate rule names must be non-repairable");
+        assert!(
+            matches!(err, RepositoryStateError::AmbiguousOwnership(_)),
+            "expected a typed ambiguity error (custom_first={custom_first}), got {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_obsolete_schema_shared_with_custom_rule_is_not_deleted() {
+        // schemas/default-shared.json is referenced by BOTH a default-origin rule
+        // and a custom rule. Even though a default reference "proves generation",
+        // the shared reference is not exclusively default-owned, so deleting it
+        // would break the custom rule — it must be preserved.
+        let config = ns_config(&["component", "team"]);
+        let jc: JitConfig = toml::from_str(&config).unwrap();
+        let ns = crate::config_manager::namespaces_from_config(&jc);
+        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let rules_toml = format!(
+            "{}\n[[rules]]\nname = \"obsolete-default\"\norigin = \"default\"\nassert = {{ json-schema = \"schemas/default-shared.json\" }}\n\
+             [[rules]]\nname = \"custom-consumer\"\nseverity = \"warn\"\nassert = {{ json-schema = \"schemas/default-shared.json\" }}\n",
+            scaffold.rules_toml
+        );
+        let mut schema_paths: Vec<(String, String)> = scaffold
+            .schema_files
+            .iter()
+            .map(|f| (format!(".jit/schemas/{}", f.name), f.content.clone()))
+            .collect();
+        schema_paths.push((
+            ".jit/schemas/default-shared.json".to_string(),
+            "{}".to_string(),
+        ));
+        let mut files: Vec<(&str, Option<&str>)> = vec![
+            (".jit/config.toml", Some(&config)),
+            (".jit/rules.toml", Some(&rules_toml)),
+        ];
+        for (p, c) in &schema_paths {
+            files.push((p, Some(c)));
+        }
+        let img = image(&files);
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let plan = derive_materializations(
+            &img,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RepairDerivedState,
+        )
+        .unwrap();
+        assert!(
+            !plan
+                .delta()
+                .actions()
+                .iter()
+                .any(|a| matches!(a, RepositoryAction::DeleteFile { .. })),
+            "a schema shared with a custom rule is not deleted: {:?}",
+            plan.delta().actions()
+        );
+    }
+
+    #[test]
+    fn test_duplicate_rule_name_custom_before_default_is_non_repairable() {
+        assert_duplicate_name_is_non_repairable(true);
+    }
+
+    #[test]
+    fn test_duplicate_rule_name_default_before_custom_is_non_repairable() {
+        assert_duplicate_name_is_non_repairable(false);
     }
 
     #[test]
