@@ -32,8 +32,9 @@ pub use image::{
     RepositorySeed, RepositorySeedKind, SeedError, TargetClaim,
 };
 pub use initialize::{
-    finalize_initialization, finalize_profile_application, render_repo_config, InitializationError,
-    InitializationScaffold, ProfileContribution, ProfileTargetContribution,
+    finalize_initialization, finalize_profile_application, render_repo_config, GitattributesClaim,
+    GitattributesStatus, InitializationError, InitializationScaffold, ProfileContribution,
+    ProfileTargetContribution,
 };
 pub use managed_document::{
     compose_managed_documents, render_managed_document, ManagedDocumentClaim, ManagedDocumentError,

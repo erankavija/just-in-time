@@ -411,6 +411,13 @@ fn test_init_json_gitattributes_has_no_stale_claims_jsonl_entry() {
     );
 }
 
+// TRANSITIONAL (jit:49adf23b increment 5): the worktree `.gitattributes` claim is
+// now published inside the fresh/profiled init transaction. A plain re-init still
+// runs the ordinary idempotent `init()` path, which does NOT perform a
+// gitattributes assertion until ordinary init migrates to the typed contract in
+// increment 7. This test's observable (a re-init reports `.gitattributes` in
+// neither created nor modified) holds in both worlds; the already-configured
+// DETECTION on re-init is pinned by increment 7 when ordinary init migrates.
 #[test]
 fn test_init_json_reinit_reports_gitattributes_absent_from_created_paths() {
     let temp = TempDir::new().unwrap();

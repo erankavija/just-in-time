@@ -38,6 +38,8 @@ use super::MaterializationPlan;
 const SCAFFOLD_OWNER: &str = "repository-init";
 /// Stable ownership identity for profile-applied assets and provenance.
 const PROFILE_OWNER: &str = "profile-application";
+/// Stable ownership identity for the worktree `.gitattributes` line-set claim.
+const GITATTRIBUTES_OWNER: &str = "gitattributes-merge-driver";
 
 /// Render the canonical fresh `config.toml` from a template body plus identity.
 ///
@@ -131,9 +133,46 @@ impl ProfileContribution {
     }
 }
 
+/// The Git-attributes line-set claim eligibility for this initialization.
+///
+/// The boundary acquires typed Git evidence before init and passes it here: the
+/// claim is `Eligible` only when Git identifies a containing worktree and the
+/// selected data root is inside it, carrying the canonical Git-escaped
+/// worktree-relative data-root events line. Otherwise it is `NotApplicable` — no
+/// `.gitattributes` target is captured and init still succeeds (`@/charter/D-4`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GitattributesClaim {
+    /// No Git worktree, or the data root is outside it. No target is captured.
+    NotApplicable,
+    /// Eligible: ensure exactly this line-set (`<escaped-data-root>/events.jsonl
+    /// merge=union`) is present in the worktree `.gitattributes`.
+    Eligible {
+        /// The canonical events merge-driver line.
+        line: String,
+    },
+}
+
+/// The exact outcome of the Git-attributes line-set claim.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitattributesStatus {
+    /// Not eligible (no Git worktree or an external data root); nothing was done.
+    NotApplicable,
+    /// The line-set was already present; unchanged.
+    Unchanged,
+    /// `.gitattributes` did not exist and was created with the jit block.
+    Created,
+    /// `.gitattributes` existed without the jit block and was appended to.
+    Modified,
+}
+
 /// Failure while rendering or composing an initialization/profile delta.
 #[derive(Debug, thiserror::Error)]
 pub enum InitializationError {
+    /// The worktree `.gitattributes` is occupied by an unsafe kind (symlink,
+    /// directory, or unsupported), holds non-UTF-8 content, or carries a competing
+    /// jit merge-driver block for a different data root.
+    #[error("worktree .gitattributes cannot be safely claimed: {0}")]
+    UnsafeGitattributes(String),
     /// The generated or existing configuration could not be parsed.
     #[error("failed to parse initialization configuration: {0}")]
     Config(String),
@@ -197,7 +236,11 @@ pub struct InitializationScaffold {
     schemas: Vec<(String, Vec<u8>)>,
     profile: Option<ProfileContribution>,
     project_name: ProjectName,
+    gitattributes: GitattributesClaim,
 }
+
+/// The marker line opening the jit-owned `.gitattributes` block.
+const GITATTRIBUTES_MARKER: &str = "# JIT merge drivers";
 
 impl InitializationScaffold {
     /// Render every neutral scaffold byte from the template body and identity.
@@ -241,12 +284,41 @@ impl InitializationScaffold {
             schemas,
             profile,
             project_name,
+            gitattributes: GitattributesClaim::NotApplicable,
         })
+    }
+
+    /// Attach the boundary-acquired Git-attributes eligibility to this scaffold.
+    pub fn with_gitattributes(mut self, claim: GitattributesClaim) -> Self {
+        self.gitattributes = claim;
+        self
     }
 
     /// The canonical project identity this scaffold publishes.
     pub fn project_name(&self) -> &ProjectName {
         &self.project_name
+    }
+
+    /// The eligible Git-attributes events line, if any.
+    fn gitattributes_line(&self) -> Option<&str> {
+        match &self.gitattributes {
+            GitattributesClaim::Eligible { line } => Some(line),
+            GitattributesClaim::NotApplicable => None,
+        }
+    }
+
+    /// The Git-attributes claim's outcome against the captured base, for the
+    /// command's report. Derived from the same pure resolution the delta uses, so
+    /// the reported status and the published bytes never disagree.
+    pub fn gitattributes_status(
+        &self,
+        base: &RepositoryImage,
+    ) -> Result<GitattributesStatus, InitializationError> {
+        let Some(line) = self.gitattributes_line() else {
+            return Ok(GitattributesStatus::NotApplicable);
+        };
+        let entry = base.entry(&VirtualPath::worktree(".gitattributes")?)?;
+        Ok(resolve_gitattributes(entry, line)?.0)
     }
 
     /// The neutral scaffold files as repository-relative `(path, bytes)` pairs.
@@ -355,6 +427,9 @@ impl InitializationScaffold {
         if let Some(profile) = &self.profile {
             paths.push(profile.record_path.clone());
         }
+        if self.gitattributes_line().is_some() {
+            paths.push(VirtualPath::worktree(".gitattributes")?);
+        }
         paths.extend(self.explicit_dirs()?);
         with_ancestor_dirs(paths)
     }
@@ -410,6 +485,7 @@ pub fn finalize_initialization(
     if let Some(profile) = &scaffold.profile {
         push_record_action(base, profile, &mut actions)?;
     }
+    push_gitattributes_action(base, scaffold, &mut actions)?;
     let mut all = directory_actions(base, &actions, &scaffold.explicit_dirs()?)?;
     all.extend(actions);
     let delta = RepositoryDelta::new(base.layout(), all)?;
@@ -420,6 +496,74 @@ pub fn finalize_initialization(
         &MaterializationIntent::InitializeRepository,
         delta,
     )?)
+}
+
+/// Emit the worktree `.gitattributes` write when the claim is eligible and the
+/// captured content is missing the jit line-set, rejecting an unsafe occupant.
+fn push_gitattributes_action(
+    base: &RepositoryImage,
+    scaffold: &InitializationScaffold,
+    actions: &mut Vec<RepositoryAction>,
+) -> Result<(), InitializationError> {
+    let Some(line) = scaffold.gitattributes_line() else {
+        return Ok(());
+    };
+    let path = VirtualPath::worktree(".gitattributes")?;
+    let entry = base.entry(&path)?;
+    if let (_status, Some(bytes)) = resolve_gitattributes(entry, line)? {
+        actions.push(RepositoryAction::WriteFile {
+            path,
+            owner: GITATTRIBUTES_OWNER.to_string(),
+            expected: ExpectedPreimage::of(entry),
+            bytes,
+            mode: FileMode::Regular,
+        });
+    }
+    Ok(())
+}
+
+/// Resolve the Git-attributes claim against the captured `.gitattributes` entry:
+/// its status and, when a write is required, the exact desired bytes preserving
+/// every unrelated byte.
+///
+/// An absent file is created with the jit block; an existing file already holding
+/// the line-set is unchanged; a file missing the block gets it appended (with the
+/// required separator). A non-UTF-8 file, a jit block present for a DIFFERENT data
+/// root (competing claim), or a symlink/directory/unsupported occupant is a typed
+/// error aborting init before any journaling.
+fn resolve_gitattributes(
+    entry: &RepositoryEntry,
+    line: &str,
+) -> Result<(GitattributesStatus, Option<Vec<u8>>), InitializationError> {
+    let block = format!("{GITATTRIBUTES_MARKER}\n{line}\n");
+    match entry {
+        RepositoryEntry::Absent => Ok((GitattributesStatus::Created, Some(block.into_bytes()))),
+        RepositoryEntry::File { bytes, .. } => {
+            let content = std::str::from_utf8(bytes).map_err(|_| {
+                InitializationError::UnsafeGitattributes(".gitattributes is not valid UTF-8".into())
+            })?;
+            if content.contains(line) {
+                Ok((GitattributesStatus::Unchanged, None))
+            } else if content.contains(GITATTRIBUTES_MARKER) {
+                Err(InitializationError::UnsafeGitattributes(
+                    "a jit merge-driver block is present for a different data root".into(),
+                ))
+            } else {
+                let separator = if content.ends_with('\n') {
+                    "\n"
+                } else {
+                    "\n\n"
+                };
+                Ok((
+                    GitattributesStatus::Modified,
+                    Some(format!("{content}{separator}{block}").into_bytes()),
+                ))
+            }
+        }
+        _ => Err(InitializationError::UnsafeGitattributes(
+            "occupied by an unsupported filesystem kind".into(),
+        )),
+    }
 }
 
 /// Compose the complete profile-application delta over an existing repository's
@@ -629,4 +773,89 @@ fn file_matches(entry: &RepositoryEntry, bytes: &[u8], mode: FileMode) -> bool {
             ..
         } if captured.as_slice() == bytes && *captured_mode == mode
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repository_state::EntryIdentity;
+
+    const LINE: &str = ".jit/events.jsonl merge=union";
+
+    fn file(bytes: &[u8]) -> RepositoryEntry {
+        RepositoryEntry::File {
+            identity: EntryIdentity::for_bytes("obj", bytes).unwrap(),
+            bytes: bytes.to_vec(),
+            mode: FileMode::Regular,
+        }
+    }
+
+    #[test]
+    fn test_resolve_gitattributes_absent_creates_block() {
+        let (status, bytes) = resolve_gitattributes(&RepositoryEntry::Absent, LINE).unwrap();
+        assert_eq!(status, GitattributesStatus::Created);
+        assert_eq!(
+            bytes.unwrap(),
+            format!("# JIT merge drivers\n{LINE}\n").into_bytes()
+        );
+    }
+
+    #[test]
+    fn test_resolve_gitattributes_present_line_is_unchanged() {
+        let entry = file(format!("# JIT merge drivers\n{LINE}\n").as_bytes());
+        let (status, bytes) = resolve_gitattributes(&entry, LINE).unwrap();
+        assert_eq!(status, GitattributesStatus::Unchanged);
+        assert!(bytes.is_none());
+    }
+
+    #[test]
+    fn test_resolve_gitattributes_appends_preserving_unrelated_bytes() {
+        let entry = file(b"*.txt text\n");
+        let (status, bytes) = resolve_gitattributes(&entry, LINE).unwrap();
+        assert_eq!(status, GitattributesStatus::Modified);
+        assert_eq!(
+            bytes.unwrap(),
+            format!("*.txt text\n\n# JIT merge drivers\n{LINE}\n").into_bytes()
+        );
+    }
+
+    #[test]
+    fn test_resolve_gitattributes_inserts_separator_when_prefix_unterminated() {
+        let entry = file(b"*.txt text");
+        let (_status, bytes) = resolve_gitattributes(&entry, LINE).unwrap();
+        assert_eq!(
+            bytes.unwrap(),
+            format!("*.txt text\n\n# JIT merge drivers\n{LINE}\n").into_bytes()
+        );
+    }
+
+    #[test]
+    fn test_resolve_gitattributes_competing_block_for_other_root_is_error() {
+        let entry = file(b"# JIT merge drivers\nother/events.jsonl merge=union\n");
+        assert!(matches!(
+            resolve_gitattributes(&entry, LINE),
+            Err(InitializationError::UnsafeGitattributes(_))
+        ));
+    }
+
+    #[test]
+    fn test_resolve_gitattributes_non_utf8_is_error() {
+        let entry = file(&[0xff, 0xfe, 0x00]);
+        assert!(matches!(
+            resolve_gitattributes(&entry, LINE),
+            Err(InitializationError::UnsafeGitattributes(_))
+        ));
+    }
+
+    #[test]
+    fn test_resolve_gitattributes_unsupported_occupant_is_error() {
+        let entry = RepositoryEntry::Directory {
+            identity: EntryIdentity::for_bytes("obj", b"dir").unwrap(),
+            mode: FileMode::Regular,
+        };
+        assert!(matches!(
+            resolve_gitattributes(&entry, LINE),
+            Err(InitializationError::UnsafeGitattributes(_))
+        ));
+    }
 }

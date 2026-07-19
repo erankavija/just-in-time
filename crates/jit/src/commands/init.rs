@@ -8,8 +8,8 @@ use crate::profile::{
     ProjectedFileMode, RepositorySnapshot, SnapshotEntry, SnapshotFile,
 };
 use crate::repository_state::{
-    apply_overlay, finalize_initialization, InitializationScaffold, ProfileContribution,
-    ProfileTargetContribution, VirtualPath,
+    apply_overlay, finalize_initialization, GitattributesClaim, GitattributesStatus,
+    InitializationScaffold, ProfileContribution, ProfileTargetContribution, VirtualPath,
 };
 use crate::storage::{
     IssueStore, JsonFileStorage, RepositoryStateStore, RepositoryStateStoreError,
@@ -28,6 +28,8 @@ pub struct FreshInitResult {
     pub project_name: ProjectName,
     /// Applied profile result when initialization included one.
     pub profile: Option<ProfileApplyResult>,
+    /// Outcome of the worktree `.gitattributes` merge-driver claim.
+    pub gitattributes: GitattributesStatus,
     /// Non-fatal diagnostics. The recovered session owns transaction recovery, so
     /// this is empty in normal operation and retained only for output stability.
     pub warnings: Vec<String>,
@@ -74,6 +76,8 @@ impl CommandExecutor<JsonFileStorage> {
     ) -> Result<FreshInitResult> {
         let package = profile_id.map(embedded_profile).transpose()?;
         let layout = self.require_layout()?;
+        // Typed Git evidence is acquired once at the boundary (loop-invariant).
+        let gitattributes = gitattributes_claim(&layout);
         let mut session = self.storage().open_mutation_session(layout)?;
         for _ in 0..8 {
             let (config, project_name) =
@@ -88,7 +92,8 @@ impl CommandExecutor<JsonFileStorage> {
                 Some((contribution, result)) => (Some(contribution), Some(result)),
                 None => (None, None),
             };
-            let scaffold = InitializationScaffold::from_config(config, project_name, contribution)?;
+            let scaffold = InitializationScaffold::from_config(config, project_name, contribution)?
+                .with_gitattributes(gitattributes.clone());
 
             let extra_paths = scaffold.delta_paths()?;
             // Probe capture: the deliberately over-inclusive scaffold overlay yields
@@ -129,6 +134,7 @@ impl CommandExecutor<JsonFileStorage> {
             match session.apply(&plan) {
                 Ok(outcome) => {
                     let project_name = scaffold.project_name().clone();
+                    let gitattributes = scaffold.gitattributes_status(&base)?;
                     let profile = apply_result.take().map(|mut result| {
                         if result.status == ProfileApplicationStatus::Applied {
                             result.transaction_id = Some(outcome.transaction_hash.clone());
@@ -138,6 +144,7 @@ impl CommandExecutor<JsonFileStorage> {
                     return Ok(FreshInitResult {
                         project_name,
                         profile,
+                        gitattributes,
                         warnings: Vec::new(),
                     });
                 }
@@ -322,13 +329,69 @@ fn embedded_profile(id: &str) -> Result<EmbeddedProfilePackage<'static>> {
     super::profile::embedded_profile(id)
 }
 
+/// Acquire typed Git evidence for the worktree `.gitattributes` merge-driver claim.
+///
+/// Eligible only when the worktree is inside a Git work tree AND the selected data
+/// root is nested beneath it; the claim line is the Git-escaped worktree-relative
+/// data-root path plus `/events.jsonl merge=union`. No Git, a disjoint data root,
+/// or an unavailable Git is `NotApplicable`, and core init still succeeds
+/// (`@/charter/D-4`).
+fn gitattributes_claim(layout: &crate::repository_state::RepositoryLayout) -> GitattributesClaim {
+    let worktree = layout.worktree_root();
+    let Ok(relative) = layout.data_root().strip_prefix(worktree) else {
+        return GitattributesClaim::NotApplicable;
+    };
+    if relative.as_os_str().is_empty() || !worktree_is_git_work_tree(worktree) {
+        return GitattributesClaim::NotApplicable;
+    }
+    GitattributesClaim::Eligible {
+        line: format!("{}/events.jsonl merge=union", git_escape_pattern(relative)),
+    }
+}
+
+/// Whether Git identifies `worktree` as inside a work tree (Git-optional: an
+/// absent or failing `git` is treated as "not a work tree").
+fn worktree_is_git_work_tree(worktree: &Path) -> bool {
+    std::process::Command::new("git")
+        .arg("-C")
+        .arg(worktree)
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .is_some_and(|output| String::from_utf8_lossy(&output.stdout).trim() == "true")
+}
+
+/// Escape a worktree-relative data-root path for use as a `.gitattributes` pattern
+/// prefix, normalizing separators and escaping the characters Git treats specially
+/// in a pattern. The canonical `.jit` passes through unchanged.
+fn git_escape_pattern(relative: &Path) -> String {
+    let path = relative.to_string_lossy().replace('\\', "/");
+    let mut escaped = String::with_capacity(path.len());
+    for ch in path.chars() {
+        if matches!(ch, ' ' | '#' | '!') {
+            escaped.push('\\');
+        }
+        escaped.push(ch);
+    }
+    escaped
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::profile::AppliedProfileRecord;
     use crate::storage::discover_repository_layout;
     use std::fs;
+    use std::path::PathBuf;
     use std::sync::{Arc, Barrier};
+
+    #[test]
+    fn test_git_escape_pattern_default_and_special_chars() {
+        assert_eq!(git_escape_pattern(&PathBuf::from(".jit")), ".jit");
+        assert_eq!(git_escape_pattern(&PathBuf::from("da ta")), "da\\ ta");
+        assert_eq!(git_escape_pattern(&PathBuf::from("a/b")), "a/b");
+    }
     use std::thread;
     use tempfile::TempDir;
 

@@ -1958,19 +1958,14 @@ fn run() -> Result<()> {
                 }
             }
 
-            // Set up .gitattributes for merge drivers (if in git repo). The
-            // git-subprocess detection and file read/append/create live in
-            // the storage layer (`jit::storage::gitattributes`); this call
-            // site only handles the outcome. A failure here is non-fatal
-            // (warning only); `None` means "nothing to report" for the
-            // `--json` created/modified path lists below.
-            let gitattributes_outcome = match jit::storage::gitattributes::setup_gitattributes() {
-                Ok(outcome) => Some(outcome),
-                Err(e) => {
-                    eprintln!("Warning: Could not set up .gitattributes: {}", e);
-                    None
-                }
-            };
+            // The worktree `.gitattributes` merge-driver claim is published as part
+            // of the init transaction itself (fresh and profiled init); its typed
+            // outcome is reported here for the `--json` created/modified path lists
+            // below. A plain re-init does not run that path and reports nothing.
+            let gitattributes_outcome = fresh_result
+                .as_ref()
+                .map(|result| result.gitattributes)
+                .unwrap_or(jit::repository_state::GitattributesStatus::NotApplicable);
 
             // Seed the `[project]` identity (REQ-01). The command layer owns the
             // orchestration — existence check, default-name computation, and the
@@ -2029,13 +2024,13 @@ fn run() -> Result<()> {
                 if scaffolded {
                     created_paths.push(".jit/rules.toml".to_string());
                 }
-                use jit::storage::gitattributes::GitattributesOutcome;
-                if gitattributes_outcome == Some(GitattributesOutcome::Created) {
+                use jit::repository_state::GitattributesStatus;
+                if gitattributes_outcome == GitattributesStatus::Created {
                     created_paths.push(".gitattributes".to_string());
                 }
 
                 let mut modified_paths = Vec::new();
-                if gitattributes_outcome == Some(GitattributesOutcome::Modified) {
+                if gitattributes_outcome == GitattributesStatus::Modified {
                     modified_paths.push(".gitattributes".to_string());
                 }
 

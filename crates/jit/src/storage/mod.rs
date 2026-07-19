@@ -22,7 +22,6 @@ pub mod file_transaction;
 pub mod gate_runs;
 pub mod gate_store;
 pub mod git_revision;
-pub mod gitattributes;
 pub mod guard_order;
 pub mod json;
 pub mod lease;
