@@ -165,6 +165,17 @@ impl RepositoryStateError {
     fn producer(error: anyhow::Error) -> Self {
         Self::Producer(format!("{error:#}"))
     }
+
+    /// Wrap a projection-composition producer failure, preserving a typed
+    /// [`ManagedDocumentError`] so a managed-region fault (an absent required
+    /// region, a competing claim) keeps its identity for exit-code mapping instead
+    /// of collapsing into an opaque string.
+    fn projection_producer(error: anyhow::Error) -> Self {
+        match error.downcast::<ManagedDocumentError>() {
+            Ok(managed) => Self::ManagedDocument(managed),
+            Err(error) => Self::producer(error),
+        }
+    }
 }
 
 /// The complete owned-materialization producer set: default rules and their
@@ -211,7 +222,7 @@ fn derive_project_render(
     let config = materialize::assemble_config(image).map_err(RepositoryStateError::producer)?;
     let actions =
         materialize::compose_configured_projections(image, &config, declarations, selected)
-            .map_err(RepositoryStateError::producer)?;
+            .map_err(RepositoryStateError::projection_producer)?;
     Ok(RepositoryDelta::new(image.layout(), actions)?)
 }
 

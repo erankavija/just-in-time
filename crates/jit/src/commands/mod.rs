@@ -333,6 +333,103 @@ pub struct RuleMembershipSync {
     pub dropped: Vec<String>,
 }
 
+/// Owned repository declarations assembled from a captured [`RepositoryImage`].
+///
+/// The declaration bundle a session-driven producer graph consumes — the parsed
+/// configuration, the authored gate registry, and the EFFECTIVE rule set (the
+/// authored `rules.toml` with its `origin = "default"` family reconciled against
+/// the configuration, or the in-memory defaults when no `rules.toml` was
+/// captured) — every part read from the captured image bytes, never the live
+/// filesystem.
+pub(crate) struct ImageDeclarations {
+    configuration: crate::declarations::ConfigurationDeclarations,
+    gates: crate::declarations::GateRegistry,
+    rules: RuleSet,
+}
+
+impl ImageDeclarations {
+    /// Borrow these owned declarations as the bundle the pure producers take.
+    pub(crate) fn borrowed(&self) -> crate::repository_state::RepositoryDeclarations<'_> {
+        crate::repository_state::RepositoryDeclarations {
+            configuration: &self.configuration,
+            gates: &self.gates,
+            rules: &self.rules,
+        }
+    }
+}
+
+/// Read a repo-relative path's bytes from the captured image.
+///
+/// A `.jit/`-prefixed path is a `Data(...)` entry and every other repo-relative
+/// path a `Worktree(...)` entry, matching the materialization producers' mapping.
+/// `Ok(None)` when the captured entry is absent or not a file.
+fn image_repo_bytes(
+    image: &crate::repository_state::RepositoryImage,
+    repo_rel: &str,
+) -> Result<Option<Vec<u8>>> {
+    use crate::repository_state::VirtualPath;
+    let vpath = match repo_rel.strip_prefix(".jit/") {
+        Some(rest) => VirtualPath::data(rest),
+        None => VirtualPath::worktree(repo_rel),
+    }?;
+    Ok(image.file_bytes(&vpath)?.map(<[u8]>::to_vec))
+}
+
+/// Assemble the configuration, effective rule set, and gate registry from a
+/// captured image, ready to drive the session-based materialization producers.
+///
+/// The effective rule set reconciles the authored `rules.toml`'s default family
+/// against the configuration exactly as the query-path loader does, but reads the
+/// rules bytes and every referenced schema from the captured image rather than the
+/// filesystem — so a mutation derives from the same closed evidence it will
+/// revalidate before journaling. A missing `.jit/config.toml` in the closure is a
+/// capture error.
+pub(crate) fn declarations_from_image(
+    image: &crate::repository_state::RepositoryImage,
+) -> Result<ImageDeclarations> {
+    use crate::declarations::{parse_configuration, parse_gate_registry, GateRegistry};
+    use crate::repository_state::{
+        assemble_config, default_ruleset, reconcile_default_rules_with_config, VirtualPath,
+    };
+
+    let config_bytes = image_repo_bytes(image, ".jit/config.toml")?
+        .ok_or_else(|| anyhow!("captured image has no .jit/config.toml"))?;
+    let configuration = parse_configuration(&config_bytes)?;
+    let jit_config = assemble_config(image)?;
+    let namespaces = crate::config_manager::namespaces_from_config(&jit_config);
+
+    let gates = match image_repo_bytes(image, ".jit/gates.toml")? {
+        Some(bytes) => parse_gate_registry(&bytes)?,
+        None => GateRegistry::default(),
+    };
+
+    let rules = match image_repo_bytes(image, ".jit/rules.toml")? {
+        Some(bytes) => {
+            let content = String::from_utf8(bytes)?;
+            // Schema references are data-root relative (`schemas/...`); the render
+            // closure captures them, so `file_bytes` resolves without a filesystem
+            // read. A captured-absent schema simply contributes no validator bytes.
+            let schemas = RuleSet::schema_requests(&content)?
+                .into_iter()
+                .filter_map(|request| {
+                    let vpath = VirtualPath::data(&request.reference).ok()?;
+                    let bytes = image.file_bytes(&vpath).ok().flatten()?.to_vec();
+                    Some((request.reference, bytes))
+                })
+                .collect::<Vec<_>>();
+            let user = RuleSet::parse(&content, Some(&jit_config), schemas)?;
+            reconcile_default_rules_with_config(user, &namespaces)
+        }
+        None => default_ruleset(&namespaces),
+    };
+
+    Ok(ImageDeclarations {
+        configuration,
+        gates,
+        rules,
+    })
+}
+
 /// Executes CLI commands with business logic and validation.
 ///
 /// Generic over storage backend to support different implementations
@@ -366,6 +463,21 @@ pub struct CommandExecutor<S: IssueStore> {
     /// Lazily-built label namespace registry, derived from the cached config and
     /// cached alongside it for the same reason.
     namespaces: OnceLock<Result<LabelNamespaces, String>>,
+    /// The canonical repository layout every session this executor opens mutates
+    /// through.
+    ///
+    /// This is the PERMANENT construction seam of the executor boundary, not an
+    /// interim shim: the executor is constructed with its canonical layout at
+    /// startup (from the CLI's Git-optional worktree root and selected data root,
+    /// or a fixture layout in tests), and every session-opening command opens
+    /// `open_mutation_session` for exactly this layout. The layout always arrives
+    /// from the construction boundary and is never inferred from the storage
+    /// parent (the layout authority forbids that). Deepening this seam to a fully
+    /// retained recovered session — reentrant only for this same canonical layout
+    /// (`@/inv` layout coherence) — changes what the executor holds internally, not
+    /// these call sites. `None` only when no layout was supplied; a session-opening
+    /// command then reports a wiring error rather than proceeding.
+    layout: Option<crate::repository_state::RepositoryLayout>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -379,7 +491,30 @@ impl<S: IssueStore> CommandExecutor<S> {
             effective_rules: OnceLock::new(),
             config: OnceLock::new(),
             namespaces: OnceLock::new(),
+            layout: None,
         }
+    }
+
+    /// Construct this executor over its canonical [`RepositoryLayout`].
+    ///
+    /// The permanent construction surface for the layout every session-opening
+    /// command mutates through (see the [`layout`](Self::layout) field). The CLI
+    /// supplies it at startup from the Git-optional worktree root plus the selected
+    /// data root; tests supply a fixture layout over a temporary worktree.
+    pub fn with_layout(mut self, layout: crate::repository_state::RepositoryLayout) -> Self {
+        self.layout = Some(layout);
+        self
+    }
+
+    /// The canonical mutation layout, or a typed error when none was supplied.
+    ///
+    /// A session-opening command needs an explicit worktree/data-root layout; a
+    /// missing one is a construction-wiring error, reported rather than inferred
+    /// from the storage parent.
+    pub(crate) fn require_layout(&self) -> Result<crate::repository_state::RepositoryLayout> {
+        self.layout
+            .clone()
+            .ok_or_else(|| anyhow!("no repository layout configured for this command"))
     }
 
     /// Get reference to the storage backend

@@ -556,7 +556,10 @@ mod tests {
         assert!(guidance.contains("<!-- jit:dogfood-guidance:begin -->"));
         assert_eq!(guidance.matches("<!-- jit:invariants:begin -->").count(), 1);
 
-        let reloaded = CommandExecutor::new(storage);
+        let layout =
+            crate::storage::discover_repository_layout(temp.path(), temp.path().join(".jit"))
+                .unwrap();
+        let reloaded = CommandExecutor::new(storage).with_layout(layout);
         let invariants = reloaded.project_render(Some("invariants")).unwrap();
         let invariants = &invariants.projections[0];
         assert_eq!(invariants.target, "AGENTS.md");

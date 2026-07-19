@@ -77,6 +77,9 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             .downcast_ref::<jit::repository_state::ProjectionError>()
             .is_some()
         || error
+            .downcast_ref::<jit::repository_state::ManagedDocumentError>()
+            .is_some()
+        || error
             .downcast_ref::<jit::profile::ProfilePlanError>()
             .is_some()
         || error
@@ -1356,7 +1359,7 @@ fn run_invariant_inner<S: IssueStore>(
 /// documentation target and reports what was written. On `--json` a failure is
 /// rendered as a JSON error object (honoring the machine-readable contract) rather
 /// than the top-level plain `Error: ...`.
-fn run_project<S: IssueStore>(
+fn run_project<S: IssueStore + jit::storage::RepositoryStateStore>(
     executor: &CommandExecutor<S>,
     command: ProjectCommands,
     quiet: bool,
@@ -1367,11 +1370,14 @@ fn run_project<S: IssueStore>(
 
     let result = run_project_inner(executor, command, quiet);
     if let Err(e) = result {
-        // A typed projection failure is a validation error (exit 4) in JSON mode
-        // too, matching the non-JSON path's top-level classification.
+        // A typed projection or managed-region composition failure is a validation
+        // error (exit 4) in JSON mode too, matching the non-JSON path's top-level
+        // classification.
         let code = if e
             .downcast_ref::<jit::repository_state::ProjectionError>()
             .is_some()
+            || e.downcast_ref::<jit::repository_state::ManagedDocumentError>()
+                .is_some()
         {
             jit::output::ErrorCode::VALIDATION_FAILED
         } else {
@@ -1388,7 +1394,7 @@ fn run_project<S: IssueStore>(
 
 /// Inner dispatch for `jit project`; errors are converted to JSON by
 /// [`run_project`] when `--json` is set.
-fn run_project_inner<S: IssueStore>(
+fn run_project_inner<S: IssueStore + jit::storage::RepositoryStateStore>(
     executor: &CommandExecutor<S>,
     command: ProjectCommands,
     quiet: bool,
@@ -1866,7 +1872,23 @@ fn run() -> Result<()> {
     if let Some(session) = recovery_session {
         storage.retain_recovery_session(session)?;
     }
+    // Construct the executor over its canonical repository layout: the Git-optional
+    // worktree root (falling back to the current directory outside Git) plus the
+    // selected data root. Session-opening commands mutate through exactly this
+    // layout; the worktree root always comes from this boundary, never inferred
+    // from the storage parent (`@/charter/D-4`, plan layout authority). Discovery
+    // is best-effort here so non-session commands are unaffected by an unusual root
+    // layout; a session-opening command reports a clear wiring error if it is
+    // absent.
+    let executor_layout = jit::storage::worktree_paths::WorktreePaths::detect()
+        .ok()
+        .and_then(|paths| {
+            jit::storage::discover_repository_layout(paths.worktree_root, &jit_dir).ok()
+        });
     let mut executor = CommandExecutor::new(storage.clone());
+    if let Some(layout) = executor_layout {
+        executor = executor.with_layout(layout);
+    }
 
     match &command {
         Commands::Init {

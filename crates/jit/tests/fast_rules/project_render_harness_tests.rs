@@ -72,7 +72,12 @@ source-of-truth = "registry-first"
 "#;
 
 /// Build an `InMemoryStorage` whose `.jit` root carries `config.toml` and the
-/// given registry files, so `cached_config` loads item kinds + projections.
+/// given registry files.
+///
+/// The config and registries are written to the on-disk root (so `cached_config`
+/// loads item kinds + projections for name selection) AND seeded into the aggregate
+/// repository image (so the render's mutation session captures them), matching the
+/// dual read the migrated command performs.
 fn storage_with(config_toml: &str, registries: &[(&str, &str)]) -> InMemoryStorage {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
@@ -80,10 +85,26 @@ fn storage_with(config_toml: &str, registries: &[(&str, &str)]) -> InMemoryStora
     let root = storage.root().to_path_buf();
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(root.join("config.toml"), config_toml).unwrap();
+    storage.add_repo_file(".jit/config.toml", config_toml);
     for (name, content) in registries {
         std::fs::write(root.join(name), content).unwrap();
+        storage.add_repo_file(&format!(".jit/{name}"), content);
     }
     storage
+}
+
+/// Construct a render executor over the storage's canonical layout: the on-disk
+/// data root and its parent worktree, exactly as the CLI wires the executor at
+/// startup. The session the render opens captures from the seeded aggregate image.
+fn render_executor(storage: &InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
+    let data = storage.root().to_path_buf();
+    let worktree = data
+        .parent()
+        .expect("test data root has a parent worktree")
+        .to_path_buf();
+    let layout = jit::storage::discover_repository_layout(worktree, data)
+        .expect("test layout is discoverable");
+    CommandExecutor::new(storage.clone()).with_layout(layout)
 }
 
 fn manual_gate(key: &str, title: &str, description: &str) -> GateDefinition {
@@ -144,7 +165,7 @@ style = "id-anchor"
     let original = format!("{prefix}{begin}\nstale\n{end}{suffix}");
     storage.add_repo_file("AGENTS.md", &original);
 
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = render_executor(&storage);
     let result = executor.project_render(Some("charter")).unwrap();
     assert_eq!(result.count, 1);
     assert_eq!(result.projections[0].target, "AGENTS.md");
@@ -178,7 +199,7 @@ fn test_invariants_projection_parity_with_typed_render() {
     // The id-anchor path reads the descriptor's registry through `read_repo_file`
     // (the repo-file map), so seed it there, not only on the config root.
     storage.add_repo_file(".jit/invariants.toml", INVARIANTS_TOML);
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = render_executor(&storage);
 
     executor.project_render(Some("invariants")).unwrap();
     let written = storage
@@ -220,7 +241,7 @@ fn test_rules_and_gates_projection_parity_with_typed_render() {
     );
     storage.save_gate_registry(&registry).unwrap();
 
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = render_executor(&storage);
     // The command renders the EFFECTIVE rules (defaults merged with local
     // rules.toml); the oracle must render the same set.
     let effective = executor.effective_rules().unwrap().clone();
@@ -253,7 +274,7 @@ target = \".jit/out.md\"
 style = \"id-anchor\"
 ";
     let storage = storage_with(config, &[]);
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = render_executor(&storage);
     let err = executor.project_render(Some("bad")).unwrap_err();
     assert!(
         err.to_string().contains("bad") || err.chain().any(|c| c.to_string().contains("unknown")),
@@ -273,7 +294,7 @@ fn test_missing_target_is_typed_error_naming_projection() {
     );
     let storage = storage_with(&config, &[]);
     storage.add_repo_file(".jit/invariants.toml", INVARIANTS_TOML);
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = render_executor(&storage);
 
     let err = executor.project_render(Some("invariants")).unwrap_err();
     let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
@@ -316,17 +337,22 @@ fn test_two_phase_render_writes_nothing_when_a_later_projection_fails() {
     storage.add_repo_file("FIRST.md", first_original);
     storage.add_repo_file("SECOND.md", second_original);
 
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = render_executor(&storage);
     // `a-good` sorts before `b-bad`, so it materializes (phase 1) before `b-bad`
     // fails — yet phase 2 never runs, so nothing is written anywhere.
     let err = executor.project_render(None).unwrap_err();
-    let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
+    // `b-bad`'s target lacks its managed region, so the managed-document engine
+    // rejects the composition with a typed required-region-absent fault before the
+    // delta is applied (it keeps the validation exit code, like the old marker
+    // error it replaced).
+    let typed = err.downcast_ref::<jit::repository_state::ManagedDocumentError>();
     assert!(
         matches!(
             typed,
-            Some(jit::repository_state::ProjectionError::MissingBeginMarker { .. })
+            Some(jit::repository_state::ManagedDocumentError::RequiredRegionAbsent(region))
+                if region == "b-bad"
         ),
-        "expected MissingBeginMarker, got {err:#}"
+        "expected RequiredRegionAbsent(\"b-bad\"), got {err:#}"
     );
     assert_eq!(
         storage.read_repo_file("FIRST.md").unwrap().unwrap(),
@@ -369,7 +395,7 @@ source-of-truth = "registry-first"
     // too.
     let storage = storage_with(&config, &[("invariants.toml", INVARIANTS_TOML)]);
     storage.add_repo_file(".jit/invariants.toml", INVARIANTS_TOML);
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = render_executor(&storage);
 
     executor.project_render(Some("house")).unwrap();
     let written = storage
@@ -408,7 +434,7 @@ source-of-truth = "markdown-first"
          mode = \"separate-file\"\ntarget = \".jit/decisions.md\"\nstyle = \"full\"\n"
     );
     let storage = storage_with(&config, &[]);
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = render_executor(&storage);
 
     let err = executor.project_render(Some("decisions")).unwrap_err();
     let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
@@ -441,7 +467,7 @@ fn test_full_style_missing_registry_source_errors_pre_write() {
     // empty (a missing store is indistinguishable from an empty one at render
     // time), and the pre-write existence probe over `read_repo_file` finds nothing.
     let storage = storage_with(&config, &[]);
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = render_executor(&storage);
 
     let err = executor.project_render(Some("invariants")).unwrap_err();
     let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();

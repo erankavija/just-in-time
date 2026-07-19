@@ -62,7 +62,19 @@ async fn main() -> Result<()> {
     let (storage, recovery_session) = prepare_server_storage(&args.data_dir)?;
 
     info!("Using JIT repository at: {}", args.data_dir);
-    let executor = Arc::new(CommandExecutor::new(storage));
+    // Construct the executor over its canonical layout so any session-opening
+    // command reached in-process mutates through the repository-mount boundary
+    // (the worktree root is the parent of the selected data root for the D-10
+    // single-mount topology). Best-effort: the current HTTP surface is read-only,
+    // so a missing layout never surfaces here.
+    let data_dir_path = std::path::Path::new(&args.data_dir);
+    let executor_layout = data_dir_path.parent().and_then(|worktree| {
+        jit::storage::discover_repository_layout(worktree, data_dir_path).ok()
+    });
+    let executor = match executor_layout {
+        Some(layout) => Arc::new(CommandExecutor::new(storage).with_layout(layout)),
+        None => Arc::new(CommandExecutor::new(storage)),
+    };
     if recovery_session.report().recovered_count() > 0 {
         info!(
             "Recovered {} pending transaction(s) before server startup",
