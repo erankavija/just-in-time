@@ -90,11 +90,21 @@
       "resolved_at": "2026-07-19T00:30:00+03:00",
       "situation": "Fifth review round: the whole-diff code-review kept surfacing new plan deviations in the ~6300-line foundation each round (non-convergence).",
       "resolution": "Invoker chose a batch plan-conformance audit. Lead fanned out 8 disjoint-footprint auditors over declarations + repository_state vs plan section 2, with an adversarial verify stage. 5 deviations confirmed (empty-string root sentinel -> RootRelativePath Root/Descendant enum; CaptureSpec phase-one Data-only; ExpectedPreimage kind vocabulary mirroring RepositoryEntry; managed-document claimed-child removal rejection; ConfigurationDeclarations transitional whole-config field removed), all fixed with tests (commit ff542ec1). Both gates then passed and the whole-diff code-review found nothing new, breaking the non-convergence. cbc3a7e5 done; merged to main at 0d224f35 (invoker-directed)."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "bacf2cd4-c4c7-421e-83ff-4ebc44925008",
+      "status": "resolved",
+      "opened_at": "2026-07-19T03:10:00+03:00",
+      "resolved_at": "2026-07-19T03:12:00+03:00",
+      "situation": "Rework attempt 2 closed all 10 prior findings (independently verified, no regressions) but the independent crash-consistency review found 4 new lead-verified defects: HIGH shared worktree .jit-bootstrap namespace unserialized across disjoint-data-root sessions (orphan companion sweep can delete a live transaction's rollback backup); MEDIUM committed-journal recovery re-asserts worktree final identities and wedges opens after legitimate post-commit edits; LOW memory-backend failure-point parity gap; LOW tautological held-FD capability revalidation.",
+      "resolution": "Invoker authorized one guided correction round scoped to exactly these 4 findings and reset the rework counter.",
+      "recommendation": "Guided correction: worktree-keyed serialization / data-root-bound companion markers; idempotent committed-recovery cleanup; model kernel-only failure points in memory backend; reopen-by-path revalidation."
     }
   ],
   "rework_counts": {
     "cbc3a7e5": 2,
-    "bacf2cd4": 2
+    "bacf2cd4": 0
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
