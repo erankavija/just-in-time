@@ -4,8 +4,7 @@ use super::{
     SnapshotEntry,
 };
 use crate::validation::repository::{
-    projection_targets, render_projections, validate_repository, OverlayRepositoryView,
-    RepositoryValidationFailure, RepositoryValidationReport, RepositoryView,
+    projection_targets, render_projections, OverlayRepositoryView, RepositoryView,
 };
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -61,14 +60,17 @@ pub struct PlannedTarget {
 }
 
 /// Deterministic, validated pure profile application plan.
+///
+/// Proposed-state validation is authoritative at the command boundary (init/profile
+/// capture the base image and validate the overlay), so this transitional plan
+/// carries no validation report of its own; the whole type is on the increment-6
+/// deletion list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileApplicationPlan {
     /// Stable package/snapshot identity.
     pub identity: PlanIdentity,
     /// Exact final targets sorted by repository-relative path.
     pub targets: BTreeMap<String, PlannedTarget>,
-    /// Validation report produced from the exact overlay image.
-    pub validation: RepositoryValidationReport,
 }
 
 impl ProfileApplicationPlan {
@@ -121,12 +123,6 @@ pub enum ProfilePlanError {
     /// A configured registry projection could not be rebuilt from final bytes.
     #[error("profile registry projection failed: {0}")]
     RegistryProjection(#[source] anyhow::Error),
-    /// Exact overlay image is structurally invalid.
-    #[error("planned repository validation failed: {0}")]
-    Validation(#[from] RepositoryValidationFailure),
-    /// Exact overlay image produced error-severity rule findings.
-    #[error("planned repository validation produced {error_count} error finding(s)")]
-    ValidationFindings { error_count: usize },
 }
 
 /// Build and validate an exact application plan without mutating the repository.
@@ -249,30 +245,16 @@ pub fn plan_profile_application_against(
         })
         .collect::<BTreeMap<_, _>>();
 
-    let overlay = OverlayRepositoryView::new(
-        validation_base,
-        targets
-            .values()
-            .map(|target| (PathBuf::from(&target.path), Some(target.bytes.clone()))),
-    )
-    .expect("validated package paths remain repository-relative");
-    let validation = validate_repository(&overlay)?;
-    if validation.rule_report.has_errors() {
-        return Err(ProfilePlanError::ValidationFindings {
-            error_count: validation.rule_report.error_count(),
-        });
-    }
-
+    // Proposed-state validation is authoritative at the command boundary: init and
+    // profile capture the base image and validate the overlay through the closed
+    // pipeline (this planner cannot open a session). `validation_base` still feeds
+    // the view-based projection helpers above until increment 6 deletes this planner.
     let identity = PlanIdentity {
         package_hash: package.hashes().package.clone(),
         target_hashes: package.hashes().targets.clone(),
         plan_hash: hash_plan(package.hashes().package.as_str(), &targets),
     };
-    Ok(ProfileApplicationPlan {
-        identity,
-        targets,
-        validation,
-    })
+    Ok(ProfileApplicationPlan { identity, targets })
 }
 
 fn validate_interpolation(package: &EmbeddedProfilePackage<'_>) -> Result<(), ProfilePlanError> {

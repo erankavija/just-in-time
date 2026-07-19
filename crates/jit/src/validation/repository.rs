@@ -1,13 +1,15 @@
 //! Read-only, byte-exact repository validation.
 //!
-//! A [`RepositoryView`] is the sole I/O boundary for this pipeline. The
-//! filesystem implementation preserves ordinary validation behavior, while an
-//! [`OverlayRepositoryView`] substitutes planned final bytes (including
-//! deletions) without copying a repository or allowing a parser to reopen the
-//! live storage root.
+//! Whole-repository validation ([`validate_repository`]) reads exclusively from a
+//! closed [`RepositoryImage`](crate::repository_state::RepositoryImage): a live
+//! capture validates the working tree and an overlay image validates a proposed
+//! final state, with no live filesystem or Git I/O in any pass. The legacy
+//! [`RepositoryView`] boundary survives only for the projection helpers
+//! ([`render_projections`], [`projection_targets`]) the profile planner still
+//! consumes; both share the same config/rules/gates loaders through a byte-read
+//! closure so validation and projection rendering never fork their loaders.
 
 use crate::config::{JitConfig, ProjectionMode};
-use crate::config_manager::ConfigManager;
 use crate::declarations::invariants::InvariantRegistry;
 use crate::declarations::rules::{RuleConfigError, RuleSet, Severity};
 use crate::declarations::GateChecker;
@@ -20,8 +22,10 @@ use crate::domain::item::{
 };
 use crate::domain::{parse_known_events, Issue, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
-use crate::repository_state::{compose_projection, require_target, splice_region};
-use crate::repository_state::{render_projection_body, ProjectionInputs};
+use crate::repository_state::{
+    compose_projection, render_projection_body, require_target, splice_region, ProjectionInputs,
+    RepositoryEntry, RepositoryImage,
+};
 use crate::validation::engine::Finding;
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
@@ -294,11 +298,37 @@ impl RepositoryView for OverlayRepositoryView {
 
 /// Validate the exact repository exposed by `view` through the full read-only
 /// pipeline.
+/// Read a repo-relative path's bytes from the captured image.
+///
+/// A `.jit/`-prefixed path is a `Data(...)` entry, every other repo-relative path
+/// a `Worktree(...)` entry. `Ok(None)` is a captured absence; a path outside the
+/// captured closure fails typed as `UndiscoveredRepositoryPath` (closed-read
+/// discipline), never a silent absence.
+fn image_read(image: &RepositoryImage, repo_rel: &str) -> Result<Option<Vec<u8>>> {
+    use crate::repository_state::VirtualPath;
+    let vpath = match repo_rel.strip_prefix(".jit/") {
+        Some(rest) => VirtualPath::data(rest),
+        None => VirtualPath::worktree(repo_rel),
+    }?;
+    Ok(image.file_bytes(&vpath)?.map(<[u8]>::to_vec))
+}
+
+/// Validate the exact repository captured in `image` through the full read-only
+/// pipeline.
+///
+/// The image is the single closed evidence source (plan §2 two-phase capture): a
+/// live capture validates the working tree, and an overlay image
+/// ([`apply_overlay`](crate::repository_state::apply_overlay)) validates a proposed
+/// final state. Every pass reads only image-projected content — no live filesystem
+/// or Git I/O — so a path outside the captured closure fails typed rather than
+/// reading through.
 pub fn validate_repository(
-    view: &dyn RepositoryView,
+    image: &RepositoryImage,
 ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
+    let read = move |path: &str| image_read(image, path);
+    let read: &ReadBytes<'_> = &read;
     let mut passes = Vec::new();
-    let config = match load_config(view).context("effective-config validation pass") {
+    let config = match load_config(read).context("effective-config validation pass") {
         Ok(config) => config,
         Err(error) => {
             return Err(RepositoryValidationFailure::new(
@@ -314,9 +344,8 @@ pub fn validate_repository(
     };
     passes.push(RepositoryValidationPass::EffectiveConfig);
 
-    let namespaces =
-        ConfigManager::new(view.repository_root().join(".jit")).namespaces_from_config(&config);
-    let (rules, rules_loaded, mut findings) = match load_rules(view, &config, &namespaces) {
+    let namespaces = crate::config_manager::namespaces_from_config(&config);
+    let (rules, rules_loaded, mut findings) = match load_rules(read, &config, &namespaces) {
         Ok(rules) => (rules, true, Vec::new()),
         Err(error) => (
             RuleSet::empty(),
@@ -334,7 +363,7 @@ pub fn validate_repository(
     passes.push(RepositoryValidationPass::RulesAndSchemas);
 
     let mut structural_error = None;
-    let gates = match load_gates(view).context("gates validation pass") {
+    let gates = match load_gates(read).context("gates validation pass") {
         Ok(gates) => {
             passes.push(RepositoryValidationPass::Gates);
             Some(gates)
@@ -345,7 +374,7 @@ pub fn validate_repository(
         }
     };
 
-    let records = match load_records(view).context("records validation pass") {
+    let records = match load_records(read, image).context("records validation pass") {
         Ok(records) => {
             passes.push(RepositoryValidationPass::Records);
             Some(records)
@@ -359,7 +388,7 @@ pub fn validate_repository(
     };
 
     if let (Some(records), Some(gates)) = (&records, &gates) {
-        let integrity_error = validate_integrity(view, &records.issues, gates)
+        let integrity_error = validate_integrity(image, &records.issues, gates)
             .context("repository-integrity validation pass")
             .err();
         if let Some(error) = integrity_error {
@@ -367,7 +396,7 @@ pub fn validate_repository(
                 structural_error = Some(error);
             }
         } else if structural_error.is_none() {
-            structural_error = validate_machine_local_claims(view.repository_root())
+            structural_error = validate_machine_local_claims(image.layout().worktree_root())
                 .context("repository-integrity validation pass")
                 .err();
             if structural_error.is_none() {
@@ -379,7 +408,7 @@ pub fn validate_repository(
     let mut namespace_and_hierarchy_complete = true;
     if rules_loaded {
         if let Some(records) = &records {
-            match collect_rule_findings(view, &records.issues, &rules, &namespaces, &config)
+            match collect_rule_findings(read, &records.issues, &rules, &namespaces, &config)
                 .context("namespace-and-hierarchy validation pass")
             {
                 Ok(rule_findings) => findings.extend(rule_findings),
@@ -409,7 +438,7 @@ pub fn validate_repository(
     }
 
     if let Some(records) = &records {
-        match collect_item_link_findings(view, &records.issues, &config)
+        match collect_item_link_findings(read, &records.issues, &config)
             .context("item-links validation pass")
         {
             Ok(item_findings) => {
@@ -426,7 +455,7 @@ pub fn validate_repository(
 
     if rules_loaded {
         if let Some(gates) = &gates {
-            match validate_projections(view, &config, &rules, gates)
+            match validate_projections(read, &config, &rules, gates)
                 .context("projections validation pass")
             {
                 Ok(()) => passes.push(RepositoryValidationPass::Projections),
@@ -463,7 +492,9 @@ pub fn validate_repository(
 /// the asset-conflict check (their bytes are re-derived from the merged
 /// registries, not frozen from the package's contribution rows).
 pub(crate) fn projection_targets(view: &dyn RepositoryView) -> Result<BTreeSet<PathBuf>> {
-    let config = load_config(view)?;
+    let read = |path: &str| view.read_file(Path::new(path));
+    let read: &ReadBytes<'_> = &read;
+    let config = load_config(read)?;
     let Some(projections) = config.projection.as_ref() else {
         return Ok(BTreeSet::new());
     };
@@ -483,14 +514,15 @@ pub(crate) fn projection_targets(view: &dyn RepositoryView) -> Result<BTreeSet<P
 /// [`compose_projection`] mechanism — so several projections that share one target
 /// each land in the final bytes (sequential composition), never last-writer-wins.
 pub(crate) fn render_projections(view: &dyn RepositoryView) -> Result<Vec<(PathBuf, Vec<u8>)>> {
-    let config = load_config(view)?;
+    let read = |path: &str| view.read_file(Path::new(path));
+    let read: &ReadBytes<'_> = &read;
+    let config = load_config(read)?;
     let Some(projections) = config.projection.as_ref() else {
         return Ok(Vec::new());
     };
-    let namespaces =
-        ConfigManager::new(view.repository_root().join(".jit")).namespaces_from_config(&config);
-    let rules = load_rules(view, &config, &namespaces)?;
-    let gates = load_gates(view)?;
+    let namespaces = crate::config_manager::namespaces_from_config(&config);
+    let rules = load_rules(read, &config, &namespaces)?;
+    let gates = load_gates(read)?;
     let inputs = ProjectionInputs {
         config: &config,
         rules: &rules,
@@ -501,8 +533,8 @@ pub(crate) fn render_projections(view: &dyn RepositoryView) -> Result<Vec<(PathB
     // change) instead of overwriting each other.
     let mut pending: BTreeMap<String, String> = BTreeMap::new();
     for (name, projection) in projections {
-        let mut read = |path: &str| read_text(view, path);
-        let (body, _count) = render_projection_body(projection, &inputs, &mut read)?;
+        let mut render_read = |path: &str| read_text(read, path);
+        let (body, _count) = render_projection_body(projection, &inputs, &mut render_read)?;
         let target = require_target(projection, name)?;
         compose_projection(
             &mut pending,
@@ -511,7 +543,7 @@ pub(crate) fn render_projections(view: &dyn RepositoryView) -> Result<Vec<(PathB
             &body,
             &projection.region_begin(name),
             &projection.region_end(name),
-            |path| read_text(view, path),
+            |path| read_text(read, path),
         )?;
     }
     Ok(pending
@@ -535,19 +567,28 @@ fn validate_relative(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn read_text(view: &dyn RepositoryView, path: &str) -> Result<Option<String>> {
-    view.read_file(Path::new(path))?
+/// A repository byte source keyed by repo-relative path.
+///
+/// The single read abstraction the config/rules/gates loaders consume, so the
+/// image-backed validation pipeline and the surviving view-backed projection
+/// helpers share one loader implementation rather than forking. `Ok(None)` is a
+/// captured/present absence; an image source returns `Err` for a path outside the
+/// captured closure (closed-read discipline), never a silent absence.
+type ReadBytes<'a> = dyn Fn(&str) -> Result<Option<Vec<u8>>> + 'a;
+
+fn read_text(read: &ReadBytes<'_>, path: &str) -> Result<Option<String>> {
+    read(path)?
         .map(|bytes| String::from_utf8(bytes).context(format!("{path} is not UTF-8")))
         .transpose()
 }
 
-fn required_text(view: &dyn RepositoryView, path: &str) -> Result<String> {
-    read_text(view, path)?.ok_or_else(|| anyhow!("required repository file '{path}' is missing"))
+fn required_text(read: &ReadBytes<'_>, path: &str) -> Result<String> {
+    read_text(read, path)?.ok_or_else(|| anyhow!("required repository file '{path}' is missing"))
 }
 
-fn load_config(view: &dyn RepositoryView) -> Result<JitConfig> {
+fn load_config(read: &ReadBytes<'_>) -> Result<JitConfig> {
     let mut config: JitConfig = toml::from_str(
-        read_text(view, ".jit/config.toml")?
+        read_text(read, ".jit/config.toml")?
             .as_deref()
             .unwrap_or(""),
     )
@@ -557,14 +598,14 @@ fn load_config(view: &dyn RepositoryView) -> Result<JitConfig> {
         .as_ref()
         .map(|hierarchy| hierarchy.types.keys().map(String::as_str).collect())
         .unwrap_or_default();
-    config.templates = match read_text(view, ".jit/templates.toml")? {
+    config.templates = match read_text(read, ".jit/templates.toml")? {
         Some(content) => {
             crate::templates::TemplateRegistry::from_toml_str(&content, &hierarchy_types)
                 .context("invalid .jit/templates.toml")?
         }
         None => crate::templates::TemplateRegistry::empty(),
     };
-    config.invariants = match read_text(view, ".jit/invariants.toml")? {
+    config.invariants = match read_text(read, ".jit/invariants.toml")? {
         Some(content) => {
             InvariantRegistry::from_toml_str(&content).context("invalid .jit/invariants.toml")?
         }
@@ -577,20 +618,19 @@ fn load_config(view: &dyn RepositoryView) -> Result<JitConfig> {
 }
 
 fn load_rules(
-    view: &dyn RepositoryView,
+    read: &ReadBytes<'_>,
     config: &JitConfig,
     namespaces: &crate::domain::LabelNamespaces,
 ) -> Result<RuleSet> {
-    let Some(content) = read_text(view, ".jit/rules.toml")? else {
+    let Some(content) = read_text(read, ".jit/rules.toml")? else {
         return Ok(crate::repository_state::default_ruleset(namespaces));
     };
-    let jit_root = view.repository_root().join(".jit");
     let schemas = RuleSet::schema_requests(&content)?.into_iter().try_fold(
         BTreeMap::new(),
         |mut schemas, request| {
             let path = format!(".jit/{}", request.reference);
-            let synthetic_path = jit_root.join(&request.reference);
-            match view.read_file(Path::new(&path)) {
+            let synthetic_path = PathBuf::from(&path);
+            match read(&path) {
                 Ok(Some(bytes)) => {
                     schemas.insert(request.reference, bytes);
                 }
@@ -601,7 +641,7 @@ fn load_rules(
                         path: synthetic_path,
                         source: IoError::new(
                             ErrorKind::NotFound,
-                            "schema absent from repository view",
+                            "schema absent from repository image",
                         ),
                     });
                 }
@@ -627,8 +667,8 @@ struct GatesFile {
     gates: Vec<crate::declarations::GateDefinition>,
 }
 
-fn load_gates(view: &dyn RepositoryView) -> Result<GateRegistry> {
-    let content = read_text(view, ".jit/gates.toml")?.unwrap_or_default();
+fn load_gates(read: &ReadBytes<'_>) -> Result<GateRegistry> {
+    let content = read_text(read, ".jit/gates.toml")?.unwrap_or_default();
     let file: GatesFile = toml::from_str(&content).context("invalid .jit/gates.toml")?;
     let mut gates = HashMap::new();
     for gate in file.gates {
@@ -654,8 +694,8 @@ struct Records {
     event_count: usize,
 }
 
-fn load_records(view: &dyn RepositoryView) -> Result<Records> {
-    let index: RepositoryIndex = serde_json::from_str(&required_text(view, ".jit/index.json")?)
+fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records> {
+    let index: RepositoryIndex = serde_json::from_str(&required_text(read, ".jit/index.json")?)
         .context("invalid .jit/index.json")?;
     if index.schema_version > SUPPORTED_INDEX_SCHEMA_VERSION {
         return Err(anyhow!(
@@ -682,7 +722,7 @@ fn load_records(view: &dyn RepositoryView) -> Result<Records> {
         .iter()
         .map(|id| {
             let path = format!(".jit/issues/{id}.json");
-            let issue: Issue = serde_json::from_str(&required_text(view, &path)?)
+            let issue: Issue = serde_json::from_str(&required_text(read, &path)?)
                 .with_context(|| format!("invalid {path}"))?;
             if issue.id != *id {
                 return Err(anyhow!(
@@ -693,15 +733,24 @@ fn load_records(view: &dyn RepositoryView) -> Result<Records> {
             Ok(issue)
         })
         .collect::<Result<Vec<_>>>()?;
-    let issue_files = view.list_files(Path::new(".jit/issues"))?;
-    let expected: BTreeSet<PathBuf> = index
+    // The complete `.jit/issues` listing is captured into the image; reconcile the
+    // JSON issue files it contains against the index ids exactly as the recursive
+    // filesystem walk did, but from the closed listing fingerprint.
+    let issues_dir = crate::repository_state::VirtualPath::data("issues")?;
+    let listing = image
+        .listing_fingerprints()
+        .get(&issues_dir)
+        .ok_or_else(|| anyhow!("captured image is missing the .jit/issues listing"))?;
+    let expected: BTreeSet<String> = index
         .all_ids
         .iter()
-        .map(|id| PathBuf::from(format!(".jit/issues/{id}.json")))
+        .map(|id| format!("{id}.json"))
         .collect();
-    let actual: BTreeSet<PathBuf> = issue_files
-        .into_iter()
-        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+    let actual: BTreeSet<String> = listing
+        .children()
+        .keys()
+        .filter(|name| name.ends_with(".json"))
+        .cloned()
         .collect();
     if actual != expected {
         return Err(anyhow!(
@@ -710,7 +759,7 @@ fn load_records(view: &dyn RepositoryView) -> Result<Records> {
     }
 
     let mut event_count = 0;
-    if let Some(events) = read_text(view, ".jit/events.jsonl")? {
+    if let Some(events) = read_text(read, ".jit/events.jsonl")? {
         event_count = parse_known_events(&events)
             .context("invalid .jit/events.jsonl")?
             .len();
@@ -722,7 +771,7 @@ fn load_records(view: &dyn RepositoryView) -> Result<Records> {
 }
 
 fn validate_integrity(
-    view: &dyn RepositoryView,
+    image: &RepositoryImage,
     issues: &[Issue],
     gates: &GateRegistry,
 ) -> Result<()> {
@@ -748,58 +797,51 @@ fn validate_integrity(
         }
     }
 
-    // Preserve the established command diagnostics while sourcing working-tree
-    // bytes exclusively from the view. Document validation remains optional
-    // outside git repositories, as before.
-    if let Ok(repository) = git2::Repository::open(view.repository_root()) {
-        let has_commits = repository.head().is_ok();
-        for issue in issues {
-            for document in &issue.documents {
-                if let Some(reference) = document.commit.as_deref() {
-                    let commit = repository
-                        .revparse_single(reference)
-                        .and_then(|object| object.peel_to_commit())
-                        .map_err(|_| {
-                            anyhow!(
-                                "Invalid document reference in issue '{}': commit '{}' not found for '{}'",
-                                issue.id,
-                                reference,
-                                document.path
-                            )
-                        })?;
-                    commit.tree()?.get_path(Path::new(&document.path)).map_err(|_| {
-                        anyhow!(
-                            "Invalid document reference in issue '{}': file '{}' not found at commit {}",
+    // Document references resolve against boundary-acquired evidence in the closed
+    // image, never live Git or filesystem I/O (plan §2 "Pinned document evidence").
+    // A pinned reference is checked against the pinned evidence for its
+    // `(commit, path)` request; an unpinned reference is present when its captured
+    // working-tree entry exists, falling back to boundary-acquired HEAD evidence.
+    // When Git is unavailable the pinned evidence carries a stable unavailable
+    // reason, reproducing the typed pinned-read diagnostic without requiring Git.
+    for issue in issues {
+        for document in &issue.documents {
+            if let Some(reference) = document.commit.as_deref() {
+                let evidence = image
+                    .pinned_evidence()
+                    .get(&(reference.to_string(), document.path.clone()));
+                match evidence {
+                    Some(evidence) if evidence.exists() => {}
+                    Some(evidence) => {
+                        return Err(anyhow!(
+                            "Invalid document reference in issue '{}': pinned document '{}' at commit '{}' is unavailable: {}",
+                            issue.id,
+                            document.path,
+                            reference,
+                            evidence.unavailable_reason().unwrap_or("not found")
+                        ));
+                    }
+                    None => {
+                        return Err(anyhow!(
+                            "Invalid document reference in issue '{}': pinned document '{}' at commit '{}' was not captured",
                             issue.id,
                             document.path,
                             reference
-                        )
-                    })?;
-                } else if view.read_file(Path::new(&document.path))?.is_none() {
-                    if view.is_planned_deletion(Path::new(&document.path))? {
-                        return Err(anyhow!(
-                            "Invalid document reference in issue '{}': file '{}' not found in planned final repository",
-                            issue.id,
-                            document.path
                         ));
                     }
-                    if has_commits {
-                        let in_head = repository
-                            .revparse_single("HEAD")
-                            .and_then(|object| object.peel_to_commit())
-                            .and_then(|commit| commit.tree())
-                            .and_then(|tree| tree.get_path(Path::new(&document.path)).map(|_| ()))
-                            .is_ok();
-                        if !in_head {
-                            return Err(anyhow!(
-                                "Invalid document reference in issue '{}': file '{}' not found at HEAD or in working tree",
-                                issue.id,
-                                document.path
-                            ));
-                        }
-                    } else {
+                }
+            } else {
+                let worktree = crate::repository_state::VirtualPath::worktree(&document.path)?;
+                let present = matches!(image.entry(&worktree)?, RepositoryEntry::File { .. });
+                if !present {
+                    let head = image
+                        .pinned_evidence()
+                        .get(&("HEAD".to_string(), document.path.clone()));
+                    let in_head =
+                        head.is_some_and(crate::repository_state::PinnedDocumentEvidence::exists);
+                    if !in_head {
                         return Err(anyhow!(
-                            "Invalid document reference in issue '{}': file '{}' not found in working tree (repository has no commits yet)",
+                            "Invalid document reference in issue '{}': file '{}' not found in the working tree or at HEAD",
                             issue.id,
                             document.path
                         ));
@@ -874,7 +916,7 @@ fn validate_machine_local_claims(repository_root: &Path) -> Result<()> {
 }
 
 fn collect_rule_findings(
-    view: &dyn RepositoryView,
+    read: &ReadBytes<'_>,
     issues: &[Issue],
     rules: &RuleSet,
     namespaces: &crate::domain::LabelNamespaces,
@@ -902,7 +944,7 @@ fn collect_rule_findings(
         .filter(|rule| rule.scope == crate::declarations::rules::RuleScope::Graph)
         .collect();
     let hierarchy = crate::repository_state::hierarchy_config(namespaces);
-    let plan_content = resolve_plan_content(view, issues, config)?;
+    let plan_content = resolve_plan_content(read, issues, config)?;
     let graph_findings = crate::validation::graph::evaluate_graph(
         &graph_rules,
         issues,
@@ -977,7 +1019,7 @@ fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFind
 }
 
 fn resolve_plan_content(
-    view: &dyn RepositoryView,
+    read: &ReadBytes<'_>,
     issues: &[Issue],
     config: &JitConfig,
 ) -> Result<HashMap<String, String>> {
@@ -1005,7 +1047,7 @@ fn resolve_plan_content(
         let Some(path) = planning.and_then(crate::commands::planning_node_plan_path) else {
             continue;
         };
-        match read_text(view, &path)? {
+        match read_text(read, &path)? {
             Some(plan) => {
                 content.insert(issue.id.clone(), plan);
             }
@@ -1017,7 +1059,7 @@ fn resolve_plan_content(
 }
 
 fn collect_item_link_findings(
-    view: &dyn RepositoryView,
+    read: &ReadBytes<'_>,
     issues: &[Issue],
     config: &JitConfig,
 ) -> Result<Vec<ReportedFinding>> {
@@ -1050,11 +1092,11 @@ fn collect_item_link_findings(
     let mut registry_items: Vec<RawScopeItem> = Vec::new();
     for kind in kinds.iter().filter(|kind| kind.kind_scope().is_project()) {
         if let Some(descriptor) = kind.toml_source() {
-            if let Some(content) = read_text(view, &descriptor.toml)? {
+            if let Some(content) = read_text(read, &descriptor.toml)? {
                 registry_items.extend(load_toml_scope_items(kind.name(), descriptor, &content)?);
             }
         } else if let Some(path) = kind.source() {
-            if let Some(markdown) = read_text(view, path)? {
+            if let Some(markdown) = read_text(read, path)? {
                 markdown_sources.push(ProjectSource {
                     kind: kind.clone(),
                     markdown,
@@ -1142,7 +1184,7 @@ fn collect_item_link_findings(
 }
 
 fn projected_content(
-    view: &dyn RepositoryView,
+    read: &ReadBytes<'_>,
     target: &str,
     mode: ProjectionMode,
     rendered: &str,
@@ -1152,7 +1194,7 @@ fn projected_content(
     match mode {
         ProjectionMode::SeparateFile => Ok(rendered.to_string()),
         ProjectionMode::Region => {
-            let current = read_text(view, target)?
+            let current = read_text(read, target)?
                 .ok_or_else(|| anyhow!("projection target '{target}' is missing"))?;
             Ok(splice_region(&current, rendered, begin, end)?)
         }
@@ -1160,7 +1202,7 @@ fn projected_content(
 }
 
 fn validate_projections(
-    view: &dyn RepositoryView,
+    read: &ReadBytes<'_>,
     config: &JitConfig,
     rules: &RuleSet,
     gates: &GateRegistry,
@@ -1177,18 +1219,18 @@ fn validate_projections(
         // Re-render the body through the SAME generic code path `jit project
         // render` uses (binding freshness to the projection code, never a stored
         // mirror), then compare the spliced-in result against the target's bytes.
-        let mut read = |path: &str| read_text(view, path);
-        let (body, _count) = render_projection_body(projection, &inputs, &mut read)?;
+        let mut render_read = |path: &str| read_text(read, path);
+        let (body, _count) = render_projection_body(projection, &inputs, &mut render_read)?;
         let target = require_target(projection, name)?;
         let expected = projected_content(
-            view,
+            read,
             &target,
             projection.mode(),
             &body,
             &projection.region_begin(name),
             &projection.region_end(name),
         )?;
-        let actual = read_text(view, &target)?
+        let actual = read_text(read, &target)?
             .ok_or_else(|| anyhow!("projection target '{target}' is missing"))?;
         if actual != expected {
             return Err(anyhow!("projection '{name}' target '{target}' is stale"));
@@ -1200,9 +1242,7 @@ fn validate_projections(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::DocumentReference;
     use crate::storage::{IssueStore, JsonFileStorage};
-    use std::process::Command;
 
     fn fixture() -> tempfile::TempDir {
         let repo = tempfile::tempdir().unwrap();
@@ -1222,91 +1262,86 @@ mod tests {
         repo
     }
 
-    fn overlay(
-        repo: &tempfile::TempDir,
-        changes: impl IntoIterator<Item = (&'static str, Option<&'static str>)>,
-    ) -> OverlayRepositoryView {
-        OverlayRepositoryView::new(
-            Arc::new(FilesystemRepositoryView::new(repo.path())),
-            changes.into_iter().map(|(path, content)| {
-                (
-                    PathBuf::from(path),
-                    content.map(|text| text.as_bytes().to_vec()),
-                )
-            }),
-        )
-        .unwrap()
+    /// A file-backed executor with the fixture's canonical layout, used to capture
+    /// whole-repository validation images through the recovered session.
+    fn executor(repo: &tempfile::TempDir) -> crate::commands::CommandExecutor<JsonFileStorage> {
+        let data = repo.path().join(".jit");
+        let layout = crate::storage::discover_repository_layout(repo.path(), &data).unwrap();
+        crate::commands::CommandExecutor::new(JsonFileStorage::new(&data)).with_layout(layout)
     }
 
-    fn commit_fixture(repo: &tempfile::TempDir, message: &str) {
-        for args in [
-            vec!["init"],
-            vec!["config", "user.name", "Repository View Test"],
-            vec!["config", "user.email", "view@example.invalid"],
-            vec!["add", "."],
-            vec!["commit", "-m", message],
-        ] {
-            let output = Command::new("git")
-                .current_dir(repo.path())
-                .args(args)
-                .output()
-                .unwrap();
-            assert!(
-                output.status.success(),
-                "git command failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
+    /// Read a repo-relative fixture file's bytes, or `None` when absent.
+    fn read_fixture(repo: &tempfile::TempDir, repo_rel: &str) -> Option<Vec<u8>> {
+        let path = match repo_rel.strip_prefix(".jit/") {
+            Some(rest) => repo.path().join(".jit").join(rest),
+            None => repo.path().join(repo_rel),
+        };
+        std::fs::read(path).ok()
+    }
+
+    /// Capture and validate the live fixture repository.
+    fn validate_live(
+        repo: &tempfile::TempDir,
+    ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
+        executor(repo).validate_repository_report().unwrap()
+    }
+
+    /// Capture and validate the fixture overlaid with proposed final bytes/absence.
+    fn validate_overlaid<P: Into<PathBuf>>(
+        repo: &tempfile::TempDir,
+        changes: impl IntoIterator<Item = (P, Option<Vec<u8>>)>,
+    ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
+        let overrides = crate::commands::overrides_from_repo_changes(
+            changes
+                .into_iter()
+                .map(|(path, value)| (path.into(), value)),
+        )
+        .unwrap();
+        let image = executor(repo)
+            .capture_validation_image_with(&overrides)
+            .unwrap();
+        validate_repository(&image)
+    }
+
+    /// A string-valued overlay change (create/replace with UTF-8 text).
+    fn put(path: &'static str, text: &str) -> (&'static str, Option<Vec<u8>>) {
+        (path, Some(text.as_bytes().to_vec()))
     }
 
     #[test]
-    fn test_filesystem_and_identity_overlay_preserve_validation_results() {
+    fn test_live_and_identity_overlay_preserve_validation_results() {
         let repo = fixture();
-        let filesystem = FilesystemRepositoryView::new(repo.path());
-        let plain = validate_repository(&filesystem).unwrap();
-        let planned = validate_repository(&overlay(&repo, [])).unwrap();
+        let plain = validate_live(&repo).unwrap();
+        let planned = validate_overlaid::<&str>(&repo, []).unwrap();
         assert_eq!(plain, planned);
         assert_eq!(plain.passes.len(), 8);
-    }
-
-    #[test]
-    fn test_live_repository_filesystem_view_regression() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(Path::parent)
-            .expect("workspace root");
-        validate_repository(&FilesystemRepositoryView::new(root)).unwrap();
     }
 
     #[test]
     fn test_overlay_config_ignores_disagreeing_live_bytes() {
         let repo = fixture();
         std::fs::write(repo.path().join(".jit/config.toml"), "not toml = [").unwrap();
-        let view = overlay(
+        assert!(validate_overlaid(
             &repo,
-            [(".jit/config.toml", Some("[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"))],
-        );
-        assert!(validate_repository(&view).is_ok());
+            [put(".jit/config.toml", "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n")],
+        )
+        .is_ok());
     }
 
     #[test]
     fn test_overlay_templates_ignore_disagreeing_live_bytes() {
         let repo = fixture();
         std::fs::write(repo.path().join(".jit/templates.toml"), "not toml = [").unwrap();
-        let view = overlay(&repo, [(".jit/templates.toml", Some("templates = []\n"))]);
-
-        assert!(validate_repository(&view).is_ok());
-        assert!(validate_repository(&FilesystemRepositoryView::new(repo.path())).is_err());
+        assert!(validate_overlaid(&repo, [put(".jit/templates.toml", "templates = []\n")]).is_ok());
+        assert!(validate_live(&repo).is_err());
     }
 
     #[test]
     fn test_overlay_rules_ignore_disagreeing_live_bytes() {
         let repo = fixture();
         std::fs::write(repo.path().join(".jit/rules.toml"), "not toml = [").unwrap();
-        let view = overlay(&repo, [(".jit/rules.toml", Some(""))]);
-
-        assert!(validate_repository(&view).is_ok());
-        let live = validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        assert!(validate_overlaid(&repo, [put(".jit/rules.toml", "")]).is_ok());
+        let live = validate_live(&repo).unwrap();
         assert_eq!(live.rule_report.findings[0].rule, "rules-file");
     }
 
@@ -1317,15 +1352,15 @@ mod tests {
         std::fs::create_dir_all(repo.path().join(".jit/schemas")).unwrap();
         std::fs::write(repo.path().join(".jit/rules.toml"), rules).unwrap();
         std::fs::write(repo.path().join(".jit/schemas/planned.json"), "not json").unwrap();
-        let view = overlay(
+        assert!(validate_overlaid(
             &repo,
             [
-                (".jit/rules.toml", Some(rules)),
-                (".jit/schemas/planned.json", Some("{}")),
+                put(".jit/rules.toml", rules),
+                put(".jit/schemas/planned.json", "{}"),
             ],
-        );
-        assert!(validate_repository(&view).is_ok());
-        let live_report = validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        )
+        .is_ok());
+        let live_report = validate_live(&repo).unwrap();
         assert!(live_report.rule_report.has_errors());
         assert_eq!(live_report.rule_report.findings[0].rule, "rules-file");
     }
@@ -1334,8 +1369,7 @@ mod tests {
     fn test_overlay_gate_registry_ignores_disagreeing_live_registry() {
         let repo = fixture();
         std::fs::write(repo.path().join(".jit/gates.toml"), "not toml = [").unwrap();
-        let view = overlay(&repo, [(".jit/gates.toml", Some(""))]);
-        assert!(validate_repository(&view).is_ok());
+        assert!(validate_overlaid(&repo, [put(".jit/gates.toml", "")]).is_ok());
     }
 
     /// F1: two region projections into the SAME target compose sequentially — the
@@ -1413,62 +1447,49 @@ style = \"id-anchor\"
     #[test]
     fn test_overlay_index_events_and_issue_records_ignore_disagreeing_live_bytes() {
         let repo = fixture();
-        let filesystem = FilesystemRepositoryView::new(repo.path());
-        let index = required_text(&filesystem, ".jit/index.json").unwrap();
-        let events = read_text(&filesystem, ".jit/events.jsonl")
-            .unwrap()
-            .unwrap_or_default();
+        let index = read_fixture(&repo, ".jit/index.json").unwrap();
+        let events = read_fixture(&repo, ".jit/events.jsonl").unwrap_or_default();
         std::fs::write(repo.path().join(".jit/index.json"), "not json").unwrap();
         std::fs::write(repo.path().join(".jit/events.jsonl"), "not jsonl").unwrap();
-        let view = OverlayRepositoryView::new(
-            Arc::new(FilesystemRepositoryView::new(repo.path())),
+        assert!(validate_overlaid(
+            &repo,
             [
-                (PathBuf::from(".jit/index.json"), Some(index.into_bytes())),
-                (
-                    PathBuf::from(".jit/events.jsonl"),
-                    Some(events.into_bytes()),
-                ),
+                (".jit/index.json", Some(index)),
+                (".jit/events.jsonl", Some(events)),
             ],
         )
-        .unwrap();
-        assert!(validate_repository(&view).is_ok());
+        .is_ok());
     }
 
     #[test]
     fn test_overlay_records_dag_and_gate_integrity_judge_planned_bytes() {
         let repo = fixture();
-        let index = required_text(
-            &FilesystemRepositoryView::new(repo.path()),
-            ".jit/index.json",
-        )
-        .unwrap();
-        let id = serde_json::from_str::<RepositoryIndex>(&index)
+        let index_bytes = read_fixture(&repo, ".jit/index.json").unwrap();
+        let id = serde_json::from_slice::<RepositoryIndex>(&index_bytes)
             .unwrap()
             .all_ids
             .remove(0);
-        let mut issue: Issue = serde_json::from_str(
-            &required_text(
-                &FilesystemRepositoryView::new(repo.path()),
-                &format!(".jit/issues/{id}.json"),
-            )
-            .unwrap(),
+        let mut issue: Issue = serde_json::from_slice(
+            &read_fixture(&repo, &format!(".jit/issues/{id}.json")).unwrap(),
         )
         .unwrap();
         issue.dependencies = vec!["missing".to_string()];
         issue.gates_required = vec!["planned".to_string()];
         let bad = serde_json::to_vec_pretty(&issue).unwrap();
-        let view = OverlayRepositoryView::new(
-            Arc::new(FilesystemRepositoryView::new(repo.path())),
-            [
-                (PathBuf::from(format!(".jit/issues/{id}.json")), Some(bad)),
-                (
-                    PathBuf::from(".jit/gates.toml"),
-                    Some(b"[[gates]]\nkey = \"planned\"\ntitle = \"p\"\ndescription = \"\"\nstage = \"postcheck\"\nmode = \"manual\"\n".to_vec()),
-                ),
-            ],
-        )
-        .unwrap();
-        let error = format!("{:#}", validate_repository(&view).unwrap_err());
+        let error = format!(
+            "{:#}",
+            validate_overlaid(
+                &repo,
+                [
+                    (format!(".jit/issues/{id}.json"), Some(bad)),
+                    (
+                        ".jit/gates.toml".to_string(),
+                        Some(b"[[gates]]\nkey = \"planned\"\ntitle = \"p\"\ndescription = \"\"\nstage = \"postcheck\"\nmode = \"manual\"\n".to_vec()),
+                    ),
+                ],
+            )
+            .unwrap_err()
+        );
         assert!(
             error.contains("repository-integrity") && error.contains("missing"),
             "{error}"
@@ -1478,14 +1499,14 @@ style = \"id-anchor\"
     #[test]
     fn test_overlay_namespace_and_hierarchy_judge_planned_config() {
         let repo = fixture();
-        let view = overlay(
+        let report = validate_overlaid(
             &repo,
-            [(
+            [put(
                 ".jit/config.toml",
-                Some("[type_hierarchy.types]\nepic = 2\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"),
+                "[type_hierarchy.types]\nepic = 2\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
             )],
-        );
-        let report = validate_repository(&view).unwrap();
+        )
+        .unwrap();
         assert!(report.rule_report.has_errors());
         assert!(report
             .rule_report
@@ -1495,45 +1516,18 @@ style = \"id-anchor\"
     }
 
     #[test]
-    fn test_overlay_document_tombstone_overrides_live_worktree_and_head() {
-        let repo = fixture();
-        let store = JsonFileStorage::new(repo.path().join(".jit"));
-        let mut issue = store.list_issues().unwrap().remove(0);
-        issue
-            .documents
-            .push(DocumentReference::new("docs/tracked.md".to_string()));
-        store.save_issue(issue).unwrap();
-        std::fs::create_dir_all(repo.path().join("docs")).unwrap();
-        std::fs::write(repo.path().join("docs/tracked.md"), "tracked\n").unwrap();
-        commit_fixture(&repo, "tracked document");
-
-        validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
-        let error = format!(
-            "{:#}",
-            validate_repository(&overlay(&repo, [("docs/tracked.md", None)])).unwrap_err()
-        );
-        assert!(
-            error.contains("not found") && error.contains("docs/tracked.md"),
-            "{error}"
-        );
-    }
-
-    #[test]
     fn test_repository_view_keeps_non_enforced_rule_error_reportable() {
         let repo = fixture();
-        let view = overlay(
+        let report = validate_overlaid(
             &repo,
-            [(
+            [put(
                 ".jit/rules.toml",
-                Some(
-                    "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
-                     severity = \"error\"\nenforce = false\n\
-                     assert = { require-label = { label = \"req:*\", min = 1 } }\n",
-                ),
+                "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
+                 severity = \"error\"\nenforce = false\n\
+                 assert = { require-label = { label = \"req:*\", min = 1 } }\n",
             )],
-        );
-
-        let report = validate_repository(&view).unwrap();
+        )
+        .unwrap();
         assert_eq!(report.rule_report.error_count(), 1);
         assert_eq!(report.rule_report.findings[0].rule, "task-needs-req");
     }
@@ -1547,24 +1541,22 @@ style = \"id-anchor\"
         let rules = "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
                      severity = \"error\"\nenforce = false\n\
                      assert = { require-label = { label = \"req:*\", min = 1 } }\n";
-        let live = validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        let live = validate_live(&repo).unwrap();
         assert!(!live.rule_report.has_errors());
-        let view = OverlayRepositoryView::new(
-            Arc::new(FilesystemRepositoryView::new(repo.path())),
+        let failure = validate_overlaid(
+            &repo,
             [
                 (
-                    PathBuf::from(".jit/rules.toml"),
+                    ".jit/rules.toml".to_string(),
                     Some(rules.as_bytes().to_vec()),
                 ),
                 (
-                    PathBuf::from(format!(".jit/issues/{}.json", issue.id)),
+                    format!(".jit/issues/{}.json", issue.id),
                     Some(serde_json::to_vec_pretty(&issue).unwrap()),
                 ),
             ],
         )
-        .unwrap();
-
-        let failure = validate_repository(&view).unwrap_err();
+        .unwrap_err();
         assert!(failure.to_string().contains("does not exist"), "{failure}");
         assert_eq!(failure.report().rule_report.error_count(), 1);
         assert_eq!(
@@ -1582,12 +1574,11 @@ style = \"id-anchor\"
         let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
         std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
         std::fs::write(repo.path().join(".jit/invariants.toml"), invariants).unwrap();
-        let filesystem = FilesystemRepositoryView::new(repo.path());
         let index: RepositoryIndex =
-            serde_json::from_str(&required_text(&filesystem, ".jit/index.json").unwrap()).unwrap();
+            serde_json::from_slice(&read_fixture(&repo, ".jit/index.json").unwrap()).unwrap();
         let id = &index.all_ids[0];
-        let mut issue: Issue = serde_json::from_str(
-            &required_text(&filesystem, &format!(".jit/issues/{id}.json")).unwrap(),
+        let mut issue: Issue = serde_json::from_slice(
+            &read_fixture(&repo, &format!(".jit/issues/{id}.json")).unwrap(),
         )
         .unwrap();
         issue
@@ -1599,10 +1590,9 @@ style = \"id-anchor\"
         )
         .unwrap();
 
-        let live = validate_repository(&filesystem).unwrap();
+        let live = validate_live(&repo).unwrap();
         assert!(!live.rule_report.has_errors(), "{:?}", live.rule_report);
-        let planned =
-            validate_repository(&overlay(&repo, [(".jit/invariants.toml", None)])).unwrap();
+        let planned = validate_overlaid(&repo, [(".jit/invariants.toml", None)]).unwrap();
         assert!(planned
             .rule_report
             .findings
@@ -1634,15 +1624,16 @@ mode = \"separate-file\"
 style = \"full\"
 ";
         let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
-        let view = overlay(
+        let error = validate_overlaid(
             &repo,
             [
-                (".jit/config.toml", Some(config)),
-                (".jit/invariants.toml", Some(invariants)),
-                ("INVARIANTS.md", Some("stale planned projection\n")),
+                put(".jit/config.toml", config),
+                put(".jit/invariants.toml", invariants),
+                put("INVARIANTS.md", "stale planned projection\n"),
             ],
-        );
-        let error = validate_repository(&view).unwrap_err().to_string();
+        )
+        .unwrap_err()
+        .to_string();
         assert!(error.contains("projections validation pass"), "{error}");
     }
 }

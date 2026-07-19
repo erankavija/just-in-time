@@ -527,7 +527,9 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp.path().join(".jit"));
         storage.init().unwrap();
-        let executor = CommandExecutor::new(storage.clone());
+        let layout =
+            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
+        let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
         executor
             .seed_project_config(
                 temp.path(),

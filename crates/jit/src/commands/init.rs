@@ -14,7 +14,7 @@ use crate::storage::{
     RecoveryRequiredError, RecoveryState, TransactionAction,
 };
 use crate::validation::repository::{
-    validate_repository, FilesystemRepositoryView, OverlayRepositoryView, RepositoryView,
+    FilesystemRepositoryView, OverlayRepositoryView, RepositoryView,
 };
 use anyhow::{Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
@@ -230,6 +230,12 @@ impl CommandExecutor<JsonFileStorage> {
         profile_id: Option<&str>,
         kernel: &FileTransactionKernel,
     ) -> Result<FreshInitResult> {
+        // Capture the base validation image BEFORE the non-reentrant repository/event
+        // locks; a capture session opened while the event lock is held would
+        // deadlock. Proposed-state validation overlays the scaffold (and profile)
+        // onto this base purely. TRANSITIONAL: increment 5 moves capture under the
+        // retained session guard with pre-journal revalidation (plan §2).
+        let base_image = self.capture_validation_image_with(&std::collections::BTreeMap::new())?;
         let bootstrap_guard = self.storage.acquire_bootstrap_write_lock()?;
         let repository_guard = self
             .storage
@@ -243,11 +249,16 @@ impl CommandExecutor<JsonFileStorage> {
             .transpose()?;
         let transaction_guard = repository_guard.as_ref().unwrap_or(&bootstrap_guard);
 
+        // `validation_base` survives ONLY as the view the profile planner's
+        // render_projections/projection_targets still consume (increment 6 deletes
+        // that machinery).
         let validation_base: Arc<dyn RepositoryView> = Arc::new(
             FilesystemRepositoryView::from_jit_root(self.storage.root())?,
         );
-        let neutral_view = OverlayRepositoryView::new(validation_base.clone(), scaffold.overlay())?;
-        let neutral_validation = validate_repository(&neutral_view)?;
+        let neutral_overrides = super::overrides_from_repo_changes(scaffold.overlay())?;
+        let neutral_image = crate::repository_state::apply_overlay(&base_image, neutral_overrides)?;
+        let neutral_validation =
+            crate::validation::repository::validate_repository(&neutral_image)?;
         if neutral_validation.rule_report.has_errors() {
             anyhow::bail!(
                 "fresh repository scaffold produced {} validation error finding(s)",
@@ -258,7 +269,12 @@ impl CommandExecutor<JsonFileStorage> {
         let profile = profile_id
             .map(|id| {
                 let package = super::profile::embedded_profile(id)?;
-                self.prepare_fresh_profile(&scaffold, validation_base.clone(), &package)
+                self.prepare_fresh_profile(
+                    &scaffold,
+                    validation_base.clone(),
+                    &base_image,
+                    &package,
+                )
             })
             .transpose()?;
 
@@ -338,6 +354,7 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         scaffold: &InitScaffold,
         filesystem: Arc<dyn RepositoryView>,
+        base_image: &crate::repository_state::RepositoryImage,
         package: &EmbeddedProfilePackage<'_>,
     ) -> Result<FreshProfilePlan> {
         super::profile::reject_reserved_application_targets(
@@ -402,13 +419,9 @@ impl CommandExecutor<JsonFileStorage> {
         final_overlay.extend(plan.overlay_changes());
         final_overlay.insert(PathBuf::from(&record_path), Some(record.to_bytes()?));
         final_overlay.insert(PathBuf::from(".jit/events.jsonl"), Some(events.clone()));
-        let final_view = OverlayRepositoryView::new(
-            Arc::new(FilesystemRepositoryView::from_jit_root(
-                self.storage.root(),
-            )?),
-            final_overlay.clone(),
-        )?;
-        let validation = validate_repository(&final_view)?;
+        let final_overrides = super::overrides_from_repo_changes(final_overlay.clone())?;
+        let final_image = crate::repository_state::apply_overlay(base_image, final_overrides)?;
+        let validation = crate::validation::repository::validate_repository(&final_image)?;
         if validation.rule_report.has_errors() {
             anyhow::bail!(
                 "fresh profiled repository produced {} validation error finding(s)",
@@ -456,7 +469,31 @@ impl CommandExecutor<JsonFileStorage> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::{IssueStore, TransactionFailureInjector, TransactionFailurePoint};
+    use crate::storage::{
+        discover_repository_layout, IssueStore, TransactionFailureInjector, TransactionFailurePoint,
+    };
+
+    /// A file-backed executor carrying the canonical layout for `worktree`, so
+    /// init's proposed-state validation can capture through the recovered session.
+    fn executor_with_layout(
+        storage: &JsonFileStorage,
+        worktree: &std::path::Path,
+    ) -> CommandExecutor<JsonFileStorage> {
+        let layout = discover_repository_layout(worktree, storage.root()).unwrap();
+        CommandExecutor::new(storage.clone()).with_layout(layout)
+    }
+
+    /// Assert the published repository validates cleanly through the closed-image
+    /// pipeline.
+    fn assert_repo_valid(worktree: &std::path::Path) {
+        let data = worktree.join(".jit");
+        let layout = discover_repository_layout(worktree, &data).unwrap();
+        CommandExecutor::new(JsonFileStorage::new(&data))
+            .with_layout(layout)
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
+    }
     use std::fs;
     use std::io;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -534,7 +571,7 @@ mod tests {
     fn test_pure_scaffold_matches_established_plain_init_bytes() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = executor_with_layout(&storage, repo.path());
         let template = HierarchyTemplate::default();
         let scaffold = InitScaffold::generate(repo.path(), &template).unwrap();
 
@@ -557,7 +594,7 @@ mod tests {
     fn test_fresh_profile_init_publishes_complete_valid_repo_without_git() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = executor_with_layout(&storage, repo.path());
 
         let result = executor
             .initialize_fresh_repository(
@@ -577,14 +614,14 @@ mod tests {
             .path()
             .join(".agents/skills/jit-manage/SKILL.md")
             .is_file());
-        validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        assert_repo_valid(repo.path());
     }
 
     #[test]
     fn test_fresh_profile_init_rolls_back_to_no_jit_after_publication_failure() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = executor_with_layout(&storage, repo.path());
         let kernel = first_publish_kernel(&storage, false);
 
         assert!(executor
@@ -608,7 +645,7 @@ mod tests {
         let index = b"{\n  \"schema_version\": 2,\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}";
         fs::write(repo.path().join(".jit/index.json"), index).unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = executor_with_layout(&storage, repo.path());
         let scaffold = InitScaffold::missing_from_existing(
             &storage,
             repo.path(),
@@ -634,7 +671,7 @@ mod tests {
     fn test_fresh_profile_init_recovers_prepared_bootstrap_before_retry() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = executor_with_layout(&storage, repo.path());
         let kernel = first_publish_kernel(&storage, true);
         let error = executor
             .initialize_fresh_repository_with_kernel(
@@ -663,14 +700,14 @@ mod tests {
             ProfileApplicationStatus::Applied
         );
         assert!(!repo.path().join(".jit-bootstrap").exists());
-        validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        assert_repo_valid(repo.path());
     }
 
     #[test]
     fn test_fresh_profile_init_reports_committed_cleanup_and_recovery_cleans_it() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = executor_with_layout(&storage, repo.path());
         let kernel = terminal_cleanup_kernel(&storage);
 
         let result = executor
@@ -689,7 +726,7 @@ mod tests {
         assert_eq!(session.report().recovered_count(), 1);
         drop(session);
         assert!(!repo.path().join(".jit-bootstrap").exists());
-        validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        assert_repo_valid(repo.path());
     }
 
     #[test]
@@ -702,7 +739,7 @@ mod tests {
                 let barrier = Arc::clone(&barrier);
                 thread::spawn(move || {
                     let storage = JsonFileStorage::new(repo.path().join(".jit"));
-                    let executor = CommandExecutor::new(storage);
+                    let executor = executor_with_layout(&storage, repo.path());
                     barrier.wait();
                     executor.initialize_fresh_repository(
                         repo.path(),
@@ -719,7 +756,7 @@ mod tests {
 
         assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
         assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
-        validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        assert_repo_valid(repo.path());
         let events = fs::read_to_string(repo.path().join(".jit/events.jsonl")).unwrap();
         assert_eq!(events.lines().count(), 1);
     }

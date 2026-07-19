@@ -295,6 +295,25 @@ impl PinnedDocumentEvidence {
         Ok(evidence)
     }
 
+    /// Whether the requested path exists at the requested revision (exact bytes
+    /// were captured). `false` covers both an unresolvable revision and a path
+    /// absent from the resolved tree — [`unavailable_reason`](Self::unavailable_reason)
+    /// carries the boundary diagnostic distinguishing them.
+    pub fn exists(&self) -> bool {
+        self.bytes.is_some()
+    }
+
+    /// The exact captured bytes at the requested revision, when present.
+    pub fn bytes(&self) -> Option<&[u8]> {
+        self.bytes.as_deref()
+    }
+
+    /// The stable Git-unavailable/not-found/read-failed reason, when the path had
+    /// no captured bytes at the requested revision.
+    pub fn unavailable_reason(&self) -> Option<&str> {
+        self.unavailable_reason.as_deref()
+    }
+
     fn validate_request(&self, request: &(String, String)) -> Result<(), CaptureError> {
         if (&self.requested_revision, &self.requested_path) != (&request.0, &request.1) {
             return Err(CaptureError::PinnedEvidenceRequestMismatch(request.clone()));

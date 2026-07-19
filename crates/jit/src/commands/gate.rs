@@ -374,7 +374,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         gate_key: String,
         by: Option<String>,
         force: bool,
-    ) -> Result<GatePassOutcome> {
+    ) -> Result<GatePassOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Validate the actor through the one `Assignee` path before it is stored
         // on the gate state.
         let by = by
@@ -516,7 +519,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: &str,
         by: Option<String>,
         force: bool,
-    ) -> Result<PassAllOutcome> {
+    ) -> Result<PassAllOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
 

@@ -6734,31 +6734,26 @@ fn run() -> Result<()> {
                     println!("{}", output.to_json_string()?);
                 }
             } else {
-                // Standard whole-repo validation. Load every repository-dependent
-                // input through the one read-only filesystem view. The same
-                // boundary accepts an overlay for a future profile planner, so
-                // no parser needs to reopen live `.jit` bytes while judging a
-                // proposed final state. Capture (do NOT `?`-propagate) any
-                // integrity error so it can be rendered before the exit status is
-                // decided below.
+                // Standard whole-repo validation. Capture the bounded whole-repository
+                // image through the recovered session and validate it, so every pass
+                // reads image-projected content with no live `.jit` reopen. Capture (do
+                // NOT `?`-propagate) any integrity error so it can be rendered before
+                // the exit status is decided below.
                 // Wrap any integrity violation in the typed ValidationFailedError
                 // (message preserved verbatim) so the top-level handler classifies
                 // it as a validation failure by downcast rather than by message text.
-                let repository_view =
-                    jit::validation::repository::FilesystemRepositoryView::from_jit_root(&jit_dir)?;
-                let (integrity_error, rule_report) =
-                    match jit::validation::repository::validate_repository(&repository_view) {
-                        Ok(report) => (None, report.rule_report),
-                        Err(failure) => {
-                            let (error, report) = failure.into_parts();
-                            (
-                                Some(anyhow::Error::new(jit::errors::ValidationFailedError::new(
-                                    format!("Invalid repository: {error:#}"),
-                                ))),
-                                report.rule_report,
-                            )
-                        }
-                    };
+                let (integrity_error, rule_report) = match executor.validate_repository_report()? {
+                    Ok(report) => (None, report.rule_report),
+                    Err(failure) => {
+                        let (error, report) = failure.into_parts();
+                        (
+                            Some(anyhow::Error::new(jit::errors::ValidationFailedError::new(
+                                format!("Invalid repository: {error:#}"),
+                            ))),
+                            report.rule_report,
+                        )
+                    }
+                };
                 let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
 
                 // The view-derived report contains the declarative local/graph

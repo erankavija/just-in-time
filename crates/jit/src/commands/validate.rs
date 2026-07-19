@@ -23,7 +23,7 @@ pub const ENFORCEMENT_DRIFT_RULE: &str = "enforcement-drift";
 /// more gate definitions still use [`GateChecker::ReviewPlaceholder`].
 pub const REVIEW_PLACEHOLDER_RULE: &str = "review-placeholder";
 
-impl<S: IssueStore> CommandExecutor<S> {
+impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// Validate with optional fix mode.
     ///
     /// # Arguments
@@ -85,6 +85,374 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok((0, vec![]))
     }
 
+    /// Validate the exact repository through the closed-image pipeline.
+    ///
+    /// A file-backed repository captures a bounded whole-repository image through
+    /// the recovered mutation session and validates it with
+    /// [`validate_repository`](crate::validation::repository::validate_repository),
+    /// so every pass reads only image-projected content and no live filesystem or
+    /// Git I/O. A pure in-memory store has no persisted index or Git evidence and
+    /// retains the storage-backed integrity+rules path below for command unit
+    /// tests.
+    pub fn validate_silent(&self) -> Result<()> {
+        if self.storage.is_file_backed() {
+            let image = self.capture_validation_image()?;
+            let report = crate::validation::repository::validate_repository(&image)?;
+            if report.rule_report.has_errors() {
+                let messages = report
+                    .rule_report
+                    .findings
+                    .iter()
+                    .filter(|finding| finding.is_error())
+                    .map(|finding| format!("[{}] {}", finding.rule, finding.message))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                return Err(anyhow!(
+                    "Validation failed with {} rule error(s):\n{}",
+                    report.rule_report.error_count(),
+                    messages
+                ));
+            }
+            return Ok(());
+        }
+
+        // Repository-integrity checks (broken deps, gates, docs, DAG, isolated
+        // nodes, transitive reduction, claims index). Label/type-label/namespace
+        // checks are NO LONGER here: they are default rules evaluated below.
+        self.validate_integrity_silent()?;
+
+        // Built-in enforcement-drift pass (REQ-01/REQ-02), computed FIRST and
+        // tolerantly so an unloadable rule set / gate registry surfaces as a
+        // declared-but-unenforced finding rather than crashing the run (REQ-01
+        // "missing OR unloadable"). Gated on declared invariants, so a repo
+        // without `.jit/invariants.toml` is unaffected. Captured up front so the
+        // finding is reported even when the malformed ruleset makes the rule
+        // evaluation below hard-error.
+        let drift_findings = self.enforcement_drift_findings()?;
+        let drift_error_message = graph_findings_error_message(&drift_findings);
+
+        // Local rules (built-in defaults + user rules) across every issue. The
+        // former hard-coded label/type/namespace checks live here now: an
+        // `error`-severity finding (e.g. a value outside a namespace enum, a bad
+        // pattern, a missing required label) fails validation — matching the old
+        // `validate_labels`/`validate_type_hierarchy` hard-reject behavior — while
+        // `warn` findings never fail.
+        let issues = self.storage.list_issues()?;
+        let rule_eval = self.rule_eval_error_message(&issues);
+
+        // Combine the drift error (if any) with the rule-evaluation error (if any)
+        // so a malformed ruleset reports BOTH the drift finding AND the parse
+        // problem, rather than losing the drift finding to an early `?`.
+        match (drift_error_message, rule_eval) {
+            (Some(drift), Ok(Some(rules))) => Err(anyhow!("{drift}\n{rules}")),
+            (Some(drift), Err(load_err)) => Err(anyhow!("{drift}\n{load_err}")),
+            (Some(drift), Ok(None)) => Err(anyhow!(drift)),
+            (None, Ok(Some(rules))) => Err(anyhow!(rules)),
+            (None, Err(load_err)) => Err(load_err),
+            (None, Ok(None)) => Ok(()),
+        }
+    }
+
+    /// Capture the bounded whole-repository validation image through the recovered
+    /// session (plan §2 two-phase capture, D14).
+    ///
+    /// Phase one reads the engine registries, the repository index, and the event
+    /// log; phase two adds the complete validation closure
+    /// ([`validate_capture_closure`](crate::repository_state::validate_capture_closure)):
+    /// every issue record and the complete issues listing, referenced rule schemas,
+    /// and every projection and item-kind source. Phase three adds every issue's
+    /// document and pinned-document evidence plus each derived plan-document path,
+    /// enumerated from the captured issue records — the command boundary owns the
+    /// planning-node resolution the pure closure cannot express. A read-set change
+    /// under the held session yields a typed retryable conflict, so the capture
+    /// repeats both phases rather than grafting into a stale image.
+    fn capture_validation_image(&self) -> Result<crate::repository_state::RepositoryImage> {
+        self.capture_validation_image_with(&std::collections::BTreeMap::new())
+    }
+
+    /// Capture the whole-repository validation image, optionally over a proposed
+    /// overlay.
+    ///
+    /// With an empty `overrides` this captures and validates the live repository.
+    /// With a non-empty overlay (the projection of a proposed
+    /// [`RepositoryDelta`](crate::repository_state::RepositoryDelta) to final
+    /// bytes/absence) the closure is computed from the OVERLAID declarations — so
+    /// it covers what the proposed state's passes read — the base is captured over
+    /// that closure, and the overlay is applied
+    /// ([`apply_overlay`](crate::repository_state::apply_overlay)) so
+    /// `validate_repository` judges one coherent proposed repository under the same
+    /// closed-read discipline.
+    pub(crate) fn capture_validation_image_with(
+        &self,
+        overrides: &std::collections::BTreeMap<
+            crate::repository_state::VirtualPath,
+            Option<Vec<u8>>,
+        >,
+    ) -> Result<crate::repository_state::RepositoryImage> {
+        use crate::repository_state::{
+            apply_overlay, validate_capture_closure, CaptureBudget, CaptureSpec, VirtualPath,
+        };
+        use crate::storage::RepositoryStateStoreError;
+
+        let layout = self.require_layout()?;
+        let mut session = self.storage().open_mutation_session(layout)?;
+        let budget = CaptureBudget {
+            max_paths: 1 << 16,
+            max_listings: 256,
+            max_bytes: 512 * 1024 * 1024,
+            max_depth: 32,
+        };
+        let registries = || -> Result<Vec<VirtualPath>> {
+            Ok(vec![
+                VirtualPath::data("config.toml")?,
+                VirtualPath::data("invariants.toml")?,
+                VirtualPath::data("rules.toml")?,
+                VirtualPath::data("gates.toml")?,
+                VirtualPath::data("templates.toml")?,
+                VirtualPath::data("index.json")?,
+                VirtualPath::data("events.jsonl")?,
+            ])
+        };
+        // Effective bytes at a repo-relative path: the override (create/replace or
+        // proposed absence) when present, otherwise the captured base bytes.
+        let effective = |image: &crate::repository_state::RepositoryImage,
+                         repo_rel: &str|
+         -> Result<Option<Vec<u8>>> {
+            let vpath = repo_rel_virtual_path(repo_rel)?;
+            match overrides.get(&vpath) {
+                Some(value) => Ok(value.clone()),
+                None => super::image_repo_bytes(image, repo_rel),
+            }
+        };
+        for _ in 0..8 {
+            let image_one = match session.capture(CaptureSpec::phase_one(registries()?, budget)?) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            // Closure planning is best-effort: a malformed registry cannot fail the
+            // capture, because validation itself is the authority that reports it.
+            // A bad config/index/rules yields a conservative closure (its projection,
+            // item-kind, issue, and schema entries drop out), and the subsequent
+            // `validate_repository` pass surfaces the parse error as a finding.
+            let config = effective_config(&image_one, &effective)
+                .unwrap_or_else(|_| toml::from_str("").expect("empty configuration parses"));
+            let all_ids = effective_index_ids(&image_one, &effective).unwrap_or_default();
+            let rules_text = effective(&image_one, ".jit/rules.toml")?
+                .map(String::from_utf8)
+                .transpose()?;
+            let schema_rules = rules_text.as_deref().filter(|content| {
+                crate::declarations::rules::RuleSet::schema_requests(content).is_ok()
+            });
+            let closure = validate_capture_closure(&config, &all_ids, schema_rules)?;
+
+            let mut spec = CaptureSpec::phase_one(registries()?, budget)?;
+            spec.discover_paths(closure.paths)?;
+            for listing in &closure.listings {
+                spec.discover_listing(listing.clone())?;
+            }
+            let mut phase_three = spec.clone();
+            let image_two = match session.capture(spec) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+
+            let issues = effective_issues(&image_two, &all_ids, &effective)?;
+            let mut full_config = config.clone();
+            full_config.templates = effective_templates(&image_two, &config, &effective)?;
+            let (worktree_docs, pinned) = document_capture_closure(&issues, &full_config)?;
+            phase_three.discover_paths(worktree_docs)?;
+            for (revision, path) in pinned {
+                phase_three.discover_pinned(revision, path)?;
+            }
+            let base = match session.capture(phase_three) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            if overrides.is_empty() {
+                return Ok(base);
+            }
+            return Ok(apply_overlay(&base, overrides.clone())?);
+        }
+        Err(anyhow!(
+            "validation capture did not converge after repeated capture conflicts"
+        ))
+    }
+
+    /// Capture the validation image and return the full whole-repository report.
+    ///
+    /// The outer `Result` carries a capture/IO failure; the inner result is the
+    /// validation outcome — `Ok(report)` when clean, or the
+    /// [`RepositoryValidationFailure`](crate::validation::repository::RepositoryValidationFailure)
+    /// carrying its structural error and partial report. Rendering callers (the
+    /// `validate` command's non-fix path) consume the report's warnings and rule
+    /// findings even on failure.
+    pub fn validate_repository_report(
+        &self,
+    ) -> Result<
+        std::result::Result<
+            crate::validation::repository::RepositoryValidationReport,
+            crate::validation::repository::RepositoryValidationFailure,
+        >,
+    > {
+        let image = self.capture_validation_image()?;
+        Ok(crate::validation::repository::validate_repository(&image))
+    }
+}
+
+/// The canonical [`VirtualPath`](crate::repository_state::VirtualPath) for a
+/// repo-relative path (`.jit/...` is `Data`, everything else `Worktree`).
+fn repo_rel_virtual_path(repo_rel: &str) -> Result<crate::repository_state::VirtualPath> {
+    use crate::repository_state::VirtualPath;
+    Ok(match repo_rel.strip_prefix(".jit/") {
+        Some(rest) => VirtualPath::data(rest),
+        None => VirtualPath::worktree(repo_rel),
+    }?)
+}
+
+/// Effective-bytes byte source over a captured image and a proposed overlay.
+type Effective<'a> =
+    dyn Fn(&crate::repository_state::RepositoryImage, &str) -> Result<Option<Vec<u8>>> + 'a;
+
+/// Parse the (possibly overlaid) configuration and invariant registry.
+fn effective_config(
+    image: &crate::repository_state::RepositoryImage,
+    effective: &Effective<'_>,
+) -> Result<JitConfig> {
+    let config_bytes = effective(image, ".jit/config.toml")?
+        .ok_or_else(|| anyhow!("captured image has no .jit/config.toml"))?;
+    let mut config: JitConfig =
+        toml::from_str(&String::from_utf8(config_bytes)?).context("invalid .jit/config.toml")?;
+    config.invariants = match effective(image, ".jit/invariants.toml")? {
+        Some(bytes) => crate::declarations::invariants::InvariantRegistry::from_toml_str(
+            &String::from_utf8(bytes)?,
+        )?,
+        None => crate::declarations::invariants::InvariantRegistry::empty(),
+    };
+    Ok(config)
+}
+
+/// Parse the (possibly overlaid) repository index's live issue ids.
+fn effective_index_ids(
+    image: &crate::repository_state::RepositoryImage,
+    effective: &Effective<'_>,
+) -> Result<Vec<String>> {
+    #[derive(serde::Deserialize)]
+    struct IndexIds {
+        #[serde(default)]
+        all_ids: Vec<String>,
+    }
+    let bytes = effective(image, ".jit/index.json")?
+        .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
+    Ok(serde_json::from_slice::<IndexIds>(&bytes)?.all_ids)
+}
+
+/// Parse every ordinary issue record named by the index (possibly overlaid).
+fn effective_issues(
+    image: &crate::repository_state::RepositoryImage,
+    all_ids: &[String],
+    effective: &Effective<'_>,
+) -> Result<Vec<Issue>> {
+    all_ids
+        .iter()
+        .map(|id| {
+            let bytes = effective(image, &format!(".jit/issues/{id}.json"))?
+                .ok_or_else(|| anyhow!("captured image has no issue file for '{id}'"))?;
+            Ok(serde_json::from_slice::<Issue>(&bytes)?)
+        })
+        .collect()
+}
+
+/// Parse the (possibly overlaid) template registry, needed to derive plan-document
+/// paths for the phase-three document closure.
+///
+/// Best-effort like the rest of closure planning: a malformed `templates.toml`
+/// yields an empty registry (no plan-document paths), and the subsequent
+/// `validate_repository` pass surfaces the parse error as a validation failure.
+fn effective_templates(
+    image: &crate::repository_state::RepositoryImage,
+    config: &JitConfig,
+    effective: &Effective<'_>,
+) -> Result<crate::templates::TemplateRegistry> {
+    let hierarchy_types: Vec<&str> = config
+        .type_hierarchy
+        .as_ref()
+        .map(|hierarchy| hierarchy.types.keys().map(String::as_str).collect())
+        .unwrap_or_default();
+    Ok(match effective(image, ".jit/templates.toml")? {
+        Some(bytes) => String::from_utf8(bytes)
+            .ok()
+            .and_then(|text| {
+                crate::templates::TemplateRegistry::from_toml_str(&text, &hierarchy_types).ok()
+            })
+            .unwrap_or_else(crate::templates::TemplateRegistry::empty),
+        None => crate::templates::TemplateRegistry::empty(),
+    })
+}
+
+/// The phase-three document closure: working-tree document/plan paths to capture,
+/// plus pinned-document `(revision, path)` evidence requests.
+type DocumentClosure = (
+    Vec<crate::repository_state::VirtualPath>,
+    Vec<(String, String)>,
+);
+
+/// Enumerate the phase-three document and plan-document capture closure.
+///
+/// Returns every working-tree document path to capture and every pinned-document
+/// `(revision, path)` request: a document pinned to a commit is captured as
+/// pinned evidence at that commit; an unpinned document is captured as its
+/// working-tree entry plus HEAD evidence for the fallback. Each breakable
+/// container's derived plan-document path (mirroring `resolve_plan_content`'s
+/// planning-node resolution) is added as a working-tree path so a container whose
+/// criteria live in an external plan validates against image-projected content.
+fn document_capture_closure(issues: &[Issue], config: &JitConfig) -> Result<DocumentClosure> {
+    use crate::repository_state::VirtualPath;
+    let mut worktree = Vec::new();
+    let mut pinned = Vec::new();
+    for issue in issues {
+        for document in &issue.documents {
+            match &document.commit {
+                Some(commit) => pinned.push((commit.clone(), document.path.clone())),
+                None => {
+                    worktree.push(VirtualPath::worktree(&document.path)?);
+                    pinned.push(("HEAD".to_string(), document.path.clone()));
+                }
+            }
+        }
+    }
+    let templates = &config.templates;
+    let breakable: std::collections::HashSet<String> =
+        templates.breakable_types().into_iter().collect();
+    let by_id: std::collections::HashMap<&str, &Issue> = issues
+        .iter()
+        .map(|issue| (issue.id.as_str(), issue))
+        .collect();
+    for issue in issues {
+        let Some(issue_type) = crate::labels::type_label_value(&issue.labels)
+            .filter(|issue_type| breakable.contains(*issue_type))
+        else {
+            continue;
+        };
+        let Some(template) = templates.template_for_container(issue_type) else {
+            continue;
+        };
+        if template.plan_doc_location(&templates.roles).is_none() {
+            continue;
+        }
+        let planning =
+            crate::commands::find_planning_node(issue, template, &templates.roles, &by_id);
+        let Some(path) = planning.and_then(crate::commands::planning_node_plan_path) else {
+            continue;
+        };
+        worktree.push(VirtualPath::worktree(&path)?);
+    }
+    Ok((worktree, pinned))
+}
+
+impl<S: IssueStore> CommandExecutor<S> {
     fn detect_and_fix_hierarchy_issues(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)> {
         use crate::config_manager::get_hierarchy_config;
 
@@ -187,73 +555,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     // Note: apply_dependency_reversal is removed - we don't reverse dependencies
     // Type hierarchy is orthogonal to DAG structure
-
-    pub fn validate_silent(&self) -> Result<()> {
-        // File-backed repositories execute the byte-exact repository-view
-        // pipeline. The reusable boundary also accepts an overlay when a future
-        // planner supplies one; selecting the filesystem view here preserves
-        // existing callers while preventing validation readers from forking.
-        // Pure in-memory stores have no persisted index and retain the legacy
-        // storage-backed path below for command unit tests.
-        if self.storage.is_file_backed() {
-            let view = crate::validation::repository::FilesystemRepositoryView::from_jit_root(
-                self.storage.root(),
-            )?;
-            let report = crate::validation::repository::validate_repository(&view)?;
-            if report.rule_report.has_errors() {
-                let messages = report
-                    .rule_report
-                    .findings
-                    .iter()
-                    .filter(|finding| finding.is_error())
-                    .map(|finding| format!("[{}] {}", finding.rule, finding.message))
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                return Err(anyhow!(
-                    "Validation failed with {} rule error(s):\n{}",
-                    report.rule_report.error_count(),
-                    messages
-                ));
-            }
-            return Ok(());
-        }
-
-        // Repository-integrity checks (broken deps, gates, docs, DAG, isolated
-        // nodes, transitive reduction, claims index). Label/type-label/namespace
-        // checks are NO LONGER here: they are default rules evaluated below.
-        self.validate_integrity_silent()?;
-
-        // Built-in enforcement-drift pass (REQ-01/REQ-02), computed FIRST and
-        // tolerantly so an unloadable rule set / gate registry surfaces as a
-        // declared-but-unenforced finding rather than crashing the run (REQ-01
-        // "missing OR unloadable"). Gated on declared invariants, so a repo
-        // without `.jit/invariants.toml` is unaffected. Captured up front so the
-        // finding is reported even when the malformed ruleset makes the rule
-        // evaluation below hard-error.
-        let drift_findings = self.enforcement_drift_findings()?;
-        let drift_error_message = graph_findings_error_message(&drift_findings);
-
-        // Local rules (built-in defaults + user rules) across every issue. The
-        // former hard-coded label/type/namespace checks live here now: an
-        // `error`-severity finding (e.g. a value outside a namespace enum, a bad
-        // pattern, a missing required label) fails validation — matching the old
-        // `validate_labels`/`validate_type_hierarchy` hard-reject behavior — while
-        // `warn` findings never fail.
-        let issues = self.storage.list_issues()?;
-        let rule_eval = self.rule_eval_error_message(&issues);
-
-        // Combine the drift error (if any) with the rule-evaluation error (if any)
-        // so a malformed ruleset reports BOTH the drift finding AND the parse
-        // problem, rather than losing the drift finding to an early `?`.
-        match (drift_error_message, rule_eval) {
-            (Some(drift), Ok(Some(rules))) => Err(anyhow!("{drift}\n{rules}")),
-            (Some(drift), Err(load_err)) => Err(anyhow!("{drift}\n{load_err}")),
-            (Some(drift), Ok(None)) => Err(anyhow!(drift)),
-            (None, Ok(Some(rules))) => Err(anyhow!(rules)),
-            (None, Err(load_err)) => Err(load_err),
-            (None, Ok(None)) => Ok(()),
-        }
-    }
 
     /// Evaluate local + graph rules + the dangling-link pass and return a combined
     /// error message if any produces an error-severity finding; `Ok(None)` when
@@ -1986,18 +2287,20 @@ mod tests {
     // Unit tests focus on pure functions like format_duration().
 
     #[test]
-    fn test_validate_silent_file_backend_reports_missing_index_through_repository_view() {
+    fn test_validate_silent_file_backend_reports_missing_index_through_captured_image() {
         let repo = tempfile::tempdir().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         storage.init().unwrap();
         std::fs::remove_file(repo.path().join(".jit/index.json")).unwrap();
-        let executor = CommandExecutor::new(storage);
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        let executor = CommandExecutor::new(storage).with_layout(layout);
 
         let error = executor.validate_silent().unwrap_err();
 
         assert!(
             format!("{error:#}").contains("index.json"),
-            "missing index must fail through repository-view validation: {error:#}"
+            "missing index must fail through captured-image validation: {error:#}"
         );
     }
 

@@ -358,6 +358,32 @@ impl ImageDeclarations {
     }
 }
 
+/// Convert repo-relative planned changes into a canonical overlay-override map.
+///
+/// Each `(repo-relative path, Some(bytes) | None)` becomes a
+/// `(VirtualPath, Some|None)` entry (`.jit/...` is `Data`, everything else
+/// `Worktree`) suitable for
+/// [`apply_overlay`](crate::repository_state::apply_overlay) and the overlaid
+/// validation capture. This adapts the transitional command-local proposal
+/// machinery (init scaffold overlay, profile plan overlay) to the delta vocabulary
+/// until increments 5/6 produce typed deltas directly.
+pub(crate) fn overrides_from_repo_changes(
+    changes: impl IntoIterator<Item = (std::path::PathBuf, Option<Vec<u8>>)>,
+) -> Result<std::collections::BTreeMap<crate::repository_state::VirtualPath, Option<Vec<u8>>>> {
+    use crate::repository_state::VirtualPath;
+    changes
+        .into_iter()
+        .map(|(path, value)| {
+            let repo_rel = path.to_string_lossy();
+            let vpath = match repo_rel.strip_prefix(".jit/") {
+                Some(rest) => VirtualPath::data(rest),
+                None => VirtualPath::worktree(repo_rel.as_ref()),
+            }?;
+            Ok((vpath, value))
+        })
+        .collect()
+}
+
 /// Read a repo-relative path's bytes from the captured image.
 ///
 /// A `.jit/`-prefixed path is a `Data(...)` entry and every other repo-relative

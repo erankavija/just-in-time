@@ -779,7 +779,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// the actual state mutation/save/event are delegated to the single
     /// `apply_state_transition` chokepoint (which skips enforcement for
     /// `Rejected`), so this path never sets `issue.state` directly.
-    pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<Vec<String>> {
+    pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Collect warnings instead of printing
@@ -910,7 +913,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns any non-fatal [`StorageWarning`]s (e.g. a worktree relocation
     /// observed while checking leases) so the calling command can surface them
     /// at its own output boundary; this method never writes to stderr.
-    pub fn claim_issue(&self, id: &str, assignee: String) -> Result<Vec<StorageWarning>> {
+    pub fn claim_issue(&self, id: &str, assignee: String) -> Result<Vec<StorageWarning>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use super::claim::check_issue_lease;
 
         let full_id = self.storage.resolve_issue_id(id)?;
@@ -1060,7 +1066,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         assignee: String,
         _filter: Option<String>,
-    ) -> Result<(String, Vec<StorageWarning>)> {
+    ) -> Result<(String, Vec<StorageWarning>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let issues = self.storage.list_issues()?;
 
         // Highest-priority issue of the domain ready set (Ready, unassigned, every

@@ -12,8 +12,7 @@ use crate::storage::{
     RecoveryRequiredError, RecoveryState, TransactionAction,
 };
 use crate::validation::repository::{
-    validate_repository, FilesystemRepositoryView, OverlayRepositoryView,
-    RepositoryValidationFailure, RepositoryView,
+    FilesystemRepositoryView, OverlayRepositoryView, RepositoryValidationFailure, RepositoryView,
 };
 use anyhow::Result;
 use std::path::{Path, PathBuf};
@@ -139,6 +138,13 @@ impl CommandExecutor<JsonFileStorage> {
         package: &EmbeddedProfilePackage<'_>,
         kernel: &FileTransactionKernel,
     ) -> Result<ProfileApplyResult> {
+        // Capture the base validation image BEFORE acquiring the repository/event
+        // locks. The event lock is a non-reentrant file lock, so a capture session
+        // opened while it is held would deadlock; the proposed overlay is validated
+        // purely below. This capture-before-locks pattern is TRANSITIONAL scaffolding
+        // for this package: increment 5 deepens the retained session so capture and
+        // publication share one held guard with pre-journal revalidation (plan §2).
+        let base_image = self.capture_validation_image_with(&std::collections::BTreeMap::new())?;
         let repo_guard = self.storage.acquire_repo_write_lock()?;
         let _events_guard = self.storage.acquire_events_write_lock()?;
 
@@ -160,9 +166,9 @@ impl CommandExecutor<JsonFileStorage> {
         ensure_profile_directory(&prepared.snapshot)?;
         let record_bytes = prepared.record.to_bytes()?;
 
-        let validation_base: Arc<dyn RepositoryView> = Arc::new(
-            FilesystemRepositoryView::from_jit_root(self.storage.root())?,
-        );
+        // Proposed-state validation overlays the final profile bytes onto the base
+        // image captured before the locks and validates the result through the
+        // closed pipeline (pure; no session under the held event lock).
         let mut overlay = prepared.plan.overlay_changes();
         overlay.insert(
             PathBuf::from(&prepared.record_path),
@@ -172,8 +178,10 @@ impl CommandExecutor<JsonFileStorage> {
             PathBuf::from(".jit/events.jsonl"),
             Some(prepared.next_events.clone()),
         );
-        let final_view = OverlayRepositoryView::new(validation_base, overlay)?;
-        let validation = validate_repository(&final_view).map_err(ProfileApplyError::from)?;
+        let final_overrides = super::overrides_from_repo_changes(overlay)?;
+        let final_image = crate::repository_state::apply_overlay(&base_image, final_overrides)?;
+        let validation = crate::validation::repository::validate_repository(&final_image)
+            .map_err(ProfileApplyError::from)?;
         if validation.rule_report.has_errors() {
             return Err(ProfileApplyError::FinalValidationFindings {
                 error_count: validation.rule_report.error_count(),
@@ -522,7 +530,9 @@ mod tests {
     #[test]
     fn test_profile_application_commits_targets_record_event_and_exact_no_op() {
         let (temp, storage, package) = fixture();
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = CommandExecutor::new(storage.clone()).with_layout(
+            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
+        );
 
         let applied = executor.apply_embedded_profile(&package).unwrap();
         assert_eq!(applied.status, ProfileApplicationStatus::Applied);
@@ -560,7 +570,9 @@ mod tests {
     #[test]
     fn test_profile_application_rolls_back_handled_publication_failure() {
         let (temp, storage, package) = fixture();
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = CommandExecutor::new(storage.clone()).with_layout(
+            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
+        );
         let kernel = kernel(
             &storage,
             [TransactionFailurePoint::AfterPublish { action: 1 }],
@@ -580,7 +592,9 @@ mod tests {
     #[test]
     fn test_profile_application_reports_committed_cleanup_and_recovery_cleans_it() {
         let (temp, storage, package) = fixture();
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = CommandExecutor::new(storage.clone()).with_layout(
+            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
+        );
         let kernel = kernel(&storage, [TransactionFailurePoint::CleanupTerminalResidue]);
 
         let applied = executor
@@ -600,7 +614,9 @@ mod tests {
     #[test]
     fn test_profile_application_prepared_interruption_recovers_all_old_state() {
         let (temp, storage, package) = fixture();
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = CommandExecutor::new(storage.clone()).with_layout(
+            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
+        );
         let kernel = kernel(
             &storage,
             [
@@ -631,7 +647,9 @@ mod tests {
     fn test_profile_application_revalidates_locked_snapshot_before_any_write() {
         let (temp, storage, package) = fixture();
         fs::write(temp.path().join(".jit/config.toml"), b"not = [valid").unwrap();
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = CommandExecutor::new(storage.clone()).with_layout(
+            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
+        );
 
         assert!(executor.apply_embedded_profile(&package).is_err());
         assert!(!temp.path().join("docs/profile.txt").exists());
@@ -644,7 +662,9 @@ mod tests {
         let (temp, storage, package) = fixture();
         let torn = b"{\"torn\":";
         fs::write(temp.path().join(".jit/events.jsonl"), torn).unwrap();
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = CommandExecutor::new(storage.clone()).with_layout(
+            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
+        );
 
         executor.apply_embedded_profile(&package).unwrap();
 
@@ -677,7 +697,9 @@ mod tests {
             serde_json::to_vec(&prior_event).unwrap(),
         )
         .unwrap();
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = CommandExecutor::new(storage.clone()).with_layout(
+            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
+        );
 
         executor.apply_embedded_profile(&package).unwrap();
 
@@ -695,7 +717,9 @@ mod tests {
     #[test]
     fn test_public_profile_application_recovers_pending_journal_before_publish() {
         let (temp, storage, package) = fixture();
-        let executor = CommandExecutor::new(storage.clone());
+        let executor = CommandExecutor::new(storage.clone()).with_layout(
+            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap(),
+        );
         let kernel = kernel(
             &storage,
             [

@@ -75,16 +75,19 @@ fn gate_findings_from_rule_report(
         .collect()
 }
 
-/// Convert one exact repository view into the built-in gate finding contract.
+/// Convert one whole-repository validation result into the built-in gate finding
+/// contract.
 ///
 /// Structural failure remains authoritative while its partial semantic report
 /// is converted once through the same severity/disposition mapping as a clean
 /// validation result.
-fn gate_findings_from_repository_view(
-    view: &dyn crate::validation::repository::RepositoryView,
+fn gate_findings_from_report(
+    result: std::result::Result<
+        crate::validation::repository::RepositoryValidationReport,
+        crate::validation::repository::RepositoryValidationFailure,
+    >,
 ) -> (Vec<GateFinding>, bool) {
-    let (structural_error, report) = match crate::validation::repository::validate_repository(view)
-    {
+    let (structural_error, report) = match result {
         Ok(report) => (None, report),
         Err(failure) => {
             let (error, report) = failure.into_parts();
@@ -213,7 +216,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// checker has `pass_context: true`, builds structured context (issue data,
     /// gate definition, prompt, run history) and passes it to the checker
     /// process via a temp file.
-    pub fn check_gate(&self, issue_id: &str, gate_key: &str) -> Result<GateRunResult> {
+    pub fn check_gate(&self, issue_id: &str, gate_key: &str) -> Result<GateRunResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
 
@@ -342,30 +348,38 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: &str,
         stage: GateStage,
         checker: &crate::declarations::GateChecker,
-    ) -> Result<GateRunResult> {
+    ) -> Result<GateRunResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         self.execute_builtin_checker_with_repository_view(gate_key, issue_id, stage, checker, None)
     }
 
-    /// Execute a built-in checker, optionally supplying the exact repository
-    /// view for a repository-validation check.
+    /// Execute a built-in checker, optionally supplying an exact repository image
+    /// for a repository-validation check.
     ///
-    /// Production file-backed callers leave `repository_view` absent and are
-    /// routed through a filesystem view rooted at the executor's storage.
-    /// Tests or a future overlay caller can supply a view explicitly to exercise
-    /// this identical checker-result conversion without reopening storage.
+    /// Production file-backed callers leave `repository_image` absent and capture
+    /// the live whole-repository image through the recovered session. Tests can
+    /// supply a captured or overlaid image explicitly to exercise this identical
+    /// checker-result conversion.
     fn execute_builtin_checker_with_repository_view(
         &self,
         gate_key: &str,
         issue_id: &str,
         stage: GateStage,
         checker: &crate::declarations::GateChecker,
-        repository_view: Option<&dyn crate::validation::repository::RepositoryView>,
-    ) -> Result<GateRunResult> {
+        repository_image: Option<&crate::repository_state::RepositoryImage>,
+    ) -> Result<GateRunResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::declarations::GateChecker;
         use crate::validation::report::RuleReport;
 
-        if repository_view.is_some() && !matches!(checker, GateChecker::RepositoryValidation) {
-            anyhow::bail!("an injected repository view requires the repository_validation checker");
+        if repository_image.is_some() && !matches!(checker, GateChecker::RepositoryValidation) {
+            anyhow::bail!(
+                "an injected repository image requires the repository_validation checker"
+            );
         }
 
         let started_at = chrono::Utc::now();
@@ -373,14 +387,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let (command, mut findings, explicit_failure) = match checker {
             GateChecker::RepositoryValidation => {
-                let (findings, failed) = if let Some(view) = repository_view {
-                    gate_findings_from_repository_view(view)
+                let (findings, failed) = if let Some(image) = repository_image {
+                    gate_findings_from_report(crate::validation::repository::validate_repository(
+                        image,
+                    ))
                 } else if self.storage.is_file_backed() {
-                    let view =
-                        crate::validation::repository::FilesystemRepositoryView::from_jit_root(
-                            self.storage.root(),
-                        )?;
-                    gate_findings_from_repository_view(&view)
+                    gate_findings_from_report(self.validate_repository_report()?)
                 } else {
                     // Pure in-memory stores have no repository byte source. Keep
                     // their established storage-backed command-test behavior.
@@ -762,7 +774,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Run all prechecks for an issue
     ///
     /// Returns Ok(()) if all prechecks pass, Err otherwise.
-    pub(crate) fn run_prechecks(&self, issue_id: &str) -> Result<()> {
+    pub(crate) fn run_prechecks(&self, issue_id: &str) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
@@ -825,7 +840,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Run all postchecks for an issue
     ///
     /// Runs all automated postchecks and auto-transitions to Done if all pass.
-    pub(crate) fn run_postchecks(&self, issue_id: &str) -> Result<()> {
+    pub(crate) fn run_postchecks(&self, issue_id: &str) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
@@ -855,11 +873,9 @@ mod tests {
         GateFindings, GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION,
     };
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage};
-    use crate::validation::repository::{FilesystemRepositoryView, OverlayRepositoryView};
     use chrono::{TimeZone, Utc};
     use std::collections::HashMap;
     use std::path::PathBuf;
-    use std::sync::Arc;
 
     fn add_builtin_gate<S: IssueStore>(
         executor: &CommandExecutor<S>,
@@ -1159,7 +1175,9 @@ assert = { require-section = { heading = "Summary" } }
         let repo = tempfile::tempdir().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         storage.init().unwrap();
-        let executor = CommandExecutor::new(storage);
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        let executor = CommandExecutor::new(storage).with_layout(layout);
         let issue_id = add_builtin_gate(
             &executor,
             "not-a-reserved-repository-key",
@@ -1181,15 +1199,17 @@ assert = { require-section = { heading = "Summary" } }
 
     #[test]
     fn test_repository_validation_checker_uses_injected_overlay_result_path() {
-        let (repo, executor, issue_id) = setup_file_repository();
-        let filesystem = FilesystemRepositoryView::new(repo.path());
+        let (_repo, executor, issue_id) = setup_file_repository();
+        let live_image = executor
+            .capture_validation_image_with(&std::collections::BTreeMap::new())
+            .unwrap();
         let live = executor
             .execute_builtin_checker_with_repository_view(
                 "not-a-reserved-repository-key",
                 &issue_id,
                 GateStage::Postcheck,
                 &GateChecker::RepositoryValidation,
-                Some(&filesystem),
+                Some(&live_image),
             )
             .unwrap();
         assert_eq!(live.status, GateRunStatus::Passed);
@@ -1202,27 +1222,25 @@ assert = { require-section = { heading = "Summary" } }
 
         let mut planned_issue = executor.storage.load_issue(&issue_id).unwrap();
         planned_issue.dependencies.push("nonexistent".to_string());
-        let overlay = OverlayRepositoryView::new(
-            Arc::new(FilesystemRepositoryView::new(repo.path())),
-            [
-                (
-                    PathBuf::from(".jit/rules.toml"),
-                    Some(LATE_REPOSITORY_RULE.as_bytes().to_vec()),
-                ),
-                (
-                    PathBuf::from(format!(".jit/issues/{issue_id}.json")),
-                    Some(serde_json::to_vec_pretty(&planned_issue).unwrap()),
-                ),
-            ],
-        )
+        let overrides = crate::commands::overrides_from_repo_changes([
+            (
+                PathBuf::from(".jit/rules.toml"),
+                Some(LATE_REPOSITORY_RULE.as_bytes().to_vec()),
+            ),
+            (
+                PathBuf::from(format!(".jit/issues/{issue_id}.json")),
+                Some(serde_json::to_vec_pretty(&planned_issue).unwrap()),
+            ),
+        ])
         .unwrap();
+        let planned_image = executor.capture_validation_image_with(&overrides).unwrap();
         let planned = executor
             .execute_builtin_checker_with_repository_view(
                 "not-a-reserved-repository-key",
                 &issue_id,
                 GateStage::Postcheck,
                 &GateChecker::RepositoryValidation,
-                Some(&overlay),
+                Some(&planned_image),
             )
             .unwrap();
 
