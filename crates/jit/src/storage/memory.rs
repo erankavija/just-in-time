@@ -26,12 +26,6 @@ pub struct InMemoryStorage {
     gate_runs: Arc<Mutex<HashMap<String, crate::domain::GateRunResult>>>,
     /// Unique root path for parallel test isolation
     root_path: std::path::PathBuf,
-    /// In-memory repository file map keyed by repo-relative path.
-    ///
-    /// Backs [`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file)
-    /// so command/domain tests can exercise project-scope sources (and any other
-    /// config-declared file) with NO real filesystem, per AGENTS.md "testability".
-    repo_files: Arc<Mutex<HashMap<String, String>>>,
     /// Outermost lock of every mutating path, shared by every clone. Process-local:
     /// this backend has no files, so there is no other process to exclude.
     repo_lock: Arc<RepoWriteLock>,
@@ -89,7 +83,6 @@ impl InMemoryStorage {
             events: Arc::new(Mutex::new(Vec::new())),
             gate_runs: Arc::new(Mutex::new(HashMap::new())),
             root_path,
-            repo_files: Arc::new(Mutex::new(HashMap::new())),
             repo_lock: RepoWriteLock::in_process(),
             repository_state: Arc::new(Mutex::new(MemoryRepositoryState::default())),
             repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
@@ -135,17 +128,57 @@ impl InMemoryStorage {
         Arc::clone(&self.active_mutation_layout)
     }
 
+    /// Map a repo-relative path to its canonical [`VirtualPath`] key in the
+    /// aggregate repository image: a `.jit/`-prefixed path is a `Data(...)` entry,
+    /// every other repo-relative path a `Worktree(...)` entry. This is the SAME
+    /// mapping the materialization producers and command capture specs use, so a
+    /// file written through [`IssueStore::write_repo_file`] is captured by a
+    /// mutation session under the identical key.
+    fn repo_file_vpath(
+        rel_path: &str,
+    ) -> Result<crate::repository_state::VirtualPath, crate::storage::PathReadError> {
+        use crate::repository_state::VirtualPath;
+        crate::storage::validate_repo_relative_path(rel_path)?;
+        match rel_path.strip_prefix(".jit/") {
+            Some(rest) => VirtualPath::data(rest),
+            None => VirtualPath::worktree(rel_path),
+        }
+        .map_err(|e| crate::storage::PathReadError::InvalidPath(e.to_string()))
+    }
+
+    /// Store `content` as the captured `File` entry for `rel_path` in the aggregate
+    /// repository image (the single store a mutation session captures and applies).
+    fn insert_repo_file(
+        &self,
+        rel_path: &str,
+        content: &str,
+    ) -> Result<(), crate::storage::PathReadError> {
+        use crate::repository_state::{EntryIdentity, FileMode, RepositoryEntry};
+        let vpath = Self::repo_file_vpath(rel_path)?;
+        let identity = EntryIdentity::for_bytes(rel_path, content.as_bytes())
+            .map_err(|e| crate::storage::PathReadError::Other(anyhow!("{e}")))?;
+        self.repository_state().entries.insert(
+            vpath,
+            RepositoryEntry::File {
+                identity,
+                bytes: content.as_bytes().to_vec(),
+                mode: FileMode::Regular,
+            },
+        );
+        Ok(())
+    }
+
     /// Seed an in-memory repository file at `rel_path` with `content`.
     ///
     /// Mirrors the issue/gate seeding pattern: a test setter so command and domain
     /// tests can stage a config-declared file (e.g. a project-scope item source)
     /// and have [`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file)
-    /// return it, without touching disk.
+    /// return it, without touching disk. The file lands in the same aggregate image
+    /// a mutation session captures, so seeded state and session-published state
+    /// share one store.
     pub fn add_repo_file(&self, rel_path: &str, content: &str) {
-        self.repo_files
-            .lock()
-            .unwrap()
-            .insert(rel_path.to_string(), content.to_string());
+        self.insert_repo_file(rel_path, content)
+            .expect("add_repo_file requires a valid repo-relative path");
     }
 
     /// Insert `issue` under the repository write lock.
@@ -361,10 +394,17 @@ impl IssueStore for InMemoryStorage {
         rel_path: &str,
     ) -> Result<Option<String>, crate::storage::PathReadError> {
         // Enforce the SAME repo-relative path contract as JsonFileStorage (reject
-        // empty, absolute, or `..`-bearing paths) via the shared validator, then
-        // serve from the in-memory file map: present -> Some, absent -> None.
-        crate::storage::validate_repo_relative_path(rel_path)?;
-        Ok(self.repo_files.lock().unwrap().get(rel_path).cloned())
+        // empty, absolute, or `..`-bearing paths), then serve from the aggregate
+        // repository image (the one store a mutation session captures): a captured
+        // File -> Some, absent or non-file -> None.
+        use crate::repository_state::RepositoryEntry;
+        let vpath = Self::repo_file_vpath(rel_path)?;
+        Ok(match self.repository_state().entries.get(&vpath) {
+            Some(RepositoryEntry::File { bytes, .. }) => {
+                Some(String::from_utf8_lossy(bytes).into_owned())
+            }
+            _ => None,
+        })
     }
 
     fn write_repo_file(
@@ -373,15 +413,10 @@ impl IssueStore for InMemoryStorage {
         content: &str,
     ) -> Result<(), crate::storage::PathReadError> {
         // Enforce the SAME repo-relative path contract as JsonFileStorage (reject
-        // empty, absolute, or `..`-bearing paths) via the shared validator, then
-        // store into the in-memory file map. A subsequent `read_repo_file` for the
-        // same path returns the written content.
-        crate::storage::validate_repo_relative_path(rel_path)?;
-        self.repo_files
-            .lock()
-            .unwrap()
-            .insert(rel_path.to_string(), content.to_string());
-        Ok(())
+        // empty, absolute, or `..`-bearing paths), then store into the aggregate
+        // repository image. A subsequent `read_repo_file` for the same path returns
+        // the written content, and a mutation session captures the same bytes.
+        self.insert_repo_file(rel_path, content)
     }
 
     fn read_path_bytes(
