@@ -19,8 +19,8 @@
 
 use super::*;
 use crate::config::{ProjectionConfig, ProjectionMode, ProjectionStyle};
-use crate::repository_state::{render_projection_body, ProjectionInputs};
 use crate::repository_state::{compose_projection, require_target, ProjectionError};
+use crate::repository_state::{render_projection_body, ProjectionInputs};
 use std::collections::BTreeMap;
 
 /// The result of rendering ONE projection, serialized as an element of

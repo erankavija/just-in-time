@@ -41,8 +41,8 @@
 //! only kind-name literals here, matching the two enforcement-target kinds
 //! `.jit/config.toml` declares under `[item_kinds]`.
 
-use crate::domain::item::{parse_kind_segmented_address, AddressScope};
 use crate::declarations::invariants::Invariant;
+use crate::domain::item::{parse_kind_segmented_address, AddressScope};
 use std::collections::BTreeSet;
 
 /// A single enforcement-drift finding: an invariant whose `enforced-by` binding

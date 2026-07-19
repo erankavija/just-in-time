@@ -196,8 +196,8 @@ mod tests {
     use crate::declarations::GateRegistry;
     use crate::hierarchy_templates::HierarchyTemplate;
     use crate::profile::{Contribution, KeyedArrayTarget, MapEntryTarget};
-    use crate::storage::{IssueStore, JsonFileStorage};
     use crate::repository_state::render_rules_and_gates_markdown;
+    use crate::storage::{IssueStore, JsonFileStorage};
     use std::fs;
     use std::path::Path;
     use tempfile::TempDir;

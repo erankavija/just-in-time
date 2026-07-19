@@ -8,6 +8,7 @@
 mod default_rules;
 mod image;
 mod managed_document;
+mod materialize;
 mod mutation;
 mod path;
 mod projection;
@@ -45,11 +46,11 @@ pub use projection::{
     splice_region, ProjectionError,
 };
 pub use projection_render::{render_projection_body, ProjectionInputs};
-pub use rules_gates_projection::render_rules_and_gates_markdown;
 pub use rule_serialize::{
     render_rule_block, rules_file_header, serialize_ruleset, type_hierarchy_schema_content,
     SchemaFile, SerializedRuleSet,
 };
+pub use rules_gates_projection::render_rules_and_gates_markdown;
 
 use crate::declarations::rules::RuleSet;
 use crate::declarations::{ConfigurationDeclarations, GateRegistry};
@@ -115,14 +116,16 @@ impl MaterializationPlan {
 /// producer families. Adding a family requires extending this function.
 pub fn derive_materializations(
     image: &RepositoryImage,
-    _declarations: RepositoryDeclarations<'_>,
+    declarations: RepositoryDeclarations<'_>,
     seed: &RepositorySeed,
     intent: MaterializationIntent,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
     let delta = match intent {
-        MaterializationIntent::SemanticMutation => derive_semantic_mutation(image)?,
-        MaterializationIntent::RenderConfiguredProjections => derive_project_render(image)?,
-        MaterializationIntent::RepairDerivedState => derive_repair(image)?,
+        MaterializationIntent::SemanticMutation => derive_semantic_mutation(image, &declarations)?,
+        MaterializationIntent::RenderConfiguredProjections => {
+            derive_project_render(image, &declarations)?
+        }
+        MaterializationIntent::RepairDerivedState => derive_repair(image, &declarations)?,
     };
     MaterializationPlan::new(image, seed, &intent, delta).map_err(Into::into)
 }
@@ -136,18 +139,58 @@ pub enum RepositoryStateError {
     /// Plan identity serialization failed.
     #[error(transparent)]
     PlanHash(#[from] PlanHashError),
+    /// Managed-document composition rejected an ambiguous or malformed claim.
+    #[error(transparent)]
+    ManagedDocument(#[from] ManagedDocumentError),
+    /// Layout classification rejected a producer path.
+    #[error(transparent)]
+    Layout(#[from] RepositoryLayoutError),
+    /// A producer read an uncaptured path or malformed captured bytes.
+    #[error("materialization producer failed: {0}")]
+    Producer(String),
 }
 
-fn derive_semantic_mutation(image: &RepositoryImage) -> Result<RepositoryDelta, DeltaError> {
-    RepositoryDelta::new(image.layout(), Vec::new())
+impl RepositoryStateError {
+    /// Wrap an opaque producer failure (an `anyhow` error from a relocated
+    /// projection/serialization producer) into the typed derivation error.
+    fn producer(error: anyhow::Error) -> Self {
+        Self::Producer(format!("{error:#}"))
+    }
 }
 
-fn derive_project_render(image: &RepositoryImage) -> Result<RepositoryDelta, DeltaError> {
-    RepositoryDelta::new(image.layout(), Vec::new())
+/// Every configured projection composed from declared authority (`@/inv/single-source-prose`).
+///
+/// The complete producer set is invoked; a caller cannot select a subset. Shared
+/// targets compose through the one managed-document primitive, never last-writer-wins.
+fn derive_semantic_mutation(
+    image: &RepositoryImage,
+    declarations: &RepositoryDeclarations<'_>,
+) -> Result<RepositoryDelta, RepositoryStateError> {
+    let actions = materialize::compose_configured_projections(image, declarations)
+        .map_err(RepositoryStateError::producer)?;
+    Ok(RepositoryDelta::new(image.layout(), actions)?)
 }
 
-fn derive_repair(image: &RepositoryImage) -> Result<RepositoryDelta, DeltaError> {
-    RepositoryDelta::new(image.layout(), Vec::new())
+/// Render-only intent: the same constrained-complete projection composition.
+fn derive_project_render(
+    image: &RepositoryImage,
+    declarations: &RepositoryDeclarations<'_>,
+) -> Result<RepositoryDelta, RepositoryStateError> {
+    let actions = materialize::compose_configured_projections(image, declarations)
+        .map_err(RepositoryStateError::producer)?;
+    Ok(RepositoryDelta::new(image.layout(), actions)?)
+}
+
+/// Repair intent: the same expected projection state; ownership-safe repair for
+/// registry-first projections is a full-file or single-region replacement proven by
+/// the projection declaration, so it reuses the same constrained-complete producer.
+fn derive_repair(
+    image: &RepositoryImage,
+    declarations: &RepositoryDeclarations<'_>,
+) -> Result<RepositoryDelta, RepositoryStateError> {
+    let actions = materialize::compose_configured_projections(image, declarations)
+        .map_err(RepositoryStateError::producer)?;
+    Ok(RepositoryDelta::new(image.layout(), actions)?)
 }
 
 /// Kind of mismatch between a captured image and expected materialization.

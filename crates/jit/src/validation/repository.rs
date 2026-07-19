@@ -8,6 +8,7 @@
 
 use crate::config::{JitConfig, ProjectionMode};
 use crate::config_manager::ConfigManager;
+use crate::declarations::invariants::InvariantRegistry;
 use crate::declarations::rules::{RuleConfigError, RuleSet, Severity};
 use crate::declarations::GateChecker;
 use crate::declarations::GateRegistry;
@@ -19,10 +20,9 @@ use crate::domain::item::{
 };
 use crate::domain::{parse_known_events, Issue, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
-use crate::validation::engine::Finding;
-use crate::declarations::invariants::InvariantRegistry;
-use crate::repository_state::{render_projection_body, ProjectionInputs};
 use crate::repository_state::{compose_projection, require_target, splice_region};
+use crate::repository_state::{render_projection_body, ProjectionInputs};
+use crate::validation::engine::Finding;
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;

@@ -1,0 +1,429 @@
+//! Pure materialization producers driven from a captured [`RepositoryImage`].
+//!
+//! Every expected materialization derives from declared authority: the configured
+//! projections and the registries the producers read are taken from the captured
+//! declaration bytes in the image, and existing target bytes are read from the same
+//! image (never from the live filesystem). Shared targets are composed by the ONE
+//! [`managed_document`](super::managed_document) primitive, so two projections into
+//! one file compose deterministically rather than last-writer-wins. The result is a
+//! set of exact [`RepositoryAction`]s for every target whose bytes differ from the
+//! captured occupant; an unchanged target contributes no action.
+
+use super::{
+    compose_managed_documents, render_projection_body, ExpectedPreimage, FileMode,
+    ManagedDocumentClaim, ProjectionInputs, RegionPlacement, RepositoryAction,
+    RepositoryDeclarations, RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
+};
+use crate::config::{JitConfig, ProjectionMode};
+use crate::declarations::invariants::InvariantRegistry;
+
+/// Map a repo-relative producer path onto its canonical [`VirtualPath`].
+///
+/// The projection producers address the engine registries and worktree targets by
+/// their logical `.jit/...` / worktree-relative spellings; a `.jit/`-prefixed path
+/// is a `Data(...)` target and every other repo-relative path is `Worktree(...)`.
+fn image_path(repo_relative: &str) -> Result<VirtualPath, RepositoryStateError> {
+    let vpath = match repo_relative.strip_prefix(".jit/") {
+        Some(rest) => VirtualPath::data(rest),
+        None => VirtualPath::worktree(repo_relative),
+    }?;
+    Ok(vpath)
+}
+
+/// Read a repo-relative path as UTF-8 text from the captured image.
+///
+/// `Ok(None)` when the captured entry is absent; a producer requesting a path the
+/// image never captured fails with `UndiscoveredRepositoryPath`, never silent
+/// absence.
+fn read_text(image: &RepositoryImage, repo_relative: &str) -> anyhow::Result<Option<String>> {
+    let vpath = image_path(repo_relative)?;
+    match image.file_bytes(&vpath)? {
+        Some(bytes) => Ok(Some(String::from_utf8(bytes.to_vec())?)),
+        None => Ok(None),
+    }
+}
+
+/// Assemble the repository configuration from the captured declaration bytes.
+///
+/// `config.toml` supplies the item-kind registry, projection registry, and
+/// validation settings; the sibling `invariants.toml` populates the `#[serde(skip)]`
+/// invariant registry the `full` invariant view renders. An absent `invariants.toml`
+/// is an empty registry, matching the on-disk load boundary.
+fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConfig> {
+    let config_text = read_text(image, ".jit/config.toml")?
+        .ok_or_else(|| anyhow::anyhow!("captured image has no .jit/config.toml"))?;
+    let mut config: JitConfig = toml::from_str(&config_text)?;
+    config.invariants = match read_text(image, ".jit/invariants.toml")? {
+        Some(text) => InvariantRegistry::from_toml_str(&text)?,
+        None => InvariantRegistry::empty(),
+    };
+    Ok(config)
+}
+
+/// Compose every configured projection into exact target actions.
+///
+/// Each projection's body is rendered by the single relocated
+/// [`render_projection_body`] producer, and its target claim is composed through the
+/// one [`managed_document`](super::managed_document) engine: a separate-file
+/// projection is a whole-file base claim, a region projection a delimited region
+/// claim, and several projections sharing a target collapse to one deterministic
+/// composition. A composed target whose bytes match the captured occupant yields no
+/// action.
+pub(crate) fn compose_configured_projections(
+    image: &RepositoryImage,
+    declarations: &RepositoryDeclarations<'_>,
+) -> anyhow::Result<Vec<RepositoryAction>> {
+    let config = assemble_config(image)?;
+    let Some(projections) = config.projection.as_ref() else {
+        return Ok(Vec::new());
+    };
+
+    let inputs = ProjectionInputs {
+        config: &config,
+        rules: declarations.rules,
+        gates: declarations.gates,
+    };
+
+    // Phase one: render every projection body and build its managed-document claim.
+    // Iterating the name-ordered projection registry keeps claim order deterministic.
+    let mut claims: Vec<(VirtualPath, ManagedDocumentClaim)> = Vec::new();
+    for (name, projection) in projections {
+        let mut read = |path: &str| read_text(image, path);
+        let (body, _count) = render_projection_body(projection, &inputs, &mut read)?;
+        let target = super::require_target(projection, name)?;
+        let vpath = image_path(&target)?;
+        let owner = format!("projection:{name}");
+        let claim = match projection.mode() {
+            ProjectionMode::SeparateFile => ManagedDocumentClaim::Base {
+                owner,
+                bytes: body.into_bytes(),
+            },
+            ProjectionMode::Region => ManagedDocumentClaim::Region {
+                owner,
+                region_id: name.clone(),
+                begin: projection.region_begin(name).into_bytes(),
+                end: projection.region_end(name).into_bytes(),
+                content: body.into_bytes(),
+                placement: RegionPlacement::RequireExisting,
+            },
+        };
+        claims.push((vpath, claim));
+    }
+
+    // Phase two: compose all claims per target once (deterministic, never
+    // last-writer-wins), then emit an action only where the composed bytes differ
+    // from the captured occupant.
+    let composed = compose_managed_documents(image, claims)?;
+    let mut actions = Vec::new();
+    for (vpath, expected_bytes) in composed {
+        let entry = image.entry(&vpath)?;
+        if let RepositoryEntry::File { bytes, mode, .. } = entry {
+            if bytes == &expected_bytes && *mode == FileMode::Regular {
+                continue;
+            }
+        }
+        actions.push(RepositoryAction::WriteFile {
+            path: vpath.clone(),
+            owner: "configured-projection".to_string(),
+            expected: ExpectedPreimage::of(entry),
+            bytes: expected_bytes,
+            mode: FileMode::Regular,
+        });
+    }
+    Ok(actions)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::declarations::rules::RuleSet;
+    use crate::declarations::GateRegistry;
+    use crate::repository_state::{
+        compare_materializations, derive_materializations, CaptureBudget, CaptureSpec,
+        EntryIdentity, MaterializationDriftKind, MaterializationIntent, RepositoryImage,
+        RepositoryLayout, RepositoryRootEvidence, RepositorySeed, RepositorySeedKind,
+    };
+    use std::collections::{BTreeMap, HashMap};
+
+    const CONFIG: &str = r#"
+[project]
+name = "materialize-test"
+
+[item_kinds.invariant]
+scope = "project"
+source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
+source-of-truth = "registry-first"
+
+[projection.invariants]
+kind = "invariant"
+mode = "region"
+target = "AGENTS.md"
+style = "id-anchor"
+"#;
+
+    const INVARIANTS: &str = r#"
+[[invariants]]
+id = "sample-invariant"
+statement = "Every dependency edge stays acyclic."
+kind = "enforced"
+
+[[invariants]]
+id = "second-invariant"
+statement = "Issues prefer functional style."
+kind = "advisory"
+"#;
+
+    const EXPECTED_ROWS: &str = "- **sample-invariant** — Every dependency edge stays acyclic.\n\
+         - **second-invariant** — Issues prefer functional style.\n";
+
+    fn layout() -> RepositoryLayout {
+        RepositoryLayout::new(
+            RepositoryRootEvidence::new("/repo", "worktree", true),
+            RepositoryRootEvidence::new("/repo/.jit", "data", true),
+        )
+        .unwrap()
+    }
+
+    /// Build a closed image from repo-relative path → bytes (`.jit/...` is Data,
+    /// everything else Worktree). A `None` value captures the path as absent.
+    fn image(files: &[(&str, Option<&str>)]) -> RepositoryImage {
+        let layout = layout();
+        let mut data_paths = Vec::new();
+        let mut worktree_paths = Vec::new();
+        let mut entries = BTreeMap::new();
+        for (repo_rel, contents) in files {
+            let vpath = image_path(repo_rel).unwrap();
+            let entry = match contents {
+                Some(text) => RepositoryEntry::File {
+                    identity: EntryIdentity::for_bytes(*repo_rel, text.as_bytes()).unwrap(),
+                    bytes: text.as_bytes().to_vec(),
+                    mode: FileMode::Regular,
+                },
+                None => RepositoryEntry::Absent,
+            };
+            match vpath.root_class() {
+                crate::repository_state::RepositoryRootClass::Data => {
+                    data_paths.push(vpath.clone())
+                }
+                crate::repository_state::RepositoryRootClass::Worktree => {
+                    worktree_paths.push(vpath.clone())
+                }
+            }
+            entries.insert(vpath, entry);
+        }
+        let budget = CaptureBudget {
+            max_paths: 32,
+            max_listings: 0,
+            max_bytes: 1 << 20,
+            max_depth: 8,
+        };
+        // Data declaration roots enter phase one; worktree targets are phase-two
+        // discovered, matching the two-phase capture contract.
+        let mut spec = CaptureSpec::phase_one(data_paths, budget).unwrap();
+        spec.discover_paths(worktree_paths).unwrap();
+        RepositoryImage::close(
+            layout,
+            spec,
+            entries,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap()
+    }
+
+    fn rules() -> RuleSet {
+        RuleSet::default()
+    }
+    fn gates() -> GateRegistry {
+        GateRegistry::default()
+    }
+    fn declarations<'a>(
+        config: &'a crate::declarations::ConfigurationDeclarations,
+        gates: &'a GateRegistry,
+        rules: &'a RuleSet,
+    ) -> RepositoryDeclarations<'a> {
+        RepositoryDeclarations {
+            configuration: config,
+            gates,
+            rules,
+        }
+    }
+    fn empty_config_decls() -> crate::declarations::ConfigurationDeclarations {
+        crate::declarations::ConfigurationDeclarations {
+            hierarchy: None,
+            namespaces: HashMap::new(),
+            item_kinds: HashMap::new(),
+            projections: BTreeMap::new(),
+            documentation: None,
+        }
+    }
+
+    fn seed() -> RepositorySeed {
+        RepositorySeed::new(
+            RepositorySeedKind::Command {
+                name: "materialize-test".into(),
+            },
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap()
+    }
+
+    fn agents_with_region(region: &str, inner: &str) -> String {
+        format!("# Doc\n\nintro\n\n<!-- jit:{region}:begin -->\n{inner}\n<!-- jit:{region}:end -->\n\ntrailing\n")
+    }
+
+    #[test]
+    fn test_derive_project_render_emits_write_for_stale_region() {
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let decls = declarations(&cfg, &g, &r);
+        let image = image(&[
+            (".jit/config.toml", Some(CONFIG)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            (
+                "AGENTS.md",
+                Some(&agents_with_region("invariants", "STALE")),
+            ),
+        ]);
+        let plan = derive_materializations(
+            &image,
+            decls,
+            &seed(),
+            MaterializationIntent::RenderConfiguredProjections,
+        )
+        .unwrap();
+        let actions = plan.delta().actions();
+        assert_eq!(actions.len(), 1, "one stale target write");
+        let RepositoryAction::WriteFile { path, bytes, .. } = &actions[0] else {
+            panic!("expected WriteFile, got {:?}", actions[0]);
+        };
+        assert_eq!(path, &VirtualPath::worktree("AGENTS.md").unwrap());
+        let text = String::from_utf8(bytes.clone()).unwrap();
+        assert!(text.contains(EXPECTED_ROWS.trim_end()));
+        // Byte-for-byte: prose outside the region is preserved.
+        assert!(text.starts_with("# Doc\n\nintro\n\n"));
+        assert!(text.ends_with("\n\ntrailing\n"));
+        assert!(!text.contains("STALE"));
+    }
+
+    #[test]
+    fn test_derive_project_render_fresh_region_emits_no_action() {
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let decls = declarations(&cfg, &g, &r);
+        // First derive against a stale doc to obtain the exact fresh bytes.
+        let stale = image(&[
+            (".jit/config.toml", Some(CONFIG)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            (
+                "AGENTS.md",
+                Some(&agents_with_region("invariants", "STALE")),
+            ),
+        ]);
+        let plan = derive_materializations(
+            &stale,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RenderConfiguredProjections,
+        )
+        .unwrap();
+        let RepositoryAction::WriteFile { bytes, .. } = &plan.delta().actions()[0] else {
+            panic!("expected write");
+        };
+        let fresh_text = String::from_utf8(bytes.clone()).unwrap();
+        // Re-derive against a doc that already holds the fresh bytes → no drift.
+        let fresh = image(&[
+            (".jit/config.toml", Some(CONFIG)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            ("AGENTS.md", Some(&fresh_text)),
+        ]);
+        let plan2 = derive_materializations(
+            &fresh,
+            decls,
+            &seed(),
+            MaterializationIntent::RenderConfiguredProjections,
+        )
+        .unwrap();
+        assert!(
+            plan2.delta().actions().is_empty(),
+            "fresh target contributes no action"
+        );
+    }
+
+    #[test]
+    fn test_derive_shared_target_composes_both_regions_deterministically() {
+        // Two region projections into ONE target compose deterministically.
+        // CONFIG already declares the `invariants` projection; append a second.
+        let config = format!(
+            "{CONFIG}\n[projection.extra]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n"
+        );
+        let agents = format!(
+            "# Doc\n\n<!-- jit:invariants:begin -->\nOLD-A\n<!-- jit:invariants:end -->\n\nmiddle\n\n<!-- jit:extra:begin -->\nOLD-B\n<!-- jit:extra:end -->\n"
+        );
+        let build = || {
+            image(&[
+                (".jit/config.toml", Some(&config)),
+                (".jit/invariants.toml", Some(INVARIANTS)),
+                ("AGENTS.md", Some(&agents)),
+            ])
+        };
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let plan_a = derive_materializations(
+            &build(),
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RenderConfiguredProjections,
+        )
+        .unwrap();
+        let plan_b = derive_materializations(
+            &build(),
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RenderConfiguredProjections,
+        )
+        .unwrap();
+        // Determinism: identical delta and plan hash across runs.
+        assert_eq!(plan_a.delta(), plan_b.delta());
+        assert_eq!(plan_a.hash(), plan_b.hash());
+        let RepositoryAction::WriteFile { bytes, .. } = &plan_a.delta().actions()[0] else {
+            panic!("expected single composed write");
+        };
+        assert_eq!(plan_a.delta().actions().len(), 1, "one composed target");
+        let text = String::from_utf8(bytes.clone()).unwrap();
+        // BOTH regions were replaced with the rendered rows; neither clobbered the
+        // other, and the unmanaged "middle" prose is preserved.
+        assert!(!text.contains("OLD-A") && !text.contains("OLD-B"));
+        assert!(text.contains("middle"));
+        assert_eq!(text.matches("sample-invariant").count(), 2);
+    }
+
+    #[test]
+    fn test_derive_then_compare_reports_stale_drift() {
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let stale = image(&[
+            (".jit/config.toml", Some(CONFIG)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            (
+                "AGENTS.md",
+                Some(&agents_with_region("invariants", "STALE")),
+            ),
+        ]);
+        let plan = derive_materializations(
+            &stale,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RenderConfiguredProjections,
+        )
+        .unwrap();
+        // Comparing the expected plan against the same stale image reports the
+        // target as stale derived state.
+        let drift = compare_materializations(&stale, &plan).unwrap();
+        assert_eq!(drift.len(), 1);
+        assert_eq!(drift[0].kind, MaterializationDriftKind::Stale);
+        assert_eq!(drift[0].path, VirtualPath::worktree("AGENTS.md").unwrap());
+    }
+}

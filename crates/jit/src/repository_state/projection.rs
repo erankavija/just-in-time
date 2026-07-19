@@ -34,9 +34,9 @@
 //! [`project_render`](crate::repository_state::projection_render).
 
 use crate::config::{ProjectionConfig, ProjectionMode, ProjectionStyle};
+use crate::declarations::invariants::{InvariantKind, InvariantRegistry};
 use crate::domain::item::AddressableItem;
 use crate::storage::PathReadError;
-use crate::declarations::invariants::{InvariantKind, InvariantRegistry};
 use anyhow::Result;
 use std::collections::BTreeMap;
 use thiserror::Error;

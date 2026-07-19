@@ -8,12 +8,12 @@
 //! each bound to the live renderer code rather than a committed mirror.
 
 use jit::commands::CommandExecutor;
+use jit::declarations::invariants::InvariantRegistry;
 use jit::declarations::GateRegistry;
 use jit::declarations::{GateDefinition, GateMode, GateStage};
-use jit::storage::{InMemoryStorage, IssueStore};
-use jit::declarations::invariants::InvariantRegistry;
 use jit::repository_state::render_invariants_markdown;
 use jit::repository_state::render_rules_and_gates_markdown;
+use jit::storage::{InMemoryStorage, IssueStore};
 use std::collections::HashMap;
 
 const INVARIANTS_TOML: &str = r#"

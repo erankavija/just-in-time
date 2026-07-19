@@ -26,6 +26,8 @@
 //! [`ProjectionError`] raised BEFORE any body is returned, so the caller never
 //! writes a partial or empty-by-accident block (REQ-07).
 
+use super::projection::{render_id_anchor_rows, render_invariants_markdown, ProjectionError};
+use super::rules_gates_projection::render_rules_and_gates_markdown;
 use crate::config::{JitConfig, ProjectionConfig, ProjectionStyle, SourceOfTruth};
 use crate::declarations::rules::RuleSet;
 use crate::declarations::GateRegistry;
@@ -35,10 +37,6 @@ use crate::domain::item::{
     AddressableItem, ItemKind, Scope,
 };
 use crate::domain::ContentFormat;
-use super::projection::{
-    render_id_anchor_rows, render_invariants_markdown, ProjectionError,
-};
-use super::rules_gates_projection::render_rules_and_gates_markdown;
 use anyhow::Result;
 use std::collections::BTreeSet;
 
