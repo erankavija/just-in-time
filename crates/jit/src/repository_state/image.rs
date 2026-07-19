@@ -699,6 +699,18 @@ impl RepositoryImage {
             }
         }
     }
+
+    /// Every boundary-acquired pinned-document evidence, keyed by
+    /// `(requested revision, requested path)`.
+    pub fn pinned_evidence(&self) -> &BTreeMap<(String, String), PinnedDocumentEvidence> {
+        &self.pinned
+    }
+
+    /// Every boundary-acquired linked-worktree fallback evidence, keyed by the
+    /// canonical logical `Data(...)` path it resolves.
+    pub fn linked_worktree_evidence(&self) -> &BTreeMap<VirtualPath, LinkedWorktreeEvidence> {
+        &self.linked_worktree
+    }
 }
 
 fn validate_entry(path: &VirtualPath, entry: &RepositoryEntry) -> Result<(), CaptureError> {

@@ -10,6 +10,7 @@ mod image;
 mod managed_document;
 mod materialize;
 mod mutation;
+mod overlay;
 mod path;
 mod projection;
 mod projection_render;
@@ -39,6 +40,7 @@ pub use mutation::{
     serialize_issue, FixedMutationClock, IdAuthority, MutationClock, MutationContext,
     MutationError, MutationIntent, SystemMutationClock,
 };
+pub use overlay::{apply_overlay, OverlayError};
 pub use path::{
     InjectivityProof, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryRootEvidence, RootRelativePath, VirtualPath,
