@@ -150,6 +150,114 @@ pub fn render_capture_closure(
     Ok(paths)
 }
 
+/// The complete phase-two capture closure for whole-repository validation.
+///
+/// The exact bounded set the validation pipeline reads from the captured image,
+/// so validation touches no live filesystem path outside the closure (plan §2
+/// two-phase capture, D14). [`paths`](ValidationCaptureClosure::paths) enumerates
+/// exact files; [`listings`](ValidationCaptureClosure::listings) enumerates the
+/// complete directory listings validation reconciles against the index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidationCaptureClosure {
+    /// Every exact `.jit/...` or worktree file validation reads.
+    pub paths: Vec<VirtualPath>,
+    /// Every complete directory listing validation reconciles (the issue files).
+    pub listings: Vec<VirtualPath>,
+}
+
+/// Enumerate the phase-two validation closure from the phase-one declarations.
+///
+/// Given the phase-one configuration, the index's `all_ids`, and (when present)
+/// the phase-one `rules.toml` bytes, this returns every additional canonical path
+/// and listing whole-repository validation reads so it consumes only
+/// image-projected content: the engine registries (`config.toml`,
+/// `invariants.toml`, `rules.toml`, `gates.toml`, `templates.toml`), the
+/// repository index and event log, every ordinary issue record plus the complete
+/// `issues` listing, the schema files the effective rules reference, every declared
+/// projection's documentation target and projected-kind sources, and every
+/// project-scope item-kind source the item-link pass indexes. The caller feeds
+/// [`paths`](ValidationCaptureClosure::paths) to
+/// [`CaptureSpec::discover_paths`](super::CaptureSpec::discover_paths) and each
+/// [`listings`](ValidationCaptureClosure::listings) entry to
+/// [`CaptureSpec::discover_listing`](super::CaptureSpec::discover_listing). Per-issue
+/// document, pinned-document, and derived plan-document evidence is enumerated by
+/// the command boundary from the captured issue records (a later capture phase),
+/// which owns the planning-node resolution the closure cannot express purely.
+pub fn validate_capture_closure(
+    config: &JitConfig,
+    all_ids: &[String],
+    rules_content: Option<&str>,
+) -> anyhow::Result<ValidationCaptureClosure> {
+    use crate::config::SourceOfTruth;
+    use crate::domain::item::resolve_item_kinds;
+
+    let mut paths = vec![
+        image_path(".jit/config.toml")?,
+        image_path(".jit/invariants.toml")?,
+        image_path(".jit/rules.toml")?,
+        image_path(".jit/gates.toml")?,
+        image_path(".jit/templates.toml")?,
+        image_path(".jit/index.json")?,
+        image_path(".jit/events.jsonl")?,
+    ];
+    // Every ordinary issue record named by the index, plus the complete listing
+    // whole-repository validation reconciles against those ids.
+    for id in all_ids {
+        paths.push(image_path(&format!(".jit/issues/{id}.json"))?);
+    }
+    let listings = vec![VirtualPath::data("issues")?];
+
+    // Every declared projection's target and projected-kind sources: the
+    // projections pass re-renders each projection from these and compares.
+    let registry = config.projection.clone().unwrap_or_default();
+    let all_kinds = resolve_item_kinds(config.item_kinds.as_ref())?;
+    for (name, projection) in &registry {
+        paths.push(image_path(&super::require_target(projection, name)?)?);
+        for kind_name in projection.kinds() {
+            let kind = all_kinds
+                .iter()
+                .find(|k| k.name() == kind_name)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("projection '{name}' references unknown kind '{kind_name}'")
+                })?;
+            match kind.source_of_truth() {
+                SourceOfTruth::MarkdownFirst => {
+                    if let Some(source) = kind.source() {
+                        paths.push(image_path(source)?);
+                    }
+                }
+                SourceOfTruth::RegistryFirst => {
+                    if let Some(descriptor) = kind.toml_source() {
+                        paths.push(image_path(&descriptor.toml)?);
+                    }
+                }
+            }
+        }
+    }
+
+    // Every project-scope item-kind source the item-link pass indexes to build the
+    // addressable-item set (issue-scope kinds parse from the captured issue bytes).
+    for kind in all_kinds
+        .iter()
+        .filter(|kind| kind.kind_scope().is_project())
+    {
+        if let Some(descriptor) = kind.toml_source() {
+            paths.push(image_path(&descriptor.toml)?);
+        } else if let Some(source) = kind.source() {
+            paths.push(image_path(source)?);
+        }
+    }
+
+    if let Some(content) = rules_content {
+        for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
+            paths.push(VirtualPath::data(&request.reference)?);
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    Ok(ValidationCaptureClosure { paths, listings })
+}
+
 /// Compose every configured projection into exact target actions.
 ///
 /// Each projection's body is rendered by the single relocated
@@ -549,6 +657,36 @@ kind = "advisory"
         assert!(all.contains(&VirtualPath::worktree("AGENTS.md").unwrap()));
         // An unknown selected name is a defensive error.
         assert!(render_capture_closure(&config, &["nope".to_string()], None).is_err());
+    }
+
+    #[test]
+    fn test_validate_capture_closure_covers_registries_records_and_projections() {
+        use std::collections::BTreeSet;
+        let config: JitConfig = toml::from_str(CONFIG).unwrap();
+        let closure = validate_capture_closure(&config, &["abc".to_string()], None).unwrap();
+        let paths: BTreeSet<VirtualPath> = closure.paths.into_iter().collect();
+        for expected in [
+            VirtualPath::data("config.toml").unwrap(),
+            VirtualPath::data("invariants.toml").unwrap(),
+            VirtualPath::data("rules.toml").unwrap(),
+            VirtualPath::data("gates.toml").unwrap(),
+            VirtualPath::data("templates.toml").unwrap(),
+            VirtualPath::data("index.json").unwrap(),
+            VirtualPath::data("events.jsonl").unwrap(),
+            VirtualPath::data("issues/abc.json").unwrap(),
+            VirtualPath::worktree("AGENTS.md").unwrap(),
+        ] {
+            assert!(paths.contains(&expected), "closure missing {expected:?}");
+        }
+        // The complete issues listing is reconciled against the index ids.
+        assert_eq!(closure.listings, vec![VirtualPath::data("issues").unwrap()]);
+        // A referenced rule schema enters the closure when rules bytes are supplied.
+        let rules = "[[rules]]\nname = \"shape\"\ntype = \"format\"\n\
+             assert = { json-schema = \"schemas/custom.json\" }\n";
+        let with_schema = validate_capture_closure(&config, &[], Some(rules)).unwrap();
+        assert!(with_schema
+            .paths
+            .contains(&VirtualPath::data("schemas/custom.json").unwrap()));
     }
 
     #[test]

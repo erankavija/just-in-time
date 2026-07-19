@@ -34,7 +34,9 @@ pub use managed_document::{
     compose_managed_documents, render_managed_document, ManagedDocumentClaim, ManagedDocumentError,
     RegionPlacement,
 };
-pub use materialize::{assemble_config, render_capture_closure};
+pub use materialize::{
+    assemble_config, render_capture_closure, validate_capture_closure, ValidationCaptureClosure,
+};
 pub use mutation::{
     finalize, issue_draft, prefix_has_torn_tail, serialize_event, serialize_gate_run,
     serialize_issue, FixedMutationClock, IdAuthority, MutationClock, MutationContext,
