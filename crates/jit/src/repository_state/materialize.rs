@@ -52,7 +52,7 @@ fn read_text(image: &RepositoryImage, repo_relative: &str) -> anyhow::Result<Opt
 /// validation settings; the sibling `invariants.toml` populates the `#[serde(skip)]`
 /// invariant registry the `full` invariant view renders. An absent `invariants.toml`
 /// is an empty registry, matching the on-disk load boundary.
-pub(crate) fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConfig> {
+pub fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConfig> {
     let config_text = read_text(image, ".jit/config.toml")?
         .ok_or_else(|| anyhow::anyhow!("captured image has no .jit/config.toml"))?;
     let mut config: JitConfig = toml::from_str(&config_text)?;
@@ -68,6 +68,86 @@ pub(crate) fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConf
         InvariantRegistry::empty()
     };
     Ok(config)
+}
+
+/// Enumerate the phase-two capture closure for `jit project render`.
+///
+/// Given the phase-one configuration and the selected projection names (an empty
+/// slice selects every declared projection), this returns every additional
+/// canonical path the render must capture so it reads only image-projected
+/// content: the four engine registries (`config.toml`, `invariants.toml`,
+/// `rules.toml`, `gates.toml`), each selected projection's documentation target
+/// (read for region-mode splicing), each projected kind's declared source, and —
+/// when the phase-one `rules.toml` bytes are supplied — the schema files the
+/// effective rule set references (needed to parse the effective rules the
+/// full-style rule/gate view renders). The caller feeds these to
+/// [`CaptureSpec::discover_paths`](super::CaptureSpec::discover_paths) after phase
+/// one; the resulting closure is what `derive_project_render` reads from.
+///
+/// This planner enumerates exactly the paths
+/// [`compose_configured_projections`] and the effective-rule assembly read, so a
+/// selective `jit project render <name>` captures its own projection's sources and
+/// target without pulling in a sibling projection's closure. An unknown selected
+/// name or a projection referencing an unknown kind is an error; the command
+/// validates names first, so this is a defensive guard rather than the primary
+/// diagnostic.
+pub fn render_capture_closure(
+    config: &JitConfig,
+    selected: &[String],
+    rules_content: Option<&str>,
+) -> anyhow::Result<Vec<VirtualPath>> {
+    use crate::config::SourceOfTruth;
+    use crate::domain::item::resolve_item_kinds;
+
+    let mut paths = vec![
+        image_path(".jit/config.toml")?,
+        image_path(".jit/invariants.toml")?,
+        image_path(".jit/rules.toml")?,
+        image_path(".jit/gates.toml")?,
+    ];
+    let registry = config.projection.clone().unwrap_or_default();
+    let all_kinds = resolve_item_kinds(config.item_kinds.as_ref())?;
+    let names: Vec<String> = if selected.is_empty() {
+        registry.keys().cloned().collect()
+    } else {
+        selected.to_vec()
+    };
+    for name in &names {
+        let projection = registry
+            .get(name)
+            .ok_or_else(|| anyhow::anyhow!("unknown projection '{name}'"))?;
+        paths.push(image_path(&super::require_target(projection, name)?)?);
+        for kind_name in projection.kinds() {
+            let kind = all_kinds
+                .iter()
+                .find(|k| k.name() == kind_name)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("projection '{name}' references unknown kind '{kind_name}'")
+                })?;
+            match kind.source_of_truth() {
+                SourceOfTruth::MarkdownFirst => {
+                    if let Some(source) = kind.source() {
+                        paths.push(image_path(source)?);
+                    }
+                }
+                SourceOfTruth::RegistryFirst => {
+                    if let Some(descriptor) = kind.toml_source() {
+                        paths.push(image_path(&descriptor.toml)?);
+                    }
+                }
+            }
+        }
+    }
+    if let Some(content) = rules_content {
+        // A rule schema reference is relative to the data root (`schemas/...`),
+        // so it is a `Data(...)` path directly rather than a repo-relative one.
+        for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
+            paths.push(VirtualPath::data(&request.reference)?);
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    Ok(paths)
 }
 
 /// Compose every configured projection into exact target actions.
@@ -437,6 +517,44 @@ kind = "advisory"
     fn gates() -> GateRegistry {
         GateRegistry::default()
     }
+
+    #[test]
+    fn test_render_capture_closure_enumerates_registries_sources_and_target() {
+        let config: JitConfig = toml::from_str(CONFIG).unwrap();
+        // Selecting the single declared projection captures the four engine
+        // registries, its region target, and its registry-first kind source.
+        let paths = render_capture_closure(&config, &["invariants".to_string()], None).unwrap();
+        let expected: std::collections::BTreeSet<VirtualPath> = [
+            VirtualPath::data("config.toml").unwrap(),
+            VirtualPath::data("invariants.toml").unwrap(),
+            VirtualPath::data("rules.toml").unwrap(),
+            VirtualPath::data("gates.toml").unwrap(),
+            VirtualPath::worktree("AGENTS.md").unwrap(),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(
+            paths.into_iter().collect::<std::collections::BTreeSet<_>>(),
+            expected
+        );
+        // An empty selection enumerates the same closure (one projection declared).
+        let all = render_capture_closure(&config, &[], None).unwrap();
+        assert!(all.contains(&VirtualPath::worktree("AGENTS.md").unwrap()));
+        // An unknown selected name is a defensive error.
+        assert!(render_capture_closure(&config, &["nope".to_string()], None).is_err());
+    }
+
+    #[test]
+    fn test_render_capture_closure_adds_referenced_rule_schemas() {
+        let config: JitConfig = toml::from_str(CONFIG).unwrap();
+        // A rules.toml that references a json-schema pulls that schema into the
+        // closure, so the effective-rule parse reads image-projected bytes.
+        let rules = "[[rules]]\nname = \"shape\"\ntype = \"format\"\n\
+             assert = { json-schema = \"schemas/custom.json\" }\n";
+        let paths = render_capture_closure(&config, &[], Some(rules)).unwrap();
+        assert!(paths.contains(&VirtualPath::data("schemas/custom.json").unwrap()));
+    }
+
     fn declarations<'a>(
         config: &'a crate::declarations::ConfigurationDeclarations,
         gates: &'a GateRegistry,
