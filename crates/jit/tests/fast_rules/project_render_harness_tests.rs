@@ -11,9 +11,9 @@ use jit::commands::CommandExecutor;
 use jit::declarations::GateRegistry;
 use jit::declarations::{GateDefinition, GateMode, GateStage};
 use jit::storage::{InMemoryStorage, IssueStore};
-use jit::validation::invariants::InvariantRegistry;
-use jit::validation::projection::render_invariants_markdown;
-use jit::validation::rules_gates_projection::render_rules_and_gates_markdown;
+use jit::declarations::invariants::InvariantRegistry;
+use jit::repository_state::render_invariants_markdown;
+use jit::repository_state::render_rules_and_gates_markdown;
 use std::collections::HashMap;
 
 const INVARIANTS_TOML: &str = r#"
@@ -276,11 +276,11 @@ fn test_missing_target_is_typed_error_naming_projection() {
     let executor = CommandExecutor::new(storage.clone());
 
     let err = executor.project_render(Some("invariants")).unwrap_err();
-    let typed = err.downcast_ref::<jit::validation::projection::ProjectionError>();
+    let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
     assert!(
         matches!(
             typed,
-            Some(jit::validation::projection::ProjectionError::MissingTarget { projection })
+            Some(jit::repository_state::ProjectionError::MissingTarget { projection })
                 if projection == "invariants"
         ),
         "expected MissingTarget naming the projection, got {err:#}"
@@ -320,11 +320,11 @@ fn test_two_phase_render_writes_nothing_when_a_later_projection_fails() {
     // `a-good` sorts before `b-bad`, so it materializes (phase 1) before `b-bad`
     // fails — yet phase 2 never runs, so nothing is written anywhere.
     let err = executor.project_render(None).unwrap_err();
-    let typed = err.downcast_ref::<jit::validation::projection::ProjectionError>();
+    let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
     assert!(
         matches!(
             typed,
-            Some(jit::validation::projection::ProjectionError::MissingBeginMarker { .. })
+            Some(jit::repository_state::ProjectionError::MissingBeginMarker { .. })
         ),
         "expected MissingBeginMarker, got {err:#}"
     );
@@ -411,11 +411,11 @@ source-of-truth = "markdown-first"
     let executor = CommandExecutor::new(storage.clone());
 
     let err = executor.project_render(Some("decisions")).unwrap_err();
-    let typed = err.downcast_ref::<jit::validation::projection::ProjectionError>();
+    let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
     assert!(
         matches!(
             typed,
-            Some(jit::validation::projection::ProjectionError::NotProjectScoped { kind })
+            Some(jit::repository_state::ProjectionError::NotProjectScoped { kind })
                 if kind == "decision"
         ),
         "expected NotProjectScoped naming the kind, got {err:#}"
@@ -444,11 +444,11 @@ fn test_full_style_missing_registry_source_errors_pre_write() {
     let executor = CommandExecutor::new(storage.clone());
 
     let err = executor.project_render(Some("invariants")).unwrap_err();
-    let typed = err.downcast_ref::<jit::validation::projection::ProjectionError>();
+    let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
     assert!(
         matches!(
             typed,
-            Some(jit::validation::projection::ProjectionError::SourceNotFound { path, kind })
+            Some(jit::repository_state::ProjectionError::SourceNotFound { path, kind })
                 if path == ".jit/invariants.toml" && kind == "invariant"
         ),
         "expected SourceNotFound for the absent store, got {err:#}"

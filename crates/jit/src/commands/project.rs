@@ -4,9 +4,9 @@
 //! one) into its configured documentation target. It is a thin boundary: it loads
 //! the projection registry plus the effective rules and gate registry, delegates
 //! ALL body rendering to
-//! [`render_projection_body`](crate::validation::project_render::render_projection_body)
+//! [`render_projection_body`](crate::repository_state::render_projection_body)
 //! and region-splicing to
-//! [`splice_region`](crate::validation::projection::splice_region), and owns no CLI
+//! [`splice_region`](crate::repository_state::splice_region), and owns no CLI
 //! parsing or output formatting (the layer boundary in AGENTS.md "Separation of
 //! Concerns"). The target path, mode, style, and delimiters come ONLY from config.
 //!
@@ -19,8 +19,8 @@
 
 use super::*;
 use crate::config::{ProjectionConfig, ProjectionMode, ProjectionStyle};
-use crate::validation::project_render::{render_projection_body, ProjectionInputs};
-use crate::validation::projection::{compose_projection, require_target, ProjectionError};
+use crate::repository_state::{render_projection_body, ProjectionInputs};
+use crate::repository_state::{compose_projection, require_target, ProjectionError};
 use std::collections::BTreeMap;
 
 /// The result of rendering ONE projection, serialized as an element of

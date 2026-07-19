@@ -16,7 +16,7 @@
 //!   entries do.
 
 use jit::config::JitConfig;
-use jit::validation::invariants::{InvariantConfigError, InvariantKind};
+use jit::declarations::invariants::{InvariantConfigError, InvariantKind};
 use serde_json::Value;
 use std::process::Command;
 use tempfile::TempDir;
@@ -389,7 +389,7 @@ fn req04_error_type_is_invariant_config_error() {
     // REQ-04 (type check via invariants module directly): `InvariantRegistry::from_toml_str`
     // surfaces a typed `InvariantConfigError::Toml` for missing fields, and
     // `InvariantConfigError::DuplicateId` for duplicate ids.
-    use jit::validation::invariants::InvariantRegistry;
+    use jit::declarations::invariants::InvariantRegistry;
 
     // Missing statement → InvariantConfigError::Toml naming the field.
     let err = InvariantRegistry::from_toml_str(

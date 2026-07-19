@@ -73,11 +73,11 @@ pub struct JitConfig {
     /// Not read from `config.toml`: populated by [`JitConfig::load`] from the
     /// sibling `invariants.toml` (absent file → empty registry) on BOTH load
     /// paths, so it carries `#[serde(skip)]` and defaults to an empty
-    /// [`InvariantRegistry`](crate::validation::invariants::InvariantRegistry).
+    /// [`InvariantRegistry`](crate::declarations::invariants::InvariantRegistry).
     /// Kept here so later indexing can project each entry as a project-scoped
     /// (`@`) addressable item.
     #[serde(skip)]
-    pub invariants: crate::validation::invariants::InvariantRegistry,
+    pub invariants: crate::declarations::invariants::InvariantRegistry,
 }
 
 /// Schema version configuration.
@@ -1445,7 +1445,7 @@ impl JitConfig {
                 // loads on this config-absent path too (absent file → empty
                 // registry; a malformed/invalid entry fails config load with a
                 // typed, descriptive error).
-                invariants: crate::validation::invariants::InvariantRegistry::load(jit_root)
+                invariants: crate::declarations::invariants::InvariantRegistry::load(jit_root)
                     .context("invalid .jit/invariants.toml")?,
             });
         }
@@ -1484,7 +1484,7 @@ impl JitConfig {
         // Chain-load `.jit/invariants.toml` on the config-present path too, with
         // the same graceful-absent / typed-error contract as the early return
         // above, so both load paths populate the registry identically.
-        config.invariants = crate::validation::invariants::InvariantRegistry::load(jit_root)
+        config.invariants = crate::declarations::invariants::InvariantRegistry::load(jit_root)
             .context("invalid .jit/invariants.toml")?;
 
         Ok(config)
@@ -2169,7 +2169,7 @@ enforced-by = "dag-no-cycles"
         assert_eq!(inv.id, "sample-invariant");
         assert_eq!(
             inv.kind,
-            crate::validation::invariants::InvariantKind::Enforced
+            crate::declarations::invariants::InvariantKind::Enforced
         );
         assert_eq!(inv.enforced_by.as_deref(), Some("dag-no-cycles"));
     }

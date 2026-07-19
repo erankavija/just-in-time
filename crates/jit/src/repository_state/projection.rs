@@ -14,7 +14,7 @@
 //!   ANY item kind with no dedicated code;
 //! - [`render_invariants_markdown`] — the built-in `full` render of the invariant
 //!   registry (the rule + gate `full` render lives in
-//!   [`rules_gates_projection`](crate::validation::rules_gates_projection));
+//!   [`rules_gates_projection`](crate::repository_state::rules_gates_projection));
 //! - [`splice_region`] — the PURE region splice; and
 //! - [`require_target`] — resolve a projection's REQUIRED `target`, naming the
 //!   projection on omission (no default is applied, REQ-07).
@@ -25,19 +25,18 @@
 //! [`project_render`](crate::commands) command, which renders and materializes
 //! EVERY projection before writing ANY target so a failing render leaves the tree
 //! untouched; the write lands through the storage boundary
-//! ([`IssueStore::write_repo_file`](crate::storage::IssueStore::write_repo_file),
-//! itself over [`write_file_atomic`](crate::repository_state::write_file_atomic)).
+//! ([`IssueStore::write_repo_file`](crate::storage::IssueStore::write_repo_file)).
 //!
 //! Target path, mode, style, and delimiters come ONLY from
 //! [`ProjectionConfig`](crate::config::ProjectionConfig); this module hardcodes no
 //! documentation filename. The projection-to-body wiring (which registry or source
 //! feeds which projection) lives in
-//! [`project_render`](crate::validation::project_render).
+//! [`project_render`](crate::repository_state::projection_render).
 
 use crate::config::{ProjectionConfig, ProjectionMode, ProjectionStyle};
 use crate::domain::item::AddressableItem;
 use crate::storage::PathReadError;
-use crate::validation::invariants::{InvariantKind, InvariantRegistry};
+use crate::declarations::invariants::{InvariantKind, InvariantRegistry};
 use anyhow::Result;
 use std::collections::BTreeMap;
 use thiserror::Error;
@@ -45,7 +44,7 @@ use thiserror::Error;
 /// Errors raised while rendering or writing a generic projection.
 ///
 /// Shared by [`splice_region`] and [`require_target`] here, the body-rendering
-/// wiring in [`project_render`](crate::validation::project_render) (kind and source
+/// wiring in [`project_render`](crate::repository_state::projection_render) (kind and source
 /// resolution), and the two-phase `jit project render` command that materializes
 /// and writes targets. Every variant carries enough context (the
 /// offending marker, the target path, the missing projection, the unknown kind, or

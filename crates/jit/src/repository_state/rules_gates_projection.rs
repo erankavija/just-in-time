@@ -1,7 +1,7 @@
 //! Project the rule and gate registries into a CONFIGURABLE documentation target.
 //!
 //! The rules/gates analogue of the invariant projection
-//! ([`projection`](crate::validation::projection)): it renders BOTH the effective
+//! ([`projection`](crate::repository_state::projection)): it renders BOTH the effective
 //! [`RuleSet`] and the [`GateRegistry`] into one reference document and writes it
 //! into a config-selected target, reusing the SAME projection primitives:
 //!
@@ -13,9 +13,9 @@
 //! `rule` + `gate` registry-first kinds: it takes the two registries directly,
 //! since their typed fields (severity, enforcement, gate title) are absent from a
 //! generic addressable row. The generic projection command
-//! ([`project_render`](crate::validation::project_render)) selects this renderer for
+//! ([`project_render`](crate::repository_state::projection_render)) selects this renderer for
 //! a `full`-style projection over the rule + gate kinds, then writes the body
-//! through the shared [`write_projection`](crate::validation::projection::write_projection).
+//! through the shared [`write_projection`](crate::repository_state::projection).
 //!
 //! Every rule/gate is addressed by its canonical kind-segmented form —
 //! `@/rule/<name>` and `@/gate/<key>` — matching the `[item_kinds.rule]` /
@@ -67,7 +67,7 @@ fn gate_address(key: &str) -> String {
 /// use jit::config::ProjectionStyle;
 /// use jit::declarations::GateRegistry;
 /// use jit::declarations::rules::RuleSet;
-/// use jit::validation::rules_gates_projection::render_rules_and_gates_markdown;
+/// use jit::repository_state::render_rules_and_gates_markdown;
 ///
 /// let rules = RuleSet::parse(
 ///     "[[rules]]\nname = \"label-format\"\ndescription = \"Labels are namespace:value.\"\n\

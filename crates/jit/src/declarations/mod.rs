@@ -5,6 +5,7 @@
 //! an alternate representation.
 
 mod gates;
+pub mod invariants;
 pub mod rules;
 
 pub use gates::{

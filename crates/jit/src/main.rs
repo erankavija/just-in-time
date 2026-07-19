@@ -74,7 +74,7 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             .downcast_ref::<jit::errors::RedundantDependencyError>()
             .is_some()
         || error
-            .downcast_ref::<jit::validation::projection::ProjectionError>()
+            .downcast_ref::<jit::repository_state::ProjectionError>()
             .is_some()
         || error
             .downcast_ref::<jit::profile::ProfilePlanError>()
@@ -1370,7 +1370,7 @@ fn run_project<S: IssueStore>(
         // A typed projection failure is a validation error (exit 4) in JSON mode
         // too, matching the non-JSON path's top-level classification.
         let code = if e
-            .downcast_ref::<jit::validation::projection::ProjectionError>()
+            .downcast_ref::<jit::repository_state::ProjectionError>()
             .is_some()
         {
             jit::output::ErrorCode::VALIDATION_FAILED

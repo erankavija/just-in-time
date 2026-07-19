@@ -42,7 +42,7 @@
 //! `.jit/config.toml` declares under `[item_kinds]`.
 
 use crate::domain::item::{parse_kind_segmented_address, AddressScope};
-use crate::validation::invariants::Invariant;
+use crate::declarations::invariants::Invariant;
 use std::collections::BTreeSet;
 
 /// A single enforcement-drift finding: an invariant whose `enforced-by` binding
@@ -161,7 +161,7 @@ impl SourceState<'_> {
 ///
 /// ```
 /// use jit::validation::drift::{enforcement_drift_tolerant, SourceState};
-/// use jit::validation::invariants::InvariantRegistry;
+/// use jit::declarations::invariants::InvariantRegistry;
 /// use std::collections::BTreeSet;
 ///
 /// let reg = InvariantRegistry::from_toml_str(
@@ -235,7 +235,7 @@ fn resolve_binding(binding: &str, rules: SourceState<'_>, gates: SourceState<'_>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::validation::invariants::InvariantRegistry;
+    use crate::declarations::invariants::InvariantRegistry;
 
     fn reg(toml: &str) -> InvariantRegistry {
         InvariantRegistry::from_toml_str(toml).unwrap()

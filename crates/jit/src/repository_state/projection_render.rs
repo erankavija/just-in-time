@@ -35,10 +35,10 @@ use crate::domain::item::{
     AddressableItem, ItemKind, Scope,
 };
 use crate::domain::ContentFormat;
-use crate::validation::projection::{
+use super::projection::{
     render_id_anchor_rows, render_invariants_markdown, ProjectionError,
 };
-use crate::validation::rules_gates_projection::render_rules_and_gates_markdown;
+use super::rules_gates_projection::render_rules_and_gates_markdown;
 use anyhow::Result;
 use std::collections::BTreeSet;
 

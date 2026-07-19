@@ -10,7 +10,10 @@ mod image;
 mod managed_document;
 mod mutation;
 mod path;
+mod projection;
+mod projection_render;
 mod rule_serialize;
+mod rules_gates_projection;
 
 pub use default_rules::{
     default_rule_membership_diff, default_rule_membership_diff_from_identities, default_ruleset,
@@ -37,6 +40,12 @@ pub use path::{
     InjectivityProof, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
+pub use projection::{
+    compose_projection, render_id_anchor_rows, render_invariants_markdown, require_target,
+    splice_region, ProjectionError,
+};
+pub use projection_render::{render_projection_body, ProjectionInputs};
+pub use rules_gates_projection::render_rules_and_gates_markdown;
 pub use rule_serialize::{
     render_rule_block, rules_file_header, serialize_ruleset, type_hierarchy_schema_content,
     SchemaFile, SerializedRuleSet,

@@ -23,8 +23,6 @@
 //! - [`graph`] — cross-issue graph-rule evaluation (validate / gate checkers);
 //! - [`strictness`] — the repo-wide [`Strictness`] enforcement modulator that
 //!   globally widens or narrows which violations block a write or transition;
-//! - [`invariants`] — the project-invariant registry and `.jit/invariants.toml`
-//!   loader (registry-first, project-scoped);
 //! - [`drift`] — the enforcement-drift check (declaration consistency between
 //!   invariants and loadable rules/gates), reporting the sole
 //!   declared-but-unenforced direction;
@@ -40,13 +38,9 @@ pub mod desugar;
 pub mod drift;
 pub mod engine;
 pub mod graph;
-pub mod invariants;
 pub mod local;
-pub mod project_render;
-pub mod projection;
 pub mod report;
 pub mod repository;
-pub mod rules_gates_projection;
 pub mod strictness;
 
 pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};

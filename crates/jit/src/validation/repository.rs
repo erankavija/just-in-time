@@ -20,9 +20,9 @@ use crate::domain::item::{
 use crate::domain::{parse_known_events, Issue, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
 use crate::validation::engine::Finding;
-use crate::validation::invariants::InvariantRegistry;
-use crate::validation::project_render::{render_projection_body, ProjectionInputs};
-use crate::validation::projection::{compose_projection, require_target, splice_region};
+use crate::declarations::invariants::InvariantRegistry;
+use crate::repository_state::{render_projection_body, ProjectionInputs};
+use crate::repository_state::{compose_projection, require_target, splice_region};
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
