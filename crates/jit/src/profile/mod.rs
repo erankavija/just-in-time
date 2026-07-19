@@ -6,7 +6,6 @@
 
 mod application;
 mod dogfood;
-mod drift;
 mod manifest;
 mod package;
 mod planner;
@@ -24,7 +23,6 @@ pub use dogfood::{
     jit_dogfood_gate, jit_dogfood_live_projection, jit_dogfood_package,
     jit_dogfood_planning_gate_keys, DogfoodProfileError, JIT_DOGFOOD_LIVE_SOURCE_PREFIX,
 };
-pub use drift::{compare_projection_tree, DriftFinding, DriftKind, ProjectionDriftError};
 pub use manifest::{
     profile_manifest_schema, AssetDeclaration, CompleteProjectionConfig, Contribution,
     KeyedArrayTarget, MapEntryTarget, ProfileManifest, ProfileMetadata, RegionDeclaration,
