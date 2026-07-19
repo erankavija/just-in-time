@@ -413,6 +413,22 @@ pub fn serialize_gate_run(result: &GateRunResult) -> Result<Vec<u8>, MutationErr
     canonical_json(result, true)
 }
 
+/// Serialize a fresh (empty) membership index to its exact on-disk bytes.
+///
+/// The finalizer is the sole authority over `index.json` serialization, so
+/// repository initialization renders its empty index through the same canonical
+/// serializer a later membership update uses; the two never disagree.
+pub fn fresh_index_bytes() -> Result<Vec<u8>, MutationError> {
+    canonical_json(
+        &RepositoryIndex {
+            schema_version: 2,
+            all_ids: Vec::new(),
+            deleted_ids: Vec::new(),
+        },
+        true,
+    )
+}
+
 /// Serialize one event to its exact single-line JSONL representation (no newline).
 pub fn serialize_event(event: &Event) -> Result<Vec<u8>, MutationError> {
     canonical_json(event, false)

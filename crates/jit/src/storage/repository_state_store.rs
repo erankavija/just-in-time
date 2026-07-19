@@ -4235,7 +4235,7 @@ mod tests {
         let issue_file = VirtualPath::data(format!("issues/{issue_id}.json")).unwrap();
         let index = VirtualPath::data("index.json").unwrap();
         let events = VirtualPath::data("events.jsonl").unwrap();
-        let index_bytes = crate::storage::json::fresh_index_bytes().unwrap();
+        let index_bytes = crate::repository_state::fresh_index_bytes().unwrap();
 
         let mut draft = crate::domain::Issue::draft("New".into(), "Body".into());
         draft.state = crate::domain::State::Ready;

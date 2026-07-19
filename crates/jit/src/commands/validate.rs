@@ -195,13 +195,48 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
     ) -> Result<crate::repository_state::RepositoryImage> {
-        use crate::repository_state::{
-            apply_overlay, validate_capture_closure, CaptureBudget, CaptureSpec, VirtualPath,
-        };
-        use crate::storage::RepositoryStateStoreError;
+        use crate::repository_state::apply_overlay;
 
         let layout = self.require_layout()?;
         let mut session = self.storage().open_mutation_session(layout)?;
+        for _ in 0..8 {
+            match self.capture_proposed_base(session.as_mut(), overrides, &[])? {
+                None => continue,
+                Some(base) if overrides.is_empty() => return Ok(base),
+                Some(base) => return Ok(apply_overlay(&base, overrides.clone())?),
+            }
+        }
+        Err(anyhow!(
+            "validation capture did not converge after repeated capture conflicts"
+        ))
+    }
+
+    /// One bounded two-phase capture attempt of the whole-repository validation
+    /// base under an already-held session.
+    ///
+    /// Returns the captured PRE-overlay base (the caller applies any overlay for
+    /// validation and reads it for its own delta), `Ok(None)` on a retryable
+    /// read-set conflict, or an error otherwise. `overrides` scopes the closure to
+    /// the proposed declarations (so a proposed init/profile state captures what
+    /// its passes read); `extra_paths` discovers additional delta targets (init
+    /// schema files, profile assets, directories, provenance) into the base so a
+    /// subsequent `apply` finds each action's captured preimage. Sharing one held
+    /// session lets a caller capture the base and apply its delta under the same
+    /// guard without a second, deadlock-prone session.
+    pub(crate) fn capture_proposed_base(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        overrides: &std::collections::BTreeMap<
+            crate::repository_state::VirtualPath,
+            Option<Vec<u8>>,
+        >,
+        extra_paths: &[crate::repository_state::VirtualPath],
+    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
+        use crate::repository_state::{
+            validate_capture_closure, CaptureBudget, CaptureSpec, VirtualPath,
+        };
+        use crate::storage::RepositoryStateStoreError;
+
         let budget = CaptureBudget {
             max_paths: 1 << 16,
             max_listings: 256,
@@ -230,61 +265,53 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 None => super::image_repo_bytes(image, repo_rel),
             }
         };
-        for _ in 0..8 {
-            let image_one = match session.capture(CaptureSpec::phase_one(registries()?, budget)?) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            };
-            // Closure planning is best-effort: a malformed registry cannot fail the
-            // capture, because validation itself is the authority that reports it.
-            // A bad config/index/rules yields a conservative closure (its projection,
-            // item-kind, issue, and schema entries drop out), and the subsequent
-            // `validate_repository` pass surfaces the parse error as a finding.
-            let config = effective_config(&image_one, &effective)
-                .unwrap_or_else(|_| toml::from_str("").expect("empty configuration parses"));
-            let all_ids = effective_index_ids(&image_one, &effective).unwrap_or_default();
-            let rules_text = effective(&image_one, ".jit/rules.toml")?
-                .map(String::from_utf8)
-                .transpose()?;
-            let schema_rules = rules_text.as_deref().filter(|content| {
-                crate::declarations::rules::RuleSet::schema_requests(content).is_ok()
-            });
-            let closure = validate_capture_closure(&config, &all_ids, schema_rules)?;
+        let image_one = match session.capture(CaptureSpec::phase_one(registries()?, budget)?) {
+            Ok(image) => image,
+            Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        // Closure planning is best-effort: a malformed registry cannot fail the
+        // capture, because validation itself is the authority that reports it.
+        // A bad config/index/rules yields a conservative closure (its projection,
+        // item-kind, issue, and schema entries drop out), and the subsequent
+        // `validate_repository` pass surfaces the parse error as a finding.
+        let config = effective_config(&image_one, &effective)
+            .unwrap_or_else(|_| toml::from_str("").expect("empty configuration parses"));
+        let all_ids = effective_index_ids(&image_one, &effective).unwrap_or_default();
+        let rules_text = effective(&image_one, ".jit/rules.toml")?
+            .map(String::from_utf8)
+            .transpose()?;
+        let schema_rules = rules_text.as_deref().filter(|content| {
+            crate::declarations::rules::RuleSet::schema_requests(content).is_ok()
+        });
+        let closure = validate_capture_closure(&config, &all_ids, schema_rules)?;
 
-            let mut spec = CaptureSpec::phase_one(registries()?, budget)?;
-            spec.discover_paths(closure.paths)?;
-            for listing in &closure.listings {
-                spec.discover_listing(listing.clone())?;
-            }
-            let mut phase_three = spec.clone();
-            let image_two = match session.capture(spec) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            };
-
-            let issues = effective_issues(&image_two, &all_ids, &effective)?;
-            let mut full_config = config.clone();
-            full_config.templates = effective_templates(&image_two, &config, &effective)?;
-            let (worktree_docs, pinned) = document_capture_closure(&issues, &full_config)?;
-            phase_three.discover_paths(worktree_docs)?;
-            for (revision, path) in pinned {
-                phase_three.discover_pinned(revision, path)?;
-            }
-            let base = match session.capture(phase_three) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            };
-            if overrides.is_empty() {
-                return Ok(base);
-            }
-            return Ok(apply_overlay(&base, overrides.clone())?);
+        let mut spec = CaptureSpec::phase_one(registries()?, budget)?;
+        spec.discover_paths(closure.paths)?;
+        for listing in &closure.listings {
+            spec.discover_listing(listing.clone())?;
         }
-        Err(anyhow!(
-            "validation capture did not converge after repeated capture conflicts"
-        ))
+        let mut phase_three = spec.clone();
+        let image_two = match session.capture(spec) {
+            Ok(image) => image,
+            Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+
+        let issues = effective_issues(&image_two, &all_ids, &effective)?;
+        let mut full_config = config.clone();
+        full_config.templates = effective_templates(&image_two, &config, &effective)?;
+        let (worktree_docs, pinned) = document_capture_closure(&issues, &full_config)?;
+        phase_three.discover_paths(worktree_docs)?;
+        phase_three.discover_paths(extra_paths.iter().cloned())?;
+        for (revision, path) in pinned {
+            phase_three.discover_pinned(revision, path)?;
+        }
+        match session.capture(phase_three) {
+            Ok(base) => Ok(Some(base)),
+            Err(RepositoryStateStoreError::RetryableConflict { .. }) => Ok(None),
+            Err(error) => Err(error.into()),
+        }
     }
 
     /// Capture the validation image and return the full whole-repository report.

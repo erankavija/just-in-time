@@ -7,6 +7,7 @@
 
 mod default_rules;
 mod image;
+mod initialize;
 mod managed_document;
 mod materialize;
 mod mutation;
@@ -30,6 +31,10 @@ pub use image::{
     PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
     RepositorySeed, RepositorySeedKind, SeedError, TargetClaim,
 };
+pub use initialize::{
+    finalize_initialization, finalize_profile_application, render_repo_config, InitializationError,
+    InitializationScaffold, ProfileContribution, ProfileTargetContribution,
+};
 pub use managed_document::{
     compose_managed_documents, render_managed_document, ManagedDocumentClaim, ManagedDocumentError,
     RegionPlacement,
@@ -38,9 +43,9 @@ pub use materialize::{
     assemble_config, render_capture_closure, validate_capture_closure, ValidationCaptureClosure,
 };
 pub use mutation::{
-    finalize, issue_draft, prefix_has_torn_tail, serialize_event, serialize_gate_run,
-    serialize_issue, FixedMutationClock, IdAuthority, MutationClock, MutationContext,
-    MutationError, MutationIntent, SystemMutationClock,
+    finalize, fresh_index_bytes, issue_draft, prefix_has_torn_tail, serialize_event,
+    serialize_gate_run, serialize_issue, FixedMutationClock, IdAuthority, MutationClock,
+    MutationContext, MutationError, MutationIntent, SystemMutationClock,
 };
 pub use overlay::{apply_overlay, OverlayError};
 pub use path::{
@@ -133,6 +138,17 @@ pub fn derive_materializations(
             derive_project_render(image, &declarations, selected.as_ref())?
         }
         MaterializationIntent::RepairDerivedState => derive_repair(image, &declarations)?,
+        MaterializationIntent::InitializeRepository | MaterializationIntent::ApplyProfile => {
+            // Init and profile application do not derive their bytes from
+            // declarations already present in the image (init CREATES those
+            // declarations); they are finalized by the dedicated
+            // `finalize_initialization`/`finalize_profile_application` entries.
+            return Err(RepositoryStateError::Producer(
+                "initialize/apply-profile intents are finalized by their dedicated entries, \
+                 not the declaration-derived producer graph"
+                    .to_string(),
+            ));
+        }
     };
     MaterializationPlan::new(image, seed, &intent, delta).map_err(Into::into)
 }

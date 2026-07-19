@@ -919,6 +919,15 @@ pub enum MaterializationIntent {
     },
     /// Repair every explicitly owned derived-state drift finding.
     RepairDerivedState,
+    /// Publish a fresh (or missing-file) repository scaffold, optionally with an
+    /// embedded profile, as one complete delta. Finalized by
+    /// [`finalize_initialization`](crate::repository_state::finalize_initialization),
+    /// not the declaration-derived producer graph.
+    InitializeRepository,
+    /// Apply an embedded profile to an existing repository as one complete delta.
+    /// Finalized by
+    /// [`finalize_profile_application`](crate::repository_state::finalize_profile_application).
+    ApplyProfile,
 }
 
 /// Stable ownership identity for a target claim.

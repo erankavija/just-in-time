@@ -1,26 +1,25 @@
 use super::CommandExecutor;
 use crate::config::{slugify_project_name, JitConfig, ProjectName};
-use crate::config_manager::ConfigManager;
-use crate::declarations::GateRegistry;
 use crate::domain::Event;
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
     append_profile_event_image, plan_profile_application_against, EmbeddedProfilePackage,
-    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileOrigin,
+    PlannedTargetAction, ProfileApplicationStatus, ProfileApplyResult, ProfileOrigin,
     ProjectedFileMode, RepositorySnapshot, SnapshotEntry, SnapshotFile,
 };
+use crate::repository_state::{
+    apply_overlay, finalize_initialization, FileMode, InitializationScaffold, ProfileContribution,
+    ProfileTargetContribution, VirtualPath,
+};
 use crate::storage::{
-    FileTransactionKernel, FileTransactionPlan, IssueStore, JsonFileStorage, RecoveryCoordinator,
-    RecoveryRequiredError, RecoveryState, TransactionAction,
+    IssueStore, JsonFileStorage, RepositoryStateStore, RepositoryStateStoreError,
 };
 use crate::validation::repository::{
     FilesystemRepositoryView, OverlayRepositoryView, RepositoryView,
 };
-use anyhow::{Context, Result};
-use std::collections::{BTreeMap, BTreeSet};
+use anyhow::{anyhow, Context, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use uuid::Uuid;
 
 /// Result of publishing a fresh repository scaffold.
 #[derive(Debug)]
@@ -29,367 +28,230 @@ pub struct FreshInitResult {
     pub project_name: ProjectName,
     /// Applied profile result when initialization included one.
     pub profile: Option<ProfileApplyResult>,
-    /// Non-fatal transaction cleanup diagnostics.
+    /// Non-fatal diagnostics. The recovered session owns transaction recovery, so
+    /// this is empty in normal operation and retained only for output stability.
     pub warnings: Vec<String>,
-}
-
-/// Pure byte image shared by ordinary and profiled fresh initialization.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct InitScaffold {
-    files: BTreeMap<String, Vec<u8>>,
-    directories: BTreeSet<String>,
-    project_name: ProjectName,
-}
-
-impl InitScaffold {
-    /// Generate every neutral repository byte without touching the filesystem.
-    pub(crate) fn generate(repo_dir: &Path, template: &HierarchyTemplate) -> Result<Self> {
-        let basename = repo_dir
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("");
-        let project_name: ProjectName = slugify_project_name(basename).parse()?;
-        let config = crate::storage::config_store::render_repo_config(
-            &template.generate_config_toml(),
-            &project_name,
-        );
-        Self::from_config(repo_dir, config, project_name)
-    }
-
-    fn from_config(repo_dir: &Path, config: String, project_name: ProjectName) -> Result<Self> {
-        let parsed: JitConfig =
-            toml::from_str(&config).context("Failed to parse generated init configuration")?;
-        let namespaces = ConfigManager::new(repo_dir.join(".jit")).namespaces_from_config(&parsed);
-        let rules = crate::repository_state::serialize_ruleset(
-            &crate::repository_state::default_ruleset(&namespaces),
-        );
-
-        let mut files = BTreeMap::from([
-            (
-                ".jit/index.json".to_string(),
-                crate::storage::json::fresh_index_bytes()?,
-            ),
-            (
-                ".jit/gates.toml".to_string(),
-                crate::declarations::serialize_gate_registry(&GateRegistry::default())?,
-            ),
-            (".jit/events.jsonl".to_string(), Vec::new()),
-            (".jit/config.toml".to_string(), config.into_bytes()),
-            (".jit/rules.toml".to_string(), rules.rules_toml.into_bytes()),
-        ]);
-        files.extend(rules.schema_files.into_iter().map(|schema| {
-            (
-                format!(".jit/schemas/{}", schema.name),
-                schema.content.into_bytes(),
-            )
-        }));
-
-        Ok(Self {
-            files,
-            directories: BTreeSet::from([".jit/issues".to_string()]),
-            project_name,
-        })
-    }
-
-    fn missing_from_existing(
-        storage: &JsonFileStorage,
-        repo_dir: &Path,
-        template: &HierarchyTemplate,
-    ) -> Result<Self> {
-        let generated = Self::generate(repo_dir, template)?;
-        let config_snapshot = storage.capture_profile_snapshot([".jit/config.toml"])?;
-        let scaffold = match config_snapshot.entry(".jit/config.toml") {
-            None => generated,
-            Some(SnapshotEntry::File(file)) => {
-                let config = String::from_utf8(file.bytes.clone())
-                    .context("existing .jit/config.toml is not UTF-8")?;
-                let parsed: JitConfig = toml::from_str(&config)
-                    .context("Failed to parse existing init configuration")?;
-                let project_name = parsed
-                    .project
-                    .and_then(|project| project.name)
-                    .unwrap_or(generated.project_name);
-                Self::from_config(repo_dir, config, project_name)?
-            }
-            Some(_) => anyhow::bail!("existing .jit/config.toml is not a regular file"),
-        };
-        let paths = scaffold
-            .files
-            .keys()
-            .map(String::as_str)
-            .chain(scaffold.directories.iter().map(String::as_str));
-        let snapshot = storage.capture_profile_snapshot(paths)?;
-        let files = scaffold
-            .files
-            .into_iter()
-            .filter_map(|(path, bytes)| match snapshot.entry(&path) {
-                None => Some(Ok((path, bytes))),
-                Some(SnapshotEntry::File(_)) if path.starts_with(".jit/schemas/") => {
-                    Some(Ok((path, bytes)))
-                }
-                Some(SnapshotEntry::File(_)) => None,
-                Some(_) => Some(Err(anyhow::anyhow!(
-                    "neutral scaffold path '{path}' is not a regular file"
-                ))),
-            })
-            .collect::<Result<BTreeMap<_, _>>>()?;
-        let directories = scaffold
-            .directories
-            .into_iter()
-            .filter_map(|path| match snapshot.entry(&path) {
-                None => Some(Ok(path)),
-                Some(SnapshotEntry::Directory) => None,
-                Some(_) => Some(Err(anyhow::anyhow!(
-                    "neutral scaffold path '{path}' is not a directory"
-                ))),
-            })
-            .collect::<Result<BTreeSet<_>>>()?;
-        Ok(Self {
-            files,
-            directories,
-            project_name: scaffold.project_name,
-        })
-    }
-
-    fn overlay(&self) -> impl Iterator<Item = (PathBuf, Option<Vec<u8>>)> + '_ {
-        self.files
-            .iter()
-            .map(|(path, bytes)| (PathBuf::from(path), Some(bytes.clone())))
-    }
-}
-
-struct FreshProfilePlan {
-    apply_result: ProfileApplyResult,
-    changed_files: BTreeMap<String, (Vec<u8>, ProjectedFileMode)>,
 }
 
 impl CommandExecutor<JsonFileStorage> {
     /// Atomically complete neutral initialization and apply one profile.
     ///
-    /// An absent data directory uses the external bootstrap journal. An
-    /// existing partial repository contributes its current bytes as the base;
-    /// only missing neutral scaffold state and profile changes enter one
-    /// repository-local transaction.
+    /// An absent data directory is published through the recovered session's
+    /// staged-root machinery; an existing partial repository fills only its missing
+    /// neutral scaffold state and the profile's changes in one delta.
     pub fn initialize_profiled_repository(
         &self,
         repo_dir: &Path,
         template: &HierarchyTemplate,
         profile_id: &str,
     ) -> Result<FreshInitResult> {
-        let _recovery_session = RecoveryCoordinator::recover_before_services(&self.storage)?;
-        let kernel = FileTransactionKernel::new(self.storage.open_repository_capability()?)?;
-        let scaffold = if self.storage.root().exists() {
-            InitScaffold::missing_from_existing(&self.storage, repo_dir, template)?
-        } else {
-            InitScaffold::generate(repo_dir, template)?
-        };
-        self.publish_init_scaffold(repo_dir, scaffold, Some(profile_id), &kernel)
+        self.run_initialization(repo_dir, template, Some(profile_id))
     }
 
-    /// Publish a fresh neutral or profiled repository in one recoverable
-    /// fresh-root transaction.
+    /// Publish a fresh neutral or profiled repository through the recovered
+    /// session.
     ///
-    /// The caller must use this only while the selected storage root is absent.
-    /// No plain mutating initialization is invoked before profile planning:
-    /// neutral bytes are generated in memory, profile bytes are merged and
-    /// validated over that image, and the complete result is published once.
+    /// The neutral scaffold and any profile bytes are captured and validated over
+    /// one held session guard, then published as one exact
+    /// [`RepositoryDelta`](crate::repository_state::RepositoryDelta); nothing is
+    /// mutated before publication.
     pub fn initialize_fresh_repository(
         &self,
         repo_dir: &Path,
         template: &HierarchyTemplate,
         profile_id: Option<&str>,
     ) -> Result<FreshInitResult> {
-        let _recovery_session = RecoveryCoordinator::recover_before_services(&self.storage)?;
-        if self.storage.root().exists() {
-            anyhow::bail!(
-                "another initializer published the data directory: {}",
-                self.storage.root().display()
-            );
-        }
-        let kernel = FileTransactionKernel::new(self.storage.open_repository_capability()?)?;
-        let scaffold = InitScaffold::generate(repo_dir, template)?;
-        self.publish_init_scaffold(repo_dir, scaffold, profile_id, &kernel)
+        self.run_initialization(repo_dir, template, profile_id)
     }
 
-    #[cfg(test)]
-    fn initialize_fresh_repository_with_kernel(
+    /// Capture the base under one recovered session, validate the proposed
+    /// scaffold/profile overlay, and publish the complete initialization delta.
+    fn run_initialization(
         &self,
         repo_dir: &Path,
         template: &HierarchyTemplate,
         profile_id: Option<&str>,
-        kernel: &FileTransactionKernel,
     ) -> Result<FreshInitResult> {
-        let scaffold = InitScaffold::generate(repo_dir, template)?;
-        self.publish_init_scaffold(repo_dir, scaffold, profile_id, kernel)
-    }
+        let package = profile_id.map(embedded_profile).transpose()?;
+        let layout = self.require_layout()?;
+        let mut session = self.storage().open_mutation_session(layout)?;
+        for _ in 0..8 {
+            let (config, project_name) =
+                self.resolve_init_config(session.as_mut(), repo_dir, template)?;
+            let neutral =
+                InitializationScaffold::from_config(config.clone(), project_name.clone(), None)?;
+            let profiled = package
+                .as_ref()
+                .map(|package| self.compute_profile_contribution(package, &neutral))
+                .transpose()?;
+            let (contribution, mut apply_result) = match profiled {
+                Some((contribution, result)) => (Some(contribution), Some(result)),
+                None => (None, None),
+            };
+            let scaffold = InitializationScaffold::from_config(config, project_name, contribution)?;
 
-    fn publish_init_scaffold(
-        &self,
-        _repo_dir: &Path,
-        scaffold: InitScaffold,
-        profile_id: Option<&str>,
-        kernel: &FileTransactionKernel,
-    ) -> Result<FreshInitResult> {
-        // Capture the base validation image BEFORE the non-reentrant repository/event
-        // locks; a capture session opened while the event lock is held would
-        // deadlock. Proposed-state validation overlays the scaffold (and profile)
-        // onto this base purely. TRANSITIONAL: increment 5 moves capture under the
-        // retained session guard with pre-journal revalidation (plan §2).
-        let base_image = self.capture_validation_image_with(&std::collections::BTreeMap::new())?;
-        let bootstrap_guard = self.storage.acquire_bootstrap_write_lock()?;
-        let repository_guard = self
-            .storage
-            .root()
-            .exists()
-            .then(|| self.storage.acquire_repo_write_lock_raw())
-            .transpose()?;
-        let _events_guard = repository_guard
-            .as_ref()
-            .map(|_| self.storage.acquire_events_write_lock())
-            .transpose()?;
-        let transaction_guard = repository_guard.as_ref().unwrap_or(&bootstrap_guard);
+            let extra_paths = scaffold.delta_paths()?;
+            // Probe capture: the deliberately over-inclusive scaffold overlay yields
+            // a base good enough to finalize the exact delta. That delta's overlay
+            // is the AUTHORITATIVE proposed state — only the files init writes — so a
+            // preserved `IfAbsent` file (e.g. an existing `rules.toml` referencing a
+            // custom schema) is not shadowed by its neutral default in the closure.
+            let probe_overrides = scaffold.overlay_overrides()?;
+            let probe = match self.capture_proposed_base(
+                session.as_mut(),
+                &probe_overrides,
+                &extra_paths,
+            )? {
+                None => continue,
+                Some(base) => base,
+            };
+            let delta_overlay =
+                validation_overlay(finalize_initialization(&probe, &scaffold)?.delta());
 
-        // `validation_base` survives ONLY as the view the profile planner's
-        // render_projections/projection_targets still consume (increment 6 deletes
-        // that machinery).
-        let validation_base: Arc<dyn RepositoryView> = Arc::new(
-            FilesystemRepositoryView::from_jit_root(self.storage.root())?,
-        );
-        let neutral_overrides = super::overrides_from_repo_changes(scaffold.overlay())?;
-        let neutral_image = crate::repository_state::apply_overlay(&base_image, neutral_overrides)?;
-        let neutral_validation =
-            crate::validation::repository::validate_repository(&neutral_image)?;
-        if neutral_validation.rule_report.has_errors() {
-            anyhow::bail!(
-                "fresh repository scaffold produced {} validation error finding(s)",
-                neutral_validation.rule_report.error_count()
-            );
-        }
-
-        let profile = profile_id
-            .map(|id| {
-                let package = super::profile::embedded_profile(id)?;
-                self.prepare_fresh_profile(
-                    &scaffold,
-                    validation_base.clone(),
-                    &base_image,
-                    &package,
-                )
-            })
-            .transpose()?;
-
-        let mut files = scaffold
-            .files
-            .iter()
-            .map(|(path, bytes)| (path.clone(), (bytes.clone(), ProjectedFileMode::Regular)))
-            .collect::<BTreeMap<_, _>>();
-        if let Some(profile) = &profile {
-            files.extend(profile.changed_files.clone());
-        }
-
-        let mut actions = scaffold
-            .directories
-            .iter()
-            .map(|path| TransactionAction::CreateDirectory {
-                path: super::profile::transaction_path(self.storage.root(), path),
-                unix_mode: Some(0o755),
-            })
-            .collect::<Vec<_>>();
-        actions.extend(files.into_iter().map(|(path, (contents, mode))| {
-            TransactionAction::WriteFile {
-                path: super::profile::transaction_path(self.storage.root(), &path),
-                contents,
-                unix_mode: super::profile::unix_mode(mode),
-            }
-        }));
-
-        let transaction_id = format!("init-{}", Uuid::new_v4());
-        let outcome = kernel.execute(
-            transaction_guard,
-            FileTransactionPlan {
-                transaction_id: transaction_id.clone(),
-                actions,
-            },
-        );
-        let mut warnings = Vec::new();
-        match outcome {
-            Ok(_) => {}
-            Err(error) => {
-                let Some(recovery) = error.downcast_ref::<RecoveryRequiredError>() else {
-                    return Err(error);
+            // Re-capture the base with the exact write set so the validation closure
+            // and the delta's preimages come from one coherent image, then finalize,
+            // validate, and publish under the same held session.
+            let base =
+                match self.capture_proposed_base(session.as_mut(), &delta_overlay, &extra_paths)? {
+                    None => continue,
+                    Some(base) => base,
                 };
-                if recovery.state != RecoveryState::Committed {
-                    return Err(error);
-                }
-                warnings.push(format!(
-                    "transaction {transaction_id} committed but cleanup is pending: {:#}",
-                    recovery.source
-                ));
-            }
-        }
-
-        let profile = profile.map(|mut profile| {
-            if !warnings.is_empty() {
-                profile.apply_result.warnings.push(
-                    ProfileApplicationWarning::TransactionCleanupPending {
-                        transaction_id: transaction_id.clone(),
-                        reason: warnings.join("; "),
-                    },
+            let plan = finalize_initialization(&base, &scaffold)?;
+            let proposed = apply_overlay(&base, delta_overlay)?;
+            let validation = crate::validation::repository::validate_repository(&proposed)?;
+            if validation.rule_report.has_errors() {
+                anyhow::bail!(
+                    "repository initialization produced {} validation error finding(s)",
+                    validation.rule_report.error_count()
                 );
             }
-            if profile.apply_result.status == ProfileApplicationStatus::Applied {
-                profile.apply_result.transaction_id = Some(transaction_id);
-            }
-            profile.apply_result
-        });
 
-        Ok(FreshInitResult {
-            project_name: scaffold.project_name,
-            profile,
-            warnings,
-        })
+            match session.apply(&plan) {
+                Ok(outcome) => {
+                    let project_name = scaffold.project_name().clone();
+                    let profile = apply_result.take().map(|mut result| {
+                        if result.status == ProfileApplicationStatus::Applied {
+                            result.transaction_id = Some(outcome.transaction_hash.clone());
+                        }
+                        result
+                    });
+                    return Ok(FreshInitResult {
+                        project_name,
+                        profile,
+                        warnings: Vec::new(),
+                    });
+                }
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "repository initialization did not converge after repeated capture conflicts"
+        ))
     }
 
-    fn prepare_fresh_profile(
+    /// Resolve the effective configuration bytes and project identity: an existing
+    /// `config.toml` is preserved (its authored project name kept), otherwise the
+    /// template body is rendered under a slug of the repository directory name.
+    fn resolve_init_config(
         &self,
-        scaffold: &InitScaffold,
-        filesystem: Arc<dyn RepositoryView>,
-        base_image: &crate::repository_state::RepositoryImage,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        repo_dir: &Path,
+        template: &HierarchyTemplate,
+    ) -> Result<(String, ProjectName)> {
+        use crate::repository_state::{CaptureBudget, CaptureSpec};
+        let budget = CaptureBudget {
+            max_paths: 16,
+            max_listings: 0,
+            max_bytes: 64 * 1024 * 1024,
+            max_depth: 6,
+        };
+        let spec = CaptureSpec::phase_one([VirtualPath::data("config.toml")?], budget)?;
+        let image = session.capture(spec)?;
+        let generated_name: ProjectName = slugify_project_name(
+            repo_dir
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or(""),
+        )
+        .parse()?;
+        match super::image_repo_bytes(&image, ".jit/config.toml")? {
+            Some(bytes) => {
+                let config =
+                    String::from_utf8(bytes).context("existing .jit/config.toml is not UTF-8")?;
+                let parsed: JitConfig = toml::from_str(&config)
+                    .context("Failed to parse existing init configuration")?;
+                let project_name = parsed
+                    .project
+                    .and_then(|project| project.name)
+                    .unwrap_or(generated_name);
+                Ok((config, project_name))
+            }
+            None => Ok((
+                crate::repository_state::render_repo_config(
+                    &template.generate_config_toml(),
+                    &generated_name,
+                ),
+                generated_name,
+            )),
+        }
+    }
+
+    /// Compute one embedded profile's contribution to the initialization delta
+    /// through the transitional profile planner (increment-6 deletion target),
+    /// carrying its asset bytes, provenance record, and audit-log image.
+    fn compute_profile_contribution(
+        &self,
         package: &EmbeddedProfilePackage<'_>,
-    ) -> Result<FreshProfilePlan> {
+        neutral: &InitializationScaffold,
+    ) -> Result<(ProfileContribution, ProfileApplyResult)> {
         super::profile::reject_reserved_application_targets(
             package.hashes().targets.keys().map(String::as_str),
         )?;
         let metadata = &package.manifest().profile;
         let record_path = format!(".jit/profiles/{}.json", metadata.id);
+        let neutral_files = neutral.neutral_files();
         let captured = self.storage.capture_profile_snapshot(
-            package.hashes().targets.keys().map(String::as_str).chain([
-                record_path.as_str(),
-                ".jit/profiles",
-                ".jit/events.jsonl",
-            ]),
+            package
+                .hashes()
+                .targets
+                .keys()
+                .map(String::as_str)
+                .chain([record_path.as_str(), ".jit/profiles", ".jit/events.jsonl"])
+                .chain(neutral_files.iter().map(|(path, _)| path.as_str())),
         )?;
+        // The neutral overlay must reflect only the scaffold state init will
+        // actually publish: schemas are always (re)written, but an existing
+        // config/gates/rules is preserved (`IfAbsent`). Overlaying a present file
+        // with its empty default would shadow the live declarations and make the
+        // profile planner see spurious drift, so present non-schema neutral files
+        // fall through to their captured on-disk bytes.
+        let overlay_files: Vec<(String, Vec<u8>)> = neutral_files
+            .into_iter()
+            .filter(|(path, _)| path.starts_with(".jit/schemas/") || captured.entry(path).is_none())
+            .collect();
         let mut entries = captured.entries().clone();
-        entries.extend(
-            scaffold
-                .directories
-                .iter()
-                .cloned()
-                .map(|path| (PathBuf::from(path), SnapshotEntry::Directory)),
-        );
-        entries.extend(scaffold.files.iter().map(|(path, bytes)| {
-            (
+        entries.insert(PathBuf::from(".jit/issues"), SnapshotEntry::Directory);
+        for (path, bytes) in &overlay_files {
+            entries.insert(
                 PathBuf::from(path),
                 SnapshotEntry::File(SnapshotFile {
                     bytes: bytes.clone(),
                     mode: ProjectedFileMode::Regular,
                 }),
-            )
-        }));
+            );
+        }
         let snapshot = RepositorySnapshot::new(captured.root(), entries)?;
         super::profile::ensure_profile_directory(&snapshot)?;
+        let filesystem: Arc<dyn RepositoryView> = Arc::new(
+            FilesystemRepositoryView::from_jit_root(self.storage.root())?,
+        );
+        let overlay = overlay_files
+            .iter()
+            .map(|(path, bytes)| (PathBuf::from(path), Some(bytes.clone())))
+            .collect::<Vec<_>>();
         let neutral_view: Arc<dyn RepositoryView> =
-            Arc::new(OverlayRepositoryView::new(filesystem, scaffold.overlay())?);
+            Arc::new(OverlayRepositoryView::new(filesystem, overlay)?);
         let plan = plan_profile_application_against(package, &snapshot, neutral_view)?;
 
         let record = super::profile::expected_record(package);
@@ -415,69 +277,102 @@ impl CommandExecutor<JsonFileStorage> {
             prior_events.to_vec()
         };
 
-        let mut final_overlay = scaffold.overlay().collect::<BTreeMap<_, _>>();
-        final_overlay.extend(plan.overlay_changes());
-        final_overlay.insert(PathBuf::from(&record_path), Some(record.to_bytes()?));
-        final_overlay.insert(PathBuf::from(".jit/events.jsonl"), Some(events.clone()));
-        let final_overrides = super::overrides_from_repo_changes(final_overlay.clone())?;
-        let final_image = crate::repository_state::apply_overlay(base_image, final_overrides)?;
-        let validation = crate::validation::repository::validate_repository(&final_image)?;
-        if validation.rule_report.has_errors() {
-            anyhow::bail!(
-                "fresh profiled repository produced {} validation error finding(s)",
-                validation.rule_report.error_count()
-            );
-        }
-
-        let mut changed_files = plan
+        let targets = plan
             .targets
             .values()
-            .filter(|target| target.action != crate::profile::PlannedTargetAction::NoOp)
-            .map(|target| (target.path.clone(), (target.bytes.clone(), target.mode)))
-            .collect::<BTreeMap<_, _>>();
-        if !record_matches {
-            changed_files.insert(
-                record_path,
-                (record.to_bytes()?, ProjectedFileMode::Regular),
-            );
-        }
-        if profile_changed {
-            changed_files.insert(
-                ".jit/events.jsonl".to_string(),
-                (events, ProjectedFileMode::Regular),
-            );
-        }
-
-        Ok(FreshProfilePlan {
-            apply_result: ProfileApplyResult {
-                id: metadata.id.clone(),
-                version: metadata.version.clone(),
-                status: if profile_changed {
-                    ProfileApplicationStatus::Applied
-                } else {
-                    ProfileApplicationStatus::Unchanged
-                },
-                plan_hash: plan.identity.plan_hash,
-                transaction_id: None,
-                warnings: Vec::new(),
+            .filter(|target| target.action != PlannedTargetAction::NoOp)
+            .map(|target| {
+                Ok(ProfileTargetContribution {
+                    path: repo_rel_virtual_path(&target.path)?,
+                    bytes: target.bytes.clone(),
+                    mode: file_mode(target.mode),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let contribution = ProfileContribution {
+            id: metadata.id.clone(),
+            version: metadata.version.clone(),
+            package_hash: package.hashes().package.clone(),
+            targets,
+            record_path: VirtualPath::data(format!("profiles/{}.json", metadata.id))?,
+            record_bytes: record.to_bytes()?,
+            record_changed: !record_matches,
+            events_bytes: events,
+            events_changed: profile_changed,
+            ensure_profiles_dir: snapshot.entry(".jit/profiles").is_none(),
+        };
+        let apply_result = ProfileApplyResult {
+            id: metadata.id.clone(),
+            version: metadata.version.clone(),
+            status: if profile_changed {
+                ProfileApplicationStatus::Applied
+            } else {
+                ProfileApplicationStatus::Unchanged
             },
-            changed_files,
+            plan_hash: plan.identity.plan_hash,
+            transaction_id: None,
+            warnings: Vec::new(),
+        };
+        Ok((contribution, apply_result))
+    }
+}
+
+/// Resolve one embedded profile package by stable id.
+fn embedded_profile(id: &str) -> Result<EmbeddedProfilePackage<'static>> {
+    super::profile::embedded_profile(id)
+}
+
+/// Project a finalized delta to the file-overlay validation reads: each written
+/// file's bytes and each deleted file's absence, ignoring directory and mode
+/// actions. This is the exact proposed repository state — only what init writes.
+fn validation_overlay(
+    delta: &crate::repository_state::RepositoryDelta,
+) -> std::collections::BTreeMap<VirtualPath, Option<Vec<u8>>> {
+    use crate::repository_state::RepositoryAction;
+    delta
+        .actions()
+        .iter()
+        .filter_map(|action| match action {
+            RepositoryAction::WriteFile { path, bytes, .. } => {
+                Some((path.clone(), Some(bytes.clone())))
+            }
+            RepositoryAction::DeleteFile { path, .. } => Some((path.clone(), None)),
+            RepositoryAction::CreateDirectory { .. } | RepositoryAction::SetMode { .. } => None,
         })
+        .collect()
+}
+
+/// Map a repository-relative path to its canonical virtual path (`.jit/...` is
+/// `Data`, everything else `Worktree`).
+fn repo_rel_virtual_path(path: &str) -> Result<VirtualPath> {
+    match path.strip_prefix(".jit/") {
+        Some(rest) => Ok(VirtualPath::data(rest)?),
+        None => Ok(VirtualPath::worktree(path)?),
+    }
+}
+
+/// Translate the transitional planner's mode into the canonical entry mode.
+fn file_mode(mode: ProjectedFileMode) -> FileMode {
+    match mode {
+        ProjectedFileMode::Regular => FileMode::Regular,
+        ProjectedFileMode::Executable => FileMode::Executable,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::{
-        discover_repository_layout, IssueStore, TransactionFailureInjector, TransactionFailurePoint,
-    };
+    use crate::profile::AppliedProfileRecord;
+    use crate::storage::discover_repository_layout;
+    use std::fs;
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+    use tempfile::TempDir;
 
-    /// A file-backed executor carrying the canonical layout for `worktree`, so
-    /// init's proposed-state validation can capture through the recovered session.
+    /// A file-backed executor carrying the canonical layout for `worktree`.
     fn executor_with_layout(
         storage: &JsonFileStorage,
-        worktree: &std::path::Path,
+        worktree: &Path,
     ) -> CommandExecutor<JsonFileStorage> {
         let layout = discover_repository_layout(worktree, storage.root()).unwrap();
         CommandExecutor::new(storage.clone()).with_layout(layout)
@@ -485,7 +380,7 @@ mod tests {
 
     /// Assert the published repository validates cleanly through the closed-image
     /// pipeline.
-    fn assert_repo_valid(worktree: &std::path::Path) {
+    fn assert_repo_valid(worktree: &Path) {
         let data = worktree.join(".jit");
         let layout = discover_repository_layout(worktree, &data).unwrap();
         CommandExecutor::new(JsonFileStorage::new(&data))
@@ -494,100 +389,32 @@ mod tests {
             .unwrap()
             .unwrap();
     }
-    use std::fs;
-    use std::io;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::{Arc, Barrier};
-    use std::thread;
-    use tempfile::TempDir;
-
-    struct FirstPublishFailure {
-        publish_pending: AtomicBool,
-        reverse_pending: AtomicBool,
-    }
-
-    struct TerminalCleanupFailure(AtomicBool);
-
-    impl TransactionFailureInjector for TerminalCleanupFailure {
-        fn check(&self, point: &TransactionFailurePoint) -> io::Result<()> {
-            if matches!(point, TransactionFailurePoint::CleanupTerminalResidue)
-                && self.0.swap(false, Ordering::SeqCst)
-            {
-                Err(io::Error::other("injected terminal cleanup residue"))
-            } else {
-                Ok(())
-            }
-        }
-    }
-
-    impl FirstPublishFailure {
-        fn new(fail_reverse: bool) -> Self {
-            Self {
-                publish_pending: AtomicBool::new(true),
-                reverse_pending: AtomicBool::new(fail_reverse),
-            }
-        }
-    }
-
-    impl TransactionFailureInjector for FirstPublishFailure {
-        fn check(&self, point: &TransactionFailurePoint) -> io::Result<()> {
-            let fail = match point {
-                TransactionFailurePoint::AfterPublish { .. } => {
-                    self.publish_pending.swap(false, Ordering::SeqCst)
-                }
-                TransactionFailurePoint::ReverseAction { .. } => {
-                    self.reverse_pending.swap(false, Ordering::SeqCst)
-                }
-                _ => false,
-            };
-            if fail {
-                Err(io::Error::other(format!("injected {point:?}")))
-            } else {
-                Ok(())
-            }
-        }
-    }
-
-    fn first_publish_kernel(
-        storage: &JsonFileStorage,
-        fail_reverse: bool,
-    ) -> FileTransactionKernel {
-        FileTransactionKernel::with_injector(
-            storage.open_repository_capability().unwrap(),
-            Arc::new(FirstPublishFailure::new(fail_reverse)),
-        )
-        .unwrap()
-    }
-
-    fn terminal_cleanup_kernel(storage: &JsonFileStorage) -> FileTransactionKernel {
-        FileTransactionKernel::with_injector(
-            storage.open_repository_capability().unwrap(),
-            Arc::new(TerminalCleanupFailure(AtomicBool::new(true))),
-        )
-        .unwrap()
-    }
 
     #[test]
-    fn test_pure_scaffold_matches_established_plain_init_bytes() {
+    fn test_fresh_init_publishes_complete_valid_repo_without_git() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
-        let template = HierarchyTemplate::default();
-        let scaffold = InitScaffold::generate(repo.path(), &template).unwrap();
 
-        storage.init().unwrap();
-        executor
-            .seed_project_config(repo.path(), &template.generate_config_toml())
+        let result = executor
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
-        executor.scaffold_default_rules().unwrap();
 
-        for (path, expected) in scaffold.files {
-            assert_eq!(
-                fs::read(repo.path().join(path)).unwrap(),
-                expected,
-                "plain init byte contract drifted"
+        assert!(result.profile.is_none());
+        for path in [
+            "index.json",
+            "gates.toml",
+            "events.jsonl",
+            "config.toml",
+            "rules.toml",
+        ] {
+            assert!(
+                repo.path().join(".jit").join(path).is_file(),
+                "missing {path}"
             );
         }
+        assert!(repo.path().join(".jit/issues").is_dir());
+        assert_repo_valid(repo.path());
     }
 
     #[test]
@@ -614,119 +441,67 @@ mod tests {
             .path()
             .join(".agents/skills/jit-manage/SKILL.md")
             .is_file());
+        assert_eq!(
+            fs::read_to_string(repo.path().join(".jit/events.jsonl"))
+                .unwrap()
+                .lines()
+                .count(),
+            1
+        );
         assert_repo_valid(repo.path());
     }
 
     #[test]
-    fn test_fresh_profile_init_rolls_back_to_no_jit_after_publication_failure() {
+    fn test_reinit_profiled_over_existing_root_is_idempotent_unchanged() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
-        let kernel = first_publish_kernel(&storage, false);
 
-        assert!(executor
-            .initialize_fresh_repository_with_kernel(
-                repo.path(),
-                &HierarchyTemplate::default(),
-                Some("jit-dogfood"),
-                &kernel,
-            )
-            .is_err());
-
-        assert!(!repo.path().join(".jit").exists());
-        assert!(!repo.path().join(".agents").exists());
-        assert!(!repo.path().join(".jit-bootstrap").exists());
-    }
-
-    #[test]
-    fn test_partial_profile_init_rolls_back_to_exact_existing_state() {
-        let repo = TempDir::new().unwrap();
-        fs::create_dir_all(repo.path().join(".jit")).unwrap();
-        let index = b"{\n  \"schema_version\": 2,\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}";
-        fs::write(repo.path().join(".jit/index.json"), index).unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
-        let scaffold = InitScaffold::missing_from_existing(
-            &storage,
-            repo.path(),
-            &HierarchyTemplate::default(),
-        )
-        .unwrap();
-        let kernel = first_publish_kernel(&storage, false);
-
-        assert!(executor
-            .publish_init_scaffold(repo.path(), scaffold, Some("jit-dogfood"), &kernel,)
-            .is_err());
-
-        assert_eq!(
-            fs::read(repo.path().join(".jit/index.json")).unwrap(),
-            index
-        );
-        for path in ["gates.toml", "events.jsonl", "config.toml", "rules.toml"] {
-            assert!(!repo.path().join(".jit").join(path).exists());
-        }
-    }
-
-    #[test]
-    fn test_fresh_profile_init_recovers_prepared_bootstrap_before_retry() {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
-        let kernel = first_publish_kernel(&storage, true);
-        let error = executor
-            .initialize_fresh_repository_with_kernel(
-                repo.path(),
-                &HierarchyTemplate::default(),
-                Some("jit-dogfood"),
-                &kernel,
-            )
-            .unwrap_err();
-        assert_eq!(
-            error.downcast_ref::<RecoveryRequiredError>().unwrap().state,
-            RecoveryState::Prepared
-        );
-        assert!(repo.path().join(".jit-bootstrap").exists());
-
-        let result = executor
+        executor
             .initialize_fresh_repository(
                 repo.path(),
                 &HierarchyTemplate::default(),
                 Some("jit-dogfood"),
             )
             .unwrap();
+        let compact_record = {
+            let record: AppliedProfileRecord = serde_json::from_slice(
+                &fs::read(repo.path().join(".jit/profiles/jit-dogfood.json")).unwrap(),
+            )
+            .unwrap();
+            serde_json::to_vec(&record).unwrap()
+        };
+        fs::write(
+            repo.path().join(".jit/profiles/jit-dogfood.json"),
+            &compact_record,
+        )
+        .unwrap();
+        let before_events = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
 
-        assert_eq!(
-            result.profile.unwrap().status,
-            ProfileApplicationStatus::Applied
-        );
-        assert!(!repo.path().join(".jit-bootstrap").exists());
-        assert_repo_valid(repo.path());
-    }
-
-    #[test]
-    fn test_fresh_profile_init_reports_committed_cleanup_and_recovery_cleans_it() {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
-        let kernel = terminal_cleanup_kernel(&storage);
-
-        let result = executor
-            .initialize_fresh_repository_with_kernel(
+        // A second `jit init` is a fresh process that re-discovers the layout over
+        // the now-published root; reuse of the first executor's absent-root layout
+        // would be a test artifact, not the real re-init path.
+        let reinit = executor_with_layout(&storage, repo.path());
+        let again = reinit
+            .initialize_profiled_repository(
                 repo.path(),
                 &HierarchyTemplate::default(),
-                Some("jit-dogfood"),
-                &kernel,
+                "jit-dogfood",
             )
             .unwrap();
 
-        assert_eq!(result.warnings.len(), 1);
-        assert_eq!(result.profile.unwrap().warnings.len(), 1);
-        assert!(repo.path().join(".jit-bootstrap").exists());
-        let session = RecoveryCoordinator::recover_before_services(&storage).unwrap();
-        assert_eq!(session.report().recovered_count(), 1);
-        drop(session);
-        assert!(!repo.path().join(".jit-bootstrap").exists());
-        assert_repo_valid(repo.path());
+        assert_eq!(
+            again.profile.unwrap().status,
+            ProfileApplicationStatus::Unchanged
+        );
+        assert_eq!(
+            fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
+            before_events
+        );
+        assert_eq!(
+            fs::read(repo.path().join(".jit/profiles/jit-dogfood.json")).unwrap(),
+            compact_record
+        );
     }
 
     #[test]
