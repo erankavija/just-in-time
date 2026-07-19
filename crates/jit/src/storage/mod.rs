@@ -32,6 +32,7 @@ pub mod path_errors;
 pub mod recovery_coordinator;
 pub mod reference;
 pub mod repo_lock;
+pub mod repository_state_store;
 pub mod ruleset_store;
 pub mod temp_cleanup;
 mod transaction_action;
@@ -69,6 +70,10 @@ pub use path_errors::{validate_repo_relative_path, PathReadError};
 pub use recovery_coordinator::{RecoveryCoordinator, RecoveryDispatchReport, RecoverySession};
 pub use reference::{render_reference_markdown, GateRunField, REFERENCE_PATH};
 pub use repo_lock::{RepoWriteGuard, RepoWriteLock};
+pub use repository_state_store::{
+    discover_repository_layout, RepositoryApplyOutcome, RepositoryMutationSession,
+    RepositoryStateStore, RepositoryStateStoreError,
+};
 pub use transaction_action::TransactionAction;
 pub use transaction_journal::TransactionDecision;
 pub use transaction_recovery::{

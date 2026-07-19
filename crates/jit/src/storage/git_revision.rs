@@ -44,6 +44,7 @@ pub enum GitRevisionError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PinnedArtifactRead {
     version: ArtifactVersion,
+    blob_oid: String,
     bytes: Vec<u8>,
 }
 
@@ -51,6 +52,12 @@ impl PinnedArtifactRead {
     /// Canonical pinned version associated with the bytes.
     pub fn version(&self) -> &ArtifactVersion {
         &self.version
+    }
+
+    /// True Git blob object id of the read content, so capture identity binds to
+    /// Git's own object identity rather than a synthesized surrogate.
+    pub fn blob_oid(&self) -> &str {
+        &self.blob_oid
     }
 
     /// Byte-faithful blob content read from Git history.
@@ -116,6 +123,17 @@ impl GitRevisionResolver {
         validate_repo_relative_path(path)?;
         let version = self.resolve_commit(revision)?;
         let object = format!("{}:{path}", version.as_str());
+        let oid_output = self.run(["rev-parse", "--verify", object.as_str()])?;
+        if !oid_output.status.success() {
+            return Err(GitRevisionError::PinnedReadFailed {
+                revision: revision.to_string(),
+                path: path.to_string(),
+                stderr: stderr(&oid_output),
+            });
+        }
+        let blob_oid = String::from_utf8_lossy(&oid_output.stdout)
+            .trim()
+            .to_string();
         let output = self.run(["cat-file", "blob", object.as_str()])?;
         if !output.status.success() {
             return Err(GitRevisionError::PinnedReadFailed {
@@ -126,6 +144,7 @@ impl GitRevisionResolver {
         }
         Ok(PinnedArtifactRead {
             version,
+            blob_oid,
             bytes: output.stdout,
         })
     }

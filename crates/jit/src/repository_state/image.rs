@@ -1,12 +1,12 @@
 //! Closed repository images, bounded capture declarations, and exact deltas.
 
 use super::{RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, VirtualPath};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Platform-neutral file mode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FileMode {
     /// Non-executable ordinary file.
@@ -16,7 +16,7 @@ pub enum FileMode {
 }
 
 /// Exact identity of captured content or an occupant.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct EntryIdentity {
     /// Boundary-acquired no-follow object identity.
     object: String,
@@ -102,6 +102,8 @@ pub enum RepositoryEntry {
     Directory {
         /// Exact directory identity.
         identity: EntryIdentity,
+        /// Normalized directory mode.
+        mode: FileMode,
     },
     /// A symbolic link, never followed.
     Symlink {
@@ -109,6 +111,8 @@ pub enum RepositoryEntry {
         identity: EntryIdentity,
         /// Exact link payload.
         target: Vec<u8>,
+        /// Normalized link mode where the platform exposes one.
+        mode: FileMode,
     },
     /// An occupant unsafe for semantic mutation.
     Unsupported {
@@ -116,6 +120,8 @@ pub enum RepositoryEntry {
         identity: EntryIdentity,
         /// Stable diagnostic.
         reason: String,
+        /// Normalized occupant mode where the platform exposes one.
+        mode: FileMode,
     },
 }
 
@@ -125,7 +131,7 @@ impl RepositoryEntry {
         match self {
             Self::Absent => None,
             Self::File { identity, .. }
-            | Self::Directory { identity }
+            | Self::Directory { identity, .. }
             | Self::Symlink { identity, .. }
             | Self::Unsupported { identity, .. } => Some(identity),
         }
@@ -135,6 +141,8 @@ impl RepositoryEntry {
 /// Fingerprint of one complete non-recursive directory listing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ListingFingerprint {
+    /// Exact identity of the listed directory; `None` represents absence.
+    container: Option<EntryIdentity>,
     /// Sorted child name to exact child identity; `None` is not representable.
     children: BTreeMap<String, EntryIdentity>,
     /// SHA-256 of the boundary's canonical listing serialization.
@@ -144,11 +152,43 @@ pub struct ListingFingerprint {
 impl ListingFingerprint {
     /// Construct a deterministic fingerprint.
     pub fn new(children: BTreeMap<String, EntryIdentity>) -> Result<Self, CaptureError> {
+        Self::with_container(None, children)
+    }
+
+    /// Construct a fingerprint for one present directory and its complete children.
+    pub fn for_directory(
+        container: EntryIdentity,
+        children: BTreeMap<String, EntryIdentity>,
+    ) -> Result<Self, CaptureError> {
+        Self::with_container(Some(container), children)
+    }
+
+    /// Construct a fingerprint for an absent listing root.
+    pub fn for_absent() -> Result<Self, CaptureError> {
+        Self::with_container(None, BTreeMap::new())
+    }
+
+    fn with_container(
+        container: Option<EntryIdentity>,
+        children: BTreeMap<String, EntryIdentity>,
+    ) -> Result<Self, CaptureError> {
+        if let Some(identity) = &container {
+            identity.validate()?;
+        }
         for (name, identity) in &children {
             validate_listing_name(name)?;
             identity.validate()?;
         }
         let mut hasher = Sha256::new();
+        match &container {
+            Some(identity) => {
+                hash_field(&mut hasher, b"directory");
+                hash_field(&mut hasher, identity.object.as_bytes());
+                hash_field(&mut hasher, identity.sha256.as_bytes());
+                hash_field(&mut hasher, &identity.byte_size.to_be_bytes());
+            }
+            None => hash_field(&mut hasher, b"absent"),
+        }
         for (name, identity) in &children {
             hash_field(&mut hasher, name.as_bytes());
             hash_field(&mut hasher, identity.object.as_bytes());
@@ -156,6 +196,7 @@ impl ListingFingerprint {
             hash_field(&mut hasher, &identity.byte_size.to_be_bytes());
         }
         Ok(Self {
+            container,
             children,
             sha256: format!("{:x}", hasher.finalize()),
         })
@@ -166,17 +207,27 @@ impl ListingFingerprint {
         &self.children
     }
 
+    /// Exact listed-directory identity, or `None` when it was absent.
+    pub fn container(&self) -> Option<&EntryIdentity> {
+        self.container.as_ref()
+    }
+
     /// Deterministic digest of the complete listing.
     pub fn sha256(&self) -> &str {
         &self.sha256
     }
 
     fn validate(&self) -> Result<(), CaptureError> {
+        if let Some(identity) = &self.container {
+            identity.validate()?;
+        }
         for (name, identity) in &self.children {
             validate_listing_name(name)?;
             identity.validate()?;
         }
-        if Self::new(self.children.clone())?.sha256 != self.sha256 {
+        if Self::with_container(self.container.clone(), self.children.clone())?.sha256
+            != self.sha256
+        {
             return Err(CaptureError::ListingFingerprintMismatch);
         }
         Ok(())
@@ -612,6 +663,21 @@ impl RepositoryImage {
         &self.layout
     }
 
+    /// Closed capture declaration used to build this image.
+    pub fn capture_spec(&self) -> &CaptureSpec {
+        &self.spec
+    }
+
+    /// Every exact captured path in canonical order.
+    pub fn entries(&self) -> &BTreeMap<VirtualPath, RepositoryEntry> {
+        &self.entries
+    }
+
+    /// Every complete-listing fingerprint in canonical order.
+    pub fn listing_fingerprints(&self) -> &BTreeMap<VirtualPath, ListingFingerprint> {
+        &self.listings
+    }
+
     /// Read an exactly captured entry; uncaptured reads are always errors.
     pub fn entry(&self, path: &VirtualPath) -> Result<&RepositoryEntry, CaptureError> {
         self.layout.ensure_canonical(path)?;
@@ -641,9 +707,13 @@ fn validate_entry(path: &VirtualPath, entry: &RepositoryEntry) -> Result<(), Cap
         RepositoryEntry::File {
             identity, bytes, ..
         } => identity.validate_bytes(bytes),
-        RepositoryEntry::Directory { identity } => identity.validate(),
-        RepositoryEntry::Symlink { identity, target } => identity.validate_bytes(target),
-        RepositoryEntry::Unsupported { identity, reason } => {
+        RepositoryEntry::Directory { identity, .. } => identity.validate(),
+        RepositoryEntry::Symlink {
+            identity, target, ..
+        } => identity.validate_bytes(target),
+        RepositoryEntry::Unsupported {
+            identity, reason, ..
+        } => {
             identity.validate()?;
             if reason.is_empty() || reason.chars().any(char::is_control) {
                 return Err(CaptureError::InvalidCapturedEntry {
@@ -847,7 +917,7 @@ impl TargetClaim {
 /// (identity + payload), and an occupant unsafe for mutation — the kinds the plan
 /// delta vocabulary enumerates. A later publication boundary verifies this
 /// preimage against the live occupant before applying the action.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExpectedPreimage {
     /// Path must remain absent.
     Absent,
@@ -862,6 +932,8 @@ pub enum ExpectedPreimage {
     Directory {
         /// Exact directory identity.
         identity: EntryIdentity,
+        /// Normalized directory mode.
+        mode: FileMode,
     },
     /// A symbolic link with exact payload, never followed.
     Symlink {
@@ -869,6 +941,8 @@ pub enum ExpectedPreimage {
         identity: EntryIdentity,
         /// Exact link payload.
         target: Vec<u8>,
+        /// Normalized link mode where the platform exposes one.
+        mode: FileMode,
     },
     /// An occupant unsafe for semantic mutation.
     Unsupported {
@@ -876,6 +950,8 @@ pub enum ExpectedPreimage {
         identity: EntryIdentity,
         /// Stable diagnostic.
         reason: String,
+        /// Normalized occupant mode where the platform exposes one.
+        mode: FileMode,
     },
 }
 
@@ -888,16 +964,27 @@ impl ExpectedPreimage {
                 identity: identity.clone(),
                 mode: *mode,
             },
-            RepositoryEntry::Directory { identity } => Self::Directory {
+            RepositoryEntry::Directory { identity, mode } => Self::Directory {
                 identity: identity.clone(),
+                mode: *mode,
             },
-            RepositoryEntry::Symlink { identity, target } => Self::Symlink {
+            RepositoryEntry::Symlink {
+                identity,
+                target,
+                mode,
+            } => Self::Symlink {
                 identity: identity.clone(),
                 target: target.clone(),
+                mode: *mode,
             },
-            RepositoryEntry::Unsupported { identity, reason } => Self::Unsupported {
+            RepositoryEntry::Unsupported {
+                identity,
+                reason,
+                mode,
+            } => Self::Unsupported {
                 identity: identity.clone(),
                 reason: reason.clone(),
+                mode: *mode,
             },
         }
     }
@@ -907,7 +994,7 @@ impl ExpectedPreimage {
         match self {
             Self::Absent => None,
             Self::File { identity, .. }
-            | Self::Directory { identity }
+            | Self::Directory { identity, .. }
             | Self::Symlink { identity, .. }
             | Self::Unsupported { identity, .. } => Some(identity),
         }
@@ -947,12 +1034,91 @@ pub enum RepositoryAction {
 }
 
 impl RepositoryAction {
-    fn path(&self) -> &VirtualPath {
+    #[cfg(test)]
+    pub(crate) fn create_directory(
+        path: VirtualPath,
+        owner: impl Into<String>,
+        expected: ExpectedPreimage,
+    ) -> Self {
+        Self::CreateDirectory {
+            path,
+            owner: owner.into(),
+            expected,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn write_file(
+        path: VirtualPath,
+        owner: impl Into<String>,
+        expected: ExpectedPreimage,
+        bytes: Vec<u8>,
+        mode: FileMode,
+    ) -> Self {
+        Self::WriteFile {
+            path,
+            owner: owner.into(),
+            expected,
+            bytes,
+            mode,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_mode(
+        path: VirtualPath,
+        owner: impl Into<String>,
+        expected: ExpectedPreimage,
+        mode: FileMode,
+    ) -> Self {
+        Self::SetMode {
+            path,
+            owner: owner.into(),
+            expected,
+            mode,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn delete_file(
+        path: VirtualPath,
+        owner: impl Into<String>,
+        expected: ExpectedPreimage,
+    ) -> Self {
+        Self::DeleteFile {
+            path,
+            owner: owner.into(),
+            expected,
+        }
+    }
+
+    /// Canonical target path.
+    pub fn path(&self) -> &VirtualPath {
         match self {
             Self::CreateDirectory { path, .. }
             | Self::WriteFile { path, .. }
             | Self::SetMode { path, .. }
             | Self::DeleteFile { path, .. } => path,
+        }
+    }
+
+    /// Stable producer or ownership identity.
+    pub fn owner(&self) -> &str {
+        match self {
+            Self::CreateDirectory { owner, .. }
+            | Self::WriteFile { owner, .. }
+            | Self::SetMode { owner, .. }
+            | Self::DeleteFile { owner, .. } => owner,
+        }
+    }
+
+    /// Exact preimage required immediately before publication.
+    pub fn expected(&self) -> &ExpectedPreimage {
+        match self {
+            Self::CreateDirectory { expected, .. }
+            | Self::WriteFile { expected, .. }
+            | Self::SetMode { expected, .. }
+            | Self::DeleteFile { expected, .. } => expected,
         }
     }
 }
@@ -1464,14 +1630,17 @@ mod tests {
         assert_eq!(
             ExpectedPreimage::of(&RepositoryEntry::Directory {
                 identity: identity.clone(),
+                mode: FileMode::Executable,
             }),
             ExpectedPreimage::Directory {
                 identity: identity.clone(),
+                mode: FileMode::Executable,
             }
         );
         assert!(ExpectedPreimage::Absent.identity().is_none());
         assert!(ExpectedPreimage::Directory {
             identity: identity.clone(),
+            mode: FileMode::Executable,
         }
         .identity()
         .is_some());
@@ -1481,6 +1650,7 @@ mod tests {
         let target = VirtualPath::data("occupant").unwrap();
         let directory = ExpectedPreimage::Directory {
             identity: identity.clone(),
+            mode: FileMode::Executable,
         };
         assert!(matches!(
             RepositoryDelta::new(

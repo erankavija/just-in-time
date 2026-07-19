@@ -10,7 +10,7 @@ use crate::storage::{
     PresetNotFoundError, RepoWriteGuard, RepoWriteLock, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, Result};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
 /// In-memory storage backend using HashMaps.
@@ -35,6 +35,44 @@ pub struct InMemoryStorage {
     /// Outermost lock of every mutating path, shared by every clone. Process-local:
     /// this backend has no files, so there is no other process to exclude.
     repo_lock: Arc<RepoWriteLock>,
+    /// Canonical aggregate repository image used by recovered mutation sessions.
+    pub(crate) repository_state: Arc<Mutex<MemoryRepositoryState>>,
+    pub(crate) repository_state_failures: Arc<dyn crate::storage::TransactionFailureInjector>,
+    /// Canonical layout of the live mutation session, shared by every clone so
+    /// reentry is admitted only for the same selected roots.
+    pub(crate) active_mutation_layout:
+        Arc<crate::storage::repository_state_store::ActiveLayoutTracker>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct MemoryRepositoryState {
+    pub(crate) entries:
+        BTreeMap<crate::repository_state::VirtualPath, crate::repository_state::RepositoryEntry>,
+    pub(crate) data_root_exists: bool,
+    pub(crate) recovery: Option<MemoryRecoveryResidue>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum MemoryRecoveryResidue {
+    Prepared {
+        original: Box<MemoryRepositoryState>,
+        final_state: Box<MemoryRepositoryState>,
+        _plan_hash: String,
+    },
+    Committed {
+        final_state: Box<MemoryRepositoryState>,
+        _plan_hash: String,
+    },
+}
+
+impl MemoryRepositoryState {
+    pub(crate) fn clone_without_recovery(&self) -> Self {
+        Self {
+            entries: self.entries.clone(),
+            data_root_exists: self.data_root_exists,
+            recovery: None,
+        }
+    }
 }
 
 impl InMemoryStorage {
@@ -53,7 +91,48 @@ impl InMemoryStorage {
             root_path,
             repo_files: Arc::new(Mutex::new(HashMap::new())),
             repo_lock: RepoWriteLock::in_process(),
+            repository_state: Arc::new(Mutex::new(MemoryRepositoryState::default())),
+            repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
+            active_mutation_layout: Arc::new(Default::default()),
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_repository_state_failures(
+        failures: Arc<dyn crate::storage::TransactionFailureInjector>,
+    ) -> Self {
+        let mut storage = Self::new();
+        storage.repository_state_failures = failures;
+        storage
+    }
+
+    /// A view sharing this backend's aggregate state, lock, and layout tracker but
+    /// with a clean failure injector. Mirrors opening a fresh `JsonFileStorage`
+    /// over the same on-disk root for recovery: same state, no injected faults.
+    #[cfg(test)]
+    pub(crate) fn without_repository_state_failures(&self) -> Self {
+        Self {
+            repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
+            ..self.clone()
+        }
+    }
+
+    pub(crate) fn repository_state(&self) -> std::sync::MutexGuard<'_, MemoryRepositoryState> {
+        self.repository_state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    pub(crate) fn repository_state_failures(
+        &self,
+    ) -> Arc<dyn crate::storage::TransactionFailureInjector> {
+        Arc::clone(&self.repository_state_failures)
+    }
+
+    pub(crate) fn active_mutation_layout(
+        &self,
+    ) -> Arc<crate::storage::repository_state_store::ActiveLayoutTracker> {
+        Arc::clone(&self.active_mutation_layout)
     }
 
     /// Seed an in-memory repository file at `rel_path` with `content`.

@@ -131,6 +131,18 @@ impl VirtualPath {
         Self { root, relative }.checked()
     }
 
+    /// Construct a virtual identity from an explicit selected-root class.
+    ///
+    /// Storage journal decoding uses this constructor so recovery re-applies the
+    /// same canonicality checks as live mutation planning instead of accepting a
+    /// string path and inferring its root.
+    pub(crate) fn from_root(
+        root: RepositoryRootClass,
+        relative: RootRelativePath,
+    ) -> Result<Self, RepositoryLayoutError> {
+        Self::new(root, relative)
+    }
+
     /// Selected root class.
     pub fn root_class(&self) -> RepositoryRootClass {
         self.root
@@ -263,6 +275,16 @@ impl RepositoryLayout {
     /// Selected data root.
     pub fn data_root(&self) -> &Path {
         self.data.path()
+    }
+
+    /// Boundary identity captured for the worktree root.
+    pub(crate) fn worktree_identity(&self) -> &str {
+        self.worktree.identity()
+    }
+
+    /// Boundary identity captured for the selected data root.
+    pub(crate) fn data_identity(&self) -> &str {
+        self.data.identity()
     }
 
     /// Stable virtual-to-physical uniqueness proof.

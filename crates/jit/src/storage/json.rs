@@ -177,26 +177,40 @@ pub struct JsonFileStorage {
     /// persisted. Clones share the slot so the command executor sees the same
     /// boundary installed by `main`.
     recovery_session: Arc<Mutex<Option<RecoverySession>>>,
+    repository_state_failures: Arc<dyn crate::storage::TransactionFailureInjector>,
+    /// Canonical layout of the live mutation session, shared by every clone so
+    /// reentry is admitted only for the same selected roots.
+    active_mutation_layout: Arc<crate::storage::repository_state_store::ActiveLayoutTracker>,
+}
+
+/// The configured storage-lock acquisition timeout (`JIT_LOCK_TIMEOUT` seconds,
+/// or the runtime default), shared by every file-backed lock this backend opens.
+fn configured_lock_timeout() -> Duration {
+    std::env::var("JIT_LOCK_TIMEOUT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .map(Duration::from_secs)
+        .unwrap_or(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ))
 }
 
 impl JsonFileStorage {
     /// Create a new JSON file storage instance at the given root path.
     /// The root should be the `.jit` directory (or custom directory from JIT_DATA_DIR).
     pub fn new<P: AsRef<Path>>(root: P) -> Self {
-        let timeout = std::env::var("JIT_LOCK_TIMEOUT")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .map(Duration::from_secs)
-            .unwrap_or(Duration::from_secs(
-                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-            ));
+        let timeout = configured_lock_timeout();
 
         let root = root.as_ref().to_path_buf();
         let bootstrap_lock_path = root
             .parent()
             .unwrap_or_else(|| Path::new("."))
             .join(".jit-bootstrap.lock");
-        let bootstrap_lock = RepoWriteLock::for_lock_path(bootstrap_lock_path, timeout);
+        // Shared by canonical path so a nested repo's data-root-parent bootstrap
+        // lock is the very same reentrant instance as its worktree-root bootstrap
+        // lock (they name one file), while a disjoint data root's parent lock is a
+        // distinct instance held beneath the separate worktree bootstrap lock.
+        let bootstrap_lock = RepoWriteLock::shared_for_lock_path(bootstrap_lock_path, timeout);
         Self {
             repo_lock: RepoWriteLock::for_storage_root_after(
                 &root,
@@ -205,9 +219,34 @@ impl JsonFileStorage {
             ),
             bootstrap_lock,
             recovery_session: Arc::new(Mutex::new(None)),
+            repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
+            active_mutation_layout: Arc::new(Default::default()),
             root,
             locker: FileLocker::new(timeout),
         }
+    }
+
+    /// Construct storage with deterministic recovered-session failure injection.
+    #[cfg(test)]
+    pub(crate) fn with_repository_state_failures<P: AsRef<Path>>(
+        root: P,
+        failures: Arc<dyn crate::storage::TransactionFailureInjector>,
+    ) -> Self {
+        let mut storage = Self::new(root);
+        storage.repository_state_failures = failures;
+        storage
+    }
+
+    pub(crate) fn repository_state_failures(
+        &self,
+    ) -> Arc<dyn crate::storage::TransactionFailureInjector> {
+        Arc::clone(&self.repository_state_failures)
+    }
+
+    pub(crate) fn active_mutation_layout(
+        &self,
+    ) -> Arc<crate::storage::repository_state_store::ActiveLayoutTracker> {
+        Arc::clone(&self.active_mutation_layout)
     }
 
     /// Retain the startup recovery boundary for this storage and every clone.
@@ -249,6 +288,23 @@ impl JsonFileStorage {
     /// directory.
     pub(crate) fn acquire_bootstrap_write_lock(&self) -> Result<RepoWriteGuard> {
         self.bootstrap_lock.acquire()
+    }
+
+    /// Acquire the bootstrap lock keyed at the WORKTREE root, serializing the
+    /// worktree-side `.jit-bootstrap` transactions namespace across every session
+    /// sharing the worktree regardless of its data root. For a nested repo this is
+    /// the same reentrant instance as [`acquire_bootstrap_write_lock`]; for a
+    /// disjoint data root it is a distinct, outer lock that prevents two such
+    /// sessions from concurrently mutating one worktree's companions and journals.
+    pub(crate) fn acquire_worktree_bootstrap_lock(
+        &self,
+        worktree_root: &Path,
+    ) -> Result<RepoWriteGuard> {
+        RepoWriteLock::shared_for_lock_path(
+            worktree_root.join(".jit-bootstrap.lock"),
+            configured_lock_timeout(),
+        )
+        .acquire()
     }
 
     /// Acquire the repository lock after the bootstrap lock.

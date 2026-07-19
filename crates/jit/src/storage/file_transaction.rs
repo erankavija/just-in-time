@@ -9,14 +9,20 @@ use super::transaction_action::{
     FileIdentity, JournalActionKind, TargetIdentity, TransactionAction,
 };
 use super::transaction_journal::{
-    JournalAction, RollbackActionState, TransactionDecision, TransactionJournal, JOURNAL_FILE,
-    JOURNAL_VERSION,
+    ControlName, JournalAction, RepositoryActionProgress, RepositoryFinalIdentity,
+    RepositoryJournalAction, RepositoryJournalActionKind, RepositoryJournalPath,
+    RepositoryTransactionJournal, RollbackActionState, TransactionDecision, TransactionJournal,
+    JOURNAL_FILE, JOURNAL_VERSION, REPOSITORY_JOURNAL_VERSION,
 };
 use super::transaction_recovery::{
     FailurePoint, FileTransactionError, NoTransactionFailures, RecoveryRequiredError,
     RecoveryState, TransactionFailureInjector,
 };
 use super::transaction_staging::{stage_bytes, sync_directory};
+use crate::repository_state::{
+    EntryIdentity, ExpectedPreimage, FileMode, RepositoryAction, RepositoryDelta, RepositoryEntry,
+    RepositoryLayout, RepositoryRootClass, VirtualPath,
+};
 use anyhow::{Context, Result};
 use cap_primitives::fs::FollowSymlinks;
 #[cfg(unix)]
@@ -24,12 +30,19 @@ use cap_std::fs::MetadataExt as _;
 use cap_std::fs::{Dir, OpenOptions};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
+use std::ffi::OsStr;
 use std::io::{ErrorKind, Read};
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 const BOOTSTRAP_DIR: &str = ".jit-bootstrap";
 const PROTOCOL_MARKER: &str = "transaction-protocol-v1";
+/// Marker file distinguishing a worktree-side companion control directory (a
+/// same-filesystem staging/backup area for the Worktree actions of an internal
+/// transaction) from a genuine external transaction control. It carries the
+/// owning internal transaction id. The companion lives under the already
+/// permitted `.jit-bootstrap/transactions/{id}` literal and holds no journal.
+const COMPANION_MARKER: &str = "companion";
 
 /// A deterministic set of repository-relative storage actions.
 #[derive(Debug, Clone)]
@@ -63,6 +76,15 @@ pub enum TransactionControlLocation {
 pub struct FileTransactionKernel {
     root: Dir,
     injector: Arc<dyn TransactionFailureInjector>,
+    repository: Option<RepositoryKernelRoots>,
+}
+
+struct RepositoryKernelRoots {
+    layout: RepositoryLayout,
+    worktree: Dir,
+    data: Option<Dir>,
+    data_parent: Dir,
+    data_leaf: String,
 }
 
 impl FileTransactionKernel {
@@ -78,7 +100,39 @@ impl FileTransactionKernel {
                 operation: format!("opening a synchronized repository root handle: {error}"),
             }
         })?;
-        Ok(Self { root, injector })
+        Ok(Self {
+            root,
+            injector,
+            repository: None,
+        })
+    }
+
+    /// Construct the canonical repository-state kernel from explicit selected
+    /// root capabilities. The ambient filesystem is not consulted after this
+    /// boundary.
+    pub(crate) fn for_repository_layout(
+        layout: RepositoryLayout,
+        worktree: Dir,
+        data: Option<Dir>,
+        data_parent: Dir,
+        data_leaf: String,
+        injector: Arc<dyn TransactionFailureInjector>,
+    ) -> Result<Self> {
+        validate_relative_component(&data_leaf)?;
+        let worktree = sync_capable_directory(&worktree)?;
+        let data = data.as_ref().map(sync_capable_directory).transpose()?;
+        let data_parent = sync_capable_directory(&data_parent)?;
+        Ok(Self {
+            root: worktree.try_clone()?,
+            injector,
+            repository: Some(RepositoryKernelRoots {
+                layout,
+                worktree,
+                data,
+                data_parent,
+                data_leaf,
+            }),
+        })
     }
 
     /// Prepare, publish, commit, and clean one action set under `guard`.
@@ -611,6 +665,7 @@ impl FileTransactionKernel {
             transaction,
             stages,
             backups,
+            companion: _,
         } = control;
         drop(stages);
         drop(backups);
@@ -628,6 +683,131 @@ impl FileTransactionKernel {
         }
         Ok(())
     }
+
+    pub(crate) fn pending_repository_transactions(
+        &self,
+        location: TransactionControlLocation,
+    ) -> Result<Vec<String>> {
+        let roots = self.repository_roots()?;
+        repository_pending_ids(roots, location)
+    }
+
+    /// Remove worktree-side companions whose owning internal transaction is gone.
+    /// Called after internal-journal recovery under the data-root guards.
+    pub(crate) fn sweep_orphan_companions(&self, _guard: &RepoWriteGuard) -> Result<()> {
+        repository_check(&*self.injector, FailurePoint::RepositorySweepCompanions)?;
+        sweep_orphan_companions(self.repository_roots()?)
+    }
+
+    pub(crate) fn recover_repository_transaction(
+        &self,
+        guard: &RepoWriteGuard,
+        location: TransactionControlLocation,
+        id: &str,
+    ) -> Result<FileTransactionOutcome> {
+        let roots = self.repository_roots()?;
+        let Some((base, transactions, transaction)) =
+            open_repository_transaction_dir(roots, location, id)?
+        else {
+            return Err(FileTransactionError::UnexpectedOccupant {
+                path: format!("missing transaction {id}"),
+            }
+            .into());
+        };
+        // A worktree-side companion under the external location carries no journal
+        // and belongs to an internal transaction (of this or another data root).
+        // External recovery runs before the data-root guards are held and cannot
+        // validate it, so any companion is skipped here; the internal-journal
+        // recovery and the orphan sweep own it.
+        if location == TransactionControlLocation::ExternalBootstrap
+            && companion_marker_owner(&transaction)?.is_some()
+        {
+            return Ok(FileTransactionOutcome {
+                plan_hash: String::new(),
+                recovery_state: RecoveryState::Clean,
+            });
+        }
+        if metadata_optional(&transaction, JOURNAL_FILE)?.is_none() {
+            // No durable journal means nothing was ever published (publication
+            // only follows a written journal), so the partial control — missing
+            // `stages`/`backups`, a leftover `journal.next`, or bare `id` dir —
+            // is removed wholesale rather than wedging recovery.
+            return cleanup_incomplete_repository_control(
+                roots,
+                base,
+                transactions,
+                transaction,
+                location,
+                id,
+            );
+        }
+        let bytes = transaction.read(JOURNAL_FILE)?;
+        let version = serde_json::from_slice::<serde_json::Value>(&bytes)?
+            .get("version")
+            .and_then(serde_json::Value::as_u64);
+        if version == Some(u64::from(JOURNAL_VERSION)) {
+            drop((transaction, transactions, base));
+            return self.recover(guard, id);
+        }
+        let journal: RepositoryTransactionJournal = serde_json::from_slice(&bytes)?;
+        // A foreign-owner external journal is another data root's absent-root
+        // publication residue that happens to live under this shared worktree
+        // bootstrap namespace. It is neither ours to recover (recovering it against
+        // our layout would be wrong) nor ours to remove; skip it cleanly so this
+        // open succeeds and leave it for its owning data root's session. Internal
+        // journals live under our own data root and are always ours.
+        if location == TransactionControlLocation::ExternalBootstrap
+            && journal.owner_digest != repository_owner_digest(&roots.layout)
+        {
+            return Ok(FileTransactionOutcome {
+                plan_hash: String::new(),
+                recovery_state: RecoveryState::Clean,
+            });
+        }
+        let stages = open_existing_dir(&transaction, "stages")?;
+        let backups = open_existing_dir(&transaction, "backups")?;
+        // An internal journal with Worktree actions has a worktree-side companion
+        // holding those actions' backups; open it so rollback restores from the
+        // same-filesystem authority and cleanup reclaims it.
+        let companion = if journal_has_worktree_action(&journal) {
+            open_companion_control(roots, id)?
+        } else {
+            None
+        };
+        let control = ControlDirs {
+            base,
+            transactions,
+            transaction,
+            stages,
+            backups,
+            companion,
+        };
+        recover_repository_journal(roots, control, journal, id, &*self.injector)
+    }
+
+    pub(crate) fn execute_repository_delta(
+        &self,
+        _guard: &RepoWriteGuard,
+        transaction_id: &str,
+        delta: &RepositoryDelta,
+    ) -> Result<FileTransactionOutcome> {
+        validate_transaction_id(transaction_id)?;
+        execute_repository_delta(
+            self.repository_roots()?,
+            transaction_id,
+            delta,
+            &*self.injector,
+        )
+    }
+
+    fn repository_roots(&self) -> Result<&RepositoryKernelRoots> {
+        self.repository.as_ref().ok_or_else(|| {
+            FileTransactionError::UnsupportedFilesystem {
+                operation: "repository-layout kernel was not constructed".into(),
+            }
+            .into()
+        })
+    }
 }
 
 struct ControlDirs {
@@ -636,6 +816,1617 @@ struct ControlDirs {
     transaction: Dir,
     stages: Dir,
     backups: Dir,
+    /// Worktree-side staging/backup authority for the Worktree actions of an
+    /// internal transaction, colocated with the worktree so a disjoint data root
+    /// on another filesystem never forces a cross-filesystem hard link or rename.
+    /// `None` for external transactions (already worktree-colocated) and for
+    /// internal transactions with no Worktree actions.
+    companion: Option<CompanionDirs>,
+}
+
+/// A companion control directory rooted at worktree `.jit-bootstrap/transactions/{id}`.
+/// Only the staging/backup handles are retained; the directory is removed by id
+/// through [`remove_companion_control`] at cleanup so no parent handle is needed.
+struct CompanionDirs {
+    stages: Dir,
+    backups: Dir,
+}
+
+/// Staging authority for `root`'s actions: the companion (worktree filesystem)
+/// for Worktree actions when one exists, otherwise the primary control.
+fn stage_authority(control: &ControlDirs, root: RepositoryRootClass) -> &Dir {
+    match (root, &control.companion) {
+        (RepositoryRootClass::Worktree, Some(companion)) => &companion.stages,
+        _ => &control.stages,
+    }
+}
+
+/// Backup authority for `root`'s actions, mirroring [`stage_authority`].
+fn backup_authority(control: &ControlDirs, root: RepositoryRootClass) -> &Dir {
+    match (root, &control.companion) {
+        (RepositoryRootClass::Worktree, Some(companion)) => &companion.backups,
+        _ => &control.backups,
+    }
+}
+
+fn repository_layout_digest(layout: &RepositoryLayout) -> Result<String> {
+    Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(layout)?)))
+}
+
+/// Stable owner identity of a transaction: a digest of the worktree and data-root
+/// paths, symlink-canonicalized. Unlike the layout digest it is invariant to a
+/// data root becoming present, so a session recognizes its own transactions in
+/// the shared worktree bootstrap namespace while never claiming a different data
+/// root's.
+///
+/// Canonicalization resolves symlinks so the SAME repository reached through a
+/// different path spelling (e.g. a symlinked home) produces one digest, and its
+/// crash residue is still recovered and reaped on the next open. The worktree
+/// root always exists and is canonicalized directly; the data root may be absent,
+/// so its parent is canonicalized and the leaf re-appended. A genuinely changed
+/// canonical path (a remount, a moved repository) deliberately produces a new
+/// digest and orphans the old residue rather than risk the opposite, unsafe
+/// direction — reaping another owner's live transaction. If canonicalization
+/// fails (a vanished parent) the lexical path is used as a last resort.
+fn repository_owner_digest(layout: &RepositoryLayout) -> String {
+    let worktree = std::fs::canonicalize(layout.worktree_root())
+        .unwrap_or_else(|_| layout.worktree_root().to_path_buf());
+    let data = canonicalize_possibly_absent(layout.data_root());
+    let mut hasher = Sha256::new();
+    hasher.update(worktree.to_string_lossy().as_bytes());
+    hasher.update([0u8]);
+    hasher.update(data.to_string_lossy().as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+/// Canonicalize a path that may not exist: resolve it directly when present, else
+/// canonicalize its parent and re-append the leaf so an absent data root still
+/// yields a stable, symlink-resolved key.
+fn canonicalize_possibly_absent(path: &Path) -> PathBuf {
+    if let Ok(canonical) = std::fs::canonicalize(path) {
+        return canonical;
+    }
+    match (path.parent(), path.file_name()) {
+        (Some(parent), Some(leaf)) => std::fs::canonicalize(parent)
+            .unwrap_or_else(|_| parent.to_path_buf())
+            .join(leaf),
+        _ => path.to_path_buf(),
+    }
+}
+
+fn repository_plan_hash(delta: &RepositoryDelta) -> Result<String> {
+    Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(delta)?)))
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("injected repository interruption at {point:?}: {source}")]
+struct RepositoryInterruption {
+    point: FailurePoint,
+    #[source]
+    source: std::io::Error,
+}
+
+fn repository_check(injector: &dyn TransactionFailureInjector, point: FailurePoint) -> Result<()> {
+    injector
+        .check(&point)
+        .map_err(|source| RepositoryInterruption { point, source }.into())
+}
+
+fn repository_pending_ids(
+    roots: &RepositoryKernelRoots,
+    location: TransactionControlLocation,
+) -> Result<Vec<String>> {
+    let Some(transactions) = repository_transactions_dir(roots, location)? else {
+        return Ok(Vec::new());
+    };
+    let mut ids = transactions
+        .entries()?
+        .map(|entry| {
+            let entry = entry?;
+            if !entry.file_type()?.is_dir() {
+                return Err(FileTransactionError::UnexpectedOccupant {
+                    path: entry.file_name().to_string_lossy().into_owned(),
+                }
+                .into());
+            }
+            let id = entry.file_name().to_string_lossy().into_owned();
+            validate_transaction_id(&id)?;
+            Ok(id)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    ids.sort();
+    Ok(ids)
+}
+
+fn repository_transactions_dir(
+    roots: &RepositoryKernelRoots,
+    location: TransactionControlLocation,
+) -> Result<Option<Dir>> {
+    match location {
+        TransactionControlLocation::ExternalBootstrap => {
+            if metadata_optional(&roots.worktree, BOOTSTRAP_DIR)?.is_none() {
+                return Ok(None);
+            }
+            let bootstrap = open_existing_dir(&roots.worktree, BOOTSTRAP_DIR)?;
+            ensure_existing_protocol_marker(&bootstrap)?;
+            if metadata_optional(&bootstrap, "transactions")?.is_none() {
+                return Ok(None);
+            }
+            open_existing_dir(&bootstrap, "transactions").map(Some)
+        }
+        TransactionControlLocation::InternalRepository => {
+            let Some(data) = &roots.data else {
+                return Ok(None);
+            };
+            if metadata_optional(data, "tmp")?.is_none() {
+                return Ok(None);
+            }
+            let tmp = open_existing_dir(data, "tmp")?;
+            if metadata_optional(&tmp, "transactions")?.is_none() {
+                return Ok(None);
+            }
+            open_existing_dir(&tmp, "transactions").map(Some)
+        }
+    }
+}
+
+fn create_repository_control(
+    roots: &RepositoryKernelRoots,
+    id: &str,
+    location: TransactionControlLocation,
+    needs_worktree_companion: bool,
+    injector: &dyn TransactionFailureInjector,
+) -> Result<ControlDirs> {
+    let (base, transactions) =
+        match location {
+            TransactionControlLocation::ExternalBootstrap => {
+                let bootstrap = open_or_create_protocol_dir(&roots.worktree, BOOTSTRAP_DIR)?;
+                ensure_protocol_marker(&bootstrap)?;
+                let transactions = open_or_create_dir(&bootstrap, "transactions")?;
+                (bootstrap, transactions)
+            }
+            TransactionControlLocation::InternalRepository => {
+                let data = roots.data.as_ref().ok_or_else(|| {
+                    FileTransactionError::UnsupportedFilesystem {
+                        operation: "internal transaction without a data-root capability".into(),
+                    }
+                })?;
+                let tmp = open_or_create_dir(data, "tmp")?;
+                let transactions = open_or_create_dir(&tmp, "transactions")?;
+                (tmp, transactions)
+            }
+        };
+    let mut control = create_transaction_dirs(base, transactions, id)?;
+    // An internal transaction publishing Worktree actions gets a worktree-side
+    // companion so those actions stage and back up on the worktree filesystem.
+    if needs_worktree_companion && location == TransactionControlLocation::InternalRepository {
+        repository_check(injector, FailurePoint::RepositoryCreateCompanion)?;
+        let owner = repository_owner_digest(&roots.layout);
+        control.companion = Some(create_companion_control(&roots.worktree, id, &owner)?);
+    }
+    Ok(control)
+}
+
+/// Create the worktree-side companion `.jit-bootstrap/transactions/{id}` with its
+/// marker, stages, and backups. The marker records the owning data root's stable
+/// owner digest, so the external-recovery scan skips it and the orphan sweep only
+/// reclaims companions belonging to the running session's own data root.
+fn create_companion_control(worktree: &Dir, id: &str, owner: &str) -> Result<CompanionDirs> {
+    let bootstrap = open_or_create_protocol_dir(worktree, BOOTSTRAP_DIR)?;
+    ensure_protocol_marker(&bootstrap)?;
+    let transactions = open_or_create_dir(&bootstrap, "transactions")?;
+    transactions.create_dir(id).map_err(|error| {
+        if error.kind() == ErrorKind::AlreadyExists {
+            anyhow::Error::new(FileTransactionError::UnexpectedOccupant {
+                path: format!("companion control {id}"),
+            })
+        } else {
+            anyhow::Error::new(error)
+        }
+    })?;
+    sync_directory(&transactions)?;
+    let transaction = open_existing_dir(&transactions, id)?;
+    stage_bytes(&transaction, COMPANION_MARKER, owner.as_bytes())?;
+    let stages = open_or_create_dir(&transaction, "stages")?;
+    let backups = open_or_create_dir(&transaction, "backups")?;
+    sync_directory(&transaction)?;
+    Ok(CompanionDirs { stages, backups })
+}
+
+/// Owner digest recorded in a worktree `.jit-bootstrap/transactions/{id}` companion
+/// marker, or `None` when the directory holds no companion marker.
+fn companion_marker_owner(transaction: &Dir) -> Result<Option<String>> {
+    match transaction.read_to_string(COMPANION_MARKER) {
+        Ok(contents) => Ok(Some(contents)),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn journal_has_worktree_action(journal: &RepositoryTransactionJournal) -> bool {
+    journal
+        .actions
+        .iter()
+        .any(|action| action.path.root == RepositoryRootClass::Worktree)
+}
+
+/// Open the worktree-side companion for `id` if it exists and its marker matches.
+fn open_companion_control(
+    roots: &RepositoryKernelRoots,
+    id: &str,
+) -> Result<Option<CompanionDirs>> {
+    if metadata_optional(&roots.worktree, BOOTSTRAP_DIR)?.is_none() {
+        return Ok(None);
+    }
+    let bootstrap = open_existing_dir(&roots.worktree, BOOTSTRAP_DIR)?;
+    if metadata_optional(&bootstrap, "transactions")?.is_none() {
+        return Ok(None);
+    }
+    let transactions = open_existing_dir(&bootstrap, "transactions")?;
+    if metadata_optional(&transactions, id)?.is_none() {
+        return Ok(None);
+    }
+    let transaction = open_existing_dir(&transactions, id)?;
+    let owner = repository_owner_digest(&roots.layout);
+    match companion_marker_owner(&transaction)? {
+        Some(marker) if marker == owner => Ok(Some(CompanionDirs {
+            stages: open_existing_dir(&transaction, "stages")?,
+            backups: open_existing_dir(&transaction, "backups")?,
+        })),
+        Some(_) => Err(FileTransactionError::LayoutMismatch.into()),
+        None => Ok(None),
+    }
+}
+
+/// Remove the worktree-side companion for `id`, reclaiming the bootstrap protocol
+/// directory when it was the last resident.
+fn remove_companion_control(roots: &RepositoryKernelRoots, id: &str) -> Result<()> {
+    if metadata_optional(&roots.worktree, BOOTSTRAP_DIR)?.is_none() {
+        return Ok(());
+    }
+    let bootstrap = open_existing_dir(&roots.worktree, BOOTSTRAP_DIR)?;
+    if metadata_optional(&bootstrap, "transactions")?.is_none() {
+        return Ok(());
+    }
+    let transactions = open_existing_dir(&bootstrap, "transactions")?;
+    if metadata_optional(&transactions, id)?.is_some() {
+        transactions.remove_dir_all(id)?;
+        sync_directory(&transactions)?;
+    }
+    if transactions.entries()?.next().is_none() {
+        drop(transactions);
+        bootstrap.remove_dir("transactions")?;
+        remove_optional_file(&bootstrap, PROTOCOL_MARKER)?;
+        sync_directory(&bootstrap)?;
+        drop(bootstrap);
+        roots.worktree.remove_dir(BOOTSTRAP_DIR)?;
+        sync_directory(&roots.worktree)?;
+    }
+    Ok(())
+}
+
+fn internal_transaction_exists(roots: &RepositoryKernelRoots, id: &str) -> Result<bool> {
+    let Some(transactions) =
+        repository_transactions_dir(roots, TransactionControlLocation::InternalRepository)?
+    else {
+        return Ok(false);
+    };
+    Ok(metadata_optional(&transactions, id)?.is_some())
+}
+
+/// Remove every worktree-side companion OWNED BY THIS data root whose internal
+/// transaction no longer exists. Runs after internal-journal recovery, under the
+/// data-root guards. A companion whose marker names a different owner belongs to
+/// another data root sharing this worktree and is left untouched — only that
+/// owner can decide whether its transaction is live or orphaned.
+fn sweep_orphan_companions(roots: &RepositoryKernelRoots) -> Result<()> {
+    if metadata_optional(&roots.worktree, BOOTSTRAP_DIR)?.is_none() {
+        return Ok(());
+    }
+    let bootstrap = open_existing_dir(&roots.worktree, BOOTSTRAP_DIR)?;
+    let Some(transactions_meta) = metadata_optional(&bootstrap, "transactions")? else {
+        return Ok(());
+    };
+    if !transactions_meta.is_dir() {
+        return Ok(());
+    }
+    let owner = repository_owner_digest(&roots.layout);
+    let transactions = open_existing_dir(&bootstrap, "transactions")?;
+    let ids = transactions
+        .entries()?
+        .filter_map(Result::ok)
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .collect::<Vec<_>>();
+    let mut orphans = Vec::new();
+    for id in ids {
+        let transaction = open_existing_dir(&transactions, &id)?;
+        if let Some(marker) = companion_marker_owner(&transaction)? {
+            if marker == owner && !internal_transaction_exists(roots, &id)? {
+                orphans.push(id);
+            }
+        }
+    }
+    drop(transactions);
+    drop(bootstrap);
+    for id in orphans {
+        remove_companion_control(roots, &id)?;
+    }
+    Ok(())
+}
+
+/// Open a transaction's base, transactions, and `id` directories without
+/// requiring `stages`/`backups`, so recovery can inspect a control created only
+/// partway before a crash. Callers open `stages`/`backups` themselves only once
+/// a durable journal proves preparation reached them.
+fn open_repository_transaction_dir(
+    roots: &RepositoryKernelRoots,
+    location: TransactionControlLocation,
+    id: &str,
+) -> Result<Option<(Dir, Dir, Dir)>> {
+    let Some(transactions) = repository_transactions_dir(roots, location)? else {
+        return Ok(None);
+    };
+    if metadata_optional(&transactions, id)?.is_none() {
+        return Ok(None);
+    }
+    let base = match location {
+        TransactionControlLocation::ExternalBootstrap => {
+            open_existing_dir(&roots.worktree, BOOTSTRAP_DIR)?
+        }
+        TransactionControlLocation::InternalRepository => {
+            open_existing_dir(roots.data.as_ref().expect("checked above"), "tmp")?
+        }
+    };
+    let transaction = open_existing_dir(&transactions, id)?;
+    Ok(Some((base, transactions, transaction)))
+}
+
+fn initial_repository_journal(
+    roots: &RepositoryKernelRoots,
+    id: &str,
+    delta: &RepositoryDelta,
+) -> Result<RepositoryTransactionJournal> {
+    let actions = delta
+        .actions()
+        .iter()
+        .enumerate()
+        .map(|(index, action)| {
+            let path = RepositoryJournalPath {
+                root: action.path().root_class(),
+                relative: action.path().relative().clone(),
+            };
+            let (kind, final_identity) = match action {
+                RepositoryAction::CreateDirectory { .. } => (
+                    RepositoryJournalActionKind::CreateDirectory {
+                        mode: FileMode::Executable,
+                        stage: ControlName::new(format!("dir-{index}"))
+                            .map_err(anyhow::Error::msg)?,
+                    },
+                    RepositoryFinalIdentity::Directory {
+                        identity: EntryIdentity::for_bytes(
+                            format!("planned-dir-{index}"),
+                            b"directory",
+                        )?,
+                        mode: FileMode::Executable,
+                    },
+                ),
+                RepositoryAction::WriteFile { bytes, mode, .. } => (
+                    RepositoryJournalActionKind::WriteFile {
+                        mode: *mode,
+                        stage: ControlName::new(format!("file-{index}"))
+                            .map_err(anyhow::Error::msg)?,
+                        backup: ControlName::new(format!("backup-{index}"))
+                            .map_err(anyhow::Error::msg)?,
+                    },
+                    RepositoryFinalIdentity::File {
+                        identity: EntryIdentity::for_bytes(format!("planned-file-{index}"), bytes)?,
+                        mode: *mode,
+                    },
+                ),
+                RepositoryAction::SetMode { expected, mode, .. } => {
+                    let ExpectedPreimage::File { identity, .. } = expected else {
+                        unreachable!("RepositoryDelta validates SetMode preimages")
+                    };
+                    (
+                        RepositoryJournalActionKind::SetMode { mode: *mode },
+                        RepositoryFinalIdentity::File {
+                            identity: identity.clone(),
+                            mode: *mode,
+                        },
+                    )
+                }
+                RepositoryAction::DeleteFile { .. } => (
+                    RepositoryJournalActionKind::DeleteFile {
+                        backup: ControlName::new(format!("backup-{index}"))
+                            .map_err(anyhow::Error::msg)?,
+                    },
+                    RepositoryFinalIdentity::Absent,
+                ),
+            };
+            Ok(RepositoryJournalAction {
+                path,
+                owner: action.owner().to_string(),
+                expected: action.expected().clone(),
+                final_identity,
+                action: kind,
+                progress: RepositoryActionProgress::Planned,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(RepositoryTransactionJournal {
+        version: REPOSITORY_JOURNAL_VERSION,
+        transaction_id: id.to_string(),
+        layout_digest: repository_layout_digest(&roots.layout)?,
+        owner_digest: repository_owner_digest(&roots.layout),
+        plan_hash: repository_plan_hash(delta)?,
+        data_root_was_absent: roots.data.is_none(),
+        data_stage: roots
+            .data
+            .is_none()
+            .then(|| ControlName::new(format!("jit-stage-{id}")))
+            .transpose()
+            .map_err(anyhow::Error::msg)?,
+        data_stage_identity: None,
+        decision: TransactionDecision::Prepared,
+        actions,
+    })
+}
+
+fn write_repository_journal(
+    transaction: &Dir,
+    journal: &RepositoryTransactionJournal,
+) -> Result<()> {
+    let next = "journal.next";
+    remove_optional_file(transaction, next)?;
+    stage_bytes(transaction, next, &serde_json::to_vec_pretty(journal)?)?;
+    transaction.rename(next, transaction, JOURNAL_FILE)?;
+    sync_directory(transaction)?;
+    Ok(())
+}
+
+fn execute_repository_delta(
+    roots: &RepositoryKernelRoots,
+    id: &str,
+    delta: &RepositoryDelta,
+    injector: &dyn TransactionFailureInjector,
+) -> Result<FileTransactionOutcome> {
+    for action in delta.actions() {
+        roots.layout.ensure_canonical(action.path())?;
+        let actual = inspect_repository_target(roots, action.path(), None)?;
+        ensure_repository_expected(action.path(), action.expected(), &actual)?;
+    }
+    let plan_hash = repository_plan_hash(delta)?;
+    if delta.actions().is_empty() {
+        return Ok(FileTransactionOutcome {
+            plan_hash,
+            recovery_state: RecoveryState::Clean,
+        });
+    }
+    let location = if roots.data.is_some() {
+        TransactionControlLocation::InternalRepository
+    } else {
+        TransactionControlLocation::ExternalBootstrap
+    };
+    let needs_worktree_companion = delta
+        .actions()
+        .iter()
+        .any(|action| action.path().root_class() == RepositoryRootClass::Worktree);
+    let control =
+        create_repository_control(roots, id, location, needs_worktree_companion, injector)?;
+    let mut journal = initial_repository_journal(roots, id, delta)?;
+    write_repository_journal(&control.transaction, &journal)?;
+    repository_check(injector, FailurePoint::RepositoryPrepareIntent)?;
+
+    let prepared = prepare_repository_actions(roots, &control, &mut journal, delta, injector);
+    if let Err(error) = prepared {
+        if error.downcast_ref::<RepositoryInterruption>().is_some() {
+            return Err(RecoveryRequiredError {
+                transaction_id: id.to_string(),
+                state: RecoveryState::Prepared,
+                source: error,
+            }
+            .into());
+        }
+        cleanup_repository_control(roots, control, location, id, &journal)?;
+        return Err(error);
+    }
+
+    let published = publish_repository_actions(roots, &control, &mut journal, injector);
+    if let Err(error) = published {
+        if error.downcast_ref::<RepositoryInterruption>().is_some()
+            || data_stage_was_published(roots, &journal)?
+        {
+            return Err(RecoveryRequiredError {
+                transaction_id: id.to_string(),
+                state: RecoveryState::Prepared,
+                source: error,
+            }
+            .into());
+        }
+        rollback_repository_actions(roots, &control, &mut journal)?;
+        cleanup_repository_control(roots, control, location, id, &journal)?;
+        return Err(error);
+    }
+
+    journal.decision = TransactionDecision::Committed;
+    write_repository_journal(&control.transaction, &journal)?;
+    if let Err(source) = repository_check(injector, FailurePoint::RepositoryAfterCommit) {
+        return Err(RecoveryRequiredError {
+            transaction_id: id.to_string(),
+            state: RecoveryState::Committed,
+            source,
+        }
+        .into());
+    }
+    repository_check(injector, FailurePoint::RepositoryCleanup)?;
+    cleanup_repository_control(roots, control, location, id, &journal)?;
+    Ok(FileTransactionOutcome {
+        plan_hash,
+        recovery_state: RecoveryState::Clean,
+    })
+}
+
+fn prepare_repository_actions(
+    roots: &RepositoryKernelRoots,
+    control: &ControlDirs,
+    journal: &mut RepositoryTransactionJournal,
+    delta: &RepositoryDelta,
+    injector: &dyn TransactionFailureInjector,
+) -> Result<()> {
+    let data_stage = if let Some(name) = &journal.data_stage {
+        roots
+            .data_parent
+            .create_dir(name.as_str())
+            .map_err(|error| {
+                if error.kind() == ErrorKind::AlreadyExists {
+                    FileTransactionError::UnexpectedOccupant {
+                        path: name.as_str().to_string(),
+                    }
+                    .into()
+                } else {
+                    anyhow::Error::new(error)
+                }
+            })?;
+        sync_directory(&roots.data_parent)?;
+        let stage = open_existing_dir(&roots.data_parent, name.as_str())?;
+        journal.data_stage_identity = inspect_repository_root(&stage)?.identity().cloned();
+        write_repository_journal(&control.transaction, journal)?;
+        Some(stage)
+    } else {
+        None
+    };
+
+    for (index, action) in delta.actions().iter().enumerate() {
+        repository_check(
+            injector,
+            FailurePoint::RepositoryPrepareAction { action: index },
+        )?;
+        if action.path().root_class() == RepositoryRootClass::Data && roots.data.is_none() {
+            prepare_staged_data_action(
+                data_stage.as_ref().expect("created above"),
+                action,
+                &mut journal.actions[index],
+            )?;
+            journal.actions[index].progress = RepositoryActionProgress::Prepared;
+        } else {
+            let path = journal_virtual_path(roots, &journal.actions[index].path)?;
+            let root = repository_live_root(roots, path.root_class())?;
+            let relative = path.relative().as_path().to_string_lossy().into_owned();
+            // Route staging and backup to the authority colocated with the
+            // action's target filesystem, so a Worktree action never stages or
+            // hard-links across a data-root filesystem boundary.
+            let stages = stage_authority(control, path.root_class());
+            let backups = backup_authority(control, path.root_class());
+            match action {
+                RepositoryAction::CreateDirectory { .. } => {
+                    let stage = create_directory_stage_name(&journal.actions[index].action);
+                    stages.create_dir(stage.as_str())?;
+                    sync_directory(stages)?;
+                    let staged = open_existing_dir(stages, stage.as_str())?;
+                    journal.actions[index].final_identity =
+                        repository_final_identity(&inspect_repository_root(&staged)?)?;
+                    journal.actions[index].progress = RepositoryActionProgress::Prepared;
+                }
+                RepositoryAction::WriteFile { bytes, mode, .. } => {
+                    let (stage, backup) = write_file_control_names(&journal.actions[index].action);
+                    stage_bytes(stages, stage.as_str(), bytes)?;
+                    set_mode(stages, stage.as_str(), repository_unix_mode(*mode))?;
+                    sync_directory(stages)?;
+                    journal.actions[index].final_identity = repository_final_identity(
+                        &inspect_repository_leaf(stages, stage.as_str())?,
+                    )?;
+                    // A replace prepares its rollback backup now, before anything
+                    // is published, so publication is a verified atomic swap and
+                    // never a check-then-rename-by-name occupant race.
+                    journal.actions[index].progress = if matches!(
+                        journal.actions[index].expected,
+                        ExpectedPreimage::File { .. }
+                    ) {
+                        let (parent, leaf) = open_parent(root, &relative, false)?;
+                        prepare_repository_backup(
+                            &parent,
+                            &leaf,
+                            backups,
+                            &backup,
+                            &journal.actions[index].expected,
+                            &path,
+                        )?;
+                        RepositoryActionProgress::BackupReady
+                    } else {
+                        RepositoryActionProgress::Prepared
+                    };
+                }
+                RepositoryAction::SetMode { .. } => {
+                    journal.actions[index].progress = RepositoryActionProgress::Prepared;
+                }
+                RepositoryAction::DeleteFile { .. } => {
+                    let backup = delete_file_backup_name(&journal.actions[index].action);
+                    let (parent, leaf) = open_parent(root, &relative, false)?;
+                    prepare_repository_backup(
+                        &parent,
+                        &leaf,
+                        backups,
+                        &backup,
+                        &journal.actions[index].expected,
+                        &path,
+                    )?;
+                    journal.actions[index].progress = RepositoryActionProgress::BackupReady;
+                }
+            }
+        }
+        write_repository_journal(&control.transaction, journal)?;
+        repository_check(
+            injector,
+            FailurePoint::RepositorySyncPreparedAction { action: index },
+        )?;
+    }
+    if let Some(stage) = &data_stage {
+        sync_directory(stage)?;
+    }
+    Ok(())
+}
+
+fn create_directory_stage_name(kind: &RepositoryJournalActionKind) -> ControlName {
+    match kind {
+        RepositoryJournalActionKind::CreateDirectory { stage, .. } => stage.clone(),
+        _ => unreachable!("journal and normalized delta stay aligned"),
+    }
+}
+
+fn write_file_control_names(kind: &RepositoryJournalActionKind) -> (ControlName, ControlName) {
+    match kind {
+        RepositoryJournalActionKind::WriteFile { stage, backup, .. } => {
+            (stage.clone(), backup.clone())
+        }
+        _ => unreachable!("journal and normalized delta stay aligned"),
+    }
+}
+
+fn delete_file_backup_name(kind: &RepositoryJournalActionKind) -> ControlName {
+    match kind {
+        RepositoryJournalActionKind::DeleteFile { backup } => backup.clone(),
+        _ => unreachable!("journal and normalized delta stay aligned"),
+    }
+}
+
+/// Create and synchronize the rollback backup of a replace/delete target during
+/// preparation. The live target is verified against the recorded preimage, then
+/// hard-linked into the backup area and reverified there, so a subsequent
+/// publication converges to the exact original file even if a non-cooperating
+/// writer swaps the target afterward.
+fn prepare_repository_backup(
+    parent: &Dir,
+    leaf: &str,
+    backups: &Dir,
+    backup: &ControlName,
+    expected: &ExpectedPreimage,
+    path: &VirtualPath,
+) -> Result<()> {
+    let current = inspect_repository_leaf(parent, leaf)?;
+    ensure_repository_expected(path, expected, &current)?;
+    parent
+        .hard_link(leaf, backups, backup.as_str())
+        .map_err(|error| {
+            if error.kind() == ErrorKind::AlreadyExists {
+                FileTransactionError::UnexpectedOccupant {
+                    path: format!("backup {}", backup.as_str()),
+                }
+                .into()
+            } else {
+                anyhow::Error::new(error)
+            }
+        })?;
+    let saved = inspect_repository_leaf(backups, backup.as_str())?;
+    if !repository_matches_expected(expected, &saved) {
+        return Err(FileTransactionError::UnexpectedOccupant {
+            path: format!("{path:?}"),
+        }
+        .into());
+    }
+    sync_directory(backups)?;
+    Ok(())
+}
+
+fn prepare_staged_data_action(
+    stage: &Dir,
+    action: &RepositoryAction,
+    journal: &mut RepositoryJournalAction,
+) -> Result<()> {
+    if action.path().relative().is_root() {
+        if !matches!(action, RepositoryAction::CreateDirectory { .. }) {
+            return Err(FileTransactionError::UnsupportedTarget {
+                path: "data root".into(),
+            }
+            .into());
+        }
+        journal.final_identity = repository_final_identity(&inspect_repository_root(stage)?)?;
+        return Ok(());
+    }
+    let relative = action.path().relative().as_path().to_string_lossy();
+    let (parent, leaf) = open_parent(stage, &relative, false)?;
+    match action {
+        RepositoryAction::CreateDirectory { .. } => {
+            parent.create_dir(&leaf)?;
+            let directory = open_existing_dir(&parent, &leaf)?;
+            journal.final_identity =
+                repository_final_identity(&inspect_repository_root(&directory)?)?;
+            sync_directory(&parent)?;
+        }
+        RepositoryAction::WriteFile { bytes, mode, .. } => {
+            stage_bytes(&parent, &leaf, bytes)?;
+            set_mode(&parent, &leaf, repository_unix_mode(*mode))?;
+            journal.final_identity =
+                repository_final_identity(&inspect_repository_leaf(&parent, &leaf)?)?;
+            sync_directory(&parent)?;
+        }
+        RepositoryAction::SetMode { .. } | RepositoryAction::DeleteFile { .. } => {
+            return Err(FileTransactionError::UnsupportedTarget {
+                path: relative.into_owned(),
+            }
+            .into())
+        }
+    }
+    Ok(())
+}
+
+fn publish_repository_actions(
+    roots: &RepositoryKernelRoots,
+    control: &ControlDirs,
+    journal: &mut RepositoryTransactionJournal,
+    injector: &dyn TransactionFailureInjector,
+) -> Result<()> {
+    for index in 0..journal.actions.len() {
+        if journal.data_root_was_absent
+            && journal.actions[index].path.root == RepositoryRootClass::Data
+        {
+            continue;
+        }
+        repository_check(
+            injector,
+            FailurePoint::RepositoryBeforeAction { action: index },
+        )?;
+        publish_repository_action(roots, control, journal, index)?;
+        journal.actions[index].progress = RepositoryActionProgress::Published;
+        write_repository_journal(&control.transaction, journal)?;
+        repository_check(
+            injector,
+            FailurePoint::RepositoryAfterAction { action: index },
+        )?;
+    }
+
+    if journal.data_root_was_absent {
+        let stage_name = journal
+            .data_stage
+            .as_ref()
+            .expect("absent root has a stage");
+        let stage = open_existing_dir(&roots.data_parent, stage_name.as_str())?;
+        // Reverify every staged data action against its recorded final identity
+        // while the stage is still mutable and nothing is committed. A staged
+        // object that no longer matches its plan aborts before the irreversible
+        // rename instead of publishing an unverified root.
+        for action in &journal.actions {
+            if action.path.root != RepositoryRootClass::Data {
+                continue;
+            }
+            let path = journal_virtual_path(roots, &action.path)?;
+            let staged = inspect_repository_target(roots, &path, Some(&stage))?;
+            ensure_repository_final(&path, &action.final_identity, &staged)?;
+        }
+        drop(stage);
+
+        repository_check(injector, FailurePoint::RepositoryBeforeDataRootPublication)?;
+        rename_noreplace_cap(
+            &roots.data_parent,
+            stage_name.as_str(),
+            &roots.data_parent,
+            &roots.data_leaf,
+        )
+        .map_err(|error| {
+            if error.kind() == ErrorKind::AlreadyExists {
+                FileTransactionError::OccupiedDataRoot {
+                    path: roots.data_leaf.clone(),
+                }
+                .into()
+            } else if error.kind() == ErrorKind::Unsupported {
+                FileTransactionError::UnsupportedFilesystem {
+                    operation: "atomic no-replace root publication".into(),
+                }
+                .into()
+            } else {
+                anyhow::Error::new(error)
+            }
+        })?;
+        sync_directory(&roots.data_parent)?;
+        let published = open_existing_dir(&roots.data_parent, &roots.data_leaf)?;
+        let actual = inspect_repository_root(&published)?;
+        let expected = journal.data_stage_identity.as_ref().ok_or_else(|| {
+            FileTransactionError::UnexpectedOccupant {
+                path: roots.data_leaf.clone(),
+            }
+        })?;
+        if actual.identity() != Some(expected) {
+            return Err(FileTransactionError::UnexpectedOccupant {
+                path: roots.data_leaf.clone(),
+            }
+            .into());
+        }
+        // Verify every final action after publication: worktree actions against
+        // the worktree root, data actions within the freshly opened published
+        // root (rename preserves each staged inode, so identities must match).
+        for action in &journal.actions {
+            let path = journal_virtual_path(roots, &action.path)?;
+            let actual = match action.path.root {
+                RepositoryRootClass::Data => {
+                    inspect_repository_target(roots, &path, Some(&published))?
+                }
+                RepositoryRootClass::Worktree => inspect_repository_target(roots, &path, None)?,
+            };
+            ensure_repository_final(&path, &action.final_identity, &actual)?;
+        }
+        repository_check(injector, FailurePoint::RepositoryAfterDataRootPublication)?;
+    }
+    Ok(())
+}
+
+fn publish_repository_action(
+    roots: &RepositoryKernelRoots,
+    control: &ControlDirs,
+    journal: &RepositoryTransactionJournal,
+    index: usize,
+) -> Result<()> {
+    let path = journal_virtual_path(roots, &journal.actions[index].path)?;
+    let root = repository_live_root(roots, path.root_class())?;
+    let relative = path.relative().as_path().to_string_lossy();
+    let (parent, leaf) = open_parent(root, &relative, false)?;
+    let current = inspect_repository_leaf(&parent, &leaf)?;
+    let expected = &journal.actions[index].expected;
+    ensure_repository_expected(&path, expected, &current)?;
+    let stages = stage_authority(control, path.root_class());
+    match &journal.actions[index].action {
+        RepositoryJournalActionKind::CreateDirectory { stage, .. } => {
+            rename_noreplace_cap(stages, stage.as_str(), &parent, &leaf)
+                .map_err(map_noreplace_error)?;
+            sync_directory(&parent)?;
+        }
+        RepositoryJournalActionKind::WriteFile { stage, .. } => {
+            if matches!(expected, ExpectedPreimage::File { .. }) {
+                // The verified backup already exists; publish is a single
+                // replacing rename, so there is no check-then-rename occupant
+                // window and no post-crash occupant is ever removed by name.
+                stages.rename(stage.as_str(), &parent, &leaf)?;
+            } else {
+                stages
+                    .hard_link(stage.as_str(), &parent, &leaf)
+                    .map_err(map_noreplace_error)?;
+            }
+            sync_directory(&parent)?;
+        }
+        RepositoryJournalActionKind::SetMode { mode } => {
+            set_repository_mode_if_identity(&parent, &leaf, expected, *mode, &path)?;
+            sync_directory(&parent)?;
+        }
+        RepositoryJournalActionKind::DeleteFile { .. } => {
+            // The verified backup already exists; the preimage recheck above
+            // rejected a symlink or wrong-identity occupant, so removal targets
+            // exactly the file we verified and never a post-crash occupant.
+            remove_repository_file_if_identity(&parent, &leaf, expected, &path)?;
+            sync_directory(&parent)?;
+        }
+    }
+    let actual = inspect_repository_target(roots, &path, None)?;
+    ensure_repository_final(&path, &journal.actions[index].final_identity, &actual)
+}
+
+/// Set `mode` on `leaf` only if its live identity still matches `expected`,
+/// verified on the same handle the permission change is applied to.
+fn set_repository_mode_if_identity(
+    parent: &Dir,
+    leaf: &str,
+    expected: &ExpectedPreimage,
+    mode: FileMode,
+    path: &VirtualPath,
+) -> Result<()> {
+    let mut file = open_regular_file_nofollow(parent, leaf)?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    let metadata = file.metadata()?;
+    let observed = RepositoryEntry::File {
+        identity: repository_entry_identity(&metadata, &bytes)?,
+        bytes,
+        mode: repository_file_mode(&metadata),
+    };
+    if !repository_matches_expected(expected, &observed) {
+        return Err(FileTransactionError::UnexpectedOccupant {
+            path: format!("{path:?}"),
+        }
+        .into());
+    }
+    #[cfg(unix)]
+    {
+        use cap_std::fs::PermissionsExt;
+        if let Some(mode) = repository_unix_mode(mode) {
+            file.set_permissions(cap_std::fs::Permissions::from_mode(mode & 0o7777))?;
+            file.sync_all()?;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (mode, file);
+    }
+    Ok(())
+}
+
+/// Remove `leaf` only if its live identity still matches the regular-file
+/// preimage, verified on an open handle immediately before removal.
+fn remove_repository_file_if_identity(
+    parent: &Dir,
+    leaf: &str,
+    expected: &ExpectedPreimage,
+    path: &VirtualPath,
+) -> Result<()> {
+    let current = inspect_repository_leaf(parent, leaf)?;
+    if !repository_matches_expected(expected, &current) {
+        return Err(FileTransactionError::UnexpectedOccupant {
+            path: format!("{path:?}"),
+        }
+        .into());
+    }
+    if !matches!(current, RepositoryEntry::File { .. }) {
+        return Err(FileTransactionError::UnsupportedTarget {
+            path: format!("{path:?}"),
+        }
+        .into());
+    }
+    parent.remove_file(leaf)?;
+    Ok(())
+}
+
+fn rollback_repository_actions(
+    roots: &RepositoryKernelRoots,
+    control: &ControlDirs,
+    journal: &mut RepositoryTransactionJournal,
+) -> Result<()> {
+    for index in (0..journal.actions.len()).rev() {
+        if journal.data_root_was_absent
+            && journal.actions[index].path.root == RepositoryRootClass::Data
+        {
+            continue;
+        }
+        rollback_repository_action(roots, control, &journal.actions[index])?;
+        journal.actions[index].progress = RepositoryActionProgress::Restored;
+        write_repository_journal(&control.transaction, journal)?;
+    }
+    remove_data_stage_if_owned(roots, journal)?;
+    journal.decision = TransactionDecision::RolledBack;
+    write_repository_journal(&control.transaction, journal)?;
+    Ok(())
+}
+
+fn rollback_repository_action(
+    roots: &RepositoryKernelRoots,
+    control: &ControlDirs,
+    action: &RepositoryJournalAction,
+) -> Result<()> {
+    let path = journal_virtual_path(roots, &action.path)?;
+    let root = repository_live_root(roots, path.root_class())?;
+    let relative = path.relative().as_path().to_string_lossy();
+    let (parent, leaf) = match open_parent(root, &relative, false) {
+        Ok(value) => value,
+        Err(error) if error.downcast_ref::<MissingParent>().is_some() => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    let current = inspect_repository_leaf(&parent, &leaf)?;
+    let backups = backup_authority(control, path.root_class());
+    if repository_matches_expected(&action.expected, &current) {
+        remove_redundant_backup(control, action)?;
+        return Ok(());
+    }
+    match &action.action {
+        RepositoryJournalActionKind::CreateDirectory { .. } => {
+            ensure_repository_final(&path, &action.final_identity, &current)?;
+            parent.remove_dir(&leaf)?;
+            sync_directory(&parent)?;
+        }
+        RepositoryJournalActionKind::WriteFile { backup, .. } => {
+            if !matches!(current, RepositoryEntry::Absent) {
+                ensure_repository_final(&path, &action.final_identity, &current)?;
+                parent.remove_file(&leaf)?;
+                sync_directory(&parent)?;
+            }
+            if matches!(action.expected, ExpectedPreimage::File { .. }) {
+                restore_verified_backup(&parent, &leaf, backups, backup, &action.expected)?;
+            }
+        }
+        RepositoryJournalActionKind::SetMode { .. } => {
+            ensure_repository_final(&path, &action.final_identity, &current)?;
+            let ExpectedPreimage::File { mode, .. } = action.expected else {
+                unreachable!("SetMode has a file preimage")
+            };
+            set_mode(&parent, &leaf, repository_unix_mode(mode))?;
+            sync_directory(&parent)?;
+        }
+        RepositoryJournalActionKind::DeleteFile { backup } => {
+            if !matches!(current, RepositoryEntry::Absent) {
+                return Err(FileTransactionError::UnexpectedOccupant {
+                    path: relative.into_owned(),
+                }
+                .into());
+            }
+            restore_verified_backup(&parent, &leaf, backups, backup, &action.expected)?;
+        }
+    }
+    let restored = inspect_repository_leaf(&parent, &leaf)?;
+    ensure_repository_expected(&path, &action.expected, &restored)
+}
+
+fn restore_verified_backup(
+    parent: &Dir,
+    leaf: &str,
+    backups: &Dir,
+    backup: &ControlName,
+    expected: &ExpectedPreimage,
+) -> Result<()> {
+    let saved = inspect_repository_leaf(backups, backup.as_str())?;
+    if !repository_matches_expected(expected, &saved) {
+        return Err(FileTransactionError::UnexpectedOccupant {
+            path: format!("backup {}", backup.as_str()),
+        }
+        .into());
+    }
+    backups.hard_link(backup.as_str(), parent, leaf)?;
+    sync_directory(parent)?;
+    backups.remove_file(backup.as_str())?;
+    sync_directory(backups)?;
+    Ok(())
+}
+
+fn remove_redundant_backup(control: &ControlDirs, action: &RepositoryJournalAction) -> Result<()> {
+    let backup = match &action.action {
+        RepositoryJournalActionKind::WriteFile { backup, .. }
+        | RepositoryJournalActionKind::DeleteFile { backup } => Some(backup),
+        _ => None,
+    };
+    if let Some(backup) = backup {
+        let backups = backup_authority(control, action.path.root);
+        let saved = inspect_repository_leaf(backups, backup.as_str())?;
+        if !matches!(saved, RepositoryEntry::Absent) {
+            if !repository_matches_expected(&action.expected, &saved) {
+                return Err(FileTransactionError::UnexpectedOccupant {
+                    path: format!("backup {}", backup.as_str()),
+                }
+                .into());
+            }
+            backups.remove_file(backup.as_str())?;
+            sync_directory(backups)?;
+        }
+    }
+    Ok(())
+}
+
+fn recover_repository_journal(
+    roots: &RepositoryKernelRoots,
+    control: ControlDirs,
+    mut journal: RepositoryTransactionJournal,
+    id: &str,
+    injector: &dyn TransactionFailureInjector,
+) -> Result<FileTransactionOutcome> {
+    validate_repository_journal(&journal, id)?;
+    if journal.version != REPOSITORY_JOURNAL_VERSION {
+        return Err(FileTransactionError::LayoutMismatch.into());
+    }
+    let published_absent_root =
+        journal.data_root_was_absent && data_stage_was_published(roots, &journal)?;
+    if journal.layout_digest != repository_layout_digest(&roots.layout)? && !published_absent_root {
+        return Err(FileTransactionError::LayoutMismatch.into());
+    }
+    let location = if journal.data_root_was_absent {
+        TransactionControlLocation::ExternalBootstrap
+    } else {
+        TransactionControlLocation::InternalRepository
+    };
+    match journal.decision {
+        TransactionDecision::Prepared if published_absent_root => {
+            verify_repository_final_actions(roots, &journal)?;
+            journal.decision = TransactionDecision::Committed;
+            write_repository_journal(&control.transaction, &journal)?;
+        }
+        TransactionDecision::Prepared => {
+            rollback_repository_actions(roots, &control, &mut journal)?;
+        }
+        TransactionDecision::Committed => verify_repository_final_actions(roots, &journal)?,
+        TransactionDecision::RolledBack => {
+            verify_repository_restored_actions(roots, &control, &journal)?
+        }
+    }
+    repository_check(injector, FailurePoint::RepositoryCleanup)?;
+    cleanup_repository_control(roots, control, location, id, &journal)?;
+    Ok(FileTransactionOutcome {
+        plan_hash: journal.plan_hash,
+        recovery_state: RecoveryState::Clean,
+    })
+}
+
+/// Validate a decoded journal against the directory that contained it before any
+/// recovery mutation. `ControlName` typing already rejects unsafe stage/backup
+/// names on decode; this adds the bindings recovery relies on: the journal must
+/// name its own containing directory, and no two actions may target one path.
+fn validate_repository_journal(journal: &RepositoryTransactionJournal, id: &str) -> Result<()> {
+    if journal.transaction_id != id {
+        return Err(FileTransactionError::LayoutMismatch.into());
+    }
+    let mut seen = HashSet::new();
+    for action in &journal.actions {
+        if !seen.insert((action.path.root, action.path.relative.clone())) {
+            return Err(FileTransactionError::DuplicateTarget {
+                path: format!("{:?}", action.path.relative),
+            }
+            .into());
+        }
+    }
+    Ok(())
+}
+
+fn cleanup_incomplete_repository_control(
+    roots: &RepositoryKernelRoots,
+    base: Dir,
+    transactions: Dir,
+    transaction: Dir,
+    location: TransactionControlLocation,
+    id: &str,
+) -> Result<FileTransactionOutcome> {
+    drop(transaction);
+    transactions.remove_dir_all(id)?;
+    sync_directory(&transactions)?;
+    if location == TransactionControlLocation::ExternalBootstrap
+        && transactions.entries()?.next().is_none()
+    {
+        drop(transactions);
+        base.remove_dir("transactions")?;
+        remove_optional_file(&base, PROTOCOL_MARKER)?;
+        sync_directory(&base)?;
+        drop(base);
+        roots.worktree.remove_dir(BOOTSTRAP_DIR)?;
+        sync_directory(&roots.worktree)?;
+    }
+    Ok(FileTransactionOutcome {
+        plan_hash: String::new(),
+        recovery_state: RecoveryState::Clean,
+    })
+}
+
+/// Verify final identities during recovery of a committed (or published-absent-root)
+/// transaction, tolerating post-commit divergence of Worktree targets.
+///
+/// Past the commit point the transaction is done and its residue only needs
+/// cleanup; recovery must converge forward idempotently. A user may legitimately
+/// edit a published Worktree target (for example `.gitattributes`) before the
+/// crashed cleanup runs, so re-asserting its final identity would wedge every
+/// later `open_mutation_session` even though the transaction committed. Data-root
+/// targets are jit-owned and are still verified — that cannot wedge legitimate
+/// use — which keeps detection of a raced post-crash occupant of a `.jit` file.
+fn verify_repository_final_actions(
+    roots: &RepositoryKernelRoots,
+    journal: &RepositoryTransactionJournal,
+) -> Result<()> {
+    for action in &journal.actions {
+        if action.path.root == RepositoryRootClass::Worktree {
+            continue;
+        }
+        let path = journal_virtual_path(roots, &action.path)?;
+        let actual = inspect_repository_target(roots, &path, None)?;
+        ensure_repository_final(&path, &action.final_identity, &actual)?;
+    }
+    Ok(())
+}
+
+fn verify_repository_restored_actions(
+    roots: &RepositoryKernelRoots,
+    control: &ControlDirs,
+    journal: &RepositoryTransactionJournal,
+) -> Result<()> {
+    for action in &journal.actions {
+        if journal.data_root_was_absent && action.path.root == RepositoryRootClass::Data {
+            continue;
+        }
+        let path = journal_virtual_path(roots, &action.path)?;
+        let actual = inspect_repository_target(roots, &path, None)?;
+        ensure_repository_expected(&path, &action.expected, &actual)?;
+        remove_redundant_backup(control, action)?;
+    }
+    Ok(())
+}
+
+fn data_stage_was_published(
+    roots: &RepositoryKernelRoots,
+    journal: &RepositoryTransactionJournal,
+) -> Result<bool> {
+    if !journal.data_root_was_absent {
+        return Ok(false);
+    }
+    let Some(expected) = journal.data_stage_identity.as_ref() else {
+        return Ok(false);
+    };
+    let stage = journal.data_stage.as_ref().expect("absent root has stage");
+    if metadata_optional(&roots.data_parent, stage.as_str())?.is_some() {
+        return Ok(false);
+    }
+    let destination = match roots.data_parent.symlink_metadata(&roots.data_leaf) {
+        Ok(metadata) if metadata.is_dir() && !metadata.is_symlink() => {
+            let directory = open_existing_dir(&roots.data_parent, &roots.data_leaf)?;
+            inspect_repository_root(&directory)?
+        }
+        Ok(_) => {
+            return Err(FileTransactionError::UnexpectedOccupant {
+                path: roots.data_leaf.clone(),
+            }
+            .into())
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    if destination.identity() == Some(expected) {
+        Ok(true)
+    } else {
+        Err(FileTransactionError::OccupiedDataRoot {
+            path: roots.data_leaf.clone(),
+        }
+        .into())
+    }
+}
+
+fn remove_data_stage_if_owned(
+    roots: &RepositoryKernelRoots,
+    journal: &RepositoryTransactionJournal,
+) -> Result<()> {
+    let Some(stage) = &journal.data_stage else {
+        return Ok(());
+    };
+    match roots.data_parent.symlink_metadata(stage.as_str()) {
+        Ok(metadata) if metadata.is_dir() && !metadata.is_symlink() => {}
+        Ok(_) => {
+            return Err(FileTransactionError::UnexpectedOccupant {
+                path: stage.as_str().to_string(),
+            }
+            .into())
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    // A recorded identity is verified before removal. When the crash landed
+    // between stage creation and the identity write, the deterministically named
+    // stage is still ours by the very journal being recovered, so it is removed
+    // rather than left as residue that would wedge the next attempt.
+    if let Some(expected) = &journal.data_stage_identity {
+        let directory = open_existing_dir(&roots.data_parent, stage.as_str())?;
+        let actual = inspect_repository_root(&directory)?;
+        if actual.identity() != Some(expected) {
+            return Err(FileTransactionError::UnexpectedOccupant {
+                path: stage.as_str().to_string(),
+            }
+            .into());
+        }
+    }
+    roots.data_parent.remove_dir_all(stage.as_str())?;
+    sync_directory(&roots.data_parent)?;
+    Ok(())
+}
+
+fn cleanup_repository_control(
+    roots: &RepositoryKernelRoots,
+    control: ControlDirs,
+    location: TransactionControlLocation,
+    id: &str,
+    journal: &RepositoryTransactionJournal,
+) -> Result<()> {
+    if !data_stage_was_published(roots, journal)? {
+        remove_data_stage_if_owned(roots, journal)?;
+    }
+    let ControlDirs {
+        base,
+        transactions,
+        transaction,
+        stages,
+        backups,
+        companion,
+    } = control;
+    drop(stages);
+    drop(backups);
+    drop(transaction);
+    // Reclaim the worktree-side companion (if any) before the primary control, so
+    // a crash between the two is caught by the orphan sweep on the next open.
+    if let Some(companion) = companion {
+        drop(companion);
+        remove_companion_control(roots, id)?;
+    }
+    transactions.remove_dir_all(id)?;
+    sync_directory(&transactions)?;
+    if location == TransactionControlLocation::ExternalBootstrap
+        && transactions.entries()?.next().is_none()
+    {
+        drop(transactions);
+        base.remove_dir("transactions")?;
+        remove_optional_file(&base, PROTOCOL_MARKER)?;
+        sync_directory(&base)?;
+        drop(base);
+        roots.worktree.remove_dir(BOOTSTRAP_DIR)?;
+        sync_directory(&roots.worktree)?;
+    }
+    Ok(())
+}
+
+fn journal_virtual_path(
+    roots: &RepositoryKernelRoots,
+    path: &RepositoryJournalPath,
+) -> Result<VirtualPath> {
+    let path = VirtualPath::from_root(path.root, path.relative.clone())?;
+    roots.layout.ensure_canonical(&path)?;
+    Ok(path)
+}
+
+fn repository_live_root(roots: &RepositoryKernelRoots, class: RepositoryRootClass) -> Result<&Dir> {
+    match class {
+        RepositoryRootClass::Worktree => Ok(&roots.worktree),
+        RepositoryRootClass::Data => roots.data.as_ref().ok_or_else(|| {
+            FileTransactionError::UnsupportedFilesystem {
+                operation: "data root is not published".into(),
+            }
+            .into()
+        }),
+    }
+}
+
+fn inspect_repository_target(
+    roots: &RepositoryKernelRoots,
+    path: &VirtualPath,
+    data_stage: Option<&Dir>,
+) -> Result<RepositoryEntry> {
+    roots.layout.ensure_canonical(path)?;
+    let root = match path.root_class() {
+        RepositoryRootClass::Worktree => &roots.worktree,
+        RepositoryRootClass::Data => match (data_stage, roots.data.as_ref()) {
+            (Some(stage), _) => stage,
+            (None, Some(data)) => data,
+            (None, None) => return Ok(RepositoryEntry::Absent),
+        },
+    };
+    if path.relative().is_root() {
+        return inspect_repository_root(root);
+    }
+    let relative = path.relative().as_path().to_string_lossy();
+    match open_parent(root, &relative, false) {
+        Ok((parent, leaf)) => inspect_repository_leaf(&parent, &leaf),
+        Err(error) if error.downcast_ref::<MissingParent>().is_some() => {
+            Ok(RepositoryEntry::Absent)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn inspect_repository_root(root: &Dir) -> Result<RepositoryEntry> {
+    let metadata = root.dir_metadata()?;
+    Ok(RepositoryEntry::Directory {
+        identity: repository_entry_identity(&metadata, b"directory")?,
+        mode: repository_file_mode(&metadata),
+    })
+}
+
+fn inspect_repository_leaf(parent: &Dir, leaf: &str) -> Result<RepositoryEntry> {
+    let metadata = match parent.symlink_metadata(leaf) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(RepositoryEntry::Absent),
+        Err(error) => return Err(error.into()),
+    };
+    if metadata.is_symlink() {
+        let target = parent.read_link(leaf)?;
+        let bytes = target.as_os_str().as_encoded_bytes().to_vec();
+        return Ok(RepositoryEntry::Symlink {
+            identity: repository_entry_identity(&metadata, &bytes)?,
+            target: bytes,
+            mode: repository_file_mode(&metadata),
+        });
+    }
+    if metadata.is_dir() {
+        return Ok(RepositoryEntry::Directory {
+            identity: repository_entry_identity(&metadata, b"directory")?,
+            mode: repository_file_mode(&metadata),
+        });
+    }
+    if metadata.is_file() {
+        let mut file = open_regular_file_nofollow(parent, leaf)?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        let metadata = file.metadata()?;
+        return Ok(RepositoryEntry::File {
+            identity: repository_entry_identity(&metadata, &bytes)?,
+            bytes,
+            mode: repository_file_mode(&metadata),
+        });
+    }
+    Ok(RepositoryEntry::Unsupported {
+        identity: repository_entry_identity(&metadata, b"unsupported")?,
+        reason: "unsupported filesystem object".into(),
+        mode: repository_file_mode(&metadata),
+    })
+}
+
+fn repository_entry_identity(
+    metadata: &cap_std::fs::Metadata,
+    bytes: &[u8],
+) -> Result<EntryIdentity> {
+    #[cfg(unix)]
+    let object = format!("{}:{}", metadata.dev(), metadata.ino());
+    #[cfg(not(unix))]
+    let object = format!("{}:{}", metadata.len(), metadata.permissions().readonly());
+    EntryIdentity::for_bytes(object, bytes).map_err(Into::into)
+}
+
+fn repository_file_mode(metadata: &cap_std::fs::Metadata) -> FileMode {
+    #[cfg(unix)]
+    {
+        use cap_std::fs::PermissionsExt as _;
+        if metadata.permissions().mode() & 0o111 == 0 {
+            FileMode::Regular
+        } else {
+            FileMode::Executable
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = metadata;
+        FileMode::Regular
+    }
+}
+
+fn repository_unix_mode(mode: FileMode) -> Option<u32> {
+    #[cfg(unix)]
+    {
+        Some(match mode {
+            FileMode::Regular => 0o644,
+            FileMode::Executable => 0o755,
+        })
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = mode;
+        None
+    }
+}
+
+fn repository_matches_expected(expected: &ExpectedPreimage, actual: &RepositoryEntry) -> bool {
+    ExpectedPreimage::of(actual) == *expected
+}
+
+fn ensure_repository_expected(
+    path: &VirtualPath,
+    expected: &ExpectedPreimage,
+    actual: &RepositoryEntry,
+) -> Result<()> {
+    if repository_matches_expected(expected, actual) {
+        Ok(())
+    } else {
+        Err(FileTransactionError::UnexpectedOccupant {
+            path: format!("{:?}", path),
+        }
+        .into())
+    }
+}
+
+fn repository_final_identity(entry: &RepositoryEntry) -> Result<RepositoryFinalIdentity> {
+    match entry {
+        RepositoryEntry::Absent => Ok(RepositoryFinalIdentity::Absent),
+        RepositoryEntry::Directory { identity, mode } => Ok(RepositoryFinalIdentity::Directory {
+            identity: identity.clone(),
+            mode: *mode,
+        }),
+        RepositoryEntry::File { identity, mode, .. } => Ok(RepositoryFinalIdentity::File {
+            identity: identity.clone(),
+            mode: *mode,
+        }),
+        RepositoryEntry::Symlink { .. } | RepositoryEntry::Unsupported { .. } => {
+            Err(FileTransactionError::UnsupportedObjectKind {
+                path: "transaction final target".into(),
+            }
+            .into())
+        }
+    }
+}
+
+fn ensure_repository_final(
+    path: &VirtualPath,
+    expected: &RepositoryFinalIdentity,
+    actual: &RepositoryEntry,
+) -> Result<()> {
+    if matches!(repository_final_identity(actual), Ok(actual) if &actual == expected) {
+        Ok(())
+    } else {
+        Err(FileTransactionError::UnexpectedOccupant {
+            path: format!("{:?}", path),
+        }
+        .into())
+    }
+}
+
+fn validate_relative_component(value: &str) -> Result<()> {
+    if value.is_empty()
+        || value.contains(['/', '\\'])
+        || value == "."
+        || value == ".."
+        || value.chars().any(char::is_control)
+    {
+        return Err(FileTransactionError::InvalidPath {
+            path: value.to_string(),
+        }
+        .into());
+    }
+    Ok(())
+}
+
+/// Map a no-replace rename failure to a typed error: an occupied destination is
+/// an unexpected occupant, and a platform without atomic no-replace rename is an
+/// unsupported filesystem rather than an opaque I/O error.
+fn map_noreplace_error(error: std::io::Error) -> anyhow::Error {
+    match error.kind() {
+        ErrorKind::AlreadyExists => FileTransactionError::UnexpectedOccupant {
+            path: "no-replace rename destination".into(),
+        }
+        .into(),
+        ErrorKind::Unsupported => FileTransactionError::UnsupportedFilesystem {
+            operation: "atomic no-replace rename".into(),
+        }
+        .into(),
+        _ => anyhow::Error::new(error),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn rename_noreplace_cap(
+    source_dir: &Dir,
+    source: impl AsRef<OsStr>,
+    target_dir: &Dir,
+    target: impl AsRef<OsStr>,
+) -> std::io::Result<()> {
+    use nix::fcntl::{renameat2, RenameFlags};
+    renameat2(
+        source_dir,
+        source.as_ref(),
+        target_dir,
+        target.as_ref(),
+        RenameFlags::RENAME_NOREPLACE,
+    )
+    .map_err(std::io::Error::from)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn rename_noreplace_cap(
+    _source_dir: &Dir,
+    _source: impl AsRef<OsStr>,
+    _target_dir: &Dir,
+    _target: impl AsRef<OsStr>,
+) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        ErrorKind::Unsupported,
+        "atomic no-replace rename is unsupported on this target",
+    ))
 }
 
 fn create_transaction_dirs(base: Dir, transactions: Dir, id: &str) -> Result<ControlDirs> {
@@ -658,6 +2449,7 @@ fn create_transaction_dirs(base: Dir, transactions: Dir, id: &str) -> Result<Con
         transaction,
         stages,
         backups,
+        companion: None,
     })
 }
 
@@ -671,6 +2463,7 @@ fn open_transaction_dirs(base: Dir, transactions: Dir, id: &str) -> Result<Contr
         transaction,
         stages,
         backups,
+        companion: None,
     })
 }
 
@@ -2627,5 +4420,48 @@ mod tests {
         assert!(error
             .downcast_ref::<FileTransactionError>()
             .is_some_and(|error| matches!(error, FileTransactionError::CrossVolume { .. })));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_owner_digest_is_stable_across_symlinked_spellings() {
+        use crate::repository_state::RepositoryRootEvidence;
+        use std::os::unix::fs::symlink;
+
+        let real = TempDir::new().unwrap();
+        let worktree = real.path().join("proj");
+        std::fs::create_dir(&worktree).unwrap();
+        let data = worktree.join(".jit"); // absent data root
+
+        // A symlinked spelling of the same repository: link -> real.path(), so
+        // link/proj and proj are the same directory reached two ways.
+        let link = real.path().join("link");
+        symlink(real.path(), &link).unwrap();
+        let symlink_worktree = link.join("proj");
+        let symlink_data = symlink_worktree.join(".jit");
+
+        let layout = |worktree: &Path, data: &Path| {
+            RepositoryLayout::new(
+                RepositoryRootEvidence::new(worktree, "w", true),
+                RepositoryRootEvidence::new(data, "d", true),
+            )
+            .unwrap()
+        };
+
+        // Same repository, two spellings -> one owner digest, so crash residue
+        // written under one spelling is recognized as own under the other.
+        assert_eq!(
+            repository_owner_digest(&layout(&worktree, &data)),
+            repository_owner_digest(&layout(&symlink_worktree, &symlink_data)),
+        );
+
+        // A genuinely distinct repository -> a distinct digest: never mistaken for
+        // own, preserving the fail-safe direction.
+        let other = real.path().join("other");
+        std::fs::create_dir(&other).unwrap();
+        assert_ne!(
+            repository_owner_digest(&layout(&worktree, &data)),
+            repository_owner_digest(&layout(&other, &other.join(".jit"))),
+        );
     }
 }

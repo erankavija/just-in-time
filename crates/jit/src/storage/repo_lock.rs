@@ -32,10 +32,47 @@
 
 use super::lock::{FileLocker, LockGuard};
 use anyhow::{Context, Result};
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::collections::HashMap;
+use std::path::{Component, Path, PathBuf};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, Weak};
 use std::thread::ThreadId;
 use std::time::Duration;
+
+/// Process-wide registry of file-backed locks keyed by canonical lock-file path.
+///
+/// Two distinct [`RepoWriteLock`] instances over one file serialize on the file
+/// lock and never nest, so a retained holder cannot reenter through a second
+/// instance. Sharing one reentrant instance per path lets independent storage
+/// backends that name the same lock file — for example sessions with different
+/// data roots under one worktree, all guarding that worktree's `.jit-bootstrap`
+/// namespace — reenter and serialize in-process rather than deadlock.
+fn shared_lock_registry() -> &'static Mutex<HashMap<PathBuf, Weak<RepoWriteLock>>> {
+    static REGISTRY: OnceLock<Mutex<HashMap<PathBuf, Weak<RepoWriteLock>>>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Lexically normalize a lock path to a stable registry key, so the same physical
+/// lock file resolves to one entry regardless of `.`/`..` or relative spelling.
+fn canonical_lock_key(path: &Path) -> PathBuf {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(path))
+            .unwrap_or_else(|_| path.to_path_buf())
+    };
+    let mut normalized = PathBuf::new();
+    for component in absolute.components() {
+        match component {
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            Component::CurDir => {}
+            other => normalized.push(other.as_os_str()),
+        }
+    }
+    normalized
+}
 
 /// File name of the repository write lock inside the storage root.
 ///
@@ -71,6 +108,11 @@ pub struct RepoWriteLock {
     /// use the bootstrap lock as their predecessor, fixing the cross-process
     /// order at bootstrap → repository → finer storage locks.
     predecessor: Option<Arc<RepoWriteLock>>,
+    /// Bound on the in-process wait for another thread to release, matching the
+    /// file lock's cross-process timeout. `None` for a process-local lock, whose
+    /// single-lock exclusion cannot form the crossed-order in-process cycle that
+    /// makes a bounded wait necessary. See [`RepoWriteLock::acquire`].
+    owner_wait_timeout: Option<Duration>,
     state: Mutex<LockState>,
     /// Signalled when the outermost guard drops and `owner` becomes `None`.
     released: Condvar,
@@ -102,6 +144,7 @@ impl RepoWriteLock {
                 FileLocker::new(timeout),
             )),
             predecessor,
+            owner_wait_timeout: Some(timeout),
             state: Mutex::new(LockState::default()),
             released: Condvar::new(),
         })
@@ -115,9 +158,29 @@ impl RepoWriteLock {
         Arc::new(Self {
             backing: Some((path.as_ref().to_path_buf(), FileLocker::new(timeout))),
             predecessor: None,
+            owner_wait_timeout: Some(timeout),
             state: Mutex::new(LockState::default()),
             released: Condvar::new(),
         })
+    }
+
+    /// A file-backed lock at `path`, shared process-wide by canonical path.
+    ///
+    /// All callers naming the same lock file reuse one reentrant instance, so a
+    /// retained holder reenters it and independent backends serialize in-process
+    /// instead of contending on — and deadlocking against — the same file lock
+    /// through separate instances.
+    pub fn shared_for_lock_path<P: AsRef<Path>>(path: P, timeout: Duration) -> Arc<Self> {
+        let key = canonical_lock_key(path.as_ref());
+        let mut registry = shared_lock_registry()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(existing) = registry.get(&key).and_then(Weak::upgrade) {
+            return existing;
+        }
+        let lock = Self::for_lock_path(&key, timeout);
+        registry.insert(key, Arc::downgrade(&lock));
+        lock
     }
 
     /// A process-local lock, serializing only the threads sharing this instance.
@@ -129,6 +192,7 @@ impl RepoWriteLock {
         Arc::new(Self {
             backing: None,
             predecessor: None,
+            owner_wait_timeout: None,
             state: Mutex::new(LockState::default()),
             released: Condvar::new(),
         })
@@ -171,12 +235,38 @@ impl RepoWriteLock {
         }
 
         // Another thread of this process owns the lock: wait for it to release
-        // rather than contending on the file lock, so ownership stays single.
-        while state.owner.is_some() {
-            state = self
-                .released
-                .wait(state)
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // rather than contending on the file lock, so ownership stays single. The
+        // wait is bounded by the same timeout the file lock uses, so a crossed
+        // acquisition order between two in-process sessions (e.g. the embedded
+        // server holding two layouts whose worktree and data-parent locks invert)
+        // fails with a timeout instead of hanging on an untimed condvar.
+        if let Some(timeout) = self.owner_wait_timeout {
+            let described = self
+                .path()
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "in-process lock".to_string());
+            let deadline = std::time::Instant::now() + timeout;
+            while state.owner.is_some() {
+                let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+                if remaining.is_zero() {
+                    anyhow::bail!("Lock timeout: could not acquire {described} within {timeout:?}");
+                }
+                let (next, result) = self
+                    .released
+                    .wait_timeout(state, remaining)
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                state = next;
+                if result.timed_out() && state.owner.is_some() {
+                    anyhow::bail!("Lock timeout: could not acquire {described} within {timeout:?}");
+                }
+            }
+        } else {
+            while state.owner.is_some() {
+                state = self
+                    .released
+                    .wait(state)
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+            }
         }
 
         // Nobody owns the lock, so nobody will call `release` while we hold the
@@ -363,6 +453,41 @@ mod tests {
         );
         drop(guard);
         assert!(competing_predecessor.acquire().is_ok());
+    }
+
+    #[test]
+    fn test_crossed_in_process_acquisition_times_out_instead_of_hanging() {
+        use std::sync::Barrier;
+
+        let temp = TempDir::new().unwrap();
+        let short = Duration::from_millis(200);
+        // Two shared file-backed locks; the same instances are reused per path, so
+        // two threads acquiring them in opposite order form an in-process AB-BA
+        // cycle that an untimed owner-wait would hang on forever.
+        let lock_a = RepoWriteLock::shared_for_lock_path(temp.path().join("a.lock"), short);
+        let lock_b = RepoWriteLock::shared_for_lock_path(temp.path().join("b.lock"), short);
+        let both_held = Arc::new(Barrier::new(2));
+
+        let worker = {
+            let a = Arc::clone(&lock_a);
+            let b = Arc::clone(&lock_b);
+            let both_held = Arc::clone(&both_held);
+            std::thread::spawn(move || {
+                let _held = a.acquire().unwrap();
+                both_held.wait();
+                b.acquire().is_err()
+            })
+        };
+
+        let _held = lock_b.acquire().unwrap();
+        both_held.wait();
+        let main_timed_out = lock_a.acquire().is_err();
+        let worker_timed_out = worker.join().unwrap();
+
+        assert!(
+            main_timed_out || worker_timed_out,
+            "crossed in-process acquisition must fail with a timeout rather than hang"
+        );
     }
 
     #[test]

@@ -47,6 +47,19 @@ pub enum FailurePoint {
     BeforeFreshRootRemoval,
     AfterFreshRootRemoval,
     CleanupTerminalResidue,
+    RepositoryRecoveryExternal,
+    RepositoryRecoveryInternal,
+    RepositoryCreateCompanion,
+    RepositorySweepCompanions,
+    RepositoryPrepareIntent,
+    RepositoryPrepareAction { action: usize },
+    RepositorySyncPreparedAction { action: usize },
+    RepositoryBeforeAction { action: usize },
+    RepositoryAfterAction { action: usize },
+    RepositoryBeforeDataRootPublication,
+    RepositoryAfterDataRootPublication,
+    RepositoryAfterCommit,
+    RepositoryCleanup,
 }
 
 /// Test seam for deterministic I/O interruption and race injection.
@@ -97,4 +110,10 @@ pub enum FileTransactionError {
     CrossVolume { path: String },
     #[error("filesystem operation required for durable transactions is unsupported: {operation}")]
     UnsupportedFilesystem { operation: String },
+    #[error("transaction journal does not match the selected repository layout")]
+    LayoutMismatch,
+    #[error("selected data-root destination became occupied: {path}")]
+    OccupiedDataRoot { path: String },
+    #[error("filesystem object kind is unsupported for transaction capture: {path}")]
+    UnsupportedObjectKind { path: String },
 }
