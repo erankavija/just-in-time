@@ -189,8 +189,10 @@ where
     let layout = discover_repository_layout(worktree_root, data_root)?;
     let mut session = storage.open_mutation_session(layout.clone())?;
     // One context, created after canonical session acquisition and reused
-    // unchanged across conflict/closure retries so identifiers and the mutation
-    // timestamp are never resampled by a retry or backend.
+    // unchanged across conflict/closure retries. Its seed and timestamp are drawn
+    // lazily, so a fully-reflected (no-op) acquire samples neither an identifier
+    // nor time; a non-noop retry reuses whatever the first attempt already drew,
+    // so no retry or backend resamples them.
     let context = MutationContext::production();
     let intents = [MutationIntent::ClaimIssue {
         issue_id: full_id.to_string(),

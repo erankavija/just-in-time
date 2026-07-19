@@ -3,8 +3,9 @@
 //! Commands submit timestamp-free, identifier-free semantic [`MutationIntent`]s.
 //! A [`MutationContext`] — created exactly once after canonical session
 //! acquisition and reused unchanged across capture-closure expansion or conflict
-//! recovery — supplies deterministic identifiers (from a single sampled seed) and
-//! one mutation timestamp (sampled once, only for a non-noop mutation). The
+//! recovery — supplies deterministic identifiers (from a single seed drawn once
+//! on the first allocation) and one mutation timestamp (sampled once, on the
+//! first transition), so a no-op mutation samples neither identity nor time. The
 //! finalizer serializes every repository-owned record (issue upserts/deletes,
 //! `index.json` membership, gate-run/audit artifacts, and events) into one exact
 //! [`RepositoryDelta`] published through the recovered store, preserving
@@ -65,28 +66,79 @@ impl MutationClock for FixedMutationClock {
 
 /// Deterministic identifier source.
 ///
-/// Production samples one 32-byte random seed once ([`IdAuthority::random`]);
-/// memory and tests inject a fixed seed ([`IdAuthority::from_seed`]). Every
-/// identifier is derived purely from the seed and a frozen allocation index, so
-/// a rebuild or retry with the same context reproduces byte-identical values and
-/// no backend ever resamples an identity.
+/// Production draws one seed from the UUID source lazily, on the first identifier
+/// allocation ([`IdAuthority::random`]); memory and tests inject a fixed seed
+/// ([`IdAuthority::from_seed`]). Every identifier is derived purely from the seed
+/// and a frozen allocation index, so a rebuild or retry with the same context
+/// reproduces byte-identical values and no backend ever resamples an identity. A
+/// no-op mutation allocates no identifier, so a production authority never draws
+/// its random source.
 #[derive(Debug, Clone)]
 pub struct IdAuthority {
-    seed: [u8; 32],
+    seed: SeedSource,
+}
+
+/// The 32-byte identity seed, either injected up front or sampled once on demand.
+#[derive(Debug, Clone)]
+enum SeedSource {
+    /// A fixed seed injected for deterministic memory/test allocation.
+    Fixed([u8; 32]),
+    /// A production seed drawn from the UUID source at most once, on first use.
+    Lazy(Cell<Option<[u8; 32]>>),
+}
+
+/// Draw one 32-byte identity seed from a single UUID sample, expanded by SHA-256
+/// under a domain-separation tag. The UUID source is sampled exactly once.
+fn sample_random_seed() -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"jit-mutation-seed-v1");
+    hasher.update(uuid::Uuid::new_v4().as_bytes());
+    let digest = hasher.finalize();
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&digest);
+    seed
 }
 
 impl IdAuthority {
     /// Inject a fixed seed for deterministic memory/test identity allocation.
     pub fn from_seed(seed: [u8; 32]) -> Self {
-        Self { seed }
+        Self {
+            seed: SeedSource::Fixed(seed),
+        }
     }
 
-    /// Sample one random seed from the UUID source (production, once per context).
+    /// A production authority that draws its seed from the UUID source lazily, on
+    /// the first identifier allocation, so a no-op mutation samples nothing.
     pub fn random() -> Self {
-        let mut seed = [0u8; 32];
-        seed[..16].copy_from_slice(uuid::Uuid::new_v4().as_bytes());
-        seed[16..].copy_from_slice(uuid::Uuid::new_v4().as_bytes());
-        Self { seed }
+        Self {
+            seed: SeedSource::Lazy(Cell::new(None)),
+        }
+    }
+
+    /// The seed, drawing the production random source once on first use.
+    fn seed(&self) -> [u8; 32] {
+        match &self.seed {
+            SeedSource::Fixed(seed) => *seed,
+            SeedSource::Lazy(cell) => match cell.get() {
+                Some(seed) => seed,
+                None => {
+                    let seed = sample_random_seed();
+                    cell.set(Some(seed));
+                    seed
+                }
+            },
+        }
+    }
+
+    /// The seed if already determined without drawing the random source: a fixed
+    /// seed, or a lazy seed already sampled by an allocation. `None` means no
+    /// identifier has been allocated, so no-op finalization can hash its plan
+    /// without forcing a sample.
+    fn sampled_seed(&self) -> Option<[u8; 32]> {
+        match &self.seed {
+            SeedSource::Fixed(seed) => Some(*seed),
+            SeedSource::Lazy(cell) => cell.get(),
+        }
     }
 
     /// Derive the hyphenated UUID string for allocation `index`.
@@ -94,10 +146,11 @@ impl IdAuthority {
     /// Exposed to the crate so an orchestrator can pre-derive the identifiers of
     /// records whose expected-absent paths must enter the `CaptureSpec` before
     /// capture (new issue and gate-run paths), replaying the same frozen order.
+    /// The first call on a production authority draws its seed (see [`Self::random`]).
     pub(crate) fn uuid_at(&self, index: u64) -> String {
         let mut hasher = Sha256::new();
         hasher.update(b"jit-mutation-id-v1");
-        hasher.update(self.seed);
+        hasher.update(self.seed());
         hasher.update(index.to_be_bytes());
         let digest = hasher.finalize();
         let mut bytes = [0u8; 16];
@@ -112,9 +165,10 @@ impl IdAuthority {
 
 /// Per-operation identity and time authority.
 ///
-/// Holds the injected [`IdAuthority`] and [`MutationClock`]. Identifiers are
-/// allocated in a frozen order and the timestamp is sampled once, lazily, so a
-/// no-op mutation samples neither. Interior mutability keeps the context shared
+/// Holds the injected [`IdAuthority`] and [`MutationClock`]. Both the identity
+/// seed and the timestamp are sampled once, lazily — the seed on the first
+/// identifier allocation, the timestamp on the first transition — so a no-op
+/// mutation samples neither. Interior mutability keeps the context shared
 /// by `&self` across the finalizer's passes while remaining reusable across
 /// retries: [`MutationContext::begin`] restarts the frozen allocation order.
 pub struct MutationContext {
@@ -135,7 +189,9 @@ impl MutationContext {
         }
     }
 
-    /// The production context: one sampled random seed and the system clock.
+    /// The production context: a lazily-drawn random seed and the system clock.
+    /// A no-op mutation allocates no identifier and stamps no transition, so it
+    /// draws neither the random source nor the clock.
     pub fn production() -> Self {
         Self::new(IdAuthority::random(), Box::new(SystemMutationClock))
     }
@@ -173,21 +229,29 @@ impl MutationContext {
         self.ids.uuid_at(index)
     }
 
-    /// Close the unchanged identity seed and exact semantic intents into the
-    /// typed seed consumed by the repository plan-hash API. Reading the seed is
-    /// not an allocation: no-op finalization still samples neither identity nor
-    /// time, while its plan remains distinct from a no-op under another context.
+    /// Close the identity seed and exact semantic intents into the typed seed
+    /// consumed by the repository plan-hash API. The seed enters the hash only
+    /// once it has been drawn — a fixed seed, or a production seed sampled by an
+    /// allocation in this finalize. A no-op allocates nothing, so its production
+    /// seed stays undrawn and is omitted, keeping no-op finalization free of any
+    /// identity or time sampling. Every non-noop retry reuses the seed drawn by
+    /// the first attempt, so equivalent retries hash identically on both backends.
     pub(crate) fn repository_seed(
         &self,
         intents: &[MutationIntent],
     ) -> Result<RepositorySeed, MutationError> {
+        let context_seed = self
+            .ids
+            .sampled_seed()
+            .map(|seed| seed.to_vec())
+            .unwrap_or_default();
         RepositorySeed::new(
             RepositorySeedKind::Command {
                 name: "repository-state-mutation-v1".to_string(),
             },
             BTreeMap::new(),
             BTreeMap::from([
-                ("context_seed".to_string(), self.ids.seed.to_vec()),
+                ("context_seed".to_string(), context_seed),
                 ("intents".to_string(), canonical_json(intents, false)?),
             ]),
         )
@@ -966,6 +1030,29 @@ mod tests {
     }
 
     #[test]
+    fn test_random_authority_draws_seed_once_lazily() {
+        // A production authority draws nothing until the first allocation, then
+        // reuses that one seed. Combined with `sample_random_seed` drawing exactly
+        // one `Uuid::new_v4`, this establishes the one-source-sample contract.
+        let ids = IdAuthority::random();
+        assert!(
+            ids.sampled_seed().is_none(),
+            "an unused production authority draws no seed"
+        );
+        let first = ids.uuid_at(0);
+        let seed = ids
+            .sampled_seed()
+            .expect("the first allocation draws the seed");
+        let second = ids.uuid_at(1);
+        assert_ne!(first, second);
+        assert_eq!(
+            ids.sampled_seed(),
+            Some(seed),
+            "the seed is drawn once, then reused for every later allocation"
+        );
+    }
+
+    #[test]
     fn test_claim_noop_when_issue_and_event_reflect_claim_samples_nothing() {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
         let issue = seeded_issue("11111111-1111-4111-8111-111111111111", Some(agent.clone()));
@@ -1002,6 +1089,52 @@ mod tests {
         assert!(
             delta.delta().actions().is_empty(),
             "fully reflected claim is a no-op"
+        );
+    }
+
+    #[test]
+    fn test_noop_claim_production_authority_draws_no_id_and_no_time() {
+        // The strongest no-op guarantee: with a real production random authority
+        // and a clock that panics on use, a fully-reflected claim acquire draws
+        // neither the random source (the seed stays undrawn) nor the clock.
+        let agent: Assignee = "agent:worker-1".parse().unwrap();
+        let issue = seeded_issue("44444444-4444-4444-8444-444444444444", Some(agent.clone()));
+        let issue_bytes = serialize_issue(&issue).unwrap();
+        let event = Event::IssueClaimed {
+            id: "e".into(),
+            issue_id: issue.id.clone(),
+            timestamp: fixed_instant(),
+            assignee: agent.clone(),
+        };
+        let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
+        let image = image_with(vec![
+            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
+            (events_path().unwrap(), file_entry(&events_bytes)),
+        ]);
+        struct PanicClock;
+        impl MutationClock for PanicClock {
+            fn now(&self) -> DateTime<Utc> {
+                panic!("no-op must not sample the mutation clock");
+            }
+        }
+        let context = MutationContext::new(IdAuthority::random(), Box::new(PanicClock));
+        let plan = finalize(
+            &layout(),
+            &image,
+            &context,
+            &[MutationIntent::ClaimIssue {
+                issue_id: issue.id.clone(),
+                agent,
+            }],
+        )
+        .unwrap();
+        assert!(
+            plan.delta().actions().is_empty(),
+            "fully reflected claim emits no bytes"
+        );
+        assert!(
+            context.ids.sampled_seed().is_none(),
+            "a no-op acquire must not draw the production random seed"
         );
     }
 
