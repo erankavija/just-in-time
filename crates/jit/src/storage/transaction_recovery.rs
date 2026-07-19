@@ -116,4 +116,8 @@ pub enum FileTransactionError {
     OccupiedDataRoot { path: String },
     #[error("filesystem object kind is unsupported for transaction capture: {path}")]
     UnsupportedObjectKind { path: String },
+    #[error(
+        "transaction journal actions resolve to one physical identity (a hard-link alias): {path}"
+    )]
+    AliasedTarget { path: String },
 }

@@ -29,7 +29,7 @@ use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::MetadataExt as _;
 use cap_std::fs::{Dir, OpenOptions};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::ffi::OsStr;
 use std::io::{ErrorKind, Read};
 use std::path::{Component, Path, PathBuf};
@@ -1975,12 +1975,25 @@ fn validate_repository_journal(journal: &RepositoryTransactionJournal, id: &str)
         return Err(FileTransactionError::LayoutMismatch.into());
     }
     let mut seen = HashSet::new();
+    let mut identities: BTreeMap<&EntryIdentity, ()> = BTreeMap::new();
     for action in &journal.actions {
         if !seen.insert((action.path.root, action.path.relative.clone())) {
             return Err(FileTransactionError::DuplicateTarget {
                 path: format!("{:?}", action.path.relative),
             }
             .into());
+        }
+        // Recheck physical uniqueness before recovery mutates anything: two actions
+        // whose recorded preimages carry one physical identity at distinct canonical
+        // paths are a hard-link alias (the same pairwise rule delta normalization
+        // enforces). An `Absent` preimage carries no identity and cannot collide.
+        if let Some(identity) = action.expected.identity() {
+            if identities.insert(identity, ()).is_some() {
+                return Err(FileTransactionError::AliasedTarget {
+                    path: format!("{:?}", action.path.relative),
+                }
+                .into());
+            }
         }
     }
     Ok(())
@@ -4463,5 +4476,65 @@ mod tests {
             repository_owner_digest(&layout(&worktree, &data)),
             repository_owner_digest(&layout(&other, &other.join(".jit"))),
         );
+    }
+
+    #[test]
+    fn test_validate_repository_journal_rejects_aliased_actions() {
+        use crate::repository_state::RootRelativePath;
+
+        let identity = EntryIdentity::for_bytes("7:99", b"linked").unwrap();
+        let aliased = |root, relative: &str| RepositoryJournalAction {
+            path: RepositoryJournalPath {
+                root,
+                relative: RootRelativePath::parse(relative).unwrap(),
+            },
+            owner: "owner".into(),
+            expected: ExpectedPreimage::File {
+                identity: identity.clone(),
+                mode: FileMode::Regular,
+            },
+            final_identity: RepositoryFinalIdentity::File {
+                identity: identity.clone(),
+                mode: FileMode::Executable,
+            },
+            action: RepositoryJournalActionKind::SetMode {
+                mode: FileMode::Executable,
+            },
+            progress: RepositoryActionProgress::Planned,
+        };
+        let journal = RepositoryTransactionJournal {
+            version: REPOSITORY_JOURNAL_VERSION,
+            transaction_id: "txn".into(),
+            layout_digest: "layout".into(),
+            owner_digest: "owner".into(),
+            plan_hash: "plan".into(),
+            data_root_was_absent: false,
+            data_stage: None,
+            data_stage_identity: None,
+            decision: TransactionDecision::Prepared,
+            actions: vec![
+                aliased(RepositoryRootClass::Worktree, "shared"),
+                aliased(RepositoryRootClass::Data, "shared"),
+            ],
+        };
+
+        // Recovery validation rejects the aliased pair before any action runs.
+        let error = validate_repository_journal(&journal, "txn").unwrap_err();
+        assert!(error
+            .downcast_ref::<FileTransactionError>()
+            .is_some_and(|error| matches!(error, FileTransactionError::AliasedTarget { .. })));
+
+        // Distinct recorded identities (distinct inodes) validate cleanly.
+        let other = EntryIdentity::for_bytes("7:100", b"distinct").unwrap();
+        let mut valid = journal.clone();
+        valid.actions[1].expected = ExpectedPreimage::File {
+            identity: other.clone(),
+            mode: FileMode::Regular,
+        };
+        valid.actions[1].final_identity = RepositoryFinalIdentity::File {
+            identity: other,
+            mode: FileMode::Executable,
+        };
+        assert!(validate_repository_journal(&valid, "txn").is_ok());
     }
 }
