@@ -1146,7 +1146,38 @@ impl RepositoryDelta {
         {
             return Err(DeltaError::DuplicateTarget(pair[0].path().clone()));
         }
+        Self::reject_physical_aliases(&actions)?;
         Ok(Self { actions })
+    }
+
+    /// Reject any two actions whose captured preimages carry one physical identity
+    /// at distinct canonical paths — a hard-link alias. Mutating either target
+    /// would silently mutate the other, breaking virtual-to-physical injectivity;
+    /// canonical-path uniqueness alone does not catch it, since two distinct paths
+    /// (across roots, or within one root) can name one inode.
+    ///
+    /// Pure: it compares only identities already captured at the boundary (the
+    /// no-follow object identity — `dev:ino` on unix), never touching the
+    /// filesystem. On unix, equal captured identities mean one inode, so a
+    /// distinct file with identical content — a distinct inode, distinct object —
+    /// is correctly not flagged. An `Absent` preimage carries no identity and thus
+    /// cannot collide: two not-yet-created targets cannot share physical storage.
+    /// A hard link introduced only after capture is a distinct, second-layer
+    /// concern: it changes a captured identity and is rejected by the held-session
+    /// pre-journal revalidation as a retryable conflict.
+    fn reject_physical_aliases(actions: &[RepositoryAction]) -> Result<(), DeltaError> {
+        let mut by_identity: BTreeMap<&EntryIdentity, &VirtualPath> = BTreeMap::new();
+        for action in actions {
+            if let Some(identity) = action.expected().identity() {
+                if let Some(previous) = by_identity.insert(identity, action.path()) {
+                    return Err(DeltaError::PhysicalAlias {
+                        first: previous.clone(),
+                        second: action.path().clone(),
+                    });
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Exact normalized actions.
@@ -1319,6 +1350,13 @@ pub enum DeltaError {
     Layout(#[from] RepositoryLayoutError),
     #[error("delta contains duplicate canonical target {0:?}")]
     DuplicateTarget(VirtualPath),
+    #[error(
+        "delta actions {first:?} and {second:?} resolve to one physical identity (a hard-link alias)"
+    )]
+    PhysicalAlias {
+        first: VirtualPath,
+        second: VirtualPath,
+    },
     #[error("delta action owner is empty or contains control characters")]
     InvalidOwner,
     #[error("delta action is invalid: {0}")]
@@ -1686,6 +1724,91 @@ mod tests {
                     mode: FileMode::Regular,
                 },
             }],
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_delta_rejects_physical_identity_aliases() {
+        let shared = EntryIdentity::for_bytes("42:100", b"linked").unwrap();
+        let file = |identity: &EntryIdentity| ExpectedPreimage::File {
+            identity: identity.clone(),
+            mode: FileMode::Regular,
+        };
+        let set_mode = |path: VirtualPath, owner: &str, expected: ExpectedPreimage| {
+            RepositoryAction::SetMode {
+                path,
+                owner: owner.into(),
+                expected,
+                mode: FileMode::Executable,
+            }
+        };
+
+        // A file hard-linked into both roots captures ONE physical identity at two
+        // canonical paths; the cross-root pair is rejected.
+        assert!(matches!(
+            RepositoryDelta::new(
+                &layout(),
+                vec![
+                    set_mode(
+                        VirtualPath::worktree("shared").unwrap(),
+                        "one",
+                        file(&shared)
+                    ),
+                    set_mode(VirtualPath::data("shared").unwrap(), "two", file(&shared)),
+                ],
+            ),
+            Err(DeltaError::PhysicalAlias { .. })
+        ));
+
+        // Two distinct canonical paths in ONE root can also name one inode; the
+        // same-root case is reachable (path uniqueness does not preclude a hard
+        // link) and is equally rejected.
+        assert!(matches!(
+            RepositoryDelta::new(
+                &layout(),
+                vec![
+                    set_mode(VirtualPath::data("a").unwrap(), "one", file(&shared)),
+                    set_mode(VirtualPath::data("b").unwrap(), "two", file(&shared)),
+                ],
+            ),
+            Err(DeltaError::PhysicalAlias { .. })
+        ));
+
+        // Distinct physical identities (distinct inodes) pass even across roots.
+        let other = EntryIdentity::for_bytes("42:200", b"distinct").unwrap();
+        assert!(RepositoryDelta::new(
+            &layout(),
+            vec![
+                set_mode(
+                    VirtualPath::worktree("shared").unwrap(),
+                    "one",
+                    file(&shared)
+                ),
+                set_mode(VirtualPath::data("shared").unwrap(), "two", file(&other)),
+            ],
+        )
+        .is_ok());
+
+        // Absent preimages carry no physical identity and never collide.
+        assert!(RepositoryDelta::new(
+            &layout(),
+            vec![
+                RepositoryAction::WriteFile {
+                    path: VirtualPath::worktree("fresh-a").unwrap(),
+                    owner: "one".into(),
+                    expected: ExpectedPreimage::Absent,
+                    bytes: b"a".to_vec(),
+                    mode: FileMode::Regular,
+                },
+                RepositoryAction::WriteFile {
+                    path: VirtualPath::data("fresh-b").unwrap(),
+                    owner: "two".into(),
+                    expected: ExpectedPreimage::Absent,
+                    bytes: b"b".to_vec(),
+                    mode: FileMode::Regular,
+                },
+            ],
         )
         .is_ok());
     }

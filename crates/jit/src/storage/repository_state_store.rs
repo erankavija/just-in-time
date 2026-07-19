@@ -2477,4 +2477,57 @@ mod tests {
             Err(RepositoryStateStoreError::RetryableConflict { .. })
         ));
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_delta_rejects_captured_cross_root_hard_link_alias() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        std::fs::write(worktree.path().join("shared"), b"linked").unwrap();
+        // One inode reachable through both roots: a cross-root hard-link alias.
+        std::fs::hard_link(worktree.path().join("shared"), data.join("shared")).unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+
+        let storage = JsonFileStorage::new(&data);
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let mut spec =
+            CaptureSpec::phase_one([VirtualPath::data("shared").unwrap()], budget()).unwrap();
+        spec.discover_paths([VirtualPath::worktree("shared").unwrap()])
+            .unwrap();
+        let image = session.capture(spec).unwrap();
+
+        // Capture recorded ONE physical identity (dev:ino) at both virtual paths,
+        // so building the delta rejects the pair with the typed alias error.
+        // (InMemoryStorage cannot represent this: each memory entry's object id is
+        // derived from its path, so two distinct paths never share one identity.)
+        let worktree_pre = ExpectedPreimage::of(
+            image
+                .entry(&VirtualPath::worktree("shared").unwrap())
+                .unwrap(),
+        );
+        let data_pre =
+            ExpectedPreimage::of(image.entry(&VirtualPath::data("shared").unwrap()).unwrap());
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![
+                RepositoryAction::set_mode(
+                    VirtualPath::worktree("shared").unwrap(),
+                    "one",
+                    worktree_pre,
+                    FileMode::Executable,
+                ),
+                RepositoryAction::set_mode(
+                    VirtualPath::data("shared").unwrap(),
+                    "two",
+                    data_pre,
+                    FileMode::Executable,
+                ),
+            ],
+        );
+        assert!(matches!(
+            delta,
+            Err(crate::repository_state::DeltaError::PhysicalAlias { .. })
+        ));
+    }
 }
