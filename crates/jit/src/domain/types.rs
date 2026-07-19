@@ -509,6 +509,37 @@ impl Issue {
         }
     }
 
+    /// Draft an issue carrying no authoritative id or lifecycle timestamps.
+    ///
+    /// The id is empty and the lifecycle timestamps hold a sentinel epoch; the
+    /// `repository_state` finalizer assigns the real id and stamps `created_at`,
+    /// `updated_at`, and `first_ready_at`. Command producers build drafts so time
+    /// and identity authority stay solely in the finalizer, never in a command.
+    pub fn draft(title: String, description: String) -> Self {
+        let sentinel = DateTime::from_timestamp(0, 0).expect("epoch is representable");
+        Self {
+            id: String::new(),
+            title,
+            description,
+            state: State::Backlog,
+            priority: Priority::Normal,
+            assignee: None,
+            dependencies: Vec::new(),
+            gates_required: Vec::new(),
+            gates_status: HashMap::new(),
+            context: HashMap::new(),
+            documents: Vec::new(),
+            labels: Vec::new(),
+            content_format: None,
+            created_at: sentinel,
+            updated_at: sentinel,
+            first_ready_at: None,
+            claimed_at: None,
+            done_at: None,
+            archived_from: None,
+        }
+    }
+
     /// Get short ID (first 8 characters of UUID)
     ///
     /// Returns a git-style short hash for human-readable output.
@@ -1290,6 +1321,40 @@ pub enum Event {
 }
 
 impl Event {
+    /// Overwrite this event's id and timestamp with finalizer-assigned values.
+    ///
+    /// The `repository_state` mutation finalizer is the sole authority over event
+    /// identity and time: it assigns a deterministic id and stamps the single
+    /// mutation timestamp, overriding whatever an intermediate constructor set.
+    pub fn assign_identity(&mut self, new_id: String, new_timestamp: DateTime<Utc>) {
+        match self {
+            Event::IssueCreated { id, timestamp, .. }
+            | Event::IssueClaimed { id, timestamp, .. }
+            | Event::IssueStateChanged { id, timestamp, .. }
+            | Event::GatePassed { id, timestamp, .. }
+            | Event::GateFailed { id, timestamp, .. }
+            | Event::GateAdded { id, timestamp, .. }
+            | Event::GateRemoved { id, timestamp, .. }
+            | Event::IssueCompleted { id, timestamp, .. }
+            | Event::IssueDeleted { id, timestamp, .. }
+            | Event::IssueReleased { id, timestamp, .. }
+            | Event::ArtifactArchiveExecuted { id, timestamp, .. }
+            | Event::IssueUpdated { id, timestamp, .. }
+            | Event::DependencyReduced { id, timestamp, .. }
+            | Event::LocalRuleBypassed { id, timestamp, .. }
+            | Event::TransitionBlocked { id, timestamp, .. }
+            | Event::GraphRuleBypassed { id, timestamp, .. }
+            | Event::GateDefinitionUpdated { id, timestamp, .. }
+            | Event::GateDefinitionCreated { id, timestamp, .. }
+            | Event::GateDefinitionRemoved { id, timestamp, .. }
+            | Event::LifecycleTimestampsBackfilled { id, timestamp, .. }
+            | Event::ProfileApplied { id, timestamp, .. } => {
+                *id = new_id;
+                *timestamp = new_timestamp;
+            }
+        }
+    }
+
     /// Create an issue created event
     pub fn new_issue_created(issue: &Issue) -> Self {
         Event::IssueCreated {

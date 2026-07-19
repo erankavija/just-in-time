@@ -224,6 +224,7 @@ struct JsonMutationSession {
     _repository_guard: Option<RepoWriteGuard>,
     _events_guard: Option<crate::storage::lock::LockGuard>,
     _reentry: LayoutReentry,
+    _order_guard: crate::storage::guard_order::RepositoryOrderGuard,
     captured: Option<RepositoryImage>,
 }
 
@@ -232,6 +233,7 @@ struct MemoryMutationSession<'a> {
     storage: &'a InMemoryStorage,
     _guard: RepoWriteGuard,
     _reentry: LayoutReentry,
+    _order_guard: crate::storage::guard_order::RepositoryOrderGuard,
     captured: Option<RepositoryImage>,
 }
 
@@ -249,6 +251,9 @@ impl RepositoryStateStore for JsonFileStorage {
         // same canonical layout.
         self.active_mutation_layout().enter(&layout)?;
         let reentry = LayoutReentry(self.active_mutation_layout());
+        // Mark a repository mutation session as held on this thread so a later
+        // attempt to enter claim coordination (reverse order) is rejected.
+        let order_guard = crate::storage::guard_order::RepositoryOrderGuard::enter();
         let injector = self.repository_state_failures();
 
         // Serialize the worktree-side `.jit-bootstrap` namespace at the WORKTREE
@@ -330,6 +335,7 @@ impl RepositoryStateStore for JsonFileStorage {
             _repository_guard: repository_guard,
             _events_guard: events_guard,
             _reentry: reentry,
+            _order_guard: order_guard,
             captured: None,
         }))
     }
@@ -342,6 +348,7 @@ impl RepositoryStateStore for InMemoryStorage {
     ) -> Result<Box<dyn RepositoryMutationSession + '_>, RepositoryStateStoreError> {
         self.active_mutation_layout().enter(&layout)?;
         let reentry = LayoutReentry(self.active_mutation_layout());
+        let order_guard = crate::storage::guard_order::RepositoryOrderGuard::enter();
         let guard = self.acquire_repo_write_lock()?;
         // Model the kernel's recovery boundaries so both backends fail identically
         // when one is injected: external recovery always runs; the internal
@@ -364,6 +371,7 @@ impl RepositoryStateStore for InMemoryStorage {
             storage: self,
             _guard: guard,
             _reentry: reentry,
+            _order_guard: order_guard,
             captured: None,
         }))
     }
@@ -3104,5 +3112,591 @@ mod tests {
             .unwrap();
         assert_eq!(std::fs::read(data.join("victim")).unwrap(), b"old");
         assert!(!worktree.path().join(".jit-bootstrap").exists());
+    }
+
+    // --- REQ-01: typed mutation determinism across both backends -------------
+    //
+    // The finalizer's serialized issue/gate/provenance/event bytes and the exact
+    // identifiers/timestamps it assigns are a pure function of the captured image
+    // and the injected mutation context, so a fixed seed and clock yield
+    // byte-identical results regardless of backend. No-op operations sample
+    // neither an identifier nor the mutation timestamp.
+
+    use crate::domain::{Assignee, Event, Issue};
+    use crate::repository_state::{
+        finalize, serialize_gate_run, serialize_issue, MutationClock, MutationContext,
+        MutationIntent,
+    };
+
+    fn req01_instant() -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::parse_from_rfc3339("2026-07-19T12:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc)
+    }
+
+    fn req01_issue(id: &str, assignee: Option<Assignee>) -> Issue {
+        let mut issue = Issue::draft("Determinism".into(), "Body".into());
+        issue.id = id.to_string();
+        issue.assignee = assignee;
+        issue.created_at = chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        issue.updated_at = issue.created_at;
+        issue
+    }
+
+    /// Seed one existing issue (and optional event log) into the memory backend's
+    /// repository-state image, including the `issues` directory parent.
+    fn seed_memory_issue(memory: &InMemoryStorage, id: &str, issue: &Issue, events: &[u8]) {
+        let mut state = memory.repository_state();
+        state.data_root_exists = true;
+        for dir in ["", "issues"] {
+            state.entries.insert(
+                VirtualPath::data(dir).unwrap(),
+                RepositoryEntry::Directory {
+                    identity: EntryIdentity::for_bytes(format!("mem-dir:{dir}"), b"directory")
+                        .unwrap(),
+                    mode: FileMode::Executable,
+                },
+            );
+        }
+        let issue_bytes = serialize_issue(issue).unwrap();
+        state.entries.insert(
+            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
+            RepositoryEntry::File {
+                identity: EntryIdentity::for_bytes("mem-issue", &issue_bytes).unwrap(),
+                bytes: issue_bytes,
+                mode: FileMode::Regular,
+            },
+        );
+        if !events.is_empty() {
+            state.entries.insert(
+                VirtualPath::data("events.jsonl").unwrap(),
+                RepositoryEntry::File {
+                    identity: EntryIdentity::for_bytes("mem-events", events).unwrap(),
+                    bytes: events.to_vec(),
+                    mode: FileMode::Regular,
+                },
+            );
+        }
+    }
+
+    fn claim_spec(id: &str) -> CaptureSpec {
+        CaptureSpec::phase_one(
+            [
+                VirtualPath::data(format!("issues/{id}.json")).unwrap(),
+                VirtualPath::data("events.jsonl").unwrap(),
+            ],
+            budget(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_conformance_claim_finalizer_bytes_match_across_backends() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        let id = "44444444-4444-4444-8444-444444444444";
+        let agent: Assignee = "agent:worker-1".parse().unwrap();
+        let issue = req01_issue(id, None);
+        let issue_bytes = serialize_issue(&issue).unwrap();
+
+        // Seed identical state on the JSON backend (real files).
+        std::fs::create_dir_all(data.join("issues")).unwrap();
+        std::fs::write(data.join(format!("issues/{id}.json")), &issue_bytes).unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+
+        // Seed identical state on the memory backend's image.
+        let memory = InMemoryStorage::new();
+        seed_memory_issue(&memory, id, &issue, &[]);
+
+        let intents = [MutationIntent::ClaimIssue {
+            issue_id: id.to_string(),
+            agent: agent.clone(),
+        }];
+
+        // A deterministic context: fixed seed and clock, one per backend.
+        let json = JsonFileStorage::new(&data);
+        let json_actions = {
+            let mut session = json.open_mutation_session(layout.clone()).unwrap();
+            let image = session.capture(claim_spec(id)).unwrap();
+            let context = MutationContext::deterministic([7u8; 32], req01_instant());
+            let delta = finalize(&layout, &image, &context, &intents).unwrap();
+            let outcome = session.apply(&image, &delta).unwrap();
+            outcome.actions_applied
+        };
+        let memory_actions = {
+            let mut session = memory.open_mutation_session(layout.clone()).unwrap();
+            let image = session.capture(claim_spec(id)).unwrap();
+            let context = MutationContext::deterministic([7u8; 32], req01_instant());
+            let delta = finalize(&layout, &image, &context, &intents).unwrap();
+            let outcome = session.apply(&image, &delta).unwrap();
+            outcome.actions_applied
+        };
+        assert_eq!(json_actions, memory_actions, "identical action count");
+
+        // Post-state bytes are byte-identical across backends.
+        let json_issue = std::fs::read(data.join(format!("issues/{id}.json"))).unwrap();
+        let json_events = std::fs::read(data.join("events.jsonl")).unwrap();
+        let (memory_issue, memory_events) = {
+            let state = memory.repository_state();
+            let issue = match state
+                .entries
+                .get(&VirtualPath::data(format!("issues/{id}.json")).unwrap())
+                .unwrap()
+            {
+                RepositoryEntry::File { bytes, .. } => bytes.clone(),
+                other => panic!("expected issue file, got {other:?}"),
+            };
+            let events = match state
+                .entries
+                .get(&VirtualPath::data("events.jsonl").unwrap())
+                .unwrap()
+            {
+                RepositoryEntry::File { bytes, .. } => bytes.clone(),
+                other => panic!("expected events file, got {other:?}"),
+            };
+            (issue, events)
+        };
+        assert_eq!(json_issue, memory_issue, "issue bytes deterministic");
+        assert_eq!(json_events, memory_events, "event bytes deterministic");
+
+        // The finalized issue carries the assignee and the exact mutation time.
+        let written: Issue = serde_json::from_slice(&json_issue).unwrap();
+        assert_eq!(written.assignee, Some(agent));
+        assert_eq!(written.claimed_at, Some(req01_instant()));
+        assert_eq!(written.updated_at, req01_instant());
+        // Exactly one event line, stamped with the mutation timestamp.
+        let events =
+            crate::domain::parse_known_events(std::str::from_utf8(&json_events).unwrap()).unwrap();
+        assert_eq!(events.len(), 1);
+        let Event::IssueClaimed { timestamp, .. } = &events[0] else {
+            panic!("expected an issue_claimed event");
+        };
+        assert_eq!(*timestamp, req01_instant());
+    }
+
+    #[test]
+    fn test_conformance_claim_noop_samples_nothing_on_both_backends() {
+        // A clock that panics on use proves neither backend samples time for a
+        // fully reflected claim.
+        struct PanicClock;
+        impl MutationClock for PanicClock {
+            fn now(&self) -> chrono::DateTime<chrono::Utc> {
+                panic!("no-op must not sample the mutation clock");
+            }
+        }
+
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        let id = "55555555-5555-4555-8555-555555555555";
+        let agent: Assignee = "agent:worker-1".parse().unwrap();
+        let issue = req01_issue(id, Some(agent.clone()));
+        // A committed claim event so both issue and tail already reflect the claim.
+        let claim_event = Event::IssueClaimed {
+            id: "evt".into(),
+            issue_id: id.to_string(),
+            timestamp: req01_instant(),
+            assignee: agent.clone(),
+        };
+        let mut events_bytes: Vec<u8> =
+            crate::repository_state::serialize_event(&claim_event).unwrap();
+        events_bytes.push(b'\n');
+
+        std::fs::create_dir_all(data.join("issues")).unwrap();
+        std::fs::write(
+            data.join(format!("issues/{id}.json")),
+            serialize_issue(&issue).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(data.join("events.jsonl"), &events_bytes).unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+
+        let memory = InMemoryStorage::new();
+        seed_memory_issue(&memory, id, &issue, &events_bytes);
+
+        let intents = [MutationIntent::ClaimIssue {
+            issue_id: id.to_string(),
+            agent,
+        }];
+
+        for run_memory in [false, true] {
+            let context = MutationContext::new(
+                crate::repository_state::IdAuthority::from_seed([3u8; 32]),
+                Box::new(PanicClock),
+            );
+            let actions = if run_memory {
+                let mut session = memory.open_mutation_session(layout.clone()).unwrap();
+                let image = session.capture(claim_spec(id)).unwrap();
+                let delta = finalize(&layout, &image, &context, &intents).unwrap();
+                session.apply(&image, &delta).unwrap().actions_applied
+            } else {
+                let json = JsonFileStorage::new(&data);
+                let mut session = json.open_mutation_session(layout.clone()).unwrap();
+                let image = session.capture(claim_spec(id)).unwrap();
+                let delta = finalize(&layout, &image, &context, &intents).unwrap();
+                session.apply(&image, &delta).unwrap().actions_applied
+            };
+            assert_eq!(
+                actions, 0,
+                "no-op emits no actions (run_memory={run_memory})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        let run_id = "run-deterministic-1";
+        let result = crate::domain::GateRunResult {
+            schema_version: 1,
+            run_id: run_id.to_string(),
+            gate_key: "cargo-ci".to_string(),
+            stage: crate::declarations::GateStage::Postcheck,
+            issue_id: "issue-1".to_string(),
+            commit: Some("abc123".to_string()),
+            branch: Some("main".to_string()),
+            tree_dirty: Some(false),
+            status: crate::domain::GateRunStatus::Passed,
+            started_at: req01_instant(),
+            completed_at: Some(req01_instant()),
+            duration_ms: Some(1500),
+            exit_code: Some(0),
+            stdout: "ok".to_string(),
+            stderr: String::new(),
+            command: "cargo test".to_string(),
+            by: Some("agent:worker-1".to_string()),
+            message: None,
+            findings: None,
+        };
+        let provenance = Event::GateDefinitionCreated {
+            id: "prov-1".into(),
+            timestamp: req01_instant(),
+            gate_key: "cargo-ci".to_string(),
+        };
+        let mut event_line = crate::repository_state::serialize_event(&provenance).unwrap();
+        event_line.push(b'\n');
+        let gate_bytes = serialize_gate_run(&result).unwrap();
+
+        // Build one delta persisting the gate-run artifact plus the provenance
+        // event; both backends must write byte-identical content.
+        let run_dir = VirtualPath::data(format!("gate-runs/{run_id}")).unwrap();
+        let run_file = VirtualPath::data(format!("gate-runs/{run_id}/result.json")).unwrap();
+        let events = VirtualPath::data("events.jsonl").unwrap();
+        let build_delta = |layout: &RepositoryLayout| {
+            RepositoryDelta::new(
+                layout,
+                vec![
+                    RepositoryAction::create_directory(
+                        run_dir.clone(),
+                        "gate",
+                        ExpectedPreimage::Absent,
+                    ),
+                    RepositoryAction::write_file(
+                        run_file.clone(),
+                        "gate",
+                        ExpectedPreimage::Absent,
+                        gate_bytes.clone(),
+                        FileMode::Regular,
+                    ),
+                    RepositoryAction::write_file(
+                        events.clone(),
+                        "provenance",
+                        ExpectedPreimage::Absent,
+                        event_line.clone(),
+                        FileMode::Regular,
+                    ),
+                ],
+            )
+            .unwrap()
+        };
+        let spec = || {
+            CaptureSpec::phase_one(
+                [run_dir.clone(), run_file.clone(), events.clone()],
+                budget(),
+            )
+            .unwrap()
+        };
+
+        std::fs::create_dir_all(data.join("gate-runs")).unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        let json = JsonFileStorage::new(&data);
+        {
+            let mut session = json.open_mutation_session(layout.clone()).unwrap();
+            let image = session.capture(spec()).unwrap();
+            session.apply(&image, &build_delta(&layout)).unwrap();
+        }
+
+        let memory = InMemoryStorage::new();
+        {
+            let mut state = memory.repository_state();
+            state.data_root_exists = true;
+            for dir in ["", "gate-runs"] {
+                state.entries.insert(
+                    VirtualPath::data(dir).unwrap(),
+                    RepositoryEntry::Directory {
+                        identity: EntryIdentity::for_bytes(format!("mem-dir:{dir}"), b"directory")
+                            .unwrap(),
+                        mode: FileMode::Executable,
+                    },
+                );
+            }
+        }
+        {
+            let mut session = memory.open_mutation_session(layout.clone()).unwrap();
+            let image = session.capture(spec()).unwrap();
+            session.apply(&image, &build_delta(&layout)).unwrap();
+        }
+
+        // Gate-run and provenance bytes are byte-identical across backends.
+        let json_gate =
+            std::fs::read(data.join(format!("gate-runs/{run_id}/result.json"))).unwrap();
+        let json_events = std::fs::read(data.join("events.jsonl")).unwrap();
+        let state = memory.repository_state();
+        let memory_gate = match state.entries.get(&run_file).unwrap() {
+            RepositoryEntry::File { bytes, .. } => bytes.clone(),
+            other => panic!("expected gate-run file, got {other:?}"),
+        };
+        let memory_events = match state.entries.get(&events).unwrap() {
+            RepositoryEntry::File { bytes, .. } => bytes.clone(),
+            other => panic!("expected events file, got {other:?}"),
+        };
+        assert_eq!(
+            json_gate, gate_bytes,
+            "gate-run bytes are the serializer output"
+        );
+        assert_eq!(json_gate, memory_gate, "gate-run bytes deterministic");
+        assert_eq!(json_events, memory_events, "provenance bytes deterministic");
+    }
+
+    // Drive the full finalizer (not a hand-built delta) on both backends and
+    // assert byte-identical serialized output, deterministic identifiers, and
+    // canonical event ordering.
+
+    fn finalize_apply<S: RepositoryStateStore>(
+        store: &S,
+        layout: &RepositoryLayout,
+        spec: CaptureSpec,
+        intents: &[MutationIntent],
+    ) {
+        let mut session = store.open_mutation_session(layout.clone()).unwrap();
+        let image = session.capture(spec).unwrap();
+        let context = MutationContext::deterministic([7u8; 32], req01_instant());
+        let delta = finalize(layout, &image, &context, intents).unwrap();
+        session.apply(&image, &delta).unwrap();
+    }
+
+    fn memory_dir(name: &str) -> (VirtualPath, RepositoryEntry) {
+        (
+            VirtualPath::data(name).unwrap(),
+            RepositoryEntry::Directory {
+                identity: EntryIdentity::for_bytes(format!("mem-dir:{name}"), b"directory")
+                    .unwrap(),
+                mode: FileMode::Executable,
+            },
+        )
+    }
+
+    fn memory_file(path: &VirtualPath, bytes: &[u8]) -> (VirtualPath, RepositoryEntry) {
+        (
+            path.clone(),
+            RepositoryEntry::File {
+                identity: EntryIdentity::for_bytes(format!("mem-file:{path:?}"), bytes).unwrap(),
+                bytes: bytes.to_vec(),
+                mode: FileMode::Regular,
+            },
+        )
+    }
+
+    fn memory_bytes(memory: &InMemoryStorage, path: &VirtualPath) -> Vec<u8> {
+        match memory.repository_state().entries.get(path).unwrap() {
+            RepositoryEntry::File { bytes, .. } => bytes.clone(),
+            other => panic!("expected a file at {path:?}, got {other:?}"),
+        }
+    }
+
+    fn provenance_event() -> Event {
+        Event::ProfileApplied {
+            id: String::new(),
+            timestamp: req01_instant(),
+            profile_id: "example".into(),
+            version: "1.0".into(),
+            origin: crate::domain::ProfileOrigin::Embedded,
+            package_hash: "hash".into(),
+            target_hashes: std::collections::BTreeMap::new(),
+            isolated_torn_tail: false,
+        }
+    }
+
+    fn gate_def_created(gate_key: &str) -> Event {
+        Event::GateDefinitionCreated {
+            id: String::new(),
+            timestamp: req01_instant(),
+            gate_key: gate_key.into(),
+        }
+    }
+
+    #[test]
+    fn test_conformance_finalize_gate_run_and_provenance_match_across_backends() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        let run_id = crate::repository_state::IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let run_dir = VirtualPath::data(format!("gate-runs/{run_id}")).unwrap();
+        let run_file = VirtualPath::data(format!("gate-runs/{run_id}/result.json")).unwrap();
+        let events = VirtualPath::data("events.jsonl").unwrap();
+        let draft = crate::domain::GateRunResult {
+            schema_version: 1,
+            run_id: "PLACEHOLDER".to_string(),
+            gate_key: "cargo-ci".to_string(),
+            stage: crate::declarations::GateStage::Postcheck,
+            issue_id: "issue-1".to_string(),
+            commit: Some("abc123".to_string()),
+            branch: Some("main".to_string()),
+            tree_dirty: Some(false),
+            status: crate::domain::GateRunStatus::Passed,
+            started_at: req01_instant(),
+            completed_at: Some(req01_instant()),
+            duration_ms: Some(1500),
+            exit_code: Some(0),
+            stdout: "ok".to_string(),
+            stderr: String::new(),
+            command: "cargo test".to_string(),
+            by: Some("agent:worker-1".to_string()),
+            message: None,
+            findings: None,
+        };
+        let intents = || {
+            [
+                MutationIntent::RecordGateRun {
+                    draft: Box::new(draft.clone()),
+                },
+                MutationIntent::RecordEvent {
+                    phase: 5,
+                    event: Box::new(provenance_event()),
+                },
+            ]
+        };
+        let spec = || {
+            CaptureSpec::phase_one(
+                [run_dir.clone(), run_file.clone(), events.clone()],
+                budget(),
+            )
+            .unwrap()
+        };
+
+        std::fs::create_dir_all(data.join("gate-runs")).unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        finalize_apply(&JsonFileStorage::new(&data), &layout, spec(), &intents());
+
+        let memory = InMemoryStorage::new();
+        {
+            let mut state = memory.repository_state();
+            state.data_root_exists = true;
+            for (path, entry) in [memory_dir(""), memory_dir("gate-runs")] {
+                state.entries.insert(path, entry);
+            }
+        }
+        finalize_apply(&memory, &layout, spec(), &intents());
+
+        let json_gate =
+            std::fs::read(data.join(format!("gate-runs/{run_id}/result.json"))).unwrap();
+        let json_events = std::fs::read(data.join("events.jsonl")).unwrap();
+        assert_eq!(
+            json_gate,
+            memory_bytes(&memory, &run_file),
+            "finalize gate-run bytes deterministic across backends"
+        );
+        assert_eq!(
+            json_events,
+            memory_bytes(&memory, &events),
+            "finalize provenance bytes deterministic across backends"
+        );
+        // The finalizer assigned the deterministic run id.
+        let persisted: crate::domain::GateRunResult = serde_json::from_slice(&json_gate).unwrap();
+        assert_eq!(persisted.run_id, run_id);
+    }
+
+    #[test]
+    fn test_conformance_finalize_create_issue_multi_event_match_across_backends() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        let ids = crate::repository_state::IdAuthority::from_seed([7u8; 32]);
+        let issue_id = ids.uuid_at(0);
+        let issue_file = VirtualPath::data(format!("issues/{issue_id}.json")).unwrap();
+        let index = VirtualPath::data("index.json").unwrap();
+        let events = VirtualPath::data("events.jsonl").unwrap();
+        let index_bytes = crate::storage::json::fresh_index_bytes().unwrap();
+
+        let mut draft = crate::domain::Issue::draft("New".into(), "Body".into());
+        draft.state = crate::domain::State::Ready;
+        let intents = || {
+            [
+                MutationIntent::CreateIssue {
+                    draft: Box::new(draft.clone()),
+                },
+                MutationIntent::RecordEvent {
+                    phase: 5,
+                    event: Box::new(gate_def_created("aaa")),
+                },
+                MutationIntent::RecordEvent {
+                    phase: 5,
+                    event: Box::new(gate_def_created("bbb")),
+                },
+            ]
+        };
+        let spec = || {
+            CaptureSpec::phase_one(
+                [issue_file.clone(), index.clone(), events.clone()],
+                budget(),
+            )
+            .unwrap()
+        };
+
+        std::fs::create_dir_all(data.join("issues")).unwrap();
+        std::fs::write(data.join("index.json"), &index_bytes).unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        finalize_apply(&JsonFileStorage::new(&data), &layout, spec(), &intents());
+
+        let memory = InMemoryStorage::new();
+        {
+            let mut state = memory.repository_state();
+            state.data_root_exists = true;
+            for (path, entry) in [memory_dir(""), memory_dir("issues")] {
+                state.entries.insert(path, entry);
+            }
+            let (path, entry) = memory_file(&index, &index_bytes);
+            state.entries.insert(path, entry);
+        }
+        finalize_apply(&memory, &layout, spec(), &intents());
+
+        // Byte-identical issue, index membership, and event log across backends.
+        let json_issue = std::fs::read(data.join(format!("issues/{issue_id}.json"))).unwrap();
+        let json_index = std::fs::read(data.join("index.json")).unwrap();
+        let json_events = std::fs::read(data.join("events.jsonl")).unwrap();
+        assert_eq!(json_issue, memory_bytes(&memory, &issue_file));
+        assert_eq!(json_index, memory_bytes(&memory, &index));
+        assert_eq!(json_events, memory_bytes(&memory, &events));
+        assert!(String::from_utf8_lossy(&json_index).contains(&issue_id));
+
+        // Canonical event order and the frozen identifier sequence (issue id is
+        // uuid_at(0), so the three events take uuid_at(1..=3)).
+        let parsed =
+            crate::domain::parse_known_events(std::str::from_utf8(&json_events).unwrap()).unwrap();
+        assert_eq!(parsed.len(), 3);
+        let event_id = |event: &Event| match event {
+            Event::IssueCreated { id, .. } | Event::GateDefinitionCreated { id, .. } => id.clone(),
+            other => panic!("unexpected event {other:?}"),
+        };
+        assert!(matches!(&parsed[0], Event::IssueCreated { .. }));
+        assert!(
+            matches!(&parsed[1], Event::GateDefinitionCreated { gate_key, .. } if gate_key == "aaa")
+        );
+        assert!(
+            matches!(&parsed[2], Event::GateDefinitionCreated { gate_key, .. } if gate_key == "bbb")
+        );
+        assert_eq!(event_id(&parsed[0]), ids.uuid_at(1));
+        assert_eq!(event_id(&parsed[1]), ids.uuid_at(2));
+        assert_eq!(event_id(&parsed[2]), ids.uuid_at(3));
     }
 }

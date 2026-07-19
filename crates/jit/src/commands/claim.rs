@@ -7,6 +7,7 @@ use crate::storage::worktree_identity::load_or_create_worktree_identity_with_war
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{ClaimCoordinator, FileLocker, IssueStore, Lease, StorageWarning};
 use anyhow::{Context, Result};
+use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
@@ -69,7 +70,7 @@ fn get_current_branch() -> Result<String> {
 ///
 /// Returns an error if the issue cannot be resolved or loaded, or if the lease
 /// cannot be acquired (e.g. it is already held by another agent).
-pub fn execute_claim_acquire<S: IssueStore>(
+pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStore>(
     storage: &S,
     issue_id: &str,
     ttl_secs: u64,
@@ -126,34 +127,99 @@ pub fn execute_claim_acquire<S: IssueStore>(
     // Initialize control plane if needed
     coordinator.init()?;
 
-    // Acquire claim with reason validation for TTL=0 leases
-    let lease = coordinator.acquire_claim_with_reason(
-        issue_id,
+    // Acquire the lease AND synchronize the repository-side issue/event state
+    // under one held coordinator lock, in the mandatory order coordinator ->
+    // bootstrap -> repository -> events. The coordinator receives the CANONICAL
+    // full id (never the raw user spelling), and the repository transition is
+    // idempotent and convergent over both the captured issue assignment and the
+    // captured event-log tail, so a crash-interrupted prior attempt converges
+    // without emitting a duplicate claim event (@/inv/event-log).
+    let agent_assignee: crate::domain::Assignee = agent.parse()?;
+    let worktree_root = paths.worktree_root.clone();
+    let data_root = storage.root().to_path_buf();
+    let (lease, ()) = coordinator.acquire_claim_synchronized(
+        &full_id,
         ttl_secs,
         reason,
         coord_config.max_indefinite_leases_per_agent(),
         coord_config.max_indefinite_leases_per_repo(),
+        |_lease| {
+            synchronize_claim_repository_state(
+                storage,
+                &worktree_root,
+                &data_root,
+                &full_id,
+                &agent_assignee,
+            )
+        },
     )?;
 
-    // Also set the assignee on the issue for visibility. Parsing through the one
-    // `Assignee` path keeps the stored value structurally valid; the agent id was
-    // already validated by `resolve_agent_id`, so this never fails in practice.
-    let agent: crate::domain::Assignee = agent.parse()?;
-    let mut issue = storage.load_issue(&full_id)?;
-    if issue.assignee.as_ref() != Some(&agent) {
-        issue.assignee = Some(agent.clone());
-        // Record the first claim time (first-occurrence only). The stamp and the
-        // `issue_claimed` event below are the coupled record of this claim: the
-        // mutation never persists without an event (@/inv/event-log), and the event
-        // is what the lifecycle-timestamp backfill folds to reconstruct
-        // `claimed_at` (see `derive_lifecycle_timestamps`).
-        issue.mark_claimed(chrono::Utc::now());
-        let issue_id = issue.id.clone();
-        storage.save_issue(issue)?;
-        storage.append_event(&crate::domain::Event::new_issue_claimed(issue_id, agent))?;
-    }
-
     Ok((lease.lease_id, warnings))
+}
+
+/// Publish the repository-side issue assignment and claim event through one
+/// recovered mutation session.
+///
+/// Invoked under the held coordinator lock, so the guard order is coordinator ->
+/// bootstrap -> repository -> events. The transition is derived from the captured
+/// image and is convergent: a claim already reflected in both the issue
+/// assignment and the event-log tail is a complete no-op; an issue assigned
+/// without its claim event emits exactly the missing event; a duplicate event is
+/// never emitted, preserving `@/inv/event-log`.
+fn synchronize_claim_repository_state<S>(
+    storage: &S,
+    worktree_root: &Path,
+    data_root: &Path,
+    full_id: &str,
+    agent: &crate::domain::Assignee,
+) -> Result<()>
+where
+    S: IssueStore + crate::storage::RepositoryStateStore,
+{
+    use crate::repository_state::{
+        finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, VirtualPath,
+    };
+    use crate::storage::{discover_repository_layout, RepositoryStateStoreError};
+
+    let layout = discover_repository_layout(worktree_root, data_root)?;
+    let mut session = storage.open_mutation_session(layout.clone())?;
+    // One context, created after canonical session acquisition and reused
+    // unchanged across conflict/closure retries so identifiers and the mutation
+    // timestamp are never resampled by a retry or backend.
+    let context = MutationContext::production();
+    let intents = [MutationIntent::ClaimIssue {
+        issue_id: full_id.to_string(),
+        agent: agent.clone(),
+    }];
+    let budget = CaptureBudget {
+        max_paths: 16,
+        max_listings: 0,
+        max_bytes: 16 * 1024 * 1024,
+        max_depth: 6,
+    };
+    let build_spec = || -> Result<CaptureSpec> {
+        Ok(CaptureSpec::phase_one(
+            [
+                VirtualPath::data(format!("issues/{full_id}.json"))?,
+                VirtualPath::data("events.jsonl")?,
+            ],
+            budget,
+        )?)
+    };
+    for _ in 0..8 {
+        let image = match session.capture(build_spec()?) {
+            Ok(image) => image,
+            Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+            Err(error) => return Err(error.into()),
+        };
+        let delta = finalize(&layout, &image, &context, &intents)?;
+        match session.apply(&image, &delta) {
+            Ok(_) => return Ok(()),
+            Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+            Err(error) => return Err(error.into()),
+        }
+    }
+    anyhow::bail!("claim repository synchronization did not converge after repeated conflicts")
 }
 
 /// Execute `jit claim heartbeat` command.
@@ -1586,4 +1652,230 @@ mod tests {
     // subprocess with its own `current_dir`, so they don't race with this
     // module's other tests over the process-wide working directory the way a
     // unit-level `std::env::set_current_dir` test would.
+
+    // --- REQ-02: coordinator-held acquire synchronization + crash convergence -
+
+    /// Acquire through the production synchronized path with explicit test paths,
+    /// exercising the real coordinator-held repository synchronization.
+    fn execute_claim_acquire_synchronized_test(
+        temp: &TempDir,
+        storage: &JsonFileStorage,
+        issue_id: &str,
+        ttl_secs: u64,
+        agent_id: &str,
+    ) -> Result<String> {
+        let full_id = storage.resolve_issue_id(issue_id)?;
+        let paths = create_test_paths(temp);
+        let identity = load_or_create_worktree_identity(
+            &paths.local_jit,
+            &paths.worktree_root,
+            "test-branch",
+        )?;
+        let locker = FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
+        let coordinator = ClaimCoordinator::new(
+            paths.clone(),
+            locker,
+            identity.worktree_id.clone(),
+            agent_id.to_string(),
+        );
+        coordinator.init()?;
+        let agent: crate::domain::Assignee = agent_id.parse()?;
+        let worktree_root = paths.worktree_root.clone();
+        let data_root = storage.root().to_path_buf();
+        let (lease, ()) = coordinator.acquire_claim_synchronized(
+            &full_id,
+            ttl_secs,
+            None,
+            100,
+            100,
+            |_lease| {
+                super::synchronize_claim_repository_state(
+                    storage,
+                    &worktree_root,
+                    &data_root,
+                    &full_id,
+                    &agent,
+                )
+            },
+        )?;
+        Ok(lease.lease_id)
+    }
+
+    /// Count claim events for one issue by a given agent in the event log.
+    fn claim_events_for(storage: &JsonFileStorage, full_id: &str, agent: &str) -> usize {
+        let agent: crate::domain::Assignee = agent.parse().unwrap();
+        storage
+            .read_events()
+            .unwrap()
+            .into_iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    crate::domain::Event::IssueClaimed { issue_id, assignee, .. }
+                        if issue_id == full_id && assignee == &agent
+                )
+            })
+            .count()
+    }
+
+    #[test]
+    fn test_claim_acquire_synchronized_publishes_issue_and_event() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Sync Issue")?;
+
+        let lease_id = execute_claim_acquire_synchronized_test(
+            &temp,
+            &storage,
+            &issue_id,
+            600,
+            "agent:worker",
+        )?;
+        assert!(!lease_id.is_empty());
+
+        // Issue is assigned with a stamped claimed_at, and exactly one claim event
+        // was appended in the same transaction (@/inv/event-log).
+        let issue = storage.load_issue(&issue_id)?;
+        assert_eq!(
+            issue.assignee.as_ref().map(|a| a.to_string()),
+            Some("agent:worker".to_string())
+        );
+        assert!(issue.claimed_at.is_some());
+        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_acquire_idempotent_over_split_and_full_reflection() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Split Issue")?;
+
+        // First acquire publishes the assigned issue and its claim event in one
+        // transaction.
+        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
+        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
+        assert!(storage.load_issue(&issue_id)?.assignee.is_some());
+
+        // Simulate a crash that left the issue assigned but lost its claim event
+        // (the split state the old save-then-append path could produce).
+        std::fs::write(storage.root().join("events.jsonl"), b"")?;
+        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 0);
+
+        // The retry emits EXACTLY the missing event (the issue is already assigned).
+        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
+        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
+
+        // A further acquire by the same agent/worktree is a complete no-op: the
+        // convergent transition never emits a duplicate event.
+        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
+        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_acquire_rejects_reverse_guard_order() -> Result<()> {
+        use crate::storage::{discover_repository_layout, RepositoryStateStore};
+
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Reverse Order")?;
+        let full_id = storage.resolve_issue_id(&issue_id)?;
+
+        let paths = create_test_paths(&temp);
+        let identity = load_or_create_worktree_identity(
+            &paths.local_jit,
+            &paths.worktree_root,
+            "test-branch",
+        )?;
+        let locker = FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
+        let coordinator = ClaimCoordinator::new(
+            paths.clone(),
+            locker,
+            identity.worktree_id,
+            "agent:worker".to_string(),
+        );
+        coordinator.init()?;
+
+        // Hold a repository mutation session, THEN attempt to coordinate: reverse
+        // acquisition is rejected before any coordinator lock is taken.
+        let layout = discover_repository_layout(&paths.worktree_root, storage.root()).unwrap();
+        let _session = storage.open_mutation_session(layout).unwrap();
+        let result =
+            coordinator.acquire_claim_synchronized(&full_id, 600, None, 100, 100, |_lease| Ok(()));
+        assert!(result.is_err(), "reverse guard order must be rejected");
+        let message = result.unwrap_err().to_string();
+        assert!(
+            message.contains("coordinator") || message.contains("repository mutation session"),
+            "error should name the guard-order violation, got: {message}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_release_renew_heartbeat_never_touch_repository_state() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Coordinator Only")?;
+        let full_id = storage.resolve_issue_id(&issue_id)?;
+
+        let paths = create_test_paths(&temp);
+        let identity = load_or_create_worktree_identity(
+            &paths.local_jit,
+            &paths.worktree_root,
+            "test-branch",
+        )?;
+        let locker = FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
+        let coordinator = ClaimCoordinator::new(
+            paths.clone(),
+            locker,
+            identity.worktree_id.clone(),
+            "agent:worker".to_string(),
+        );
+        coordinator.init()?;
+        let agent: crate::domain::Assignee = "agent:worker".parse().unwrap();
+        let worktree_root = paths.worktree_root.clone();
+        let data_root = storage.root().to_path_buf();
+
+        // Acquire an indefinite lease (claims the issue via the synchronized path).
+        let (lease, ()) = coordinator.acquire_claim_synchronized(
+            &full_id,
+            0,
+            Some("manual oversight"),
+            100,
+            100,
+            |_lease| {
+                super::synchronize_claim_repository_state(
+                    &storage,
+                    &worktree_root,
+                    &data_root,
+                    &full_id,
+                    &agent,
+                )
+            },
+        )?;
+
+        // Snapshot repository-owned state after the acquire.
+        let issue_before = storage.load_issue(&issue_id)?;
+        let events_before = storage.read_events()?;
+
+        // Coordinator-only operations (heartbeat, renew, force-evict/release) never
+        // open a repository session, so they cannot mutate the issue or event log.
+        coordinator.heartbeat(&lease.lease_id)?;
+        coordinator.renew_lease(&lease.lease_id, 0)?;
+        coordinator.force_evict_lease(&lease.lease_id, "released")?;
+
+        let issue_after = storage.load_issue(&issue_id)?;
+        let events_after = storage.read_events()?;
+        assert_eq!(issue_before.assignee, issue_after.assignee);
+        assert_eq!(issue_before.claimed_at, issue_after.claimed_at);
+        assert_eq!(
+            events_before.len(),
+            events_after.len(),
+            "coordinator-only operations must not append repository events"
+        );
+        Ok(())
+    }
 }

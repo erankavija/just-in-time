@@ -7,6 +7,7 @@
 
 mod image;
 mod managed_document;
+mod mutation;
 mod path;
 
 pub use image::{
@@ -19,6 +20,11 @@ pub use image::{
 pub use managed_document::{
     compose_managed_documents, render_managed_document, ManagedDocumentClaim, ManagedDocumentError,
     RegionPlacement,
+};
+pub use mutation::{
+    finalize, issue_draft, prefix_has_torn_tail, serialize_event, serialize_gate_run,
+    serialize_issue, FixedMutationClock, IdAuthority, MutationClock, MutationContext,
+    MutationError, MutationIntent, SystemMutationClock,
 };
 pub use path::{
     InjectivityProof, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,

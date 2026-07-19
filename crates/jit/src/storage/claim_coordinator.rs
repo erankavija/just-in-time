@@ -523,6 +523,168 @@ impl ClaimCoordinator {
         Ok(lease)
     }
 
+    /// Acquire a claim and run the repository-side synchronization under the held
+    /// coordinator lock, in the mandatory order coordinator → (repository
+    /// session: bootstrap → repository → events).
+    ///
+    /// This is the sole claim path that mutates repository-owned issue/event
+    /// state. It enters claim coordination first — rejecting reverse acquisition
+    /// when a repository mutation session is already held on this thread — then
+    /// reconciles the derived `claims.index.json` against the append-only claims
+    /// log before lease creation, so a lease durably appended by a crash-
+    /// interrupted attempt is recognized even when its index was never published.
+    /// An existing lease for the same issue, agent, and worktree is treated as a
+    /// convergent retry (the lease is reused and no second acquire is logged);
+    /// while still holding the lock, `repository_sync` runs with the resulting
+    /// lease. `issue_id` must already be canonical (resolved to its full id).
+    pub fn acquire_claim_synchronized<T>(
+        &self,
+        issue_id: &str,
+        ttl_secs: u64,
+        reason: Option<&str>,
+        max_indefinite_per_agent: u32,
+        max_indefinite_per_repo: u32,
+        repository_sync: impl FnOnce(&Lease) -> Result<T>,
+    ) -> Result<(Lease, T)> {
+        // Enter coordination first: a repository-session holder cannot coordinate.
+        let _order = crate::storage::guard_order::CoordinationOrderGuard::enter()
+            .map_err(|error| anyhow::anyhow!("{error}"))?;
+
+        // Policy: TTL=0 requires a reason.
+        if ttl_secs == 0 && matches!(reason, None | Some("")) {
+            bail!(
+                "Indefinite leases (TTL=0) require --reason flag.\n\
+                 Example: jit claim acquire {} --ttl 0 --reason \"Manual oversight\"",
+                issue_id
+            );
+        }
+
+        // Acquire the exclusive coordinator lock, held across BOTH lease creation
+        // and the repository synchronization.
+        let lock_path = self.paths.shared_jit.join("locks/claims.lock");
+        fs::create_dir_all(lock_path.parent().unwrap())?;
+        let _guard = self
+            .locker
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+
+        // Reconcile the derived index against the append-only log before lease
+        // creation. Neither helper locks the coordinator, so this is deadlock-free
+        // under the held lock.
+        let (consistent, _warnings) = self.verify_index_consistency()?;
+        if !consistent {
+            let rebuilt = self.rebuild_index_from_log()?;
+            self.write_index_atomic(&rebuilt)?;
+        }
+
+        let mut index = self.load_claims_index()?;
+        self.evict_expired(&mut index)?;
+
+        let existing = index
+            .leases
+            .iter()
+            .find(|lease| Self::canonical_issue_match(&lease.issue_id, issue_id))
+            .cloned();
+
+        let lease = match existing {
+            Some(existing)
+                if existing.agent_id == self.agent_id
+                    && existing.worktree_id == self.worktree_id =>
+            {
+                // Our own lease from a crash-interrupted attempt: reuse it and let
+                // the idempotent repository sync converge without a second event.
+                existing
+            }
+            Some(existing) => {
+                let expires_info = if existing.ttl_secs == 0 {
+                    format!("(indefinite lease, last beat: {})", existing.last_beat)
+                } else {
+                    format!("until {}", existing.expires_at.unwrap())
+                };
+                bail!(
+                    "{}",
+                    errors::already_claimed(issue_id, &existing.agent_id, &expires_info)
+                );
+            }
+            None => {
+                if ttl_secs == 0 {
+                    let agent_indefinite_count = index
+                        .leases
+                        .iter()
+                        .filter(|l| l.agent_id == self.agent_id && l.ttl_secs == 0)
+                        .count() as u32;
+                    if agent_indefinite_count >= max_indefinite_per_agent {
+                        bail!(
+                            "Exceeded per-agent limit for indefinite leases.\n\
+                             Agent {} already has {} indefinite lease(s) (max: {}).\n\
+                             Release an existing indefinite lease or use a finite TTL.",
+                            self.agent_id,
+                            agent_indefinite_count,
+                            max_indefinite_per_agent
+                        );
+                    }
+                    let repo_indefinite_count =
+                        index.leases.iter().filter(|l| l.ttl_secs == 0).count() as u32;
+                    if repo_indefinite_count >= max_indefinite_per_repo {
+                        bail!(
+                            "Exceeded per-repository limit for indefinite leases.\n\
+                             Repository has {} indefinite lease(s) (max: {}).\n\
+                             Wait for leases to be released or use a finite TTL.",
+                            repo_indefinite_count,
+                            max_indefinite_per_repo
+                        );
+                    }
+                }
+                let now = self.clock.now();
+                let lease = Lease {
+                    lease_id: Uuid::new_v4().to_string(),
+                    issue_id: issue_id.to_string(),
+                    agent_id: self.agent_id.clone(),
+                    worktree_id: self.worktree_id.clone(),
+                    branch: self.get_current_branch().ok(),
+                    ttl_secs,
+                    acquired_at: now,
+                    expires_at: if ttl_secs > 0 {
+                        Some(now + Duration::seconds(ttl_secs as i64))
+                    } else {
+                        None
+                    },
+                    last_beat: now,
+                    stale: false,
+                };
+                self.append_claim_op(&ClaimOp::Acquire {
+                    lease: lease.clone(),
+                })?;
+                index.add_lease(lease.clone());
+                self.write_index_atomic(&index)?;
+                lease
+            }
+        };
+
+        // Repository synchronization runs under the held coordinator lock.
+        let synced = repository_sync(&lease)?;
+        Ok((lease, synced))
+    }
+
+    /// Canonical issue-identity match tolerant of short-id spellings.
+    ///
+    /// Two ids are the same issue when equal, or when one is a prefix of the
+    /// other with the shorter at least `SHORT_ID_LENGTH` characters — a short-id
+    /// spelling of one full id. This lets a full-id acquire recognize a lease a
+    /// prior implementation recorded under a short-id spelling and never
+    /// duplicate it.
+    fn canonical_issue_match(stored: &str, requested: &str) -> bool {
+        const SHORT_ID_LENGTH: usize = 8;
+        if stored == requested {
+            return true;
+        }
+        let (short, long) = if stored.len() < requested.len() {
+            (stored, requested)
+        } else {
+            (requested, stored)
+        };
+        short.len() >= SHORT_ID_LENGTH && long.starts_with(short)
+    }
+
     /// Send a heartbeat for an indefinite lease.
     ///
     /// Updates `last_beat` without changing expiration. This is used to
@@ -1168,6 +1330,70 @@ mod tests {
         assert_eq!(lease.worktree_id, "wt:test123");
         assert_eq!(lease.ttl_secs, 600);
         assert!(lease.expires_at.is_some());
+    }
+
+    #[test]
+    fn test_acquire_synchronized_recognizes_short_id_lease() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        // A lease recorded under a short-id spelling by a prior path.
+        coordinator.acquire_claim("abcdef12", 600).unwrap();
+        // A canonical full-id acquire recognizes it and never duplicates the lease.
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized("abcdef1234567890", 600, None, 100, 100, |_| Ok(()))
+            .unwrap();
+        assert_eq!(lease.issue_id, "abcdef12");
+        assert_eq!(coordinator.load_claims_index().unwrap().leases.len(), 1);
+        let log = std::fs::read_to_string(temp_dir.path().join(".git/jit/claims.jsonl")).unwrap();
+        assert_eq!(log.lines().count(), 1, "no duplicate acquire is logged");
+    }
+
+    #[test]
+    fn test_acquire_synchronized_reconciles_index_from_log() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        coordinator.acquire_claim("issue-recon", 600).unwrap();
+        // Simulate a crash where the durable log advanced but the derived index was
+        // never published.
+        std::fs::remove_file(temp_dir.path().join(".git/jit/claims.index.json")).unwrap();
+        // The retry reconciles the index from the append-only log, recognizes the
+        // own lease, and never appends a duplicate acquire.
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized("issue-recon", 600, None, 100, 100, |_| Ok(()))
+            .unwrap();
+        assert_eq!(lease.issue_id, "issue-recon");
+        assert_eq!(coordinator.load_claims_index().unwrap().leases.len(), 1);
+        let log = std::fs::read_to_string(temp_dir.path().join(".git/jit/claims.jsonl")).unwrap();
+        assert_eq!(
+            log.lines().count(),
+            1,
+            "reconcile must recognize the durable lease, not re-acquire"
+        );
+    }
+
+    #[test]
+    fn test_acquire_synchronized_rejects_another_agents_lease() {
+        let temp_dir = TempDir::new().unwrap();
+        let owner = setup_coordinator(&temp_dir);
+        owner.acquire_claim("issue-owned", 600).unwrap();
+        // A different agent cannot acquire the same issue.
+        let locker = FileLocker::new(StdDuration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
+        let other = ClaimCoordinator::new(
+            WorktreePaths {
+                common_dir: temp_dir.path().join(".git"),
+                worktree_root: temp_dir.path().to_path_buf(),
+                local_jit: temp_dir.path().join(".jit"),
+                shared_jit: temp_dir.path().join(".git/jit"),
+            },
+            locker,
+            "wt:other".to_string(),
+            "agent:other".to_string(),
+        );
+        let result =
+            other.acquire_claim_synchronized("issue-owned", 600, None, 100, 100, |_| Ok(()));
+        assert!(result.is_err(), "another agent's lease blocks acquisition");
     }
 
     #[test]
