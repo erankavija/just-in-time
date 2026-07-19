@@ -166,6 +166,16 @@
       "situation": "Rework attempt 2 closed all 10 prior findings (independently verified, no regressions) but the independent crash-consistency review found 4 new lead-verified defects: HIGH shared worktree .jit-bootstrap namespace unserialized across disjoint-data-root sessions (orphan companion sweep can delete a live transaction's rollback backup); MEDIUM committed-journal recovery re-asserts worktree final identities and wedges opens after legitimate post-commit edits; LOW memory-backend failure-point parity gap; LOW tautological held-FD capability revalidation.",
       "resolution": "Invoker authorized one guided correction round scoped to exactly these 4 findings and reset the rework counter.",
       "recommendation": "Guided correction: worktree-keyed serialization / data-root-bound companion markers; idempotent committed-recovery cleanup; model kernel-only failure points in memory backend; reopen-by-path revalidation."
+    },
+    {
+      "category": "gate-vs-plan-scope-amendment",
+      "issue_id": "bacf2cd4-c4c7-421e-83ff-4ebc44925008",
+      "status": "resolved",
+      "opened_at": "2026-07-19T04:20:00+03:00",
+      "resolved_at": "2026-07-19T04:22:00+03:00",
+      "situation": "code-review run b1991dfd-f094-43b5-961b-b310bac4d4f6 failed with one high finding: production mutation paths (IssueStore per-file publishers, init/profile direct FileTransactionKernel use) are not migrated to open_mutation_session, reading the issue's 'no per-file or command-semantic method survives' as requiring adoption in this package. The approved breakdown defers consumer migration to 49adf23b (wave 5) and the cutover to 661d6be2 (wave 6).",
+      "resolution": "Invoker approved amending bacf2cd4's description to codify the adoption boundary (predecessor paths remain as tracked deletion debt until 49adf23b/661d6be2); code-review re-run against the amended contract.",
+      "recommendation": "Amend issue text to codify the approved plan rather than pulling wave-5 scope into wave 2."
     }
   ],
   "rework_counts": {
