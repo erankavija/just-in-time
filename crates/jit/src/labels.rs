@@ -26,7 +26,7 @@ use std::sync::OnceLock;
 ///   separator.
 static LABEL_REGEX: OnceLock<Regex> = OnceLock::new();
 
-/// `pub(crate)` so `validation::defaults::CANONICAL_LABEL_REGEX` (the write-path
+/// `pub(crate)` so `repository_state::default_rules::CANONICAL_LABEL_REGEX` (the write-path
 /// duplicate) can be tested against this compiled pattern's source string and
 /// kept in lockstep, rather than drifting behind a manual-sync comment.
 pub(crate) fn label_regex() -> &'static Regex {

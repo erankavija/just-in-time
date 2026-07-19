@@ -86,7 +86,7 @@ const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:(?:[a-zA-Z0-9][a-zA-Z0-9.
 ///
 /// ```
 /// use jit::domain::{LabelNamespace, LabelNamespaces};
-/// use jit::validation::defaults::default_ruleset;
+/// use jit::repository_state::default_ruleset;
 /// use std::collections::HashMap;
 ///
 /// // A registry with a unique `type` namespace.
@@ -251,7 +251,7 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
 ///
 /// ```
 /// use jit::domain::{LabelNamespace, LabelNamespaces};
-/// use jit::validation::defaults::{default_ruleset, reconcile_default_rules_with_config};
+/// use jit::repository_state::{default_ruleset, reconcile_default_rules_with_config};
 /// use std::collections::HashMap;
 ///
 /// // A ruleset scaffolded when only `type` was declared (unique).
@@ -400,7 +400,7 @@ impl DefaultRuleMembershipDiff {
 ///
 /// ```
 /// use jit::domain::{LabelNamespace, LabelNamespaces};
-/// use jit::validation::defaults::{default_ruleset, default_rule_membership_diff};
+/// use jit::repository_state::{default_ruleset, default_rule_membership_diff};
 /// use std::collections::HashMap;
 ///
 /// let mut ns = HashMap::new();
@@ -512,7 +512,7 @@ pub fn default_rule_membership_diff_from_identities(
 
 /// The stable schema file name the `type-hierarchy-known` rule (`origin =
 /// "default"`) references once serialized to `.jit/rules.toml` (the sanitized
-/// `<origin>:<name>` identity + `.json`, matching [`serialize`](crate::validation::serialize)'s
+/// `<origin>:<name>` identity + `.json`, matching [`serialize`](crate::repository_state::rule_serialize)'s
 /// schema-stem derivation). This file is a write-through projection: the rule
 /// derives its enum from `[type_hierarchy]` in memory at load
 /// ([`with_default_assertions_from_config`]), so the file tracks config for
@@ -526,7 +526,7 @@ pub const TYPE_HIERARCHY_SCHEMA_FILE: &str = "default-type-hierarchy-known.json"
 ///
 /// This is the SINGLE source for that schema's shape, shared by
 /// [`default_ruleset`] (used for both in-memory evaluation and the projection
-/// [`serialize`](crate::validation::serialize) writes), so the baked
+/// [`serialize`](crate::repository_state::rule_serialize) writes), so the baked
 /// `.jit/schemas/default-type-hierarchy-known.json` projection can never drift
 /// from the schema validation actually uses (one source, not two). Pure: no I/O,
 /// deterministic.
@@ -550,7 +550,7 @@ pub fn type_hierarchy_known_schema(namespaces: &LabelNamespaces) -> serde_json::
 /// Exposed `pub(crate)` so the graph-rule evaluation call site
 /// (`CommandExecutor::evaluate_graph_rules`) can build the same repo
 /// [`HierarchyConfig`] to inject into `type-hierarchy` rules (D1).
-pub(crate) fn hierarchy_config(namespaces: &LabelNamespaces) -> HierarchyConfig {
+pub fn hierarchy_config(namespaces: &LabelNamespaces) -> HierarchyConfig {
     match &namespaces.type_hierarchy {
         // Explicit hierarchy: use its types + associations (legacy `Some` branch).
         Some(types) => {

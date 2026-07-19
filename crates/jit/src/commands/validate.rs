@@ -481,7 +481,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Absent: the in-memory defaults are loadable. A namespace-registry
             // failure (rare) reads as unloadable rather than crashing.
             self.cached_namespaces().ok().map(|namespaces| {
-                crate::validation::defaults::default_ruleset(namespaces)
+                crate::repository_state::default_ruleset(namespaces)
                     .rules
                     .into_iter()
                     .map(|r| r.name)
@@ -584,7 +584,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // NOTE: label format, namespace registry, namespace value/pattern/
         // unique/required, type-label requirement, and unknown-type detection are
         // NO LONGER checked here. They are now default rules (see
-        // `validation::defaults`) evaluated by `validate_silent` via
+        // `repository_state::default_rules`) evaluated by `validate_silent` via
         // `local_rules_error_message` (a0f0f342 migration).
 
         // Validate document references (git integration)
@@ -664,7 +664,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // evaluation time (D1); it is no longer stored in the parsed rule. Build
         // it from the same namespace registry the default rules derive from.
         let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-        let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
+        let hierarchy = crate::repository_state::hierarchy_config(namespaces);
         let repo_format = self.repo_content_format()?;
 
         // Resolve any external plan documents at the boundary so a container
@@ -1102,7 +1102,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if !graph_rules.is_empty() {
             let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-            let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
+            let hierarchy = crate::repository_state::hierarchy_config(namespaces);
             // Resolve external plan docs for the in-scope issues so a container
             // whose criteria live in an external file validates against the FILE.
             let plan_content = self.resolve_plan_content(&slice)?;

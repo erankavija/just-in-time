@@ -1,6 +1,6 @@
 //! Persistence for the validation ruleset files (`rules.toml` + `schemas/*.json`).
 //!
-//! The validation layer ([`crate::validation::serialize`]) produces the CONTENT
+//! The repository_state layer ([`crate::repository_state::rule_serialize`]) produces the CONTENT
 //! (the `rules.toml` body and the schema file name/content pairs); this storage
 //! module owns the on-disk `rules.toml` + `schemas/` layout and performs the
 //! writes, so those storage paths live only in the storage layer. All writes go
@@ -321,7 +321,7 @@ pub fn read_rule_identities(jit_root: &Path) -> Result<Vec<(String, Option<Strin
 /// leading header/comments and any unrelated trailing tables all survive.
 ///
 /// `to_add` entries are typically rendered via
-/// [`crate::validation::serialize::render_rule_block`] and are appended verbatim
+/// [`crate::repository_state::render_rule_block`] and are appended verbatim
 /// (exactly the canonical text `jit init` scaffolds), so blocks jit itself wrote
 /// stay byte-stable. A name in `to_drop` that does not match an
 /// `origin = "default"` block (already absent, or present only under a different
@@ -447,8 +447,8 @@ pub fn sync_namespace_unique_rules(
 mod tests {
     use super::*;
     use crate::domain::{LabelNamespace, LabelNamespaces};
-    use crate::validation::defaults::{default_ruleset, TYPE_HIERARCHY_SCHEMA_FILE};
-    use crate::validation::serialize::{serialize_ruleset, type_hierarchy_schema_content};
+    use crate::repository_state::{default_ruleset, TYPE_HIERARCHY_SCHEMA_FILE};
+    use crate::repository_state::{serialize_ruleset, type_hierarchy_schema_content};
     use std::collections::HashMap;
 
     fn registry(entries: Vec<(&str, LabelNamespace)>) -> LabelNamespaces {

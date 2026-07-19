@@ -604,7 +604,7 @@ pub enum Assertion {
     /// A built-in type-hierarchy warning (orphan-leaf or strategic-consistency).
     /// Graph scope. Authorable in `rules.toml` via the `type-hierarchy` assert
     /// kind, and also constructed programmatically as a built-in default rule
-    /// (see [`default_ruleset`](crate::validation::defaults::default_ruleset)).
+    /// (see [`default_ruleset`](crate::repository_state::default_ruleset)).
     /// Evaluation reuses the existing [`crate::domain::type_taxonomy`] domain functions
     /// rather than reimplementing the hierarchy logic; the repo's
     /// [`HierarchyConfig`] is NOT stored in the parsed rule — it is injected by
@@ -776,7 +776,7 @@ pub struct Rule {
     /// [`origin`](Rule::origin) rather than an embedded prefix.
     pub name: String,
     /// Provenance marker, e.g. `"default"` for the FIXED built-in rule set
-    /// ([`default_ruleset`](crate::validation::defaults::default_ruleset)) or
+    /// ([`default_ruleset`](crate::repository_state::default_ruleset)) or
     /// `"bracket"` for the planning-bracket coverage-preview rule. `None` for a
     /// plain repo-authored rule.
     pub origin: Option<String>,
@@ -1535,7 +1535,7 @@ fn validate_schema_reference(rule: &str, reference: &str) -> Result<(), RuleConf
 /// projection is missing or malformed.
 ///
 /// A permissive JSON Schema (`{}` matches anything) carrying the declared file
-/// identity for diagnostics. [`reconcile_default_rules_with_config`](crate::validation::defaults::reconcile_default_rules_with_config)
+/// identity for diagnostics. [`reconcile_default_rules_with_config`](crate::repository_state::reconcile_default_rules_with_config)
 /// replaces it with the config-derived assertion at load, so the rebuildable
 /// projection is never load-bearing for a default rule's validation and this
 /// placeholder is not evaluated once reconciliation has run.

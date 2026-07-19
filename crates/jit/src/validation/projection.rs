@@ -26,7 +26,7 @@
 //! EVERY projection before writing ANY target so a failing render leaves the tree
 //! untouched; the write lands through the storage boundary
 //! ([`IssueStore::write_repo_file`](crate::storage::IssueStore::write_repo_file),
-//! itself over [`write_file_atomic`](crate::validation::serialize::write_file_atomic)).
+//! itself over [`write_file_atomic`](crate::repository_state::write_file_atomic)).
 //!
 //! Target path, mode, style, and delimiters come ONLY from
 //! [`ProjectionConfig`](crate::config::ProjectionConfig); this module hardcodes no

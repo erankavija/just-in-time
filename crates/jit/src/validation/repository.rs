@@ -582,7 +582,7 @@ fn load_rules(
     namespaces: &crate::domain::LabelNamespaces,
 ) -> Result<RuleSet> {
     let Some(content) = read_text(view, ".jit/rules.toml")? else {
-        return Ok(crate::validation::defaults::default_ruleset(namespaces));
+        return Ok(crate::repository_state::default_ruleset(namespaces));
     };
     let jit_root = view.repository_root().join(".jit");
     let schemas = RuleSet::schema_requests(&content)?.into_iter().try_fold(
@@ -618,7 +618,7 @@ fn load_rules(
         },
     )?;
     let parsed = RuleSet::parse(&content, Some(config), schemas)?;
-    Ok(crate::validation::defaults::reconcile_default_rules_with_config(parsed, namespaces))
+    Ok(crate::repository_state::reconcile_default_rules_with_config(parsed, namespaces))
 }
 
 #[derive(Deserialize)]
@@ -901,7 +901,7 @@ fn collect_rule_findings(
         .iter()
         .filter(|rule| rule.scope == crate::declarations::rules::RuleScope::Graph)
         .collect();
-    let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
+    let hierarchy = crate::repository_state::hierarchy_config(namespaces);
     let plan_content = resolve_plan_content(view, issues, config)?;
     let graph_findings = crate::validation::graph::evaluate_graph(
         &graph_rules,

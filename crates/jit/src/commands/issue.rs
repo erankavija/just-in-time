@@ -35,7 +35,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// configured `[type_hierarchy]`, deciding through the SAME rule engine the
     /// write path uses — NOT a parallel `config.toml` containment check.
     ///
-    /// The `type-hierarchy-known` default rule (`validation::defaults`)
+    /// The `type-hierarchy-known` default rule (`repository_state::default_rules`)
     /// reports an undeclared `type:<kind>` as an `error` finding, but because it
     /// is `enforce = false` it only WARNS on the normal write path
     /// (`validate_for_write`). An explicit `--type` is a deliberate, hard

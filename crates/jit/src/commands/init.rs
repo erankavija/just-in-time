@@ -60,8 +60,8 @@ impl InitScaffold {
         let parsed: JitConfig =
             toml::from_str(&config).context("Failed to parse generated init configuration")?;
         let namespaces = ConfigManager::new(repo_dir.join(".jit")).namespaces_from_config(&parsed);
-        let rules = crate::validation::serialize::serialize_ruleset(
-            &crate::validation::defaults::default_ruleset(&namespaces),
+        let rules = crate::repository_state::serialize_ruleset(
+            &crate::repository_state::default_ruleset(&namespaces),
         );
 
         let mut files = BTreeMap::from([

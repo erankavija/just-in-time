@@ -326,7 +326,7 @@ pub struct WriteValidation {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RuleMembershipSync {
     /// Names of the `origin = "default"` `namespace-unique-<ns>` rows
-    /// appended, in [`default_ruleset`](crate::validation::defaults::default_ruleset)'s
+    /// appended, in [`default_ruleset`](crate::repository_state::default_ruleset)'s
     /// emission order.
     pub added: Vec<String>,
     /// Names of the `origin = "default"` `namespace-unique-<ns>` rows dropped.
@@ -349,9 +349,9 @@ pub struct CommandExecutor<S: IssueStore> {
     /// Lazily-built EFFECTIVE rule set. When `.jit/rules.toml` is present it
     /// supplies the rules, with the `origin = "default"` family reconciled against
     /// this repo's `config.toml` registry at load
-    /// ([`reconcile_default_rules_with_config`](crate::validation::defaults::reconcile_default_rules_with_config));
+    /// ([`reconcile_default_rules_with_config`](crate::repository_state::reconcile_default_rules_with_config));
     /// when absent, the built-in
-    /// [`default_ruleset`](crate::validation::defaults::default_ruleset) is built
+    /// [`default_ruleset`](crate::repository_state::default_ruleset) is built
     /// IN MEMORY. The former hard-coded checks (a0f0f342 migration) now live as
     /// default rules here. A load/parse error from either source is retained as an
     /// `Err` so a misconfigured repo surfaces the problem rather than silently
@@ -422,7 +422,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   fields (severity, enforce, selector). The default family is reconciled
     ///   against the declared `[namespaces]` / `[type_hierarchy]` registry IN
     ///   MEMORY at load
-    ///   ([`reconcile_default_rules_with_config`](crate::validation::defaults::reconcile_default_rules_with_config)):
+    ///   ([`reconcile_default_rules_with_config`](crate::repository_state::reconcile_default_rules_with_config)):
     ///   assertions are re-derived, a rule is added for a newly-declared namespace
     ///   and dropped for a removed one, so a hand edit of the registry cannot
     ///   desync validation against a stale `schemas/default-*.json` projection.
@@ -430,7 +430,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   are used verbatim, reading their own declared schema files. An
     ///   intentionally-emptied file yields an empty set.
     /// - **File ABSENT (pre-init repo or deleted file):** build the FIXED
-    ///   [`default_ruleset`](crate::validation::defaults::default_ruleset) from the
+    ///   [`default_ruleset`](crate::repository_state::default_ruleset) from the
     ///   repo's namespace registry IN MEMORY (MF4). This is read-only — NO disk
     ///   write, NO warning, NO error — so gates, the server, read-only checkouts,
     ///   and multiple worktrees stay safe. Only `jit init` materializes the file
@@ -455,7 +455,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let user = self.rules().map_err(|e| e.to_string())?.clone();
                     let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
                     Ok(
-                        crate::validation::defaults::reconcile_default_rules_with_config(
+                        crate::repository_state::reconcile_default_rules_with_config(
                             user, namespaces,
                         ),
                     )
@@ -464,7 +464,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     // no warning) from the repo's namespace registry. Materialized
                     // to disk only by `jit init`.
                     let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
-                    Ok(crate::validation::defaults::default_ruleset(namespaces))
+                    Ok(crate::repository_state::default_ruleset(namespaces))
                 }
             })
             .as_ref()
@@ -905,7 +905,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let slice = self.transition_neighborhood(issue)?;
 
         let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-        let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
+        let hierarchy = crate::repository_state::hierarchy_config(namespaces);
         let repo_format = self.repo_content_format()?;
 
         // Resolve external plan docs for the neighborhood so closure-time coverage
@@ -1148,14 +1148,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             self.sync_default_rule_membership()?;
             crate::storage::ruleset_store::rewrite_rules_header(
                 jit_root,
-                crate::validation::serialize::rules_file_header(),
+                crate::repository_state::rules_file_header(),
             )?;
             return Ok(false);
         }
 
         // Validation produces the content; storage performs the atomic writes.
-        let serialized = crate::validation::serialize::serialize_ruleset(
-            &crate::validation::defaults::default_ruleset(&namespaces),
+        let serialized = crate::repository_state::serialize_ruleset(
+            &crate::repository_state::default_ruleset(&namespaces),
         );
         let schema_files: Vec<(String, String)> = serialized
             .schema_files
@@ -1176,7 +1176,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// The default rules validate against the registry reconciled in memory at
     /// load
-    /// ([`reconcile_default_rules_with_config`](crate::validation::defaults::reconcile_default_rules_with_config)),
+    /// ([`reconcile_default_rules_with_config`](crate::repository_state::reconcile_default_rules_with_config)),
     /// so these files are write-through projections for external consumers, never
     /// the validation authority. jit republishes them whenever it writes
     /// `config.toml` or `rules.toml` (init/re-init, `config set`) so a projection
@@ -1192,8 +1192,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let namespaces = self.config_manager.namespaces_from_config(&config);
         // Validation builds the schema content (the SAME files `jit init`
         // scaffolds); storage performs the atomic per-file write.
-        let serialized = crate::validation::serialize::serialize_ruleset(
-            &crate::validation::defaults::default_ruleset(&namespaces),
+        let serialized = crate::repository_state::serialize_ruleset(
+            &crate::repository_state::default_ruleset(&namespaces),
         );
         let mut written = Vec::new();
         for file in serialized.schema_files {
@@ -1213,10 +1213,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// the registry-first `rule` item kind — which resolves `@/rule/<name>`
     /// straight from the file, not the in-memory-reconciled ruleset (`jit item
     /// show`/`list`, docs-mechanical citation checking) — never dangles behind
-    /// [`reconcile_default_rules_with_config`](crate::validation::defaults::reconcile_default_rules_with_config)'s
+    /// [`reconcile_default_rules_with_config`](crate::repository_state::reconcile_default_rules_with_config)'s
     /// load-time-only reconciliation.
     ///
-    /// Computes [`default_rule_membership_diff`](crate::validation::defaults::default_rule_membership_diff)
+    /// Computes [`default_rule_membership_diff`](crate::repository_state::default_rule_membership_diff)
     /// between the CURRENT on-disk `rules.toml` and the CURRENT `[namespaces]`
     /// registry, then appends the row for each newly-unique namespace and drops
     /// the row for each namespace no longer unique or no longer declared —
@@ -1248,7 +1248,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let identities = crate::storage::ruleset_store::read_rule_identities(jit_root)?;
         let config = self.config_manager.load()?;
         let namespaces = self.config_manager.namespaces_from_config(&config);
-        let diff = crate::validation::defaults::default_rule_membership_diff_from_identities(
+        let diff = crate::repository_state::default_rule_membership_diff_from_identities(
             &identities,
             &namespaces,
         );
@@ -1259,7 +1259,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let to_add_blocks: Vec<String> = diff
             .to_add
             .iter()
-            .map(crate::validation::serialize::render_rule_block)
+            .map(crate::repository_state::render_rule_block)
             .collect();
         crate::storage::ruleset_store::sync_namespace_unique_rules(
             jit_root,

@@ -3,7 +3,7 @@
 //!
 //! This is the inverse of the [`rules`](crate::declarations::rules) loader: it
 //! renders an arbitrary in-memory [`RuleSet`] (typically the built-in
-//! [`default_ruleset`](crate::validation::defaults::default_ruleset)) into a
+//! [`default_ruleset`](crate::repository_state::default_ruleset)) into a
 //! complete, reloadable `rules.toml`. This module produces CONTENT only and
 //! performs no I/O; `jit init` persists that content through the storage layer
 //! ([`write_validation_ruleset`](crate::storage::ruleset_store::write_validation_ruleset))
@@ -93,7 +93,7 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
 /// content from the SAME [`type_hierarchy_known_schema`] the in-memory default
 /// uses keeps the materialized write-path rule in lock-step with config (R5).
 pub fn type_hierarchy_schema_content(namespaces: &crate::domain::LabelNamespaces) -> String {
-    pretty_schema(&crate::validation::defaults::type_hierarchy_known_schema(
+    pretty_schema(&super::default_rules::type_hierarchy_known_schema(
         namespaces,
     ))
 }
@@ -479,7 +479,7 @@ mod tests {
     use super::*;
     use crate::declarations::rules::{RuleScope, RuleSet, Severity};
     use crate::domain::{LabelNamespace, LabelNamespaces};
-    use crate::validation::defaults::default_ruleset;
+    use crate::repository_state::default_rules::default_ruleset;
     use std::collections::HashMap;
 
     fn registry(entries: Vec<(&str, LabelNamespace)>) -> LabelNamespaces {

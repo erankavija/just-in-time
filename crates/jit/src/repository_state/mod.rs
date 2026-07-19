@@ -5,11 +5,18 @@
 //! It performs no filesystem I/O and imports no validation, storage, command, or
 //! profile modules.
 
+mod default_rules;
 mod image;
 mod managed_document;
 mod mutation;
 mod path;
+mod rule_serialize;
 
+pub use default_rules::{
+    default_rule_membership_diff, default_rule_membership_diff_from_identities, default_ruleset,
+    hierarchy_config, reconcile_default_rules_with_config, type_hierarchy_known_schema,
+    DefaultRuleMembershipDiff, TYPE_HIERARCHY_SCHEMA_FILE,
+};
 pub use image::{
     plan_hash, CaptureBudget, CaptureError, CaptureSpec, DeltaError, EntryIdentity,
     ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
@@ -29,6 +36,10 @@ pub use mutation::{
 pub use path::{
     InjectivityProof, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryRootEvidence, RootRelativePath, VirtualPath,
+};
+pub use rule_serialize::{
+    render_rule_block, rules_file_header, serialize_ruleset, type_hierarchy_schema_content,
+    SchemaFile, SerializedRuleSet,
 };
 
 use crate::declarations::rules::RuleSet;
