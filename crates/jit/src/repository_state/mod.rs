@@ -123,10 +123,10 @@ pub fn derive_materializations(
     seed: &RepositorySeed,
     intent: MaterializationIntent,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
-    let delta = match intent {
+    let delta = match &intent {
         MaterializationIntent::SemanticMutation => derive_semantic_mutation(image, &declarations)?,
-        MaterializationIntent::RenderConfiguredProjections => {
-            derive_project_render(image, &declarations)?
+        MaterializationIntent::RenderConfiguredProjections { selected } => {
+            derive_project_render(image, &declarations, selected.as_ref())?
         }
         MaterializationIntent::RepairDerivedState => derive_repair(image, &declarations)?,
     };
@@ -180,7 +180,8 @@ fn compose_complete(
     let config = materialize::assemble_config(image).map_err(RepositoryStateError::producer)?;
     let mut actions = materialize::compose_default_ruleset(image, &config)?;
     actions.extend(
-        materialize::compose_configured_projections(image, &config, declarations)
+        // A semantic mutation is complete over EVERY declared projection.
+        materialize::compose_configured_projections(image, &config, declarations, None)
             .map_err(RepositoryStateError::producer)?,
     );
     Ok(actions)
@@ -198,14 +199,19 @@ fn derive_semantic_mutation(
 }
 
 /// Render-only intent: a constrained-complete operation over the configured
-/// projections alone (it never selects individual projection families).
+/// projections in scope. `selected` scopes WHICH declared projections participate
+/// (declaration scope), never which producer families run: every in-scope
+/// projection is composed completely from its own declared sources, and an
+/// out-of-scope projection contributes no action so its target is left untouched.
 fn derive_project_render(
     image: &RepositoryImage,
     declarations: &RepositoryDeclarations<'_>,
+    selected: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<RepositoryDelta, RepositoryStateError> {
     let config = materialize::assemble_config(image).map_err(RepositoryStateError::producer)?;
-    let actions = materialize::compose_configured_projections(image, &config, declarations)
-        .map_err(RepositoryStateError::producer)?;
+    let actions =
+        materialize::compose_configured_projections(image, &config, declarations, selected)
+            .map_err(RepositoryStateError::producer)?;
     Ok(RepositoryDelta::new(image.layout(), actions)?)
 }
 

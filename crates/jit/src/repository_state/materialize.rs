@@ -163,6 +163,7 @@ pub(crate) fn compose_configured_projections(
     image: &RepositoryImage,
     config: &JitConfig,
     declarations: &RepositoryDeclarations<'_>,
+    selected: Option<&std::collections::BTreeSet<String>>,
 ) -> anyhow::Result<Vec<RepositoryAction>> {
     let Some(projections) = config.projection.as_ref() else {
         return Ok(Vec::new());
@@ -174,10 +175,16 @@ pub(crate) fn compose_configured_projections(
         gates: declarations.gates,
     };
 
-    // Phase one: render every projection body and build its managed-document claim.
-    // Iterating the name-ordered projection registry keeps claim order deterministic.
+    // Phase one: render every in-scope projection body and build its
+    // managed-document claim. Iterating the name-ordered projection registry keeps
+    // claim order deterministic. `selected` scopes WHICH declared projections
+    // participate; an out-of-scope projection contributes no claim, so its target
+    // is left untouched.
     let mut claims: Vec<(VirtualPath, ManagedDocumentClaim)> = Vec::new();
     for (name, projection) in projections {
+        if selected.is_some_and(|names| !names.contains(name)) {
+            continue;
+        }
         let mut read = |path: &str| read_text(image, path);
         let (body, _count) = render_projection_body(projection, &inputs, &mut read)?;
         let target = super::require_target(projection, name)?;
@@ -555,6 +562,52 @@ kind = "advisory"
         assert!(paths.contains(&VirtualPath::data("schemas/custom.json").unwrap()));
     }
 
+    #[test]
+    fn test_render_selection_scopes_to_named_projection() {
+        use std::collections::BTreeSet;
+        let cfg = empty_config_decls();
+        let (g, r) = (gates(), rules());
+        let image = image(&[
+            (".jit/config.toml", Some(CONFIG)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            (
+                "AGENTS.md",
+                Some(&agents_with_region("invariants", "STALE")),
+            ),
+        ]);
+        // Selecting the declared projection renders it (stale region → write).
+        let in_scope: BTreeSet<String> = ["invariants".to_string()].into_iter().collect();
+        let plan = derive_materializations(
+            &image,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RenderConfiguredProjections {
+                selected: Some(in_scope),
+            },
+        )
+        .unwrap();
+        assert!(
+            !plan.delta().actions().is_empty(),
+            "the selected projection must render"
+        );
+        // A selection naming only an out-of-scope projection renders nothing, so a
+        // sibling projection's target is left untouched.
+        let out_of_scope: BTreeSet<String> = ["absent".to_string()].into_iter().collect();
+        let plan2 = derive_materializations(
+            &image,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RenderConfiguredProjections {
+                selected: Some(out_of_scope),
+            },
+        )
+        .unwrap();
+        assert!(
+            plan2.delta().actions().is_empty(),
+            "an out-of-scope selection must touch no target"
+        );
+    }
+
     fn declarations<'a>(
         config: &'a crate::declarations::ConfigurationDeclarations,
         gates: &'a GateRegistry,
@@ -608,7 +661,7 @@ kind = "advisory"
             &image,
             decls,
             &seed(),
-            MaterializationIntent::RenderConfiguredProjections,
+            MaterializationIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
         let actions = plan.delta().actions();
@@ -643,7 +696,7 @@ kind = "advisory"
             &stale,
             declarations(&cfg, &g, &r),
             &seed(),
-            MaterializationIntent::RenderConfiguredProjections,
+            MaterializationIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
         let RepositoryAction::WriteFile { bytes, .. } = &plan.delta().actions()[0] else {
@@ -660,7 +713,7 @@ kind = "advisory"
             &fresh,
             decls,
             &seed(),
-            MaterializationIntent::RenderConfiguredProjections,
+            MaterializationIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
         assert!(
@@ -690,14 +743,14 @@ kind = "advisory"
             &build(),
             declarations(&cfg, &g, &r),
             &seed(),
-            MaterializationIntent::RenderConfiguredProjections,
+            MaterializationIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
         let plan_b = derive_materializations(
             &build(),
             declarations(&cfg, &g, &r),
             &seed(),
-            MaterializationIntent::RenderConfiguredProjections,
+            MaterializationIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
         // Determinism: identical delta and plan hash across runs.
@@ -731,7 +784,7 @@ kind = "advisory"
             &stale,
             declarations(&cfg, &g, &r),
             &seed(),
-            MaterializationIntent::RenderConfiguredProjections,
+            MaterializationIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
         // Comparing the expected plan against the same stale image reports the

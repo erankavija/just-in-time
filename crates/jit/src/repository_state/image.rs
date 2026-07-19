@@ -866,13 +866,26 @@ fn validate_seed_text(field: &'static str, value: &str) -> Result<(), SeedError>
 }
 
 /// Constrained complete materialization operation.
+///
+/// The render variant carries a `selected` name set that scopes WHICH declared
+/// projections are in scope for this operation, not WHICH producer families run.
+/// This is declaration scope, not an à-la-carte producer switch: each selected
+/// projection's output still derives completely from its own declared sources, so
+/// a `jit project render <name>` renders exactly that projection's target from its
+/// own closure and leaves sibling projections' targets untouched. Semantic-mutation
+/// and repair intents remain complete over every declared projection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MaterializationIntent {
     /// Full derived-state rebuild after a semantic mutation.
     SemanticMutation,
-    /// Render all configured projections selected by declarations.
-    RenderConfiguredProjections,
+    /// Render the configured projections in scope. `None` selects every declared
+    /// projection; `Some(set)` scopes the operation to exactly the named
+    /// projections (each rendered completely from its own declared sources).
+    RenderConfiguredProjections {
+        /// The declaration-scoped projection names, or `None` for all.
+        selected: Option<std::collections::BTreeSet<String>>,
+    },
     /// Repair every explicitly owned derived-state drift finding.
     RepairDerivedState,
 }
