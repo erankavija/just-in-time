@@ -1386,8 +1386,8 @@ fn first_image_difference(expected: &RepositoryImage, actual: &RepositoryImage) 
 mod tests {
     use super::*;
     use crate::repository_state::{
-        plan_hash, CaptureBudget, MaterializationIntent, RepositoryAction, RepositorySeed,
-        RepositorySeedKind,
+        plan_hash, serialize_event, CaptureBudget, MaterializationIntent, RepositoryAction,
+        RepositorySeed, RepositorySeedKind,
     };
     use std::collections::{BTreeMap, HashMap, HashSet};
     use std::sync::Mutex;
@@ -1462,6 +1462,148 @@ mod tests {
             delta.clone(),
         )
         .unwrap()
+    }
+
+    /// A fresh-init delta that publishes one issue record plus the enclosing
+    /// data root, `index.json`, and `issues/` directory, using the canonical
+    /// issue serializer so the published bytes match every other mutation path.
+    fn issue_creation_delta(
+        layout: &RepositoryLayout,
+        issue: &Issue,
+        issue_bytes: &[u8],
+    ) -> RepositoryDelta {
+        RepositoryDelta::new(
+            layout,
+            vec![
+                RepositoryAction::create_directory(
+                    VirtualPath::data("").unwrap(),
+                    "init",
+                    ExpectedPreimage::Absent,
+                ),
+                RepositoryAction::write_file(
+                    VirtualPath::data("index.json").unwrap(),
+                    "init",
+                    ExpectedPreimage::Absent,
+                    serde_json::to_vec(&serde_json::json!({
+                        "schema_version": 2,
+                        "all_ids": [issue.id],
+                        "deleted_ids": [],
+                    }))
+                    .unwrap(),
+                    FileMode::Regular,
+                ),
+                RepositoryAction::create_directory(
+                    VirtualPath::data("issues").unwrap(),
+                    "issue",
+                    ExpectedPreimage::Absent,
+                ),
+                RepositoryAction::write_file(
+                    VirtualPath::data(format!("issues/{}.json", issue.id)).unwrap(),
+                    "issue",
+                    ExpectedPreimage::Absent,
+                    issue_bytes.to_vec(),
+                    FileMode::Regular,
+                ),
+            ],
+        )
+        .unwrap()
+    }
+
+    fn issue_creation_spec(issue_id: &str) -> CaptureSpec {
+        CaptureSpec::phase_one(
+            [
+                VirtualPath::data("").unwrap(),
+                VirtualPath::data("index.json").unwrap(),
+                VirtualPath::data("issues").unwrap(),
+                VirtualPath::data(format!("issues/{issue_id}.json")).unwrap(),
+            ],
+            budget(),
+        )
+        .unwrap()
+    }
+
+    /// Crossing regression: an issue published by a mutation session reads back
+    /// as the identical typed record through `load_issue`/`list_issues` on both
+    /// backends. Wave-3 session tests never crossed apply → typed read, so a
+    /// divergence between the published bytes and the reader's deserialization
+    /// would have gone unnoticed; this pins that parity.
+    #[test]
+    fn test_session_published_issue_reads_back_typed_on_both_backends() {
+        let issue = Issue::new("Crossing".to_string(), "body".to_string());
+        let issue_bytes = serialize_issue(&issue).unwrap();
+
+        // Memory backend.
+        let memory = InMemoryStorage::new();
+        let mtemp = TempDir::new().unwrap();
+        let mlayout = discover_repository_layout(mtemp.path(), mtemp.path().join(".jit")).unwrap();
+        let mut msession = memory.open_mutation_session(mlayout.clone()).unwrap();
+        let mimage = msession.capture(issue_creation_spec(&issue.id)).unwrap();
+        msession
+            .apply(&test_plan(
+                &mimage,
+                &issue_creation_delta(&mlayout, &issue, &issue_bytes),
+            ))
+            .unwrap();
+        assert_eq!(memory.load_issue(&issue.id).unwrap(), issue);
+        assert_eq!(memory.list_issues().unwrap(), vec![issue.clone()]);
+        assert_eq!(
+            memory.resolve_issue_id(&issue.short_id()).unwrap(),
+            issue.id
+        );
+
+        // JSON backend.
+        let jtemp = TempDir::new().unwrap();
+        let jdata = jtemp.path().join(".jit");
+        let jlayout = discover_repository_layout(jtemp.path(), &jdata).unwrap();
+        let json = JsonFileStorage::new(&jdata);
+        let mut jsession = json.open_mutation_session(jlayout.clone()).unwrap();
+        let jimage = jsession.capture(issue_creation_spec(&issue.id)).unwrap();
+        jsession
+            .apply(&test_plan(
+                &jimage,
+                &issue_creation_delta(&jlayout, &issue, &issue_bytes),
+            ))
+            .unwrap();
+        assert_eq!(json.load_issue(&issue.id).unwrap(), issue);
+        assert_eq!(json.list_issues().unwrap(), vec![issue]);
+    }
+
+    /// Reverse crossing for the audit tail: bytes written through the
+    /// `IssueStore::append_event` path are exactly what a subsequently opened
+    /// mutation session captures for `events.jsonl`, so the claim-sync
+    /// convergence check (which reads that captured tail) and the session agree
+    /// on one representation.
+    #[test]
+    fn test_appended_event_bytes_capture_into_session_image() {
+        let issue = Issue::new("Evt".to_string(), "b".to_string());
+        let event = Event::new_issue_created(&issue);
+        let mut expected = serialize_event(&event).unwrap();
+        expected.push(b'\n');
+
+        let memory = InMemoryStorage::new();
+        memory.append_event(&event).unwrap();
+        // Round-trips back through the typed reader as the same event.
+        assert_eq!(memory.read_events().unwrap(), vec![event.clone()]);
+
+        let temp = TempDir::new().unwrap();
+        let layout = discover_repository_layout(temp.path(), temp.path().join(".jit")).unwrap();
+        let mut session = memory.open_mutation_session(layout).unwrap();
+        let spec = CaptureSpec::phase_one(
+            [
+                VirtualPath::data("").unwrap(),
+                VirtualPath::data("events.jsonl").unwrap(),
+            ],
+            budget(),
+        )
+        .unwrap();
+        let image = session.capture(spec).unwrap();
+        match image
+            .entries()
+            .get(&VirtualPath::data("events.jsonl").unwrap())
+        {
+            Some(RepositoryEntry::File { bytes, .. }) => assert_eq!(bytes, &expected),
+            other => panic!("expected captured events.jsonl file, got {other:?}"),
+        }
     }
 
     #[derive(Default)]

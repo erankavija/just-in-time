@@ -3,27 +3,35 @@
 //! This backend stores all data in RAM using HashMaps, providing 10-100x faster
 //! test execution compared to JSON file I/O. Thread-safe for concurrent access.
 
-use crate::declarations::GateRegistry;
-use crate::domain::{Event, Issue};
+use crate::declarations::{parse_gate_registry, serialize_gate_registry, GateRegistry};
+use crate::domain::{Event, GateRunResult, Issue};
+use crate::repository_state::{
+    serialize_event, serialize_gate_run, serialize_issue, EntryIdentity, FileMode, RepositoryEntry,
+    RepositoryRootClass, VirtualPath,
+};
 use crate::storage::{
     AmbiguousIdError, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError, IssueStore,
     PresetNotFoundError, RepoWriteGuard, RepoWriteLock, MIN_ID_PREFIX_LENGTH,
 };
-use anyhow::{anyhow, Result};
-use std::collections::{BTreeMap, HashMap};
+use anyhow::{anyhow, Context, Result};
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 /// In-memory storage backend using HashMaps.
 ///
 /// All data is stored in memory and lost when the instance is dropped.
 /// Uses `Arc<Mutex<>>` for thread-safe shared interior mutability.
+///
+/// Every repository-owned typed record — issues, the gate registry, the audit
+/// log, and gate-run results — is held solely as its canonical bytes in the
+/// aggregate [`MemoryRepositoryState`] image, the single store a recovered
+/// mutation session captures and applies. There is no parallel typed cache: a
+/// record written through an [`IssueStore`] method and one published by a
+/// session share one source of truth and round-trip through the identical
+/// canonical serializers.
 #[derive(Clone)]
 #[allow(dead_code)] // Public API used only in tests, not in binary
 pub struct InMemoryStorage {
-    issues: Arc<Mutex<HashMap<String, Issue>>>,
-    gate_registry: Arc<Mutex<GateRegistry>>,
-    events: Arc<Mutex<Vec<Event>>>,
-    gate_runs: Arc<Mutex<HashMap<String, crate::domain::GateRunResult>>>,
     /// Unique root path for parallel test isolation
     root_path: std::path::PathBuf,
     /// Outermost lock of every mutating path, shared by every clone. Process-local:
@@ -78,10 +86,6 @@ impl InMemoryStorage {
         let root_path = std::path::PathBuf::from(format!("/tmp/jit-test-{}", unique_id));
 
         Self {
-            issues: Arc::new(Mutex::new(HashMap::new())),
-            gate_registry: Arc::new(Mutex::new(GateRegistry::default())),
-            events: Arc::new(Mutex::new(Vec::new())),
-            gate_runs: Arc::new(Mutex::new(HashMap::new())),
             root_path,
             repo_lock: RepoWriteLock::in_process(),
             repository_state: Arc::new(Mutex::new(MemoryRepositoryState::default())),
@@ -206,17 +210,132 @@ impl InMemoryStorage {
             .expect("add_repo_file requires a valid repo-relative path");
     }
 
+    /// Canonical `Data(...)` identity for one issue record.
+    fn issue_vpath(id: &str) -> VirtualPath {
+        VirtualPath::data(format!("issues/{id}.json")).expect("issue record path is canonical")
+    }
+
+    /// Canonical `Data(...)` identity for one gate-run result.
+    fn gate_run_vpath(run_id: &str) -> VirtualPath {
+        VirtualPath::data(format!("gate-runs/{run_id}/result.json"))
+            .expect("gate-run result path is canonical")
+    }
+
+    /// Canonical `Data(...)` identity for the gate registry.
+    fn gate_registry_vpath() -> VirtualPath {
+        VirtualPath::data("gates.toml").expect("gate registry path is canonical")
+    }
+
+    /// Canonical `Data(...)` identity for the audit log.
+    fn events_vpath() -> VirtualPath {
+        VirtualPath::data("events.jsonl").expect("audit log path is canonical")
+    }
+
+    /// Publish `bytes` as the captured `File` entry for `vpath` in the aggregate
+    /// image, marking the data root existing. This is the single byte-writing
+    /// path behind every repository-owned typed record so that seeded state,
+    /// per-method writes, and session-published deltas share one store.
+    fn put_data_entry(state: &mut MemoryRepositoryState, vpath: VirtualPath, bytes: Vec<u8>) {
+        let object = vpath.relative().as_str().to_owned();
+        let identity =
+            EntryIdentity::for_bytes(object, &bytes).expect("entry identity is hashable");
+        Self::mark_data_root_existing(state);
+        state.entries.insert(
+            vpath,
+            RepositoryEntry::File {
+                identity,
+                bytes,
+                mode: FileMode::Regular,
+            },
+        );
+    }
+
+    /// Read the exact captured bytes for `vpath` from the aggregate image.
+    fn data_entry_bytes(state: &MemoryRepositoryState, vpath: &VirtualPath) -> Option<Vec<u8>> {
+        match state.entries.get(vpath) {
+            Some(RepositoryEntry::File { bytes, .. }) => Some(bytes.clone()),
+            _ => None,
+        }
+    }
+
+    /// Enumerate the captured `Data(...)` file entries whose relative path lies
+    /// directly under `dir` (one segment deep) and ends with `suffix`, returning
+    /// `(leaf, bytes)` for each. Backs the issue and gate-run scans without a
+    /// parallel typed index.
+    fn data_files_in<'a>(
+        state: &'a MemoryRepositoryState,
+        dir: &'a str,
+        suffix: &'a str,
+    ) -> impl Iterator<Item = (String, Vec<u8>)> + 'a {
+        let prefix = format!("{dir}/");
+        state.entries.iter().filter_map(move |(vpath, entry)| {
+            if vpath.root_class() != RepositoryRootClass::Data {
+                return None;
+            }
+            let RepositoryEntry::File { bytes, .. } = entry else {
+                return None;
+            };
+            let rel = vpath.relative().as_str();
+            let leaf = rel.strip_prefix(&prefix)?;
+            if leaf.contains('/') || !leaf.ends_with(suffix) {
+                return None;
+            }
+            Some((leaf.to_owned(), bytes.clone()))
+        })
+    }
+
+    /// Deserialize every captured issue record in the aggregate image.
+    fn load_issues(state: &MemoryRepositoryState) -> Result<Vec<Issue>> {
+        Self::data_files_in(state, "issues", ".json")
+            .map(|(_, bytes)| {
+                serde_json::from_slice::<Issue>(&bytes)
+                    .context("Failed to deserialize issue from repository image")
+            })
+            .collect()
+    }
+
+    /// Deserialize one captured issue record, if present.
+    fn load_issue_entry(state: &MemoryRepositoryState, id: &str) -> Result<Option<Issue>> {
+        Self::data_entry_bytes(state, &Self::issue_vpath(id))
+            .map(|bytes| {
+                serde_json::from_slice::<Issue>(&bytes)
+                    .context("Failed to deserialize issue from repository image")
+            })
+            .transpose()
+    }
+
+    /// Deserialize the captured audit log, oldest event first.
+    fn load_events(state: &MemoryRepositoryState) -> Result<Vec<Event>> {
+        let Some(bytes) = Self::data_entry_bytes(state, &Self::events_vpath()) else {
+            return Ok(Vec::new());
+        };
+        String::from_utf8_lossy(&bytes)
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| {
+                serde_json::from_str::<Event>(line)
+                    .context("Failed to deserialize event from repository image")
+            })
+            .collect()
+    }
+
     /// Insert `issue` under the repository write lock.
     ///
     /// The single write path behind [`IssueStore::save_issue`] and
     /// [`IssueStore::restore_issue_verbatim`], which differ only in whether the
     /// caller's `updated_at` is stamped before the write reaches here. Both
     /// backends must agree on that, or the atomicity tests over this one prove
-    /// nothing about [`JsonFileStorage`](crate::storage::JsonFileStorage).
+    /// nothing about [`JsonFileStorage`](crate::storage::JsonFileStorage). The
+    /// issue is persisted as its canonical bytes in the aggregate image, exactly
+    /// as a mutation session publishes it.
     fn persist_issue(&self, issue: Issue) -> Result<()> {
         let _repo_lock = self.repo_lock.acquire()?;
-        Self::mark_data_root_existing(&mut self.repository_state());
-        self.issues.lock().unwrap().insert(issue.id.clone(), issue);
+        let bytes = serialize_issue(&issue).map_err(|e| anyhow!("{e}"))?;
+        Self::put_data_entry(
+            &mut self.repository_state(),
+            Self::issue_vpath(&issue.id),
+            bytes,
+        );
         Ok(())
     }
 }
@@ -249,22 +368,16 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn load_issue(&self, id: &str) -> Result<Issue> {
-        self.issues
-            .lock()
-            .unwrap()
-            .get(id)
-            .cloned()
+        Self::load_issue_entry(&self.repository_state(), id)?
             .ok_or_else(|| IssueNotFoundError::new(id).into())
     }
 
     fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, crate::storage::PathReadError> {
         use crate::storage::PathReadError;
-        // In-memory: a missing issue is always NotFound (no I/O involved).
-        self.issues
-            .lock()
-            .unwrap()
-            .get(id)
-            .cloned()
+        // In-memory: a missing issue is always NotFound (no I/O involved); a
+        // present-but-corrupt record surfaces as a genuine parse failure.
+        Self::load_issue_entry(&self.repository_state(), id)
+            .map_err(PathReadError::Other)?
             .ok_or_else(|| PathReadError::NotFound(format!("Issue not found: {}", id)))
     }
 
@@ -286,26 +399,27 @@ impl IssueStore for InMemoryStorage {
             return Err(InvalidIdPrefixError::new(partial_id).into());
         }
 
-        // Find matching issues
-        let issues = self.issues.lock().unwrap();
-        let matches: Vec<String> = issues
-            .keys()
-            .filter(|id| id.replace('-', "").to_lowercase().starts_with(&normalized))
-            .cloned()
+        // Find matching issues from the captured records.
+        let issues = Self::load_issues(&self.repository_state())?;
+        let matches: Vec<&Issue> = issues
+            .iter()
+            .filter(|issue| {
+                issue
+                    .id
+                    .replace('-', "")
+                    .to_lowercase()
+                    .starts_with(&normalized)
+            })
             .collect();
 
         match matches.len() {
             0 => Err(IssueNotFoundError::new(partial_id).into()),
-            1 => Ok(matches[0].clone()),
+            1 => Ok(matches[0].id.clone()),
             _ => {
                 // Get titles for better error message
                 let issue_list: Vec<String> = matches
                     .iter()
-                    .filter_map(|id| {
-                        issues
-                            .get(id)
-                            .map(|issue| format!("{} | {}", issue.short_id(), issue.title))
-                    })
+                    .map(|issue| format!("{} | {}", issue.short_id(), issue.title))
                     .collect();
                 Err(AmbiguousIdError::issue(partial_id, issue_list).into())
             }
@@ -314,38 +428,52 @@ impl IssueStore for InMemoryStorage {
 
     fn delete_issue(&self, id: &str) -> Result<()> {
         let _repo_lock = self.repo_lock.acquire()?;
-        self.issues
-            .lock()
-            .unwrap()
-            .remove(id)
-            .ok_or_else(|| IssueNotFoundError::new(id))?;
+        let mut state = self.repository_state();
+        let vpath = Self::issue_vpath(id);
+        if state.entries.remove(&vpath).is_none() {
+            return Err(IssueNotFoundError::new(id).into());
+        }
         Ok(())
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
-        Ok(self.issues.lock().unwrap().values().cloned().collect())
+        Self::load_issues(&self.repository_state())
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
-        Ok(self.gate_registry.lock().unwrap().clone())
+        match Self::data_entry_bytes(&self.repository_state(), &Self::gate_registry_vpath()) {
+            Some(bytes) => parse_gate_registry(&bytes)
+                .context("Failed to deserialize gate registry from repository image"),
+            None => Ok(GateRegistry::default()),
+        }
     }
 
     fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
         let _repo_lock = self.repo_lock.acquire()?;
-        Self::mark_data_root_existing(&mut self.repository_state());
-        *self.gate_registry.lock().unwrap() = registry.clone();
+        let bytes = serialize_gate_registry(registry).map_err(|e| anyhow!("{e}"))?;
+        Self::put_data_entry(
+            &mut self.repository_state(),
+            Self::gate_registry_vpath(),
+            bytes,
+        );
         Ok(())
     }
 
     fn append_event(&self, event: &Event) -> Result<()> {
         let _repo_lock = self.repo_lock.acquire()?;
-        Self::mark_data_root_existing(&mut self.repository_state());
-        self.events.lock().unwrap().push(event.clone());
+        let mut line = serialize_event(event).map_err(|e| anyhow!("{e}"))?;
+        line.push(b'\n');
+        let mut state = self.repository_state();
+        // Append to the exact captured audit-log bytes, preserving every prior
+        // byte, exactly as the canonical finalizer appends one JSONL record.
+        let mut bytes = Self::data_entry_bytes(&state, &Self::events_vpath()).unwrap_or_default();
+        bytes.extend_from_slice(&line);
+        Self::put_data_entry(&mut state, Self::events_vpath(), bytes);
         Ok(())
     }
 
     fn read_events(&self) -> Result<Vec<Event>> {
-        Ok(self.events.lock().unwrap().clone())
+        Self::load_events(&self.repository_state())
     }
 
     fn root(&self) -> &std::path::Path {
@@ -353,36 +481,58 @@ impl IssueStore for InMemoryStorage {
         &self.root_path
     }
 
-    fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()> {
-        Self::mark_data_root_existing(&mut self.repository_state());
-        self.gate_runs
-            .lock()
-            .unwrap()
-            .insert(result.run_id.clone(), result.clone());
+    fn save_gate_run_result(&self, result: &GateRunResult) -> Result<()> {
+        let bytes = serialize_gate_run(result).map_err(|e| anyhow!("{e}"))?;
+        Self::put_data_entry(
+            &mut self.repository_state(),
+            Self::gate_run_vpath(&result.run_id),
+            bytes,
+        );
         Ok(())
     }
 
-    fn load_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult> {
-        self.gate_runs
-            .lock()
-            .unwrap()
-            .get(run_id)
-            .cloned()
+    fn load_gate_run_result(&self, run_id: &str) -> Result<GateRunResult> {
+        Self::data_entry_bytes(&self.repository_state(), &Self::gate_run_vpath(run_id))
+            .map(|bytes| {
+                serde_json::from_slice::<GateRunResult>(&bytes)
+                    .context("Failed to deserialize gate-run result from repository image")
+            })
+            .transpose()?
             .ok_or_else(|| GateRunNotFoundError::new(run_id).into())
     }
 
-    fn list_gate_runs_for_issue(
-        &self,
-        issue_id: &str,
-    ) -> Result<Vec<crate::domain::GateRunResult>> {
-        Ok(self
-            .gate_runs
-            .lock()
-            .unwrap()
-            .values()
-            .filter(|r| r.issue_id == issue_id)
-            .cloned()
-            .collect())
+    fn list_gate_runs_for_issue(&self, issue_id: &str) -> Result<Vec<GateRunResult>> {
+        let state = self.repository_state();
+        state
+            .entries
+            .iter()
+            .filter_map(|(vpath, entry)| {
+                if vpath.root_class() != RepositoryRootClass::Data {
+                    return None;
+                }
+                let RepositoryEntry::File { bytes, .. } = entry else {
+                    return None;
+                };
+                let rel = vpath.relative().as_str();
+                // Match exactly `gate-runs/<run_id>/result.json`.
+                let inner = rel
+                    .strip_prefix("gate-runs/")?
+                    .strip_suffix("/result.json")?;
+                if inner.is_empty() || inner.contains('/') {
+                    return None;
+                }
+                Some(bytes.clone())
+            })
+            .map(|bytes| {
+                serde_json::from_slice::<GateRunResult>(&bytes)
+                    .context("Failed to deserialize gate-run result from repository image")
+            })
+            .filter_map(|result| match result {
+                Ok(r) if r.issue_id == issue_id => Some(Ok(r)),
+                Ok(_) => None,
+                Err(e) => Some(Err(e)),
+            })
+            .collect()
     }
 
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
@@ -519,11 +669,10 @@ mod tests {
             !storage.repository_state().data_root_exists,
             "an unseeded store is absent-root"
         );
-        assert!(storage
+        assert!(!storage
             .repository_state()
             .entries
-            .get(&VirtualPath::data("").unwrap())
-            .is_none());
+            .contains_key(&VirtualPath::data("").unwrap()));
 
         // Seeding any repository-owned file marks the data root as existing and
         // publishes the Data("") directory entry.
