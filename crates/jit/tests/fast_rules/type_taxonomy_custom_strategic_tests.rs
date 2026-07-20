@@ -1,7 +1,6 @@
 //! Tests for warning validations with custom strategic types
 
 use jit::domain::type_taxonomy::{HierarchyConfig, ValidationWarning};
-use jit::domain::Issue;
 use std::collections::HashMap;
 
 #[test]
@@ -19,7 +18,7 @@ fn test_custom_strategic_type_theme() {
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
     // Theme without theme:* label should warn
-    let mut theme = Issue::new("UI Theme".to_string(), "Theme description".to_string());
+    let mut theme = crate::fixture_issue("UI Theme".to_string(), "Theme description".to_string());
     theme.labels = vec!["type:theme".to_string()];
 
     let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &theme);
@@ -50,7 +49,7 @@ fn test_custom_strategic_type_theme_with_label() {
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
     // Theme with theme:* label should not warn
-    let mut theme = Issue::new("UI Theme".to_string(), "Theme description".to_string());
+    let mut theme = crate::fixture_issue("UI Theme".to_string(), "Theme description".to_string());
     theme.labels = vec!["type:theme".to_string(), "theme:design-system".to_string()];
 
     let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &theme);
@@ -73,7 +72,7 @@ fn test_type_alias_release_uses_milestone_namespace() {
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
     // Release without milestone:* label should warn
-    let mut release = Issue::new("v2.0".to_string(), "Release description".to_string());
+    let mut release = crate::fixture_issue("v2.0".to_string(), "Release description".to_string());
     release.labels = vec!["type:release".to_string()];
 
     let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &release);
@@ -106,7 +105,7 @@ fn test_type_alias_release_with_milestone_label() {
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
     // Release with milestone:* label should not warn
-    let mut release = Issue::new("v2.0".to_string(), "Release description".to_string());
+    let mut release = crate::fixture_issue("v2.0".to_string(), "Release description".to_string());
     release.labels = vec!["type:release".to_string(), "milestone:v2.0".to_string()];
 
     let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &release);
@@ -129,7 +128,8 @@ fn test_orphan_detection_with_custom_hierarchy() {
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
     // Subtask without parent labels should warn
-    let mut subtask = Issue::new("Fix typo".to_string(), "Subtask description".to_string());
+    let mut subtask =
+        crate::fixture_issue("Fix typo".to_string(), "Subtask description".to_string());
     subtask.labels = vec!["type:subtask".to_string()];
 
     let warnings = jit::domain::type_taxonomy::validate_orphans(&config, &subtask);
@@ -155,7 +155,8 @@ fn test_orphan_with_custom_parent_label() {
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
     // Subtask with theme:* label should not warn
-    let mut subtask = Issue::new("Fix typo".to_string(), "Subtask description".to_string());
+    let mut subtask =
+        crate::fixture_issue("Fix typo".to_string(), "Subtask description".to_string());
     subtask.labels = vec![
         "type:subtask".to_string(),
         "theme:design-system".to_string(),
@@ -181,7 +182,7 @@ fn test_non_strategic_type_no_warning() {
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
     // Feature without feature:* label should NOT warn (not strategic)
-    let mut feature = Issue::new("Login".to_string(), "Feature description".to_string());
+    let mut feature = crate::fixture_issue("Login".to_string(), "Feature description".to_string());
     feature.labels = vec!["type:feature".to_string()];
 
     let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &feature);

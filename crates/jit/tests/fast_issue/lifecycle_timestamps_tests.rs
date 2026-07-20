@@ -8,11 +8,16 @@
 
 use crate::harness::TestHarness;
 use chrono::{TimeZone, Utc};
+use jit::commands::CommandExecutor;
 use jit::domain::{Event, State};
-use jit::storage::IssueStore;
+use jit::storage::{discover_repository_layout, IssueStore, JsonFileStorage};
 
 /// Append a synthetic `issue_state_changed` event with a fixed timestamp.
 fn append_state_changed(h: &TestHarness, issue_id: &str, to: State, day: u32) {
+    append_state_changed_to(&h.storage, issue_id, to, day);
+}
+
+fn append_state_changed_to<S: IssueStore>(storage: &S, issue_id: &str, to: State, day: u32) {
     let event = Event::IssueStateChanged {
         id: uuid::Uuid::new_v4().to_string(),
         issue_id: issue_id.to_string(),
@@ -20,7 +25,7 @@ fn append_state_changed(h: &TestHarness, issue_id: &str, to: State, day: u32) {
         from: State::Backlog,
         to,
     };
-    h.storage.append_event(&event).unwrap();
+    storage.append_event(&event).unwrap();
 }
 
 /// Strip the lifecycle timestamps off an issue to simulate a record written
@@ -31,6 +36,39 @@ fn clear_lifecycle_fields(h: &TestHarness, id: &str) {
     issue.claimed_at = None;
     issue.done_at = None;
     h.storage.save_issue(issue).unwrap();
+}
+
+fn backfill_candidate() -> (TestHarness, String) {
+    let h = TestHarness::new();
+    let id = h.create_issue("Legacy");
+    clear_lifecycle_fields(&h, &id);
+    append_state_changed(&h, &id, State::Done, 3);
+    (h, id)
+}
+
+fn repository_bytes(h: &TestHarness, id: &str) -> (Option<String>, Option<String>, Option<String>) {
+    (
+        h.storage.read_repo_file(".jit/index.json").unwrap(),
+        h.storage
+            .read_repo_file(&format!(".jit/issues/{id}.json"))
+            .unwrap(),
+        h.storage.read_repo_file(".jit/events.jsonl").unwrap(),
+    )
+}
+
+fn replace_index(h: &TestHarness, value: serde_json::Value) {
+    h.storage
+        .write_repo_file(
+            ".jit/index.json",
+            &serde_json::to_string_pretty(&value).unwrap(),
+        )
+        .unwrap();
+}
+
+fn assert_backfill_rejected_without_writes(h: &TestHarness, id: &str) {
+    let before = repository_bytes(h, id);
+    assert!(h.executor.backfill_lifecycle_timestamps().is_err());
+    assert_eq!(repository_bytes(h, id), before);
 }
 
 /// A dependency-free issue is born Ready (auto-promotion at creation), so it
@@ -307,4 +345,114 @@ fn test_backfill_appends_migration_event() {
         }
         _ => unreachable!(),
     }
+}
+
+#[test]
+fn test_backfill_rejects_future_index_schema_without_writes() {
+    let (h, id) = backfill_candidate();
+    replace_index(
+        &h,
+        serde_json::json!({"schema_version": 99, "all_ids": [id], "deleted_ids": []}),
+    );
+
+    assert_backfill_rejected_without_writes(&h, &id);
+}
+
+#[test]
+fn test_backfill_rejects_duplicate_active_ids_without_writes() {
+    let (h, id) = backfill_candidate();
+    replace_index(
+        &h,
+        serde_json::json!({"schema_version": 2, "all_ids": [id, id], "deleted_ids": []}),
+    );
+
+    assert_backfill_rejected_without_writes(&h, &id);
+}
+
+#[test]
+fn test_backfill_rejects_duplicate_deleted_ids_without_writes() {
+    let (h, id) = backfill_candidate();
+    replace_index(
+        &h,
+        serde_json::json!({
+            "schema_version": 2,
+            "all_ids": [id],
+            "deleted_ids": ["deleted", "deleted"]
+        }),
+    );
+
+    assert_backfill_rejected_without_writes(&h, &id);
+}
+
+#[test]
+fn test_backfill_rejects_active_deleted_conflict_without_writes() {
+    let (h, id) = backfill_candidate();
+    replace_index(
+        &h,
+        serde_json::json!({"schema_version": 2, "all_ids": [id], "deleted_ids": [id]}),
+    );
+
+    assert_backfill_rejected_without_writes(&h, &id);
+}
+
+#[test]
+fn test_backfill_rejects_missing_indexed_issue_without_writes() {
+    let repo = tempfile::TempDir::new().unwrap();
+    let data_root = repo.path().join(".jit");
+    let storage = JsonFileStorage::new(&data_root);
+    storage.init().unwrap();
+    let mut issue = crate::fixture_issue("Legacy".into(), String::new());
+    issue.first_ready_at = None;
+    issue.claimed_at = None;
+    issue.done_at = None;
+    let id = issue.id.clone();
+    storage.save_issue(issue).unwrap();
+    append_state_changed_to(&storage, &id, State::Done, 3);
+    let layout = discover_repository_layout(repo.path(), &data_root).unwrap();
+    let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
+    let index_before = storage.read_repo_file(".jit/index.json").unwrap();
+
+    // Remove only the physical record; active index membership remains corrupt.
+    std::fs::remove_file(data_root.join("issues").join(format!("{id}.json"))).unwrap();
+    assert_eq!(
+        storage.read_repo_file(".jit/index.json").unwrap(),
+        index_before
+    );
+
+    let before = (
+        storage.read_repo_file(".jit/index.json").unwrap(),
+        storage.read_repo_file(".jit/events.jsonl").unwrap(),
+    );
+    let error = executor
+        .backfill_lifecycle_timestamps()
+        .expect_err("missing indexed record must be rejected");
+    assert!(
+        error
+            .to_string()
+            .contains(&format!("indexed issue {id} is absent")),
+        "unexpected error: {error:#}"
+    );
+    assert_eq!(
+        (
+            storage.read_repo_file(".jit/index.json").unwrap(),
+            storage.read_repo_file(".jit/events.jsonl").unwrap(),
+        ),
+        before
+    );
+    assert!(!data_root.join("issues").join(format!("{id}.json")).exists());
+}
+
+#[test]
+fn test_backfill_rejects_mismatched_embedded_issue_id_without_writes() {
+    let (h, id) = backfill_candidate();
+    let mut issue = h.get_issue(&id);
+    issue.id = "44444444-4444-4444-8444-444444444444".into();
+    h.storage
+        .write_repo_file(
+            &format!(".jit/issues/{id}.json"),
+            &serde_json::to_string_pretty(&issue).unwrap(),
+        )
+        .unwrap();
+
+    assert_backfill_rejected_without_writes(&h, &id);
 }

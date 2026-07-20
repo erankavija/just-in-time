@@ -12,6 +12,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
+#[cfg(test)]
 use uuid::Uuid;
 
 /// Length of short issue ID (git-style short hash)
@@ -482,33 +483,14 @@ pub struct Issue {
     pub archived_from: Option<State>,
 }
 
-impl Issue {
-    /// Create a new issue with default values
-    pub fn new(title: String, description: String) -> Self {
-        let now = Utc::now();
-        Self {
-            id: Uuid::new_v4().to_string(),
-            title,
-            description,
-            state: State::Backlog,
-            priority: Priority::Normal,
-            assignee: None,
-            dependencies: Vec::new(),
-            gates_required: Vec::new(),
-            gates_status: HashMap::new(),
-            context: HashMap::new(),
-            documents: Vec::new(),
-            labels: Vec::new(),
-            content_format: None,
-            created_at: now,
-            updated_at: now,
-            first_ready_at: None,
-            claimed_at: None,
-            done_at: None,
-            archived_from: None,
-        }
-    }
+#[cfg(test)]
+pub(crate) fn fixture_issue(title: String, description: String) -> Issue {
+    let mut issue = Issue::draft(title, description);
+    issue.id = Uuid::new_v4().to_string();
+    issue
+}
 
+impl Issue {
     /// Draft an issue carrying no authoritative id or lifecycle timestamps.
     ///
     /// The id is empty and the lifecycle timestamps hold a sentinel epoch; the
@@ -546,33 +528,6 @@ impl Issue {
     /// Minimum length is 8 characters for reasonable collision resistance.
     pub fn short_id(&self) -> String {
         self.id.chars().take(SHORT_ID_LENGTH).collect()
-    }
-
-    /// Create a new issue with labels
-    #[cfg(test)]
-    pub fn new_with_labels(title: String, description: String, labels: Vec<String>) -> Self {
-        let now = Utc::now();
-        Self {
-            id: Uuid::new_v4().to_string(),
-            title,
-            description,
-            state: State::Backlog,
-            priority: Priority::Normal,
-            assignee: None,
-            dependencies: Vec::new(),
-            gates_required: Vec::new(),
-            gates_status: HashMap::new(),
-            context: HashMap::new(),
-            documents: Vec::new(),
-            labels,
-            content_format: None,
-            created_at: now,
-            updated_at: now,
-            first_ready_at: None,
-            claimed_at: None,
-            done_at: None,
-            archived_from: None,
-        }
     }
 
     /// The terminal state this issue counts as for dependency, readiness, and
@@ -1356,11 +1311,11 @@ impl Event {
     }
 
     /// Create an issue created event
-    pub fn new_issue_created(issue: &Issue) -> Self {
+    pub fn draft_issue_created(issue: &Issue) -> Self {
         Event::IssueCreated {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id: issue.id.clone(),
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             title: issue.title.clone(),
             priority: issue.priority,
         }
@@ -1371,21 +1326,21 @@ impl Event {
     /// Takes a typed [`Assignee`] so a malformed actor can never be logged; the
     /// caller parses (and thereby validates) the actor before constructing the
     /// event.
-    pub fn new_issue_claimed(issue_id: String, assignee: Assignee) -> Self {
+    pub fn draft_issue_claimed(issue_id: String, assignee: Assignee) -> Self {
         Event::IssueClaimed {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             assignee,
         }
     }
 
     /// Create an issue state changed event
-    pub fn new_issue_state_changed(issue_id: String, from: State, to: State) -> Self {
+    pub fn draft_issue_state_changed(issue_id: String, from: State, to: State) -> Self {
         Event::IssueStateChanged {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             from,
             to,
         }
@@ -1395,15 +1350,15 @@ impl Event {
     ///
     /// `updated_by` is a typed [`Assignee`] (the actor who passed the gate), so
     /// no malformed actor can be logged.
-    pub fn new_gate_passed(
+    pub fn draft_gate_passed(
         issue_id: String,
         gate_key: String,
         updated_by: Option<Assignee>,
     ) -> Self {
         Event::GatePassed {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             gate_key,
             updated_by,
         }
@@ -1413,46 +1368,46 @@ impl Event {
     ///
     /// `updated_by` is a typed [`Assignee`] (the actor who failed the gate), so
     /// no malformed actor can be logged.
-    pub fn new_gate_failed(
+    pub fn draft_gate_failed(
         issue_id: String,
         gate_key: String,
         updated_by: Option<Assignee>,
     ) -> Self {
         Event::GateFailed {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             gate_key,
             updated_by,
         }
     }
 
     /// Create a gate added event
-    pub fn new_gate_added(issue_id: String, gate_key: String) -> Self {
+    pub fn draft_gate_added(issue_id: String, gate_key: String) -> Self {
         Event::GateAdded {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             gate_key,
         }
     }
 
     /// Create a gate removed event
-    pub fn new_gate_removed(issue_id: String, gate_key: String) -> Self {
+    pub fn draft_gate_removed(issue_id: String, gate_key: String) -> Self {
         Event::GateRemoved {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             gate_key,
         }
     }
 
     /// Create an issue completed event
-    pub fn new_issue_completed(issue_id: String) -> Self {
+    pub fn draft_issue_completed(issue_id: String) -> Self {
         Event::IssueCompleted {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
         }
     }
 
@@ -1461,18 +1416,18 @@ impl Event {
     /// `assignee` is the typed [`Assignee`] being released; callers emit this
     /// event only when a prior assignee existed, so the actor is always a valid
     /// `kind:identifier`.
-    pub fn new_issue_released(issue_id: String, assignee: Assignee, reason: String) -> Self {
+    pub fn draft_issue_released(issue_id: String, assignee: Assignee, reason: String) -> Self {
         Event::IssueReleased {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             assignee,
             reason,
         }
     }
 
     /// Create the durable commit record for dependency-aware archival.
-    pub fn new_artifact_archive_executed(
+    pub fn draft_artifact_archive_executed(
         target: crate::domain::artifact_plan::PlanTarget,
         destination_root: String,
         publications: Vec<crate::domain::artifact_execution::ArchivePublication>,
@@ -1481,8 +1436,8 @@ impl Event {
         reconciling: bool,
     ) -> Self {
         Event::ArtifactArchiveExecuted {
-            id: Uuid::new_v4().to_string(),
-            timestamp: Utc::now(),
+            id: String::new(),
+            timestamp: DateTime::UNIX_EPOCH,
             target,
             destination_root,
             publications,
@@ -1493,16 +1448,16 @@ impl Event {
     }
 
     /// Create a dependency reduced event
-    pub fn new_dependency_reduced(
+    pub fn draft_dependency_reduced(
         issue_id: String,
         old_count: usize,
         new_count: usize,
         removed_deps: Vec<String>,
     ) -> Self {
         Event::DependencyReduced {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             old_count,
             new_count,
             removed_deps,
@@ -1510,11 +1465,11 @@ impl Event {
     }
 
     /// Create an issue updated event
-    pub fn new_issue_updated(issue_id: String, updated_by: String, fields: Vec<String>) -> Self {
+    pub fn draft_issue_updated(issue_id: String, updated_by: String, fields: Vec<String>) -> Self {
         Event::IssueUpdated {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             updated_by,
             fields,
         }
@@ -1524,11 +1479,11 @@ impl Event {
     ///
     /// Records that an issue was permanently deleted, preserving an audit trail
     /// of the removal in the event log (the issue file itself is gone).
-    pub fn new_issue_deleted(issue_id: String) -> Self {
+    pub fn draft_issue_deleted(issue_id: String) -> Self {
         Event::IssueDeleted {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
         }
     }
 
@@ -1536,11 +1491,11 @@ impl Event {
     ///
     /// Records that a `--force` write deliberately bypassed an `enforce` rule
     /// whose `error` finding would otherwise have blocked the write (DR §7.6).
-    pub fn new_local_rule_bypassed(issue_id: String, rule: String) -> Self {
+    pub fn draft_local_rule_bypassed(issue_id: String, rule: String) -> Self {
         Event::LocalRuleBypassed {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             rule,
         }
     }
@@ -1550,11 +1505,11 @@ impl Event {
     /// Records that an enforcing graph rule blocked the issue's transition into
     /// `target` (CC-2). Appended before the blocking error is returned, one per
     /// blocking rule.
-    pub fn new_transition_blocked(issue_id: String, target: State, rule: String) -> Self {
+    pub fn draft_transition_blocked(issue_id: String, target: State, rule: String) -> Self {
         Event::TransitionBlocked {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             target,
             rule,
         }
@@ -1565,11 +1520,11 @@ impl Event {
     /// Records that a `--force` transition deliberately bypassed an enforcing
     /// graph rule whose `error` finding would otherwise have blocked the
     /// transition into `target` (CC-2).
-    pub fn new_graph_rule_bypassed(issue_id: String, target: State, rule: String) -> Self {
+    pub fn draft_graph_rule_bypassed(issue_id: String, target: State, rule: String) -> Self {
         Event::GraphRuleBypassed {
-            id: Uuid::new_v4().to_string(),
+            id: String::new(),
             issue_id,
-            timestamp: Utc::now(),
+            timestamp: DateTime::UNIX_EPOCH,
             target,
             rule,
         }
@@ -1579,10 +1534,10 @@ impl Event {
     ///
     /// Registry-scoped (issue-less): records that the
     /// gate registry entry `gate_key` was edited via `jit gate update`.
-    pub fn new_gate_definition_updated(gate_key: String) -> Self {
+    pub fn draft_gate_definition_updated(gate_key: String) -> Self {
         Event::GateDefinitionUpdated {
-            id: Uuid::new_v4().to_string(),
-            timestamp: Utc::now(),
+            id: String::new(),
+            timestamp: DateTime::UNIX_EPOCH,
             gate_key,
         }
     }
@@ -1590,13 +1545,13 @@ impl Event {
     /// Create a gate-definition-created event.
     ///
     /// Registry-scoped (issue-less, like
-    /// [`new_gate_definition_updated`](Self::new_gate_definition_updated)):
+    /// [`draft_gate_definition_updated`](Self::draft_gate_definition_updated)):
     /// records that `gate_key` was added to the gate registry via `jit gate
     /// define`.
-    pub fn new_gate_definition_created(gate_key: String) -> Self {
+    pub fn draft_gate_definition_created(gate_key: String) -> Self {
         Event::GateDefinitionCreated {
-            id: Uuid::new_v4().to_string(),
-            timestamp: Utc::now(),
+            id: String::new(),
+            timestamp: DateTime::UNIX_EPOCH,
             gate_key,
         }
     }
@@ -1604,29 +1559,29 @@ impl Event {
     /// Create a gate-definition-removed event.
     ///
     /// Registry-scoped (issue-less, like
-    /// [`new_gate_definition_updated`](Self::new_gate_definition_updated)):
+    /// [`draft_gate_definition_updated`](Self::draft_gate_definition_updated)):
     /// records that `gate_key` was removed from the gate registry via `jit
     /// gate remove`.
-    pub fn new_gate_definition_removed(gate_key: String) -> Self {
+    pub fn draft_gate_definition_removed(gate_key: String) -> Self {
         Event::GateDefinitionRemoved {
-            id: Uuid::new_v4().to_string(),
-            timestamp: Utc::now(),
+            id: String::new(),
+            timestamp: DateTime::UNIX_EPOCH,
             gate_key,
         }
     }
 
     /// Create a lifecycle-timestamp backfill event recording how many issues the
     /// one-time migration updated.
-    pub fn new_lifecycle_timestamps_backfilled(issues_updated: usize) -> Self {
+    pub fn draft_lifecycle_timestamps_backfilled(issues_updated: usize) -> Self {
         Event::LifecycleTimestampsBackfilled {
-            id: Uuid::new_v4().to_string(),
-            timestamp: Utc::now(),
+            id: String::new(),
+            timestamp: DateTime::UNIX_EPOCH,
             issues_updated,
         }
     }
 
     /// Create a repository-scoped profile application event.
-    pub fn new_profile_applied(
+    pub fn draft_profile_applied(
         profile_id: String,
         version: String,
         origin: ProfileOrigin,
@@ -1635,8 +1590,8 @@ impl Event {
         isolated_torn_tail: bool,
     ) -> Self {
         Event::ProfileApplied {
-            id: Uuid::new_v4().to_string(),
-            timestamp: Utc::now(),
+            id: String::new(),
+            timestamp: DateTime::UNIX_EPOCH,
             profile_id,
             version,
             origin,
@@ -1690,7 +1645,10 @@ mod tests {
 
     #[test]
     fn test_new_issue_has_correct_defaults() {
-        let issue = Issue::new("Test Issue".to_string(), "Description".to_string());
+        let issue = crate::domain::types::fixture_issue(
+            "Test Issue".to_string(),
+            "Description".to_string(),
+        );
 
         assert_eq!(issue.title, "Test Issue");
         assert_eq!(issue.description, "Description");
@@ -1709,7 +1667,7 @@ mod tests {
 
     #[test]
     fn test_mark_lifecycle_timestamps_are_first_occurrence_only() {
-        let mut issue = Issue::new("t".to_string(), String::new());
+        let mut issue = crate::domain::types::fixture_issue("t".to_string(), String::new());
         let first = Utc::now();
         let later = first + chrono::Duration::hours(1);
 
@@ -1761,7 +1719,7 @@ mod tests {
 
     #[test]
     fn test_issue_with_timestamps_serializes_the_fields() {
-        let mut issue = Issue::new("t".to_string(), String::new());
+        let mut issue = crate::domain::types::fixture_issue("t".to_string(), String::new());
         let at = Utc::now();
         issue.mark_first_ready(at);
         issue.mark_claimed(at);
@@ -1780,7 +1738,7 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_with_no_dependencies_or_gates() {
-        let issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         let resolved = HashMap::new();
 
         assert!(!issue.is_blocked(&resolved));
@@ -1788,8 +1746,10 @@ mod tests {
 
     #[test]
     fn test_issue_blocked_by_unmet_dependency() {
-        let mut issue = Issue::new("Dependent".to_string(), "Desc".to_string());
-        let dependency = Issue::new("Dependency".to_string(), "Desc".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Dependent".to_string(), "Desc".to_string());
+        let dependency =
+            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
 
         issue.dependencies.push(dependency.id.clone());
 
@@ -1801,8 +1761,10 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_when_dependency_is_done() {
-        let mut issue = Issue::new("Dependent".to_string(), "Desc".to_string());
-        let mut dependency = Issue::new("Dependency".to_string(), "Desc".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Dependent".to_string(), "Desc".to_string());
+        let mut dependency =
+            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
         dependency.state = State::Done;
 
         issue.dependencies.push(dependency.id.clone());
@@ -1815,7 +1777,7 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_by_unpassed_gate() {
-        let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         issue.gates_required.push("review".to_string());
 
         let resolved = HashMap::new();
@@ -1828,7 +1790,7 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_by_pending_gate() {
-        let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
             "review".to_string(),
@@ -1849,7 +1811,7 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_by_failed_gate() {
-        let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
             "review".to_string(),
@@ -1870,7 +1832,7 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_when_gate_passed() {
-        let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
             "review".to_string(),
@@ -1926,7 +1888,8 @@ mod tests {
 
     #[test]
     fn test_issue_with_documents() {
-        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         assert_eq!(issue.documents.len(), 0);
 
         issue
@@ -1938,7 +1901,8 @@ mod tests {
 
     #[test]
     fn test_issue_serialization_with_documents() {
-        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         issue.documents.push(
             DocumentReference::at_commit("docs/design.md".to_string(), "abc123".to_string())
                 .with_label("Design".to_string()),
@@ -1955,13 +1919,15 @@ mod tests {
 
     #[test]
     fn test_new_issue_starts_in_backlog() {
-        let issue = Issue::new("Test".to_string(), "Description".to_string());
+        let issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         assert_eq!(issue.state, State::Backlog);
     }
 
     #[test]
     fn test_backlog_issue_should_auto_transition_to_ready_when_unblocked() {
-        let issue = Issue::new("Test".to_string(), "Description".to_string());
+        let issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         let resolved = HashMap::new();
 
         assert_eq!(issue.state, State::Backlog);
@@ -1970,8 +1936,10 @@ mod tests {
 
     #[test]
     fn test_backlog_issue_should_not_transition_to_ready_when_blocked() {
-        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
-        let dependency = Issue::new("Dependency".to_string(), "Desc".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let dependency =
+            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
         issue.dependencies.push(dependency.id.clone());
 
         let mut resolved = HashMap::new();
@@ -1983,7 +1951,8 @@ mod tests {
 
     #[test]
     fn test_gated_issue_should_auto_transition_to_done_when_gates_pass() {
-        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
@@ -2000,7 +1969,8 @@ mod tests {
 
     #[test]
     fn test_gated_issue_should_not_transition_to_done_when_gates_pending() {
-        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
@@ -2017,7 +1987,8 @@ mod tests {
 
     #[test]
     fn test_gated_issue_should_not_transition_to_done_when_gates_failed() {
-        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
@@ -2034,7 +2005,8 @@ mod tests {
 
     #[test]
     fn test_in_progress_issue_should_not_auto_transition() {
-        let mut issue = Issue::new("Test".to_string(), "Description".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::InProgress;
 
         let resolved = HashMap::new();
@@ -2064,13 +2036,14 @@ mod tests {
 
     #[test]
     fn test_new_issue_has_empty_labels() {
-        let issue = Issue::new("Test".to_string(), "Description".to_string());
+        let issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         assert!(issue.labels.is_empty());
     }
 
     #[test]
     fn test_issue_serialization_with_labels() {
-        let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         issue.labels.push("milestone:v1.0".to_string());
         issue.labels.push("epic:auth".to_string());
         issue.labels.push("type:task".to_string());
@@ -2088,7 +2061,7 @@ mod tests {
 
     #[test]
     fn test_issue_labels_can_be_modified() {
-        let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         assert!(issue.labels.is_empty());
 
         issue.labels.push("component:backend".to_string());
@@ -2186,8 +2159,10 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_when_dependency_is_rejected() {
-        let mut issue = Issue::new("Dependent".to_string(), "Desc".to_string());
-        let mut dependency = Issue::new("Dependency".to_string(), "Desc".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Dependent".to_string(), "Desc".to_string());
+        let mut dependency =
+            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
         dependency.state = State::Rejected;
 
         issue.dependencies.push(dependency.id.clone());
@@ -2584,7 +2559,8 @@ mod tests {
 
         #[test]
         fn test_issue_assignee_serializes_unchanged() {
-            let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
+            let mut issue =
+                crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
             issue.assignee = Some(Assignee::from_str("agent:copilot").unwrap());
 
             let json = serde_json::to_string(&issue).unwrap();
@@ -2597,7 +2573,7 @@ mod tests {
 
     #[test]
     fn test_issue_timestamps_serialize_as_rfc3339() {
-        let issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
 
         let value: serde_json::Value =
             serde_json::from_str(&serde_json::to_string(&issue).unwrap()).unwrap();
@@ -2641,7 +2617,7 @@ mod tests {
         #[test]
         fn test_issue_claimed_assignee_serde_round_trips_as_string() {
             let actor = Assignee::from_str("agent:copilot").unwrap();
-            let event = Event::new_issue_claimed("issue-1".to_string(), actor);
+            let event = Event::draft_issue_claimed("issue-1".to_string(), actor);
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"assignee\":\"agent:copilot\""));
@@ -2654,7 +2630,7 @@ mod tests {
         fn test_issue_released_assignee_serde_round_trips_as_string() {
             let prev = Assignee::from_str("copilot:session-1").unwrap();
             let event =
-                Event::new_issue_released("issue-1".to_string(), prev, "timeout".to_string());
+                Event::draft_issue_released("issue-1".to_string(), prev, "timeout".to_string());
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"assignee\":\"copilot:session-1\""));
@@ -2667,7 +2643,7 @@ mod tests {
         fn test_gate_event_updated_by_serde_round_trips_as_string() {
             let by = Assignee::from_str("ci:runner").unwrap();
             let event =
-                Event::new_gate_passed("issue-1".to_string(), "tests".to_string(), Some(by));
+                Event::draft_gate_passed("issue-1".to_string(), "tests".to_string(), Some(by));
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"updated_by\":\"ci:runner\""));

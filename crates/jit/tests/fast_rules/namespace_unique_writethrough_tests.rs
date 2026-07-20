@@ -197,8 +197,8 @@ fn test_config_set_write_throughs_membership() {
     let storage = JsonFileStorage::new(&jit_dir);
     // `jit config set` publishes the repo config edit through the recovered
     // session, so the executor needs its canonical layout.
-    let layout = jit::storage::discover_repository_layout(jit_dir.parent().unwrap(), &jit_dir)
-        .unwrap();
+    let layout =
+        jit::storage::discover_repository_layout(jit_dir.parent().unwrap(), &jit_dir).unwrap();
     let executor = CommandExecutor::new(storage).with_layout(layout);
     executor
         .set_config("project.name", "demo-project", false)

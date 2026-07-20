@@ -228,7 +228,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         // Validate first (includes local rule enforcement on the post-update
         // shape, so `jit issue update --filter` cannot bypass enforce rules).
-        // Bypass events are deferred and only emitted after the save succeeds.
+        // Bypass events are carried into the same mutation as the issue write.
         let validation = self.validate_update(issue, operations, force)?;
 
         // Check if any changes needed
@@ -250,8 +250,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut modified_fields = Vec::new();
         // Warnings from non-enforcing graph rules fired during the state transition.
         let mut transition_warnings: Vec<String> = Vec::new();
-        // Pending state-change events: captured here, emitted AFTER save_issue so a
-        // failed write never leaves a ghost event in the log.
+        // Pending state-change events: captured here and published atomically with
+        // the issue write, so a failed mutation leaves no ghost audit entry.
         let mut pending_state_events: Vec<Event> = Vec::new();
         // Pending claim event for a first assignee set on this update, emitted with
         // the same deferred-after-save discipline. Coupled to the `claimed_at`
@@ -293,25 +293,24 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // `errors` by the caller, which continues with the remaining
                 // matched issues). Non-enforcing rules return warnings that are
                 // surfaced in `BulkUpdateResult::warnings`.
-                // `persist = false`: the combined save and the transition events
-                // are emitted below alongside the other field edits, ensuring the
-                // events are only appended AFTER save_issue commits successfully.
-                let warnings =
+                // `persist = false`: the combined issue write and transition events
+                // are published below in one mutation alongside the field edits.
+                let (warnings, bypass_events) =
                     self.apply_state_transition(&mut updated, new_state, force, false, |_| {})?;
                 transition_warnings.extend(warnings);
+                pending_state_events.extend(bypass_events.into_iter().map(|(_, event)| event));
                 state_changed = true;
 
-                // Defer the transition events until after save_issue succeeds so a
-                // failed write never leaves a ghost event in the event log. The
-                // sequence mirrors the chokepoint's own `persist = true` audit:
-                // the state change, then completion when the issue lands Done.
-                pending_state_events.push(Event::new_issue_state_changed(
+                // Carry the transition events into the same mutation as the issue
+                // write. The sequence mirrors the chokepoint's own `persist = true`
+                // audit: state change, then completion when the issue lands Done.
+                pending_state_events.push(Event::draft_issue_state_changed(
                     issue.id.clone(),
                     old_state,
                     new_state,
                 ));
                 if new_state == State::Done {
-                    pending_state_events.push(Event::new_issue_completed(issue.id.clone()));
+                    pending_state_events.push(Event::draft_issue_completed(issue.id.clone()));
                 }
             }
         }
@@ -357,8 +356,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // Stamp the first claim time (first-occurrence only) and defer the
                 // coupled `issue_claimed` event, so this bulk assignment records
                 // `claimed_at` exactly like the single-issue claim/assign paths.
-                updated.mark_claimed(chrono::Utc::now());
-                pending_claim_event = Some(Event::new_issue_claimed(updated.id.clone(), assignee));
+                pending_claim_event =
+                    Some(Event::draft_issue_claimed(updated.id.clone(), assignee));
                 modified_fields.push("assignee".to_string());
             }
         } else if operations.unassign && updated.assignee.is_some() {
@@ -376,36 +375,33 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Save if modified
         let modified = state_changed || !modified_fields.is_empty();
+        let mut events = pending_state_events
+            .into_iter()
+            .enumerate()
+            .map(|(index, event)| (index as u8 + 1, event))
+            .collect::<Vec<_>>();
         if modified {
-            self.storage.save_issue(updated)?;
-
-            // Emit the deferred transition events AFTER the save commits, so a
-            // failed write never leaves a ghost event in the event log.
-            for event in &pending_state_events {
-                self.storage.append_event(event)?;
-            }
-
-            // Emit the deferred claim event (first assignee set) after the save,
-            // same ordering discipline, so `claimed_at` never persists unaudited.
             if let Some(event) = pending_claim_event {
-                self.storage.append_event(&event)?;
+                events.push((4, event));
             }
-
-            // Log the field-edit event for the edits beyond the state change.
             if !modified_fields.is_empty() {
-                self.storage.append_event(&Event::new_issue_updated(
-                    issue.id.clone(),
-                    "bulk-update".to_string(),
-                    modified_fields,
-                ))?;
+                events.push((
+                    5,
+                    Event::draft_issue_updated(
+                        issue.id.clone(),
+                        "bulk-update".to_string(),
+                        modified_fields,
+                    ),
+                ));
             }
         }
-
-        // Emit any `--force` bypass events after the (conditional) save, so a
-        // failed write never leaves a false bypass entry — but independent of
-        // whether fields changed, so a forced override is always audited even on
-        // a no-op write. No-op on an empty `bypassed_rules`.
-        self.log_rule_bypasses(&issue.id, &validation.bypassed_rules)?;
+        events.extend(validation.bypassed_rules.iter().map(|rule| {
+            (
+                9,
+                Event::draft_local_rule_bypassed(issue.id.clone(), rule.clone()),
+            )
+        }));
+        self.publish_issue_mutation(if modified { vec![updated] } else { Vec::new() }, events)?;
 
         Ok((modified, transition_warnings))
     }
@@ -692,7 +688,7 @@ mod tests {
         };
 
         let executor =
-            crate::commands::CommandExecutor::new(crate::storage::InMemoryStorage::new());
+            crate::commands::test_helpers::memory_executor(crate::storage::InMemoryStorage::new());
 
         let changes = executor.compute_changes(&issue, &ops).unwrap();
         assert_eq!(changes.len(), 1);
@@ -710,7 +706,7 @@ mod tests {
         };
 
         let executor =
-            crate::commands::CommandExecutor::new(crate::storage::InMemoryStorage::new());
+            crate::commands::test_helpers::memory_executor(crate::storage::InMemoryStorage::new());
 
         let changes = executor.compute_changes(&issue, &ops).unwrap();
         assert_eq!(changes.len(), 2);
@@ -731,7 +727,7 @@ mod tests {
         };
 
         let executor =
-            crate::commands::CommandExecutor::new(crate::storage::InMemoryStorage::new());
+            crate::commands::test_helpers::memory_executor(crate::storage::InMemoryStorage::new());
 
         let changes = executor.compute_changes(&issue, &ops).unwrap();
         assert!(changes.is_empty());
@@ -750,7 +746,7 @@ mod tests {
         // executor takes ownership of `storage`.
         let reader = storage.clone();
 
-        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             assignee: Some("agent:worker-1".to_string()),
@@ -792,7 +788,7 @@ mod tests {
         let issue = create_test_issue("test-1", State::Ready, vec!["type:task"]);
         storage.save_issue(issue).unwrap();
 
-        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Apply bulk update
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -830,7 +826,7 @@ mod tests {
             .save_issue(create_test_issue("3", State::InProgress, vec![]))
             .unwrap();
 
-        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Update all ready issues
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -862,7 +858,7 @@ mod tests {
             .save_issue(create_test_issue("1", State::Done, vec![]))
             .unwrap();
 
-        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to set same state
         let filter = QueryFilter::parse("state:done").unwrap();
@@ -890,7 +886,7 @@ mod tests {
         issue.gates_required = vec!["tests".to_string()];
         storage.save_issue(issue).unwrap();
 
-        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to transition to Done without passing gates
         let filter = QueryFilter::parse("state:gated").unwrap();
@@ -929,7 +925,7 @@ mod tests {
             .save_issue(create_test_issue("3", State::Ready, vec![]))
             .unwrap();
 
-        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to transition all to Done
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -961,7 +957,7 @@ mod tests {
             .save_issue(create_test_issue("1", State::Ready, vec!["type:task"]))
             .unwrap();
 
-        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to add label without colon (invalid format)
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -994,7 +990,7 @@ mod tests {
             .save_issue(create_test_issue("1", State::Ready, vec!["type:task"]))
             .unwrap();
 
-        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to add another type:* label (violates uniqueness)
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -1024,7 +1020,7 @@ mod tests {
             .save_issue(create_test_issue("1", State::Ready, vec![]))
             .unwrap();
 
-        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to set assignee without colon (invalid format)
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -1052,7 +1048,7 @@ mod tests {
             .save_issue(create_test_issue("1", State::Ready, vec![]))
             .unwrap();
 
-        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Valid assignee format should work
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -1118,7 +1114,7 @@ mod tests {
         let bulk_storage = InMemoryStorage::new();
         seed(&bulk_storage);
         let bulk_reader = bulk_storage.clone();
-        let mut bulk = crate::commands::CommandExecutor::new(bulk_storage);
+        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
@@ -1130,7 +1126,7 @@ mod tests {
         let single_storage = InMemoryStorage::new();
         seed(&single_storage);
         let single_reader = single_storage.clone();
-        let single = crate::commands::CommandExecutor::new(single_storage);
+        let single = crate::commands::test_helpers::memory_executor(single_storage);
         for id in ["aaaa1111", "bbbb2222"] {
             single
                 .update_issue(
@@ -1179,7 +1175,7 @@ mod tests {
 
         let bulk_storage = InMemoryStorage::new();
         seed(&bulk_storage);
-        let mut bulk = crate::commands::CommandExecutor::new(bulk_storage);
+        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let issue = bulk.get_issue("bbbb2222").unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
@@ -1193,7 +1189,7 @@ mod tests {
 
         let single_storage = InMemoryStorage::new();
         seed(&single_storage);
-        let single = crate::commands::CommandExecutor::new(single_storage);
+        let single = crate::commands::test_helpers::memory_executor(single_storage);
         let single_error = single
             .update_issue(
                 "bbbb2222",
@@ -1230,7 +1226,7 @@ mod tests {
 
         let bulk_storage = InMemoryStorage::new();
         seed(&bulk_storage);
-        let mut bulk = crate::commands::CommandExecutor::new(bulk_storage);
+        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let issue = bulk.get_issue("aaaa1111").unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
@@ -1244,7 +1240,7 @@ mod tests {
 
         let single_storage = InMemoryStorage::new();
         seed(&single_storage);
-        let single = crate::commands::CommandExecutor::new(single_storage);
+        let single = crate::commands::test_helpers::memory_executor(single_storage);
         let single_error = single
             .update_issue(
                 "aaaa1111",
@@ -1276,7 +1272,7 @@ mod tests {
             .save_issue(create_test_issue("1", State::Ready, vec!["type:task"]))
             .unwrap();
 
-        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Valid labels should work
         let filter = QueryFilter::parse("state:ready").unwrap();

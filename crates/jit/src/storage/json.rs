@@ -8,12 +8,15 @@
 
 use crate::declarations::GateRegistry;
 use crate::domain::{parse_known_events, Event, Issue};
+use crate::repository_state::{
+    RepositoryIndex, RepositoryIndexError, SUPPORTED_INDEX_SCHEMA_VERSION,
+};
 use crate::storage::{
     AmbiguousIdError, FileLocker, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
     IssueStore, RecoveryCoordinator, RecoverySession, RepoWriteGuard, RepoWriteLock,
     RepositoryFormatTooNewError, RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
@@ -22,16 +25,6 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-/// On-disk repository-format version this binary writes and understands.
-///
-/// This is the authoritative compatibility marker for the whole repository (a
-/// single index-level version, not per-store schema versions). New indexes are
-/// stamped with it, and a repository whose `index.json` `schema_version` exceeds
-/// it is refused by [`ensure_supported_index_version`] so a stale binary fails
-/// fast and legibly instead of misreading newer data. Bump this whenever an
-/// on-disk layout or interpretation changes.
-const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 2;
-
 const ISSUES_DIR: &str = "issues";
 const INDEX_FILE: &str = "index.json";
 const GATES_FILE: &str = "gates.toml";
@@ -39,17 +32,7 @@ const EVENTS_FILE: &str = "events.jsonl";
 const GATE_RUNS_DIR: &str = "gate-runs";
 const GATE_RUN_RESULT_FILE: &str = "result.json";
 
-/// Index of all issues in the repository
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Index {
-    /// Schema version for future migrations
-    schema_version: u32,
-    /// List of all issue IDs
-    all_ids: Vec<String>,
-    /// List of deleted issue IDs (schema v2+)
-    #[serde(default)]
-    deleted_ids: Vec<String>,
-}
+type Index = RepositoryIndex;
 
 #[cfg(all(test, unix))]
 mod artifact_location_tests {
@@ -104,33 +87,15 @@ mod artifact_location_tests {
     }
 }
 
-impl Default for Index {
-    fn default() -> Self {
-        Self {
-            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: Vec::new(),
-            deleted_ids: Vec::new(),
+/// Parse and validate one captured `index.json` without consulting ambient state.
+pub(crate) fn parse_repository_index(bytes: &[u8]) -> Result<Index> {
+    match RepositoryIndex::parse(bytes) {
+        Ok(index) => Ok(index),
+        Err(RepositoryIndexError::UnsupportedVersion { found, supported }) => {
+            Err(RepositoryFormatTooNewError::new(found, supported).into())
         }
+        Err(error) => Err(anyhow!(error)),
     }
-}
-
-/// Reject an index whose on-disk format version is newer than this binary
-/// supports; otherwise pass it through unchanged.
-///
-/// Applied on every index-load path (local, git HEAD, main worktree) so an
-/// outdated binary fails fast with a legible [`RepositoryFormatTooNewError`]
-/// instead of misinterpreting a newer layout. A version equal to or older than
-/// [`SUPPORTED_INDEX_SCHEMA_VERSION`] is accepted (older indexes deserialize via
-/// serde field defaults).
-fn ensure_supported_index_version(index: Index) -> Result<Index> {
-    if index.schema_version > SUPPORTED_INDEX_SCHEMA_VERSION {
-        return Err(RepositoryFormatTooNewError::new(
-            index.schema_version,
-            SUPPORTED_INDEX_SCHEMA_VERSION,
-        )
-        .into());
-    }
-    Ok(index)
 }
 
 /// JSON file-based storage for issues, gates, and events.
@@ -335,10 +300,10 @@ impl JsonFileStorage {
 
         // Fail fast at startup when the on-disk format is newer than this binary
         // supports. `validate()` runs for every non-init command, so routing the
-        // version check through it (via `load_index`, which applies
-        // `ensure_supported_index_version`) guards even commands that never load
-        // the index themselves — e.g. `jit gate list`, which reads `gates.toml`
-        // directly — rather than letting them misread newer data (jit:def64ac4).
+        // version check through it (via the shared typed index codec) guards even
+        // commands that never load the index themselves — e.g. `jit gate list`,
+        // which reads `gates.toml` directly — rather than letting them misread
+        // newer data (jit:def64ac4).
         self.load_index()?;
 
         Ok(())
@@ -463,13 +428,17 @@ impl JsonFileStorage {
 
     fn load_index(&self) -> Result<Index> {
         let index_path = self.root.join(INDEX_FILE);
-        let index = self.read_json(&index_path)?;
-        ensure_supported_index_version(index)
+        let bytes = fs::read(&index_path)
+            .with_context(|| format!("Failed to read file: {}", index_path.display()))?;
+        parse_repository_index(&bytes)
     }
 
     fn save_index(&self, index: &Index) -> Result<()> {
         let index_path = self.root.join(INDEX_FILE);
-        self.write_json(&index_path, index)
+        let bytes = index
+            .to_pretty_bytes()
+            .context("Failed to serialize index")?;
+        crate::storage::atomic_write::write_file_atomic(&index_path, std::str::from_utf8(&bytes)?)
     }
 
     /// Load aggregated index from all sources (local + git + main worktree).
@@ -481,131 +450,143 @@ impl JsonFileStorage {
     ///
     /// Deduplicates IDs across sources.
     fn load_aggregated_index(&self) -> Result<Index> {
-        use std::collections::HashSet;
+        use std::collections::BTreeMap;
 
-        let mut all_ids = HashSet::new();
-        let mut deleted_ids = HashSet::new();
+        // The first source that mentions an id wins: local, then HEAD, then the
+        // main worktree. This mirrors issue loading and lets a local restore
+        // override a stale lower-priority tombstone (and vice versa).
+        let mut membership = BTreeMap::new();
 
-        // A source whose format is newer than this binary supports must abort the
-        // whole aggregation (fail fast), never be silently skipped like a missing
-        // or non-git source. `merge_source` propagates that one typed error while
-        // swallowing benign absences, keeping the guard consistent across the
-        // local, git-HEAD, and main-worktree index paths.
-        let merge_source = |loaded: Result<Index>,
-                            all_ids: &mut HashSet<String>,
-                            deleted_ids: &mut HashSet<String>|
+        // Only a genuinely absent source may be skipped. Once index bytes exist,
+        // every read, parse, version, and membership-structure failure aborts the
+        // aggregation instead of exposing a plausible but incomplete issue set.
+        let merge_source = |loaded: Result<Option<Index>>,
+                            membership: &mut BTreeMap<String, bool>|
          -> Result<()> {
             match loaded {
-                Ok(index) => {
-                    all_ids.extend(index.all_ids);
-                    deleted_ids.extend(index.deleted_ids);
+                Ok(Some(index)) => {
+                    index.all_ids.into_iter().for_each(|id| {
+                        membership.entry(id).or_insert(true);
+                    });
+                    index.deleted_ids.into_iter().for_each(|id| {
+                        membership.entry(id).or_insert(false);
+                    });
                     Ok(())
                 }
-                Err(e) if e.is::<RepositoryFormatTooNewError>() => Err(e),
-                Err(_) => Ok(()), // missing/non-git source: ignore as before
+                Ok(None) => Ok(()),
+                Err(error) => Err(error),
             }
         };
 
         // 1. Load local index
-        merge_source(self.load_index(), &mut all_ids, &mut deleted_ids)?;
+        let local = match fs::read(self.root.join(INDEX_FILE)) {
+            Ok(bytes) => Some(parse_repository_index(&bytes)?),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error).context("Failed to read local index"),
+        };
+        merge_source(Ok(local), &mut membership)?;
 
         // 2. Try loading index from git
-        merge_source(self.load_index_from_git(), &mut all_ids, &mut deleted_ids)?;
+        merge_source(self.load_index_from_git(), &mut membership)?;
 
         // 3. Try loading index from main worktree
-        merge_source(
-            self.load_index_from_main_worktree(),
-            &mut all_ids,
-            &mut deleted_ids,
-        )?;
-
-        // Filter out deleted IDs from the aggregated set
-        all_ids.retain(|id| !deleted_ids.contains(id));
+        merge_source(self.load_index_from_main_worktree(), &mut membership)?;
 
         Ok(Index {
             schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: {
-                let mut ids: Vec<String> = all_ids.into_iter().collect();
-                ids.sort();
-                ids
-            },
+            all_ids: membership
+                .into_iter()
+                .filter_map(|(id, is_active)| is_active.then_some(id))
+                .collect(),
             deleted_ids: vec![], // Don't propagate deleted_ids in aggregated index
         })
     }
 
     /// Load index from git HEAD.
-    fn load_index_from_git(&self) -> Result<Index> {
-        // Run git from repository root, not from .jit directory
+    fn load_index_from_git(&self) -> Result<Option<Index>> {
         let repo_root = self
             .root
             .parent()
             .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid .jit path"))?;
+        let repository = match git2::Repository::discover(repo_root) {
+            Ok(repository) => repository,
+            Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
+            Err(error) => return Err(error).context("Failed to open git repository"),
+        };
+        let head = match repository.head() {
+            Ok(head) => head,
+            Err(error)
+                if matches!(
+                    error.code(),
+                    git2::ErrorCode::NotFound | git2::ErrorCode::UnbornBranch
+                ) =>
+            {
+                return Ok(None)
+            }
+            Err(error) => return Err(error).context("Failed to resolve git HEAD"),
+        };
+        let tree = head
+            .peel_to_tree()
+            .context("Failed to resolve the git HEAD tree")?;
+        let entry = match tree.get_path(Path::new(".jit/index.json")) {
+            Ok(entry) => entry,
+            Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
+            Err(error) => return Err(error).context("Failed to resolve index from git HEAD"),
+        };
+        let object = entry
+            .to_object(&repository)
+            .context("Failed to load index object from git HEAD")?;
+        let blob = object
+            .as_blob()
+            .ok_or_else(|| anyhow!("git HEAD index path is not a file"))?;
 
-        let output = Command::new("git")
-            .arg("show")
-            .arg("HEAD:.jit/index.json")
-            .current_dir(repo_root)
-            .output()
-            .context("Failed to execute git command")?;
-
-        if !output.status.success() {
-            bail!("Index not in git");
-        }
-
-        let index =
-            serde_json::from_slice(&output.stdout).context("Failed to parse index from git")?;
-        ensure_supported_index_version(index)
+        parse_repository_index(blob.content())
+            .map(Some)
+            .context("Failed to parse index from git")
     }
 
     /// Load index from main worktree.
-    fn load_index_from_main_worktree(&self) -> Result<Index> {
+    fn load_index_from_main_worktree(&self) -> Result<Option<Index>> {
         let repo_root = self
             .root
             .parent()
             .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid .jit path"))?;
-
-        let output = Command::new("git")
-            .args(["rev-parse", "--git-common-dir"])
-            .current_dir(repo_root)
-            .output();
-
-        if output.is_err() || !output.as_ref().unwrap().status.success() {
-            bail!("Not in a git repository");
-        }
-
-        let common_dir = PathBuf::from(String::from_utf8(output.unwrap().stdout)?.trim());
-
-        let output = Command::new("git")
-            .args(["rev-parse", "--show-toplevel"])
-            .current_dir(repo_root)
-            .output()?;
-
-        if !output.status.success() {
-            bail!("Failed to get worktree root");
-        }
-
-        let worktree_root = PathBuf::from(String::from_utf8(output.stdout)?.trim());
-
-        // Check if we're in main worktree
-        let is_main = common_dir == worktree_root.join(".git");
-        if is_main {
-            bail!("Already in main worktree");
-        }
-
-        let main_worktree_root = if common_dir.file_name().unwrap() == ".git" {
-            common_dir.parent().unwrap().to_path_buf()
-        } else {
-            bail!("Cannot determine main worktree location");
+        let repository = match git2::Repository::discover(repo_root) {
+            Ok(repository) => repository,
+            Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
+            Err(error) => return Err(error).context("Failed to open git repository"),
         };
+        let common_dir = repository.commondir();
+
+        // A normal repository points directly at its common directory. Only a
+        // linked worktree has a distinct per-worktree repository path.
+        if repository.path() == common_dir {
+            return Ok(None);
+        }
+
+        if common_dir.file_name().and_then(|name| name.to_str()) != Some(".git") {
+            return Err(anyhow!(
+                "git common directory is not a main-worktree .git directory: {}",
+                common_dir.display()
+            ));
+        }
+        let main_worktree_root = common_dir.parent().ok_or_else(|| {
+            anyhow!(
+                "git common directory has no main-worktree parent: {}",
+                common_dir.display()
+            )
+        })?;
 
         let main_index_path = main_worktree_root.join(".jit/index.json");
-
-        if !main_index_path.exists() {
-            bail!("Index not in main worktree");
-        }
-
-        let index = self.read_json(&main_index_path)?;
-        ensure_supported_index_version(index)
+        let bytes = match fs::read(&main_index_path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => {
+                return Err(error)
+                    .with_context(|| format!("Failed to read file: {}", main_index_path.display()))
+            }
+        };
+        parse_repository_index(&bytes).map(Some)
     }
 
     /// Load an issue from git HEAD.
@@ -743,7 +724,7 @@ impl IssueStore for JsonFileStorage {
         // a new repository and proceeds normally.
         let index_path = self.root.join(INDEX_FILE);
         if index_path.exists() {
-            self.load_index()?; // applies ensure_supported_index_version
+            self.load_index()?; // applies the shared format/invariant validation
         }
 
         let issues_dir = self.root.join(ISSUES_DIR);
@@ -1782,7 +1763,10 @@ mod tests {
         let (_temp, storage) = setup_storage();
         storage.init().unwrap();
 
-        let issue = Issue::new("Test Issue".to_string(), "Description".to_string());
+        let issue = crate::domain::types::fixture_issue(
+            "Test Issue".to_string(),
+            "Description".to_string(),
+        );
         let issue_id = issue.id.clone();
 
         storage.save_issue(issue.clone()).unwrap();
@@ -1798,7 +1782,7 @@ mod tests {
         let (_temp, storage) = setup_storage();
         storage.init().unwrap();
 
-        let issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         storage.save_issue(issue.clone()).unwrap();
 
         let index = storage.load_index().unwrap();
@@ -1810,7 +1794,7 @@ mod tests {
         let (_temp, storage) = setup_storage();
         storage.init().unwrap();
 
-        let mut issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         storage.save_issue(issue.clone()).unwrap();
 
         issue.title = "Updated".to_string();
@@ -1828,8 +1812,10 @@ mod tests {
         let (_temp, storage) = setup_storage();
         storage.init().unwrap();
 
-        let issue1 = Issue::new("Issue 1".to_string(), "Desc 1".to_string());
-        let issue2 = Issue::new("Issue 2".to_string(), "Desc 2".to_string());
+        let issue1 =
+            crate::domain::types::fixture_issue("Issue 1".to_string(), "Desc 1".to_string());
+        let issue2 =
+            crate::domain::types::fixture_issue("Issue 2".to_string(), "Desc 2".to_string());
 
         storage.save_issue(issue1.clone()).unwrap();
         storage.save_issue(issue2.clone()).unwrap();
@@ -1845,7 +1831,7 @@ mod tests {
         let (_temp, storage) = setup_storage();
         storage.init().unwrap();
 
-        let issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         let issue_id = issue.id.clone();
 
         storage.save_issue(issue.clone()).unwrap();
@@ -1916,7 +1902,7 @@ mod tests {
                 let storage = Arc::clone(&storage);
                 thread::spawn(move || {
                     for i in 0..issues_per_thread {
-                        let issue = Issue::new(
+                        let issue = crate::domain::types::fixture_issue(
                             format!("Thread {} Issue {}", thread_id, i),
                             format!("Description {}-{}", thread_id, i),
                         );
@@ -1954,8 +1940,10 @@ mod tests {
         storage.init().unwrap();
 
         // Create two issues
-        let issue1 = Issue::new("Issue 1".to_string(), "Desc 1".to_string());
-        let issue2 = Issue::new("Issue 2".to_string(), "Desc 2".to_string());
+        let issue1 =
+            crate::domain::types::fixture_issue("Issue 1".to_string(), "Desc 1".to_string());
+        let issue2 =
+            crate::domain::types::fixture_issue("Issue 2".to_string(), "Desc 2".to_string());
         let id1 = issue1.id.clone();
         let id2 = issue2.id.clone();
 
@@ -2003,7 +1991,10 @@ mod tests {
         let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
         storage.init().unwrap();
 
-        let issue = Issue::new("Test Issue".to_string(), "Description".to_string());
+        let issue = crate::domain::types::fixture_issue(
+            "Test Issue".to_string(),
+            "Description".to_string(),
+        );
         let issue_id = issue.id.clone();
         storage.save_issue(issue.clone()).unwrap();
 
@@ -2043,7 +2034,7 @@ mod tests {
         let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
         storage.init().unwrap();
 
-        let issue = Issue::new("Test".to_string(), "Desc".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         let issue_id = issue.id.clone();
         storage.save_issue(issue.clone()).unwrap();
 
@@ -2096,7 +2087,7 @@ mod tests {
         storage.init().unwrap();
 
         // Create base issue
-        let base = Issue::new("Base".to_string(), "Desc".to_string());
+        let base = crate::domain::types::fixture_issue("Base".to_string(), "Desc".to_string());
         let base_id = base.id.clone();
         storage.save_issue(base.clone()).unwrap();
 
@@ -2106,7 +2097,10 @@ mod tests {
                 let storage = Arc::clone(&storage);
                 let base_id = base_id.clone();
                 thread::spawn(move || {
-                    let dep = Issue::new(format!("Dep {}", i), "Desc".to_string());
+                    let dep = crate::domain::types::fixture_issue(
+                        format!("Dep {}", i),
+                        "Desc".to_string(),
+                    );
                     let dep_id = dep.id.clone();
                     storage.save_issue(dep.clone()).unwrap();
 
@@ -2142,7 +2136,8 @@ mod tests {
 
         // Create some initial issues
         for i in 0..3 {
-            let issue = Issue::new(format!("Initial {}", i), "Desc".to_string());
+            let issue =
+                crate::domain::types::fixture_issue(format!("Initial {}", i), "Desc".to_string());
             storage.save_issue(issue.clone()).unwrap();
         }
 
@@ -2166,7 +2161,8 @@ mod tests {
         handles.push(thread::spawn(move || {
             barrier_writer.wait();
             for i in 0..5 {
-                let issue = Issue::new(format!("New {}", i), "Desc".to_string());
+                let issue =
+                    crate::domain::types::fixture_issue(format!("New {}", i), "Desc".to_string());
                 storage_writer.save_issue(issue.clone()).unwrap();
             }
         }));
@@ -2212,6 +2208,30 @@ mod tests {
             (temp_dir, repo_path)
         }
 
+        fn add_secondary_worktree(repo_path: &Path) -> (TempDir, PathBuf) {
+            use std::time::{SystemTime, UNIX_EPOCH};
+
+            let container = TempDir::new().unwrap();
+            let worktree_path = container.path().join("worktree");
+            let suffix = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let branch = format!("secondary-{suffix}");
+            let output = Command::new("git")
+                .args(["worktree", "add", "-b", &branch])
+                .arg(&worktree_path)
+                .current_dir(repo_path)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            (container, worktree_path)
+        }
+
         #[test]
         fn test_load_issue_from_local_first() {
             // Setup: Create a local .jit directory
@@ -2219,7 +2239,10 @@ mod tests {
             storage.init().unwrap();
 
             // Create and save an issue locally
-            let issue = Issue::new("Local Issue".to_string(), "Description".to_string());
+            let issue = crate::domain::types::fixture_issue(
+                "Local Issue".to_string(),
+                "Description".to_string(),
+            );
             let issue_id = issue.id.clone();
             storage.save_issue(issue.clone()).unwrap();
 
@@ -2237,7 +2260,10 @@ mod tests {
             storage.init().unwrap();
 
             // Create an issue and commit it
-            let issue = Issue::new("Committed Issue".to_string(), "From git".to_string());
+            let issue = crate::domain::types::fixture_issue(
+                "Committed Issue".to_string(),
+                "From git".to_string(),
+            );
             let issue_id = issue.id.clone();
             storage.save_issue(issue.clone()).unwrap();
 
@@ -2283,7 +2309,10 @@ mod tests {
             main_storage.init().unwrap();
 
             // Create an issue in main worktree (not committed)
-            let issue = Issue::new("Main WT Issue".to_string(), "Uncommitted".to_string());
+            let issue = crate::domain::types::fixture_issue(
+                "Main WT Issue".to_string(),
+                "Uncommitted".to_string(),
+            );
             let issue_id = issue.id.clone();
             main_storage.save_issue(issue.clone()).unwrap();
 
@@ -2326,7 +2355,10 @@ mod tests {
             storage.init().unwrap();
 
             // Create and commit issue
-            let issue = Issue::new("Committed Issue".to_string(), "In git".to_string());
+            let issue = crate::domain::types::fixture_issue(
+                "Committed Issue".to_string(),
+                "In git".to_string(),
+            );
             let issue_id = issue.id.clone();
             storage.save_issue(issue.clone()).unwrap();
 
@@ -2361,6 +2393,116 @@ mod tests {
         }
 
         #[test]
+        fn test_load_aggregated_index_rejects_invalid_git_index() {
+            let (_temp_dir, repo_path) = setup_git_repo();
+            let jit_dir = repo_path.join(".jit");
+            let storage = JsonFileStorage::new(&jit_dir);
+            storage.init().unwrap();
+
+            fs::write(jit_dir.join(INDEX_FILE), b"{ invalid json").unwrap();
+            Command::new("git")
+                .args(["add", ".jit/index.json"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+            Command::new("git")
+                .args(["commit", "-m", "invalid index fixture"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+
+            storage.save_index(&Index::default()).unwrap();
+            let error = storage
+                .load_aggregated_index()
+                .expect_err("a malformed fallback index must not be skipped");
+            assert!(error.to_string().contains("Failed to parse index from git"));
+        }
+
+        #[test]
+        fn test_local_membership_overrides_git_membership_in_both_states() {
+            let (_temp_dir, repo_path) = setup_git_repo();
+            let jit_dir = repo_path.join(".jit");
+            let storage = JsonFileStorage::new(&jit_dir);
+            storage.init().unwrap();
+
+            storage
+                .save_index(&Index {
+                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+                    all_ids: vec!["deleted-locally".to_string()],
+                    deleted_ids: vec!["restored-locally".to_string()],
+                })
+                .unwrap();
+            let add = Command::new("git")
+                .args(["add", ".jit/index.json"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+            assert!(add.status.success());
+            let commit = Command::new("git")
+                .args(["commit", "-m", "record tombstone"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+            assert!(commit.status.success());
+
+            storage
+                .save_index(&Index {
+                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+                    all_ids: vec!["restored-locally".to_string()],
+                    deleted_ids: vec!["deleted-locally".to_string()],
+                })
+                .unwrap();
+
+            assert_eq!(
+                storage.load_aggregated_index().unwrap().all_ids,
+                vec!["restored-locally"]
+            );
+        }
+
+        #[test]
+        fn test_git_membership_overrides_main_worktree_in_both_states() {
+            let (_temp_dir, repo_path) = setup_git_repo();
+            let main_jit = repo_path.join(".jit");
+            let main_storage = JsonFileStorage::new(&main_jit);
+            main_storage.init().unwrap();
+            main_storage
+                .save_index(&Index {
+                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+                    all_ids: vec!["active-in-head".to_string()],
+                    deleted_ids: vec!["deleted-in-head".to_string()],
+                })
+                .unwrap();
+            let add = Command::new("git")
+                .args(["add", ".jit/index.json"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+            assert!(add.status.success());
+            let commit = Command::new("git")
+                .args(["commit", "-m", "record head membership"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+            assert!(commit.status.success());
+
+            let (_secondary_container, secondary_path) = add_secondary_worktree(&repo_path);
+            fs::remove_file(secondary_path.join(".jit/index.json")).unwrap();
+            main_storage
+                .save_index(&Index {
+                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+                    all_ids: vec!["deleted-in-head".to_string()],
+                    deleted_ids: vec!["active-in-head".to_string()],
+                })
+                .unwrap();
+
+            let secondary_storage = JsonFileStorage::new(secondary_path.join(".jit"));
+            assert_eq!(
+                secondary_storage.load_aggregated_index().unwrap().all_ids,
+                vec!["active-in-head"]
+            );
+        }
+
+        #[test]
         fn test_load_aggregated_index_includes_main_worktree_issues() {
             // Setup: Create git repo with main worktree
             let (_temp_dir, repo_path) = setup_git_repo();
@@ -2369,7 +2511,10 @@ mod tests {
             main_storage.init().unwrap();
 
             // Create issue in main worktree (not committed)
-            let issue = Issue::new("Main WT Issue".to_string(), "Uncommitted".to_string());
+            let issue = crate::domain::types::fixture_issue(
+                "Main WT Issue".to_string(),
+                "Uncommitted".to_string(),
+            );
             let issue_id = issue.id.clone();
             main_storage.save_issue(issue.clone()).unwrap();
 
@@ -2402,6 +2547,42 @@ mod tests {
         }
 
         #[test]
+        fn test_aggregated_index_propagates_main_worktree_failures() {
+            let (_temp_dir, repo_path) = setup_git_repo();
+            let main_jit = repo_path.join(".jit");
+            let main_storage = JsonFileStorage::new(&main_jit);
+            main_storage.init().unwrap();
+            let add = Command::new("git")
+                .args(["add", ".jit/index.json"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+            assert!(add.status.success());
+            let commit = Command::new("git")
+                .args(["commit", "-m", "initialize index"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+            assert!(commit.status.success());
+
+            let (_secondary_container, secondary_path) = add_secondary_worktree(&repo_path);
+            let secondary_storage = JsonFileStorage::new(secondary_path.join(".jit"));
+
+            fs::write(main_jit.join(INDEX_FILE), b"{ invalid json").unwrap();
+            let malformed = secondary_storage
+                .load_aggregated_index()
+                .expect_err("a malformed main-worktree index must abort aggregation");
+            assert!(malformed.to_string().contains("failed to parse index"));
+
+            fs::remove_file(main_jit.join(INDEX_FILE)).unwrap();
+            fs::create_dir(main_jit.join(INDEX_FILE)).unwrap();
+            let unreadable = secondary_storage
+                .load_aggregated_index()
+                .expect_err("an unreadable main-worktree index must abort aggregation");
+            assert!(unreadable.to_string().contains("Failed to read file"));
+        }
+
+        #[test]
         fn test_load_aggregated_index_deduplicates() {
             // Setup: Create git repo
             let (_temp_dir, repo_path) = setup_git_repo();
@@ -2410,7 +2591,10 @@ mod tests {
             storage.init().unwrap();
 
             // Create and commit issue
-            let issue = Issue::new("Duplicate Issue".to_string(), "Test".to_string());
+            let issue = crate::domain::types::fixture_issue(
+                "Duplicate Issue".to_string(),
+                "Test".to_string(),
+            );
             let issue_id = issue.id.clone();
             storage.save_issue(issue.clone()).unwrap();
 
@@ -2446,7 +2630,10 @@ mod tests {
             storage.init().unwrap();
 
             // Create and commit an issue
-            let mut issue = Issue::new("Original".to_string(), "Old version".to_string());
+            let mut issue = crate::domain::types::fixture_issue(
+                "Original".to_string(),
+                "Old version".to_string(),
+            );
             let issue_id = issue.id.clone();
             storage.save_issue(issue.clone()).unwrap();
 
@@ -2582,7 +2769,8 @@ mod tests {
             storage.init().unwrap();
 
             // Create an issue
-            let issue = Issue::new("Test".to_string(), "Description".to_string());
+            let issue =
+                crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
             let issue_id = issue.id.clone();
             storage.save_issue(issue.clone()).unwrap();
 
@@ -2607,7 +2795,8 @@ mod tests {
             storage.init().unwrap();
 
             // Create and delete an issue
-            let issue = Issue::new("Test".to_string(), "Description".to_string());
+            let issue =
+                crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
             let issue_id = issue.id.clone();
             storage.save_issue(issue.clone()).unwrap();
             storage.delete_issue(&issue_id).unwrap();
@@ -2921,6 +3110,38 @@ mod tests {
                 .list_issues()
                 .expect_err("aggregated read must be refused");
             assert!(err.downcast_ref::<RepositoryFormatTooNewError>().is_some());
+        }
+
+        #[test]
+        fn test_aggregated_read_rejects_every_invalid_local_index_shape() {
+            let cases = [
+                (
+                    r#"{"schema_version":2,"all_ids":["a","a"],"deleted_ids":[]}"#,
+                    "duplicate active issue id 'a'",
+                ),
+                (
+                    r#"{"schema_version":2,"all_ids":[],"deleted_ids":["a","a"]}"#,
+                    "duplicate deleted issue id 'a'",
+                ),
+                (
+                    r#"{"schema_version":2,"all_ids":["a"],"deleted_ids":["a"]}"#,
+                    "both active and deleted",
+                ),
+                ("{ invalid json", "failed to parse index"),
+            ];
+
+            for (raw, expected) in cases {
+                let temp_dir = TempDir::new().unwrap();
+                let storage = JsonFileStorage::new(temp_dir.path());
+                fs::write(temp_dir.path().join(INDEX_FILE), raw).unwrap();
+                let error = storage
+                    .load_aggregated_index()
+                    .expect_err("invalid local index must abort aggregation");
+                assert!(
+                    error.to_string().contains(expected),
+                    "expected {expected:?} in {error:#}"
+                );
+            }
         }
 
         // REQ-03: a repo whose version EQUALS the binary's support operates normally

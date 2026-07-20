@@ -206,7 +206,7 @@ fn hard_criterion_rule() -> Rule {
 fn projection_json(parser: &dyn ContentParser, body: &str) -> Value {
     // The body is what the projection parses; the issue carries it as its
     // description, exactly as in production.
-    let issue = Issue::new("Plan".to_string(), body.to_string());
+    let issue = crate::fixture_issue("Plan".to_string(), body.to_string());
     let projection = project(&issue).with_sections(&issue.description, parser);
     serde_json::to_value(&projection).expect("projection serializes")
 }

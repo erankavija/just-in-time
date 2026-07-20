@@ -2,7 +2,6 @@
 //!
 //! Validates that partial UUID prefixes work like git short hashes.
 use crate::harness::TestHarness;
-use jit::domain::Issue;
 use jit::storage::{InMemoryStorage, IssueStore};
 use proptest::prelude::*;
 
@@ -237,7 +236,7 @@ fn make_storage() -> InMemoryStorage {
 
 /// Save an issue whose `id` field is set to `custom_id`.
 fn save_issue_with_id(storage: &InMemoryStorage, custom_id: &str, title: &str) {
-    let mut issue = Issue::new(title.to_string(), String::new());
+    let mut issue = crate::fixture_issue(title.to_string(), String::new());
     issue.id = custom_id.to_string();
     storage.save_issue(issue).unwrap();
 }

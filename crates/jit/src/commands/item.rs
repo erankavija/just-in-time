@@ -649,7 +649,7 @@ source-of-truth = \"registry-first\"
     }
 
     fn issue_with_criteria(title: &str, body: &str) -> Issue {
-        Issue::new(title.to_string(), body.to_string())
+        crate::domain::types::fixture_issue(title.to_string(), body.to_string())
     }
 
     #[test]
@@ -792,7 +792,7 @@ source-of-truth = \"registry-first\"
     fn test_show_item_same_self_id_distinct_scopes() {
         // REQ-04: the same self-id under an issue scope and the project scope are
         // two distinct items, each resolved by its own qualified id.
-        let issue = Issue::new(
+        let issue = crate::domain::types::fixture_issue(
             "A".to_string(),
             "## Success Criteria\n\n- [hard] GLOSS-01: issue one\n".to_string(),
         );
@@ -974,7 +974,7 @@ source-of-truth = \"registry-first\"
         // REQ-03: resolve_link_label treats every address form (explicit project,
         // explicit issue, and `<short>/<self-id>` sugar) as a qualified reference,
         // and a bare self-id as unqualified.
-        let issue = Issue::new(
+        let issue = crate::domain::types::fixture_issue(
             "A".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n".to_string(),
         );
@@ -1509,7 +1509,7 @@ stage = \"postcheck\"
         // markdown index is produced for them. An issue description containing an
         // invariant-looking line is NOT projected as an invariant item — invariants
         // come ONLY from `.jit/invariants.toml`.
-        let issue = Issue::new(
+        let issue = crate::domain::types::fixture_issue(
             "A".to_string(),
             "## Success Criteria\n\n- [hard] missing-invariant: a markdown line that LOOKS like an invariant\n"
                 .to_string(),
@@ -1758,7 +1758,7 @@ stage = \"postcheck\"
         // all four kinds — requirement/decision/risk (issue-scope, markdown-first)
         // and invariant (project-scope, registry-first). The canonical `[item_kinds]`
         // table is declared, and a `.jit/invariants.toml` is loaded.
-        let issue = Issue::new(
+        let issue = crate::domain::types::fixture_issue(
             "A".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n\n\
              ## Decisions\n\n- D-01: use json storage\n\n\

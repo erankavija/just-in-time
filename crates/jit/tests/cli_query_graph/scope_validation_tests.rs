@@ -13,7 +13,7 @@
 //! deterministic); the exit-4 CLI contract is covered by a subprocess test.
 
 use jit::commands::CommandExecutor;
-use jit::domain::{DocumentReference, Issue, State};
+use jit::domain::{DocumentReference, State};
 use jit::storage::{InMemoryStorage, IssueStore};
 
 /// Wire a `plan` bracket onto container `container_id`: a planning node `P`
@@ -37,7 +37,8 @@ fn wire_plan_bracket<S: IssueStore>(
         .unwrap()
         .short_id();
 
-    let mut p = Issue::new("planning".to_string(), String::new());
+    let mut p = crate::fixture_issue("planning".to_string(), String::new());
+    p.id = format!("plan-{container_id}");
     p.labels = vec!["type:planning".to_string()];
     p.state = planning_state;
     p.documents.push(DocumentReference {
@@ -51,11 +52,34 @@ fn wire_plan_bracket<S: IssueStore>(
     let p_id = p.id.clone();
     executor.storage().save_issue(p).unwrap();
 
-    let mut b = Issue::new("breakdown".to_string(), String::new());
+    let mut b = crate::fixture_issue("breakdown".to_string(), String::new());
+    b.id = format!("break-{container_id}");
     b.labels = vec!["type:breakdown".to_string(), format!("brackets:{c_short}")];
     b.dependencies = vec![p_id.clone()];
     b.state = State::Backlog;
     executor.storage().save_issue(b).unwrap();
+    if !executor.storage().is_file_backed() {
+        let mut ids = executor
+            .storage()
+            .list_issues()
+            .unwrap()
+            .into_iter()
+            .map(|issue| issue.id)
+            .collect::<Vec<_>>();
+        ids.sort();
+        executor
+            .storage()
+            .write_repo_file(
+                ".jit/index.json",
+                &serde_json::json!({
+                    "schema_version": 2,
+                    "all_ids": ids,
+                    "deleted_ids": []
+                })
+                .to_string(),
+            )
+            .unwrap();
+    }
 
     p_id
 }
@@ -103,7 +127,12 @@ fn executor_with_rules_and_templates(
     std::fs::create_dir_all(storage.root()).unwrap();
     std::fs::write(storage.root().join("templates.toml"), templates_toml).unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    CommandExecutor::new(storage)
+    storage.add_repo_file(".jit/templates.toml", templates_toml);
+    storage.add_repo_file(".jit/rules.toml", rules_toml);
+    let layout =
+        jit::storage::discover_repository_layout(storage.root().parent().unwrap(), storage.root())
+            .unwrap();
+    CommandExecutor::new(storage).with_layout(layout)
 }
 
 /// Save an issue directly into storage, returning its id.
@@ -114,7 +143,14 @@ fn seed(
     description: &str,
     deps: &[String],
 ) -> String {
-    let mut issue = Issue::new(title.to_string(), description.to_string());
+    let mut issue = crate::fixture_issue(title.to_string(), description.to_string());
+    let hash = title
+        .bytes()
+        .chain(description.bytes())
+        .fold(0xcbf29ce484222325_u64, |hash, byte| {
+            (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
+        });
+    issue.id = format!("{hash:016x}-fixture");
     issue.labels = labels.iter().map(|s| s.to_string()).collect();
     issue.dependencies = deps.to_vec();
     issue.state = State::Backlog;
@@ -439,7 +475,8 @@ fn seed_breakdown_bracketing(
     state: State,
     deps: &[String],
 ) -> String {
-    let mut b = Issue::new("breakdown".to_string(), String::new());
+    let mut b = crate::fixture_issue("breakdown".to_string(), String::new());
+    b.id = format!("break-{pointer}");
     b.labels = vec!["type:breakdown".to_string(), format!("brackets:{pointer}")];
     b.dependencies = deps.to_vec();
     b.state = state;
@@ -608,25 +645,14 @@ fn container_with_external_plan(
         std::slice::from_ref(&impl_id),
     );
 
-    // Write the external plan doc carrying the criteria, at the {id}-substituted
-    // path under the REPO ROOT (the parent of `.jit`, i.e. `storage.root()`'s
-    // parent), since `plan_doc_location` templates are repo-root-relative. For
-    // `InMemoryStorage` this parent is `/tmp`; the file-backed module below
-    // exercises a real `.jit`-rooted layout.
-    let repo_root = executor
-        .storage()
-        .root()
-        .parent()
-        .expect("storage root has a parent")
-        .to_path_buf();
-    let plan_dir = repo_root.join("dev/active");
-    std::fs::create_dir_all(&plan_dir).unwrap();
+    // Seed the repo-root-relative plan into the aggregate image captured by the
+    // in-memory mutation session. Writing this fixture to the real `/tmp`
+    // filesystem would recreate the retired ambient-read path.
     let plan_path = format!("dev/active/{c}-plan.md");
-    std::fs::write(
-        repo_root.join(&plan_path),
+    executor.storage().add_repo_file(
+        &plan_path,
         "## Success Criteria\n\n- [hard] REQ-77: declared only in the external plan\n",
-    )
-    .unwrap();
+    );
     // Doc-ref-canonical resolution: the plan location comes from the planning
     // node's `plan` reference, so wire a (done) bracket pointing at the file.
     wire_plan_bracket(executor, &c, &plan_path, State::Done);
@@ -753,19 +779,11 @@ fn test_scope_resolves_plan_from_relinked_nondefault_path() {
     );
 
     // Write the plan ONLY at the archived path; leave the template default absent.
-    let repo_root = executor
-        .storage()
-        .root()
-        .parent()
-        .expect("storage root has a parent")
-        .to_path_buf();
     let archived = format!("dev/archive/features/{c}/plan.md");
-    std::fs::create_dir_all(repo_root.join(format!("dev/archive/features/{c}"))).unwrap();
-    std::fs::write(
-        repo_root.join(&archived),
+    executor.storage().add_repo_file(
+        &archived,
         "## Success Criteria\n\n- [hard] REQ-77: lives only at the archived path\n",
-    )
-    .unwrap();
+    );
 
     // The (done) planning node's `plan` reference points at the archived path.
     wire_plan_bracket(&executor, &c, &archived, State::Done);
@@ -799,19 +817,11 @@ fn test_scope_relinked_nondefault_plan_covered_is_clean() {
         std::slice::from_ref(&impl_id),
     );
 
-    let repo_root = executor
-        .storage()
-        .root()
-        .parent()
-        .expect("storage root has a parent")
-        .to_path_buf();
     let archived = format!("dev/archive/features/{c}/plan.md");
-    std::fs::create_dir_all(repo_root.join(format!("dev/archive/features/{c}"))).unwrap();
-    std::fs::write(
-        repo_root.join(&archived),
+    executor.storage().add_repo_file(
+        &archived,
         "## Success Criteria\n\n- [hard] REQ-77: lives only at the archived path\n",
-    )
-    .unwrap();
+    );
     wire_plan_bracket(&executor, &c, &archived, State::Done);
 
     let report = executor.validate_scope(&c).expect("scope validation runs");
@@ -842,18 +852,16 @@ fn test_inline_template_still_validates_from_body() {
 // ---------------------------------------------------------------------------
 // File-backed regression (jit:1536006d): the external plan base dir is the REPO
 // ROOT (parent of `.jit`), NOT `storage.root()` (the `.jit` dir). The
-// InMemoryStorage tests above write the plan under `storage.root()/dev/active`
-// (= `.jit/dev/active`), which MASKS the `.jit`-vs-repo-root distinction. These
-// tests use a real `JsonFileStorage` rooted at `<tmp>/.jit` with the plan file
-// at the REPO-ROOT-relative `<tmp>/dev/active/{id}-plan.md` (NOT under `.jit/`),
-// so they FAIL while the resolver passes `storage.root()` and PASS after the
-// base dir is corrected to the repo root.
+// InMemoryStorage tests above seed the canonical `Worktree(...)` entry directly,
+// so these tests retain the physical-path regression: a real `JsonFileStorage`
+// rooted at `<tmp>/.jit` with the plan at the repo-root-relative
+// `<tmp>/dev/active/{id}-plan.md` (NOT under `.jit/`).
 // ---------------------------------------------------------------------------
 
 mod file_backed_external_plan {
     use super::{COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL};
     use jit::commands::CommandExecutor;
-    use jit::domain::{Issue, State};
+    use jit::domain::State;
     use jit::storage::{IssueStore, JsonFileStorage};
     use tempfile::TempDir;
 
@@ -883,7 +891,14 @@ mod file_backed_external_plan {
         description: &str,
         deps: &[String],
     ) -> String {
-        let mut issue = Issue::new(title.to_string(), description.to_string());
+        let mut issue = crate::fixture_issue(title.to_string(), description.to_string());
+        let hash = title
+            .bytes()
+            .chain(description.bytes())
+            .fold(0xcbf29ce484222325_u64, |hash, byte| {
+                (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
+            });
+        issue.id = format!("{hash:016x}-fixture");
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue.dependencies = deps.to_vec();
         issue.state = State::Backlog;

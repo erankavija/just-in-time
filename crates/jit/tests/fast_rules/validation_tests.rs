@@ -2,14 +2,13 @@
 //!
 //! Tests comprehensive validation including broken references and orphaned data.
 
-use jit::commands::CommandExecutor;
 use jit::domain::Priority;
 use jit::storage::{InMemoryStorage, IssueStore};
 
 #[test]
 fn test_validation_detects_broken_dependency() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = crate::memory_executor(storage.clone());
 
     // Create two issues
     let (issue1_id, _) = executor
@@ -57,7 +56,7 @@ fn test_validation_detects_broken_dependency() {
 #[test]
 fn test_validation_detects_cycle() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = crate::memory_executor(storage.clone());
 
     // Create two issues
     let (issue1_id, _) = executor
@@ -103,7 +102,7 @@ fn test_validation_detects_cycle() {
 #[test]
 fn test_validation_passes_with_valid_graph() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = crate::memory_executor(storage.clone());
 
     // Create a valid dependency graph: A -> B -> C
     let (issue_c_id, _) = executor
@@ -153,7 +152,7 @@ fn test_validation_passes_with_valid_graph() {
 #[test]
 fn test_validation_detects_multiple_broken_dependencies() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = crate::memory_executor(storage.clone());
 
     let (issue1_id, _) = executor
         .create_issue(
@@ -184,7 +183,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
 #[test]
 fn test_validation_empty_repository() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
 
     // Empty repository should validate successfully
     assert!(executor.validate_silent().is_ok());
@@ -193,7 +192,7 @@ fn test_validation_empty_repository() {
 #[test]
 fn test_validation_detects_invalid_gate_reference() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = crate::memory_executor(storage.clone());
 
     // Create issue with gate requirement
     let (_issue, _) = executor
@@ -221,7 +220,7 @@ fn test_validation_detects_invalid_gate_reference() {
 #[test]
 fn test_validation_detects_isolated_issues() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = crate::memory_executor(storage.clone());
 
     // Create connected issues: A -> B
     let (issue_a_id, _) = executor
@@ -276,7 +275,7 @@ fn test_validation_detects_isolated_issues() {
 #[test]
 fn test_validation_passes_with_all_connected_issues() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = crate::memory_executor(storage.clone());
 
     // Create a connected graph: A -> B -> C
     let (issue_a_id, _) = executor
@@ -329,7 +328,7 @@ fn test_validation_passes_with_all_connected_issues() {
 #[test]
 fn test_validation_passes_with_single_issue() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage.clone());
+    let executor = crate::memory_executor(storage.clone());
 
     // Create a single issue (edge case - should not be considered isolated)
     let (_issue_id, _) = executor

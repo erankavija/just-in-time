@@ -209,7 +209,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Add a single gate to an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<Vec<String>> {
+    pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
 
         // Collect warnings instead of printing
@@ -222,7 +225,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !issue.gates_required.contains(&gate_key) {
             issue.gates_required.push(gate_key.clone());
             // Note: Gates don't block Ready state, only Done state
-            self.storage.save_issue(issue)?;
+            self.publish_issue_mutation(vec![issue], Vec::new())?;
         }
         Ok(warnings)
     }
@@ -234,7 +237,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &str,
         gate_keys: &[String],
-    ) -> Result<(GateAddResult, Vec<String>)> {
+    ) -> Result<(GateAddResult, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Validate input
         if gate_keys.is_empty() {
             return Err(anyhow!("Must provide at least one gate key"));
@@ -254,6 +260,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut added = Vec::new();
         let mut already_exist = Vec::new();
         let mut not_found = Vec::new();
+        let mut events = Vec::new();
 
         // First pass: validate all gates exist in registry
         for gate_key in gate_keys {
@@ -281,23 +288,24 @@ impl<S: IssueStore> CommandExecutor<S> {
                         GateState {
                             status: GateStatus::Pending,
                             updated_by: None,
-                            updated_at: Utc::now(),
+                            updated_at: chrono::DateTime::default(),
                         },
                     );
                 }
 
                 added.push(gate_key.clone());
 
-                // Log gate added event
-                self.storage
-                    .append_event(&Event::new_gate_added(full_id.clone(), gate_key.clone()))?;
+                events.push((
+                    1,
+                    Event::draft_gate_added(full_id.clone(), gate_key.clone()),
+                ));
             }
         }
 
         // Save only if at least one gate was actually added. Re-adding gates
         // that already exist is a no-op and must not bump `updated_at`.
         if !added.is_empty() {
-            self.storage.save_issue(issue)?;
+            self.publish_issue_mutation(vec![issue], events)?;
         }
 
         Ok((
@@ -316,7 +324,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &str,
         gate_keys: &[String],
-    ) -> Result<(GateRemoveResult, Vec<String>)> {
+    ) -> Result<(GateRemoveResult, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Validate input
         if gate_keys.is_empty() {
             return Err(anyhow!("Must provide at least one gate key"));
@@ -334,6 +345,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut removed = Vec::new();
         let mut not_found = Vec::new();
+        let mut events = Vec::new();
 
         for gate_key in gate_keys {
             if issue.gates_required.contains(gate_key) {
@@ -341,9 +353,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 issue.gates_status.remove(gate_key);
                 removed.push(gate_key.clone());
 
-                // Log gate removed event
-                self.storage
-                    .append_event(&Event::new_gate_removed(full_id.clone(), gate_key.clone()))?;
+                events.push((
+                    1,
+                    Event::draft_gate_removed(full_id.clone(), gate_key.clone()),
+                ));
             } else {
                 not_found.push(gate_key.clone());
             }
@@ -352,7 +365,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Save only if at least one gate was actually removed. Removing gates
         // that are not present is a no-op and must not bump `updated_at`.
         if !removed.is_empty() {
-            self.storage.save_issue(issue)?;
+            self.publish_issue_mutation(vec![issue], events)?;
         }
 
         Ok((GateRemoveResult { removed, not_found }, warnings))
@@ -485,16 +498,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some(by.clone()),
-                updated_at: Utc::now(),
+                updated_at: chrono::DateTime::default(),
             },
         );
 
         let issue_id = issue.id.clone();
-        self.storage.save_issue(issue)?;
-
-        // Log event
-        let event = Event::new_gate_passed(issue_id, gate_key, Some(by));
-        self.storage.append_event(&event)?;
+        let event = Event::draft_gate_passed(issue_id, gate_key, Some(by));
+        self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
 
         // Check if Gated issue can now transition to Done
         self.auto_transition_to_done(&full_id)?;
@@ -580,7 +590,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: &str,
         gate_key: String,
         by: Option<String>,
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Validate the actor through the one `Assignee` path before it is stored
         // on the gate state.
         let by = by
@@ -619,16 +632,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             GateState {
                 status: GateStatus::Failed,
                 updated_by: by.clone(),
-                updated_at: Utc::now(),
+                updated_at: chrono::DateTime::default(),
             },
         );
 
         let issue_id = issue.id.clone();
-        self.storage.save_issue(issue)?;
-
-        // Log event
-        let event = Event::new_gate_failed(issue_id, gate_key, by);
-        self.storage.append_event(&event)?;
+        let event = Event::draft_gate_failed(issue_id, gate_key, by);
+        self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
 
         Ok(warnings)
     }
@@ -681,7 +691,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // @/inv/event-log: registry-scoped audit entry for the definition create.
         self.storage
-            .append_event(&Event::new_gate_definition_created(key))?;
+            .append_event(&Event::draft_gate_definition_created(key))?;
 
         Ok(())
     }
@@ -750,7 +760,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // @/inv/event-log: registry-scoped audit entry for the definition create.
         self.storage
-            .append_event(&Event::new_gate_definition_created(key))?;
+            .append_event(&Event::draft_gate_definition_created(key))?;
 
         Ok(())
     }
@@ -974,7 +984,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // @/inv/event-log: registry-scoped audit entry for the definition edit.
         self.storage
-            .append_event(&Event::new_gate_definition_updated(updated.key.clone()))?;
+            .append_event(&Event::draft_gate_definition_updated(updated.key.clone()))?;
 
         Ok(updated)
     }
@@ -994,7 +1004,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // @/inv/event-log: registry-scoped audit entry for the definition removal.
         self.storage
-            .append_event(&Event::new_gate_definition_removed(key.to_string()))?;
+            .append_event(&Event::draft_gate_definition_removed(key.to_string()))?;
 
         Ok(())
     }
@@ -1032,7 +1042,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         skip_precheck: bool,
         skip_postcheck: bool,
         except_gates: &[String],
-    ) -> Result<(GateAddResult, Vec<String>)> {
+    ) -> Result<(GateAddResult, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::declarations::{GateChecker, GateStage};
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
@@ -1103,9 +1116,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         // definition writes (created for new keys, updated for overwrites).
         for (key, existed) in definition_writes {
             let event = if existed {
-                Event::new_gate_definition_updated(key)
+                Event::draft_gate_definition_updated(key)
             } else {
-                Event::new_gate_definition_created(key)
+                Event::draft_gate_definition_created(key)
             };
             self.storage.append_event(&event)?;
         }
@@ -1218,7 +1231,7 @@ enforce_leases = "off"
 "#;
         std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
 
-        CommandExecutor::new(storage)
+        crate::commands::test_helpers::memory_executor(storage)
     }
 
     #[test]
@@ -1254,7 +1267,7 @@ enforce_leases = "off"
         executor.storage.save_gate_registry(&registry).unwrap();
 
         // Create issue with the gate
-        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
         executor
@@ -1309,7 +1322,7 @@ enforce_leases = "off"
         let executor = setup();
         define_manual_gate(&executor, "g1");
 
-        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
 
@@ -1334,7 +1347,7 @@ enforce_leases = "off"
         let executor = setup();
         define_manual_gate(&executor, "g1");
 
-        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
         let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
@@ -1385,7 +1398,7 @@ enforce_leases = "off"
         executor.storage.save_gate_registry(&registry).unwrap();
 
         // Create issue with the gate
-        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
         executor
@@ -1438,7 +1451,7 @@ enforce_leases = "off"
         executor.storage.save_gate_registry(&registry).unwrap();
 
         // Create issue with the gate
-        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
         executor
@@ -1471,7 +1484,7 @@ enforce_leases = "off"
         let executor = setup();
         define_manual_gate(&executor, "manual-gate");
 
-        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
         executor

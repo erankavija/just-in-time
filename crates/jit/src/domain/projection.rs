@@ -216,7 +216,8 @@ mod tests {
     use crate::domain::types::{DocumentReference, Issue};
 
     fn issue_with(labels: Vec<&str>, description: &str) -> Issue {
-        let mut issue = Issue::new("Title".to_string(), description.to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Title".to_string(), description.to_string());
         issue.labels = labels.into_iter().map(str::to_string).collect();
         issue
     }

@@ -43,7 +43,7 @@ impl PinnedRootResolver for FakePinnedResolver {
 }
 
 fn issue(id: &str, issue_type: &str, state: State) -> Issue {
-    let mut issue = Issue::new(id.to_string(), String::new());
+    let mut issue = crate::fixture_issue(id.to_string(), String::new());
     issue.id = id.to_string();
     issue.labels = vec![format!("type:{issue_type}")];
     issue.state = state;

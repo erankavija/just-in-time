@@ -546,7 +546,7 @@ type DocumentClosure = (
 /// `(revision, path)` request: a document pinned to a commit is captured as
 /// pinned evidence at that commit; an unpinned document is captured as its
 /// working-tree entry plus HEAD evidence for the fallback. Each breakable
-/// container's derived plan-document path (mirroring `resolve_plan_content`'s
+/// container's derived plan-document path (mirroring plan-content projection's
 /// planning-node resolution) is added as a working-tree path so a container whose
 /// criteria live in an external plan validates against image-projected content.
 fn document_capture_closure(issues: &[Issue], config: &JitConfig) -> Result<DocumentClosure> {
@@ -594,7 +594,7 @@ fn document_capture_closure(issues: &[Issue], config: &JitConfig) -> Result<Docu
 }
 
 /// Project the plan-document content map from a captured validation image — the
-/// closed-read replacement for the ambient `resolve_plan_content`'s filesystem
+/// closed-read replacement for the retired ambient filesystem
 /// reads.
 ///
 /// Planning-node resolution runs against the full captured issue set (so a scoped
@@ -768,79 +768,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         // session; the finalizer stamps `updated_at` and reconciles the lifecycle
         // timestamps from the captured preimage.
         self.publish_issue_mutation(vec![issue], Vec::new())
-    }
-
-    /// Publish semantic issue update(s) plus any inline provenance event(s) through
-    /// the recovered mutation session in one transaction — the closed-read
-    /// replacement for the `save_issue` + `append_event` pair on the validate-fix
-    /// path.
-    ///
-    /// Each update is a [`MutationIntent::UpdateIssue`] of an issue that must exist
-    /// in the captured image; the finalizer stamps its `updated_at` and reconciles
-    /// `created_at`/`first_ready_at` from the captured preimage. Each event is a
-    /// [`MutationIntent::RecordEvent`] whose id and timestamp the finalizer assigns
-    /// (the caller submits an empty id and a placeholder timestamp). One
-    /// [`MutationContext`] is created before the retry loop and reused, so a
-    /// conflict retry reproduces identical identifiers and the single mutation
-    /// timestamp. General enough for the remaining `save_issue` consumers to adopt
-    /// in the increment-8 swap-and-delete.
-    fn publish_issue_mutation(
-        &self,
-        updates: Vec<Issue>,
-        events: Vec<(u8, crate::domain::Event)>,
-    ) -> Result<()>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::repository_state::{
-            finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, VirtualPath,
-        };
-        use crate::storage::RepositoryStateStoreError;
-
-        let issue_ids: Vec<String> = updates.iter().map(|issue| issue.id.clone()).collect();
-        let intents: Vec<MutationIntent> = updates
-            .into_iter()
-            .map(|issue| MutationIntent::UpdateIssue {
-                issue: Box::new(issue),
-            })
-            .chain(events.into_iter().map(|(phase, event)| {
-                MutationIntent::RecordEvent {
-                    phase,
-                    event: Box::new(event),
-                }
-            }))
-            .collect();
-
-        let layout = self.require_layout()?;
-        let mut session = self.storage().open_mutation_session(layout.clone())?;
-        let context = MutationContext::production();
-        let budget = CaptureBudget {
-            max_paths: 64,
-            max_listings: 0,
-            max_bytes: 64 * 1024 * 1024,
-            max_depth: 6,
-        };
-        for _ in 0..8 {
-            let mut paths = issue_ids
-                .iter()
-                .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                .collect::<Result<Vec<_>, _>>()?;
-            paths.push(VirtualPath::data("events.jsonl")?);
-            let image = match session.capture(CaptureSpec::phase_one(paths, budget)?) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            };
-            let plan = finalize(&layout, &image, &context, &intents)?;
-            match session.apply(&plan) {
-                Ok(_) => return Ok(()),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "issue mutation did not converge after repeated capture conflicts"
-        ))
     }
 
     // Note: apply_dependency_reversal is removed - we don't reverse dependencies
@@ -1285,11 +1212,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Plan-document content for `emit_for`, image-projected when a captured
     /// session is available (the closed-read replacement for the ambient
-    /// `resolve_plan_content`).
+    /// the plan-content projection).
     ///
-    /// When the store is file-backed AND a canonical layout is configured — the
-    /// production path, where the CLI/server supplies the worktree/data roots —
-    /// this captures the whole-repository validation image
+    /// This captures the whole-repository validation image
     /// ([`capture_validation_image`](Self::capture_validation_image), whose
     /// closure enqueues every derived plan-document path) and projects the
     /// plan-document content map through [`plan_content_from_image`]. Planning-node
@@ -1297,13 +1222,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// resolves a bracket's planning node, and the plan bytes are read from the
     /// closed image rather than the live filesystem.
     ///
-    /// Without a captured session — an in-memory store (its session models
-    /// aggregate state, not the plan docs' real filesystem) or a layout-less
-    /// file-backed executor (git-optional startup that discovered no layout, and
-    /// test fixtures) — there is no closed image to project, so it falls back to
-    /// the ambient resolver. That is the sole remaining reference to
-    /// `resolve_plan_content`, retired with the layout-aware fixture story in the
-    /// increment-8 predecessor scans (plan §2 "boundary plan-document resolver").
     pub(crate) fn image_plan_content(
         &self,
         emit_for: &[Issue],
@@ -1311,144 +1229,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        if self.storage.is_file_backed() && self.layout.is_some() {
-            let image = self.capture_validation_image()?;
-            return plan_content_from_image(&image, emit_for);
-        }
-        self.resolve_plan_content(emit_for)
-    }
-
-    /// Build the plan-document content map the graph engine consumes (boundary).
-    ///
-    /// For every issue in `issues` whose type is a **breakable container type**
-    /// (one some graph template's `applies_to` lists, per
-    /// [`TemplateRegistry::breakable_types`](crate::templates::TemplateRegistry::breakable_types))
-    /// AND whose template declares an EXTERNAL plan-doc location (the planning
-    /// node carries a `doc`, per
-    /// [`GraphTemplate::plan_doc_location`](crate::templates::GraphTemplate::plan_doc_location)),
-    /// this resolves the criteria-source content from disk via the
-    /// [`plan_doc`](crate::commands::plan_doc) resolver, keyed by issue id.
-    ///
-    /// The plan-doc location is **doc-ref-canonical**: it is read from the
-    /// bracket's planning node's
-    /// [`PLAN_DOC_LABEL`](crate::commands::plan_doc::PLAN_DOC_LABEL)-labeled
-    /// [`DocumentReference`](crate::domain::DocumentReference), NOT the
-    /// `dev/active/{id}` template path. The template's `plan_doc_location` is only
-    /// the creation-time DEFAULT (`jit apply plan` seeds the reference from it);
-    /// once recorded, the reference is the validation-time source of truth, so a
-    /// plan that is moved/archived and re-linked keeps validating from its new
-    /// location with no leniency. The planning node is found by
-    /// [`find_planning_node`] (the breakdown node's `brackets:<id>` label and its
-    /// planning-node dependency).
-    ///
-    /// An issue is OMITTED from the map — so the engine falls back to the issue's
-    /// own description (the inline plan) — when: its template declares no `doc`;
-    /// the template registry is empty; no bracket planning node exists yet; or the
-    /// planning node records no external plan reference. An empty map reproduces
-    /// the legacy inline behavior exactly.
-    ///
-    /// A recorded plan reference's `path` is REPO-ROOT-relative, so the base dir
-    /// passed to [`load_plan_content`](crate::commands::plan_doc::load_plan_content)
-    /// is the repo root (the PARENT of `.jit`), NOT `storage.root()` (which is
-    /// the `.jit` directory). This is the ONLY place external plan files are read
-    /// for validation; the pure engine never touches the filesystem.
-    ///
-    /// A missing plan file (the recorded reference points at a path that does not
-    /// exist) is gated on the bracket's **planning node state**: while the planning
-    /// node has not yet completed, the plan is legitimately unauthored, so the
-    /// container is simply OMITTED from the map and no error is raised — this is
-    /// what lets a freshly-applied bracket validate cleanly before its plan
-    /// exists. Once the planning node is `done` the plan MUST exist (downstream
-    /// coverage reads its criteria), so a still-missing file surfaces as a
-    /// [`PlanDocError`](crate::commands::plan_doc::PlanDocError). Any OTHER read
-    /// failure (unreadable file, parse error) always surfaces as an error,
-    /// regardless of planning state — never a silent pass. (A *dangling*
-    /// reference is independently a hard `jit validate` error via
-    /// `validate_document_references`, in every lifecycle state.)
-    pub fn resolve_plan_content(
-        &self,
-        issues: &[Issue],
-    ) -> Result<std::collections::HashMap<String, String>> {
-        use crate::commands::plan_doc::{load_plan_content, PlanDocError};
-        use std::io::ErrorKind;
-
-        let templates = &self.cached_config()?.templates;
-
-        // Breakable container types come from the template registry: a type is
-        // breakable iff some template's `applies_to` lists it. An empty registry
-        // (no templates, the unbracketed-repo case) yields an empty set, so the
-        // map below is empty — the engine then reads each issue's own description.
-        let breakable: std::collections::HashSet<String> =
-            templates.breakable_types().into_iter().collect();
-
-        // Recorded plan-reference paths are REPO-ROOT-relative (e.g.
-        // `dev/archive/features/<id>/plan.md`), so the base dir is the repo root —
-        // the PARENT of `.jit` — NOT `storage.root()` (which is the `.jit` dir
-        // itself). Mirror `add_document_reference`'s repo-root derivation; fall
-        // back to `storage.root()` only if it has no parent (a defensive case
-        // that does not arise for a real `.jit` directory).
-        let storage_root = self.storage.root();
-        let base_dir = storage_root.parent().unwrap_or(storage_root);
-
-        // Id → issue over the WHOLE store (not just `issues`), for resolving a
-        // bracket's planning node — both to read its plan reference and to decide
-        // whether a missing plan is "not authored yet" (skip) or "due" (error).
-        // The scoped-validation slice bounds out the bracket infrastructure (B/P),
-        // so the planning node must be looked up against the full graph for the
-        // gate to be consistent across scopes.
-        let all_issues = self.storage.list_issues()?;
-        let by_id: std::collections::HashMap<&str, &Issue> =
-            all_issues.iter().map(|i| (i.id.as_str(), i)).collect();
-
-        let mut out = std::collections::HashMap::new();
-        for issue in issues {
-            // The issue's `type:` label selects its template.
-            let Some(issue_type) =
-                label_utils::type_label_value(&issue.labels).filter(|t| breakable.contains(*t))
-            else {
-                continue;
-            };
-            let Some(template) = templates.template_for_container(issue_type) else {
-                continue;
-            };
-            // No `doc` on the planning-node template (an inline plan): skip — the
-            // engine uses the description.
-            if template.plan_doc_location(&templates.roles).is_none() {
-                continue;
-            }
-
-            // Doc-ref-canonical: the plan lives wherever the bracket's planning
-            // node's `plan` reference points, not the template path. With no
-            // planning node, or none carrying an external plan reference, the plan
-            // is inline — skip so the engine reads the container's description.
-            let planning = find_planning_node(issue, template, &templates.roles, &by_id);
-            let Some(plan_path) = planning.and_then(planning_node_plan_path) else {
-                continue;
-            };
-
-            // `load_plan_content` treats a concrete path (no `{id}` placeholder)
-            // verbatim, reusing the same boundary read + typed error as the
-            // template path did.
-            match load_plan_content(issue, &plan_path, &issue.id, base_dir) {
-                Ok(content) => {
-                    out.insert(issue.id.clone(), content);
-                }
-                Err(e) => {
-                    // A not-yet-authored plan is acceptable WHILE the bracket's
-                    // planning node is still open; only once it is `done` must the
-                    // plan exist. Every other read failure is always an error.
-                    let not_authored_yet = matches!(
-                        &e,
-                        PlanDocError::Read { source, .. } if source.kind() == ErrorKind::NotFound
-                    ) && planning.is_none_or(|p| p.state != State::Done);
-                    if not_authored_yet {
-                        continue;
-                    }
-                    return Err(anyhow!("{e}"));
-                }
-            }
-        }
-        Ok(out)
+        let image = self.capture_validation_image()?;
+        plan_content_from_image(&image, emit_for)
     }
 
     /// Run the declarative rule set (`.jit/rules.toml`) as a per-issue or
@@ -2811,6 +2593,7 @@ source-of-truth = \"registry-first\"
         storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
+        storage.add_repo_file(".jit/config.toml", CANONICAL_ITEM_KINDS);
         // The registry-first `invariant` kind reads its toml through the storage
         // boundary at the descriptor path, so seed the in-memory repo-file map (not
         // the real fs) at `.jit/invariants.toml`.
@@ -2818,7 +2601,7 @@ source-of-truth = \"registry-first\"
         for issue in issues {
             storage.save_issue(issue).unwrap();
         }
-        CommandExecutor::new(storage)
+        finish_dangling_executor(storage)
     }
 
     /// Like [`dangling_exec`] but its `config.toml` ALSO registers the link
@@ -2832,24 +2615,39 @@ source-of-truth = \"registry-first\"
         // Invariant registry through the storage boundary (descriptor path); the
         // `config.toml` is parsed from the real `.jit` root by `cached_config`.
         storage.add_repo_file(".jit/invariants.toml", REGISTRY_TOML);
-        std::fs::write(
-            storage.root().join("config.toml"),
-            format!(
-                "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
-                 [namespaces.satisfies]\ndescription = \"satisfied item\"\nunique = false\n\
-                 [namespaces.enforces]\ndescription = \"enforced invariant\"\nunique = false\n\
-                 {CANONICAL_ITEM_KINDS}"
-            ),
-        )
-        .unwrap();
+        let config = format!(
+            "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
+             [namespaces.satisfies]\ndescription = \"satisfied item\"\nunique = false\n\
+             [namespaces.enforces]\ndescription = \"enforced invariant\"\nunique = false\n\
+             {CANONICAL_ITEM_KINDS}"
+        );
+        std::fs::write(storage.root().join("config.toml"), &config).unwrap();
+        storage.add_repo_file(".jit/config.toml", &config);
         for issue in issues {
             storage.save_issue(issue).unwrap();
         }
-        CommandExecutor::new(storage)
+        finish_dangling_executor(storage)
+    }
+
+    fn finish_dangling_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
+        let mut ids = storage
+            .list_issues()
+            .unwrap()
+            .into_iter()
+            .map(|issue| issue.id)
+            .collect::<Vec<_>>();
+        ids.sort();
+        storage.add_repo_file(
+            ".jit/index.json",
+            &serde_json::json!({"schema_version": 2, "all_ids": ids, "deleted_ids": []})
+                .to_string(),
+        );
+        let layout = storage.repository_layout();
+        CommandExecutor::new(storage).with_layout(layout)
     }
 
     fn issue_with_labels(title: &str, body: &str, labels: &[&str]) -> Issue {
-        let mut issue = Issue::new(title.to_string(), body.to_string());
+        let mut issue = crate::domain::types::fixture_issue(title.to_string(), body.to_string());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue
     }

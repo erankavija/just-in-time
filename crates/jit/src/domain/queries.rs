@@ -110,10 +110,11 @@ pub fn derive_lifecycle_timestamps(issue_id: &str, events: &[Event]) -> Lifecycl
 /// use jit::domain::queries::build_issue_map;
 /// use jit::domain::Issue;
 ///
-/// let issues = vec![
-///     Issue::new("Task 1".to_string(), String::new()),
-///     Issue::new("Task 2".to_string(), String::new()),
-/// ];
+/// let mut task_1 = Issue::draft("Task 1".to_string(), String::new());
+/// task_1.id = "task-1".to_string();
+/// let mut task_2 = Issue::draft("Task 2".to_string(), String::new());
+/// task_2.id = "task-2".to_string();
+/// let issues = vec![task_1, task_2];
 ///
 /// let map = build_issue_map(&issues);
 /// assert_eq!(map.len(), 2);
@@ -280,9 +281,9 @@ pub fn query_by_label(issues: &[Issue], pattern: &str) -> Vec<Issue> {
 /// use jit::domain::queries::query_by_labels;
 /// use jit::domain::Issue;
 ///
-/// let mut a = Issue::new("A".to_string(), String::new());
+/// let mut a = Issue::draft("A".to_string(), String::new());
 /// a.labels = vec!["epic:auth".to_string(), "component:api".to_string()];
-/// let mut b = Issue::new("B".to_string(), String::new());
+/// let mut b = Issue::draft("B".to_string(), String::new());
 /// b.labels = vec!["epic:auth".to_string()];
 ///
 /// let issues = vec![a, b];
@@ -395,21 +396,21 @@ pub fn count_by_state(issues: &[Issue]) -> Vec<(State, usize)> {
 ///
 /// // A spine `C -> I -> B -> P`: container, an impl task, a breakdown node,
 /// // and the plan upstream of the breakdown. Edges point dependent -> dependency.
-/// let mut c = Issue::new("container".to_string(), String::new());
+/// let mut c = Issue::draft("container".to_string(), String::new());
 /// c.id = "C".to_string();
 /// c.labels = vec!["type:epic".to_string()];
 /// c.dependencies = vec!["I".to_string()];
 ///
-/// let mut i = Issue::new("impl".to_string(), String::new());
+/// let mut i = Issue::draft("impl".to_string(), String::new());
 /// i.id = "I".to_string();
 /// i.dependencies = vec!["B".to_string()];
 ///
-/// let mut b = Issue::new("breakdown".to_string(), String::new());
+/// let mut b = Issue::draft("breakdown".to_string(), String::new());
 /// b.id = "B".to_string();
 /// b.labels = vec!["type:breakdown".to_string()];
 /// b.dependencies = vec!["P".to_string()];
 ///
-/// let mut p = Issue::new("plan".to_string(), String::new());
+/// let mut p = Issue::draft("plan".to_string(), String::new());
 /// p.id = "P".to_string();
 ///
 /// let issues = vec![c, i, b, p];
@@ -557,9 +558,9 @@ mod tests {
     #[test]
     fn test_build_issue_map() {
         // Create test issues
-        let issue1 = Issue::new("Task 1".to_string(), String::new());
-        let issue2 = Issue::new("Task 2".to_string(), String::new());
-        let issue3 = Issue::new("Task 3".to_string(), String::new());
+        let issue1 = crate::domain::types::fixture_issue("Task 1".to_string(), String::new());
+        let issue2 = crate::domain::types::fixture_issue("Task 2".to_string(), String::new());
+        let issue3 = crate::domain::types::fixture_issue("Task 3".to_string(), String::new());
 
         let issues = vec![issue1.clone(), issue2.clone(), issue3.clone()];
 
@@ -587,7 +588,7 @@ mod tests {
 
     #[test]
     fn test_build_issue_map_single() {
-        let issue = Issue::new("Single task".to_string(), String::new());
+        let issue = crate::domain::types::fixture_issue("Single task".to_string(), String::new());
         let issues = vec![issue.clone()];
         let map = build_issue_map(&issues);
 
@@ -596,7 +597,7 @@ mod tests {
     }
 
     fn labeled_issue(title: &str, labels: &[&str]) -> Issue {
-        let mut issue = Issue::new(title.to_string(), String::new());
+        let mut issue = crate::domain::types::fixture_issue(title.to_string(), String::new());
         issue.labels = labels.iter().map(|l| l.to_string()).collect();
         issue
     }
@@ -667,7 +668,7 @@ mod tests {
 
     /// Build an issue with the given id, type label, and dependency ids.
     fn scope_issue(id: &str, type_: &str, deps: &[&str]) -> Issue {
-        let mut issue = Issue::new(format!("issue {id}"), String::new());
+        let mut issue = crate::domain::types::fixture_issue(format!("issue {id}"), String::new());
         issue.id = id.to_string();
         issue.labels = vec![crate::labels::type_label(type_)];
         issue.dependencies = deps.iter().map(|s| s.to_string()).collect();
@@ -771,11 +772,12 @@ mod tests {
 
     #[test]
     fn test_query_blocked_dependency_reason_is_typed() {
-        let mut dep = Issue::new("Upstream".to_string(), String::new());
+        let mut dep = crate::domain::types::fixture_issue("Upstream".to_string(), String::new());
         dep.id = "dep1".to_string();
         dep.state = State::InProgress;
 
-        let mut blocked = Issue::new("Downstream".to_string(), String::new());
+        let mut blocked =
+            crate::domain::types::fixture_issue("Downstream".to_string(), String::new());
         blocked.id = "blocked1".to_string();
         blocked.state = State::Backlog;
         blocked.dependencies = vec!["dep1".to_string()];
@@ -802,15 +804,18 @@ mod tests {
     #[test]
     fn test_query_blocked_omits_rejected_dependency_from_reasons() {
         // A Rejected dependency is met: only the InProgress one is a reason.
-        let mut rejected = Issue::new("Abandoned".to_string(), String::new());
+        let mut rejected =
+            crate::domain::types::fixture_issue("Abandoned".to_string(), String::new());
         rejected.id = "dep1".to_string();
         rejected.state = State::Rejected;
 
-        let mut pending = Issue::new("Upstream".to_string(), String::new());
+        let mut pending =
+            crate::domain::types::fixture_issue("Upstream".to_string(), String::new());
         pending.id = "dep2".to_string();
         pending.state = State::InProgress;
 
-        let mut blocked = Issue::new("Downstream".to_string(), String::new());
+        let mut blocked =
+            crate::domain::types::fixture_issue("Downstream".to_string(), String::new());
         blocked.id = "blocked1".to_string();
         blocked.state = State::Backlog;
         blocked.dependencies = vec!["dep1".to_string(), "dep2".to_string()];
@@ -835,11 +840,12 @@ mod tests {
 
         // A Backlog issue with an unmet dependency keeps it blocked; a required
         // gate with no recorded status contributes a Pending gate reason.
-        let mut dep = Issue::new("Upstream".to_string(), String::new());
+        let mut dep = crate::domain::types::fixture_issue("Upstream".to_string(), String::new());
         dep.id = "dep1".to_string();
         dep.state = State::InProgress;
 
-        let mut blocked = Issue::new("Downstream".to_string(), String::new());
+        let mut blocked =
+            crate::domain::types::fixture_issue("Downstream".to_string(), String::new());
         blocked.id = "blocked1".to_string();
         blocked.state = State::Backlog;
         blocked.dependencies = vec!["dep1".to_string()];

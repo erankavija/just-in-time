@@ -140,7 +140,7 @@ fn sdd_compliant_body() -> String {
 /// Success Criteria with a `[hard]` criterion) and a correctly-formatted `req:`
 /// id derived from the criteria.
 fn sdd_compliant_epic() -> Issue {
-    let mut epic = Issue::new("Validation engine".to_string(), sdd_compliant_body());
+    let mut epic = crate::fixture_issue("Validation engine".to_string(), sdd_compliant_body());
     epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
     epic
 }
@@ -205,7 +205,7 @@ fn test_sdd_graph_coverage_and_reference_pass_when_satisfied() {
     epic.state = State::Done;
     // A done child the epic depends on (containment), satisfying the one [hard]
     // criterion REQ-01.
-    let mut child = Issue::new("implement REQ-01".to_string(), String::new());
+    let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
     child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
     child.state = State::Done;
     epic.dependencies.push(child.id.clone());
@@ -242,7 +242,7 @@ fn test_sdd_graph_reference_warns_on_dangling_satisfies() {
     let mut epic = sdd_compliant_epic(); // declares req:REQ-01
 
     // Child satisfies a req id that is declared NOWHERE -> dangling reference.
-    let mut child = Issue::new("rogue".to_string(), String::new());
+    let mut child = crate::fixture_issue("rogue".to_string(), String::new());
     child.labels = vec!["type:task".to_string(), "satisfies:REQ-99".to_string()];
     child.state = State::Done;
     epic.dependencies.push(child.id.clone());
@@ -272,7 +272,7 @@ fn test_sdd_graph_stray_req_label_is_reported() {
     epic.labels.push("req:REQ-77".to_string());
 
     // A done child satisfies only REQ-01.
-    let mut child = Issue::new("implement REQ-01".to_string(), String::new());
+    let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
     child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
     child.state = State::Done;
     epic.dependencies.push(child.id.clone());
@@ -322,7 +322,7 @@ fn test_sdd_graph_req_resolution_is_scoped_to_linked_graph() {
     epic.state = State::Done;
 
     // An unrelated issue satisfies REQ-01 but is NOT linked to this epic.
-    let mut unrelated = Issue::new("unrelated".to_string(), String::new());
+    let mut unrelated = crate::fixture_issue("unrelated".to_string(), String::new());
     unrelated.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
     unrelated.state = State::Done;
     // deliberately NO dependency edge to the epic
@@ -456,7 +456,7 @@ fn test_bug_with_reproduction_steps_passes() {
     let body = "## Reproduction\n\n\
         - run `jit validate`\n\
         - observe the panic\n";
-    let mut bug = Issue::new("crash on validate".to_string(), body.to_string());
+    let mut bug = crate::fixture_issue("crash on validate".to_string(), body.to_string());
     bug.labels = vec!["type:bug".to_string()];
     assert!(
         !has_local_finding(&bug, &set),
@@ -467,7 +467,7 @@ fn test_bug_with_reproduction_steps_passes() {
 #[test]
 fn test_bug_without_reproduction_fails() {
     let set = load_example("bug-repro");
-    let mut bug = Issue::new("crash".to_string(), "## Notes\n\n- it broke\n".to_string());
+    let mut bug = crate::fixture_issue("crash".to_string(), "## Notes\n\n- it broke\n".to_string());
     bug.labels = vec!["type:bug".to_string()];
     let eval = evaluate_local(&bug, &set, ContentFormat::Markdown).unwrap();
     assert!(
@@ -482,7 +482,7 @@ fn test_bug_without_reproduction_fails() {
 
 fn release_with_notes_doc() -> Issue {
     let body = "## Checklist\n\n- bump version\n- tag\n";
-    let mut release = Issue::new("v1.0.0".to_string(), body.to_string());
+    let mut release = crate::fixture_issue("v1.0.0".to_string(), body.to_string());
     release.labels = vec!["type:release".to_string()];
     release.documents = vec![
         DocumentReference::new("docs/release-notes-1.0.0.md".to_string())
@@ -529,7 +529,7 @@ fn test_release_graph_requires_qa_signoff_dependency() {
 
     // Add the qa-signoff dependency -> the graph rule is satisfied.
     let qa = {
-        let mut qa = Issue::new("QA sign-off".to_string(), String::new());
+        let mut qa = crate::fixture_issue("QA sign-off".to_string(), String::new());
         qa.labels = vec!["type:qa-signoff".to_string()];
         qa
     };
@@ -560,7 +560,7 @@ mod sdd_criteria_label_match {
                     - Given a rule mixing shorthand and a raw schema When the loader runs Then it errors\n\n\
                     ## Success Criteria\n\n\
                     - [hard] REQ-01: the loader rejects mixed shorthand and raw schema\n";
-        let mut epic = Issue::new("epic".to_string(), body.to_string());
+        let mut epic = crate::fixture_issue("epic".to_string(), body.to_string());
         epic.labels = labels.iter().map(|s| s.to_string()).collect();
         epic
     }
@@ -634,7 +634,7 @@ mod sdd_criteria_label_match {
                     - Given x When y Then z\n\n\
                     ## Success Criteria\n\n\
                     - [hard] REQ-03: check padding\n";
-        let mut epic = Issue::new("epic".to_string(), body.to_string());
+        let mut epic = crate::fixture_issue("epic".to_string(), body.to_string());
         epic.labels = vec![
             "type:epic".to_string(),
             "req:REQ-3".to_string(), // no leading zero -> stray
@@ -691,7 +691,7 @@ mod sdd_lifecycle {
             std::fs::copy(entry.path(), schemas_dst.join(entry.file_name())).unwrap();
         }
 
-        CommandExecutor::new(storage)
+        crate::memory_executor(storage)
     }
 
     /// A well-formed SDD spec body: Requirements, Scenarios, and Success Criteria.
@@ -716,12 +716,12 @@ mod sdd_lifecycle {
         let rules = graph_rules(&set);
 
         // In-progress epic: correct structure, correct req: label.
-        let mut epic = Issue::new("Feature X".to_string(), sdd_spec_body());
+        let mut epic = crate::fixture_issue("Feature X".to_string(), sdd_spec_body());
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
 
         // A child the epic depends on (containment), still in progress (not done).
-        let mut child = Issue::new("implement REQ-01".to_string(), String::new());
+        let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
         child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
         child.state = State::InProgress;
         epic.dependencies.push(child.id.clone());
@@ -748,7 +748,7 @@ mod sdd_lifecycle {
 
         // Seed an epic with a well-formed spec body and req:REQ-01, but NO child
         // that satisfies it. The epic is in-progress.
-        let mut epic = Issue::new("Feature X".to_string(), sdd_spec_body());
+        let mut epic = crate::fixture_issue("Feature X".to_string(), sdd_spec_body());
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
         let epic_id = epic.id.clone();
@@ -802,7 +802,7 @@ mod sdd_lifecycle {
 
         // In-progress epic with a stray req:REQ-77 (not in the criteria prose)
         // alongside the legitimate req:REQ-01.
-        let mut epic = Issue::new("Feature X".to_string(), sdd_spec_body());
+        let mut epic = crate::fixture_issue("Feature X".to_string(), sdd_spec_body());
         epic.labels = vec![
             "type:epic".to_string(),
             "req:REQ-01".to_string(),
@@ -811,7 +811,7 @@ mod sdd_lifecycle {
         epic.state = State::InProgress;
 
         // A child in progress (not done) so the in-flight state is realistic.
-        let mut child = Issue::new("implement REQ-01".to_string(), String::new());
+        let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
         child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
         child.state = State::InProgress;
         epic.dependencies.push(child.id.clone());
@@ -851,14 +851,14 @@ mod sdd_lifecycle {
         let executor = executor_with_sdd_example();
 
         // Seed the epic.
-        let mut epic = Issue::new("Feature X".to_string(), sdd_spec_body());
+        let mut epic = crate::fixture_issue("Feature X".to_string(), sdd_spec_body());
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
         let epic_id = epic.id.clone();
         executor.storage().save_issue(epic).unwrap();
 
         // Seed a done child the epic depends on (containment) satisfying REQ-01.
-        let mut child = Issue::new("implement REQ-01".to_string(), String::new());
+        let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
         child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
         child.state = State::Done;
         let child_id = child.id.clone();
@@ -910,7 +910,7 @@ mod fresh_evidence {
     /// A done issue whose `code-review` gate was recorded `hours_ago` before
     /// [`fixed_now`].
     fn done_with_code_review(hours_ago: i64) -> Issue {
-        let mut issue = Issue::new("implement feature".to_string(), String::new());
+        let mut issue = crate::fixture_issue("implement feature".to_string(), String::new());
         issue.state = State::Done;
         issue.gates_required = vec!["code-review".to_string()];
         issue.gates_status.insert(
@@ -959,7 +959,7 @@ mod fresh_evidence {
         let set = load_example("fresh-evidence");
         let rules = graph_rules(&set);
         // Done, requires the gate, but has no recorded result.
-        let mut issue = Issue::new("implement feature".to_string(), String::new());
+        let mut issue = crate::fixture_issue("implement feature".to_string(), String::new());
         issue.state = State::Done;
         issue.gates_required = vec!["code-review".to_string()];
         let findings = issue_graph_findings_at(&rules, std::slice::from_ref(&issue), fixed_now());
@@ -1010,7 +1010,7 @@ mod nyquist {
 
     /// An epic with [hard] criteria REQ-01 and REQ-02, both verified via gates.
     fn epic_with_both_verified() -> Issue {
-        let mut epic = Issue::new("Feature X".to_string(), nyquist_compliant_body());
+        let mut epic = crate::fixture_issue("Feature X".to_string(), nyquist_compliant_body());
         epic.labels = vec!["type:epic".to_string()];
         // Both [hard] criteria are verified via gates_required.
         epic.gates_required = vec!["verify:REQ-01".to_string(), "verify:REQ-02".to_string()];
@@ -1019,7 +1019,7 @@ mod nyquist {
 
     /// An epic with [hard] criteria REQ-01 and REQ-02, both verified via labels.
     fn epic_with_label_verification() -> Issue {
-        let mut epic = Issue::new("Feature Y".to_string(), nyquist_compliant_body());
+        let mut epic = crate::fixture_issue("Feature Y".to_string(), nyquist_compliant_body());
         epic.labels = vec![
             "type:epic".to_string(),
             "checks:REQ-01".to_string(),
@@ -1057,7 +1057,7 @@ mod nyquist {
         let set = load_example("nyquist");
         let rules = graph_rules(&set);
         // Only REQ-01 is verified; REQ-02 is unmapped.
-        let mut epic = Issue::new("Feature Z".to_string(), nyquist_compliant_body());
+        let mut epic = crate::fixture_issue("Feature Z".to_string(), nyquist_compliant_body());
         epic.labels = vec!["type:epic".to_string()];
         epic.gates_required = vec!["verify:REQ-01".to_string()];
 
@@ -1083,7 +1083,7 @@ mod nyquist {
         // nyquist example), the unmapped-criterion finding mentions both.
         let set = load_example("nyquist");
         let rules = graph_rules(&set);
-        let mut epic = Issue::new("Feature W".to_string(), nyquist_compliant_body());
+        let mut epic = crate::fixture_issue("Feature W".to_string(), nyquist_compliant_body());
         epic.labels = vec!["type:epic".to_string()]; // no gates, no checks labels
 
         let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
@@ -1147,9 +1147,9 @@ mod cross_epic {
     /// archetypal cross-epic collision the example is designed to catch.
     fn two_epics_colliding_on(req_value: &str) -> (Issue, Issue) {
         let label = format!("req:{req_value}");
-        let mut epic_a = Issue::new(format!("Epic A ({req_value})"), String::new());
+        let mut epic_a = crate::fixture_issue(format!("Epic A ({req_value})"), String::new());
         epic_a.labels = vec!["type:epic".to_string(), label.clone()];
-        let mut epic_b = Issue::new(format!("Epic B ({req_value})"), String::new());
+        let mut epic_b = crate::fixture_issue(format!("Epic B ({req_value})"), String::new());
         epic_b.labels = vec!["type:epic".to_string(), label];
         // No dependency edge — the point is that the collision is cross-epic.
         (epic_a, epic_b)
@@ -1200,9 +1200,9 @@ mod cross_epic {
         let set = load_example("cross-epic");
         let rules = graph_rules(&set);
 
-        let mut epic_a = Issue::new("Epic A".to_string(), String::new());
+        let mut epic_a = crate::fixture_issue("Epic A".to_string(), String::new());
         epic_a.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
-        let mut epic_b = Issue::new("Epic B".to_string(), String::new());
+        let mut epic_b = crate::fixture_issue("Epic B".to_string(), String::new());
         epic_b.labels = vec!["type:epic".to_string(), "req:REQ-02".to_string()];
 
         let findings = issue_graph_findings(&rules, &[epic_a, epic_b]);
@@ -1269,16 +1269,16 @@ mod cross_epic {
 
         // 300 epics with unique req values.
         for i in 0..300u32 {
-            let mut epic = Issue::new(format!("unique-epic-{i}"), String::new());
+            let mut epic = crate::fixture_issue(format!("unique-epic-{i}"), String::new());
             epic.labels = vec!["type:epic".to_string(), format!("req:UNIQ-{i:04}")];
             issues.push(epic);
         }
         // 50 collision pairs: two epics per colliding value.
         for i in 0..50u32 {
             let label = format!("req:COLL-{i:04}");
-            let mut a = Issue::new(format!("coll-a-{i}"), String::new());
+            let mut a = crate::fixture_issue(format!("coll-a-{i}"), String::new());
             a.labels = vec!["type:epic".to_string(), label.clone()];
-            let mut b = Issue::new(format!("coll-b-{i}"), String::new());
+            let mut b = crate::fixture_issue(format!("coll-b-{i}"), String::new());
             b.labels = vec!["type:epic".to_string(), label];
             issues.push(a);
             issues.push(b);
@@ -1335,7 +1335,7 @@ mod research {
     /// A `type:goal` issue with a well-formed body and `hyp:H-1` derived from
     /// the single `[hard]` hypothesis in the body.
     fn compliant_goal() -> Issue {
-        let mut goal = Issue::new("Improve accuracy".to_string(), compliant_goal_body());
+        let mut goal = crate::fixture_issue("Improve accuracy".to_string(), compliant_goal_body());
         goal.labels = vec!["type:goal".to_string(), "hyp:H-1".to_string()];
         goal
     }
@@ -1348,7 +1348,7 @@ mod research {
             - evaluate on the held-out test set\n\n\
             ## Evidence\n\n\
             - accuracy reached 96.3%, exceeding the 95% threshold\n";
-        let mut exp = Issue::new("Scale training data".to_string(), body.to_string());
+        let mut exp = crate::fixture_issue("Scale training data".to_string(), body.to_string());
         exp.labels = vec!["type:experiment".to_string(), "tests:H-1".to_string()];
         let _ = goal_id; // containment is wired by the caller: goal depends on exp
         exp.state = State::Done;
@@ -1590,7 +1590,7 @@ enforce = true
 assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependencies" } }
 "#;
         std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-        CommandExecutor::new(storage)
+        crate::memory_executor(storage)
     }
 
     /// Save an issue directly into storage at a given state, bypassing validation.
@@ -1601,7 +1601,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
         body: &str,
         state: State,
     ) -> String {
-        let mut issue = Issue::new(title.to_string(), body.to_string());
+        let mut issue = crate::fixture_issue(title.to_string(), body.to_string());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue.state = state;
         let id = issue.id.clone();

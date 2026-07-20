@@ -172,7 +172,8 @@ pub fn execute_gate_checker_with_context(
 
     Ok(GateRunResult {
         schema_version: GATE_RUN_SCHEMA_VERSION,
-        run_id: uuid::Uuid::new_v4().to_string(),
+        // Repository mutation finalization assigns the durable run identity.
+        run_id: String::new(),
         gate_key: gate_key.to_string(),
         stage,
         issue_id: issue_id.to_string(),

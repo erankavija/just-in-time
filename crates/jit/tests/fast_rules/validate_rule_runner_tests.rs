@@ -13,7 +13,6 @@
 //! rather than asserting on the total finding/outcome count, which now legitimately
 //! includes default-rule activity.
 
-use jit::commands::CommandExecutor;
 use jit::domain::Issue;
 use jit::storage::{InMemoryStorage, IssueStore};
 
@@ -39,7 +38,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
 "#;
 
 fn epic(req: bool) -> Issue {
-    let mut e = Issue::new("an epic".to_string(), String::new());
+    let mut e = crate::fixture_issue("an epic".to_string(), String::new());
     // `epic:auth` keeps the epic strategically consistent so the built-in
     // `strategic-consistency` graph warning (origin = "default") does not add
     // findings beyond the user rule under test.
@@ -62,7 +61,7 @@ fn test_per_issue_local_rule_fails() {
     let id = bad.id.clone();
     storage.save_issue(bad).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     let report = executor.run_rules(Some(&id)).unwrap();
 
     assert!(report.has_errors(), "missing req:* label is an error");
@@ -81,7 +80,7 @@ fn test_per_issue_local_rule_passes() {
     let id = good.id.clone();
     storage.save_issue(good).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     let report = executor.run_rules(Some(&id)).unwrap();
 
     // The user rule is satisfied: no `epic-needs-req` finding. (Default rules may
@@ -99,7 +98,7 @@ fn test_whole_repo_collects_local_findings_for_all_issues() {
     storage.save_issue(epic(false)).unwrap();
     storage.save_issue(epic(false)).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     let report = executor.run_rules(None).unwrap();
 
     assert_eq!(report.error_count(), 2, "both epics fail: {report:?}");
@@ -117,15 +116,15 @@ severity = "error"
 assert = { dependency-shape = { target = { type = "story" }, mode = "must" } }
 "#;
     let storage = store_with_rules(rules);
-    let mut story = Issue::new("a story".to_string(), String::new());
+    let mut story = crate::fixture_issue("a story".to_string(), String::new());
     story.labels = vec!["type:story".to_string()];
-    let mut task = Issue::new("a task".to_string(), String::new());
+    let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()]; // no story dependency -> violation
     let task_id = task.id.clone();
     storage.save_issue(story).unwrap();
     storage.save_issue(task).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     let report = executor.run_rules(Some(&task_id)).unwrap();
 
     assert!(report.has_errors(), "graph rule fires for the task");
@@ -142,7 +141,7 @@ fn test_explain_lists_matched_rules_and_outcomes() {
     let id = bad.id.clone();
     storage.save_issue(bad).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     let report = executor.explain_rules(&id).unwrap();
 
     assert_eq!(report.issue_id, id);
@@ -169,7 +168,7 @@ fn test_explain_passing_rule_marks_pass() {
     let id = good.id.clone();
     storage.save_issue(good).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     let report = executor.explain_rules(&id).unwrap();
 
     // The USER rule passes for a compliant epic; assert on it by name (default
@@ -187,12 +186,12 @@ fn test_explain_passing_rule_marks_pass() {
 fn test_explain_non_matching_rule_is_reported_as_skipped() {
     let storage = store_with_rules(EPIC_NEEDS_REQ);
     // A task does not match the epic selector.
-    let mut task = Issue::new("a task".to_string(), String::new());
+    let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     let id = task.id.clone();
     storage.save_issue(task).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     let report = executor.explain_rules(&id).unwrap();
 
     // The epic-selected USER rule does not match a task, but is now STILL listed
@@ -229,12 +228,12 @@ severity = "error"
 assert = { require-section = { heading = "Plan" } }
 "#;
     let storage = store_with_rules(rules);
-    let mut issue = Issue::new("a task".to_string(), String::new());
+    let mut issue = crate::fixture_issue("a task".to_string(), String::new());
     issue.state = jit::domain::State::InProgress;
     let id = issue.id.clone();
     storage.save_issue(issue).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     let report = executor.explain_rules(&id).unwrap();
 
     let outcome = report
@@ -266,12 +265,12 @@ severity = "error"
 assert = { require-section = { heading = "Summary" } }
 "#;
     let storage = store_with_rules(rules);
-    let mut issue = Issue::new("a task".to_string(), String::new());
+    let mut issue = crate::fixture_issue("a task".to_string(), String::new());
     issue.state = jit::domain::State::InProgress;
     let id = issue.id.clone();
     storage.save_issue(issue).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     let report = executor.explain_rules(&id).unwrap();
 
     let outcome = report
@@ -312,7 +311,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
     let id = bad.id.clone();
     storage.save_issue(bad).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     let report = executor.run_rules(Some(&id)).unwrap();
 
     assert!(!report.has_errors(), "warn never fails validate");

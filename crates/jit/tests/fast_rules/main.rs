@@ -18,3 +18,16 @@ mod type_taxonomy_custom_strategic_tests;
 mod type_taxonomy_warnings_tests;
 mod validate_rule_runner_tests;
 mod validation_tests;
+
+fn memory_executor(
+    storage: jit::storage::InMemoryStorage,
+) -> jit::commands::CommandExecutor<jit::storage::InMemoryStorage> {
+    let layout = storage.repository_layout();
+    jit::commands::CommandExecutor::new(storage).with_layout(layout)
+}
+
+fn fixture_issue(title: String, description: String) -> jit::domain::Issue {
+    let mut issue = jit::domain::Issue::draft(title, description);
+    issue.id = uuid::Uuid::new_v4().to_string();
+    issue
+}

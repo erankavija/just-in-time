@@ -215,7 +215,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// let storage = InMemoryStorage::new();
     /// storage.init().unwrap();
-    /// let executor = CommandExecutor::new(storage);
+    /// let layout = storage.repository_layout();
+    /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let (done, _) = executor
     ///     .create_issue("Shipped".into(), String::new(), Priority::Normal,
     ///         vec![], vec![], None, None, false)

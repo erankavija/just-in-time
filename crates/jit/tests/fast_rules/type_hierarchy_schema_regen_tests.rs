@@ -19,6 +19,12 @@ use jit::storage::{IssueStore, JsonFileStorage};
 use std::fs;
 use tempfile::TempDir;
 
+fn executor(jit_dir: &std::path::Path) -> CommandExecutor<JsonFileStorage> {
+    let worktree = jit_dir.parent().expect(".jit root has a worktree parent");
+    let layout = jit::storage::discover_repository_layout(worktree, jit_dir).unwrap();
+    CommandExecutor::new(JsonFileStorage::new(jit_dir)).with_layout(layout)
+}
+
 /// The fully-formed scaffold a freshly-`jit init`ed repo carries: a `config.toml`
 /// with a 4-level hierarchy plus the scaffolded `rules.toml` + baked schemas.
 fn setup_initialized_repo() -> (TempDir, std::path::PathBuf) {
@@ -38,7 +44,7 @@ unique = true
     let storage = JsonFileStorage::new(&jit_dir);
     storage.init().unwrap();
     // Materialize rules.toml + the baked schemas, mirroring `jit init`.
-    let executor = CommandExecutor::new(storage);
+    let executor = executor(&jit_dir);
     executor.scaffold_default_rules().unwrap();
     (temp, jit_dir)
 }
@@ -60,7 +66,7 @@ unique = true
 fn create_typed(jit_dir: &std::path::Path, type_label: &str) -> Vec<String> {
     // A FRESH executor so the OnceLock config/rules caches reflect the edited
     // config.toml and the (possibly) regenerated schema on disk.
-    let executor = CommandExecutor::new(JsonFileStorage::new(jit_dir));
+    let executor = executor(jit_dir);
     let (_id, warnings) = executor
         .create_issue(
             "issue".to_string(),
@@ -133,7 +139,7 @@ fn test_reinit_refreshes_type_hierarchy_projection() {
     let (_temp, jit_dir) = setup_initialized_repo();
     add_planning_type(&jit_dir);
 
-    let executor = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let executor = executor(&jit_dir);
     // rules.toml already exists, so scaffold returns false (no clobber) but still
     // republishes the default-schema projections.
     let scaffolded = executor.scaffold_default_rules().unwrap();
@@ -162,7 +168,7 @@ fn test_refresh_republishes_all_default_projections() {
     let (_temp, jit_dir) = setup_initialized_repo();
     add_planning_type(&jit_dir);
 
-    let admin = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let admin = executor(&jit_dir);
     let mut written = admin.refresh_default_schema_projections().unwrap();
     written.sort();
     assert_eq!(
@@ -203,7 +209,7 @@ fn test_refresh_is_noop_without_materialized_schemas() {
     let storage = JsonFileStorage::new(&jit_dir);
     storage.init().unwrap();
 
-    let admin = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let admin = executor(&jit_dir);
     let written = admin.refresh_default_schema_projections().unwrap();
     assert!(written.is_empty(), "no baked layout => nothing republished");
     assert!(!jit_dir.join("schemas").exists());

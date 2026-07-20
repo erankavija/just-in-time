@@ -96,7 +96,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     fn marker(isolated_torn_tail: bool) -> Event {
-        Event::new_profile_applied(
+        Event::draft_profile_applied(
             "example".to_string(),
             "1.0.0".to_string(),
             ProfileOrigin::Embedded,

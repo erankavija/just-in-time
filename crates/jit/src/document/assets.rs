@@ -67,6 +67,73 @@ pub struct AssetScanner {
 }
 
 impl AssetScanner {
+    /// Discover asset references and resolve their repository-relative paths
+    /// without reading asset bytes. This is the first phase of image-backed
+    /// scans: callers add every resolved local path to their capture closure.
+    pub fn discover_assets(&self, doc_path: &Path, content: &str) -> Result<Vec<Asset>, String> {
+        let doc_path_str = doc_path.to_string_lossy().to_string();
+        let adapter = self
+            .registry
+            .resolve(&doc_path_str, content)
+            .ok_or_else(|| format!("No adapter found for document: {doc_path_str}"))?;
+        adapter
+            .scan_assets(content)
+            .into_iter()
+            .map(|original_path| {
+                if original_path.starts_with("http://") || original_path.starts_with("https://") {
+                    Ok(Asset {
+                        original_path,
+                        resolved_path: None,
+                        asset_type: AssetType::External,
+                        mime_type: None,
+                        content_hash: None,
+                        is_shared: false,
+                    })
+                } else {
+                    let resolved_path = self.resolve_path(&original_path, doc_path)?;
+                    Ok(Asset {
+                        original_path,
+                        resolved_path: Some(resolved_path),
+                        asset_type: AssetType::Missing,
+                        mime_type: None,
+                        content_hash: None,
+                        is_shared: false,
+                    })
+                }
+            })
+            .collect()
+    }
+
+    /// Classify discovered assets exclusively from one captured repository
+    /// image, preserving the exact byte evidence used by the ensuing mutation.
+    pub fn hydrate_assets_from_image(
+        &self,
+        discovered: Vec<Asset>,
+        image: &crate::repository_state::RepositoryImage,
+    ) -> Result<Vec<Asset>, String> {
+        discovered
+            .into_iter()
+            .map(|mut asset| {
+                let Some(path) = asset.resolved_path.as_ref() else {
+                    return Ok(asset);
+                };
+                let virtual_path = crate::repository_state::VirtualPath::worktree(path)
+                    .map_err(|error| error.to_string())?;
+                let bytes = image
+                    .file_bytes(&virtual_path)
+                    .map_err(|error| error.to_string())?;
+                if let Some(bytes) = bytes {
+                    let mut hasher = Sha256::new();
+                    hasher.update(bytes);
+                    asset.asset_type = AssetType::Local;
+                    asset.mime_type = detect_mime_type(path);
+                    asset.content_hash = Some(format!("{:x}", hasher.finalize()));
+                }
+                Ok(asset)
+            })
+            .collect()
+    }
+
     /// Create a new asset scanner
     ///
     /// # Arguments

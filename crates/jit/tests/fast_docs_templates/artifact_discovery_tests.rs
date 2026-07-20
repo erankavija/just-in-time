@@ -457,7 +457,7 @@ impl PinnedRootResolver for PinResolver {
 }
 
 fn pinned_issue() -> Issue {
-    let mut issue = Issue::new("history".to_string(), String::new());
+    let mut issue = crate::fixture_issue("history".to_string(), String::new());
     issue.id = "history".to_string();
     issue.state = State::Done;
     issue.labels = vec!["type:epic".to_string()];

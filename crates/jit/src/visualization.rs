@@ -107,8 +107,8 @@ fn exported_node_ids<'a>(all_nodes: &'a [&Issue]) -> std::collections::HashSet<&
 /// use jit::visualization;
 /// use jit::{graph::DependencyGraph, Issue};
 ///
-/// let issue1 = Issue::new("Setup".to_string(), "Initial setup".to_string());
-/// let mut issue2 = Issue::new("Deploy".to_string(), "Deploy app".to_string());
+/// let issue1 = Issue::draft("Setup".to_string(), "Initial setup".to_string());
+/// let mut issue2 = Issue::draft("Deploy".to_string(), "Deploy app".to_string());
 /// issue2.dependencies.push(issue1.id.clone());
 ///
 /// let issues = vec![&issue1, &issue2];
@@ -174,8 +174,8 @@ pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
 /// use jit::visualization;
 /// use jit::{graph::DependencyGraph, Issue};
 ///
-/// let issue1 = Issue::new("Design".to_string(), "Design API".to_string());
-/// let mut issue2 = Issue::new("Implement".to_string(), "Build API".to_string());
+/// let issue1 = Issue::draft("Design".to_string(), "Design API".to_string());
+/// let mut issue2 = Issue::draft("Implement".to_string(), "Build API".to_string());
 /// issue2.dependencies.push(issue1.id.clone());
 ///
 /// let issues = vec![&issue1, &issue2];
@@ -292,9 +292,9 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
 /// use jit::domain::type_taxonomy::HierarchyConfig;
 /// use jit::{graph::DependencyGraph, Issue};
 ///
-/// let mut epic = Issue::new("Epic".to_string(), String::new());
+/// let mut epic = Issue::draft("Epic".to_string(), String::new());
 /// epic.labels = vec!["type:epic".to_string()];
-/// let mut task = Issue::new("Task".to_string(), String::new());
+/// let mut task = Issue::draft("Task".to_string(), String::new());
 /// task.labels = vec!["type:task".to_string()];
 /// epic.dependencies.push(task.id.clone());
 ///
@@ -356,8 +356,14 @@ mod tests {
 
     #[test]
     fn test_export_dot_format() {
-        let issue1 = Issue::new("API Design".to_string(), "Design REST API".to_string());
-        let mut issue2 = Issue::new("Backend".to_string(), "Implement backend".to_string());
+        let issue1 = crate::domain::types::fixture_issue(
+            "API Design".to_string(),
+            "Design REST API".to_string(),
+        );
+        let mut issue2 = crate::domain::types::fixture_issue(
+            "Backend".to_string(),
+            "Implement backend".to_string(),
+        );
         issue2.dependencies.push(issue1.id.clone());
 
         let issues = vec![&issue1, &issue2];
@@ -376,8 +382,10 @@ mod tests {
 
     #[test]
     fn test_export_mermaid_format() {
-        let issue1 = Issue::new("Setup".to_string(), "Initial setup".to_string());
-        let mut issue2 = Issue::new("Deploy".to_string(), "Deploy to prod".to_string());
+        let issue1 =
+            crate::domain::types::fixture_issue("Setup".to_string(), "Initial setup".to_string());
+        let mut issue2 =
+            crate::domain::types::fixture_issue("Deploy".to_string(), "Deploy to prod".to_string());
         issue2.dependencies.push(issue1.id.clone());
 
         let issues = vec![&issue1, &issue2];
@@ -396,10 +404,14 @@ mod tests {
 
     #[test]
     fn test_export_dot_with_different_states() {
-        let mut issue1 = Issue::new("Done Task".to_string(), "Completed".to_string());
+        let mut issue1 =
+            crate::domain::types::fixture_issue("Done Task".to_string(), "Completed".to_string());
         issue1.state = State::Done;
 
-        let mut issue2 = Issue::new("In Progress".to_string(), "Working on it".to_string());
+        let mut issue2 = crate::domain::types::fixture_issue(
+            "In Progress".to_string(),
+            "Working on it".to_string(),
+        );
         issue2.state = State::InProgress;
 
         let issues = vec![&issue1, &issue2];
@@ -413,7 +425,10 @@ mod tests {
 
     #[test]
     fn test_export_handles_special_characters() {
-        let issue = Issue::new("Title with \"quotes\"".to_string(), "Test".to_string());
+        let issue = crate::domain::types::fixture_issue(
+            "Title with \"quotes\"".to_string(),
+            "Test".to_string(),
+        );
         let issues = vec![&issue];
         let graph = DependencyGraph::new(&issues);
 
@@ -427,7 +442,8 @@ mod tests {
     /// the six documented keys and nothing else — no full-record fields leak in.
     #[test]
     fn test_export_json_summary_node_has_exactly_summary_keys() {
-        let issue = Issue::new("Summary".to_string(), "Body text".to_string());
+        let issue =
+            crate::domain::types::fixture_issue("Summary".to_string(), "Body text".to_string());
         let issues = vec![&issue];
         let graph = DependencyGraph::new(&issues);
 
@@ -455,7 +471,8 @@ mod tests {
     #[test]
     fn test_export_json_full_node_is_complete_record() {
         use crate::domain::{GateState, GateStatus, State};
-        let mut issue = Issue::new("Full".to_string(), "Body text".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Full".to_string(), "Body text".to_string());
         issue.state = State::Done;
         issue.gates_required.push("tests".to_string());
         issue.gates_status.insert(
@@ -494,8 +511,8 @@ mod tests {
     /// contents.
     #[test]
     fn test_export_json_shapes_share_edges() {
-        let dep = Issue::new("Dep".to_string(), String::new());
-        let mut issue = Issue::new("Root".to_string(), String::new());
+        let dep = crate::domain::types::fixture_issue("Dep".to_string(), String::new());
+        let mut issue = crate::domain::types::fixture_issue("Root".to_string(), String::new());
         issue.dependencies.push(dep.id.clone());
 
         let issues = vec![&dep, &issue];
@@ -517,9 +534,9 @@ mod tests {
     /// summary node never does.
     #[test]
     fn test_export_json_full_carries_resolved_hierarchy_fields() {
-        let mut epic = Issue::new("Epic".to_string(), String::new());
+        let mut epic = crate::domain::types::fixture_issue("Epic".to_string(), String::new());
         epic.labels = vec!["type:epic".to_string()];
-        let mut task = Issue::new("Task".to_string(), String::new());
+        let mut task = crate::domain::types::fixture_issue("Task".to_string(), String::new());
         task.labels = vec!["type:task".to_string()];
         epic.dependencies.push(task.id.clone());
 
@@ -567,9 +584,9 @@ mod tests {
     fn test_export_json_full_hierarchy_keys_match_tree_view() {
         use crate::output::HierarchyNodeView;
 
-        let mut epic = Issue::new("Epic".to_string(), String::new());
+        let mut epic = crate::domain::types::fixture_issue("Epic".to_string(), String::new());
         epic.labels = vec!["type:epic".to_string()];
-        let mut task = Issue::new("Task".to_string(), String::new());
+        let mut task = crate::domain::types::fixture_issue("Task".to_string(), String::new());
         task.labels = vec!["type:task".to_string()];
         epic.dependencies.push(task.id.clone());
 

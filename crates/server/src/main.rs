@@ -11,7 +11,7 @@ mod routes;
 mod sse;
 mod watcher;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::Router;
 use clap::Parser;
 use std::path::PathBuf;
@@ -65,16 +65,15 @@ async fn main() -> Result<()> {
     // Construct the executor over its canonical layout so any session-opening
     // command reached in-process mutates through the repository-mount boundary
     // (the worktree root is the parent of the selected data root for the D-10
-    // single-mount topology). Best-effort: the current HTTP surface is read-only,
-    // so a missing layout never surfaces here.
+    // single-mount topology). Layout construction is mandatory even for today's
+    // read-only HTTP surface so future mutation paths cannot inherit a fallback.
     let data_dir_path = std::path::Path::new(&args.data_dir);
-    let executor_layout = data_dir_path.parent().and_then(|worktree| {
-        jit::storage::discover_repository_layout(worktree, data_dir_path).ok()
-    });
-    let executor = match executor_layout {
-        Some(layout) => Arc::new(CommandExecutor::new(storage).with_layout(layout)),
-        None => Arc::new(CommandExecutor::new(storage)),
-    };
+    let worktree = data_dir_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("repository data directory has no parent worktree"))?;
+    let executor_layout = jit::storage::discover_repository_layout(worktree, data_dir_path)
+        .context("failed to construct repository layout")?;
+    let executor = Arc::new(CommandExecutor::new(storage).with_layout(executor_layout));
     if recovery_session.report().recovered_count() > 0 {
         info!(
             "Recovered {} pending transaction(s) before server startup",

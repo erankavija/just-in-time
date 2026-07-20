@@ -249,13 +249,34 @@
       "resolved_at": "2026-07-20T10:15:00+03:00",
       "situation": "Increment 8 must delete the ambient resolve_plan_content fallback (no-dual-path constraint), but two production sites (main.rs:1883-1891, crates/server/src/main.rs:75-76) build executors with a best-effort layout and fall back when absent. Deleting the fallback makes a discoverable layout mandatory for validate/transition/rules paths.",
       "resolution": "Invoker chose: layout mandatory, typed wiring error on absence; server constructs its layout from the repository mount at startup or fails there; no layout-less read-only mode survives. Lead evidence that @/charter/D-4 is preserved: WorktreePaths::detect_from falls back to the cwd as worktree root when there is no git repo, so requiring a layout does not require git. Recorded as binding ruling 16 in handoff-10."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "resolved",
+      "opened_at": "2026-07-20T19:54:32+03:00",
+      "resolved_at": "2026-07-20T20:24:13+03:00",
+      "situation": "After two rework attempts, independent review found two related lifecycle-repair defects: the final captured index is not validated for schema, duplicate/deleted membership, or path-id versus embedded Issue.id consistency; and RepairIssueLifecycle clones the caller record, allowing non-lifecycle fields to bypass normal update reconciliation. A mismatched indexed record can therefore overwrite another issue.",
+      "resolution": "Invoker authorized one narrow guided correction and reset the rework counter, followed by the issue gates once the remaining issue scope is complete.",
+      "recommendation": "Authorize one narrow guided correction: parse and validate the final captured index with ordinary repository invariants, reject duplicate/deleted/mismatched records with zero writes, constrain RepairIssueLifecycle to copy only first_ready_at/claimed_at/done_at onto the captured preimage, correct the two stale retry/atomicity comments, and add focused zero-write regressions before independent review."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "resolved",
+      "opened_at": "2026-07-20T20:56:52+03:00",
+      "resolved_at": "2026-07-20T21:00:35+03:00",
+      "situation": "After the two invoker-authorized lifecycle/index rework attempts, lifecycle repair and shared index validation pass, but final review found aggregated membership applies lower-priority HEAD/main tombstones globally and can hide a higher-priority locally restored issue. Main-worktree discovery also swallows nonzero git failures and retains structural unwraps.",
+      "resolution": "Invoker authorized a narrow lead-owned correction with conflict/error regressions and one independent verification.",
+      "recommendation": "Authorize one lead-owned narrow correction: preserve local then HEAD then main membership precedence per ID, type absence separately from Git/I/O/structural failure without unwraps, add conflict and malformed-main regressions, then perform one independent verification before resuming the broader consumer cutover."
     }
   ],
   "rework_counts": {
     "cbc3a7e5": 2,
     "bacf2cd4": 2,
     "a6a9b964": 1,
-    "44d318ab": 1
+    "44d318ab": 1,
+    "49adf23b": 2
   },
   "started_at": "2026-07-18T16:22:26Z"
 }

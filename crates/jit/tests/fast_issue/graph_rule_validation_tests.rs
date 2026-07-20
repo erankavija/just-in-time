@@ -8,7 +8,6 @@
 //! folds error-severity findings into validation failure.
 
 use jit::commands::CommandExecutor;
-use jit::domain::Issue;
 use jit::storage::{InMemoryStorage, IssueStore};
 
 /// Build a fresh in-memory store whose on-disk root (used only for `rules.toml`)
@@ -19,7 +18,25 @@ fn store_with_rules(rules_toml: &str) -> InMemoryStorage {
     storage.init().unwrap();
     std::fs::create_dir_all(storage.root()).unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+    storage.add_repo_file(".jit/rules.toml", rules_toml);
+    storage.add_repo_file(".jit/config.toml", "");
     storage
+}
+
+fn executor_for(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
+    let mut ids = storage
+        .list_issues()
+        .unwrap()
+        .into_iter()
+        .map(|issue| issue.id)
+        .collect::<Vec<_>>();
+    ids.sort();
+    storage.add_repo_file(
+        ".jit/index.json",
+        &serde_json::json!({"schema_version": 2, "all_ids": ids, "deleted_ids": []}).to_string(),
+    );
+    let layout = storage.repository_layout();
+    CommandExecutor::new(storage).with_layout(layout)
 }
 
 /// A `dependency-shape` graph rule: every `type:task` must depend on a
@@ -37,9 +54,9 @@ fn test_validate_fails_on_error_severity_graph_rule_violation() {
     let storage = store_with_rules(SHAPE_RULES);
 
     // A story exists, and a task that does NOT depend on it -> violation.
-    let mut story = Issue::new("a story".to_string(), String::new());
+    let mut story = crate::fixture_issue("a story".to_string(), String::new());
     story.labels = vec!["type:story".to_string()];
-    let mut task = Issue::new("a task".to_string(), String::new());
+    let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     // The two issues still need to be connected for the (unrelated) isolated-node
     // check, so make the story depend on the task. This does NOT satisfy the
@@ -48,7 +65,7 @@ fn test_validate_fails_on_error_severity_graph_rule_violation() {
     storage.save_issue(story).unwrap();
     storage.save_issue(task).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = executor_for(storage);
     let result = executor.validate_silent();
 
     assert!(
@@ -71,15 +88,15 @@ fn test_validate_passes_when_graph_rule_is_satisfied() {
     let storage = store_with_rules(SHAPE_RULES);
 
     // The task DOES depend on the story -> rule satisfied.
-    let mut story = Issue::new("a story".to_string(), String::new());
+    let mut story = crate::fixture_issue("a story".to_string(), String::new());
     story.labels = vec!["type:story".to_string()];
-    let mut task = Issue::new("a task".to_string(), String::new());
+    let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     task.dependencies = vec![story.id.clone()];
     storage.save_issue(story).unwrap();
     storage.save_issue(task).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = executor_for(storage);
     let result = executor.validate_silent();
 
     assert!(
@@ -100,15 +117,15 @@ assert = { dependency-shape = { target = { type = "story" }, mode = "should" } }
 "#;
     let storage = store_with_rules(warn_rules);
 
-    let mut story = Issue::new("a story".to_string(), String::new());
+    let mut story = crate::fixture_issue("a story".to_string(), String::new());
     story.labels = vec!["type:story".to_string()];
-    let mut task = Issue::new("a task".to_string(), String::new());
+    let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     story.dependencies = vec![task.id.clone()]; // connect, but don't satisfy rule
     storage.save_issue(story).unwrap();
     storage.save_issue(task).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = executor_for(storage);
     let result = executor.validate_silent();
 
     assert!(
@@ -129,19 +146,19 @@ assert = { label-coverage = { } }
 "#;
     let storage = store_with_rules(coverage_rules);
 
-    let mut epic = Issue::new(
+    let mut epic = crate::fixture_issue(
         "epic".to_string(),
         "## Success Criteria\n\n- [hard] REQ-01: do the thing\n".to_string(),
     );
     epic.labels = vec!["type:epic".to_string()];
     // A dependent child that does NOT carry satisfies:REQ-01.
-    let mut child = Issue::new("child".to_string(), String::new());
+    let mut child = crate::fixture_issue("child".to_string(), String::new());
     child.labels = vec!["type:task".to_string()];
     child.dependencies = vec![epic.id.clone()];
     storage.save_issue(epic).unwrap();
     storage.save_issue(child).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = executor_for(storage);
     let result = executor.validate_silent();
 
     assert!(
@@ -169,14 +186,14 @@ assert = { label-coverage = { child-link = "bogus" } }
 "#;
     let storage = store_with_rules(bad_rules);
 
-    let mut epic = Issue::new(
+    let mut epic = crate::fixture_issue(
         "epic".to_string(),
         "## Success Criteria\n\n- [hard] REQ-01: x\n".to_string(),
     );
     epic.labels = vec!["type:epic".to_string()];
     storage.save_issue(epic).unwrap();
 
-    let executor = CommandExecutor::new(storage);
+    let executor = executor_for(storage);
     let result = executor.validate_silent();
 
     assert!(result.is_err(), "config-error finding must fail validation");

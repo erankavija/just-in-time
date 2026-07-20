@@ -5,7 +5,6 @@
 
 use jit::commands::CommandExecutor;
 use jit::domain::type_taxonomy::{detect_membership_issues, HierarchyConfig, ValidationIssue};
-use jit::domain::Issue;
 use jit::storage::json::JsonFileStorage;
 use jit::storage::IssueStore;
 use std::collections::HashMap;
@@ -14,8 +13,14 @@ use tempfile::TempDir;
 fn setup_test_repo() -> (TempDir, CommandExecutor<JsonFileStorage>) {
     let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path().join(".jit"));
-    let executor = CommandExecutor::new(storage);
-    executor.init().unwrap(); // Initialize the repository
+    let initial_layout =
+        jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(initial_layout)
+        .init()
+        .unwrap(); // Initialize the repository
+    let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
+    let executor = CommandExecutor::new(storage).with_layout(layout);
     (temp, executor)
 }
 
@@ -25,12 +30,12 @@ fn test_valid_epic_membership() {
     let config = HierarchyConfig::default();
 
     // Create an epic
-    let mut epic = Issue::new("Authentication System".to_string(), String::new());
+    let mut epic = crate::fixture_issue("Authentication System".to_string(), String::new());
     epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
     executor.storage().save_issue(epic.clone()).unwrap();
 
     // Create a task that references the epic
-    let mut task = Issue::new("Implement login".to_string(), String::new());
+    let mut task = crate::fixture_issue("Implement login".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "epic:auth".to_string()];
     executor.storage().save_issue(task.clone()).unwrap();
 
@@ -51,7 +56,7 @@ fn test_invalid_epic_reference_not_found() {
     let config = HierarchyConfig::default();
 
     // Create a task that references a non-existent epic
-    let mut task = Issue::new("Implement login".to_string(), String::new());
+    let mut task = crate::fixture_issue("Implement login".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "epic:nonexistent".to_string()];
     executor.storage().save_issue(task.clone()).unwrap();
 
@@ -90,12 +95,12 @@ fn test_invalid_epic_reference_wrong_type() {
     let config = HierarchyConfig::default();
 
     // Create an issue with type:task but epic:backend label
-    let mut backend = Issue::new("Backend Service".to_string(), String::new());
+    let mut backend = crate::fixture_issue("Backend Service".to_string(), String::new());
     backend.labels = vec!["type:task".to_string(), "epic:backend".to_string()];
     executor.storage().save_issue(backend.clone()).unwrap();
 
     // Create a task that references it as an epic (wrong!)
-    let mut task = Issue::new("Add endpoint".to_string(), String::new());
+    let mut task = crate::fixture_issue("Add endpoint".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "epic:backend".to_string()];
     executor.storage().save_issue(task.clone()).unwrap();
 
@@ -122,12 +127,12 @@ fn test_valid_milestone_membership() {
     let config = HierarchyConfig::default();
 
     // Create milestone
-    let mut milestone = Issue::new("v1.0 Release".to_string(), String::new());
+    let mut milestone = crate::fixture_issue("v1.0 Release".to_string(), String::new());
     milestone.labels = vec!["type:milestone".to_string(), "milestone:v1.0".to_string()];
     executor.storage().save_issue(milestone.clone()).unwrap();
 
     // Create task under milestone
-    let mut task = Issue::new("Fix critical bug".to_string(), String::new());
+    let mut task = crate::fixture_issue("Fix critical bug".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "milestone:v1.0".to_string()];
     executor.storage().save_issue(task.clone()).unwrap();
 
@@ -143,11 +148,11 @@ fn test_multiple_membership_labels() {
     let config = HierarchyConfig::default();
 
     // Create milestone and epic
-    let mut milestone = Issue::new("v1.0".to_string(), String::new());
+    let mut milestone = crate::fixture_issue("v1.0".to_string(), String::new());
     milestone.labels = vec!["type:milestone".to_string(), "milestone:v1.0".to_string()];
     executor.storage().save_issue(milestone.clone()).unwrap();
 
-    let mut epic = Issue::new("Auth".to_string(), String::new());
+    let mut epic = crate::fixture_issue("Auth".to_string(), String::new());
     epic.labels = vec![
         "type:epic".to_string(),
         "epic:auth".to_string(),
@@ -156,7 +161,7 @@ fn test_multiple_membership_labels() {
     executor.storage().save_issue(epic.clone()).unwrap();
 
     // Task belongs to both
-    let mut task = Issue::new("Login".to_string(), String::new());
+    let mut task = crate::fixture_issue("Login".to_string(), String::new());
     task.labels = vec![
         "type:task".to_string(),
         "epic:auth".to_string(),
@@ -179,7 +184,7 @@ fn test_no_membership_labels_is_ok() {
     let config = HierarchyConfig::default();
 
     // Task with no membership labels (orphan)
-    let mut task = Issue::new("Standalone task".to_string(), String::new());
+    let mut task = crate::fixture_issue("Standalone task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     executor.storage().save_issue(task.clone()).unwrap();
 
@@ -198,7 +203,7 @@ fn test_epic_referencing_itself() {
     let config = HierarchyConfig::default();
 
     // Epic that references itself (valid but maybe weird)
-    let mut epic = Issue::new("Auth".to_string(), String::new());
+    let mut epic = crate::fixture_issue("Auth".to_string(), String::new());
     epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
     executor.storage().save_issue(epic.clone()).unwrap();
 
@@ -218,12 +223,12 @@ fn test_mixed_valid_and_invalid_references() {
     let config = HierarchyConfig::default();
 
     // Create one valid epic
-    let mut epic = Issue::new("Auth".to_string(), String::new());
+    let mut epic = crate::fixture_issue("Auth".to_string(), String::new());
     epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
     executor.storage().save_issue(epic.clone()).unwrap();
 
     // Task references one valid, one invalid
-    let mut task = Issue::new("Login".to_string(), String::new());
+    let mut task = crate::fixture_issue("Login".to_string(), String::new());
     task.labels = vec![
         "type:task".to_string(),
         "epic:auth".to_string(),      // Valid
@@ -260,12 +265,12 @@ fn test_custom_type_names_and_namespaces() {
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
     // Create a theme
-    let mut theme = Issue::new("Dark Mode".to_string(), String::new());
+    let mut theme = crate::fixture_issue("Dark Mode".to_string(), String::new());
     theme.labels = vec!["type:theme".to_string(), "theme:ui".to_string()];
     executor.storage().save_issue(theme.clone()).unwrap();
 
     // Create a feature that references the theme
-    let mut feature = Issue::new("Dark sidebar".to_string(), String::new());
+    let mut feature = crate::fixture_issue("Dark sidebar".to_string(), String::new());
     feature.labels = vec!["type:feature".to_string(), "theme:ui".to_string()];
     executor.storage().save_issue(feature.clone()).unwrap();
 
@@ -296,12 +301,12 @@ fn test_type_alias_same_namespace() {
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
     // Create a release (uses milestone namespace)
-    let mut release = Issue::new("v2.0".to_string(), String::new());
+    let mut release = crate::fixture_issue("v2.0".to_string(), String::new());
     release.labels = vec!["type:release".to_string(), "milestone:v2.0".to_string()];
     executor.storage().save_issue(release.clone()).unwrap();
 
     // Task references it via milestone:v2.0 label
-    let mut task = Issue::new("Prepare release notes".to_string(), String::new());
+    let mut task = crate::fixture_issue("Prepare release notes".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "milestone:v2.0".to_string()];
     executor.storage().save_issue(task.clone()).unwrap();
 

@@ -220,7 +220,7 @@ pub enum ChildLink {
 /// let set = RuleSet::parse(toml, None, []).unwrap();
 /// let rules: Vec<&_> = set.rules.iter().collect();
 ///
-/// let mut task = Issue::new("a task".into(), String::new());
+/// let mut task = Issue::draft("a task".into(), String::new());
 /// task.labels = vec!["type:task".into()];
 /// let task_id = task.id.clone();
 /// let findings: Vec<GraphFinding> = evaluate_graph(
@@ -330,7 +330,7 @@ impl ChildLink {
 /// let set = RuleSet::parse(toml, None, []).unwrap();
 /// let rules: Vec<&_> = set.rules.iter().collect();
 ///
-/// let mut task = Issue::new("a task".into(), String::new());
+/// let mut task = Issue::draft("a task".into(), String::new());
 /// task.labels = vec!["type:task".into()];
 /// // No design dependency -> one finding, attributed to the task.
 /// let findings = evaluate_graph(
@@ -1728,7 +1728,7 @@ mod tests {
     }
 
     fn issue(title: &str, labels: &[&str]) -> Issue {
-        let mut i = Issue::new(title.to_string(), String::new());
+        let mut i = crate::domain::types::fixture_issue(title.to_string(), String::new());
         i.labels = labels.iter().map(|s| s.to_string()).collect();
         i
     }
@@ -1866,7 +1866,7 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        let mut epic = Issue::new("epic".to_string(), body);
+        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body);
         epic.labels = vec!["type:epic".to_string()];
         epic
     }
@@ -1961,7 +1961,7 @@ source-of-truth = "markdown-first"
         let mut container = epic_with_criteria(&["REQ-01"]);
         // The impl task ALSO has a REQ-01 in its OWN description (task scope) and
         // credits the container's criterion with a BARE satisfies label.
-        let mut impl_node = Issue::new(
+        let mut impl_node = crate::domain::types::fixture_issue(
             "impl".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: the task's own criterion\n".to_string(),
         );
@@ -2133,7 +2133,7 @@ source-of-truth = "markdown-first"
         // Only [hard] criteria are required; an [aspirational] one is ignored.
         let rule = coverage_rule("marker = \"[hard]\"");
         let body = "## Success Criteria\n\n- [hard] REQ-01: must\n- [aspirational] REQ-99: nice\n";
-        let mut epic = Issue::new("epic".to_string(), body.to_string());
+        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body.to_string());
         epic.labels = vec!["type:epic".to_string()];
         let mut child = issue("child", &["satisfies:REQ-01"]);
         child.dependencies = vec![epic.id.clone()];
@@ -2163,7 +2163,7 @@ source-of-truth = "markdown-first"
         let body = "## Success Criteria\n\n\
             - [ ] [hard] REQ-01: unchecked, uncovered\n\
             - [x] [hard] REQ-02: checked, uncovered\n";
-        let mut epic = Issue::new("epic".to_string(), body.to_string());
+        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body.to_string());
         epic.labels = vec!["type:epic".to_string()];
         // No satisfying children: both criteria must be reported as uncovered.
 
@@ -3288,7 +3288,7 @@ source-of-truth = "markdown-first"
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        let mut epic = Issue::new("epic".to_string(), body);
+        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body);
         epic.labels = vec!["type:epic".to_string()];
         epic
     }
@@ -3595,7 +3595,7 @@ source-of-truth = "markdown-first"
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        let mut epic = Issue::new("epic".to_string(), body);
+        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body);
         epic.labels = vec!["type:epic".to_string()];
         epic
     }
@@ -3705,7 +3705,7 @@ source-of-truth = "markdown-first"
         let body = "## Success Criteria\n\n\
                     - [hard] REQ-01: required\n\
                     - [aspirational] REQ-99: nice-to-have\n";
-        let mut epic = Issue::new("epic".to_string(), body.to_string());
+        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body.to_string());
         epic.labels = vec![
             "type:epic".to_string(),
             "req:REQ-01".to_string(), // matches [hard] criterion -> not stray
@@ -3734,7 +3734,7 @@ source-of-truth = "markdown-first"
         // A non-default criteria-section name is reflected in the finding text.
         let rule = clm_rule(r#"namespace = "req", criteria-section = "hard_requirements""#);
         let body = "## Hard Requirements\n\n- REQ-01: do it\n";
-        let mut epic = Issue::new("epic".to_string(), body.to_string());
+        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body.to_string());
         epic.labels = vec!["type:epic".to_string(), "req:REQ-77".to_string()]; // stray
 
         let rules = vec![&rule];

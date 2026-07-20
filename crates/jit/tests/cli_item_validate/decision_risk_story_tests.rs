@@ -44,7 +44,6 @@
 //!   file duplicates either `D-01` or `RISK-01`.
 
 use jit::commands::CommandExecutor;
-use jit::domain::Issue;
 use jit::storage::{IssueStore, JsonFileStorage};
 use serde_json::Value;
 use std::path::Path;
@@ -132,11 +131,12 @@ fn default_executor_with(
     .unwrap();
     let mut shorts = Vec::new();
     for (title, body) in issues {
-        let issue = Issue::new(title.to_string(), body.to_string());
+        let issue = crate::fixture_issue(title.to_string(), body.to_string());
         shorts.push(issue.short_id());
         storage.save_issue(issue).unwrap();
     }
-    (CommandExecutor::new(storage), shorts)
+    let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
+    (CommandExecutor::new(storage).with_layout(layout), shorts)
 }
 
 #[test]

@@ -107,9 +107,9 @@ fn executor_with_templates(templates_toml: &str) -> CommandExecutor<InMemoryStor
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
     storage.init().unwrap();
-    std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("templates.toml"), templates_toml).unwrap();
-    CommandExecutor::new(storage)
+    crate::seed_memory_data_file(&storage, "templates.toml", templates_toml);
+    let layout = storage.repository_layout();
+    CommandExecutor::new(storage).with_layout(layout)
 }
 
 /// Create a breakable container, returning its id.
@@ -281,6 +281,7 @@ fn test_container_anchor_defaults_without_a_templates_file() {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
     storage.init().unwrap();
-    let executor = CommandExecutor::new(storage);
+    let layout = storage.repository_layout();
+    let executor = CommandExecutor::new(storage).with_layout(layout);
     assert_eq!(executor.container_anchor().unwrap(), "container");
 }

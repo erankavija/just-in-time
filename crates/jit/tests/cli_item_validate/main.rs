@@ -16,3 +16,9 @@ mod validate_cli_rule_tests;
 mod validate_document_tests;
 mod validate_drift_builtin_tests;
 mod validation_lease_tests;
+
+fn fixture_issue(title: String, description: String) -> jit::domain::Issue {
+    let mut issue = jit::domain::Issue::draft(title, description);
+    issue.id = uuid::Uuid::new_v4().to_string();
+    issue
+}

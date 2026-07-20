@@ -645,10 +645,10 @@ fn executor_with_templates() -> CommandExecutor<InMemoryStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
     storage.init().unwrap();
-    std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("config.toml"), CONFIG_TOML).unwrap();
-    std::fs::write(storage.root().join("templates.toml"), TEMPLATES_TOML).unwrap();
-    CommandExecutor::new(storage)
+    crate::seed_memory_data_file(&storage, "config.toml", CONFIG_TOML);
+    crate::seed_memory_data_file(&storage, "templates.toml", TEMPLATES_TOML);
+    let layout = storage.repository_layout();
+    CommandExecutor::new(storage).with_layout(layout)
 }
 
 #[test]

@@ -66,7 +66,6 @@ pub mod test_helpers;
 pub use archive::ArchiveExecutionHooks;
 pub use batch_create::{
     BatchCreateOutcome, BatchIssueDef, BatchValidationError, BatchValidationProblem,
-    BatchWriteError,
 };
 pub use breakdown::{BracketBreakdownResult, BracketChild};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
@@ -107,9 +106,14 @@ use crate::labels as label_utils;
 use crate::storage::IssueStore;
 // Type hierarchy validation (currently only validates type labels)
 use anyhow::{anyhow, Context, Result};
-use chrono::Utc;
 use serde::Serialize;
 use std::sync::OnceLock;
+
+/// Finalizer-assigned record identities returned after one semantic publication.
+struct MutationPublication {
+    created_issue_ids: Vec<String>,
+    gate_run_ids: Vec<String>,
+}
 
 /// The unpassed gates of `issue` paired with their current status and registry
 /// mode, in the order [`Issue::get_unpassed_gates`] reports them.
@@ -319,6 +323,8 @@ pub struct WriteValidation {
     pub bypassed_rules: Vec<String>,
 }
 
+type PhasedEvents = Vec<(u8, Event)>;
+
 /// Outcome of [`CommandExecutor::sync_default_rule_membership`]: the
 /// `namespace-unique-*` default-rule NAMES appended to `.jit/rules.toml` and
 /// those dropped from it. Both empty means the file already matched the
@@ -366,7 +372,7 @@ impl ImageDeclarations {
 /// [`apply_overlay`](crate::repository_state::apply_overlay) and the overlaid
 /// validation capture. Production init/profile now compose typed deltas directly;
 /// this remains as a proposed-overlay test helper for validation/gate-check suites
-/// (a `.jit`-prefix path adapter on the increment-8 deletion sweep).
+/// that need a compact `.jit`-prefix path adapter.
 #[cfg(test)]
 pub(crate) fn overrides_from_repo_changes(
     changes: impl IntoIterator<Item = (std::path::PathBuf, Option<Vec<u8>>)>,
@@ -574,6 +580,213 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.layout
             .clone()
             .ok_or_else(|| anyhow!("no repository layout configured for this command"))
+    }
+
+    /// Publish one closed set of repository-owned issue/gate-run/audit intents.
+    ///
+    /// Capture paths are derived solely from the typed intents, so command callers
+    /// cannot submit a partial snapshot. Each retry opens a fresh session while
+    /// reusing the operation's sole identity/time authority.
+    fn publish_repository_mutation(
+        &self,
+        intents: Vec<crate::repository_state::MutationIntent>,
+    ) -> Result<MutationPublication>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        self.publish_repository_mutation_with(|_| Ok(intents.clone()))
+    }
+
+    fn publish_repository_mutation_with<F>(&self, build_intents: F) -> Result<MutationPublication>
+    where
+        S: crate::storage::RepositoryStateStore,
+        F: Fn(
+            &crate::repository_state::MutationContext,
+        ) -> Result<Vec<crate::repository_state::MutationIntent>>,
+    {
+        use crate::repository_state::{
+            finalize, CaptureBudget, CaptureSpec, MutationIntent, VirtualPath,
+        };
+        use crate::storage::RepositoryStateStoreError;
+        use std::collections::BTreeSet;
+
+        let layout = self.require_layout()?;
+        // Operation-scoped: each retry gets a fresh recovered session while
+        // identifiers and mutation time remain stable.
+        let context = crate::repository_state::MutationContext::production();
+        for _ in 0..8 {
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let intents = build_intents(&context)?;
+            let create_count = intents
+                .iter()
+                .map(|intent| match intent {
+                    MutationIntent::CreateIssue { .. } => 1,
+                    MutationIntent::CreateIssueBatch { drafts, .. } => drafts.len(),
+                    _ => 0,
+                })
+                .sum();
+            let created_issue_ids = (0..create_count)
+                .map(|index| context.identifier_at(index as u64))
+                .collect::<Vec<_>>();
+            let mut gate_keys = intents
+                .iter()
+                .filter_map(|intent| match intent {
+                    MutationIntent::RecordGateRun { draft } => {
+                        Some((draft.issue_id.clone(), draft.gate_key.clone()))
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            gate_keys.sort();
+            let gate_run_ids = (0..gate_keys.len())
+                .map(|index| context.identifier_at((create_count + index) as u64))
+                .collect::<Vec<_>>();
+
+            let mut paths = BTreeSet::new();
+            for intent in &intents {
+                match intent {
+                    MutationIntent::CreateIssue { .. }
+                    | MutationIntent::CreateIssueBatch { .. } => {
+                        paths.insert(VirtualPath::data("issues")?);
+                        paths.insert(VirtualPath::data("index.json")?);
+                        paths.insert(VirtualPath::data("events.jsonl")?);
+                    }
+                    MutationIntent::ClaimIssue { issue_id, .. } => {
+                        paths.insert(VirtualPath::data(format!("issues/{issue_id}.json"))?);
+                        paths.insert(VirtualPath::data("events.jsonl")?);
+                    }
+                    MutationIntent::UpdateIssue { issue }
+                    | MutationIntent::RepairIssueLifecycle { issue } => {
+                        paths.insert(VirtualPath::data(format!("issues/{}.json", issue.id))?);
+                    }
+                    MutationIntent::DeleteIssue { issue_id } => {
+                        paths.insert(VirtualPath::data(format!("issues/{issue_id}.json"))?);
+                        paths.insert(VirtualPath::data("index.json")?);
+                    }
+                    MutationIntent::RecordGateRun { .. } => {}
+                    MutationIntent::RecordEvent { .. } => {
+                        paths.insert(VirtualPath::data("events.jsonl")?);
+                    }
+                }
+            }
+            for id in &created_issue_ids {
+                paths.insert(VirtualPath::data(format!("issues/{id}.json"))?);
+            }
+            for id in &gate_run_ids {
+                paths.insert(VirtualPath::data("gate-runs")?);
+                paths.insert(VirtualPath::data(format!("gate-runs/{id}"))?);
+                paths.insert(VirtualPath::data(format!("gate-runs/{id}/result.json"))?);
+            }
+            let budget = CaptureBudget {
+                max_paths: paths.len().saturating_add(16),
+                max_listings: 0,
+                max_bytes: 64 * 1024 * 1024,
+                max_depth: 8,
+            };
+            let spec = CaptureSpec::phase_one(paths, budget)?;
+            let image = match session.capture(spec) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let plan = finalize(&layout, &image, &context, &intents)?;
+            match session.apply(&plan) {
+                Ok(_) => {
+                    return Ok(MutationPublication {
+                        created_issue_ids,
+                        gate_run_ids,
+                    })
+                }
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "repository mutation did not converge after repeated capture conflicts"
+        ))
+    }
+
+    fn publish_issue_mutation(&self, updates: Vec<Issue>, events: Vec<(u8, Event)>) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::MutationIntent;
+        let intents = updates
+            .into_iter()
+            .map(|issue| MutationIntent::UpdateIssue {
+                issue: Box::new(issue),
+            })
+            .chain(
+                events
+                    .into_iter()
+                    .map(|(phase, event)| MutationIntent::RecordEvent {
+                        phase,
+                        event: Box::new(event),
+                    }),
+            )
+            .collect();
+        self.publish_repository_mutation(intents).map(|_| ())
+    }
+
+    fn publish_issue_creation(&self, draft: Issue, bypassed_rules: &[String]) -> Result<String>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::MutationIntent;
+        let publication = self.publish_repository_mutation_with(|context| {
+            let issue_id = context.identifier_at(0);
+            Ok(std::iter::once(MutationIntent::CreateIssue {
+                draft: Box::new(draft.clone()),
+            })
+            .chain(
+                bypassed_rules
+                    .iter()
+                    .map(|rule| MutationIntent::RecordEvent {
+                        phase: 9,
+                        event: Box::new(Event::draft_local_rule_bypassed(
+                            issue_id.clone(),
+                            rule.clone(),
+                        )),
+                    }),
+            )
+            .collect())
+        })?;
+        publication
+            .created_issue_ids
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("issue finalizer returned no created issue identity"))
+    }
+
+    fn publish_gate_evaluation(
+        &self,
+        mut result: crate::domain::GateRunResult,
+        issue: Issue,
+        event: Event,
+    ) -> Result<crate::domain::GateRunResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::MutationIntent;
+        let intents = vec![
+            MutationIntent::UpdateIssue {
+                issue: Box::new(issue),
+            },
+            MutationIntent::RecordGateRun {
+                draft: Box::new(result.clone()),
+            },
+            MutationIntent::RecordEvent {
+                phase: 1,
+                event: Box::new(event),
+            },
+        ];
+        let publication = self.publish_repository_mutation(intents)?;
+        result.run_id = publication
+            .gate_run_ids
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("gate-run finalizer returned no record identity"))?;
+        Ok(result)
     }
 
     /// Get reference to the storage backend
@@ -798,21 +1011,28 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
-    /// Append one [`Event::LocalRuleBypassed`] per bypassed `enforce` rule.
+    /// Publish one [`Event::LocalRuleBypassed`] per bypassed `enforce` rule.
     ///
     /// Pass the rule names from [`WriteValidation::bypassed_rules`]. A non-empty
     /// list means the caller explicitly forced an override, which always merits an
     /// audit entry — including a forced no-op write that changed no other field.
-    /// When the override accompanies an issue write, call this AFTER the write
-    /// commits so a failed save leaves no false bypass entry. A no-op when `rules`
-    /// is empty (ordinary writes, rejections, and read-only/preview runs log
-    /// nothing).
-    fn log_rule_bypasses(&self, issue_id: &str, rules: &[String]) -> Result<()> {
-        for rule in rules {
-            let event = Event::new_local_rule_bypassed(issue_id.to_string(), rule.clone());
-            self.storage.append_event(&event)?;
-        }
-        Ok(())
+    /// Overrides accompanying an issue write travel in that write's mutation plan;
+    /// this event-only helper is for the no-op case. It is a no-op when `rules` is
+    /// empty (ordinary writes, rejections, and read-only/preview runs log nothing).
+    fn log_rule_bypasses(&self, issue_id: &str, rules: &[String]) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let events = rules
+            .iter()
+            .map(|rule| {
+                (
+                    9,
+                    Event::draft_local_rule_bypassed(issue_id.to_string(), rule.clone()),
+                )
+            })
+            .collect();
+        self.publish_issue_mutation(Vec::new(), events)
     }
 
     /// The SINGLE chokepoint through which ALL issue state changes must flow.
@@ -861,44 +1081,35 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// 5. **State mutation.** Sets `issue.state = target`, and maintains
     ///    [`Issue::archived_from`]: entering [`State::Archived`] records the state
     ///    left behind, reviving out of it clears the field.
-    /// 6. **Persistence + audit (when `persist`).** When `persist` is true, saves
-    ///    the issue and appends the `issue_state_changed` event (plus
-    ///    `issue_completed` when landing [`State::Done`]). Including the event
-    ///    write here — not only at call sites — means a future caller that forgets
-    ///    to log cannot leave a state change unaudited.
+    /// 6. **Persistence + audit (when `persist`).** When `persist` is true, the
+    ///    issue and its `issue_state_changed` event (plus `issue_completed` when
+    ///    landing [`State::Done`]) publish in one recoverable delta.
     ///
     /// # The `persist` flag
     ///
-    /// Persistence conventions differ per caller: the state-only paths
-    /// (`update_issue_state`, the auto-transition helpers, `release_issue`) want
-    /// the chokepoint to own the save + event, so they pass `persist = true`. The
-    /// batch paths that combine a state change with other field edits in ONE save
-    /// (`update_issue`, bulk update) pass `persist = false`: they enforce + mutate
-    /// through the chokepoint, then perform their own combined save and emit the
-    /// `issue_state_changed` event themselves (with their existing idempotency and
-    /// bypass-event ordering). Enforcement and the no-op/rejection policy are
-    /// always centralized regardless of `persist`.
+    /// State-only paths ask the chokepoint to publish; paths combining a state
+    /// change with other edits pass `persist = false` and publish their complete
+    /// intent set afterward.
     ///
-    /// `pre_save` runs after a successful (non-blocked) enforcement and state
-    /// mutation but BEFORE the save when `persist` is true, letting a caller stamp
-    /// additional fields (e.g. clearing the assignee on release) into the same
-    /// write. It is unused (a no-op closure) for callers that only change state.
+    /// `before_publish` runs after successful enforcement and state
+    /// mutation but before publication when `persist` is true, letting a caller
+    /// include additional fields in the same issue update.
     fn apply_state_transition(
         &self,
         issue: &mut Issue,
         target: State,
         force: bool,
         persist: bool,
-        pre_save: impl FnOnce(&mut Issue),
-    ) -> Result<Vec<String>>
+        before_publish: impl FnOnce(&mut Issue),
+    ) -> Result<(Vec<String>, PhasedEvents)>
     where
         S: crate::storage::RepositoryStateStore,
     {
         let old_state = issue.state;
 
-        // No-op: nothing to transition, enforce, save, or log.
+        // No-op: nothing to transition, enforce, publish, or log.
         if old_state == target {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), Vec::new()));
         }
 
         // Archived is terminality-preserving (`jit:45a140ae`): a revive out of
@@ -934,8 +1145,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         // abandoning or retiring/parking an issue must not be gated on rules such
         // as coverage. Every other target runs enforcement against the TARGET-state
         // projection of the issue.
-        let warnings = if matches!(target, State::Rejected | State::Archived) {
-            Vec::new()
+        let (warnings, bypass_events) = if matches!(target, State::Rejected | State::Archived) {
+            (Vec::new(), Vec::new())
         } else {
             let mut projected = issue.clone();
             projected.state = target;
@@ -955,35 +1166,23 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue.archived_from = None;
         }
 
-        // Stamp the lifecycle timestamp for this transition (first-occurrence
-        // only; see `Issue::mark_*`). Done HERE, at the single chokepoint every
-        // state change flows through, so no Ready/Done path can forget it —
-        // including `persist = false` callers, which carry this mutated issue
-        // into their own combined save. Claim/assignment stamps `claimed_at`
-        // separately (assignment is not a state transition).
-        match target {
-            State::Ready => issue.mark_first_ready(Utc::now()),
-            State::Done => issue.mark_done(Utc::now()),
-            _ => {}
-        }
-
         if persist {
-            pre_save(issue);
+            before_publish(issue);
             let issue_id = issue.id.clone();
-            self.storage.save_issue(issue.clone())?;
-
-            let event = Event::new_issue_state_changed(issue_id.clone(), old_state, target);
-            self.storage.append_event(&event)?;
-
+            let mut events = bypass_events.clone();
+            events.push((
+                1,
+                Event::draft_issue_state_changed(issue_id.clone(), old_state, target),
+            ));
             if target == State::Done {
-                let event = Event::new_issue_completed(issue_id);
-                self.storage.append_event(&event)?;
+                events.push((2, Event::draft_issue_completed(issue_id)));
             }
+            self.publish_issue_mutation(vec![issue.clone()], events)?;
         }
 
         // Surface the legacy-revive advisory ahead of any enforcement warnings.
         revive_warnings.extend(warnings);
-        Ok(revive_warnings)
+        Ok((revive_warnings, bypass_events))
     }
 
     /// The dependency and gate guards a transition must clear, evaluated against
@@ -1055,13 +1254,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   [`Loose`](crate::validation::Strictness::Loose) level that is an
     ///   `enforce = true` / `error` finding; [`Strict`](crate::validation::Strictness::Strict)
     ///   widens it to any violation and [`Permissive`](crate::validation::Strictness::Permissive)
-    ///   blocks nothing. A blocking finding appends one
+    ///   blocks nothing. A blocking finding publishes one
     ///   [`Event::TransitionBlocked`] per rule (the attempted transition is the
     ///   auditable act) and returns a
     ///   [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
     ///   4), unless `force` is set.
     /// - With `force`, blocking findings do NOT block; one
-    ///   [`Event::GraphRuleBypassed`] is appended per overridden rule.
+    ///   [`Event::GraphRuleBypassed`] is returned per overridden rule for the
+    ///   caller to publish atomically with the issue update.
     /// - A `config-error` finding (a malformed rule: bad regex, missing key) whose
     ///   selector applies to this issue BLOCKS whenever the strictness/enforce
     ///   decision blocks it — a broken guard must not silently pass. The blocker
@@ -1074,7 +1274,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue: &Issue,
         target: State,
         force: bool,
-    ) -> Result<Vec<String>>
+    ) -> Result<(Vec<String>, PhasedEvents)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -1095,7 +1295,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Nothing to enforce: skip the (potentially large) store read entirely.
         if rules.is_empty() {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), Vec::new()));
         }
 
         // Neighborhood slice: the issue plus its transitive dependency closure in
@@ -1170,22 +1370,35 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if !blocking.is_empty() {
             if force {
-                // Forced override: record one bypass event per blocked rule. The
-                // caller commits the issue save right after this returns; the
-                // append-only audit log records the deliberate override.
-                for (rule, _) in &blocking {
-                    let event =
-                        Event::new_graph_rule_bypassed(issue.id.clone(), target, rule.clone());
-                    self.storage.append_event(&event)?;
-                }
+                // Forced override: return one bypass event per blocked rule. The
+                // caller includes these in the same mutation as the issue update.
+                let events = blocking
+                    .iter()
+                    .map(|(rule, _)| {
+                        (
+                            1,
+                            Event::draft_graph_rule_bypassed(
+                                issue.id.clone(),
+                                target,
+                                rule.clone(),
+                            ),
+                        )
+                    })
+                    .collect();
+                return Ok((warnings, events));
             } else {
                 // Blocked: log the attempted transition (one event per blocking
                 // rule) BEFORE returning the error, then persist nothing.
-                for (rule, _) in &blocking {
-                    let event =
-                        Event::new_transition_blocked(issue.id.clone(), target, rule.clone());
-                    self.storage.append_event(&event)?;
-                }
+                let events = blocking
+                    .iter()
+                    .map(|(rule, _)| {
+                        (
+                            1,
+                            Event::draft_transition_blocked(issue.id.clone(), target, rule.clone()),
+                        )
+                    })
+                    .collect();
+                self.publish_issue_mutation(Vec::new(), events)?;
                 return Err(crate::errors::TransitionBlockedError::graph_rules(
                     issue.id.clone(),
                     target,
@@ -1196,7 +1409,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        Ok(warnings)
+        Ok((warnings, Vec::new()))
     }
 
     /// Build the dependency-neighborhood issue slice for transition-time graph
@@ -1820,7 +2033,8 @@ assert = {}
         storage.init().unwrap();
 
         // Create a test issue
-        let issue = Issue::new("test-issue".to_string(), "Test".to_string());
+        let issue =
+            crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         storage.save_issue(issue).unwrap();
 
@@ -1848,7 +2062,8 @@ enforce_leases = "off"
         storage.init().unwrap();
 
         // Create a test issue
-        let issue = Issue::new("test-issue".to_string(), "Test".to_string());
+        let issue =
+            crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         storage.save_issue(issue).unwrap();
 
@@ -1868,7 +2083,8 @@ enforce_leases = "off"
         storage.init().unwrap();
 
         // Create a test issue
-        let issue = Issue::new("test-issue".to_string(), "Test".to_string());
+        let issue =
+            crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         storage.save_issue(issue).unwrap();
 
@@ -1898,7 +2114,8 @@ enforce_leases = "strict"
         storage.init().unwrap();
 
         // Create a test issue
-        let issue = Issue::new("test-issue".to_string(), "Test".to_string());
+        let issue =
+            crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         storage.save_issue(issue).unwrap();
 

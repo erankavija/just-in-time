@@ -15,6 +15,14 @@ use jit::validation::evaluate_local;
 use std::fs;
 use tempfile::TempDir;
 
+fn executor(jit_dir: &std::path::Path) -> CommandExecutor<JsonFileStorage> {
+    let storage = JsonFileStorage::new(jit_dir);
+    let layout =
+        jit::storage::discover_repository_layout(jit_dir.parent().unwrap(), storage.root())
+            .unwrap();
+    CommandExecutor::new(storage).with_layout(layout)
+}
+
 /// A freshly-`jit init`ed repo: `config.toml` with a single `type` namespace,
 /// plus the scaffolded `rules.toml` + baked `schemas/default-*.json`.
 fn setup_initialized_repo() -> (TempDir, std::path::PathBuf) {
@@ -33,9 +41,7 @@ unique = true
     .unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
     storage.init().unwrap();
-    CommandExecutor::new(storage)
-        .scaffold_default_rules()
-        .unwrap();
+    executor(&jit_dir).scaffold_default_rules().unwrap();
     (temp, jit_dir)
 }
 
@@ -76,13 +82,13 @@ unique = true
 }
 
 fn issue_with_label(label: &str) -> Issue {
-    let mut issue = Issue::new("t".to_string(), String::new());
+    let mut issue = crate::fixture_issue("t".to_string(), String::new());
     issue.labels = vec![label.to_string()];
     issue
 }
 
 fn issue_with_labels(labels: &[&str]) -> Issue {
-    let mut issue = Issue::new("t".to_string(), String::new());
+    let mut issue = crate::fixture_issue("t".to_string(), String::new());
     issue.labels = labels.iter().map(|s| s.to_string()).collect();
     issue
 }
@@ -95,7 +101,7 @@ fn test_new_unique_namespace_enforces_uniqueness_without_regeneration() {
     let (_temp, jit_dir) = setup_initialized_repo();
     declare_unique_squad_namespace(&jit_dir);
 
-    let exec = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let exec = executor(&jit_dir);
     let rules = exec.effective_rules().unwrap();
     assert!(
         rules
@@ -147,7 +153,10 @@ fn test_hand_declared_namespace_validates_without_regeneration() {
     let id = issue.id.clone();
     storage.save_issue(issue).unwrap();
 
-    let exec = CommandExecutor::new(storage);
+    let layout =
+        jit::storage::discover_repository_layout(jit_dir.parent().unwrap(), storage.root())
+            .unwrap();
+    let exec = CommandExecutor::new(storage).with_layout(layout);
     let report = exec.run_rules(Some(&id)).unwrap();
     assert!(
         !report.has_errors(),
@@ -163,7 +172,7 @@ fn test_undeclared_namespace_still_fails_validation() {
     // so derive-at-load did not blanket-accept every namespace.
     let (_temp, jit_dir) = setup_initialized_repo();
 
-    let exec = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let exec = executor(&jit_dir);
     let rules = exec.effective_rules().unwrap();
     let eval = evaluate_local(
         &issue_with_label("undeclared:x"),
@@ -188,7 +197,7 @@ fn test_create_issue_in_new_namespace_then_validate_label_clean() {
     let (_temp, jit_dir) = setup_initialized_repo();
     declare_enforces_namespace(&jit_dir);
 
-    let exec = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let exec = executor(&jit_dir);
     let (id, _warnings) = exec
         .create_issue(
             "enforcer".to_string(),
@@ -202,7 +211,7 @@ fn test_create_issue_in_new_namespace_then_validate_label_clean() {
         )
         .unwrap();
 
-    let reloaded = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let reloaded = executor(&jit_dir);
     let issue = reloaded.get_issue(&id).unwrap();
     let rules = reloaded.effective_rules().unwrap();
     let eval = evaluate_local(&issue, rules, ContentFormat::Markdown).unwrap();
@@ -230,7 +239,7 @@ fn test_missing_default_schema_still_validates_and_enforces() {
     let (_temp, jit_dir) = setup_initialized_repo();
     std::fs::remove_file(namespace_registry_projection(&jit_dir)).unwrap();
 
-    let exec = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let exec = executor(&jit_dir);
     let rules = exec
         .effective_rules()
         .expect("a missing default projection must not fail rule loading");
@@ -269,7 +278,7 @@ fn test_corrupt_default_schema_still_validates_and_enforces() {
     let (_temp, jit_dir) = setup_initialized_repo();
     std::fs::write(namespace_registry_projection(&jit_dir), "{ not valid json").unwrap();
 
-    let exec = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let exec = executor(&jit_dir);
     let rules = exec
         .effective_rules()
         .expect("a malformed default projection must not fail rule loading");

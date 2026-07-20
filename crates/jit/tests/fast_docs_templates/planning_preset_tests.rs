@@ -165,7 +165,10 @@ fn test_project_defined_preset_save_list_show_apply_in_process() {
     let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path());
     storage.init().unwrap();
-    let executor = CommandExecutor::new(storage);
+    let layout =
+        jit::storage::discover_repository_layout(temp.path().parent().unwrap(), storage.root())
+            .unwrap();
+    let executor = CommandExecutor::new(storage).with_layout(layout);
 
     // Two project-declared gates standing in for a language-specific CI bundle.
     executor

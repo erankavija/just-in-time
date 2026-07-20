@@ -103,7 +103,7 @@ fn goal_body() -> String {
 
 /// The breakable container `C` (a research goal) declaring `hyp:H-1`.
 fn breakable_container() -> Issue {
-    let mut goal = Issue::new("Improve accuracy".to_string(), goal_body());
+    let mut goal = crate::fixture_issue("Improve accuracy".to_string(), goal_body());
     goal.labels = vec!["type:goal".to_string(), "hyp:H-1".to_string()];
     goal
 }
@@ -234,10 +234,10 @@ fn test_research_uncovered_hard_hypothesis_blocked_at_breakdown_gate() {
     let rules = graph_rules(&set);
 
     let mut container = breakable_container();
-    let mut experiment = Issue::new("draft experiment".to_string(), String::new());
+    let mut experiment = crate::fixture_issue("draft experiment".to_string(), String::new());
     experiment.labels = vec!["type:experiment".to_string()]; // does NOT test H-1
     experiment.state = State::Backlog;
-    let mut breakdown = Issue::new("breakdown".to_string(), String::new());
+    let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -271,9 +271,9 @@ fn test_research_preview_silent_while_breakdown_node_in_backlog() {
     let rules = graph_rules(&set);
 
     let mut container = breakable_container();
-    let mut experiment = Issue::new("draft experiment".to_string(), String::new());
+    let mut experiment = crate::fixture_issue("draft experiment".to_string(), String::new());
     experiment.labels = vec!["type:experiment".to_string()]; // does NOT test H-1
-    let mut breakdown = Issue::new("breakdown".to_string(), String::new());
+    let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -303,10 +303,10 @@ fn test_research_preview_passes_when_backlog_experiment_carries_mapping() {
     let rules = graph_rules(&set);
 
     let mut container = breakable_container();
-    let mut experiment = Issue::new("draft experiment".to_string(), String::new());
+    let mut experiment = crate::fixture_issue("draft experiment".to_string(), String::new());
     experiment.labels = vec!["type:experiment".to_string(), "tests:H-1".to_string()];
     experiment.state = State::Backlog; // NOT done
-    let mut breakdown = Issue::new("breakdown".to_string(), String::new());
+    let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -337,9 +337,9 @@ fn test_research_preview_excludes_bracket_types_and_halts_walk() {
     let rules = graph_rules(&set);
 
     let mut container = breakable_container();
-    let mut experiment = Issue::new("draft experiment".to_string(), String::new());
+    let mut experiment = crate::fixture_issue("draft experiment".to_string(), String::new());
     experiment.labels = vec!["type:experiment".to_string()]; // no tests: here
-    let mut breakdown = Issue::new("breakdown".to_string(), String::new());
+    let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -348,7 +348,7 @@ fn test_research_preview_excludes_bracket_types_and_halts_walk() {
     // gated/done, so a backlog B that has not started breakdown stays silent).
     breakdown.state = State::InProgress;
     // P, beyond the boundary, is the only carrier of tests:H-1.
-    let mut plan = Issue::new("plan".to_string(), String::new());
+    let mut plan = crate::fixture_issue("plan".to_string(), String::new());
     plan.labels = vec!["type:planning".to_string(), "tests:H-1".to_string()];
 
     container.dependencies = vec![experiment.id.clone()];
@@ -375,11 +375,11 @@ fn test_research_preview_credits_non_sink_experiment_interior() {
     let rules = graph_rules(&set);
 
     let mut container = breakable_container();
-    let mut exp_a = Issue::new("exp a (sink)".to_string(), String::new());
+    let mut exp_a = crate::fixture_issue("exp a (sink)".to_string(), String::new());
     exp_a.labels = vec!["type:experiment".to_string()];
-    let mut exp_b = Issue::new("exp b (interior)".to_string(), String::new());
+    let mut exp_b = crate::fixture_issue("exp b (interior)".to_string(), String::new());
     exp_b.labels = vec!["type:experiment".to_string(), "tests:H-1".to_string()];
-    let mut breakdown = Issue::new("breakdown".to_string(), String::new());
+    let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -419,7 +419,7 @@ fn test_research_closure_rule_still_requires_done_experiment() {
     let mut goal = breakable_container();
     goal.state = State::Done;
     // An experiment testing H-1 but still in backlog (not done).
-    let mut experiment = Issue::new("experiment".to_string(), String::new());
+    let mut experiment = crate::fixture_issue("experiment".to_string(), String::new());
     experiment.labels = vec!["type:experiment".to_string(), "tests:H-1".to_string()];
     experiment.state = State::Backlog;
     goal.dependencies.push(experiment.id.clone());

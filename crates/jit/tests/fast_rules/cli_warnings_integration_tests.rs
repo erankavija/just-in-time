@@ -11,11 +11,12 @@ use jit::storage::{IssueStore, JsonFileStorage};
 use jit::validation::graph::GraphFinding;
 use tempfile::TempDir;
 
-fn setup_test_storage() -> (TempDir, JsonFileStorage) {
+fn setup_test_repo() -> (TempDir, CommandExecutor<JsonFileStorage>) {
     let temp_dir = TempDir::new().unwrap();
-    let storage = JsonFileStorage::new(temp_dir.path());
+    let storage = JsonFileStorage::new(temp_dir.path().join(".jit"));
     storage.init().unwrap();
-    (temp_dir, storage)
+    let layout = jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
+    (temp_dir, CommandExecutor::new(storage).with_layout(layout))
 }
 
 /// Graph-rule findings attributed to `id`, the rule-engine replacement for the
@@ -32,8 +33,7 @@ fn warnings_for(executor: &CommandExecutor<JsonFileStorage>, id: &str) -> Vec<Gr
 
 #[test]
 fn test_create_epic_without_label_shows_warning() {
-    let (_temp_dir, storage) = setup_test_storage();
-    let executor = CommandExecutor::new(storage);
+    let (_temp_dir, executor) = setup_test_repo();
 
     // Create epic without epic:* label
     let (id, _) = executor
@@ -57,8 +57,7 @@ fn test_create_epic_without_label_shows_warning() {
 
 #[test]
 fn test_create_task_without_parent_shows_warning() {
-    let (_temp_dir, storage) = setup_test_storage();
-    let executor = CommandExecutor::new(storage);
+    let (_temp_dir, executor) = setup_test_repo();
 
     // Create task without parent labels
     let (id, _) = executor
@@ -82,8 +81,7 @@ fn test_create_task_without_parent_shows_warning() {
 
 #[test]
 fn test_create_epic_with_label_no_warning() {
-    let (_temp_dir, storage) = setup_test_storage();
-    let executor = CommandExecutor::new(storage);
+    let (_temp_dir, executor) = setup_test_repo();
 
     // Create epic with epic:* label
     let (id, _) = executor
@@ -104,8 +102,7 @@ fn test_create_epic_with_label_no_warning() {
 
 #[test]
 fn test_create_task_with_parent_no_warning() {
-    let (_temp_dir, storage) = setup_test_storage();
-    let executor = CommandExecutor::new(storage);
+    let (_temp_dir, executor) = setup_test_repo();
 
     // Create task with epic label
     let (id, _) = executor

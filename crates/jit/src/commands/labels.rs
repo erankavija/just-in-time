@@ -17,7 +17,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Note: Part of public API, may be used by external consumers.
     #[allow(dead_code)]
-    pub fn add_label(&self, issue_id: &str, label: &str) -> Result<Vec<String>> {
+    pub fn add_label(&self, issue_id: &str, label: &str) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let mut issue = self.storage.load_issue(&full_id)?;
 
@@ -43,7 +46,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|f| format!("[{}] {}", f.rule, f.message))
             .collect();
 
-        self.storage.save_issue(issue)?;
+        self.publish_issue_mutation(vec![issue], Vec::new())?;
         Ok(warnings)
     }
 

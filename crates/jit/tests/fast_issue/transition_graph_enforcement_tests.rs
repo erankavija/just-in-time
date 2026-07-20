@@ -12,7 +12,7 @@
 //! block the diversion).
 
 use jit::commands::CommandExecutor;
-use jit::domain::{Event, Issue, State};
+use jit::domain::{Event, State};
 use jit::errors::TransitionBlockedError;
 use jit::storage::{InMemoryStorage, IssueStore};
 
@@ -28,7 +28,8 @@ fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     std::fs::create_dir_all(storage.root()).unwrap();
     std::fs::write(storage.root().join("config.toml"), "").unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    CommandExecutor::new(storage)
+    let layout = storage.repository_layout();
+    CommandExecutor::new(storage).with_layout(layout)
 }
 
 /// Save an issue directly into storage at a given state, bypassing validation.
@@ -38,7 +39,7 @@ fn seed_issue(
     labels: &[&str],
     state: State,
 ) -> String {
-    let mut issue = Issue::new(title.to_string(), String::new());
+    let mut issue = crate::fixture_issue(title.to_string(), String::new());
     issue.labels = labels.iter().map(|s| s.to_string()).collect();
     issue.state = state;
     let id = issue.id.clone();
@@ -307,7 +308,7 @@ fn test_gated_diversion_runs_before_graph_enforcement() {
     // `test_gated_diversion_enforces_gated_keyed_graph_rule`.)
     let executor = executor_with_rules(DONE_NEEDS_DESIGN);
 
-    let mut issue = Issue::new("Epic".to_string(), String::new());
+    let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
     issue.gates_required = vec!["tests".to_string()];
@@ -362,7 +363,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
     let executor = executor_with_rules(rules);
 
-    let mut issue = Issue::new("Epic".to_string(), String::new());
+    let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
     issue.gates_required = vec!["tests".to_string()];
@@ -412,7 +413,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
     let executor = executor_with_rules(rules);
 
-    let mut issue = Issue::new("Epic".to_string(), String::new());
+    let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
     issue.gates_required = vec!["tests".to_string()];
@@ -461,7 +462,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
     let executor = executor_with_rules(rules);
 
-    let mut issue = Issue::new("Epic".to_string(), String::new());
+    let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
     issue.gates_required = vec!["tests".to_string()];
@@ -627,7 +628,7 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
 
     let executor = executor_with_rules(DONE_NEEDS_DESIGN);
 
-    let mut issue = Issue::new("Epic".to_string(), String::new());
+    let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::Gated;
     issue.gates_required = vec!["tests".to_string()];

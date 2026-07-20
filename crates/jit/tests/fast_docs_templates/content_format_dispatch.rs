@@ -48,7 +48,7 @@ assert = { require-section = { heading = "Success Criteria" } }
 }
 
 fn epic(body: &str, format: Option<ContentFormat>) -> Issue {
-    let mut issue = Issue::new("An epic".to_string(), body.to_string());
+    let mut issue = crate::fixture_issue("An epic".to_string(), body.to_string());
     issue.labels = vec!["type:epic".to_string()];
     issue.content_format = format;
     issue
@@ -192,7 +192,7 @@ fn test_html_graph_label_coverage_uses_html_parser_in_production() {
     .unwrap();
 
     // Epic with an HTML success-criteria section declaring REQ-01, no covering child.
-    let mut html_epic = Issue::new("epic".to_string(), HTML_BODY.to_string());
+    let mut html_epic = crate::fixture_issue("epic".to_string(), HTML_BODY.to_string());
     html_epic.labels = vec!["type:epic".to_string()];
     html_epic.content_format = Some(ContentFormat::Html);
 

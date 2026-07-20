@@ -85,7 +85,7 @@ fn test_orphan_warning_is_unconditional_in_default_ruleset() {
     // no rules.toml, the in-memory defaults always emit them, so an orphaned task
     // warns. A repo that wants them silenced edits rules.toml.
     let temp_dir = TempDir::new().unwrap();
-    let storage = JsonFileStorage::new(temp_dir.path());
+    let storage = JsonFileStorage::new(temp_dir.path().join(".jit"));
     storage.init().unwrap();
 
     // Remove the scaffolded rules.toml so we exercise the in-memory defaults.
@@ -94,7 +94,8 @@ fn test_orphan_warning_is_unconditional_in_default_ruleset() {
         std::fs::remove_file(&rules_path).unwrap();
     }
 
-    let executor = CommandExecutor::new(storage);
+    let layout = jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
+    let executor = CommandExecutor::new(storage).with_layout(layout);
 
     // Create a task without parent labels (orphaned at a leaf level).
     let (issue_id, _) = executor

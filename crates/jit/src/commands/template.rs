@@ -582,19 +582,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                         self.storage.restore_issue_verbatim((*original).clone())?;
                         let fields = changed_fields(original, &current);
                         if !fields.is_empty() {
-                            self.storage
-                                .append_event(&crate::domain::Event::new_issue_updated(
+                            self.storage.append_event(
+                                &crate::domain::Event::draft_issue_updated(
                                     current.id.clone(),
                                     APPLY_ACTOR.to_string(),
                                     fields,
-                                ))?;
+                                ),
+                            )?;
                         }
                     }
                 }
                 None => {
                     self.storage.delete_issue(&current.id)?;
                     self.storage
-                        .append_event(&crate::domain::Event::new_issue_deleted(current.id))?;
+                        .append_event(&crate::domain::Event::draft_issue_deleted(current.id))?;
                 }
             }
         }
@@ -676,7 +677,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue.description = node_description(node, &node_context);
             self.storage.save_issue(issue)?;
             self.storage
-                .append_event(&crate::domain::Event::new_issue_updated(
+                .append_event(&crate::domain::Event::draft_issue_updated(
                     node_id.clone(),
                     APPLY_ACTOR.to_string(),
                     vec!["description".to_string()],
@@ -730,7 +731,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         gates: &[String],
         issue_id: &str,
         warnings: &mut Vec<String>,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         for gate in gates {
             let mut w = match self.resolve_template_gate(gate)? {
                 TemplateGateResolution::Preset => {
@@ -810,7 +814,7 @@ fn resolve_endpoint(
 /// creation: fields set, then auto-promoted to [`State::Ready`] (so a state-keyed
 /// rule sees the persisted shape).
 fn project_planned_issue(planned: &PlannedNode) -> Issue {
-    let mut issue = Issue::new(planned.title.clone(), planned.description.clone());
+    let mut issue = Issue::draft(planned.title.clone(), planned.description.clone());
     issue.priority = planned.priority;
     issue.labels = planned.labels.clone();
     // A freshly-created issue with no dependencies is auto-promoted to Ready
@@ -861,11 +865,8 @@ mod tests {
 
     #[test]
     fn test_type_label_value_extracts_type() {
-        let issue = Issue::new_with_labels(
-            "T".to_string(),
-            String::new(),
-            vec!["type:epic".to_string(), "area:auth".to_string()],
-        );
+        let mut issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        issue.labels = vec!["type:epic".to_string(), "area:auth".to_string()];
         assert_eq!(label_utils::type_label_value(&issue.labels), Some("epic"));
     }
 
@@ -908,7 +909,7 @@ mod tests {
 
     #[test]
     fn test_changed_fields_is_empty_for_an_untouched_issue() {
-        let issue = Issue::new("T".to_string(), "d".to_string());
+        let issue = crate::domain::types::fixture_issue("T".to_string(), "d".to_string());
         let mut same = issue.clone();
         // A storage-owned timestamp bump is not a content change.
         same.updated_at = chrono::Utc::now();
@@ -917,7 +918,7 @@ mod tests {
 
     #[test]
     fn test_changed_fields_names_every_mutated_field() {
-        let original = Issue::new("T".to_string(), "d".to_string());
+        let original = crate::domain::types::fixture_issue("T".to_string(), "d".to_string());
         let mut current = original.clone();
         current.dependencies = vec!["u1".to_string()];
         current.state = State::InProgress;

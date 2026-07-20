@@ -358,11 +358,11 @@ mod repository_ownership_tests {
         )
         .unwrap();
 
-        let mut outside = Issue::new("outside".into(), "outside".into());
+        let mut outside = crate::domain::types::fixture_issue("outside".into(), "outside".into());
         outside.id = "outside-full-id".into();
         outside.state = State::InProgress;
         outside.documents = vec![DocumentReference::new("docs/outside.md".into())];
-        let mut inside = Issue::new("inside".into(), "inside".into());
+        let mut inside = crate::domain::types::fixture_issue("inside".into(), "inside".into());
         inside.id = "inside-full-id".into();
         inside.state = State::Done;
         inside.documents = vec![
@@ -402,7 +402,7 @@ mod repository_ownership_tests {
         fs::create_dir_all(repo.path().join("docs")).unwrap();
         fs::write(repo.path().join("docs/not-a-directory"), "bytes").unwrap();
 
-        let mut issue = Issue::new("owner".into(), "owner".into());
+        let mut issue = crate::domain::types::fixture_issue("owner".into(), "owner".into());
         issue.id = "owner-full-id".into();
         issue.documents = vec![DocumentReference::new(
             "docs/not-a-directory/child.md".into(),

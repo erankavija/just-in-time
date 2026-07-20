@@ -75,7 +75,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         content_format: Option<crate::domain::ContentFormat>,
         issue_type: Option<String>,
         force: bool,
-    ) -> Result<(String, Vec<String>)> {
+    ) -> Result<(String, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Config comes from the executor cache so it is not re-parsed per call.
         // Label format and ALL namespace constraints (canonical format, uniqueness,
         // registry, etc.) are now enforced SOLELY by the effective rule set inside
@@ -111,7 +114,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        let mut issue = Issue::new(title, description);
+        let mut issue = Issue::draft(title, description);
         issue.priority = priority;
         issue.gates_required = gates;
         issue.labels = labels;
@@ -135,7 +138,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             // `first_ready_at` for later transitions. Stamp it here so a
             // dependency-free issue that is born Ready still records when it
             // became workable (first-occurrence semantics via `mark_first_ready`).
-            issue.mark_first_ready(chrono::Utc::now());
         }
 
         // REQ-02: when `--type` was explicitly provided, hard-reject an undeclared
@@ -149,28 +151,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Single write-time validation entry point: runs the legacy validator
         // plus the declarative local rules against the FINAL issue shape, and
-        // defers any `--force` bypass events until after the save succeeds.
+        // carries any `--force` bypass events into the same repository mutation.
         let validation = self.validate_for_write(&issue, force)?;
 
-        // Clone fields needed for event and return value before moving issue
-        let issue_id = issue.id.clone();
-        let title = issue.title.clone();
-        let priority = issue.priority;
-
-        self.storage.save_issue(issue)?;
-
-        // Log event
-        let event = Event::IssueCreated {
-            id: uuid::Uuid::new_v4().to_string(),
-            issue_id: issue_id.clone(),
-            timestamp: chrono::Utc::now(),
-            title,
-            priority,
-        };
-        self.storage.append_event(&event)?;
-
-        // Emit bypass events only AFTER the issue write committed.
-        self.log_rule_bypasses(&issue_id, &validation.bypassed_rules)?;
+        let issue_id = self.publish_issue_creation(issue, &validation.bypassed_rules)?;
 
         Ok((issue_id, validation.warnings))
     }
@@ -304,7 +288,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// let storage = InMemoryStorage::new();
     /// storage.init().unwrap();
-    /// let executor = CommandExecutor::new(storage);
+    /// let layout = storage.repository_layout();
+    /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str| {
     ///     executor
     ///         .create_issue(title.into(), String::new(), Priority::Normal,
@@ -357,7 +342,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// let storage = InMemoryStorage::new();
     /// storage.init().unwrap();
-    /// let executor = CommandExecutor::new(storage);
+    /// let layout = storage.repository_layout();
+    /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str| {
     ///     executor
     ///         .create_issue(title.into(), String::new(), Priority::Normal,
@@ -586,8 +572,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         // projected onto a temporary value only for validation; the real
         // mutation happens via the chokepoint below. Runs BEFORE any persistence
         // so a blocked write changes nothing; any `--force` bypass events are
-        // deferred (emitted after the save in the persisted case, or
-        // unconditionally for a forced no-op override).
+        // deferred (published with the write in the persisted case, or as the
+        // sole effect of a forced no-op override).
         if let Some(t) = target_state {
             issue.state = t;
         }
@@ -597,8 +583,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Gate-blocked `--state done`: persist the projected Gated shape (only
         // when something changed) and return the gate-blocking error. Bypass
-        // events are emitted from inside that path (after its save when it
-        // persists, otherwise for the forced no-op override). The diversion
+        // events are emitted from inside that path in the same publication when
+        // it persists (or alone for a forced no-op override). The diversion
         // routes through the chokepoint against the GATED target state, with
         // the user's --force preserved for graph-rule bypass.
         if gate_blocked {
@@ -616,12 +602,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Apply the resolved state transition through the SINGLE chokepoint, which
         // runs transition-time graph-rule enforcement (CC-2) and mutates
         // `issue.state`. `persist = false`: this path batches the state change
-        // with any field edits into one combined save below (and emits the
+        // with any field edits into one publication below (and emits the
         // state-change event there), so the chokepoint only enforces + mutates.
         // A blocking enforce rule returns a `TransitionBlockedError` (exit 4) and
         // persists nothing; non-blocking findings surface as warnings.
+        let mut graph_bypass_events = Vec::new();
         if let Some(t) = target_state {
-            warnings.extend(self.apply_state_transition(&mut issue, t, force, false, |_| {})?);
+            let (transition_warnings, events) =
+                self.apply_state_transition(&mut issue, t, force, false, |_| {})?;
+            warnings.extend(transition_warnings);
+            graph_bypass_events = events;
         }
 
         // Persist only when something actually changed: real field edits or a
@@ -629,47 +619,38 @@ impl<S: IssueStore> CommandExecutor<S> {
         // idempotent gate/assignee flags, already handled upstream) must not
         // bump `updated_at` and emit a false progress signal.
         let persisted = has_field_edits || old_state != issue.state;
+        let mut events = graph_bypass_events;
         if persisted {
             let new_state = issue.state;
-            self.storage.save_issue(issue)?;
-
-            // Log state change event (after the save).
             if old_state != new_state {
-                let event = Event::new_issue_state_changed(full_id.clone(), old_state, new_state);
-                self.storage.append_event(&event)?;
-
-                // Log completion event if transitioning to Done.
+                events.push((
+                    1,
+                    Event::draft_issue_state_changed(full_id.clone(), old_state, new_state),
+                ));
                 if new_state == State::Done {
-                    let event = Event::new_issue_completed(full_id.clone());
-                    self.storage.append_event(&event)?;
+                    events.push((2, Event::draft_issue_completed(full_id.clone())));
                 }
             }
-
-            // Log the field-edit event (after the save), mirroring `bulk_update`
-            // so every content mutation is captured in the event log, not only
-            // state transitions.
             if !changed_fields.is_empty() {
-                let event = Event::new_issue_updated(
-                    full_id.clone(),
-                    "issue-update".to_string(),
-                    changed_fields,
-                );
-                self.storage.append_event(&event)?;
+                events.push((
+                    3,
+                    Event::draft_issue_updated(
+                        full_id.clone(),
+                        "issue-update".to_string(),
+                        changed_fields,
+                    ),
+                ));
             }
         }
+        events.extend(validation.bypassed_rules.iter().map(|rule| {
+            (
+                9,
+                Event::draft_local_rule_bypassed(full_id.clone(), rule.clone()),
+            )
+        }));
+        self.publish_issue_mutation(if persisted { vec![issue] } else { Vec::new() }, events)?;
 
-        // Emit bypass events whenever the user explicitly forced an override of an
-        // `enforce` rule, independent of whether other fields/state changed. A
-        // forced no-op write (no field edits, no transition) against an issue that
-        // violates an enforce rule still produces a non-empty `bypassed_rules`, and
-        // dropping those events would lose the audit trail of the deliberate
-        // override. In the persisted case this runs AFTER the save above, preserving
-        // the "log only after the write commits" ordering; in the no-op case there
-        // is no save to order against. Ordinary (non-forced) rejections and previews
-        // yield an empty `bypassed_rules`, so this stays a no-op for them.
-        self.log_rule_bypasses(&full_id, &validation.bypassed_rules)?;
-
-        // Check if any dependent issues can now transition to ready (after save!)
+        // Check whether the completed publication unblocks dependents.
         if let Some(s) = state {
             if s.is_terminal() {
                 self.check_auto_transitions()?;
@@ -737,29 +718,42 @@ impl<S: IssueStore> CommandExecutor<S> {
             warnings.push(warning);
         }
 
-        self.storage.delete_issue(&full_id)?;
-
-        // Deletion is a state change; record it after the delete commits so a
-        // failed delete never leaves a ghost event (event-logging invariant).
-        let event = Event::new_issue_deleted(full_id.clone());
-        self.storage.append_event(&event)?;
-
-        // Cascade: strip the deleted id from every dependent so the deletion
-        // never leaves a dangling edge in the graph.
+        let mut updates = Vec::new();
+        let mut events = vec![(1, Event::draft_issue_deleted(full_id.clone()))];
         for mut dependent in self.storage.list_issues()? {
             if !dependent.dependencies.iter().any(|d| d == &full_id) {
                 continue;
             }
             dependent.dependencies.retain(|d| d != &full_id);
             let dependent_id = dependent.id.clone();
-            self.storage.save_issue(dependent)?;
-            let event = Event::new_issue_updated(
-                dependent_id,
-                "dependency-cascade-delete".to_string(),
-                vec!["dependencies".to_string()],
-            );
-            self.storage.append_event(&event)?;
+            updates.push(dependent);
+            events.push((
+                2,
+                Event::draft_issue_updated(
+                    dependent_id,
+                    "dependency-cascade-delete".to_string(),
+                    vec!["dependencies".to_string()],
+                ),
+            ));
         }
+        let mut intents = updates
+            .into_iter()
+            .map(
+                |issue| crate::repository_state::MutationIntent::UpdateIssue {
+                    issue: Box::new(issue),
+                },
+            )
+            .collect::<Vec<_>>();
+        intents.push(crate::repository_state::MutationIntent::DeleteIssue {
+            issue_id: full_id.clone(),
+        });
+        intents.extend(events.into_iter().map(|(phase, event)| {
+            crate::repository_state::MutationIntent::RecordEvent {
+                phase,
+                event: Box::new(event),
+            }
+        }));
+        self.publish_repository_mutation(intents)?;
 
         // Removing an edge can unblock a dependent stuck in Backlog, mirroring
         // the readiness check `remove_dependency(_ies)` runs after an edge is
@@ -782,7 +776,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// deliberately bypasses validation. Local rules are enforced on the
     /// content-bearing write paths (`create_issue`, `update_issue`, bulk update)
     /// via `validate_for_write`. Transition-time GRAPH-rule enforcement (CC-2) and
-    /// the actual state mutation/save/event are delegated to the single
+    /// the actual state mutation/publication are delegated to the single
     /// `apply_state_transition` chokepoint (which skips enforcement for
     /// `Rejected`), so this path never sets `issue.state` directly.
     pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<Vec<String>>
@@ -856,13 +850,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // `when = { state = "gated" }` rule, saves, and logs), then run
                 // postchecks which may auto-transition to Done (also enforced via
                 // the chokepoint inside `auto_transition_to_done`).
-                warnings.extend(self.apply_state_transition(
-                    &mut issue,
-                    State::Gated,
-                    false,
-                    true,
-                    |_| {},
-                )?);
+                warnings.extend(
+                    self.apply_state_transition(&mut issue, State::Gated, false, true, |_| {})?
+                        .0,
+                );
 
                 // Run postchecks (which may auto-transition to Done)
                 self.run_postchecks(&full_id)?;
@@ -874,7 +865,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Apply the transition through the chokepoint: enforce (CC-2), mutate,
         // save, and log. `Rejected`'s validation bypass and the no-op guard are
         // handled inside it.
-        warnings.extend(self.apply_state_transition(&mut issue, new_state, false, true, |_| {})?);
+        warnings.extend(
+            self.apply_state_transition(&mut issue, new_state, false, true, |_| {})?
+                .0,
+        );
 
         Ok(warnings)
     }
@@ -882,7 +876,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Assign an issue to someone.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn assign_issue(&self, id: &str, assignee: String) -> Result<Vec<String>> {
+    pub fn assign_issue(&self, id: &str, assignee: String) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Collect warnings instead of printing
@@ -902,15 +899,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.assignee = Some(assignee.clone());
         // Record the first assignment time (first-occurrence only; re-assigning an
         // already-claimed issue leaves the original stamp intact).
-        issue.mark_claimed(chrono::Utc::now());
         let issue_id = issue.id.clone();
-        self.storage.save_issue(issue)?;
         // The assignee (and `claimed_at`) mutation above appends an
         // `issue_claimed` event so the change is auditable (@/inv/event-log) and the
         // lifecycle-timestamp backfill can fold it back into `claimed_at` (see
         // `derive_lifecycle_timestamps`), matching the `claim`/lease-acquire paths.
-        self.storage
-            .append_event(&Event::new_issue_claimed(issue_id, assignee))?;
+        self.publish_issue_mutation(
+            vec![issue],
+            vec![(1, Event::draft_issue_claimed(issue_id, assignee))],
+        )?;
         Ok(warnings)
     }
 
@@ -1002,14 +999,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // `issue_claimed` event below are coupled: the mutation persists together
         // with the event (@/inv/event-log), and the event feeds the
         // lifecycle-timestamp backfill (`derive_lifecycle_timestamps`).
-        issue.mark_claimed(chrono::Utc::now());
-
         let issue_id = issue.id.clone();
-        self.storage.save_issue(issue)?;
-
-        // Log assignment event
-        let event = Event::new_issue_claimed(issue_id, actor);
-        self.storage.append_event(&event)?;
+        self.publish_issue_mutation(
+            vec![issue],
+            vec![(1, Event::draft_issue_claimed(issue_id, actor))],
+        )?;
 
         Ok(warnings)
     }
@@ -1017,7 +1011,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Unassign an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn unassign_issue(&self, id: &str) -> Result<Vec<String>> {
+    pub fn unassign_issue(&self, id: &str) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Collect warnings instead of printing
@@ -1032,7 +1029,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(warnings);
         }
         issue.assignee = None;
-        self.storage.save_issue(issue)?;
+        self.publish_issue_mutation(vec![issue], Vec::new())?;
         Ok(warnings)
     }
 
@@ -1045,28 +1042,33 @@ impl<S: IssueStore> CommandExecutor<S> {
         let old_assignee = issue.assignee.clone();
 
         // If in progress, transition back to ready THROUGH the chokepoint, which
-        // enforces graph rules, clears the assignee in the same save (via the
-        // pre-save hook), and logs the state-change event. Releasing back to Ready
+        // enforces graph rules, clears the assignee in the same issue update, and
+        // logs the state-change event atomically. Releasing back to Ready
         // is a regression and ordinarily matches no done/gated-scoped enforce
         // rule, but routing it here keeps the invariant that no command sets
         // `issue.state` directly.
-        if issue.state == State::InProgress {
-            self.apply_state_transition(&mut issue, State::Ready, false, true, |issue| {
-                issue.assignee = None;
-            })?;
-        } else {
-            // No state change: just clear the assignee and save.
-            issue.assignee = None;
-            self.storage.save_issue(issue)?;
+        let old_state = issue.state;
+        let mut graph_bypass_events = Vec::new();
+        if old_state == State::InProgress {
+            let (_, bypass_events) =
+                self.apply_state_transition(&mut issue, State::Ready, false, false, |_| {})?;
+            graph_bypass_events = bypass_events;
         }
-
-        // Log release event (after any state-change event the chokepoint emitted).
-        // Only a real prior assignee is a release actor; releasing an unassigned
-        // issue records no actor (and an empty assignee is not a valid `Assignee`).
+        issue.assignee = None;
+        let mut events = graph_bypass_events;
+        if old_state == State::InProgress {
+            events.push((
+                1,
+                Event::draft_issue_state_changed(full_id.clone(), old_state, State::Ready),
+            ));
+        }
         if let Some(assignee) = old_assignee {
-            let event = Event::new_issue_released(full_id.clone(), assignee, reason.to_string());
-            self.storage.append_event(&event)?;
+            events.push((
+                2,
+                Event::draft_issue_released(full_id.clone(), assignee, reason.to_string()),
+            ));
         }
+        self.publish_issue_mutation(vec![issue], events)?;
 
         Ok(())
     }
@@ -1176,7 +1178,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   changed (a genuine transition into `Gated`, or accompanying field
     ///   edits that must not be lost). When false, the call is a pure no-op —
     ///   e.g. retrying `--state done` on an already-`Gated` issue with no other
-    ///   edits — and the issue is neither saved (no `updated_at` bump) nor
+    ///   edits — and the issue is neither published (no `updated_at` bump) nor
     ///   logged.
     /// - The `issue_state_changed` event is only appended for a real transition
     ///   (`old_state != Gated`); a `gated -> gated` no-op must never be logged,
@@ -1185,8 +1187,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// - `bypassed_rules` lists the `enforce` rules a `--force` write overrode;
     ///   one `LocalRuleBypassed` event is emitted per entry whenever the list is
     ///   non-empty (a deliberate override always merits an audit entry, even on a
-    ///   forced no-op). When `persist` is true the events are emitted AFTER the
-    ///   save commits, so a failed write leaves no false bypass entry.
+    ///   forced no-op). The issue and events share one recoverable publication.
     fn handle_gate_blocking(
         &self,
         issue: &mut Issue,
@@ -1210,52 +1211,56 @@ impl<S: IssueStore> CommandExecutor<S> {
         // `state = "gated"` enforce rule therefore blocks the diversion before
         // anything persists. Persistence and the state-changed event are
         // handled below (not by the chokepoint) because this path may carry
-        // field edits in the same save and is a no-op for an already-gated
+        // field edits in the same publication and is a no-op for an already-gated
         // issue.
         let mut diversion_warnings = Vec::new();
+        let mut graph_bypass_events = Vec::new();
         if old_state != State::Gated {
             issue.state = old_state;
             // Non-blocking findings ride on the gate-blocking error returned
             // below (TransitionBlockedError::with_warnings) so they surface in
             // both the rendered message and the JSON details.
-            diversion_warnings =
+            let (warnings, bypass_events) =
                 self.apply_state_transition(issue, State::Gated, force, false, |_| {})?;
+            diversion_warnings = warnings;
+            graph_bypass_events = bypass_events;
         }
         issue.state = State::Gated;
 
         let issue_id = issue.id.clone();
+        let mut events = graph_bypass_events;
         if persist {
-            // Save the state change (and any field edits) before returning error
-            self.storage.save_issue(issue.clone())?;
-
-            // Log the state change only for a genuine transition into Gated.
             if old_state != State::Gated {
-                let event =
-                    Event::new_issue_state_changed(issue_id.clone(), old_state, State::Gated);
-                self.storage.append_event(&event)?;
+                events.push((
+                    1,
+                    Event::draft_issue_state_changed(issue_id.clone(), old_state, State::Gated),
+                ));
             }
-
-            // Log the field-edit event for any persisted content changes, so a
-            // gate-blocked `--state done` that still keeps real edits records them
-            // (same contract as the non-blocked path and `bulk_update`).
             if !changed_fields.is_empty() {
-                let event = Event::new_issue_updated(
-                    issue_id.clone(),
-                    "issue-update".to_string(),
-                    changed_fields.to_vec(),
-                );
-                self.storage.append_event(&event)?;
+                events.push((
+                    2,
+                    Event::draft_issue_updated(
+                        issue_id.clone(),
+                        "issue-update".to_string(),
+                        changed_fields.to_vec(),
+                    ),
+                ));
             }
         }
-
-        // Emit any `--force` bypass events whenever an enforce rule was overridden,
-        // regardless of whether the gate-blocked write persisted other changes. A
-        // forced no-op `--state done` on an already-`Gated` issue that violates an
-        // enforce rule still carries a deliberate override that must be audited. In
-        // the persisted case this runs AFTER the save above (preserving ordering);
-        // in the no-op case there is no save to order against. An empty
-        // `bypassed_rules` (ordinary writes) keeps this a no-op.
-        self.log_rule_bypasses(&issue_id, bypassed_rules)?;
+        events.extend(bypassed_rules.iter().map(|rule| {
+            (
+                9,
+                Event::draft_local_rule_bypassed(issue_id.clone(), rule.clone()),
+            )
+        }));
+        self.publish_issue_mutation(
+            if persist {
+                vec![issue.clone()]
+            } else {
+                Vec::new()
+            },
+            events,
+        )?;
 
         Err(TransitionBlockedError::gates(
             issue.id.clone(),
@@ -1289,7 +1294,7 @@ enforce_leases = "off"
 "#;
         std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
 
-        CommandExecutor::new(storage)
+        crate::commands::test_helpers::memory_executor(storage)
     }
 
     #[test]
@@ -1317,7 +1322,8 @@ enforce_leases = "off"
         executor.storage.save_gate_registry(&registry).unwrap();
 
         // Create issue with precheck gate
-        let mut issue = crate::domain::Issue::new("Test task".to_string(), "Test".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Test task".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
@@ -1374,7 +1380,8 @@ enforce_leases = "off"
         executor.storage.save_gate_registry(&registry).unwrap();
 
         // Create issue with precheck gate
-        let mut issue = crate::domain::Issue::new("Test task".to_string(), "Test".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Test task".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
@@ -1414,11 +1421,13 @@ enforce_leases = "off"
     fn test_claim_promotes_existing_same_assignee_assignment_once_unblocked() {
         let executor = setup();
 
-        let dependency = crate::domain::Issue::new("Dependency".to_string(), "".to_string());
+        let dependency =
+            crate::domain::types::fixture_issue("Dependency".to_string(), "".to_string());
         let dependency_id = dependency.id.clone();
         executor.storage.save_issue(dependency).unwrap();
 
-        let mut dependent = crate::domain::Issue::new("Dependent".to_string(), "".to_string());
+        let mut dependent =
+            crate::domain::types::fixture_issue("Dependent".to_string(), "".to_string());
         dependent.dependencies.push(dependency_id.clone());
         let dependent_id = dependent.id.clone();
         executor.storage.save_issue(dependent).unwrap();
@@ -1479,7 +1488,7 @@ enforce_leases = "off"
     fn test_claim_rejects_different_assignee_when_already_assigned() {
         let executor = setup();
 
-        let mut issue = crate::domain::Issue::new("Task".to_string(), "".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Task".to_string(), "".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
@@ -1522,7 +1531,7 @@ enforce_leases = "off"
         let executor = setup();
 
         // Create issue with gates
-        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
@@ -1550,13 +1559,14 @@ enforce_leases = "off"
         let executor = setup();
 
         // Create dependency
-        let mut dep = crate::domain::Issue::new("Dependency".to_string(), "Dep".to_string());
+        let mut dep =
+            crate::domain::types::fixture_issue("Dependency".to_string(), "Dep".to_string());
         dep.state = State::InProgress; // Not done
         let dep_id = dep.id.clone();
         executor.storage.save_issue(dep).unwrap();
 
         // Create issue that depends on it
-        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.dependencies.push(dep_id.clone());
         issue.state = State::Backlog; // Blocked
         let issue_id = issue.id.clone();
@@ -1579,7 +1589,7 @@ enforce_leases = "off"
         let executor = setup();
 
         // Create issue with unpassed gates
-        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
@@ -1602,7 +1612,7 @@ enforce_leases = "off"
         let executor = setup();
 
         // Issue in progress with an unpassed gate.
-        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
@@ -1644,7 +1654,7 @@ enforce_leases = "off"
     fn test_update_issue_pure_done_retry_on_gated_is_noop() {
         let executor = setup();
 
-        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
@@ -1707,7 +1717,7 @@ enforce_leases = "off"
         use crate::domain::ContentFormat;
         let executor = setup();
 
-        let mut issue = crate::domain::Issue::new("Test".to_string(), "Body".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Body".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
@@ -1794,7 +1804,8 @@ enforce_leases = "off"
     fn test_update_issue_field_edits_persist_when_done_blocked_on_gated() {
         let executor = setup();
 
-        let mut issue = crate::domain::Issue::new("Old Title".to_string(), "Test".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Old Title".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
@@ -1866,7 +1877,8 @@ enforce_leases = "off"
     fn test_update_issue_idempotent_field_on_gated_retry_is_noop() {
         let executor = setup();
 
-        let mut issue = crate::domain::Issue::new("Same Title".to_string(), "Test".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Same Title".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
@@ -1922,7 +1934,7 @@ enforce_leases = "off"
     fn test_assign_same_assignee_is_noop() {
         let executor = setup();
 
-        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
 
@@ -1946,7 +1958,7 @@ enforce_leases = "off"
     fn test_unassign_already_unassigned_is_noop() {
         let executor = setup();
 
-        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
         let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
@@ -1964,7 +1976,7 @@ enforce_leases = "off"
     fn test_update_issue_with_no_changes_is_noop() {
         let executor = setup();
 
-        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
@@ -2002,7 +2014,7 @@ enforce_leases = "off"
     fn test_update_issue_description_logs_issue_updated_event() {
         let executor = setup();
 
-        let issue = crate::domain::Issue::new("Test".to_string(), "old".to_string());
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "old".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
         let events_before = executor.storage.read_events().unwrap().len();
@@ -2065,7 +2077,7 @@ enforce_leases = "off"
     fn test_delete_issue_logs_issue_deleted_event() {
         let executor = setup();
 
-        let issue = crate::domain::Issue::new("Doomed".to_string(), "Test".to_string());
+        let issue = crate::domain::types::fixture_issue("Doomed".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
         let events_before = executor.storage.read_events().unwrap().len();
@@ -2090,10 +2102,10 @@ enforce_leases = "off"
     fn test_add_dependency_logs_issue_updated_event() {
         let executor = setup();
 
-        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
         executor.storage.save_issue(a).unwrap();
-        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         executor.storage.save_issue(b).unwrap();
 
@@ -2122,10 +2134,10 @@ enforce_leases = "off"
     fn test_remove_dependency_logs_issue_updated_event() {
         let executor = setup();
 
-        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
         executor.storage.save_issue(a).unwrap();
-        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         executor.storage.save_issue(b).unwrap();
         executor.add_dependency(&a_id, &b_id).unwrap();
@@ -2158,10 +2170,10 @@ enforce_leases = "off"
         // which must also event-log the edit.
         let executor = setup();
 
-        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
         executor.storage.save_issue(a).unwrap();
-        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         executor.storage.save_issue(b).unwrap();
         executor.add_dependency(&a_id, &b_id).unwrap();
@@ -2194,11 +2206,11 @@ enforce_leases = "off"
         // bump) and must not append an event, both for the single and bulk paths.
         let executor = setup();
 
-        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
         executor.storage.save_issue(a).unwrap();
         // B exists but A does NOT depend on it, so removing B from A is a no-op.
-        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         executor.storage.save_issue(b).unwrap();
 
@@ -2231,10 +2243,10 @@ enforce_leases = "off"
         // dangling edge that corrupts the graph (jit:f847df3f).
         let executor = setup();
 
-        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
         executor.storage.save_issue(a).unwrap();
-        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         executor.storage.save_issue(b).unwrap();
         executor.add_dependency(&a_id, &b_id).unwrap();
@@ -2334,10 +2346,10 @@ enforce_leases = "off"
         // (jit:f847df3f).
         let executor = setup();
 
-        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
         executor.storage.save_issue(a).unwrap();
-        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         executor.storage.save_issue(b).unwrap();
         executor.add_dependency(&a_id, &b_id).unwrap();
@@ -2373,10 +2385,10 @@ enforce_leases = "off"
         // work against the raw stored id, not via global resolution.
         let executor = setup();
 
-        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
         executor.storage.save_issue(a).unwrap();
-        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         executor.storage.save_issue(b).unwrap();
         executor.add_dependency(&a_id, &b_id).unwrap();
@@ -2400,7 +2412,7 @@ enforce_leases = "off"
         // neither edge is removed (jit:f847df3f review).
         let executor = setup();
 
-        let mut a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let mut a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
         let dep1 = "abcd1234-0000-0000-0000-000000000001".to_string();
         let dep2 = "abcd1234-0000-0000-0000-000000000002".to_string();
         a.dependencies = vec![dep1.clone(), dep2.clone()];
@@ -2431,11 +2443,12 @@ enforce_leases = "off"
         // `output.rs`). This pins that contract so the two stay in sync.
         let executor = setup();
 
-        let dep = crate::domain::Issue::new("Dep".to_string(), "Test".to_string());
+        let dep = crate::domain::types::fixture_issue("Dep".to_string(), "Test".to_string());
         let dep_id = dep.id.clone();
         executor.storage.save_issue(dep).unwrap();
 
-        let mut issue = crate::domain::Issue::new("Parent".to_string(), "Test".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Parent".to_string(), "Test".to_string());
         issue.dependencies = vec![dep_id.clone(), "missing-id".to_string()];
 
         let resolved = executor.get_dependencies_enriched(&issue);
@@ -2508,7 +2521,7 @@ enforce_leases = "off"
     #[test]
     fn test_update_explicit_declared_type_accepted_via_rule_engine() {
         let executor = setup();
-        let issue = crate::domain::Issue::new("T".to_string(), String::new());
+        let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
 
@@ -2545,7 +2558,7 @@ enforce_leases = "off"
     #[test]
     fn test_update_explicit_undeclared_type_rejected_via_rule_engine() {
         let executor = setup();
-        let issue = crate::domain::Issue::new("T".to_string(), String::new());
+        let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
 
@@ -2575,13 +2588,14 @@ enforce_leases = "off"
         let executor = setup();
 
         // Create dependency issue that is Done
-        let mut dep = crate::domain::Issue::new("Dependency".to_string(), "Dep".to_string());
+        let mut dep =
+            crate::domain::types::fixture_issue("Dependency".to_string(), "Dep".to_string());
         dep.state = State::Done;
         let dep_id = dep.id.clone();
         executor.storage.save_issue(dep).unwrap();
 
         // Create issue in Backlog that depends on the Done dependency
-        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::Backlog;
         issue.dependencies.push(dep_id.clone());
         let issue_id = issue.id.clone();

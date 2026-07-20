@@ -305,7 +305,7 @@ fn test_archived_to_archived_is_noop() {
 fn test_archived_from_field_absent_on_active_issue_roundtrips() {
     // An issue that never entered Archived carries no archived_from, and the
     // field is skipped on serialize so existing issue files round-trip.
-    let issue = Issue::new("Active".to_string(), String::new());
+    let issue = crate::fixture_issue("Active".to_string(), String::new());
     assert_eq!(issue.archived_from, None);
     let json = serde_json::to_string(&issue).unwrap();
     assert!(

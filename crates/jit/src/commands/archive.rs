@@ -608,7 +608,7 @@ impl CommandExecutor<JsonFileStorage> {
             .collect::<Vec<_>>();
 
         if event_needed {
-            let event = Event::new_artifact_archive_executed(
+            let event = Event::draft_artifact_archive_executed(
                 plan.target().clone(),
                 plan.destination_root().to_string(),
                 publications.clone(),
@@ -835,7 +835,7 @@ impl CommandExecutor<JsonFileStorage> {
         if state.publications.is_empty() && reference_changes.is_empty() {
             return cause;
         }
-        let event = Event::new_artifact_archive_executed(
+        let event = Event::draft_artifact_archive_executed(
             state.plan.target().clone(),
             state.plan.destination_root().to_string(),
             state.publications,
@@ -1053,11 +1053,17 @@ fn canonicalize_warnings(warnings: &mut Vec<PlanWarning>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{DocumentReference, Issue, State};
+    use crate::domain::{DocumentReference, State};
     use crate::storage::JsonFileStorage;
     use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
+
+    fn executor(repo: &TempDir, storage: JsonFileStorage) -> CommandExecutor<JsonFileStorage> {
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        CommandExecutor::new(storage).with_layout(layout)
+    }
 
     #[derive(Default)]
     struct FaultHooks {
@@ -1082,7 +1088,7 @@ mod tests {
         .unwrap();
         let issue =
             |id: &str, state: State, archived_from: Option<State>, issue_type: Option<&str>| {
-                let mut issue = Issue::new(id.to_string(), String::new());
+                let mut issue = crate::domain::types::fixture_issue(id.to_string(), String::new());
                 issue.id = id.to_string();
                 issue.state = state;
                 issue.archived_from = archived_from;
@@ -1210,7 +1216,8 @@ mod tests {
         fs::write(repo.path().join("fixtures/root.md"), content).unwrap();
         let ids = (0..owner_count)
             .map(|index| {
-                let mut issue = Issue::new(format!("Owner {index}"), String::new());
+                let mut issue =
+                    crate::domain::types::fixture_issue(format!("Owner {index}"), String::new());
                 issue.state = State::Done;
                 let mut document = DocumentReference::new("fixtures/root.md".into());
                 document.assets.push(crate::document::Asset {
@@ -1550,7 +1557,7 @@ mod tests {
             .unwrap()
             .is_empty());
 
-        let valid = Event::new_artifact_archive_executed(
+        let valid = Event::draft_artifact_archive_executed(
             PlanTarget::Document {
                 path: "fixtures/root.md".into(),
             },
@@ -1785,7 +1792,7 @@ mod tests {
         .unwrap();
         fs::write(repo.path().join("fixtures/child.md"), "child").unwrap();
         fs::write(repo.path().join("shared/global.md"), "shared").unwrap();
-        let executor = CommandExecutor::new(storage);
+        let executor = executor(&repo, storage);
 
         let result = executor
             .execute_archive_document("fixtures/root.md")
@@ -2092,7 +2099,7 @@ mod tests {
         git(repo.path(), &["commit", "-qm", "fixture"]);
         let commit = git(repo.path(), &["rev-parse", "HEAD"]);
 
-        let mut container = Issue::new("Container".into(), String::new());
+        let mut container = crate::domain::types::fixture_issue("Container".into(), String::new());
         container.state = State::Done;
         container.labels = vec!["type:epic".into()];
         container.documents = vec![
@@ -2101,14 +2108,15 @@ mod tests {
         ];
         let container_id = container.id.clone();
         storage.save_issue(container).unwrap();
-        let mut outside = Issue::new("Outside active".into(), String::new());
+        let mut outside =
+            crate::domain::types::fixture_issue("Outside active".into(), String::new());
         outside.state = State::InProgress;
         outside.labels = vec!["type:task".into()];
         outside.documents = vec![DocumentReference::new("fixtures/root.md".into())];
         let outside_id = outside.id.clone();
         storage.save_issue(outside).unwrap();
 
-        let executor = CommandExecutor::new(storage);
+        let executor = executor(&repo, storage);
         let result = executor.execute_archive_container(&container_id).unwrap();
         let destination = format!("archive/{}-container/fixtures/root.md", &container_id[..8]);
         let container = executor.storage.load_issue(&container_id).unwrap();
@@ -2165,7 +2173,7 @@ epic = "epic"
         fs::write(repo.path().join("fixtures/bundle/image.png"), b"png").unwrap();
         fs::write(repo.path().join("fixtures/data.csv"), "a,b\n1,2\n").unwrap();
 
-        let mut epic = Issue::new("Archive fixture".into(), String::new());
+        let mut epic = crate::domain::types::fixture_issue("Archive fixture".into(), String::new());
         epic.state = State::Done;
         epic.labels = vec!["type:epic".into(), "epic:archive-fixture".into()];
         epic.documents = [
@@ -2181,7 +2189,8 @@ epic = "epic"
         .collect();
         let id = epic.id.clone();
         storage.save_issue(epic).unwrap();
-        (repo, CommandExecutor::new(storage), id)
+        let executor = executor(&repo, storage);
+        (repo, executor, id)
     }
 
     #[test]
@@ -2441,7 +2450,8 @@ epic = "epic"
             owner_repo.path().join("docs/outside.md"),
         )
         .unwrap();
-        let mut outside = Issue::new("Active outside owner".into(), String::new());
+        let mut outside =
+            crate::domain::types::fixture_issue("Active outside owner".into(), String::new());
         outside.state = State::InProgress;
         outside.documents = vec![DocumentReference::new("docs/outside.md".into())];
         owner_storage.save_issue(outside).unwrap();
@@ -2479,13 +2489,14 @@ epic = "epic"
         .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), content).unwrap();
-        let mut container = Issue::new("Container".into(), String::new());
+        let mut container = crate::domain::types::fixture_issue("Container".into(), String::new());
         container.state = state;
         container.labels = vec!["type:epic".to_string()];
         container.documents = vec![DocumentReference::new("fixtures/root.md".into())];
         let id = container.id.clone();
         storage.save_issue(container).unwrap();
-        (repo, CommandExecutor::new(storage), id)
+        let executor = executor(&repo, storage);
+        (repo, executor, id)
     }
 
     fn state_change_count(executor: &CommandExecutor<JsonFileStorage>, id: &str) -> usize {
@@ -2564,7 +2575,8 @@ epic = "epic"
         // archived FROM a terminal state: the archived owner is effectively
         // terminal, so it is not an active owner and the document still moves.
         let (_repo, executor, _) = executable_document_repo(1, "shared doc");
-        let mut archived_owner = Issue::new("Independently archived".into(), String::new());
+        let mut archived_owner =
+            crate::domain::types::fixture_issue("Independently archived".into(), String::new());
         archived_owner.state = State::Archived;
         archived_owner.archived_from = Some(State::Done);
         archived_owner.documents = vec![DocumentReference::new("fixtures/root.md".into())];

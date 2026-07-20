@@ -506,7 +506,6 @@ pub fn render_reference_markdown() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::Issue;
     use crate::storage::{InMemoryStorage, InvalidIdPrefixError, IssueStore};
     use schemars::schema_for;
     use std::collections::BTreeSet;
@@ -617,7 +616,7 @@ mod tests {
     /// `SHORT_ID_LENGTH` characters of it — derived on read, never a stored field.
     #[test]
     fn test_issue_id_is_uuid_v4_and_short_id_is_its_prefix() {
-        let issue = Issue::new("Probe".to_string(), String::new());
+        let issue = crate::domain::types::fixture_issue("Probe".to_string(), String::new());
 
         let parsed = Uuid::parse_str(&issue.id).expect("an issue id is a UUID");
         assert_eq!(parsed.get_version(), Some(uuid::Version::Random));
@@ -645,7 +644,7 @@ mod tests {
     fn test_resolution_refuses_a_prefix_below_the_projected_minimum() {
         let storage = InMemoryStorage::new();
         storage.init().expect("in-memory storage initializes");
-        let issue = Issue::new("Probe".to_string(), String::new());
+        let issue = crate::domain::types::fixture_issue("Probe".to_string(), String::new());
         let id = issue.id.clone();
         storage.save_issue(issue).expect("the issue saves");
 
@@ -684,7 +683,7 @@ mod tests {
     fn test_full_id_resolves_only_in_canonical_form() {
         let storage = InMemoryStorage::new();
         storage.init().expect("in-memory storage initializes");
-        let issue = Issue::new("Probe".to_string(), String::new());
+        let issue = crate::domain::types::fixture_issue("Probe".to_string(), String::new());
         let id = issue.id.clone();
         storage.save_issue(issue).expect("the issue saves");
 

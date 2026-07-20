@@ -694,7 +694,7 @@ This is a read-only export. Future versions may support:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{DocumentReference, Issue};
+    use crate::domain::DocumentReference;
     use crate::snapshot::{IssuesInfo, MetadataInfo, RepoInfo, SnapshotManifest, VerificationInfo};
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
@@ -731,8 +731,8 @@ mod tests {
         storage.init().unwrap();
 
         // Create a couple of issues
-        let issue1 = Issue::new("Issue 1".to_string(), String::new());
-        let issue2 = Issue::new("Issue 2".to_string(), String::new());
+        let issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
+        let issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), String::new());
         storage.save_issue(issue1.clone()).unwrap();
         storage.save_issue(issue2.clone()).unwrap();
 
@@ -747,7 +747,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        let issue = Issue::new("Test Issue".to_string(), String::new());
+        let issue = crate::domain::types::fixture_issue("Test Issue".to_string(), String::new());
         let issue_id = issue.id.clone();
         storage.save_issue(issue).unwrap();
 
@@ -766,21 +766,21 @@ mod tests {
         storage.init().unwrap();
 
         // Create issues with epic labels
-        let mut issue1 = Issue::new("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
         issue1.labels.push("epic:auth".to_string());
         storage.save_issue(issue1.clone()).unwrap();
 
-        let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), String::new());
         issue2.labels.push("epic:auth".to_string());
         storage.save_issue(issue2.clone()).unwrap();
 
         // Create issue with different epic
-        let mut issue3 = Issue::new("Issue 3".to_string(), String::new());
+        let mut issue3 = crate::domain::types::fixture_issue("Issue 3".to_string(), String::new());
         issue3.labels.push("epic:billing".to_string());
         storage.save_issue(issue3.clone()).unwrap();
 
         // Create unrelated issue
-        let issue4 = Issue::new("Issue 4".to_string(), String::new());
+        let issue4 = crate::domain::types::fixture_issue("Issue 4".to_string(), String::new());
         storage.save_issue(issue4.clone()).unwrap();
 
         let exporter = SnapshotExporter::new(storage.clone());
@@ -802,11 +802,11 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        let mut issue1 = Issue::new("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
         issue1.labels.push("milestone:v1.0".to_string());
         storage.save_issue(issue1.clone()).unwrap();
 
-        let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), String::new());
         issue2.labels.push("milestone:v2.0".to_string());
         storage.save_issue(issue2.clone()).unwrap();
 
@@ -827,7 +827,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        let issue = Issue::new("Issue".to_string(), String::new());
+        let issue = crate::domain::types::fixture_issue("Issue".to_string(), String::new());
         storage.save_issue(issue).unwrap();
 
         let exporter = SnapshotExporter::new(storage.clone());
@@ -846,7 +846,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        let mut issue1 = Issue::new("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
         issue1.documents.push(DocumentReference {
             path: "docs/design.md".to_string(),
             commit: None,
@@ -857,7 +857,7 @@ mod tests {
         });
         storage.save_issue(issue1.clone()).unwrap();
 
-        let mut issue2 = Issue::new("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), String::new());
         issue2.documents.push(DocumentReference {
             path: "docs/impl.md".to_string(),
             commit: None,

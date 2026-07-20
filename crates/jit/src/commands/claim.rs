@@ -187,13 +187,6 @@ where
     use crate::storage::{discover_repository_layout, RepositoryStateStoreError};
 
     let layout = discover_repository_layout(worktree_root, data_root)?;
-    let mut session = storage.open_mutation_session(layout.clone())?;
-    // One context, created after canonical session acquisition and reused
-    // unchanged across conflict/closure retries. Its seed and timestamp are drawn
-    // lazily, so a fully-reflected (no-op) acquire samples neither an identifier
-    // nor time; a non-noop retry reuses whatever the first attempt already drew,
-    // so no retry or backend resamples them.
-    let context = MutationContext::production();
     let intents = [MutationIntent::ClaimIssue {
         issue_id: full_id.to_string(),
         agent: agent.clone(),
@@ -213,7 +206,11 @@ where
             budget,
         )?)
     };
+    // Operation-scoped: a capture/apply retry must keep claim audit identity and
+    // transition time stable while opening a fresh recovered session.
+    let context = MutationContext::production();
     for _ in 0..8 {
+        let mut session = storage.open_mutation_session(layout.clone())?;
         let image = match session.capture(build_spec()?) {
             Ok(image) => image,
             Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
@@ -836,7 +833,6 @@ pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::Issue;
     use crate::storage::claim_coordinator::Lease;
     // Test helpers below load identity with explicit paths and don't surface
     // warnings; the production paths use the `_with_warnings` variant instead.
@@ -1111,16 +1107,14 @@ mod tests {
         Ok(leases)
     }
 
-    /// Shared fixture boundary: the single grandfathered `Issue::new` +
-    /// `save_issue` pair backing both `create_test_issue` and
-    /// `create_test_issue_with_id` (predecessor APIs frozen for new call
-    /// sites during wave 3; wave 5 migrates this helper).
+    /// Seed one persisted issue for claim tests.
     fn create_test_issue_inner(
         storage: &JsonFileStorage,
         title: &str,
         id: Option<&str>,
     ) -> Result<String> {
-        let mut issue = Issue::new(title.to_string(), "Test description".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue(title.to_string(), "Test description".to_string());
         if let Some(id) = id {
             issue.id = id.to_string();
         }

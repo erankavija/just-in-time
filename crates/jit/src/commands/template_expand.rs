@@ -132,7 +132,7 @@ pub struct TemplateDelta {
 /// let registry = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
 /// let template = registry.get("plan").unwrap();
 ///
-/// let mut container = Issue::new("Auth epic".to_string(), String::new());
+/// let mut container = Issue::draft("Auth epic".to_string(), String::new());
 /// container.labels = vec!["type:epic".to_string()];
 /// let bindings = BTreeMap::from([("container".to_string(), container.id.clone())]);
 /// let snapshots = BTreeMap::from([("container".to_string(), vec![])]);
@@ -550,11 +550,11 @@ applies_to = ["epic"]
     }
 
     fn epic(id: &str) -> Issue {
-        let mut issue = Issue::new_with_labels(
+        let mut issue = crate::domain::types::fixture_issue(
             "Auth epic".to_string(),
             "- [hard] REQ-01: x".to_string(),
-            vec!["type:epic".to_string(), "area:auth".to_string()],
         );
+        issue.labels = vec!["type:epic".to_string(), "area:auth".to_string()];
         issue.id = id.to_string();
         issue
     }
@@ -787,7 +787,10 @@ applies_to = ["epic"]
 
     #[test]
     fn test_interpolation_resolves_container_and_doc_tokens() {
-        let mut issue = Issue::new("Auth epic".to_string(), "- [hard] REQ-01: x".to_string());
+        let mut issue = crate::domain::types::fixture_issue(
+            "Auth epic".to_string(),
+            "- [hard] REQ-01: x".to_string(),
+        );
         issue.id = "abc123def456".to_string();
         let node = TemplateNode {
             role: "planning".to_string(),
@@ -811,7 +814,7 @@ applies_to = ["epic"]
 
     #[test]
     fn test_node_description_falls_back_when_absent() {
-        let issue = Issue::new("Epic X".to_string(), String::new());
+        let issue = crate::domain::types::fixture_issue("Epic X".to_string(), String::new());
         let node = TemplateNode {
             role: "breakdown".to_string(),
             type_name: "breakdown".to_string(),
@@ -829,7 +832,7 @@ applies_to = ["epic"]
 
     #[test]
     fn test_node_description_falls_back_when_blank_or_whitespace() {
-        let issue = Issue::new("Epic Y".to_string(), String::new());
+        let issue = crate::domain::types::fixture_issue("Epic Y".to_string(), String::new());
         // An explicitly empty template and a whitespace-only one must both fall
         // back to the non-empty role/title line (APPA-02).
         for desc in ["", "   \n\t "] {
@@ -854,7 +857,7 @@ applies_to = ["epic"]
         // The interpolation context is a fixed `{token}` substitution, not a
         // templating language: an unsupported `{token}` is left untouched while the
         // known container tokens around it still resolve.
-        let mut issue = Issue::new("Auth epic".to_string(), String::new());
+        let mut issue = crate::domain::types::fixture_issue("Auth epic".to_string(), String::new());
         issue.id = "abc123def456".to_string();
         let ctx = InterpolationContext::for_container(&issue);
         let rendered = ctx.interpolate("{container.title} then {totally.unknown} end");

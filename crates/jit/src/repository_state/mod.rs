@@ -7,6 +7,7 @@
 
 mod default_rules;
 mod image;
+mod index;
 mod initialize;
 mod managed_document;
 mod materialize;
@@ -32,6 +33,7 @@ pub use image::{
     PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
     RepositorySeed, RepositorySeedKind, SeedError, TargetClaim,
 };
+pub(crate) use index::{RepositoryIndex, RepositoryIndexError, SUPPORTED_INDEX_SCHEMA_VERSION};
 pub use initialize::{
     finalize_initialization, finalize_profile_application, render_repo_config, GitattributesClaim,
     GitattributesStatus, InitializationError, InitializationScaffold, ProfileContribution,
@@ -189,8 +191,9 @@ pub fn finalize_config_edit(
     let config_path = VirtualPath::data("config.toml")?;
     let overlay = std::iter::once((config_path.clone(), Some(edited_config_bytes.to_vec())))
         .collect::<std::collections::BTreeMap<_, _>>();
-    let overlaid = apply_overlay(base, overlay)
-        .map_err(|error| RepositoryStateError::Producer(format!("config overlay failed: {error}")))?;
+    let overlaid = apply_overlay(base, overlay).map_err(|error| {
+        RepositoryStateError::Producer(format!("config overlay failed: {error}"))
+    })?;
 
     // The authored config write carries the base preimage; the complete producer
     // set derives the coupled schemas/rule-membership/projections from the edited

@@ -5,6 +5,12 @@
 use crate::commands::CommandExecutor;
 use crate::storage::{InMemoryStorage, IssueStore};
 
+/// Attach the explicit synthetic layout to an in-memory executor fixture.
+pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
+    let layout = storage.repository_layout();
+    CommandExecutor::new(storage).with_layout(layout)
+}
+
 /// Create an executor with enforcement mode configured.
 ///
 /// # Arguments
@@ -25,7 +31,7 @@ enforce_leases = "{}"
     );
     std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
 
-    CommandExecutor::new(storage)
+    memory_executor(storage)
 }
 
 /// Create an executor with enforcement disabled (for backward compatibility tests).

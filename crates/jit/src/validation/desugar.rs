@@ -568,13 +568,13 @@ mod tests {
         // from an issue body whose heading text differs in punctuation/case but
         // slugifies identically. The desugared schema must accept it.
         use crate::document::MarkdownContentParser;
-        use crate::domain::{project, Issue};
+        use crate::domain::project;
 
         let desugared = desugar(&Assertion::RequireSection {
             heading: "Success Criteria".to_string(),
         })
         .unwrap();
-        let issue = Issue::new(
+        let issue = crate::domain::types::fixture_issue(
             "t".to_string(),
             "## Success / Criteria!\n\n- [hard] REQ-01\n".to_string(),
         );

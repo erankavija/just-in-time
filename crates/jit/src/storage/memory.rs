@@ -94,6 +94,27 @@ impl InMemoryStorage {
         }
     }
 
+    /// Canonical synthetic layout for command executors backed by this in-memory
+    /// store. The paths are identities only—the backend performs no filesystem
+    /// I/O through them—but each instance receives a distinct nested layout so it
+    /// exercises the same typed session boundary as file-backed storage.
+    pub fn repository_layout(&self) -> crate::repository_state::RepositoryLayout {
+        let data = self.root_path.join(".jit");
+        crate::repository_state::RepositoryLayout::new(
+            crate::repository_state::RepositoryRootEvidence::new(
+                &self.root_path,
+                format!("memory-worktree:{}", self.root_path.display()),
+                true,
+            ),
+            crate::repository_state::RepositoryRootEvidence::new(
+                &data,
+                format!("memory-data:{}", data.display()),
+                true,
+            ),
+        )
+        .expect("an in-memory store always has a valid nested synthetic layout")
+    }
+
     #[cfg(test)]
     pub(crate) fn with_repository_state_failures(
         failures: Arc<dyn crate::storage::TransactionFailureInjector>,
@@ -264,8 +285,8 @@ impl InMemoryStorage {
             if dir.as_os_str().is_empty() {
                 break;
             }
-            if let Ok(dir_path) =
-                RootRelativePath::parse(dir).and_then(|rel| VirtualPath::from_root(vpath.root_class(), rel))
+            if let Ok(dir_path) = RootRelativePath::parse(dir)
+                .and_then(|rel| VirtualPath::from_root(vpath.root_class(), rel))
             {
                 state
                     .entries
@@ -757,7 +778,8 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        let issue = Issue::new("Test".to_string(), "Description".to_string());
+        let issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         storage.save_issue(issue.clone()).unwrap();
 
         let loaded = storage.load_issue(&issue.id).unwrap();
@@ -771,7 +793,8 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        let mut issue = Issue::new("Original".to_string(), "Desc".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Original".to_string(), "Desc".to_string());
         storage.save_issue(issue.clone()).unwrap();
 
         issue.title = "Updated".to_string();
@@ -800,7 +823,8 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        let issue = Issue::new("Delete me".to_string(), "Test".to_string());
+        let issue =
+            crate::domain::types::fixture_issue("Delete me".to_string(), "Test".to_string());
         storage.save_issue(issue.clone()).unwrap();
 
         storage.delete_issue(&issue.id).unwrap();
@@ -823,8 +847,10 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        let issue1 = Issue::new("Issue 1".to_string(), "First".to_string());
-        let issue2 = Issue::new("Issue 2".to_string(), "Second".to_string());
+        let issue1 =
+            crate::domain::types::fixture_issue("Issue 1".to_string(), "First".to_string());
+        let issue2 =
+            crate::domain::types::fixture_issue("Issue 2".to_string(), "Second".to_string());
 
         storage.save_issue(issue1.clone()).unwrap();
         storage.save_issue(issue2.clone()).unwrap();
@@ -882,8 +908,9 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        let issue = Issue::new("Event test".to_string(), "Test".to_string());
-        let event = Event::new_issue_created(&issue);
+        let issue =
+            crate::domain::types::fixture_issue("Event test".to_string(), "Test".to_string());
+        let event = Event::draft_issue_created(&issue);
 
         storage.append_event(&event).unwrap();
 
@@ -897,14 +924,14 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        let issue1 = Issue::new("Issue 1".to_string(), "Test".to_string());
-        let issue2 = Issue::new("Issue 2".to_string(), "Test".to_string());
+        let issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), "Test".to_string());
+        let issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), "Test".to_string());
 
         storage
-            .append_event(&Event::new_issue_created(&issue1))
+            .append_event(&Event::draft_issue_created(&issue1))
             .unwrap();
         storage
-            .append_event(&Event::new_issue_created(&issue2))
+            .append_event(&Event::draft_issue_created(&issue2))
             .unwrap();
 
         let events = storage.read_events().unwrap();
@@ -916,7 +943,8 @@ mod tests {
         let storage1 = InMemoryStorage::new();
         storage1.init().unwrap();
 
-        let issue1 = Issue::new("Issue 1".to_string(), "In storage 1".to_string());
+        let issue1 =
+            crate::domain::types::fixture_issue("Issue 1".to_string(), "In storage 1".to_string());
         storage1.save_issue(issue1.clone()).unwrap();
 
         // Clone shares the same underlying storage (via RefCell)
@@ -925,7 +953,8 @@ mod tests {
         assert_eq!(loaded.title, "Issue 1");
 
         // Verify they share the same underlying storage
-        let issue2 = Issue::new("Issue 2".to_string(), "In storage 2".to_string());
+        let issue2 =
+            crate::domain::types::fixture_issue("Issue 2".to_string(), "In storage 2".to_string());
         storage2.save_issue(issue2.clone()).unwrap();
 
         // Both see the same data because they share the RefCell
@@ -940,7 +969,8 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
 
-        let mut issue = Issue::new("Complex".to_string(), "Test".to_string());
+        let mut issue =
+            crate::domain::types::fixture_issue("Complex".to_string(), "Test".to_string());
         issue.priority = Priority::Critical;
         issue.state = State::InProgress;
         issue.assignee = Some("agent:test".parse().unwrap());

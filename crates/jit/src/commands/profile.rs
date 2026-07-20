@@ -606,7 +606,7 @@ mod tests {
     #[test]
     fn test_profile_application_does_not_mark_valid_unterminated_event_as_torn() {
         let (temp, storage, executor, package) = fixture();
-        let prior_event = Event::new_profile_applied(
+        let prior_event = Event::draft_profile_applied(
             "prior".to_string(),
             "1.0.0".to_string(),
             ProfileOrigin::Embedded,

@@ -96,15 +96,6 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     {
         return ExitCode::InvalidArgument;
     }
-    // A mid-write batch-create failure is an infra/external error (exit 10): some
-    // issues were created, then a write failed.
-    if error
-        .downcast_ref::<jit::commands::BatchWriteError>()
-        .is_some()
-    {
-        return ExitCode::ExternalError;
-    }
-
     // Claim/lease commands require git; running them outside a git repository is
     // an external-dependency failure (exit 10).
     if error
@@ -1877,18 +1868,13 @@ fn run() -> Result<()> {
     // selected data root. Session-opening commands mutate through exactly this
     // layout; the worktree root always comes from this boundary, never inferred
     // from the storage parent (`@/charter/D-4`, plan layout authority). Discovery
-    // is best-effort here so non-session commands are unaffected by an unusual root
-    // layout; a session-opening command reports a clear wiring error if it is
-    // absent.
-    let executor_layout = jit::storage::worktree_paths::WorktreePaths::detect()
-        .ok()
-        .and_then(|paths| {
-            jit::storage::discover_repository_layout(paths.worktree_root, &jit_dir).ok()
-        });
-    let mut executor = CommandExecutor::new(storage.clone());
-    if let Some(layout) = executor_layout {
-        executor = executor.with_layout(layout);
-    }
+    // is mandatory: startup reports discovery/wiring failures before dispatch.
+    let worktree_paths = jit::storage::worktree_paths::WorktreePaths::detect()
+        .context("failed to discover repository worktree layout")?;
+    let executor_layout =
+        jit::storage::discover_repository_layout(worktree_paths.worktree_root, &jit_dir)
+            .context("failed to construct repository layout")?;
+    let mut executor = CommandExecutor::new(storage.clone()).with_layout(executor_layout);
 
     match &command {
         Commands::Init {
@@ -8013,17 +7999,6 @@ mod exit_code_projection_tests {
                 }
                 .into(),
                 2,
-                "issue batch-create",
-            ),
-            (
-                jit::commands::BatchWriteError {
-                    created: vec![("a".to_string(), "aaaa1111".to_string())],
-                    failed_key: "b".to_string(),
-                    stage: "create".to_string(),
-                    reason: "disk full".to_string(),
-                }
-                .into(),
-                10,
                 "issue batch-create",
             ),
             (

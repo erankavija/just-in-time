@@ -28,7 +28,8 @@ fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     )
     .unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    CommandExecutor::new(storage)
+    let layout = storage.repository_layout();
+    CommandExecutor::new(storage).with_layout(layout)
 }
 
 /// An enforce rule: epics must carry a `req:*` label.
@@ -234,7 +235,7 @@ fn test_update_enforce_rule_blocks_and_force_logs() {
     let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
 
     // Seed a satisfying epic directly (bypassing create enforcement).
-    let mut issue = Issue::new("An epic".to_string(), String::new());
+    let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
     issue.state = State::Ready;
     let id = issue.id.clone();
@@ -317,7 +318,7 @@ assert = { require-label = { label = "owner:*", min = 1 } }
 
     // Seed an epic that violates BOTH enforce rules (no req:, no owner:),
     // bypassing create-time enforcement by writing through storage directly.
-    let mut issue = Issue::new("An epic".to_string(), String::new());
+    let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::Ready;
     let id = issue.id.clone();
@@ -402,7 +403,7 @@ assert = { json-schema = "schemas/no-bad.json" }
     )
     .unwrap();
 
-    let mut issue = Issue::new("An epic".to_string(), String::new());
+    let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::Ready;
     let id = issue.id.clone();
@@ -459,7 +460,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
 "#,
     );
 
-    let mut issue = Issue::new("A task".to_string(), String::new());
+    let mut issue = crate::fixture_issue("A task".to_string(), String::new());
     issue.labels = vec!["type:task".to_string()]; // no req: -> violates the rule
     issue.state = State::InProgress;
     issue.gates_required = vec!["manual-gate".to_string()]; // unpassed
@@ -528,7 +529,7 @@ assert = { json-schema = "schemas/no-bad.json" }
     .unwrap();
 
     // Seed an issue that already violates the rule (it carries a `bad:` label).
-    let mut issue = Issue::new("An epic".to_string(), String::new());
+    let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string(), "bad:value".to_string()];
     issue.state = State::Ready;
     executor.storage().save_issue(issue).unwrap();
@@ -617,7 +618,7 @@ fn test_update_evaluates_rules_against_post_transition_shape() {
     // make the rule fire (final-shape evaluation), blocking the transition.
     let executor = executor_with_rules(READY_NEEDS_REQ_ENFORCE);
 
-    let mut issue = Issue::new("A task".to_string(), String::new());
+    let mut issue = crate::fixture_issue("A task".to_string(), String::new());
     issue.labels = vec!["type:task".to_string()];
     issue.state = State::Backlog;
     let id = issue.id.clone();
@@ -721,7 +722,20 @@ fn test_no_bypass_event_when_save_fails() {
     std::fs::write(inner.root().join("rules.toml"), EPIC_NEEDS_REQ_ENFORCE).unwrap();
 
     let storage = FailingSaveStorage::new(inner);
-    let executor = CommandExecutor::new(storage);
+    let layout = jit::repository_state::RepositoryLayout::new(
+        jit::repository_state::RepositoryRootEvidence::new(
+            "/jit-failing-memory-worktree",
+            "failing-memory-worktree",
+            true,
+        ),
+        jit::repository_state::RepositoryRootEvidence::new(
+            "/jit-failing-memory-worktree/.jit",
+            "failing-memory-data",
+            true,
+        ),
+    )
+    .unwrap();
+    let executor = CommandExecutor::new(storage).with_layout(layout);
 
     let result = executor.create_issue(
         "An epic".to_string(),
@@ -779,6 +793,47 @@ struct FailingSaveStorage {
 impl FailingSaveStorage {
     fn new(inner: InMemoryStorage) -> Self {
         Self { inner }
+    }
+}
+
+struct FailingMutationSession<'a> {
+    inner: Box<dyn jit::storage::RepositoryMutationSession + 'a>,
+}
+
+impl jit::storage::RepositoryMutationSession for FailingMutationSession<'_> {
+    fn layout(&self) -> &jit::repository_state::RepositoryLayout {
+        self.inner.layout()
+    }
+
+    fn capture(
+        &mut self,
+        spec: jit::repository_state::CaptureSpec,
+    ) -> Result<jit::repository_state::RepositoryImage, jit::storage::RepositoryStateStoreError>
+    {
+        self.inner.capture(spec)
+    }
+
+    fn apply(
+        &mut self,
+        _plan: &jit::repository_state::MaterializationPlan,
+    ) -> Result<jit::storage::RepositoryApplyOutcome, jit::storage::RepositoryStateStoreError> {
+        Err(jit::storage::RepositoryStateStoreError::UnsafeTarget(
+            "simulated publication failure".to_string(),
+        ))
+    }
+}
+
+impl jit::storage::RepositoryStateStore for FailingSaveStorage {
+    fn open_mutation_session(
+        &self,
+        layout: jit::repository_state::RepositoryLayout,
+    ) -> Result<
+        Box<dyn jit::storage::RepositoryMutationSession + '_>,
+        jit::storage::RepositoryStateStoreError,
+    > {
+        Ok(Box::new(FailingMutationSession {
+            inner: self.inner.open_mutation_session(layout)?,
+        }))
     }
 }
 

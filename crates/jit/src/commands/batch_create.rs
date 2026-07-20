@@ -13,11 +13,9 @@
 //! - **Pre-validation** is atomic: on ANY validation failure ZERO issues are
 //!   created and a [`BatchValidationError`] enumerating every offending entry is
 //!   returned (mapped to exit code 2, `InvalidArgument`).
-//! - **The write phase is NOT atomic.** Once issue creation begins, a failure
-//!   mid-way (e.g. a storage error) returns a [`BatchWriteError`] carrying the
-//!   PARTIAL `{key: id}` map produced so far plus the failing step. There is no
-//!   rollback; recovery is manual (delete the partially-created issues, fix the
-//!   file, re-run).
+//! - **Publication is atomic.** The finalizer allocates all ids, resolves every
+//!   symbolic edge, and publishes issues, index membership, and audit events in
+//!   one recoverable repository delta.
 
 use super::*;
 use std::collections::{HashMap, HashSet};
@@ -115,8 +113,8 @@ pub enum BatchValidationProblem {
     /// An entry's FINAL issue shape would be rejected by the same write-time
     /// validation [`create_issue`](crate::commands::CommandExecutor::create_issue)
     /// runs (label format, namespace-uniqueness such as a single `type:*`, and
-    /// every other enforcing local rule). Catching this in pre-validation is what
-    /// guarantees no entry slips through to a partial write.
+    /// every other enforcing local rule). Catching this before finalization gives
+    /// callers a complete, entry-attributed validation report.
     WriteValidation { key: String, message: String },
 }
 
@@ -172,44 +170,6 @@ impl std::fmt::Display for BatchValidationError {
     }
 }
 
-/// A write FAILED partway through batch creation (NOT atomic).
-///
-/// Carries the partial `{key: id}` map of issues created before the failure plus
-/// the key whose step failed and the underlying error message. Recovery is
-/// manual: inspect/delete the created issues, fix the file, and re-run.
-#[derive(Debug, Clone, Error)]
-pub struct BatchWriteError {
-    /// `{key: id}` for issues successfully created before the failure.
-    pub created: Vec<(String, String)>,
-    /// The key whose creation or wiring step failed.
-    pub failed_key: String,
-    /// Which stage failed: `"create"` or `"dependency"`.
-    pub stage: String,
-    /// The underlying error message.
-    pub reason: String,
-}
-
-impl std::fmt::Display for BatchWriteError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "batch-create partially created {} issue(s) then failed at the {} step for key '{}': {}",
-            self.created.len(),
-            self.stage,
-            self.failed_key,
-            self.reason
-        )?;
-        writeln!(f, "No rollback was performed; recover manually.")?;
-        if !self.created.is_empty() {
-            writeln!(f, "Created so far (key -> id):")?;
-            for (key, id) in &self.created {
-                writeln!(f, "  {key} -> {id}")?;
-            }
-        }
-        Ok(())
-    }
-}
-
 /// Successful outcome of a batch create: the symbolic `key` to created issue id
 /// map, in input order.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -233,12 +193,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// references, cycle detection over the symbolic graph, type/label/gate
     /// validity, priority parse) BEFORE any write. On any validation failure it
     /// returns a [`BatchValidationError`] enumerating every offender and creates
-    /// ZERO issues. On success it creates all issues (reusing
-    /// [`create_issue`](Self::create_issue)) then wires dependency edges (reusing
-    /// [`add_dependency`](Self::add_dependency)), returning the `{key: id}` map.
-    ///
-    /// The write phase is NOT atomic: a mid-way failure returns a
-    /// [`BatchWriteError`] with the partial map and the failing step.
+    /// ZERO issues. On success it finalizes every issue and dependency edge into
+    /// one recoverable delta, returning the `{key: id}` map.
     ///
     /// # Examples
     ///
@@ -272,82 +228,53 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let outcome = executor.batch_create_from_json(defs).unwrap();
     /// println!("spec -> {}", outcome.as_map()["spec"]);
     /// ```
-    pub fn batch_create_from_json(&self, defs: Vec<BatchIssueDef>) -> Result<BatchCreateOutcome> {
+    pub fn batch_create_from_json(&self, defs: Vec<BatchIssueDef>) -> Result<BatchCreateOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // FULL pre-validation: collect every problem, write nothing on failure.
         let problems = self.collect_batch_problems(&defs)?;
         if !problems.is_empty() {
             return Err(BatchValidationError { problems }.into());
         }
 
-        // Write phase (NOT atomic). Create every issue, then wire edges.
-        let mut created: Vec<(String, String)> = Vec::with_capacity(defs.len());
-        let mut key_to_id: HashMap<String, String> = HashMap::with_capacity(defs.len());
-
-        for def in &defs {
-            let priority = def
-                .priority
-                .as_deref()
-                .map(Priority::from_str)
-                .transpose()
-                .map_err(|e| Self::batch_write_error(&created, &def.key, "create", e))?
-                .unwrap_or(Priority::Normal);
-
-            // The `type` is passed to create_issue as a `type:<t>` label; the
-            // config default type is applied there when no `type:` label exists.
-            let labels = def
-                .r#type
-                .as_deref()
-                .map(label_utils::type_label)
+        let drafts = defs
+            .iter()
+            .map(|def| {
+                let priority = def
+                    .priority
+                    .as_deref()
+                    .map(Priority::from_str)
+                    .transpose()?
+                    .unwrap_or(Priority::Normal);
+                self.batch_candidate_issue(def, priority)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let positions = defs
+            .iter()
+            .enumerate()
+            .map(|(index, def)| (def.key.as_str(), index))
+            .collect::<HashMap<_, _>>();
+        let mut dependencies = Vec::new();
+        for (dependent, def) in defs.iter().enumerate() {
+            dependencies.extend(
+                def.depends_on
+                    .iter()
+                    .map(|dependency| (dependent, positions[dependency.as_str()])),
+            );
+        }
+        let intent = crate::repository_state::MutationIntent::CreateIssueBatch {
+            drafts,
+            dependencies,
+        };
+        let publication = self.publish_repository_mutation(vec![intent])?;
+        Ok(BatchCreateOutcome {
+            key_to_id: defs
                 .into_iter()
-                .chain(def.labels.iter().cloned())
-                .collect::<Vec<_>>();
-
-            let (id, _warnings) = self
-                .create_issue(
-                    def.title.clone(),
-                    def.description.clone(),
-                    priority,
-                    def.gates.clone(),
-                    labels,
-                    None,
-                    None,
-                    false,
-                )
-                .map_err(|e| Self::batch_write_error(&created, &def.key, "create", e))?;
-
-            created.push((def.key.clone(), id.clone()));
-            key_to_id.insert(def.key.clone(), id);
-        }
-
-        // Wire dependency edges after all ids exist, mapping symbolic keys to ids.
-        for def in &defs {
-            for dep_key in &def.depends_on {
-                // Both keys are guaranteed present: pre-validation rejected
-                // unknown references, and every key was just created above.
-                let issue_id = &key_to_id[&def.key];
-                let dep_id = &key_to_id[dep_key];
-                self.add_dependency(issue_id, dep_id)
-                    .map_err(|e| Self::batch_write_error(&created, &def.key, "dependency", e))?;
-            }
-        }
-
-        Ok(BatchCreateOutcome { key_to_id: created })
-    }
-
-    /// Build a [`BatchWriteError`] capturing the partial progress so far.
-    fn batch_write_error(
-        created: &[(String, String)],
-        failed_key: &str,
-        stage: &str,
-        source: anyhow::Error,
-    ) -> anyhow::Error {
-        BatchWriteError {
-            created: created.to_vec(),
-            failed_key: failed_key.to_string(),
-            stage: stage.to_string(),
-            reason: source.to_string(),
-        }
-        .into()
+                .zip(publication.created_issue_ids)
+                .map(|(def, id)| (def.key, id))
+                .collect(),
+        })
     }
 
     /// Collect EVERY pre-validation problem for a batch (does not stop at the
@@ -446,8 +373,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             // as `create_issue` assembles and validates it (label format,
             // namespace-uniqueness like a single `type:*`, every enforcing local
             // rule). This is what catches write-time-only violations BEFORE any
-            // write, closing the partial-write gap. `validate_for_write` does not
-            // save; with `force = false` a blocking finding is returned as an
+            // publication, so all entry-attributed problems are reported together.
+            // `validate_for_write` does not save; with `force = false` a blocking finding is returned as an
             // error whose message we attribute to this entry's key.
             let candidate = self.batch_candidate_issue(def, priority)?;
             if let Err(err) = self.validate_for_write(&candidate, false) {
@@ -465,10 +392,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`create_issue`](Self::create_issue) assembles it before validating, so
     /// pre-validation sees the shape that would actually be persisted: the config
     /// default `type:<t>` label applied when the entry carries no `type:` label,
-    /// the requested priority / gates / labels / content format, and `state =
-    /// Ready` (create_issue auto-promotes a dependency-free new issue before
-    /// validating — batch wires dependency edges only AFTER creation, so every
-    /// candidate is dependency-free here).
+    /// the requested priority / gates / labels / content format, and the state
+    /// implied by its declared dependencies.
     fn batch_candidate_issue(&self, def: &BatchIssueDef, priority: Priority) -> Result<Issue> {
         // Assemble labels as the write path does: the `type` field becomes a
         // `type:<t>` label, followed by the entry's explicit labels.
@@ -494,14 +419,18 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        let mut issue = Issue::new(def.title.clone(), def.description.clone());
+        let mut issue = Issue::draft(def.title.clone(), def.description.clone());
         issue.priority = priority;
         issue.gates_required = def.gates.clone();
         issue.labels = labels;
         issue.content_format = None;
-        // create_issue auto-promotes a dependency-free new issue to Ready before
-        // validating; batch candidates are always dependency-free at this point.
-        issue.state = State::Ready;
+        // The finalizer publishes this same dependency-derived state while wiring
+        // all symbolic edges in the aggregate delta.
+        issue.state = if def.depends_on.is_empty() {
+            State::Ready
+        } else {
+            State::Backlog
+        };
         Ok(issue)
     }
 
@@ -559,7 +488,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
-        CommandExecutor::new(storage)
+        crate::commands::test_helpers::memory_executor(storage)
     }
 
     #[test]
@@ -631,8 +560,8 @@ mod tests {
         // The `type` field plus an explicit `type:*` label yields two `type:`
         // labels, which write-time namespace-uniqueness validation rejects
         // (`namespace-unique-type`, origin = "default"). This is the
-        // write-time-only violation that previously slipped past pre-validation
-        // into a partial write.
+        // write-time-only violation that previously slipped past the batch's
+        // validation report.
         let exec = executor();
         let mut d = def("bad", &[]);
         d.r#type = Some("task".to_string());

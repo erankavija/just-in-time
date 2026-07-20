@@ -38,7 +38,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &str,
         dep_id: &str,
-    ) -> Result<(DependencyAddResult, Vec<String>)> {
+    ) -> Result<(DependencyAddResult, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         self.add_dependency_with_policy(issue_id, dep_id, RedundancyPolicy::Reduce)
     }
 
@@ -62,7 +65,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: &str,
         dep_id: &str,
         policy: RedundancyPolicy,
-    ) -> Result<(DependencyAddResult, Vec<String>)> {
+    ) -> Result<(DependencyAddResult, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Resolve both IDs first
         let full_issue_id = self.storage.resolve_issue_id(issue_id)?;
         let full_dep_id = self.storage.resolve_issue_id(dep_id)?;
@@ -137,11 +143,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         full_issue_id: &str,
         full_dep_id: &str,
         warnings: Vec<String>,
-    ) -> Result<(DependencyAddResult, Vec<String>)> {
+    ) -> Result<(DependencyAddResult, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use std::collections::HashSet;
 
         let candidate_refs: Vec<&Issue> = candidate_issues.iter().collect();
         let graph = DependencyGraph::new(&candidate_refs);
+        let mut updates = Vec::new();
+        let mut events = Vec::new();
 
         let original_deps = |id: &str| -> HashSet<String> {
             original_issues
@@ -182,23 +193,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let old_state = from_issue.state;
                 from_issue.state = State::Backlog;
 
-                self.storage.save_issue(from_issue)?;
-
-                let event =
-                    Event::new_issue_state_changed(from_id.clone(), old_state, State::Backlog);
-                self.storage.append_event(&event)?;
-            } else {
-                self.storage.save_issue(from_issue)?;
+                events.push((
+                    1,
+                    Event::draft_issue_state_changed(from_id.clone(), old_state, State::Backlog),
+                ));
             }
-
-            // Record the field edit (after the save) so the change is event-logged,
-            // mirroring `update_issue` and `remove_dependency(_ies)`.
-            let event = Event::new_issue_updated(
-                from_id,
-                "dependency-add".to_string(),
-                vec!["dependencies".to_string()],
-            );
-            self.storage.append_event(&event)?;
+            updates.push(from_issue);
+            events.push((
+                2,
+                Event::draft_issue_updated(
+                    from_id,
+                    "dependency-add".to_string(),
+                    vec!["dependencies".to_string()],
+                ),
+            ));
             DependencyAddResult::Added
         };
 
@@ -222,11 +230,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue.dependencies = reduced.iter().cloned().collect();
             let new_count = issue.dependencies.len();
             let issue_id = issue.id.clone();
-            self.storage.save_issue(issue)?;
-
-            let event = Event::new_dependency_reduced(issue_id, old_count, new_count, removed);
-            self.storage.append_event(&event)?;
+            updates.push(issue);
+            events.push((
+                3,
+                Event::draft_dependency_reduced(issue_id, old_count, new_count, removed),
+            ));
         }
+
+        self.publish_issue_mutation(updates, events)?;
 
         Ok((result, warnings))
     }
@@ -257,13 +268,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         // same no-change contract as `update_issue`. Removing an edge can unblock
         // the issue, so the readiness check runs only on the real-change path.
         if removed {
-            self.storage.save_issue(issue)?;
-            let event = Event::new_issue_updated(
+            let event = Event::draft_issue_updated(
                 full_issue_id.clone(),
                 "dependency-remove".to_string(),
                 vec!["dependencies".to_string()],
             );
-            self.storage.append_event(&event)?;
+            self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
             self.auto_transition_to_ready(&full_issue_id)?;
         }
 
@@ -280,7 +290,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &str,
         dep_ids: &[String],
-    ) -> Result<DependenciesAddResult> {
+    ) -> Result<DependenciesAddResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         self.add_dependencies_with_policy(issue_id, dep_ids, RedundancyPolicy::Reduce)
     }
 
@@ -306,7 +319,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: &str,
         dep_ids: &[String],
         policy: RedundancyPolicy,
-    ) -> Result<DependenciesAddResult> {
+    ) -> Result<DependenciesAddResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));
         }
@@ -560,9 +576,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         candidate_issues: &[Issue],
         full_issue_id: &str,
         reduced_from: &HashSet<String>,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let candidate_refs: Vec<&Issue> = candidate_issues.iter().collect();
         let graph = DependencyGraph::new(&candidate_refs);
+        let mut updates = Vec::new();
+        let mut events = Vec::new();
 
         let original_deps = |id: &str| -> HashSet<String> {
             original_issues
@@ -594,19 +615,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         if from_issue.state == State::Ready && any_unmet {
             let old_state = from_issue.state;
             from_issue.state = State::Backlog;
-            self.storage.save_issue(from_issue)?;
-            let event = Event::new_issue_state_changed(from_id.clone(), old_state, State::Backlog);
-            self.storage.append_event(&event)?;
-        } else {
-            self.storage.save_issue(from_issue)?;
+            events.push((
+                1,
+                Event::draft_issue_state_changed(from_id.clone(), old_state, State::Backlog),
+            ));
         }
-
-        let event = Event::new_issue_updated(
-            from_id,
-            "dependency-add".to_string(),
-            vec!["dependencies".to_string()],
-        );
-        self.storage.append_event(&event)?;
+        updates.push(from_issue);
+        events.push((
+            2,
+            Event::draft_issue_updated(
+                from_id,
+                "dependency-add".to_string(),
+                vec!["dependencies".to_string()],
+            ),
+        ));
 
         // --- Other nodes: drop the edges the new edges made redundant.
         for candidate in candidate_issues {
@@ -628,13 +650,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue.dependencies = reduced.iter().cloned().collect();
             let new_count = issue.dependencies.len();
             let issue_id = issue.id.clone();
-            self.storage.save_issue(issue)?;
-
-            let event = Event::new_dependency_reduced(issue_id, old_count, new_count, removed);
-            self.storage.append_event(&event)?;
+            updates.push(issue);
+            events.push((
+                3,
+                Event::draft_dependency_reduced(issue_id, old_count, new_count, removed),
+            ));
         }
-
-        Ok(())
+        self.publish_issue_mutation(updates, events)
     }
 
     /// Remove multiple dependencies from an issue.
@@ -737,13 +759,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         // `update_issue`. Removing edges can unblock the issue, so the readiness
         // check runs only on the real-change path.
         if !removed.is_empty() {
-            self.storage.save_issue(issue)?;
-            let event = Event::new_issue_updated(
+            let event = Event::draft_issue_updated(
                 full_issue_id.clone(),
                 "dependency-remove".to_string(),
                 vec!["dependencies".to_string()],
             );
-            self.storage.append_event(&event)?;
+            self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
             self.auto_transition_to_ready(&full_issue_id)?;
         }
 

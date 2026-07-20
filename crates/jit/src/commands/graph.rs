@@ -421,7 +421,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// let storage = InMemoryStorage::new();
     /// storage.init().unwrap();
-    /// let executor = CommandExecutor::new(storage);
+    /// let layout = storage.repository_layout();
+    /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str, labels: Vec<String>| {
     ///     executor
     ///         .create_issue(title.into(), String::new(), Priority::Normal,
@@ -508,7 +509,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// let storage = InMemoryStorage::new();
     /// storage.init().unwrap();
-    /// let executor = CommandExecutor::new(storage);
+    /// let layout = storage.repository_layout();
+    /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// // An epic that contains nothing, plus a task that claims to belong to it.
     /// executor
     ///     .create_issue("Auth".into(), String::new(), Priority::Normal, vec![],

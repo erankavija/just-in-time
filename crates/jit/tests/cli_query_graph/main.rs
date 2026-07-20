@@ -18,3 +18,9 @@ mod query_tests;
 mod remote_document_tls_tests;
 mod scope_validation_tests;
 mod search_tests;
+
+fn fixture_issue(title: String, description: String) -> jit::domain::Issue {
+    let mut issue = jit::domain::Issue::draft(title, description);
+    issue.id = uuid::Uuid::new_v4().to_string();
+    issue
+}

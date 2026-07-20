@@ -470,7 +470,6 @@ fn test_harness_empty_container_rollup() {
 /// types, evaluates zero-document containers, and leaves issues/events intact.
 #[test]
 fn test_harness_archive_candidates_are_complete_and_non_mutating() {
-    use jit::domain::Issue;
     use jit::storage::IssueStore;
 
     let h = TestHarness::new();
@@ -487,7 +486,7 @@ fn test_harness_archive_candidates_are_complete_and_non_mutating() {
     )
     .unwrap();
     let save = |title: &str, state: State, kind: &str| {
-        let mut issue = Issue::new(title.to_string(), String::new());
+        let mut issue = crate::fixture_issue(title.to_string(), String::new());
         issue.state = state;
         issue.labels = vec![format!("type:{kind}")];
         let id = issue.id.clone();

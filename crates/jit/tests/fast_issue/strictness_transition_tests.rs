@@ -11,7 +11,7 @@
 //!   downgraded to advisory under `permissive`.
 
 use jit::commands::CommandExecutor;
-use jit::domain::{Issue, State};
+use jit::domain::State;
 use jit::storage::{InMemoryStorage, IssueStore};
 
 /// A `warn` graph rule: an epic reaching `done` should depend on a `type:design`.
@@ -49,13 +49,14 @@ fn executor(strictness: &str, rules_toml: &str) -> CommandExecutor<InMemoryStora
     )
     .unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    CommandExecutor::new(storage)
+    let layout = storage.repository_layout();
+    CommandExecutor::new(storage).with_layout(layout)
 }
 
 /// Seed an in-progress epic with NO design dependency (so the rule under test is
 /// violated at a `done` transition) and return its id.
 fn seed_epic(executor: &CommandExecutor<InMemoryStorage>) -> String {
-    let mut issue = Issue::new("Epic".to_string(), String::new());
+    let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
     let id = issue.id.clone();

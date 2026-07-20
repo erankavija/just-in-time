@@ -92,7 +92,7 @@ pub enum LocalEvalError {
 /// let rules = RuleSet::parse(toml, None, []).unwrap();
 ///
 /// // An epic with no `req:*` label violates the enforce rule.
-/// let mut epic = Issue::new("An epic".to_string(), String::new());
+/// let mut epic = Issue::draft("An epic".to_string(), String::new());
 /// epic.labels = vec!["type:epic".to_string()];
 /// let evaluation = evaluate_local(&epic, &rules, ContentFormat::Markdown).unwrap();
 /// assert!(!evaluation.blocking_rules().is_empty());
@@ -247,7 +247,7 @@ impl LocalEvaluation {
 /// "#;
 /// let rules = RuleSet::parse(toml, None, []).unwrap();
 ///
-/// let mut task = Issue::new("A task".to_string(), String::new());
+/// let mut task = Issue::draft("A task".to_string(), String::new());
 /// task.labels = vec!["type:task".to_string()];
 /// let evaluation = evaluate_local(&task, &rules, ContentFormat::Markdown).unwrap();
 /// // A warn rule produces a (non-blocking) finding.
@@ -420,7 +420,7 @@ mod tests {
     }
 
     fn epic_without_req() -> Issue {
-        let mut issue = Issue::new("An epic".to_string(), String::new());
+        let mut issue = crate::domain::types::fixture_issue("An epic".to_string(), String::new());
         issue.labels = vec!["type:epic".to_string()];
         issue
     }
@@ -756,7 +756,7 @@ enforce = true
 assert = { require-doc-type = { doc-type = "design" } }
 "#,
         );
-        let mut task = Issue::new("A task".to_string(), String::new());
+        let mut task = crate::domain::types::fixture_issue("A task".to_string(), String::new());
         task.labels = vec!["type:task".to_string()];
         // No design doc -> blocks.
         assert!(evaluate_local(&task, &rules, ContentFormat::Markdown)

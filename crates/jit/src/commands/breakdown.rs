@@ -126,7 +126,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         container_id: &str,
         children: Vec<BracketChild>,
-    ) -> Result<BracketBreakdownResult> {
+    ) -> Result<BracketBreakdownResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Resolve the container's type up front so the template can be selected by
         // `applies_to`, mirroring how `jit apply plan` picks the template.
         let full_container_id = self.storage.resolve_issue_id(container_id)?;
@@ -251,7 +254,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         template: &GraphTemplate,
         container_id: &str,
         children: Vec<BracketChild>,
-    ) -> Result<BracketBreakdownResult> {
+    ) -> Result<BracketBreakdownResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         if children.is_empty() {
             return Err(anyhow!(
                 "bracket breakdown requires at least one child issue"

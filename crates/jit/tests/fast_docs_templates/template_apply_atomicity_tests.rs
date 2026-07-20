@@ -181,9 +181,65 @@ impl<S: IssueStore> IssueStore for FaultyStore<S> {
     }
 }
 
-/// Delegated so an executor over the faulty store can capture the read-only
-/// validation image the transition-time graph-rule pass needs; the injected
-/// write fault stays on `save_issue`, which the capture never touches.
+struct FaultyMutationSession<'a> {
+    inner: Box<dyn jit::storage::RepositoryMutationSession + 'a>,
+    fail_on: SavePredicate,
+    armed: Arc<AtomicBool>,
+    fired: Arc<AtomicBool>,
+    saved: Arc<Mutex<Vec<String>>>,
+}
+
+impl jit::storage::RepositoryMutationSession for FaultyMutationSession<'_> {
+    fn layout(&self) -> &jit::repository_state::RepositoryLayout {
+        self.inner.layout()
+    }
+
+    fn capture(
+        &mut self,
+        spec: jit::repository_state::CaptureSpec,
+    ) -> Result<jit::repository_state::RepositoryImage, jit::storage::RepositoryStateStoreError>
+    {
+        self.inner.capture(spec)
+    }
+
+    fn apply(
+        &mut self,
+        plan: &jit::repository_state::MaterializationPlan,
+    ) -> Result<jit::storage::RepositoryApplyOutcome, jit::storage::RepositoryStateStoreError> {
+        let issues = plan
+            .delta()
+            .actions()
+            .iter()
+            .filter_map(|action| match action {
+                jit::repository_state::RepositoryAction::WriteFile { bytes, .. } => {
+                    serde_json::from_slice::<Issue>(bytes).ok()
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        if self.armed.load(Ordering::SeqCst)
+            && !self.fired.load(Ordering::SeqCst)
+            && issues.iter().any(|issue| (self.fail_on)(issue))
+        {
+            self.fired.store(true, Ordering::SeqCst);
+            return Err(jit::storage::RepositoryStateStoreError::UnsafeTarget(
+                "injected write failure publishing issue mutation".to_string(),
+            ));
+        }
+        let outcome = self.inner.apply(plan)?;
+        if self.armed.load(Ordering::SeqCst) {
+            self.saved
+                .lock()
+                .unwrap()
+                .extend(issues.into_iter().map(|issue| issue.id));
+        }
+        Ok(outcome)
+    }
+}
+
+/// Inject the fault at the canonical typed publication boundary. The legacy
+/// `save_issue` override remains only for template's not-yet-migrated rollback
+/// choreography; newly created/updated issues fail through session `apply`.
 impl<S: IssueStore + jit::storage::RepositoryStateStore> jit::storage::RepositoryStateStore
     for FaultyStore<S>
 {
@@ -194,7 +250,13 @@ impl<S: IssueStore + jit::storage::RepositoryStateStore> jit::storage::Repositor
         Box<dyn jit::storage::RepositoryMutationSession + '_>,
         jit::storage::RepositoryStateStoreError,
     > {
-        self.inner.open_mutation_session(layout)
+        Ok(Box::new(FaultyMutationSession {
+            inner: self.inner.open_mutation_session(layout)?,
+            fail_on: self.fail_on.clone(),
+            armed: self.armed.clone(),
+            fired: self.fired.clone(),
+            saved: self.saved.clone(),
+        }))
     }
 }
 
@@ -242,12 +304,15 @@ applies_to  = ["epic"]
 /// plus the config-declared `repo-validate` gate the template's anchor names.
 /// Arms the store on the way out, so only the apply under test can trip the
 /// injected failure. Returns the executor, the container id, and the upstream id.
-fn fixture<S: IssueStore>(
+fn fixture<S: IssueStore + jit::storage::RepositoryStateStore>(
     store: FaultyStore<S>,
 ) -> (CommandExecutor<FaultyStore<S>>, String, String) {
     std::env::set_var("JIT_TEST_MODE", "1");
     store.init().unwrap();
-    let executor = CommandExecutor::new(store.clone());
+    let layout =
+        jit::storage::discover_repository_layout(store.root().parent().unwrap(), store.root())
+            .unwrap();
+    let executor = CommandExecutor::new(store.clone()).with_layout(layout);
 
     executor
         .add_gate_definition(
@@ -671,9 +736,57 @@ impl IssueStore for StallingStore {
     }
 }
 
-/// Delegated to the wrapped `JsonFileStorage` so the transition-time graph-rule
-/// pass can capture its read-only validation image; the stall injection remains
-/// on `save_issue`, which the capture never enters.
+struct StallingMutationSession<'a> {
+    inner: Box<dyn jit::storage::RepositoryMutationSession + 'a>,
+    stall_on: SavePredicate,
+    stall_for: Duration,
+    armed: Arc<AtomicBool>,
+    fired: Arc<AtomicBool>,
+    stalling: Arc<(Mutex<bool>, Condvar)>,
+}
+
+impl jit::storage::RepositoryMutationSession for StallingMutationSession<'_> {
+    fn layout(&self) -> &jit::repository_state::RepositoryLayout {
+        self.inner.layout()
+    }
+
+    fn capture(
+        &mut self,
+        spec: jit::repository_state::CaptureSpec,
+    ) -> Result<jit::repository_state::RepositoryImage, jit::storage::RepositoryStateStoreError>
+    {
+        self.inner.capture(spec)
+    }
+
+    fn apply(
+        &mut self,
+        plan: &jit::repository_state::MaterializationPlan,
+    ) -> Result<jit::storage::RepositoryApplyOutcome, jit::storage::RepositoryStateStoreError> {
+        let should_stall = self.armed.load(Ordering::SeqCst)
+            && !self.fired.load(Ordering::SeqCst)
+            && plan.delta().actions().iter().any(|action| match action {
+                jit::repository_state::RepositoryAction::WriteFile { bytes, .. } => {
+                    serde_json::from_slice::<Issue>(bytes)
+                        .is_ok_and(|issue| (self.stall_on)(&issue))
+                }
+                _ => false,
+            });
+        if should_stall {
+            self.fired.store(true, Ordering::SeqCst);
+            let (mutex, condvar) = &*self.stalling;
+            *mutex.lock().unwrap() = true;
+            condvar.notify_all();
+            std::thread::sleep(self.stall_for);
+            return Err(jit::storage::RepositoryStateStoreError::UnsafeTarget(
+                "injected write failure publishing issue mutation".to_string(),
+            ));
+        }
+        self.inner.apply(plan)
+    }
+}
+
+/// Inject the stall/failure at the typed publication boundary while preserving
+/// template rollback's still-legacy `IssueStore` observation hooks.
 impl jit::storage::RepositoryStateStore for StallingStore {
     fn open_mutation_session(
         &self,
@@ -682,7 +795,14 @@ impl jit::storage::RepositoryStateStore for StallingStore {
         Box<dyn jit::storage::RepositoryMutationSession + '_>,
         jit::storage::RepositoryStateStoreError,
     > {
-        self.inner.open_mutation_session(layout)
+        Ok(Box::new(StallingMutationSession {
+            inner: self.inner.open_mutation_session(layout)?,
+            stall_on: self.stall_on.clone(),
+            stall_for: self.stall_for,
+            armed: self.armed.clone(),
+            fired: self.fired.clone(),
+            stalling: self.stalling.clone(),
+        }))
     }
 }
 
@@ -690,7 +810,10 @@ impl jit::storage::RepositoryStateStore for StallingStore {
 fn json_fixture(store: StallingStore) -> (CommandExecutor<StallingStore>, String, String) {
     std::env::set_var("JIT_TEST_MODE", "1");
     store.init().unwrap();
-    let executor = CommandExecutor::new(store.clone());
+    let layout =
+        jit::storage::discover_repository_layout(store.root().parent().unwrap(), store.root())
+            .unwrap();
+    let executor = CommandExecutor::new(store.clone()).with_layout(layout);
 
     executor
         .add_gate_definition(
@@ -768,7 +891,13 @@ fn test_apply_excludes_a_concurrent_writer_and_rollback_spares_its_issue() {
         let jit_root = jit_root.clone();
         std::thread::spawn(move || {
             store.await_stall();
-            let writer_executor = CommandExecutor::new(JsonFileStorage::new(&jit_root));
+            let writer_storage = JsonFileStorage::new(&jit_root);
+            let layout = jit::storage::discover_repository_layout(
+                jit_root.parent().unwrap(),
+                writer_storage.root(),
+            )
+            .unwrap();
+            let writer_executor = CommandExecutor::new(writer_storage).with_layout(layout);
             let started = Instant::now();
             let (id, _) = writer_executor
                 .create_issue(

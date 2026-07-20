@@ -53,7 +53,8 @@ fn executor(strictness: Option<&str>, rules_toml: &str) -> CommandExecutor<InMem
     )
     .unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    CommandExecutor::new(storage)
+    let layout = storage.repository_layout();
+    CommandExecutor::new(storage).with_layout(layout)
 }
 
 /// Attempt to create an epic that violates the rule under test (no `req:*`

@@ -106,11 +106,14 @@
 //! use jit::domain::type_taxonomy::HierarchyConfig;
 //!
 //! // milestone → epic → task (each container depends on what it contains)
-//! let mut milestone = Issue::new("Release".into(), String::new());
+//! let mut milestone = Issue::draft("Release".into(), String::new());
+//! milestone.id = "milestone".into();
 //! milestone.labels = vec!["type:milestone".into()];
-//! let mut epic = Issue::new("Auth".into(), String::new());
+//! let mut epic = Issue::draft("Auth".into(), String::new());
+//! epic.id = "epic".into();
 //! epic.labels = vec!["type:epic".into()];
-//! let mut task = Issue::new("Login".into(), String::new());
+//! let mut task = Issue::draft("Login".into(), String::new());
+//! task.id = "task".into();
 //! task.labels = vec!["type:task".into()];
 //!
 //! milestone.dependencies = vec![epic.id.clone()];
@@ -313,13 +316,13 @@ impl HierarchyResolution {
 /// use jit::domain::type_taxonomy::HierarchyConfig;
 ///
 /// // A diamond: two epics both depend on the same task.
-/// let mut e1 = Issue::new("E1".into(), String::new());
+/// let mut e1 = Issue::draft("E1".into(), String::new());
 /// e1.id = "aaaa".into();
 /// e1.labels = vec!["type:epic".into()];
-/// let mut e2 = Issue::new("E2".into(), String::new());
+/// let mut e2 = Issue::draft("E2".into(), String::new());
 /// e2.id = "bbbb".into();
 /// e2.labels = vec!["type:epic".into()];
-/// let mut task = Issue::new("T".into(), String::new());
+/// let mut task = Issue::draft("T".into(), String::new());
 /// task.id = "cccc".into();
 /// task.labels = vec!["type:task".into()];
 /// e1.dependencies = vec![task.id.clone()];
@@ -590,11 +593,14 @@ pub struct MembershipDivergence {
 /// let config = HierarchyConfig::default();
 ///
 /// // The epic "auth" contains `inside` via the DAG but not `outside`.
-/// let mut epic = Issue::new("Auth".into(), String::new());
+/// let mut epic = Issue::draft("Auth".into(), String::new());
+/// epic.id = "epic".into();
 /// epic.labels = vec!["type:epic".into(), "epic:auth".into()];
-/// let mut inside = Issue::new("Inside".into(), String::new());
+/// let mut inside = Issue::draft("Inside".into(), String::new());
+/// inside.id = "inside".into();
 /// inside.labels = vec!["type:task".into(), "epic:auth".into()];
-/// let mut outside = Issue::new("Outside".into(), String::new());
+/// let mut outside = Issue::draft("Outside".into(), String::new());
+/// outside.id = "outside".into();
 /// outside.labels = vec!["type:task".into(), "epic:auth".into()];
 /// epic.dependencies = vec![inside.id.clone()]; // only `inside` is a DAG member
 ///
@@ -712,7 +718,6 @@ fn dependency_closure(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::Issue;
 
     /// A minimal [`HierarchyNode`] double so resolution can be tested without
     /// building full issues.
@@ -878,11 +883,11 @@ mod tests {
     #[test]
     fn test_redundant_edge_does_not_mutate_input() {
         // Reduction is internal to resolution; the caller's edge list survives.
-        let mut epic = Issue::new("Epic".into(), String::new());
+        let mut epic = crate::domain::types::fixture_issue("Epic".into(), String::new());
         epic.labels = vec!["type:epic".into()];
-        let mut story = Issue::new("Story".into(), String::new());
+        let mut story = crate::domain::types::fixture_issue("Story".into(), String::new());
         story.labels = vec!["type:story".into()];
-        let task = Issue::new("Task".into(), String::new());
+        let task = crate::domain::types::fixture_issue("Task".into(), String::new());
         story.dependencies = vec![task.id.clone()];
         epic.dependencies = vec![story.id.clone(), task.id.clone()];
 
@@ -979,10 +984,10 @@ mod tests {
     fn test_rejected_container_still_resolves_structurally() {
         // State is out of scope for resolution: a rejected epic still contains
         // its task. Resolution operates on Issues, so build them here.
-        let mut epic = Issue::new("Epic".into(), String::new());
+        let mut epic = crate::domain::types::fixture_issue("Epic".into(), String::new());
         epic.labels = vec!["type:epic".into()];
         epic.state = crate::domain::State::Rejected;
-        let mut task = Issue::new("Task".into(), String::new());
+        let mut task = crate::domain::types::fixture_issue("Task".into(), String::new());
         task.labels = vec!["type:task".into()];
         epic.dependencies = vec![task.id.clone()];
 
@@ -993,11 +998,11 @@ mod tests {
     #[test]
     fn test_divergence_flags_label_without_dag_membership() {
         let config = default_config();
-        let mut epic = Issue::new("Auth".into(), String::new());
+        let mut epic = crate::domain::types::fixture_issue("Auth".into(), String::new());
         epic.labels = vec!["type:epic".into(), "epic:auth".into()];
-        let mut inside = Issue::new("Inside".into(), String::new());
+        let mut inside = crate::domain::types::fixture_issue("Inside".into(), String::new());
         inside.labels = vec!["type:task".into(), "epic:auth".into()];
-        let mut outside = Issue::new("Outside".into(), String::new());
+        let mut outside = crate::domain::types::fixture_issue("Outside".into(), String::new());
         outside.labels = vec!["type:task".into(), "epic:auth".into()];
         epic.dependencies = vec![inside.id.clone()];
 
@@ -1012,11 +1017,11 @@ mod tests {
     fn test_divergence_transitive_membership_is_not_flagged() {
         // A task reachable transitively (epic → story → task) is a DAG member.
         let config = default_config();
-        let mut epic = Issue::new("Auth".into(), String::new());
+        let mut epic = crate::domain::types::fixture_issue("Auth".into(), String::new());
         epic.labels = vec!["type:epic".into(), "epic:auth".into()];
-        let mut story = Issue::new("Story".into(), String::new());
+        let mut story = crate::domain::types::fixture_issue("Story".into(), String::new());
         story.labels = vec!["type:story".into()];
-        let mut task = Issue::new("Task".into(), String::new());
+        let mut task = crate::domain::types::fixture_issue("Task".into(), String::new());
         task.labels = vec!["type:task".into(), "epic:auth".into()];
         epic.dependencies = vec![story.id.clone()];
         story.dependencies = vec![task.id.clone()];
@@ -1033,7 +1038,7 @@ mod tests {
         // A label with no anchor container is left to membership-reference
         // validation, not reported as a divergence.
         let config = default_config();
-        let mut task = Issue::new("Task".into(), String::new());
+        let mut task = crate::domain::types::fixture_issue("Task".into(), String::new());
         task.labels = vec!["type:task".into(), "epic:ghost".into()];
         let divergences = detect_membership_divergences(&[&task], &config);
         assert!(divergences.is_empty());

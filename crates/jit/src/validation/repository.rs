@@ -677,7 +677,7 @@ fn collect_rule_findings(
         .filter(|rule| rule.scope == crate::declarations::rules::RuleScope::Graph)
         .collect();
     let hierarchy = crate::repository_state::hierarchy_config(namespaces);
-    let plan_content = resolve_plan_content(read, issues, config)?;
+    let plan_content = project_plan_content(read, issues, config)?;
     let graph_findings = crate::validation::graph::evaluate_graph(
         &graph_rules,
         issues,
@@ -751,7 +751,7 @@ fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFind
     }
 }
 
-fn resolve_plan_content(
+fn project_plan_content(
     read: &ReadBytes<'_>,
     issues: &[Issue],
     config: &JitConfig,
@@ -981,7 +981,7 @@ mod tests {
         let repo = tempfile::tempdir().unwrap();
         let store = JsonFileStorage::new(repo.path().join(".jit"));
         store.init().unwrap();
-        let mut issue = Issue::new(
+        let mut issue = crate::domain::types::fixture_issue(
             "Root".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n".to_string(),
         );

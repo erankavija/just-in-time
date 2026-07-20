@@ -429,7 +429,7 @@ pub trait IssueStore: Clone {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Issue, Priority, State};
+    use crate::domain::{Priority, State};
 
     /// Test that JsonFileStorage implements IssueStore correctly
     #[test]
@@ -439,7 +439,8 @@ mod tests {
 
         storage.init().unwrap();
 
-        let issue = Issue::new("Test".to_string(), "Description".to_string());
+        let issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         storage.save_issue(issue.clone()).unwrap();
 
         let loaded = storage.load_issue(&issue.id).unwrap();
@@ -452,7 +453,8 @@ mod tests {
         fn test_with_storage<S: IssueStore>(storage: S) {
             storage.init().unwrap();
 
-            let mut issue = Issue::new("Trait test".to_string(), "Works".to_string());
+            let mut issue =
+                crate::domain::types::fixture_issue("Trait test".to_string(), "Works".to_string());
             issue.priority = Priority::High;
             issue.state = State::Ready;
 
@@ -475,7 +477,8 @@ mod tests {
         fn test_with_storage<S: IssueStore>(storage: S) {
             storage.init().unwrap();
 
-            let seed = Issue::new("Snapshot".to_string(), "Original".to_string());
+            let seed =
+                crate::domain::types::fixture_issue("Snapshot".to_string(), "Original".to_string());
             storage.save_issue(seed.clone()).unwrap();
             let snapshot = storage.load_issue(&seed.id).unwrap();
 
@@ -508,8 +511,10 @@ mod tests {
         fn test_with_storage<S: IssueStore>(storage: S) {
             storage.init().unwrap();
 
-            let issue1 = Issue::new("Issue 1".to_string(), "First".to_string());
-            let issue2 = Issue::new("Issue 2".to_string(), "Second".to_string());
+            let issue1 =
+                crate::domain::types::fixture_issue("Issue 1".to_string(), "First".to_string());
+            let issue2 =
+                crate::domain::types::fixture_issue("Issue 2".to_string(), "Second".to_string());
 
             storage.save_issue(issue1.clone()).unwrap();
             storage.save_issue(issue2.clone()).unwrap();
@@ -533,7 +538,8 @@ mod tests {
         fn test_with_storage<S: IssueStore>(storage: S) {
             storage.init().unwrap();
 
-            let issue = Issue::new("Delete me".to_string(), "Test".to_string());
+            let issue =
+                crate::domain::types::fixture_issue("Delete me".to_string(), "Test".to_string());
             storage.save_issue(issue.clone()).unwrap();
 
             storage.delete_issue(&issue.id).unwrap();
@@ -590,8 +596,9 @@ mod tests {
         fn test_with_storage<S: IssueStore>(storage: S) {
             storage.init().unwrap();
 
-            let issue = Issue::new("Event test".to_string(), "Test".to_string());
-            let event = Event::new_issue_created(&issue);
+            let issue =
+                crate::domain::types::fixture_issue("Event test".to_string(), "Test".to_string());
+            let event = Event::draft_issue_created(&issue);
 
             storage.append_event(&event).unwrap();
 

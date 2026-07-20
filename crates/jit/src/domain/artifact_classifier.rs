@@ -844,7 +844,6 @@ fn merge<T: Clone>(existing: &[T], additional: impl IntoIterator<Item = T>) -> V
 mod tests {
     use super::*;
     use crate::domain::type_taxonomy::HierarchyConfig;
-    use crate::domain::Issue;
     use std::collections::HashMap;
 
     const CONTAINER: &str = "abcdef12-3456-7890-abcd-ef1234567890";
@@ -980,7 +979,8 @@ mod tests {
 
     #[test]
     fn test_preferred_container_destination_uses_unambiguous_strategic_label_slug() {
-        let mut issue = Issue::new("A title that may change".into(), String::new());
+        let mut issue =
+            crate::domain::types::fixture_issue("A title that may change".into(), String::new());
         issue.id = CONTAINER.into();
         issue.labels = vec!["type:epic".into(), "epic:artifact-archival".into()];
 
@@ -992,7 +992,8 @@ mod tests {
 
     #[test]
     fn test_preferred_container_destination_falls_back_to_title_for_missing_or_ambiguous_label() {
-        let mut issue = Issue::new("Stable Title Fallback".into(), String::new());
+        let mut issue =
+            crate::domain::types::fixture_issue("Stable Title Fallback".into(), String::new());
         issue.id = CONTAINER.into();
         issue.labels = vec!["type:epic".into()];
 

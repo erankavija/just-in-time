@@ -193,7 +193,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn container(description: &str) -> Issue {
-        Issue::new("Container".to_string(), description.to_string())
+        crate::domain::types::fixture_issue("Container".to_string(), description.to_string())
     }
 
     // --- resolve_plan_doc_location (pure) ---------------------------------

@@ -29,3 +29,17 @@ mod template_apply_atomicity_tests;
 mod template_apply_tests;
 mod template_binding_tests;
 mod templates_loader_tests;
+
+fn seed_memory_data_file(storage: &jit::storage::InMemoryStorage, name: &str, content: &str) {
+    use jit::storage::IssueStore;
+
+    std::fs::create_dir_all(storage.root()).unwrap();
+    std::fs::write(storage.root().join(name), content).unwrap();
+    storage.add_repo_file(&format!(".jit/{name}"), content);
+}
+
+fn fixture_issue(title: String, description: String) -> jit::domain::Issue {
+    let mut issue = jit::domain::Issue::draft(title, description);
+    issue.id = uuid::Uuid::new_v4().to_string();
+    issue
+}

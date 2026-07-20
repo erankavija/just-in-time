@@ -1550,7 +1550,7 @@ mod tests {
     /// would have gone unnoticed; this pins that parity.
     #[test]
     fn test_session_published_issue_reads_back_typed_on_both_backends() {
-        let issue = Issue::new("Crossing".to_string(), "body".to_string());
+        let issue = crate::domain::types::fixture_issue("Crossing".to_string(), "body".to_string());
         let issue_bytes = serialize_issue(&issue).unwrap();
 
         // Memory backend.
@@ -1596,8 +1596,8 @@ mod tests {
     /// on one representation.
     #[test]
     fn test_appended_event_bytes_capture_into_session_image() {
-        let issue = Issue::new("Evt".to_string(), "b".to_string());
-        let event = Event::new_issue_created(&issue);
+        let issue = crate::domain::types::fixture_issue("Evt".to_string(), "b".to_string());
+        let event = Event::draft_issue_created(&issue);
         let mut expected = serialize_event(&event).unwrap();
         expected.push(b'\n');
 
@@ -3425,7 +3425,7 @@ mod tests {
     }
 
     fn req01_issue(id: &str, assignee: Option<Assignee>) -> Issue {
-        let mut issue = Issue::draft("Determinism".into(), "Body".into());
+        let mut issue = crate::domain::types::fixture_issue("Determinism".into(), "Body".into());
         issue.id = id.to_string();
         issue.assignee = assignee;
         issue.created_at = chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
@@ -3436,7 +3436,9 @@ mod tests {
     }
 
     fn req01_map_issue(reverse: bool) -> Issue {
-        let mut issue = Issue::draft("Canonical backend retry".into(), "Body".into());
+        let mut issue =
+            crate::domain::types::fixture_issue("Canonical backend retry".into(), "Body".into());
+        issue.id = "11111111-1111-4111-8111-111111111111".into();
         let order = if reverse { [1, 0] } else { [0, 1] };
         let context = [("alpha", "one"), ("zeta", "two")];
         let gates = [
@@ -3763,6 +3765,7 @@ mod tests {
         let issue_id = crate::repository_state::IdAuthority::from_seed([31u8; 32]).uuid_at(0);
         let spec = CaptureSpec::phase_one(
             [
+                VirtualPath::data("issues").unwrap(),
                 VirtualPath::data("index.json").unwrap(),
                 VirtualPath::data("events.jsonl").unwrap(),
                 VirtualPath::data(format!("issues/{issue_id}.json")).unwrap(),
@@ -3795,12 +3798,10 @@ mod tests {
         {
             let mut state = memory.repository_state();
             state.data_root_exists = true;
+            let issues_dir = VirtualPath::data("issues").unwrap();
             state.entries.insert(
-                VirtualPath::data("issues").unwrap(),
-                RepositoryEntry::Directory {
-                    identity: EntryIdentity::for_bytes("mem-issues", b"directory").unwrap(),
-                    mode: FileMode::Executable,
-                },
+                issues_dir.clone(),
+                json_image.entries().get(&issues_dir).unwrap().clone(),
             );
         }
         let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
@@ -4041,7 +4042,12 @@ mod tests {
         };
         let spec = || {
             CaptureSpec::phase_one(
-                [run_dir.clone(), run_file.clone(), events.clone()],
+                [
+                    VirtualPath::data("gate-runs").unwrap(),
+                    run_dir.clone(),
+                    run_file.clone(),
+                    events.clone(),
+                ],
                 budget(),
             )
             .unwrap()
@@ -4209,7 +4215,12 @@ mod tests {
         };
         let spec = || {
             CaptureSpec::phase_one(
-                [run_dir.clone(), run_file.clone(), events.clone()],
+                [
+                    VirtualPath::data("gate-runs").unwrap(),
+                    run_dir.clone(),
+                    run_file.clone(),
+                    events.clone(),
+                ],
                 budget(),
             )
             .unwrap()
@@ -4258,7 +4269,7 @@ mod tests {
         let events = VirtualPath::data("events.jsonl").unwrap();
         let index_bytes = crate::repository_state::fresh_index_bytes().unwrap();
 
-        let mut draft = crate::domain::Issue::draft("New".into(), "Body".into());
+        let mut draft = crate::domain::types::fixture_issue("New".into(), "Body".into());
         draft.state = crate::domain::State::Ready;
         let intents = || {
             [
@@ -4277,7 +4288,12 @@ mod tests {
         };
         let spec = || {
             CaptureSpec::phase_one(
-                [issue_file.clone(), index.clone(), events.clone()],
+                [
+                    VirtualPath::data("issues").unwrap(),
+                    issue_file.clone(),
+                    index.clone(),
+                    events.clone(),
+                ],
                 budget(),
             )
             .unwrap()

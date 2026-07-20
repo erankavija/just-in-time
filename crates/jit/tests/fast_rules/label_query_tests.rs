@@ -1,13 +1,12 @@
 //! Tests for label-based query functionality (Phase 1.4)
 
-use jit::commands::CommandExecutor;
 use jit::domain::Priority;
 use jit::storage::InMemoryStorage;
 
 #[test]
 fn test_query_by_label_exact_match() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     executor.init().unwrap();
 
     // Create issues with various labels
@@ -62,7 +61,7 @@ fn test_query_by_label_exact_match() {
 #[test]
 fn test_query_by_label_wildcard_namespace() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     executor.init().unwrap();
 
     // Create issues with various milestones
@@ -117,7 +116,7 @@ fn test_query_by_label_wildcard_namespace() {
 #[test]
 fn test_query_by_label_no_matches() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     executor.init().unwrap();
 
     // Create issue without the queried label
@@ -143,7 +142,7 @@ fn test_query_by_label_no_matches() {
 #[test]
 fn test_query_by_label_empty_repo() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     executor.init().unwrap();
 
     // Query with no issues
@@ -155,7 +154,7 @@ fn test_query_by_label_empty_repo() {
 #[test]
 fn test_query_by_label_wildcard_matches_all_in_namespace() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     executor.init().unwrap();
 
     // Create issues with multiple types
@@ -211,7 +210,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
 #[test]
 fn test_query_by_label_case_sensitive() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     executor.init().unwrap();
 
     // Create issue with specific case
@@ -246,7 +245,7 @@ fn test_query_by_label_at_prefixed_value_matches_whole() {
     // a widened-grammar `@`-prefixed value is compared whole, never re-split
     // further.
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     executor.init().unwrap();
 
     let (matching_id, _) = executor
@@ -284,7 +283,7 @@ fn test_query_by_label_at_prefixed_value_matches_whole() {
 #[test]
 fn test_query_by_label_invalid_pattern() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     executor.init().unwrap();
 
     // Invalid pattern (no colon)
@@ -299,7 +298,7 @@ fn test_query_by_label_invalid_pattern() {
 #[test]
 fn test_query_by_label_multiple_labels_per_issue() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
+    let executor = crate::memory_executor(storage);
     executor.init().unwrap();
 
     // Create issue with multiple labels
