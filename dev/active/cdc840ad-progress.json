@@ -223,8 +223,17 @@
       "status": "resolved",
       "opened_at": "2026-07-19T19:10:00+03:00",
       "resolved_at": "2026-07-19T19:15:00+03:00",
-      "situation": "44d318ab's issue text described live jit validate/--fix and project-render behavior, but plan §3/D16 assigns that consumer wiring to 49adf23b and acceptance evidence to b1621508; the worker also produced concrete blocker evidence (InMemoryStorage two-store split, missing validation-closure capture planner).",
+      "situation": "44d318ab's issue text described live jit validate/--fix and project-render behavior, but plan \u00a73/D16 assigns that consumer wiring to 49adf23b and acceptance evidence to b1621508; the worker also produced concrete blocker evidence (InMemoryStorage two-store split, missing validation-closure capture planner).",
       "resolution": "Invoker approved amending 44d318ab to the plan boundary (commit d2685611): this package owns the complete REQ-06 mechanism with unit/harness tests; the live-command sentences state the end state 49adf23b completes."
+    },
+    {
+      "category": "plan-invariant-vs-live-defect",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "resolved",
+      "opened_at": "2026-07-20T02:40:00+03:00",
+      "resolved_at": "2026-07-20T03:05:00+03:00",
+      "situation": "jit validate at HEAD failed on this repo: the no-follow document-closure capture rejected paths traversing the git-tracked .claude/skills -> ../.agents/skills symlink; a fix looked like it required changing the plan's no-follow capture invariant, blocking the re-init unification in increment 7 item (c).",
+      "resolution": "Invoker ruled .agents canonical and .claude user-local (symlink does not belong to git). Lead diagnosis: capture was correct; 25 document links on old done issues pointed through the symlink path. Lead repaired at 02c50c02 (links repointed to .agents/skills via jit doc remove/add, .claude/skills untracked, .claude/ gitignored). No capture-semantics change; no plan amendment; re-init unification unblocked."
     }
   ],
   "rework_counts": {
