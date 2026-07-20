@@ -240,6 +240,15 @@
       "resolved_at": "2026-07-20T03:05:00+03:00",
       "situation": "jit validate at HEAD failed on this repo: the no-follow document-closure capture rejected paths traversing the git-tracked .claude/skills -> ../.agents/skills symlink; a fix looked like it required changing the plan's no-follow capture invariant, blocking the re-init unification in increment 7 item (c).",
       "resolution": "Invoker ruled .agents canonical and .claude user-local (symlink does not belong to git). Lead diagnosis: capture was correct; 25 document links on old done issues pointed through the symlink path. Lead repaired at 02c50c02 (links repointed to .agents/skills via jit doc remove/add, .claude/skills untracked, .claude/ gitignored). No capture-semantics change; no plan amendment; re-init unification unblocked."
+    },
+    {
+      "category": "architectural-decision",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "resolved",
+      "opened_at": "2026-07-20T10:10:00+03:00",
+      "resolved_at": "2026-07-20T10:15:00+03:00",
+      "situation": "Increment 8 must delete the ambient resolve_plan_content fallback (no-dual-path constraint), but two production sites (main.rs:1883-1891, crates/server/src/main.rs:75-76) build executors with a best-effort layout and fall back when absent. Deleting the fallback makes a discoverable layout mandatory for validate/transition/rules paths.",
+      "resolution": "Invoker chose: layout mandatory, typed wiring error on absence; server constructs its layout from the repository mount at startup or fails there; no layout-less read-only mode survives. Lead evidence that @/charter/D-4 is preserved: WorktreePaths::detect_from falls back to the cwd as worktree root when there is no git repo, so requiring a layout does not require git. Recorded as binding ruling 16 in handoff-10."
     }
   ],
   "rework_counts": {
