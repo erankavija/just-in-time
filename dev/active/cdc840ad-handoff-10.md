@@ -47,6 +47,10 @@ Increment 8 is the whole remaining scope of `49adf23b`. Worker G's dispatch-read
 
 **Scope warning from worker G:** increment 8 is bigger than "~40 `save_issue` sites". Raw call-site counts (includes in-file `#[cfg(test)]` modules, so production is lower but still well above 40): `issue.rs` 47, `gate_check.rs` 32, `bulk_update.rs` 20, `snapshot.rs` 12, `gate.rs` 11, `archive.rs` 11, `dependency.rs` 8, `mod.rs` 5, `item.rs` 4, `validate.rs` 3. Budget 2+ workers; dispatch fresh per slice.
 
+**Recommended ordering (worker G): D → B → A → C → E.** The ruling A depends on is already made (ruling 16). **B and D are independent and can run in parallel by two workers.** D is cheap and dependency-free; C is strictly after B; E gates everything and runs last.
+
+**Correction to a lead hypothesis, load-bearing:** `InMemoryStorage` *can* supply a layout — worker G proved it in `d3619a13` by giving `TestHarness` a synthetic `RepositoryLayout::new(RepositoryRootEvidence::new(...), ...)` (both `pub`); the memory session accepts any valid layout and never touches those paths on disk. So "in-memory cannot supply a layout" is NOT a blocker for item A. The real blocker is fixture-shaped: an in-memory session captures the aggregate in-memory map, so plan docs written to the real filesystem under `storage.root().parent()` are invisible to it. Mechanical to fix.
+
 ## Binding lead rulings ledger (accumulated; do NOT relitigate)
 
 Rulings 1–9 from handoff-9 remain in force. Added this session:
@@ -67,6 +71,20 @@ Rulings 1–9 from handoff-9 remain in force. Added this session:
 - **Do trust a worker's own capacity read.** Both F and G self-assessed as near-exhausted and proposed bounded slices rather than starting large interdependent work; both reads were correct and both stood down with clean trees and precise residue lists. Workers C and D were lost mid-increment to the opposite pattern. Ask for a capacity read before dispatching a large increment onto a worker that just landed one.
 - **A commit message claiming N tests must actually add N tests.** `ddb574b0`'s message says "two tests"; only one new `fn` was added — the other was an existing test whose stale TRANSITIONAL comment was rewritten to final-behavior prose (legitimate, and the right sweep per the stale-text rule, but the message overstates it). Verify test claims against the diff, not the message.
 - **False LSP diagnostics recurred again** at every deletion/module-move commit (`E0277` bound cascades, `E0425`, `E0283`, module-not-found for legitimately deleted files). `cargo check`/`clippy` were clean at each. cargo remains the only arbiter.
+### Mechanism traps from increments 6–7, not in the issue inventory (worker G)
+
+These are concrete and will recur during the increment-8 sweep:
+
+1. **Use PER-METHOD `where S: RepositoryStateStore`, never an impl-level bound.** An impl-level bound over-constrains `IssueStore`-only siblings and breaks the three mock stores. Let cargo drive the cascade iteratively; it converges in ~6 rounds.
+2. **Expect non-obvious cascade edges.** Adding the bound to `remove_dependency` pulls in `apply_template_with`, because `commit_delta → remove_dependency → check_auto_transitions → apply_state_transition`. That is what forced `FaultyStore`/`StallingStore` to get delegating `RepositoryStateStore` impls (and `FaultyStore`'s generic bound widened). Expect more of these in item B.
+3. **The memory backend modeled NO directory entries** until `d3619a13`; the first in-memory session write under `issues/` failed with "missing target parent". Fixed by `memory.rs ensure_ancestor_dirs` — any increment-8 site newly writing a nested `Data(...)` path in-memory depends on that fix being present.
+4. **`declarations_from_image` REQUIRES `.jit/config.toml` in the image.** On first-time config creation the base has it absent, so declarations must be built from the config-OVERLAID image, not the base. This bit `set_config`.
+5. **Whole-repo proposal validation gates on PRE-EXISTING repo validity.** Re-init and `set_config` now refuse on a repo that already fails validation, so test fixtures must be genuinely valid. Expect fixture fallout wherever increment 8 adds proposal validation.
+6. **`jit init` bypasses the non-init startup `validate()` gate.** Unifying re-init therefore required explicitly re-adding the index format guard; without it the too-new-format test silently regresses from exit 10 to exit 1.
+7. **`JsonFileStorage::new(temp)` often makes the DATA root the temp dir ITSELF**, so a layout needs the worktree to be its PARENT — `discover_repository_layout` rejects equal roots. Several fixtures trip on this.
+8. **Pinned Git-unavailable evidence reasons must be control-free.** A multi-line git stderr produced invalid `PinnedDocumentEvidence`. Fixed, but the evidence contract rejects raw diagnostics generally.
+9. **Stale FIXTURE data bites like stale live data.** `scratch_build` checks out an ANCESTOR commit, so the `.claude` repair at HEAD did not reach it. Any increment-8 work touching old-commit checkouts should assume pre-repair data.
+
 - Prior traps remain in force (handoff-9 §Traps and its chain), especially: no generic bytes-in-delta helper in `repository_state`; validate init/profile proposals by overlaying the FINALIZED delta, never the desired-files set; every written file needs explicit `CreateDirectory` ancestors; ONE `MutationContext` created before the retry loop (init/profile finalize twice per attempt, retry 8×); provenance-matched install from the clean worktree before gates; sequential gate evaluates with explicit cwd; no `/tmp` builds; `CARGO_INCREMENTAL=0` and clear `target/*/incremental` before cargo-ci; claim/serve suites need repo-lock writes + loopback outside the restricted sandbox.
 
 ## Open questions needing invoker input
