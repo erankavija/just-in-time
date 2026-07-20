@@ -1,4 +1,4 @@
-use crate::domain::{Event, ProfileOrigin};
+use crate::domain::ProfileOrigin;
 use crate::profile::ProfileManifest;
 use crate::repository_state::FileMode;
 use schemars::JsonSchema;
@@ -175,63 +175,9 @@ pub struct ProfilePlanResult {
     pub targets: Vec<ProfileTargetChange>,
 }
 
-/// Construct the exact next append-only event-log image.
-///
-/// Every prefix byte is retained. A non-empty prefix lacking a trailing
-/// newline receives exactly one separator before the serialized event.
-pub fn append_profile_event_image(
-    prefix: &[u8],
-    event: &Event,
-) -> Result<Vec<u8>, serde_json::Error> {
-    let event_bytes = serde_json::to_vec(event)?;
-    let separator = usize::from(!prefix.is_empty() && !prefix.ends_with(b"\n"));
-    let mut image = Vec::with_capacity(prefix.len() + separator + event_bytes.len() + 1);
-    image.extend_from_slice(prefix);
-    if separator == 1 {
-        image.push(b'\n');
-    }
-    image.extend_from_slice(&event_bytes);
-    image.push(b'\n');
-    Ok(image)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::Event;
-
-    fn event() -> Event {
-        Event::new_profile_applied(
-            "example".to_string(),
-            "1.0.0".to_string(),
-            ProfileOrigin::Embedded,
-            "package".to_string(),
-            BTreeMap::from([("docs/example.md".to_string(), "target".to_string())]),
-            false,
-        )
-    }
-
-    #[test]
-    fn test_event_image_preserves_empty_newline_torn_and_multiple_prefixes() {
-        let event = event();
-        let serialized = serde_json::to_vec(&event).unwrap();
-        for (prefix, separator) in [
-            (b"".as_slice(), b"".as_slice()),
-            (b"{\"old\":1}\n".as_slice(), b"".as_slice()),
-            (b"{\"torn\":".as_slice(), b"\n".as_slice()),
-            (
-                b"{\"first\":1}\n{\"second\":2}\n".as_slice(),
-                b"".as_slice(),
-            ),
-        ] {
-            let image = append_profile_event_image(prefix, &event).unwrap();
-            let mut expected = prefix.to_vec();
-            expected.extend_from_slice(separator);
-            expected.extend_from_slice(&serialized);
-            expected.push(b'\n');
-            assert_eq!(image, expected);
-        }
-    }
 
     #[test]
     fn test_installed_record_is_minimal_stable_json() {

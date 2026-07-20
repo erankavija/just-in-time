@@ -12,9 +12,9 @@ mod package;
 
 pub use crate::domain::ProfileOrigin;
 pub use application::{
-    append_profile_event_image, AppliedProfileRecord, ProfileApplicationStatus,
-    ProfileApplicationWarning, ProfileApplyResult, ProfileListResult, ProfilePlanResult,
-    ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    AppliedProfileRecord, ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
+    ProfileListResult, ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary,
+    ProfileTargetAction, ProfileTargetChange,
 };
 pub use apply_claims::{build_profile_claims, ProfileClaimError};
 pub use dogfood::{

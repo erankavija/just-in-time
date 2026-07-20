@@ -1,10 +1,8 @@
 use super::CommandExecutor;
 use crate::config::{slugify_project_name, JitConfig, ProjectName};
-use crate::domain::Event;
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
-    append_profile_event_image, build_profile_claims, EmbeddedProfilePackage,
-    ProfileApplicationStatus, ProfileApplyResult, ProfileOrigin,
+    build_profile_claims, EmbeddedProfilePackage, ProfileApplicationStatus, ProfileApplyResult,
 };
 use crate::repository_state::{
     apply_overlay, derive_profile_materializations, finalize_initialization, GitattributesClaim,
@@ -76,6 +74,9 @@ impl CommandExecutor<JsonFileStorage> {
         // Typed Git evidence is acquired once at the boundary (loop-invariant).
         let gitattributes = gitattributes_claim(&layout);
         let mut session = self.storage().open_mutation_session(layout)?;
+        // One MutationContext per operation, reused across probe/final finalize and
+        // every retry so a composed ProfileApplied event's id/timestamp stay stable.
+        let context = crate::repository_state::MutationContext::production();
         for _ in 0..8 {
             let (config, project_name) =
                 self.resolve_init_config(session.as_mut(), repo_dir, template)?;
@@ -113,8 +114,9 @@ impl CommandExecutor<JsonFileStorage> {
                 None => continue,
                 Some(base) => base,
             };
-            let delta_overlay =
-                super::validation_overlay(finalize_initialization(&probe, &scaffold)?.delta());
+            let delta_overlay = super::validation_overlay(
+                finalize_initialization(&probe, &scaffold, &context)?.delta(),
+            );
 
             // Re-capture the base with the exact write set so the validation closure
             // and the delta's preimages come from one coherent image, then finalize,
@@ -124,7 +126,7 @@ impl CommandExecutor<JsonFileStorage> {
                     None => continue,
                     Some(base) => base,
                 };
-            let plan = finalize_initialization(&base, &scaffold)?;
+            let plan = finalize_initialization(&base, &scaffold, &context)?;
             let proposed = apply_overlay(&base, delta_overlay)?;
             let validation = crate::validation::repository::validate_repository(&proposed)?;
             if validation.rule_report.has_errors() {
@@ -291,36 +293,19 @@ impl CommandExecutor<JsonFileStorage> {
         }
         let profile_changed = !all_unchanged || !record_matches;
 
-        let prior_events = neutral_base
-            .file_bytes(&events_path)?
-            .map(<[u8]>::to_vec)
-            .unwrap_or_default();
-        let events = if profile_changed {
-            let isolated_torn_tail =
-                super::profile::has_malformed_unterminated_event_tail(&prior_events);
-            let event = Event::new_profile_applied(
-                metadata.id.clone(),
-                metadata.version.clone(),
-                ProfileOrigin::Embedded,
-                package.hashes().package.clone(),
-                package.hashes().targets.clone(),
-                isolated_torn_tail,
-            );
-            append_profile_event_image(&prior_events, &event)?
-        } else {
-            prior_events
-        };
-
+        // The finalizer composes the ProfileApplied audit append from the captured
+        // events prefix (owning its id, timestamp, and torn-tail evidence); the
+        // command only signals whether the profile changed.
         let contribution = ProfileContribution {
             id: metadata.id.clone(),
             version: metadata.version.clone(),
             package_hash: package.hashes().package.clone(),
+            target_hashes: package.hashes().targets.clone(),
             targets,
             record_path,
             record_bytes: record.to_bytes()?,
             record_changed: !record_matches,
-            events_bytes: events,
-            events_changed: profile_changed,
+            emit_event: profile_changed,
             ensure_profiles_dir,
         };
         let apply_result = ProfileApplyResult {

@@ -45,9 +45,10 @@ pub use materialize::{
     assemble_config, render_capture_closure, validate_capture_closure, ValidationCaptureClosure,
 };
 pub use mutation::{
-    finalize, fresh_index_bytes, issue_draft, prefix_has_torn_tail, serialize_event,
-    serialize_gate_run, serialize_issue, FixedMutationClock, IdAuthority, MutationClock,
-    MutationContext, MutationError, MutationIntent, SystemMutationClock,
+    finalize, finalize_audit_append, fresh_index_bytes, issue_draft, prefix_has_torn_tail,
+    profile_applied_event, serialize_event, serialize_gate_run, serialize_issue,
+    FixedMutationClock, IdAuthority, MutationClock, MutationContext, MutationError, MutationIntent,
+    SystemMutationClock,
 };
 pub use overlay::{apply_overlay, OverlayError};
 pub use path::{

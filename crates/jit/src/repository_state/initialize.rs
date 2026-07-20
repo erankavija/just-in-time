@@ -12,15 +12,16 @@
 //! The profile's asset/region/registry bytes arrive as a [`ProfileContribution`]
 //! the command derives through
 //! [`derive_profile_materializations`](super::derive_profile_materializations); the
-//! `ProfileApplied` audit line still arrives as command-computed bytes (its
-//! finalizer-routed replacement is scheduled for a later increment). Both flow
-//! through `session.apply` here.
+//! `ProfileApplied` audit line is composed here by the finalizer from the captured
+//! `events.jsonl` prefix (id/timestamp/torn-tail owned by the mutation finalizer,
+//! never command code). Every byte flows through `session.apply` here.
 
 use std::collections::BTreeMap;
 
 use crate::config::{JitConfig, ProjectName};
 use crate::config_manager::namespaces_from_config;
 use crate::declarations::{serialize_gate_registry, GateRegistry};
+use crate::domain::ProfileOrigin;
 
 use super::default_rules::default_ruleset;
 use super::image::{
@@ -28,7 +29,9 @@ use super::image::{
     RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositorySeed,
     RepositorySeedKind, SeedError,
 };
-use super::mutation::fresh_index_bytes;
+use super::mutation::{
+    finalize_audit_append, fresh_index_bytes, profile_applied_event, MutationContext, MutationError,
+};
 use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
 use super::rule_serialize::serialize_ruleset;
 use super::MaterializationPlan;
@@ -56,8 +59,8 @@ pub fn render_repo_config(base_config_toml: &str, project_name: &ProjectName) ->
 
 /// One profile asset target carried into the init/profile delta.
 ///
-/// The bytes originate from the command's profile planner (increment-6 deletion
-/// target); this type simply carries them to the producer as a canonical claim.
+/// The bytes come from the command's `derive_profile_materializations`; this type
+/// carries them to the producer as a canonical claim.
 #[derive(Debug, Clone)]
 pub struct ProfileTargetContribution {
     /// Canonical target path.
@@ -77,18 +80,21 @@ pub struct ProfileContribution {
     pub version: String,
     /// Exact package identity.
     pub package_hash: String,
-    /// Non-noop asset targets (the command's planner pre-filters unchanged ones).
+    /// Non-noop asset targets (the command's derivation pre-filters unchanged ones).
     pub targets: Vec<ProfileTargetContribution>,
+    /// Package contribution hashes keyed by repository target, for the audit event.
+    pub target_hashes: BTreeMap<String, String>,
     /// Canonical applied-provenance record path (`.jit/profiles/<id>.json`).
     pub record_path: VirtualPath,
     /// Exact provenance record bytes.
     pub record_bytes: Vec<u8>,
     /// Whether the captured provenance record differs from `record_bytes`.
     pub record_changed: bool,
-    /// Exact audit-log bytes (captured prefix plus the appended `ProfileApplied`).
-    pub events_bytes: Vec<u8>,
-    /// Whether the audit log changed from its captured prefix.
-    pub events_changed: bool,
+    /// Whether the application appends a `ProfileApplied` audit event (the profile
+    /// changed). The finalizer composes the event from the captured `events.jsonl`
+    /// prefix, assigning its id/timestamp and torn-tail evidence — command code no
+    /// longer computes audit-log bytes.
+    pub emit_event: bool,
     /// Whether the `.jit/profiles` directory must be created.
     pub ensure_profiles_dir: bool,
 }
@@ -121,10 +127,9 @@ impl ProfileContribution {
             .iter()
             .map(|target| (target.path.clone(), Some(target.bytes.clone())))
             .collect();
-        overrides.insert(
-            VirtualPath::data("events.jsonl")?,
-            Some(self.events_bytes.clone()),
-        );
+        // The audit-log bytes are composed by the finalizer, not the command, so
+        // they are not a proposed override here; the finalized delta's own
+        // `events.jsonl` action carries them into the validation overlay.
         if self.record_changed {
             overrides.insert(self.record_path.clone(), Some(self.record_bytes.clone()));
         }
@@ -190,6 +195,9 @@ pub enum InitializationError {
     /// The complete semantic plan could not be hashed.
     #[error(transparent)]
     PlanHash(#[from] PlanHashError),
+    /// The finalizer could not compose the audit-log append.
+    #[error(transparent)]
+    Mutation(#[from] MutationError),
     /// A scaffold path is occupied by an unexpected filesystem kind.
     #[error("initialization target '{path}' is occupied by an unsupported filesystem kind")]
     UnexpectedOccupant {
@@ -204,11 +212,9 @@ enum WritePolicy {
     /// Write only when the base captured the path as absent (preserve authored
     /// content; fill missing scaffold state).
     IfAbsent,
-    /// Always write (repair-owned generated content; profile assets the planner
-    /// already proved changed).
+    /// Always write (repair-owned generated content; profile assets the
+    /// derivation already proved changed).
     Always,
-    /// Write only when the captured bytes differ from the desired bytes.
-    IfChanged,
 }
 
 /// One desired file target with its write policy and ownership.
@@ -386,19 +392,9 @@ impl InitializationScaffold {
                 owner: SCAFFOLD_OWNER,
             });
         }
-        // The audit log is created empty for a plain init and carries the profile
-        // event image for a profiled init; write it whenever it differs from the
-        // captured prefix (absent for fresh init).
-        files.push(DesiredFile {
-            path: VirtualPath::data("events.jsonl")?,
-            bytes: self
-                .profile
-                .as_ref()
-                .map_or_else(Vec::new, |profile| profile.events_bytes.clone()),
-            mode: FileMode::Regular,
-            policy: WritePolicy::IfChanged,
-            owner: SCAFFOLD_OWNER,
-        });
+        // The audit log is not a neutral scaffold file: the finalizer composes it
+        // (an empty log for a plain init, a `ProfileApplied` append for a profiled
+        // one) from the captured prefix. See `finalize_initialization`.
         if let Some(profile) = &self.profile {
             files.extend(profile_asset_files(profile));
         }
@@ -422,6 +418,9 @@ impl InitializationScaffold {
             .into_iter()
             .map(|file| file.path)
             .collect();
+        // The finalizer composes `events.jsonl` from the captured prefix, so its
+        // path must be captured for the prior bytes and the action preimage.
+        paths.push(VirtualPath::data("events.jsonl")?);
         if let Some(profile) = &self.profile {
             paths.push(profile.record_path.clone());
         }
@@ -471,17 +470,23 @@ impl InitializationScaffold {
 /// Every action's expected preimage is derived from the captured base, so
 /// `session.apply` revalidates against exactly what was captured. Neutral scaffold
 /// files fill missing state (authored content preserved), generated schemas are
-/// rewritten, the audit log and profile provenance write when they change, and
-/// profile assets write unconditionally (the planner proved them changed). An
-/// empty delta (nothing to publish) is a complete no-op.
+/// rewritten, profile provenance writes when it changes, and profile assets write
+/// unconditionally (the derivation proved them changed). The audit log is composed
+/// by the finalizer (`context`): a plain init creates it empty, a profiled init
+/// appends one `ProfileApplied` record. An empty delta (nothing to publish) is a
+/// complete no-op.
 pub fn finalize_initialization(
     base: &RepositoryImage,
     scaffold: &InitializationScaffold,
+    context: &MutationContext,
 ) -> Result<MaterializationPlan, InitializationError> {
     let mut actions = Vec::new();
     push_file_actions(base, &scaffold.desired_files()?, &mut actions)?;
     if let Some(profile) = &scaffold.profile {
         push_record_action(base, profile, &mut actions)?;
+    }
+    if let Some(action) = events_action(base, scaffold.profile.as_ref(), context)? {
+        actions.push(action);
     }
     push_gitattributes_action(base, scaffold, &mut actions)?;
     let mut all = directory_actions(base, &actions, &scaffold.explicit_dirs()?)?;
@@ -494,6 +499,46 @@ pub fn finalize_initialization(
         &MaterializationIntent::InitializeRepository,
         delta,
     )?)
+}
+
+/// Compose the `events.jsonl` action for an init/profile delta.
+///
+/// A profile whose application emits an event appends one `ProfileApplied` record
+/// through the finalizer — [`finalize_audit_append`] assigns its id/timestamp and
+/// torn-tail evidence over the captured prefix, so command code never computes
+/// audit-log bytes. Otherwise the log is created empty when absent (fresh init) and
+/// left untouched when already present.
+fn events_action(
+    base: &RepositoryImage,
+    profile: Option<&ProfileContribution>,
+    context: &MutationContext,
+) -> Result<Option<RepositoryAction>, InitializationError> {
+    if let Some(profile) = profile {
+        if profile.emit_event {
+            let event = profile_applied_event(
+                profile.id.clone(),
+                profile.version.clone(),
+                ProfileOrigin::Embedded,
+                profile.package_hash.clone(),
+                profile.target_hashes.clone(),
+            );
+            return Ok(finalize_audit_append(base, context, vec![(2, event)])?);
+        }
+    }
+    let path = VirtualPath::data("events.jsonl")?;
+    match base.entry(&path)? {
+        RepositoryEntry::Absent => Ok(Some(RepositoryAction::WriteFile {
+            path,
+            owner: SCAFFOLD_OWNER.to_string(),
+            expected: ExpectedPreimage::Absent,
+            bytes: Vec::new(),
+            mode: FileMode::Regular,
+        })),
+        RepositoryEntry::File { .. } => Ok(None),
+        _ => Err(InitializationError::UnexpectedOccupant {
+            path: format!("{path:?}"),
+        }),
+    }
 }
 
 /// Emit the worktree `.gitattributes` write when the claim is eligible and the
@@ -569,18 +614,15 @@ fn resolve_gitattributes(
 pub fn finalize_profile_application(
     base: &RepositoryImage,
     profile: &ProfileContribution,
+    context: &MutationContext,
 ) -> Result<MaterializationPlan, InitializationError> {
-    let mut files = profile_asset_files(profile);
-    files.push(DesiredFile {
-        path: VirtualPath::data("events.jsonl")?,
-        bytes: profile.events_bytes.clone(),
-        mode: FileMode::Regular,
-        policy: WritePolicy::IfChanged,
-        owner: PROFILE_OWNER,
-    });
+    let files = profile_asset_files(profile);
     let mut actions = Vec::new();
     push_file_actions(base, &files, &mut actions)?;
     push_record_action(base, profile, &mut actions)?;
+    if let Some(action) = events_action(base, Some(profile), context)? {
+        actions.push(action);
+    }
     let explicit = if profile.ensure_profiles_dir {
         vec![VirtualPath::data("profiles")?]
     } else {
@@ -746,7 +788,6 @@ fn push_file_actions(
         let write = match file.policy {
             WritePolicy::IfAbsent => matches!(entry, RepositoryEntry::Absent),
             WritePolicy::Always => true,
-            WritePolicy::IfChanged => !file_matches(entry, &file.bytes, file.mode),
         };
         if write {
             actions.push(RepositoryAction::WriteFile {
@@ -759,18 +800,6 @@ fn push_file_actions(
         }
     }
     Ok(())
-}
-
-/// Whether a captured entry is a file already holding exactly `bytes` and `mode`.
-fn file_matches(entry: &RepositoryEntry, bytes: &[u8], mode: FileMode) -> bool {
-    matches!(
-        entry,
-        RepositoryEntry::File {
-            bytes: captured,
-            mode: captured_mode,
-            ..
-        } if captured.as_slice() == bytes && *captured_mode == mode
-    )
 }
 
 #[cfg(test)]

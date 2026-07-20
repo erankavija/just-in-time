@@ -693,60 +693,8 @@ pub fn finalize(
 
     // Pass 4: order events canonically, assign their identifiers last, stamp the
     // single mutation timestamp, and compose the exact audit append.
-    if !pending_events.is_empty() {
-        let path = events_path()?;
-        let prefix = captured_file_bytes(image, &path)?.unwrap_or(&[]).to_vec();
-        // The finalizer owns torn-tail evidence. The reader (parse_known_events)
-        // accepts a malformed, unterminated partial line only when the line
-        // IMMEDIATELY following it is a `ProfileApplied { isolated_torn_tail: true }`
-        // certifier. Detect this before sampling time or allocating identifiers.
-        let torn_tail = prefix_has_torn_tail(&prefix);
-        let has_marker = pending_events
-            .iter()
-            .any(|pending| matches!(pending.event, Event::ProfileApplied { .. }));
-        if torn_tail && !has_marker {
-            // Appending non-certifying events after an uncertified torn tail would
-            // produce a log the reader rejects; refuse instead of corrupting it.
-            return Err(MutationError::UncertifiedTornTail);
-        }
-
-        let now = context.timestamp();
-        // Assign identifiers in canonical event order (the frozen last phase),
-        // stamping the single mutation timestamp and the torn-tail evidence.
-        pending_events.sort_by(|left, right| left.sort_key().cmp(&right.sort_key()));
-        for pending in &mut pending_events {
-            let id = context.allocate();
-            pending.event.assign_identity(id, now);
-            if let Event::ProfileApplied {
-                isolated_torn_tail, ..
-            } = &mut pending.event
-            {
-                *isolated_torn_tail = torn_tail;
-            }
-        }
-        // Over a torn tail, the certifying marker must be composed as the line
-        // immediately following the torn partial; the remaining events keep their
-        // canonical order after it.
-        if torn_tail {
-            let marker = pending_events
-                .iter()
-                .position(|pending| matches!(pending.event, Event::ProfileApplied { .. }))
-                .expect("a markerless torn tail was already rejected");
-            let certifier = pending_events.remove(marker);
-            pending_events.insert(0, certifier);
-        }
-        let lines = pending_events
-            .iter()
-            .map(|pending| serialize_event(&pending.event))
-            .collect::<Result<Vec<_>, _>>()?;
-        let bytes = compose_events(&prefix, &lines);
-        actions.push(RepositoryAction::WriteFile {
-            path: path.clone(),
-            owner: OWNER.to_string(),
-            expected: expected_of(image, &path)?,
-            bytes,
-            mode: FileMode::Regular,
-        });
+    if let Some(action) = compose_event_action(image, context, pending_events)? {
+        actions.push(action);
     }
 
     // Index membership: creations extend `all_ids` and clear any `deleted_ids`
@@ -764,6 +712,142 @@ pub fn finalize(
         delta,
     )
     .map_err(Into::into)
+}
+
+/// Compose the audit-log append action for a set of pending events over the
+/// captured `events.jsonl` prefix: order them canonically, assign identifiers (via
+/// the context, in the caller's frozen allocation order), stamp the single mutation
+/// timestamp, certify a torn tail (a `ProfileApplied` marker is required, and the
+/// certifier is composed immediately after the torn partial), and produce the exact
+/// bytes. Returns `None` when there are no events. This is the event pass of
+/// [`finalize`], factored out so [`finalize_audit_append`] can reuse the one
+/// torn-tail authority.
+fn compose_event_action(
+    image: &RepositoryImage,
+    context: &MutationContext,
+    mut pending_events: Vec<PendingEvent>,
+) -> Result<Option<RepositoryAction>, MutationError> {
+    if pending_events.is_empty() {
+        return Ok(None);
+    }
+    let path = events_path()?;
+    let prefix = captured_file_bytes(image, &path)?.unwrap_or(&[]).to_vec();
+    // The finalizer owns torn-tail evidence. The reader (parse_known_events) accepts
+    // a malformed, unterminated partial line only when the line IMMEDIATELY following
+    // it is a `ProfileApplied { isolated_torn_tail: true }` certifier. Detect this
+    // before sampling time or allocating identifiers.
+    let torn_tail = prefix_has_torn_tail(&prefix);
+    let has_marker = pending_events
+        .iter()
+        .any(|pending| matches!(pending.event, Event::ProfileApplied { .. }));
+    if torn_tail && !has_marker {
+        // Appending non-certifying events after an uncertified torn tail would
+        // produce a log the reader rejects; refuse instead of corrupting it.
+        return Err(MutationError::UncertifiedTornTail);
+    }
+
+    let now = context.timestamp();
+    // Assign identifiers in canonical event order, stamping the single mutation
+    // timestamp and the torn-tail evidence.
+    pending_events.sort_by(|left, right| left.sort_key().cmp(&right.sort_key()));
+    for pending in &mut pending_events {
+        let id = context.allocate();
+        pending.event.assign_identity(id, now);
+        if let Event::ProfileApplied {
+            isolated_torn_tail, ..
+        } = &mut pending.event
+        {
+            *isolated_torn_tail = torn_tail;
+        }
+    }
+    // Over a torn tail, the certifying marker must be composed as the line
+    // immediately following the torn partial; the remaining events keep their
+    // canonical order after it.
+    if torn_tail {
+        let marker = pending_events
+            .iter()
+            .position(|pending| matches!(pending.event, Event::ProfileApplied { .. }))
+            .expect("a markerless torn tail was already rejected");
+        let certifier = pending_events.remove(marker);
+        pending_events.insert(0, certifier);
+    }
+    let lines = pending_events
+        .iter()
+        .map(|pending| serialize_event(&pending.event))
+        .collect::<Result<Vec<_>, _>>()?;
+    let bytes = compose_events(&prefix, &lines);
+    Ok(Some(RepositoryAction::WriteFile {
+        path: path.clone(),
+        owner: OWNER.to_string(),
+        expected: expected_of(image, &path)?,
+        bytes,
+        mode: FileMode::Regular,
+    }))
+}
+
+/// Compose the exact `events.jsonl` append action for repository-owned provenance
+/// events emitted by a delta the record finalizer does not otherwise build — the
+/// init/profile finalizers, whose deltas also carry asset/registry/record file
+/// actions. Each `(phase, event)` pair is an inline event variant carrying a
+/// sentinel id/timestamp; this resets the context's frozen allocation order, then
+/// assigns identifiers and the single mutation timestamp and certifies a torn tail
+/// exactly as [`finalize`] does — so a `ProfileApplied` line is the authoritative
+/// audit record, never a command-computed image. Returns `None` when `events` is
+/// empty (no append, no identity or time sampling).
+///
+/// The context must be the operation's single reused [`MutationContext`] and must
+/// not also drive a full [`finalize`] in the same operation (both reset the frozen
+/// order); the init/profile paths use only this entry.
+/// Build the inline `ProfileApplied` audit event for the finalizer path: a bare
+/// variant with an empty id and the sentinel timestamp that [`finalize_audit_append`]
+/// overwrites via [`Event::assign_identity`], and a `false` torn-tail flag the
+/// finalizer sets from the captured prefix. Unlike `Event::new_profile_applied` it
+/// samples neither a UUID nor the wall clock, so the finalizer — not command code —
+/// owns the event's identity, time, and torn-tail evidence.
+pub fn profile_applied_event(
+    profile_id: String,
+    version: String,
+    origin: crate::domain::ProfileOrigin,
+    package_hash: String,
+    target_hashes: BTreeMap<String, String>,
+) -> Event {
+    Event::ProfileApplied {
+        id: String::new(),
+        timestamp: sentinel_time(),
+        profile_id,
+        version,
+        origin,
+        package_hash,
+        target_hashes,
+        isolated_torn_tail: false,
+    }
+}
+
+pub fn finalize_audit_append(
+    image: &RepositoryImage,
+    context: &MutationContext,
+    events: Vec<(u8, Event)>,
+) -> Result<Option<RepositoryAction>, MutationError> {
+    if events.is_empty() {
+        return Ok(None);
+    }
+    context.begin();
+    let pending = events
+        .into_iter()
+        .enumerate()
+        .map(|(ordinal, (phase, event))| {
+            let (primary, secondary) = event_identities(&event);
+            PendingEvent {
+                phase,
+                tag: event.get_type().to_string(),
+                primary,
+                secondary,
+                ordinal,
+                event,
+            }
+        })
+        .collect();
+    compose_event_action(image, context, pending)
 }
 
 /// Build the write action for an issue, using the captured preimage so a create

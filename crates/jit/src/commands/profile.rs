@@ -1,15 +1,14 @@
 use super::CommandExecutor;
-use crate::domain::Event;
 use crate::profile::{
-    append_profile_event_image, build_profile_claims, jit_dogfood_package, AppliedProfileRecord,
-    EmbeddedProfilePackage, ProfileApplicationStatus, ProfileApplyResult, ProfileListResult,
-    ProfileOrigin, ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary,
-    ProfileTargetAction, ProfileTargetChange,
+    build_profile_claims, jit_dogfood_package, AppliedProfileRecord, EmbeddedProfilePackage,
+    ProfileApplicationStatus, ProfileApplyResult, ProfileListResult, ProfileOrigin,
+    ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction,
+    ProfileTargetChange,
 };
 use crate::repository_state::{
     apply_overlay, derive_profile_materializations, finalize_profile_application, CaptureBudget,
-    CaptureSpec, FileMode, ProfileContribution, ProfileTargetContribution, RepositoryEntry,
-    RepositoryImage, RepositoryRootClass, RootRelativePath, VirtualPath,
+    CaptureSpec, FileMode, MutationContext, ProfileContribution, ProfileTargetContribution,
+    RepositoryEntry, RepositoryImage, RepositoryRootClass, RootRelativePath, VirtualPath,
 };
 use crate::storage::{
     JsonFileStorage, RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
@@ -154,6 +153,9 @@ impl CommandExecutor<JsonFileStorage> {
         let metadata = &package.manifest().profile;
         let layout = self.require_layout()?;
         let mut session = self.storage().open_mutation_session(layout)?;
+        // One MutationContext per operation, reused across probe/final finalize and
+        // every retry so the appended ProfileApplied event's id/timestamp stay stable.
+        let context = MutationContext::production();
         for _ in 0..8 {
             let Some(prepared) = self.prepare_embedded_profile(session.as_mut(), package)? else {
                 continue;
@@ -184,7 +186,7 @@ impl CommandExecutor<JsonFileStorage> {
                 Some(base) => base,
             };
             let delta_overlay = super::validation_overlay(
-                finalize_profile_application(&probe, contribution)?.delta(),
+                finalize_profile_application(&probe, contribution, &context)?.delta(),
             );
 
             let base =
@@ -192,7 +194,7 @@ impl CommandExecutor<JsonFileStorage> {
                     None => continue,
                     Some(base) => base,
                 };
-            let plan = finalize_profile_application(&base, contribution)?;
+            let plan = finalize_profile_application(&base, contribution, &context)?;
             let proposed = apply_overlay(&base, delta_overlay).map_err(anyhow::Error::from)?;
             let validation = crate::validation::repository::validate_repository(&proposed)
                 .map_err(ProfileApplyError::from)?;
@@ -283,35 +285,19 @@ impl CommandExecutor<JsonFileStorage> {
         let is_no_op = all_unchanged && record_matches;
         let profile_changed = !is_no_op;
 
-        let prior_events = base
-            .file_bytes(&events_path)?
-            .map(<[u8]>::to_vec)
-            .unwrap_or_default();
-        let events_bytes = if profile_changed {
-            let isolated_torn_tail = has_malformed_unterminated_event_tail(&prior_events);
-            let event = Event::new_profile_applied(
-                metadata.id.clone(),
-                metadata.version.clone(),
-                ProfileOrigin::Embedded,
-                package.hashes().package.clone(),
-                package.hashes().targets.clone(),
-                isolated_torn_tail,
-            );
-            append_profile_event_image(&prior_events, &event)?
-        } else {
-            prior_events
-        };
-
+        // The finalizer composes the ProfileApplied audit append from the captured
+        // events prefix (owning its id, timestamp, and torn-tail evidence); the
+        // command only signals whether the profile changed.
         let contribution = ProfileContribution {
             id: metadata.id.clone(),
             version: metadata.version.clone(),
             package_hash: package.hashes().package.clone(),
+            target_hashes: package.hashes().targets.clone(),
             targets,
             record_path,
             record_bytes: record.to_bytes()?,
             record_changed: !record_matches,
-            events_bytes,
-            events_changed: profile_changed,
+            emit_event: profile_changed,
             ensure_profiles_dir,
         };
         Ok(Some(PreparedProfileApplication {
@@ -493,17 +479,6 @@ pub(super) fn profile_dir_needs_creation(
     }
 }
 
-pub(super) fn has_malformed_unterminated_event_tail(events: &[u8]) -> bool {
-    if events.is_empty() || events.ends_with(b"\n") {
-        return false;
-    }
-    let final_line = events
-        .rsplit(|byte| *byte == b'\n')
-        .next()
-        .unwrap_or(events);
-    serde_json::from_slice::<serde_json::Value>(final_line).is_err()
-}
-
 pub(super) fn reject_reserved_application_targets<'a>(
     targets: impl IntoIterator<Item = &'a str>,
 ) -> Result<()> {
@@ -527,6 +502,7 @@ pub(super) fn reject_reserved_application_targets<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::Event;
     use crate::hierarchy_templates::HierarchyTemplate;
     use crate::storage::{discover_repository_layout, IssueStore};
     use include_dir::{include_dir, Dir};
