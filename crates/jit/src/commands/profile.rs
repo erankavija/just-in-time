@@ -513,7 +513,7 @@ mod tests {
     static PACKAGE: Dir<'_> =
         include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only");
 
-    /// A file-backed executor over an initialized, config-seeded repository carrying
+    /// A file-backed executor over a canonically initialized repository carrying
     /// its canonical layout.
     fn fixture() -> (
         TempDir,
@@ -523,15 +523,13 @@ mod tests {
     ) {
         let temp = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        storage.init().unwrap();
+        let initializer = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+        initializer
+            .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
-        executor
-            .seed_project_config(
-                temp.path(),
-                &HierarchyTemplate::default().generate_config_toml(),
-            )
-            .unwrap();
         let package = EmbeddedProfilePackage::from_dir(&PACKAGE).unwrap();
         (temp, storage, executor, package)
     }

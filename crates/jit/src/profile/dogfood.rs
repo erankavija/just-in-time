@@ -506,18 +506,17 @@ mod tests {
     fn test_profile_applies_to_neutral_repo_and_ordinary_renderers_consume_config() {
         let temp = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        storage.init().unwrap();
         let layout =
             crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
-        executor
-            .seed_project_config(
-                temp.path(),
-                &HierarchyTemplate::default().generate_config_toml(),
-            )
+        let initializer = CommandExecutor::new(storage.clone()).with_layout(layout);
+        initializer
+            .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
             .unwrap();
         fs::write(temp.path().join("AGENTS.md"), b"# Existing guidance\n").unwrap();
 
+        let layout =
+            crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
+        let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
         let package = jit_dogfood_package().unwrap();
         let applied = executor.apply_embedded_profile(&package).unwrap();
         assert_eq!(

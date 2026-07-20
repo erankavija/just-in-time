@@ -4,10 +4,9 @@
 //! resolution (repo vs user-global), key parsing, per-type value dispatch, and
 //! typed validation of the incoming value (notably `project.name` through
 //! [`ProjectName`], REQ-03 of the multi-jit story: an invalid identity must
-//! never reach the file). ALL config-file IO — reading the TOML document and
-//! the atomic write — is delegated to [`crate::storage::config_store`], so no
-//! persistence lives in this command module (the layer boundary in AGENTS.md
-//! "Separation of Concerns").
+//! never reach the file). User-global config IO is delegated to the explicit
+//! [`crate::storage::user_config_store`] control plane; repository config edits
+//! publish through the recovered repository-state session.
 //!
 //! `jit config get` (see [`CommandExecutor::get_config`]): a dotted-key
 //! accessor covering the WHOLE configuration surface (jit:043ae624), built by
@@ -22,8 +21,10 @@
 use super::*;
 use crate::config::{EffectiveConfig, ProjectName};
 use crate::errors::InvalidArgumentError;
-use crate::storage::config_store;
-use std::path::{Path, PathBuf};
+use crate::storage::user_config_store::{
+    read_user_config_document, save_user_config_document, UserConfigRoot,
+};
+use std::path::PathBuf;
 
 /// Result of a `jit config set` write, carrying what the CLI needs to print.
 ///
@@ -229,10 +230,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Set a `section.field` key in the repo (or, with `global`, the user-global)
     /// `config.toml`, returning what the CLI needs to print.
     ///
-    /// Resolves the target file, reads the existing TOML document (or starts an
-    /// empty one) and writes it back through [`crate::storage::config_store`] —
-    /// this command owns no file IO. `value` is parsed into the expected type for
-    /// the key BEFORE the write: `project.name` is validated through
+    /// Resolves the target file and edits a formatting-preserving TOML document.
+    /// User-global writes use the capability-confined user-config store;
+    /// repository writes publish through the recovered mutation session. `value`
+    /// is parsed into the expected type BEFORE the write: `project.name` is validated through
     /// [`ProjectName`] so an invalid identity is rejected and the file is left
     /// untouched (REQ-03). Numeric (`*_secs`/`*_pct`/`max_*`) and boolean
     /// (`enable_*`/`require_*`/`auto_*`) keys are parsed into their TOML types;
@@ -246,10 +247,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             // edit, and atomically write it directly (no registry to re-derive).
             let home =
                 dirs::home_dir().ok_or_else(|| anyhow!("Could not determine home directory"))?;
-            let config_path = home.join(".config/jit").join("config.toml");
-            let mut doc = config_store::read_config_document(&config_path)?;
+            let user_config = UserConfigRoot::from_home(&home);
+            let config_path = user_config.config_path();
+            let mut doc = read_user_config_document(&user_config)?;
             edit_config_document(&mut doc, key, value)?;
-            config_store::save_config_document(&config_path, &doc)?;
+            save_user_config_document(&user_config, &doc)?;
             return Ok(ConfigSetOutcome {
                 key: key.to_string(),
                 value: value.to_string(),
@@ -258,7 +260,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             });
         }
 
-        let config_path = config_store::repo_config_path(self.storage.root());
+        let layout = self.require_layout()?;
+        let config_path =
+            layout.resolve(&crate::repository_state::VirtualPath::data("config.toml")?)?;
         self.set_repo_config(key, value)?;
         Ok(ConfigSetOutcome {
             key: key.to_string(),
@@ -315,8 +319,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
                     Err(error) => return Err(error.into()),
                 };
-            let current = super::image_repo_bytes(&config_image, ".jit/config.toml")?
-                .unwrap_or_default();
+            let current =
+                super::image_repo_bytes(&config_image, ".jit/config.toml")?.unwrap_or_default();
             let mut doc = String::from_utf8(current)
                 .context("existing .jit/config.toml is not UTF-8")?
                 .parse::<toml_edit::DocumentMut>()
@@ -358,40 +362,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
         anyhow::bail!("config set did not converge after repeated capture conflicts")
-    }
-
-    /// Seed the repo `[project]` identity into a freshly-initialized `.jit`
-    /// (REQ-01), returning the seeded name (or `None` when it was a no-op).
-    ///
-    /// Owns the seeding orchestration: the config-existence check, the
-    /// default-name computation (slugifying `repo_dir`'s basename via
-    /// [`slugify_project_name`](crate::config::slugify_project_name)), and the
-    /// call to [`crate::storage::config_store::seed_repo_config`], which appends
-    /// the `[project]` table to the template-generated `base_config_toml` body
-    /// and writes it atomically. Idempotent: when `config.toml` already exists it
-    /// is a no-op returning `Ok(None)`, so a re-init never disturbs an existing
-    /// `[project]` table.
-    pub fn seed_project_config(
-        &self,
-        repo_dir: &Path,
-        base_config_toml: &str,
-    ) -> Result<Option<ProjectName>> {
-        let jit_root = self.storage.root();
-
-        // Idempotent: an existing config.toml keeps its `[project]` table, so a
-        // re-init never reseeds (REQ-03 preserved for free).
-        if config_store::repo_config_path(jit_root).exists() {
-            return Ok(None);
-        }
-
-        let dir_basename = repo_dir
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("");
-        let project_name: ProjectName =
-            crate::config::slugify_project_name(dir_basename).parse()?;
-        config_store::seed_repo_config(jit_root, base_config_toml, &project_name)?;
-        Ok(Some(project_name))
     }
 
     /// Resolve a dotted `section[.field[.subfield...]]` key against the WHOLE
