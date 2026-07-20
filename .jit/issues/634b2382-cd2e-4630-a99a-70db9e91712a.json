@@ -28,7 +28,7 @@
   "context": {},
   "documents": [
     {
-      "path": ".claude/skills/jit-project-lead/references/parent-escalation.md",
+      "path": ".agents/skills/jit-project-lead/references/parent-escalation.md",
       "commit": null,
       "label": "Parent-escalation policy",
       "doc_type": "reference",
@@ -42,7 +42,7 @@
     "type:task"
   ],
   "created_at": "2026-07-01T22:08:58.353738020Z",
-  "updated_at": "2026-07-05T19:51:12.988663437Z",
+  "updated_at": "2026-07-20T06:50:45.027458443Z",
   "first_ready_at": "2026-07-02T23:45:10.814024954Z",
   "claimed_at": "2026-07-03T00:32:15.462733971Z",
   "done_at": "2026-07-03T06:38:23.030186692Z"

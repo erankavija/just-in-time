@@ -25,3 +25,6 @@ badges/
 
 # jit-execution-lead worktrees (transient, never tracked)
 .agents/worktrees/
+
+# user-local Claude config (canonical skills live in .agents/skills)
+.claude/

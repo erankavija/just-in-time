@@ -21,21 +21,21 @@
   "context": {},
   "documents": [
     {
-      "path": ".claude/skills/jit-project-lead/scripts/standards-scan.sh",
+      "path": ".agents/skills/jit-project-lead/scripts/standards-scan.sh",
       "commit": null,
       "label": "Standards scanner script",
       "doc_type": "implementation",
       "format": "markdown"
     },
     {
-      "path": ".claude/skills/jit-project-lead/references/standards-scan.md",
+      "path": ".agents/skills/jit-project-lead/references/standards-scan.md",
       "commit": null,
       "label": "Standards scanner reference",
       "doc_type": "design",
       "format": "markdown"
     },
     {
-      "path": ".claude/skills/jit-project-lead/scripts/test-standards-scan.sh",
+      "path": ".agents/skills/jit-project-lead/scripts/test-standards-scan.sh",
       "commit": null,
       "label": "Standards scanner test suite",
       "doc_type": "test",
@@ -49,7 +49,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.823122684Z",
-  "updated_at": "2026-07-05T19:51:12.993499640Z",
+  "updated_at": "2026-07-20T06:50:45.079409441Z",
   "first_ready_at": "2026-07-02T08:15:40.011537647Z",
   "claimed_at": "2026-07-02T08:16:46.838842012Z",
   "done_at": "2026-07-02T20:32:46.476445057Z"

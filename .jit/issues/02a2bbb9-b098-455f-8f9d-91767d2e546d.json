@@ -14,122 +14,75 @@
     "cargo-ci"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T21:25:56.466270091Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-02T21:27:37.483781699Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-02T21:25:56.466270091Z"
     }
   },
   "context": {},
   "documents": [
     {
-      "path": ".claude/skills/jit-project-lead/evals/evals.json",
+      "path": ".agents/skills/jit-project-lead/evals/evals.json",
       "commit": null,
       "label": "jit-project-lead skeleton scenario evals",
-      "doc_type": "eval"
+      "doc_type": "eval",
+      "format": "markdown"
     },
     {
-      "path": ".claude/skills/jit-project-lead/trigger_eval.json",
+      "path": ".agents/skills/jit-project-lead/trigger_eval.json",
       "commit": null,
       "label": "jit-project-lead trigger eval set",
       "doc_type": "eval"
     },
     {
-      "path": ".claude/skills/jit-project-lead/trigger_eval_results.json",
+      "path": ".agents/skills/jit-project-lead/trigger_eval_results.json",
       "commit": null,
       "label": "jit-project-lead trigger eval results (17/17)",
       "doc_type": "eval"
     },
     {
-      "path": ".claude/skills/jit-project-lead/evals/results.md",
+      "path": ".agents/skills/jit-project-lead/evals/results.md",
       "commit": null,
       "label": "jit-project-lead skeleton eval verdicts (all PASS)",
       "doc_type": "eval",
       "format": "markdown",
       "assets": [
         {
-          "original_path": "transcripts/routing-mode-1.completion-report.md",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/routing-mode-1.completion-report.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "d50328655e617f8f5189c1f438d28d6814cf5ae202940fa803ae9d494fbce43d",
-          "is_shared": false
-        },
-        {
-          "original_path": "transcripts/routing-mode-2.completion-report.md",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/routing-mode-2.completion-report.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "83ca4fa30d0762525e706a00044b72251585e817b5634f803ea9906da576f735",
-          "is_shared": false
-        },
-        {
-          "original_path": "transcripts/fallback-stop-and-ask.completion-report.md",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/fallback-stop-and-ask.completion-report.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "4b2d41495fd24c4474ec3e4372a5ca22e4804d018ae8056305451a61578f36d1",
-          "is_shared": false
-        },
-        {
           "original_path": "evals.json",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/evals.json",
+          "resolved_path": ".agents/skills/jit-project-lead/evals/evals.json",
           "asset_type": "local",
           "mime_type": null,
-          "content_hash": "1025c2d43a0e48414de25f1254374c69cbfc9f2c2d87bbe8b83f8ae2caf1ff9c",
+          "content_hash": "e1cbf126a3e24bb91fa62203eb5726ed27e46e92cdc8a79430ecec9fd088a799",
           "is_shared": false
         },
         {
           "original_path": "setup-test-repo.sh",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/setup-test-repo.sh",
+          "resolved_path": ".agents/skills/jit-project-lead/evals/setup-test-repo.sh",
           "asset_type": "local",
           "mime_type": null,
-          "content_hash": "699e4bec171d3b4a7c15a36df0984b02ccf9849e1269c9194dc82a9b5ae2877b",
-          "is_shared": false
-        },
-        {
-          "original_path": "transcripts/tier-derivation-collapsed.completion-report.md",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/tier-derivation-collapsed.completion-report.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "992f685b9366d2f507bef4d1c82702a8707d9c74e57c94a06574332f0da0fe73",
-          "is_shared": false
-        },
-        {
-          "original_path": "transcripts/routing-mode-3.completion-report.md",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/routing-mode-3.completion-report.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "97c7dfe10a4806ea8134e471427242b8bd0d9938889d229a93f627431a403ec2",
-          "is_shared": false
-        },
-        {
-          "original_path": "transcripts/tier-derivation-two-tier.completion-report.md",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/tier-derivation-two-tier.completion-report.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "23f56156b5e6ad1e5ce64f854626a9239be5ef42ff2daa074338645388cfc509",
-          "is_shared": false
-        },
-        {
-          "original_path": "transcripts/activation-and-preflight.completion-report.md",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/activation-and-preflight.completion-report.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "c7432ec80d131592e99d80c4c049df9a5c85b9e8072c3d83f742270a201b51fd",
+          "content_hash": "acc2228b0957c53e24f2b01dbe8a8c33a1d9f3805ae06aaaf9210a929f6b0444",
           "is_shared": false
         },
         {
           "original_path": "transcripts/routing-mode-4.completion-report.md",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/routing-mode-4.completion-report.md",
+          "resolved_path": ".agents/skills/jit-project-lead/evals/transcripts/routing-mode-4.completion-report.md",
           "asset_type": "local",
           "mime_type": "text/markdown",
-          "content_hash": "08b703774fb71dc2235767994e6bb22375d427c6550f846f978c16d9ccc9046d",
+          "content_hash": "2d42eef3fba5404205d23fe7279e21568ada537417e85bcc965e487f03790193",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/activation-and-preflight.completion-report.md",
+          "resolved_path": ".agents/skills/jit-project-lead/evals/transcripts/activation-and-preflight.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "2df6376f39b43bb6de1ec59d5824bc395551578d861f22bae449261b65cb0798",
           "is_shared": false
         },
         {
@@ -137,7 +90,55 @@
           "resolved_path": "dev/eval/skill-eval-adjudication.md",
           "asset_type": "local",
           "mime_type": "text/markdown",
-          "content_hash": "0bb2f6d199851514d528aa77c18c8d193f49631f18578d12864929de5c0ac2d9",
+          "content_hash": "087379fec5dabcebb4fd619194b5a6e81d8255ed930498d3ab61b263cfa25adc",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/tier-derivation-collapsed.completion-report.md",
+          "resolved_path": ".agents/skills/jit-project-lead/evals/transcripts/tier-derivation-collapsed.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "79df2805efbd350b97c53602cf14f8e8cd7a65526e147a3895eba52607619fe9",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/fallback-stop-and-ask.completion-report.md",
+          "resolved_path": ".agents/skills/jit-project-lead/evals/transcripts/fallback-stop-and-ask.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "2d3e1fc165e0379f4938867d099fe49180dbb3ea635bae95b57a286b7be111fa",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/routing-mode-1.completion-report.md",
+          "resolved_path": ".agents/skills/jit-project-lead/evals/transcripts/routing-mode-1.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "c5500ce6fb59034d2f027b3cd3fb2f279ed4a92615fd3fdb9b970e600eaa244d",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/routing-mode-2.completion-report.md",
+          "resolved_path": ".agents/skills/jit-project-lead/evals/transcripts/routing-mode-2.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "315543b93c83d2fc06ef5d9ec4d867805b26a02a4032af95cfca2aa3a28b8ee9",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/tier-derivation-two-tier.completion-report.md",
+          "resolved_path": ".agents/skills/jit-project-lead/evals/transcripts/tier-derivation-two-tier.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "8565ebde1830259e21bf0caf03bac87c4d91059ae623be22fc26a70197cbc601",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/routing-mode-3.completion-report.md",
+          "resolved_path": ".agents/skills/jit-project-lead/evals/transcripts/routing-mode-3.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "daa97a7133eda1e628521bd67edfb259dddb2983f43151cccdbb81f69baa10e6",
           "is_shared": false
         }
       ]
@@ -150,7 +151,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.521406995Z",
-  "updated_at": "2026-07-09T23:38:08.807700469Z",
+  "updated_at": "2026-07-20T06:50:44.960600894Z",
   "first_ready_at": "2026-07-02T20:46:17.616311708Z",
   "claimed_at": "2026-07-02T20:49:27.992267135Z",
   "done_at": "2026-07-02T21:28:57.774098384Z"

@@ -13,28 +13,28 @@
     "cargo-ci"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T22:40:52.329153185Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-02T22:42:28.752269462Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-02T22:40:52.329153185Z"
     }
   },
   "context": {},
   "documents": [
     {
-      "path": ".claude/skills/jit-project-lead/scripts/standards-fix.sh",
+      "path": ".agents/skills/jit-project-lead/scripts/standards-fix.sh",
       "commit": null,
       "label": "Mechanical content-standards auto-fixer",
       "doc_type": "implementation",
       "format": "markdown"
     },
     {
-      "path": ".claude/skills/jit-project-lead/references/standards-fix.md",
+      "path": ".agents/skills/jit-project-lead/references/standards-fix.md",
       "commit": null,
       "label": "Auto-fixer contract and rule->correction mapping",
       "doc_type": "reference",
@@ -48,7 +48,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.853900227Z",
-  "updated_at": "2026-07-05T19:51:12.904841216Z",
+  "updated_at": "2026-07-20T06:50:44.975489355Z",
   "first_ready_at": "2026-07-02T20:32:46.536192180Z",
   "claimed_at": "2026-07-02T20:49:27.954323738Z",
   "done_at": "2026-07-02T22:43:56.279040099Z"

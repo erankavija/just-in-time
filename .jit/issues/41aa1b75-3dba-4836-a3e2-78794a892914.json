@@ -13,89 +13,65 @@
     "cargo-ci"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T23:11:37.271444604Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-02T23:06:19.230581152Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-02T23:11:37.271444604Z"
     }
   },
   "context": {},
   "documents": [
     {
-      "path": ".claude/skills/jit-planning-lead/evals/evals.json",
+      "path": ".agents/skills/jit-planning-lead/evals/evals.json",
       "commit": null,
       "label": "Eval Scenarios (three entry paths)",
       "doc_type": "notes",
       "format": "markdown"
     },
     {
-      "path": ".claude/skills/jit-planning-lead/evals/setup-test-repo.sh",
+      "path": ".agents/skills/jit-planning-lead/evals/setup-test-repo.sh",
       "commit": null,
       "label": "Eval Setup Script",
       "doc_type": "notes",
       "format": "markdown"
     },
     {
-      "path": ".claude/skills/jit-planning-lead/evals/transcripts/research-and-plan.completion-report.md",
+      "path": ".agents/skills/jit-planning-lead/evals/transcripts/research-and-plan.completion-report.md",
       "commit": null,
       "label": "Run report: research-and-plan",
       "doc_type": "notes",
       "format": "markdown"
     },
     {
-      "path": ".claude/skills/jit-planning-lead/evals/transcripts/plan-from-existing.completion-report.md",
+      "path": ".agents/skills/jit-planning-lead/evals/transcripts/plan-from-existing.completion-report.md",
       "commit": null,
       "label": "Run report: plan-from-existing",
       "doc_type": "notes",
       "format": "markdown"
     },
     {
-      "path": ".claude/skills/jit-planning-lead/evals/results.md",
+      "path": ".agents/skills/jit-planning-lead/evals/results.md",
       "commit": null,
       "label": "Eval Results (graded baseline)",
       "doc_type": "notes",
       "format": "markdown",
       "assets": [
         {
-          "original_path": "evals.json",
-          "resolved_path": ".claude/skills/jit-planning-lead/evals/evals.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "ca6507b08cfddbdbea09e2ac31d827f6864135542afc71ac8c47a14216f9a016",
-          "is_shared": false
-        },
-        {
-          "original_path": "../../../../dev/eval/skill-eval-adjudication.md",
-          "resolved_path": "dev/eval/skill-eval-adjudication.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "0bb2f6d199851514d528aa77c18c8d193f49631f18578d12864929de5c0ac2d9",
-          "is_shared": false
-        },
-        {
-          "original_path": "transcripts/research-and-plan.completion-report.md",
-          "resolved_path": ".claude/skills/jit-planning-lead/evals/transcripts/research-and-plan.completion-report.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "c52506669b0cd222dad600d1a128ed09b489325cb90d401255d9d6ded9ed8d67",
-          "is_shared": false
-        },
-        {
           "original_path": "setup-test-repo.sh",
-          "resolved_path": ".claude/skills/jit-planning-lead/evals/setup-test-repo.sh",
+          "resolved_path": ".agents/skills/jit-planning-lead/evals/setup-test-repo.sh",
           "asset_type": "local",
           "mime_type": null,
-          "content_hash": "33b1949a09e7be904507c7d9e4e0dc07b9005eb137356e005e78f8a711f97c0d",
+          "content_hash": "b72eeb38d48f3a415555c5791cec66486ed18d7e57feb602ceb2302ee328e507",
           "is_shared": false
         },
         {
           "original_path": "transcripts/plan-from-existing.completion-report.md",
-          "resolved_path": ".claude/skills/jit-planning-lead/evals/transcripts/plan-from-existing.completion-report.md",
+          "resolved_path": ".agents/skills/jit-planning-lead/evals/transcripts/plan-from-existing.completion-report.md",
           "asset_type": "local",
           "mime_type": "text/markdown",
           "content_hash": "b551c2fbc4ce7f8edeff4fdd0b7d0bb556b96fbac6dea5e377f6792a24ce38fe",
@@ -103,10 +79,34 @@
         },
         {
           "original_path": "transcripts/plan-from-import.completion-report.md",
-          "resolved_path": ".claude/skills/jit-planning-lead/evals/transcripts/plan-from-import.completion-report.md",
+          "resolved_path": ".agents/skills/jit-planning-lead/evals/transcripts/plan-from-import.completion-report.md",
           "asset_type": "local",
           "mime_type": "text/markdown",
           "content_hash": "2f16f2a54132d9183f7a88e5213d4564f3dc14f901d1197ac2081c2663074ff8",
+          "is_shared": false
+        },
+        {
+          "original_path": "evals.json",
+          "resolved_path": ".agents/skills/jit-planning-lead/evals/evals.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "781a6c1d67fbbfc2b31eb6a6006e07ac362f496c1483dd245f153d34c21ab1ec",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/research-and-plan.completion-report.md",
+          "resolved_path": ".agents/skills/jit-planning-lead/evals/transcripts/research-and-plan.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "c52506669b0cd222dad600d1a128ed09b489325cb90d401255d9d6ded9ed8d67",
+          "is_shared": false
+        },
+        {
+          "original_path": "../../../../dev/eval/skill-eval-adjudication.md",
+          "resolved_path": "dev/eval/skill-eval-adjudication.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "087379fec5dabcebb4fd619194b5a6e81d8255ed930498d3ab61b263cfa25adc",
           "is_shared": false
         }
       ]
@@ -119,7 +119,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.339047952Z",
-  "updated_at": "2026-07-09T23:38:09.107500787Z",
+  "updated_at": "2026-07-20T06:50:45.019990377Z",
   "first_ready_at": "2026-07-02T20:46:17.781357668Z",
   "claimed_at": "2026-07-02T20:49:27.937054355Z",
   "done_at": "2026-07-02T23:13:02.140144568Z"
