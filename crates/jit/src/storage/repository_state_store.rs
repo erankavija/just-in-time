@@ -603,6 +603,27 @@ fn ensure_delta_is_captured(
     Ok(())
 }
 
+/// Normalize a Git diagnostic into a stable, control-free unavailable reason.
+///
+/// `PinnedDocumentEvidence` requires the unavailable reason to be non-empty and
+/// control-character-free (the identity contract). A raw `git` diagnostic is
+/// often multi-line (e.g. "fatal: not a git repository\nStopping at filesystem
+/// boundary"), so each control character (newlines included) collapses to a
+/// single space and the result is trimmed; an all-control diagnostic degrades to
+/// a fixed fallback so the reason is never empty.
+fn stable_unavailable_reason(diagnostic: &str) -> String {
+    let normalized: String = diagnostic
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    let trimmed = normalized.split_whitespace().collect::<Vec<_>>().join(" ");
+    if trimmed.is_empty() {
+        "Git evidence is unavailable".to_string()
+    } else {
+        trimmed
+    }
+}
+
 fn capture_capability_image(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
@@ -654,7 +675,7 @@ fn capture_capability_image(
                     None,
                     None,
                     None,
-                    Some(error.to_string()),
+                    Some(stable_unavailable_reason(&error.to_string())),
                 )?,
             };
             Ok(((revision.clone(), path.clone()), evidence))

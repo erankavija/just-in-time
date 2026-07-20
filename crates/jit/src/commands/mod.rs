@@ -890,7 +890,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         force: bool,
         persist: bool,
         pre_save: impl FnOnce(&mut Issue),
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let old_state = issue.state;
 
         // No-op: nothing to transition, enforce, save, or log.
@@ -1071,7 +1074,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue: &Issue,
         target: State,
         force: bool,
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::declarations::rules::{RuleScope, Severity};
         use crate::validation::graph::evaluate_graph;
 
@@ -1102,9 +1108,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         let hierarchy = crate::repository_state::hierarchy_config(namespaces);
         let repo_format = self.repo_content_format()?;
 
-        // Resolve external plan docs for the neighborhood so closure-time coverage
-        // honors a container whose criteria live in an external plan file too.
-        let plan_content = self.resolve_plan_content(&slice)?;
+        // Resolve external plan docs for the neighborhood from the captured
+        // validation image so closure-time coverage honors a container whose
+        // criteria live in an external plan file too (closed-read, no live
+        // filesystem).
+        let plan_content = self.image_plan_content(&slice)?;
 
         let findings = evaluate_graph(
             &rules,

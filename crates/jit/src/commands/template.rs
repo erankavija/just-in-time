@@ -129,7 +129,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         container_id: &str,
         anchor_bindings: &BTreeMap<String, String>,
         force: bool,
-    ) -> Result<(TemplateApplyResult, Vec<String>)> {
+    ) -> Result<(TemplateApplyResult, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Clone the template out of the cached config: the engine mutates issues
         // through `&self`, so it cannot hold a borrow into the config cache.
         let template = self
@@ -211,7 +214,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         container_id: &str,
         anchor_bindings: &BTreeMap<String, String>,
         force: bool,
-    ) -> Result<(TemplateApplyResult, Vec<String>)> {
+    ) -> Result<(TemplateApplyResult, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // One repository write lock for the whole apply: the reads that validation
         // depends on (the store snapshot the cycle check simulates over, the
         // already-applied probe) and every write that follows are serialized
@@ -481,7 +487,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         delta: &TemplateDelta,
         warnings: &mut Vec<String>,
-    ) -> Result<BTreeMap<String, String>> {
+    ) -> Result<BTreeMap<String, String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let mut created: BTreeMap<String, String> = BTreeMap::new();
         for planned in &delta.creates {
             let (node_id, mut create_warnings) = self.create_issue(

@@ -234,7 +234,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Remove a dependency from an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn remove_dependency(&self, issue_id: &str, dep_id: &str) -> Result<Vec<String>> {
+    pub fn remove_dependency(&self, issue_id: &str, dep_id: &str) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_issue_id = self.storage.resolve_issue_id(issue_id)?;
         let full_dep_id = self.storage.resolve_issue_id(dep_id)?;
 
@@ -650,7 +653,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &str,
         dep_ids: &[String],
-    ) -> Result<DependenciesRemoveResult> {
+    ) -> Result<DependenciesRemoveResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Validate input
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));

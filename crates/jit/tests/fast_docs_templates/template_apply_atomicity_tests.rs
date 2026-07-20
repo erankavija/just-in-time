@@ -181,6 +181,23 @@ impl<S: IssueStore> IssueStore for FaultyStore<S> {
     }
 }
 
+/// Delegated so an executor over the faulty store can capture the read-only
+/// validation image the transition-time graph-rule pass needs; the injected
+/// write fault stays on `save_issue`, which the capture never touches.
+impl<S: IssueStore + jit::storage::RepositoryStateStore> jit::storage::RepositoryStateStore
+    for FaultyStore<S>
+{
+    fn open_mutation_session(
+        &self,
+        layout: jit::repository_state::RepositoryLayout,
+    ) -> Result<
+        Box<dyn jit::storage::RepositoryMutationSession + '_>,
+        jit::storage::RepositoryStateStoreError,
+    > {
+        self.inner.open_mutation_session(layout)
+    }
+}
+
 /// A `plan`-shaped template: `P` and `B` (`B → P`), the container anchor
 /// depending on `B`, a `move-upstream-to-role` transform onto `P`, and a
 /// registry-gate on the anchor.
@@ -387,7 +404,9 @@ fn test_apply_rolls_back_nodes_and_edges_when_an_edge_write_fails() {
 /// leaves a fresh `updated_at`, which `jit issue show --json` and
 /// `jit graph export --full` both surface, so the store is observably changed by
 /// an apply that failed (REQ-2).
-fn check_rollback_restores_records_verbatim<S: IssueStore>(inner: S) {
+fn check_rollback_restores_records_verbatim<S: IssueStore + jit::storage::RepositoryStateStore>(
+    inner: S,
+) {
     let store = FaultyStore::new(inner, |issue| {
         issue.gates_required.iter().any(|g| g == "repo-validate")
     });
@@ -649,6 +668,21 @@ impl IssueStore for StallingStore {
         at_commit: Option<&str>,
     ) -> Result<(Vec<u8>, String), PathReadError> {
         self.inner.read_path_bytes(path, at_commit)
+    }
+}
+
+/// Delegated to the wrapped `JsonFileStorage` so the transition-time graph-rule
+/// pass can capture its read-only validation image; the stall injection remains
+/// on `save_issue`, which the capture never enters.
+impl jit::storage::RepositoryStateStore for StallingStore {
+    fn open_mutation_session(
+        &self,
+        layout: jit::repository_state::RepositoryLayout,
+    ) -> Result<
+        Box<dyn jit::storage::RepositoryMutationSession + '_>,
+        jit::storage::RepositoryStateStoreError,
+    > {
+        self.inner.open_mutation_session(layout)
     }
 }
 

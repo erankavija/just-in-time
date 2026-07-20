@@ -593,6 +593,74 @@ fn document_capture_closure(issues: &[Issue], config: &JitConfig) -> Result<Docu
     Ok((worktree, pinned))
 }
 
+/// Project the plan-document content map from a captured validation image — the
+/// closed-read replacement for the ambient `resolve_plan_content`'s filesystem
+/// reads.
+///
+/// Planning-node resolution runs against the full captured issue set (so a scoped
+/// slice still finds a bracket's planning node), while content is emitted only for
+/// `emit_for`. Each breakable container whose bracket planning node records an
+/// external plan reference contributes its plan-document bytes, read from the
+/// image's captured plan-document entries (enqueued by [`document_capture_closure`])
+/// rather than the live filesystem. A not-yet-authored plan whose planning node is
+/// not `done` is omitted (a freshly-applied bracket validates cleanly before its
+/// plan exists); a missing plan whose planning node is `done` is an error.
+fn plan_content_from_image(
+    image: &crate::repository_state::RepositoryImage,
+    emit_for: &[Issue],
+) -> Result<std::collections::HashMap<String, String>> {
+    let effective = |img: &crate::repository_state::RepositoryImage,
+                     repo_rel: &str|
+     -> Result<Option<Vec<u8>>> { super::image_repo_bytes(img, repo_rel) };
+    let effective: &Effective<'_> = &effective;
+
+    // Declaration parsing is best-effort, mirroring `capture_proposed_base`: a
+    // missing or malformed config/index/issue set yields an empty projection (no
+    // breakable containers, so no external plan docs), and `validate_repository`
+    // is the authority that reports the parse error. Only a genuinely missing
+    // required plan document (below) is a hard error.
+    let mut config = effective_config(image, effective)
+        .unwrap_or_else(|_| toml::from_str("").expect("empty configuration parses"));
+    config.templates = effective_templates(image, &config, effective)?;
+    let all_ids = effective_index_ids(image, effective).unwrap_or_default();
+    let all_issues = effective_issues(image, &all_ids, effective).unwrap_or_default();
+
+    let templates = &config.templates;
+    let breakable: std::collections::HashSet<String> =
+        templates.breakable_types().into_iter().collect();
+    let by_id: std::collections::HashMap<&str, &Issue> = all_issues
+        .iter()
+        .map(|issue| (issue.id.as_str(), issue))
+        .collect();
+
+    let mut out = std::collections::HashMap::new();
+    for issue in emit_for {
+        let Some(issue_type) =
+            label_utils::type_label_value(&issue.labels).filter(|t| breakable.contains(*t))
+        else {
+            continue;
+        };
+        let Some(template) = templates.template_for_container(issue_type) else {
+            continue;
+        };
+        if template.plan_doc_location(&templates.roles).is_none() {
+            continue;
+        }
+        let planning = find_planning_node(issue, template, &templates.roles, &by_id);
+        let Some(plan_path) = planning.and_then(planning_node_plan_path) else {
+            continue;
+        };
+        match super::image_repo_bytes(image, &plan_path)? {
+            Some(bytes) => {
+                out.insert(issue.id.clone(), String::from_utf8(bytes)?);
+            }
+            None if planning.is_none_or(|node| node.state != State::Done) => {}
+            None => return Err(anyhow!("required plan document '{plan_path}' is missing")),
+        }
+    }
+    Ok(out)
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     fn detect_and_fix_hierarchy_issues(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)> {
         use crate::config_manager::get_hierarchy_config;
@@ -703,7 +771,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// which the caller combines with any enforcement-drift finding so neither is
     /// lost. Does NOT include the enforcement-drift pass (the caller runs that
     /// separately and tolerantly).
-    fn rule_eval_error_message(&self, issues: &[Issue]) -> Result<Option<String>> {
+    fn rule_eval_error_message(&self, issues: &[Issue]) -> Result<Option<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         if let Some(message) = self.local_rules_error_message(issues)? {
             return Ok(Some(message));
         }
@@ -1090,7 +1161,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn evaluate_graph_rules(
         &self,
         issues: &[Issue],
-    ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
+    ) -> Result<Vec<crate::validation::graph::GraphFinding>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::declarations::rules::RuleScope;
 
         // Surface a misconfigured rules.toml instead of swallowing it.
@@ -1109,10 +1183,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         let hierarchy = crate::repository_state::hierarchy_config(namespaces);
         let repo_format = self.repo_content_format()?;
 
-        // Resolve any external plan documents at the boundary so a container
-        // whose criteria live in an external file is validated against the FILE
-        // content; the engine itself reads only the injected map (stays pure).
-        let plan_content = self.resolve_plan_content(issues)?;
+        // Resolve any external plan documents from the captured validation image
+        // so a container whose criteria live in an external file is validated
+        // against the FILE content; the engine itself reads only the injected map
+        // (stays pure) and the plan bytes come from the closed image, not the
+        // live filesystem.
+        let plan_content = self.image_plan_content(issues)?;
 
         // Inject the wall-clock instant at the boundary so `gate-recency` rules
         // are deterministic and the graph engine stays pure (CC-5b).
@@ -1124,6 +1200,41 @@ impl<S: IssueStore> CommandExecutor<S> {
             chrono::Utc::now(),
             &plan_content,
         ))
+    }
+
+    /// Plan-document content for `emit_for`, image-projected when a captured
+    /// session is available (the closed-read replacement for the ambient
+    /// `resolve_plan_content`).
+    ///
+    /// When the store is file-backed AND a canonical layout is configured — the
+    /// production path, where the CLI/server supplies the worktree/data roots —
+    /// this captures the whole-repository validation image
+    /// ([`capture_validation_image`](Self::capture_validation_image), whose
+    /// closure enqueues every derived plan-document path) and projects the
+    /// plan-document content map through [`plan_content_from_image`]. Planning-node
+    /// resolution runs against the full captured issue set, so a scoped slice still
+    /// resolves a bracket's planning node, and the plan bytes are read from the
+    /// closed image rather than the live filesystem.
+    ///
+    /// Without a captured session — an in-memory store (its session models
+    /// aggregate state, not the plan docs' real filesystem) or a layout-less
+    /// file-backed executor (git-optional startup that discovered no layout, and
+    /// test fixtures) — there is no closed image to project, so it falls back to
+    /// the ambient resolver. That is the sole remaining reference to
+    /// `resolve_plan_content`, retired with the layout-aware fixture story in the
+    /// increment-8 predecessor scans (plan §2 "boundary plan-document resolver").
+    pub(crate) fn image_plan_content(
+        &self,
+        emit_for: &[Issue],
+    ) -> Result<std::collections::HashMap<String, String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        if self.storage.is_file_backed() && self.layout.is_some() {
+            let image = self.capture_validation_image()?;
+            return plan_content_from_image(&image, emit_for);
+        }
+        self.resolve_plan_content(emit_for)
     }
 
     /// Build the plan-document content map the graph engine consumes (boundary).
@@ -1278,7 +1389,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns an error if `.jit/rules.toml` is malformed, the issue id cannot be
     /// resolved, or a matching local rule's schema fails to compile (a
     /// misconfigured rule never silently disables enforcement).
-    pub fn run_rules(&self, id: Option<&str>) -> Result<crate::validation::report::RuleReport> {
+    pub fn run_rules(&self, id: Option<&str>) -> Result<crate::validation::report::RuleReport>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
         // If the rule SOURCE is unloadable, do NOT crash the whole report: the
@@ -1472,7 +1586,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn validate_scope(
         &self,
         container_id: &str,
-    ) -> Result<crate::validation::report::RuleReport> {
+    ) -> Result<crate::validation::report::RuleReport>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::declarations::rules::{RuleScope, Severity};
         use crate::validation::report::{ReportedFinding, RuleReport};
 
@@ -1545,9 +1662,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !graph_rules.is_empty() {
             let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
             let hierarchy = crate::repository_state::hierarchy_config(namespaces);
-            // Resolve external plan docs for the in-scope issues so a container
-            // whose criteria live in an external file validates against the FILE.
-            let plan_content = self.resolve_plan_content(&slice)?;
+            // Resolve external plan docs for the in-scope issues from the captured
+            // validation image so a container whose criteria live in an external
+            // file validates against the FILE (closed-read, no live filesystem).
+            let plan_content = self.image_plan_content(&slice)?;
             let graph_findings = crate::validation::graph::evaluate_graph_scoped(
                 &graph_rules,
                 &slice,
@@ -1606,7 +1724,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Returns an error if `.jit/rules.toml` is malformed, the issue id cannot be
     /// resolved, or a matching local rule's schema fails to compile.
-    pub fn explain_rules(&self, id: &str) -> Result<crate::validation::report::ExplainReport> {
+    pub fn explain_rules(&self, id: &str) -> Result<crate::validation::report::ExplainReport>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::declarations::rules::RuleScope;
         use crate::validation::report::{ExplainReport, RuleOutcome};
 
@@ -1971,7 +2092,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # Returns
     ///
     /// Count of issues transitioned and informational messages
-    fn check_pending_transitions(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)> {
+    fn check_pending_transitions(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let mut total_fixed = 0;
         let mut messages = Vec::new();
         let max_passes = 10; // Safety limit to prevent infinite loops

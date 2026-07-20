@@ -869,7 +869,11 @@ mod file_backed_external_plan {
         storage.init().unwrap();
         std::fs::write(jit_dir.join("templates.toml"), PLAN_TEMPLATE_EXTERNAL).unwrap();
         std::fs::write(jit_dir.join("rules.toml"), COVERAGE_ON_EPIC).unwrap();
-        (repo_root, CommandExecutor::new(storage))
+        // A layout so the file-backed validation paths can capture the closed
+        // image they project plan-document content from.
+        let layout =
+            jit::storage::discover_repository_layout(repo_root.path(), storage.root()).unwrap();
+        (repo_root, CommandExecutor::new(storage).with_layout(layout))
     }
 
     fn seed(

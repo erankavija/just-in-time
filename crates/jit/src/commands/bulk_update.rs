@@ -164,7 +164,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         filter: &QueryFilter,
         operations: &UpdateOperations,
         force: bool,
-    ) -> Result<BulkUpdateResult> {
+    ) -> Result<BulkUpdateResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let all_issues = self.storage.list_issues()?;
         let matched = filter.filter_issues(&all_issues)?;
 
@@ -219,7 +222,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue: &Issue,
         operations: &UpdateOperations,
         force: bool,
-    ) -> Result<(bool, Vec<String>)> {
+    ) -> Result<(bool, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Validate first (includes local rule enforcement on the post-update
         // shape, so `jit issue update --filter` cannot bypass enforce rules).
         // Bypass events are deferred and only emitted after the save succeeds.

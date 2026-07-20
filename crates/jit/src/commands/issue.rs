@@ -438,7 +438,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         content_format: Option<Option<crate::domain::ContentFormat>>,
         issue_type: Option<String>,
         force: bool,
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Collect warnings instead of printing
@@ -722,7 +725,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// without requiring target resolution) and `jit issue show --json`'s
     /// `dangling_dependency_ids` field remain as defense-in-depth for that case
     /// and for any legacy data that predates this fix.
-    pub fn delete_issue(&self, id: &str) -> Result<Vec<String>> {
+    pub fn delete_issue(&self, id: &str) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(id)?;
 
         // Collect warnings instead of printing
@@ -1030,7 +1036,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(warnings)
     }
 
-    pub fn release_issue(&self, id: &str, reason: &str) -> Result<()> {
+    pub fn release_issue(&self, id: &str, reason: &str) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(id)?;
         let mut issue = self.storage.load_issue(&full_id)?;
         let old_assignee = issue.assignee.clone();
@@ -1092,7 +1101,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    pub(super) fn auto_transition_to_ready(&self, issue_id: &str) -> Result<bool> {
+    pub(super) fn auto_transition_to_ready(&self, issue_id: &str) -> Result<bool>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issues = self.storage.list_issues()?;
         let resolved = crate::domain::queries::build_issue_map(&issues);
@@ -1110,7 +1122,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    pub(super) fn auto_transition_to_done(&self, issue_id: &str) -> Result<bool> {
+    pub(super) fn auto_transition_to_done(&self, issue_id: &str) -> Result<bool>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let mut issue = self.storage.load_issue(&full_id)?;
 
@@ -1134,7 +1149,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    pub(super) fn check_auto_transitions(&self) -> Result<()> {
+    pub(super) fn check_auto_transitions(&self) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let issues = self.storage.list_issues()?;
         let backlog_issues: Vec<_> = issues
             .iter()
@@ -1177,7 +1195,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         changed_fields: &[String],
         bypassed_rules: &[String],
         force: bool,
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let registry = self.storage.load_gate_registry()?;
         let gate_blockers = unpassed_gate_blockers(issue, &registry);
         // The gate-diversion path lands the issue in `gated`, so it enforces
