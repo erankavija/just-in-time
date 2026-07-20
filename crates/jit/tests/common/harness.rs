@@ -7,6 +7,7 @@
 
 use jit::commands::CommandExecutor;
 use jit::domain::{Issue, Priority, State};
+use jit::repository_state::{RepositoryLayout, RepositoryRootEvidence};
 use jit::storage::{InMemoryStorage, IssueStore};
 
 /// Test harness that provides isolated environment for each test
@@ -23,7 +24,17 @@ impl TestHarness {
 
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
-        let executor = CommandExecutor::new(storage.clone());
+        // A synthetic canonical layout so session-backed mutations (e.g. the
+        // validate-fix path) can open the in-memory mutation session. The in-memory
+        // backend models its state in one aggregate map keyed by virtual path and
+        // never touches these paths on the real filesystem, so any valid nested
+        // worktree/data layout serves.
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new("/jit-test-harness", "harness-worktree", true),
+            RepositoryRootEvidence::new("/jit-test-harness/.jit", "harness-data", true),
+        )
+        .expect("synthetic harness layout is valid");
+        let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
         Self { executor, storage }
     }
 

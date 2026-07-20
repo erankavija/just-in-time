@@ -7,7 +7,7 @@ use crate::declarations::{parse_gate_registry, serialize_gate_registry, GateRegi
 use crate::domain::{Event, GateRunResult, Issue};
 use crate::repository_state::{
     serialize_event, serialize_gate_run, serialize_issue, EntryIdentity, FileMode, RepositoryEntry,
-    RepositoryRootClass, VirtualPath,
+    RepositoryRootClass, RootRelativePath, VirtualPath,
 };
 use crate::storage::{
     AmbiguousIdError, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError, IssueStore,
@@ -186,6 +186,7 @@ impl InMemoryStorage {
             .map_err(|e| crate::storage::PathReadError::Other(anyhow!("{e}")))?;
         let mut state = self.repository_state();
         Self::mark_data_root_existing(&mut state);
+        Self::ensure_ancestor_dirs(&mut state, &vpath);
         state.entries.insert(
             vpath,
             RepositoryEntry::File {
@@ -240,6 +241,7 @@ impl InMemoryStorage {
         let identity =
             EntryIdentity::for_bytes(object, &bytes).expect("entry identity is hashable");
         Self::mark_data_root_existing(state);
+        Self::ensure_ancestor_dirs(state, &vpath);
         state.entries.insert(
             vpath,
             RepositoryEntry::File {
@@ -248,6 +250,37 @@ impl InMemoryStorage {
                 mode: FileMode::Regular,
             },
         );
+    }
+
+    /// Model a `Directory` entry for every ancestor of `vpath` up to (but not
+    /// including) the data root, so the aggregate image reflects the directory
+    /// tree a real repository carries. A recovered mutation session verifies that
+    /// each written file's parent directory exists — exactly as the file backend
+    /// does against the on-disk tree — so an issue/gate-run write under a nested
+    /// `Data(...)` path must find its parent modeled here.
+    fn ensure_ancestor_dirs(state: &mut MemoryRepositoryState, vpath: &VirtualPath) {
+        let mut ancestor = vpath.relative().as_path().parent();
+        while let Some(dir) = ancestor {
+            if dir.as_os_str().is_empty() {
+                break;
+            }
+            if let Ok(dir_path) =
+                RootRelativePath::parse(dir).and_then(|rel| VirtualPath::from_root(vpath.root_class(), rel))
+            {
+                state
+                    .entries
+                    .entry(dir_path)
+                    .or_insert_with(|| RepositoryEntry::Directory {
+                        identity: EntryIdentity::for_bytes(
+                            format!("memory-directory:{}", dir.display()),
+                            b"directory",
+                        )
+                        .expect("directory identity is hashable"),
+                        mode: FileMode::Executable,
+                    });
+            }
+            ancestor = dir.parent();
+        }
     }
 
     /// Read the exact captured bytes for `vpath` from the aggregate image.

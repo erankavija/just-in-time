@@ -295,6 +295,18 @@ pub enum MutationIntent {
         /// Claiming agent identity.
         agent: Assignee,
     },
+    /// Semantic full-issue update of an issue that ALREADY EXISTS in the captured
+    /// image. The finalizer stamps `updated_at` from the mutation clock and derives
+    /// `created_at`/`first_ready_at` from the captured preimage (they are not the
+    /// caller's to set); every other field is taken verbatim from `issue`. Index
+    /// membership is unchanged (no id is allocated), and a target absent from the
+    /// captured image is a typed [`MutationError::MissingIssue`] — never an implicit
+    /// create.
+    UpdateIssue {
+        /// Semantic issue whose id must match a captured issue; its lifecycle
+        /// timestamps are reconciled against the preimage by the finalizer.
+        issue: Box<Issue>,
+    },
     /// Record one gate-run artifact. The finalizer assigns `run_id` and preserves
     /// external checker `started_at`/`completed_at` evidence verbatim.
     RecordGateRun {
@@ -639,6 +651,25 @@ pub fn finalize(
                     },
                 });
             }
+        }
+    }
+
+    // Pass 2b: full-issue semantic updates of existing issues. No identifier is
+    // allocated (the id must match a captured issue), preserving the frozen
+    // allocation order. `updated_at` is stamped from the single mutation clock;
+    // `created_at`/`first_ready_at` are reconciled from the captured preimage so a
+    // caller cannot rewrite lifecycle history. A target absent from the captured
+    // image is a typed error, never an implicit create.
+    for intent in intents {
+        if let MutationIntent::UpdateIssue { issue } = intent {
+            let preimage = captured_issue(image, &issue.id)?
+                .ok_or_else(|| MutationError::MissingIssue(issue.id.clone()))?;
+            let now = context.timestamp();
+            let mut updated = (**issue).clone();
+            updated.created_at = preimage.created_at;
+            updated.first_ready_at = preimage.first_ready_at;
+            updated.updated_at = now;
+            actions.push(write_issue_action(image, &updated)?);
         }
     }
 

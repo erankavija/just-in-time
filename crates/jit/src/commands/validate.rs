@@ -662,7 +662,10 @@ fn plan_content_from_image(
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    fn detect_and_fix_hierarchy_issues(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)> {
+    fn detect_and_fix_hierarchy_issues(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::config_manager::get_hierarchy_config;
 
         let config = get_hierarchy_config(&self.storage)?;
@@ -748,7 +751,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok((fixes_applied, messages))
     }
 
-    fn apply_type_fix(&mut self, issue_id: &str, old_type: &str, new_type: &str) -> Result<()> {
+    fn apply_type_fix(&self, issue_id: &str, old_type: &str, new_type: &str) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let mut issue = self.storage.load_issue(issue_id)?;
 
         // Replace the type label
@@ -758,8 +764,83 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.labels.retain(|l| l != &old_label);
         issue.labels.push(new_label);
 
-        self.storage.save_issue(issue)?;
-        Ok(())
+        // Publish the relabel as a semantic full-issue update through the recovered
+        // session; the finalizer stamps `updated_at` and reconciles the lifecycle
+        // timestamps from the captured preimage.
+        self.publish_issue_mutation(vec![issue], Vec::new())
+    }
+
+    /// Publish semantic issue update(s) plus any inline provenance event(s) through
+    /// the recovered mutation session in one transaction — the closed-read
+    /// replacement for the `save_issue` + `append_event` pair on the validate-fix
+    /// path.
+    ///
+    /// Each update is a [`MutationIntent::UpdateIssue`] of an issue that must exist
+    /// in the captured image; the finalizer stamps its `updated_at` and reconciles
+    /// `created_at`/`first_ready_at` from the captured preimage. Each event is a
+    /// [`MutationIntent::RecordEvent`] whose id and timestamp the finalizer assigns
+    /// (the caller submits an empty id and a placeholder timestamp). One
+    /// [`MutationContext`] is created before the retry loop and reused, so a
+    /// conflict retry reproduces identical identifiers and the single mutation
+    /// timestamp. General enough for the remaining `save_issue` consumers to adopt
+    /// in the increment-8 swap-and-delete.
+    fn publish_issue_mutation(
+        &self,
+        updates: Vec<Issue>,
+        events: Vec<(u8, crate::domain::Event)>,
+    ) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{
+            finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, VirtualPath,
+        };
+        use crate::storage::RepositoryStateStoreError;
+
+        let issue_ids: Vec<String> = updates.iter().map(|issue| issue.id.clone()).collect();
+        let intents: Vec<MutationIntent> = updates
+            .into_iter()
+            .map(|issue| MutationIntent::UpdateIssue {
+                issue: Box::new(issue),
+            })
+            .chain(events.into_iter().map(|(phase, event)| {
+                MutationIntent::RecordEvent {
+                    phase,
+                    event: Box::new(event),
+                }
+            }))
+            .collect();
+
+        let layout = self.require_layout()?;
+        let mut session = self.storage().open_mutation_session(layout.clone())?;
+        let context = MutationContext::production();
+        let budget = CaptureBudget {
+            max_paths: 64,
+            max_listings: 0,
+            max_bytes: 64 * 1024 * 1024,
+            max_depth: 6,
+        };
+        for _ in 0..8 {
+            let mut paths = issue_ids
+                .iter()
+                .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+                .collect::<Result<Vec<_>, _>>()?;
+            paths.push(VirtualPath::data("events.jsonl")?);
+            let image = match session.capture(CaptureSpec::phase_one(paths, budget)?) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let plan = finalize(&layout, &image, &context, &intents)?;
+            match session.apply(&plan) {
+                Ok(_) => return Ok(()),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "issue mutation did not converge after repeated capture conflicts"
+        ))
     }
 
     // Note: apply_dependency_reversal is removed - we don't reverse dependencies
@@ -1996,7 +2077,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         graph: &DependencyGraph<Issue>,
         issue_id: &str,
         dry_run: bool,
-    ) -> Result<usize> {
+    ) -> Result<usize>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let mut issue = self.storage.load_issue(issue_id)?;
 
         if issue.dependencies.is_empty() {
@@ -2024,15 +2108,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .collect();
 
             issue.dependencies = reduced.into_iter().collect();
-            self.storage.save_issue(issue.clone())?;
 
-            let event = Event::new_dependency_reduced(
-                issue.id.clone(),
-                current_len,
-                reduced_len,
+            // The dependency-reduced event is an inline-variant event: an empty id
+            // and a placeholder timestamp the finalizer overwrites when it assigns
+            // identity and stamps the single mutation time. The reduced issue and
+            // the event publish through one recovered-session transaction.
+            let event = Event::DependencyReduced {
+                id: String::new(),
+                issue_id: issue.id.clone(),
+                timestamp: chrono::DateTime::from_timestamp(0, 0).expect("epoch is valid"),
+                old_count: current_len,
+                new_count: reduced_len,
                 removed_deps,
-            );
-            self.storage.append_event(&event)?;
+            };
+            self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
         }
 
         Ok(redundant_count)
@@ -2041,7 +2130,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Fix transitive reduction violations for all issues.
     ///
     /// Returns count of redundant edges fixed (or that would be fixed if dry_run).
-    fn fix_all_transitive_reductions(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)> {
+    fn fix_all_transitive_reductions(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
