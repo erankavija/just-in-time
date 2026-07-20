@@ -1,12 +1,8 @@
 //! Embedded production package for jit's repository-neutral dogfood workflow.
 
-use super::{
-    derive_preset_projection, project_package, EmbeddedProfilePackage, PackageProjection,
-    ProfilePackageError, ProjectionError,
-};
+use super::{Contribution, EmbeddedProfilePackage, KeyedArrayTarget, ProfilePackageError};
 use crate::declarations::GateDefinition;
 use include_dir::{include_dir, Dir};
-use std::collections::{BTreeMap, BTreeSet};
 
 static JIT_DOGFOOD_DIRECTORY: Dir<'_> =
     include_dir!("$CARGO_MANIFEST_DIR/../../profiles/jit-dogfood");
@@ -20,9 +16,6 @@ pub enum DogfoodProfileError {
     /// The production package failed immutable package validation.
     #[error("invalid embedded jit-dogfood package: {0}")]
     Package(#[from] ProfilePackageError),
-    /// A package projection could not be rendered.
-    #[error("failed to project embedded jit-dogfood package: {0}")]
-    Projection(#[from] ProjectionError),
     /// A requested gate is absent from the package.
     #[error("jit-dogfood package does not declare gate '{0}'")]
     MissingGate(String),
@@ -47,11 +40,20 @@ pub fn jit_dogfood_package() -> Result<EmbeddedProfilePackage<'static>, DogfoodP
 /// Deserialize one gate definition from the package's authored gate inventory.
 pub fn jit_dogfood_gate(key: &str) -> Result<GateDefinition, DogfoodProfileError> {
     let package = jit_dogfood_package()?;
-    let value = derive_preset_projection(&package)
-        .gates
+    let value = package
+        .manifest()
+        .contributions
         .iter()
-        .find(|value| value.get("key").and_then(serde_json::Value::as_str) == Some(key))
-        .cloned()
+        .find_map(|contribution| match contribution {
+            Contribution::KeyedArray {
+                target: KeyedArrayTarget::Gates,
+                value,
+                ..
+            } if value.get("key").and_then(serde_json::Value::as_str) == Some(key) => {
+                Some(value.clone())
+            }
+            _ => None,
+        })
         .ok_or_else(|| DogfoodProfileError::MissingGate(key.to_string()))?;
 
     serde_json::from_value(value).map_err(|source| DogfoodProfileError::InvalidGate {
@@ -113,81 +115,6 @@ pub fn jit_dogfood_planning_gate_keys() -> Result<Vec<String>, DogfoodProfileErr
     Ok(keys)
 }
 
-/// Project only package-authored live consumers plus managed regions.
-///
-/// Install-only adopter state remains excluded. `existing` supplies current
-/// bytes for managed-region targets, using repository-relative keys.
-pub fn jit_dogfood_live_projection(
-    existing: &BTreeMap<String, Vec<u8>>,
-) -> Result<PackageProjection, DogfoodProfileError> {
-    let package = jit_dogfood_package()?;
-    let projected = project_package(&package, existing)?;
-    let live_targets = package
-        .manifest()
-        .assets
-        .iter()
-        .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
-        .map(|asset| asset.target.as_str())
-        .chain(
-            package
-                .manifest()
-                .regions
-                .iter()
-                .map(|region| region.target.as_str()),
-        )
-        .collect::<BTreeSet<_>>();
-    let mut files = projected
-        .files()
-        .iter()
-        .filter(|(target, _)| live_targets.contains(target.as_str()))
-        .map(|(target, file)| (target.clone(), file.clone()))
-        .collect::<BTreeMap<_, _>>();
-    if let (Some(current), Some(projected_agents)) =
-        (existing.get("AGENTS.md"), files.get_mut("AGENTS.md"))
-    {
-        preserve_nested_region(
-            current,
-            &mut projected_agents.bytes,
-            b"<!-- jit:invariants:begin -->",
-            b"<!-- jit:invariants:end -->",
-        );
-    }
-    Ok(PackageProjection::from_files(files))
-}
-
-fn preserve_nested_region(current: &[u8], projected: &mut Vec<u8>, begin: &[u8], end: &[u8]) {
-    let Some(current_begin) = find_bytes(current, begin) else {
-        return;
-    };
-    let Some(current_end_rel) = find_bytes(&current[current_begin + begin.len()..], end) else {
-        return;
-    };
-    let current_content_start = current_begin + begin.len();
-    let current_content_end = current_content_start + current_end_rel;
-
-    let Some(projected_begin) = find_bytes(projected, begin) else {
-        return;
-    };
-    let Some(projected_end_rel) = find_bytes(&projected[projected_begin + begin.len()..], end)
-    else {
-        return;
-    };
-    let projected_content_start = projected_begin + begin.len();
-    let projected_content_end = projected_content_start + projected_end_rel;
-    projected.splice(
-        projected_content_start..projected_content_end,
-        current[current_content_start..current_content_end]
-            .iter()
-            .copied(),
-    );
-}
-
-fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack
-        .windows(needle.len())
-        .position(|window| window == needle)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,6 +125,7 @@ mod tests {
     use crate::profile::{Contribution, KeyedArrayTarget, MapEntryTarget};
     use crate::repository_state::render_rules_and_gates_markdown;
     use crate::storage::{IssueStore, JsonFileStorage};
+    use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
     use tempfile::TempDir;
@@ -447,20 +375,29 @@ mod tests {
     }
 
     #[test]
-    fn test_live_projection_excludes_install_only_state() {
-        let projection = jit_dogfood_live_projection(&BTreeMap::new()).unwrap();
-        assert!(projection
-            .get(".agents/skills/jit-manage/SKILL.md")
-            .is_some());
-        assert!(projection.get("scripts/ai-review.sh").is_some());
-        assert!(projection.get("AGENTS.md").is_some());
-        assert!(projection.get(".jit/invariants.toml").is_none());
-        assert!(projection
-            .get(".jit/schemas/jit-content-standards.json")
-            .is_none());
-        assert!(projection
-            .get(".jit/reference/rules-and-gates.md")
-            .is_none());
+    fn test_live_assets_cover_source_consumers_and_exclude_install_only_state() {
+        let package = jit_dogfood_package().unwrap();
+        let live: BTreeSet<&str> = package
+            .manifest()
+            .assets
+            .iter()
+            .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
+            .map(|asset| asset.target.as_str())
+            .collect();
+        // Live consumers are packaged from `assets/live/`.
+        assert!(live.contains(".agents/skills/jit-manage/SKILL.md"));
+        assert!(live.contains("scripts/ai-review.sh"));
+        let regions: BTreeSet<&str> = package
+            .manifest()
+            .regions
+            .iter()
+            .map(|region| region.target.as_str())
+            .collect();
+        assert!(regions.contains("AGENTS.md"));
+        // Install-only adopter state is never a live consumer.
+        assert!(!live.contains(".jit/invariants.toml"));
+        assert!(!live.contains(".jit/schemas/jit-content-standards.json"));
+        assert!(!live.contains(".jit/reference/rules-and-gates.md"));
     }
 
     #[test]
@@ -491,32 +428,75 @@ mod tests {
     }
 
     #[test]
-    fn test_live_projection_matches_every_declared_source_tree_consumer() {
+    fn test_live_assets_match_every_declared_source_tree_consumer() {
+        use crate::repository_state::splice_region;
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let agents = fs::read(root.join("AGENTS.md")).unwrap();
-        let projection =
-            jit_dogfood_live_projection(&BTreeMap::from([("AGENTS.md".to_string(), agents)]))
-                .unwrap();
+        let package = jit_dogfood_package().unwrap();
 
-        for file in projection.files().values() {
-            let live = fs::read(root.join(&file.target))
-                .unwrap_or_else(|error| panic!("failed to read {}: {error}", file.target));
-            assert_eq!(live, file.bytes, "{} drifted from the package", file.target);
-
+        // Every live asset is an exact copy of the repo file it consumes, mode included.
+        for asset in package
+            .manifest()
+            .assets
+            .iter()
+            .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
+        {
+            let live = fs::read(root.join(&asset.target))
+                .unwrap_or_else(|error| panic!("failed to read {}: {error}", asset.target));
+            assert_eq!(
+                live,
+                package.source_bytes(&asset.source).unwrap(),
+                "{} drifted from the package",
+                asset.target
+            );
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                let executable = fs::metadata(root.join(&file.target))
+                let executable = fs::metadata(root.join(&asset.target))
                     .unwrap()
                     .permissions()
                     .mode()
                     & 0o111
                     != 0;
                 assert_eq!(
-                    executable,
-                    file.mode == super::super::ProjectedFileMode::Executable,
+                    executable, asset.executable,
                     "{} has the wrong executable mode",
-                    file.target
+                    asset.target
+                );
+            }
+        }
+
+        // Each managed region's packaged source matches the live region body, modulo
+        // any nested managed sub-region the repo fills (the invariants projection)
+        // that the package leaves as a placeholder. Normalizing both sides' invariants
+        // sub-region through the same splice makes prose drift the only difference the
+        // comparison can surface.
+        let inv_begin = "<!-- jit:invariants:begin -->";
+        let inv_end = "<!-- jit:invariants:end -->";
+        for region in &package.manifest().regions {
+            let live = fs::read_to_string(root.join(&region.target)).unwrap();
+            let begin = format!("<!-- jit:{}:begin -->", region.region_id);
+            let end = format!("<!-- jit:{}:end -->", region.region_id);
+            let body_start = live.find(&begin).expect("live region begin") + begin.len() + 1;
+            let body_end = live.find(&end).expect("live region end");
+            let body = &live[body_start..body_end];
+            let source =
+                std::str::from_utf8(package.source_bytes(&region.source).unwrap()).unwrap();
+            if source.contains(inv_begin) {
+                let normalized_live =
+                    splice_region(body, "_No invariants declared._", inv_begin, inv_end).unwrap();
+                let normalized_source =
+                    splice_region(source, "_No invariants declared._", inv_begin, inv_end).unwrap();
+                assert_eq!(
+                    normalized_live, normalized_source,
+                    "{} region prose drifted from the package",
+                    region.target
+                );
+            } else {
+                assert_eq!(
+                    body.as_bytes(),
+                    source.as_bytes(),
+                    "{} region drifted from the package",
+                    region.target
                 );
             }
         }

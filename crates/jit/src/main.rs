@@ -80,9 +80,6 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             .downcast_ref::<jit::repository_state::ManagedDocumentError>()
             .is_some()
         || error
-            .downcast_ref::<jit::profile::ProfilePlanError>()
-            .is_some()
-        || error
             .downcast_ref::<jit::profile::ProfileClaimError>()
             .is_some()
         || error
@@ -748,11 +745,8 @@ fn profile_json_error(error: &anyhow::Error, command: &str) -> jit::output::Json
         JsonError::new(ErrorCode::PROFILE_NOT_FOUND, error.to_string(), command)
             .with_suggestion("Run 'jit profile list --json' to see embedded profiles")
     } else if error
-        .downcast_ref::<jit::profile::ProfilePlanError>()
+        .downcast_ref::<jit::profile::ProfileClaimError>()
         .is_some()
-        || error
-            .downcast_ref::<jit::profile::ProfileClaimError>()
-            .is_some()
         || error
             .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()

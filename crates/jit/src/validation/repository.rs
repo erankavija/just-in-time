@@ -3,11 +3,9 @@
 //! Whole-repository validation ([`validate_repository`]) reads exclusively from a
 //! closed [`RepositoryImage`](crate::repository_state::RepositoryImage): a live
 //! capture validates the working tree and an overlay image validates a proposed
-//! final state, with no live filesystem or Git I/O in any pass. The legacy
-//! [`RepositoryView`] boundary survives only for the projection helpers
-//! ([`render_projections`], [`projection_targets`]) the profile planner still
-//! consumes; both share the same config/rules/gates loaders through a byte-read
-//! closure so validation and projection rendering never fork their loaders.
+//! final state, with no live filesystem or Git I/O in any pass. Every pass reads
+//! image-projected bytes through one byte-read closure, so no path forks its
+//! config/rules/gates loaders.
 
 use crate::config::{JitConfig, ProjectionMode};
 use crate::declarations::invariants::InvariantRegistry;
@@ -23,8 +21,8 @@ use crate::domain::item::{
 use crate::domain::{parse_known_events, Issue, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
 use crate::repository_state::{
-    compose_projection, render_projection_body, require_target, splice_region, ProjectionInputs,
-    RepositoryEntry, RepositoryImage,
+    render_projection_body, require_target, splice_region, ProjectionInputs, RepositoryEntry,
+    RepositoryImage,
 };
 use crate::validation::engine::Finding;
 use crate::validation::report::{ReportedFinding, RuleReport};
@@ -32,8 +30,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::{Error as IoError, ErrorKind};
-use std::path::{Component, Path, PathBuf};
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
 
 const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 2;
 
@@ -72,7 +69,7 @@ pub struct RepositoryValidationReport {
 }
 
 /// A structural repository-validation failure with all semantic findings that
-/// could still be collected from the already loaded [`RepositoryView`].
+/// could still be collected from the already captured [`RepositoryImage`].
 ///
 /// Callers that render validation output should inspect [`Self::report`] before
 /// propagating [`Self::into_error`]. This keeps a structural failure authoritative
@@ -116,188 +113,6 @@ impl std::error::Error for RepositoryValidationFailure {
     }
 }
 
-/// A read-only repository byte source.
-///
-/// Paths are relative to the repository root. Implementations must never follow
-/// an absolute or parent-traversing input. `list_files` returns regular-file
-/// paths in deterministic order.
-pub trait RepositoryView: Send + Sync {
-    /// Repository root used only for diagnostics and synthetic schema paths.
-    fn repository_root(&self) -> &Path;
-
-    /// Read one repository-relative file, or `None` when it is absent.
-    fn read_file(&self, relative: &Path) -> Result<Option<Vec<u8>>>;
-
-    /// List regular files recursively beneath a repository-relative directory.
-    fn list_files(&self, relative_dir: &Path) -> Result<Vec<PathBuf>>;
-
-    /// Whether `relative` is explicitly deleted by a planned view layer.
-    ///
-    /// Ordinary filesystem absence returns `false`, preserving validators whose
-    /// contract permits a Git `HEAD` fallback. An overlay tombstone returns
-    /// `true`, making the proposed final-state deletion authoritative.
-    fn is_planned_deletion(&self, relative: &Path) -> Result<bool> {
-        validate_relative(relative)?;
-        Ok(false)
-    }
-}
-
-/// A repository view backed directly by the working tree filesystem.
-#[derive(Debug, Clone)]
-pub struct FilesystemRepositoryView {
-    root: PathBuf,
-    jit_root: PathBuf,
-}
-
-impl FilesystemRepositoryView {
-    /// Create a filesystem view rooted at the repository containing `.jit`.
-    pub fn new(root: impl Into<PathBuf>) -> Self {
-        let root = root.into();
-        let jit_root = root.join(".jit");
-        Self { root, jit_root }
-    }
-
-    /// Create a filesystem view for an explicitly selected JIT data directory.
-    /// The view still exposes its contents under the canonical virtual `.jit/`
-    /// prefix, so custom `JIT_DATA_DIR` repositories execute the same pipeline.
-    pub fn from_jit_root(jit_root: impl Into<PathBuf>) -> Result<Self> {
-        let jit_root = jit_root.into();
-        let root = jit_root
-            .parent()
-            .ok_or_else(|| {
-                anyhow!(
-                    "JIT data directory '{}' has no repository parent",
-                    jit_root.display()
-                )
-            })?
-            .to_path_buf();
-        Ok(Self { root, jit_root })
-    }
-
-    fn resolve(&self, relative: &Path) -> PathBuf {
-        relative.strip_prefix(".jit").map_or_else(
-            |_| self.root.join(relative),
-            |inside| self.jit_root.join(inside),
-        )
-    }
-}
-
-impl RepositoryView for FilesystemRepositoryView {
-    fn repository_root(&self) -> &Path {
-        &self.root
-    }
-
-    fn read_file(&self, relative: &Path) -> Result<Option<Vec<u8>>> {
-        validate_relative(relative)?;
-        let path = self.resolve(relative);
-        match std::fs::read(&path) {
-            Ok(bytes) => Ok(Some(bytes)),
-            Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(error).with_context(|| format!("reading {}", path.display())),
-        }
-    }
-
-    fn list_files(&self, relative_dir: &Path) -> Result<Vec<PathBuf>> {
-        validate_relative(relative_dir)?;
-        let start = self.resolve(relative_dir);
-        if !start.exists() {
-            return Ok(Vec::new());
-        }
-        let mut pending = vec![start];
-        let mut files = Vec::new();
-        while let Some(dir) = pending.pop() {
-            let entries =
-                std::fs::read_dir(&dir).with_context(|| format!("listing {}", dir.display()))?;
-            for entry in entries {
-                let entry = entry?;
-                let file_type = entry.file_type()?;
-                if file_type.is_dir() {
-                    pending.push(entry.path());
-                } else if file_type.is_file() {
-                    let path = entry.path();
-                    let relative = if path.starts_with(&self.jit_root) {
-                        PathBuf::from(".jit").join(path.strip_prefix(&self.jit_root)?)
-                    } else {
-                        path.strip_prefix(&self.root)?.to_path_buf()
-                    };
-                    files.push(relative);
-                }
-            }
-        }
-        files.sort();
-        Ok(files)
-    }
-}
-
-/// A layered final-state view over another repository view.
-///
-/// Map values are `Some(bytes)` for replacement/creation and `None` for a
-/// planned deletion. Every read and directory listing consults the overlay
-/// first, so all validators see one coherent proposed repository.
-#[derive(Clone)]
-pub struct OverlayRepositoryView {
-    base: Arc<dyn RepositoryView>,
-    changes: BTreeMap<PathBuf, Option<Vec<u8>>>,
-}
-
-impl OverlayRepositoryView {
-    /// Layer repository-relative planned bytes over `base`.
-    pub fn new(
-        base: Arc<dyn RepositoryView>,
-        changes: impl IntoIterator<Item = (PathBuf, Option<Vec<u8>>)>,
-    ) -> Result<Self> {
-        let changes = changes
-            .into_iter()
-            .map(|(path, bytes)| {
-                validate_relative(&path)?;
-                Ok((path, bytes))
-            })
-            .collect::<Result<BTreeMap<_, _>>>()?;
-        Ok(Self { base, changes })
-    }
-}
-
-impl RepositoryView for OverlayRepositoryView {
-    fn repository_root(&self) -> &Path {
-        self.base.repository_root()
-    }
-
-    fn read_file(&self, relative: &Path) -> Result<Option<Vec<u8>>> {
-        validate_relative(relative)?;
-        self.changes
-            .get(relative)
-            .cloned()
-            .map_or_else(|| self.base.read_file(relative), Ok)
-    }
-
-    fn list_files(&self, relative_dir: &Path) -> Result<Vec<PathBuf>> {
-        validate_relative(relative_dir)?;
-        let mut files: BTreeSet<PathBuf> =
-            self.base.list_files(relative_dir)?.into_iter().collect();
-        for (path, bytes) in &self.changes {
-            if path.starts_with(relative_dir) {
-                if bytes.is_some() {
-                    files.insert(path.clone());
-                } else {
-                    files.remove(path);
-                }
-            }
-        }
-        Ok(files.into_iter().collect())
-    }
-
-    fn is_planned_deletion(&self, relative: &Path) -> Result<bool> {
-        validate_relative(relative)?;
-        match self.changes.get(relative) {
-            Some(None) => Ok(true),
-            Some(Some(_)) => Ok(false),
-            None => self.base.is_planned_deletion(relative),
-        }
-    }
-}
-
-/// Validate the exact repository exposed by `view` through the full read-only
-/// pipeline.
 /// Read a repo-relative path's bytes from the captured image.
 ///
 /// A `.jit/`-prefixed path is a `Data(...)` entry, every other repo-relative path
@@ -483,88 +298,6 @@ pub fn validate_repository(
         Some(error) => Err(RepositoryValidationFailure::new(error, report)),
         None => Ok(report),
     }
-}
-
-/// Resolve every configured projection target from a proposed repository image.
-///
-/// Returns the repo-relative target path of EVERY declared `[projection.<name>]`.
-/// Profile planning uses this set to exempt package-owned projection targets from
-/// the asset-conflict check (their bytes are re-derived from the merged
-/// registries, not frozen from the package's contribution rows).
-pub(crate) fn projection_targets(view: &dyn RepositoryView) -> Result<BTreeSet<PathBuf>> {
-    let read = |path: &str| view.read_file(Path::new(path));
-    let read: &ReadBytes<'_> = &read;
-    let config = load_config(read)?;
-    let Some(projections) = config.projection.as_ref() else {
-        return Ok(BTreeSet::new());
-    };
-    projections
-        .iter()
-        .map(|(name, projection)| Ok(PathBuf::from(require_target(projection, name)?)))
-        .collect()
-}
-
-/// Render every configured projection for a proposed final repository image.
-///
-/// Profile planning uses this before validation so a package-owned projection
-/// target is derived from the merged registries rather than frozen from only the
-/// package's contribution rows. Each returned `(target, bytes)` is the exact
-/// content `jit project render` would write over the proposed image, rendered
-/// through the SAME generic body path AND composed through the SAME
-/// [`compose_projection`] mechanism — so several projections that share one target
-/// each land in the final bytes (sequential composition), never last-writer-wins.
-pub(crate) fn render_projections(view: &dyn RepositoryView) -> Result<Vec<(PathBuf, Vec<u8>)>> {
-    let read = |path: &str| view.read_file(Path::new(path));
-    let read: &ReadBytes<'_> = &read;
-    let config = load_config(read)?;
-    let Some(projections) = config.projection.as_ref() else {
-        return Ok(Vec::new());
-    };
-    let namespaces = crate::config_manager::namespaces_from_config(&config);
-    let rules = load_rules(read, &config, &namespaces)?;
-    let gates = load_gates(read)?;
-    let inputs = ProjectionInputs {
-        config: &config,
-        rules: &rules,
-        gates: &gates,
-    };
-    // Thread every projection through one `pending` map keyed by target, so two
-    // projections into the SAME file compose (each splice sees the prior one's
-    // change) instead of overwriting each other.
-    let mut pending: BTreeMap<String, String> = BTreeMap::new();
-    for (name, projection) in projections {
-        let mut render_read = |path: &str| read_text(read, path);
-        let (body, _count) = render_projection_body(projection, &inputs, &mut render_read)?;
-        let target = require_target(projection, name)?;
-        compose_projection(
-            &mut pending,
-            &target,
-            projection.mode(),
-            &body,
-            &projection.region_begin(name),
-            &projection.region_end(name),
-            |path| read_text(read, path),
-        )?;
-    }
-    Ok(pending
-        .into_iter()
-        .map(|(target, content)| (PathBuf::from(target), content.into_bytes()))
-        .collect())
-}
-
-fn validate_relative(path: &Path) -> Result<()> {
-    if path.as_os_str().is_empty()
-        || path.is_absolute()
-        || path
-            .components()
-            .any(|component| !matches!(component, Component::Normal(_)))
-    {
-        return Err(anyhow!(
-            "repository view path '{}' must be a non-empty relative normal path",
-            path.display()
-        ));
-    }
-    Ok(())
 }
 
 /// A repository byte source keyed by repo-relative path.
@@ -898,9 +631,9 @@ fn validate_integrity(
 }
 
 /// Validate the machine-local claims control plane selected by the repository
-/// root. This boundary intentionally sits beside `RepositoryView`: claims live
-/// in `.git/jit`, not in the planned `.jit` byte set, so overlays delegate to
-/// the same coordination state without reopening repository storage.
+/// root. This boundary intentionally sits beside the captured repository image:
+/// claims live in `.git/jit`, not in the planned `.jit` byte set, so overlays
+/// delegate to the same coordination state without reopening repository storage.
 fn validate_machine_local_claims(repository_root: &Path) -> Result<()> {
     if std::env::var("JIT_TEST_MODE").is_err() {
         let index_issues = crate::commands::validate_claims_index_at(repository_root)
@@ -1370,78 +1103,6 @@ mod tests {
         let repo = fixture();
         std::fs::write(repo.path().join(".jit/gates.toml"), "not toml = [").unwrap();
         assert!(validate_overlaid(&repo, [put(".jit/gates.toml", "")]).is_ok());
-    }
-
-    /// F1: two region projections into the SAME target compose sequentially — the
-    /// second splices onto the first's change, so BOTH regions are fresh after
-    /// `render_projections` (profile planning's re-render path), never
-    /// last-writer-wins where one region stays stale.
-    #[test]
-    fn test_render_projections_composes_shared_target_both_regions_fresh() {
-        let repo = fixture();
-        let config = "\
-[type_hierarchy.types]
-task = 4
-
-[namespaces.type]
-description = \"Issue type\"
-unique = true
-
-[item_kinds.invariant]
-section = \"success_criteria\"
-id-pattern = \"[a-z][a-z0-9-]*\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
-source-of-truth = \"registry-first\"
-
-[projection.first]
-kind = \"invariant\"
-mode = \"region\"
-target = \"SHARED.md\"
-style = \"id-anchor\"
-
-[projection.second]
-kind = \"invariant\"
-mode = \"region\"
-target = \"SHARED.md\"
-style = \"id-anchor\"
-";
-        std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
-        std::fs::write(
-            repo.path().join(".jit/invariants.toml"),
-            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"Every edge stays acyclic.\"\nkind = \"enforced\"\n",
-        )
-        .unwrap();
-        // ONE file carries BOTH projections' region markers, each wrapping a
-        // distinct stale placeholder.
-        let shared = "# Shared\n\n\
-             <!-- jit:first:begin -->\nSTALE-FIRST\n<!-- jit:first:end -->\n\n\
-             <!-- jit:second:begin -->\nSTALE-SECOND\n<!-- jit:second:end -->\n";
-        std::fs::write(repo.path().join("SHARED.md"), shared).unwrap();
-
-        let rendered = render_projections(&FilesystemRepositoryView::new(repo.path())).unwrap();
-        // The two projections collapse to ONE composed target, not two entries.
-        assert_eq!(rendered.len(), 1, "shared target must yield one entry");
-        let (path, bytes) = &rendered[0];
-        assert_eq!(path, Path::new("SHARED.md"));
-        let out = String::from_utf8(bytes.clone()).unwrap();
-        // BOTH regions are fresh: neither stale placeholder survives, and the
-        // rendered invariant lands in both regions (composition, not last-writer).
-        assert!(
-            !out.contains("STALE-FIRST"),
-            "first region stayed stale: {out}"
-        );
-        assert!(
-            !out.contains("STALE-SECOND"),
-            "second region stayed stale: {out}"
-        );
-        assert_eq!(
-            out.matches("sample-invariant").count(),
-            2,
-            "both regions must carry the rendered invariant: {out}"
-        );
     }
 
     #[test]

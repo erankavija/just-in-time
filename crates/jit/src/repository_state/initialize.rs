@@ -9,13 +9,12 @@
 //! and applies the returned plan; it never hand-builds a transaction or a
 //! command-local final-byte inventory.
 //!
-//! Two dispositions are scheduled predecessor debt carried into this delta rather
-//! than rebuilt here: the profile's asset bytes still arrive from the command's
-//! `plan_profile_application_against` planner (its `repository_state::TargetClaim`
-//! replacement lands in increment 6), and the `ProfileApplied` audit line still
-//! arrives as command-computed bytes (its finalizer-routed replacement lands in
-//! increment 7). Both flow through `session.apply` here; no new call site is added
-//! to those predecessors.
+//! The profile's asset/region/registry bytes arrive as a [`ProfileContribution`]
+//! the command derives through
+//! [`derive_profile_materializations`](super::derive_profile_materializations); the
+//! `ProfileApplied` audit line still arrives as command-computed bytes (its
+//! finalizer-routed replacement is scheduled for a later increment). Both flow
+//! through `session.apply` here.
 
 use std::collections::BTreeMap;
 
@@ -323,10 +322,9 @@ impl InitializationScaffold {
 
     /// The neutral scaffold files as repository-relative `(path, bytes)` pairs.
     ///
-    /// The command overlays these onto its transitional profile-planning view (the
-    /// `RepositoryView`/planner path that increment 6 deletes) so profile
-    /// application sees the proposed neutral repository. Excludes the audit log and
-    /// any profile contribution.
+    /// The command overlays these onto the captured base so the profile derivation
+    /// sees the proposed neutral repository. Excludes the audit log and any profile
+    /// contribution.
     pub fn neutral_files(&self) -> Vec<(String, Vec<u8>)> {
         let mut files = vec![
             (".jit/config.toml".to_string(), self.config.clone()),
