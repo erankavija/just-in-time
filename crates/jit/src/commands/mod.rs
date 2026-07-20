@@ -2417,7 +2417,7 @@ mod tests {
     #[test]
     fn test_manual_gate_evidence_repeats_but_operation_retry_is_stable() {
         use crate::repository_state::{finalize, MutationContext};
-        use crate::storage::{InMemoryStorage, RepositoryStateStore};
+        use crate::storage::{InMemoryStorage, RepositoryStateStore, RepositoryStateStoreError};
 
         for status in [GateStatus::Passed, GateStatus::Failed] {
             let storage = InMemoryStorage::new();
@@ -2464,10 +2464,37 @@ mod tests {
             .unwrap();
             let first_plan =
                 finalize(&layout, &first_image, &first_context, &first.intents).unwrap();
+
+            // Force a genuine captured-image retry. The operation context must
+            // retain its event identity and timestamp when the issue preimage
+            // changes between attempts.
+            let mut concurrent = storage.load_issue(&id).unwrap();
+            concurrent.labels.push("owner:concurrent".to_string());
+            storage.save_issue(concurrent).unwrap();
+            assert!(matches!(
+                first_session.apply(&first_plan),
+                Err(RepositoryStateStoreError::RetryableConflict { .. })
+            ));
+            drop(first_session);
+
+            let mut retry_session = storage.open_mutation_session(layout.clone()).unwrap();
+            let retry_image = retry_session
+                .capture(captured_gate_issue_spec(&id))
+                .unwrap();
+            let retry = derive_captured_issue_mutation(
+                issue_from_image(&retry_image, &id),
+                &gate_registry_from_image(&retry_image),
+                &request,
+            )
+            .unwrap();
             let retry_plan =
-                finalize(&layout, &first_image, &first_context, &first.intents).unwrap();
-            assert_eq!(first_plan.delta(), retry_plan.delta());
-            first_session.apply(&first_plan).unwrap();
+                finalize(&layout, &retry_image, &first_context, &retry.intents).unwrap();
+            assert_eq!(
+                event_bytes(&first_plan),
+                event_bytes(&retry_plan),
+                "one operation context must keep manual evidence identity and time stable"
+            );
+            retry_session.apply(&retry_plan).unwrap();
             assert_eq!(
                 storage.load_issue(&id).unwrap().gates_status["review"].updated_at,
                 first_time
@@ -2526,6 +2553,34 @@ mod tests {
             assert_eq!(*evidence[1].1, second_time);
             assert_ne!(evidence[0].0, evidence[1].0);
         }
+    }
+
+    #[test]
+    fn test_manual_gate_pending_status_is_rejected_before_other_validation() {
+        let issue = crate::domain::types::fixture_issue(
+            "pending-precedence".to_string(),
+            "Pending precedence".to_string(),
+        );
+        let request = CapturedIssueMutation::SetManualGateStatus {
+            issue_id: issue.id.clone(),
+            gate_key: "missing-and-not-required".to_string(),
+            status: GateStatus::Pending,
+            by: None,
+        };
+
+        let error = match derive_captured_issue_mutation(
+            issue,
+            &crate::declarations::GateRegistry::default(),
+            &request,
+        ) {
+            Ok(_) => panic!("pending status unexpectedly accepted"),
+            Err(error) => error,
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "manual gate status must be passed or failed"
+        );
     }
 
     #[test]

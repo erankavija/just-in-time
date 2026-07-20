@@ -1650,7 +1650,7 @@ The gate key may be supplied as a positional argument or via `--gate <key>`. Exa
 **Options:**
 - `--gate <KEY>` - Gate key (flag form, alternative to the positional argument)
 - `--by <WHO>` - Who is passing the gate (e.g., `human:alice`, `ci:github-actions`). Required for a manual gate; ignored for an automated gate, whose verdict comes from the checker.
-- `--force` - Re-run the checker even if the gate already passed at the current HEAD commit
+- `--force` - Re-run an automated gate's checker even if it already passed at the current HEAD commit
 
 **Examples:**
 ```bash
@@ -1669,24 +1669,22 @@ jit gate evaluate abc123 --gate tests --force
 ```
 
 **Behavior:**
-- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, it updates gate status to `passed`, records who passed it and the timestamp. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
+- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, every invocation records fresh evidence with a new event and timestamp, including when the same attestor already passed the gate at the current `HEAD`. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
 - For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required. This evaluation records a run; it does not itself complete the issue.
 - After required statuses are passed, use `jit issue update <id> --state done` to complete a gated issue through the explicit completion path.
 
-**Skip when already passed at HEAD:**
-- If the gate's latest run already passed at the current `HEAD` commit, `jit gate
-  evaluate` skips the (often expensive) checker, exits `0`, and reports
+**Automated skip when already passed at HEAD:**
+- If an automated gate's latest run already passed at the current `HEAD` commit,
+  `jit gate evaluate` skips the (often expensive) checker, exits `0`, and reports
   `already_passed: true` in `--json`. The non-`--json` path prints a concise
   "already passed at HEAD, skipping (use --force to re-run)" line.
 - The skip compares the current `HEAD` against the commit stamped on the latest
   recorded run; both must be present and equal. When there is no git repository
   or no commit (`HEAD` unresolvable), the run is never skipped — the prior pass
   cannot be proven current.
-- For a manual gate the skip additionally requires the recorded pass to be
-  attested: its attestor must be a human or agent, not the automated executor. An
-  unattested auto-era pass — e.g. left behind when an auto gate is redefined to
-  manual — is never skipped; a bare `jit gate evaluate` still requires `--by`.
-- `--force` bypasses the check and re-runs the checker unconditionally.
+- Manual attestations are never skipped; each invocation with `--by` records
+  fresh evidence even at the same `HEAD`.
+- `--force` bypasses the automated check and re-runs the checker unconditionally.
 - On a normal run (manual attestation, or a freshly executed checker), `--json`
   reports `already_passed: false`.
 
@@ -1791,10 +1789,10 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 
 **Behavior:**
 - Runs each required gate in declaration order, delegating to `jit gate evaluate`, so
-  every gate inherits the same exit-code taxonomy, `verdict` semantics, and the
-  **skip-if-passed-at-HEAD** behaviour (an already-passed gate is not re-run;
-  its entry reports `already_passed: true`). For a manual gate the skip applies
-  only when the recorded pass is attested.
+  every gate inherits the same exit-code taxonomy and `verdict` semantics.
+  Automated gates also inherit **skip-if-passed-at-HEAD** behaviour (an
+  already-passed gate is not re-run; its entry reports `already_passed: true`),
+  while manual gates record fresh evidence on every invocation.
 - **Manual gates require attestation:** every manual gate in the required set
   needs `--by <attestor>` (applied uniformly; ignored by automated gates).
   Without it, evaluation fails fast at the first manual gate reached in
@@ -1842,6 +1840,8 @@ jit gate evaluate-all abc123
 Record a failed verdict for a **manual** gate. An automated gate is rejected
 (exit `2`): its verdict comes only from running its checker via
 [`jit gate evaluate`](#jit-gate-evaluate), never from a hand-recorded fail.
+Every manual failure records fresh evidence with a new event and timestamp,
+including repeated failures at the same `HEAD`.
 
 **Usage:**
 ```bash
