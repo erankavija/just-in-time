@@ -128,6 +128,17 @@ fn scratch_repo_stale_for(workspace_root: &Path, ancestor: &str) -> Option<TempD
     ]) {
         return None;
     }
+    // The checked-out ANCESTOR predates the repository's move to canonical
+    // `.agents/skills` doc links (`.claude` was a user-local convenience symlink
+    // briefly git-tracked by mistake). A session-backed `jit init` captures the
+    // whole-repository closure, whose no-follow discipline must not traverse that
+    // symlink, so scrub the stale repository data from the disposable scratch tree:
+    // the `jit init` below then runs fresh and exercises the stale-binary refusal
+    // without any `.claude` dependency (jit:49adf23b).
+    let _ = Command::new("rm")
+        .args(["-rf", ".jit", ".claude"])
+        .current_dir(temp.path())
+        .status();
     Some(temp)
 }
 

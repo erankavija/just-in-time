@@ -1927,73 +1927,66 @@ fn run() -> Result<()> {
 
             // Snapshot which core repository files already exist so the `--json`
             // envelope can report exactly what THIS run created, rather than the
-            // full idempotent set `executor.init()` always ensures.
+            // full idempotent set the init transaction always ensures.
             let index_existed = jit_dir.join("index.json").exists();
             let gates_existed = jit_dir.join("gates.toml").exists();
             let events_existed = jit_dir.join("events.jsonl").exists();
             let config_existed = jit_dir.join("config.toml").exists();
             let rules_existed = jit_dir.join("rules.toml").exists();
-            let fresh = !jit_dir.exists();
-            let fresh_result = profile_result(
+
+            // `jit init` bypasses the non-init startup `validate()` gate, so a
+            // re-init over an EXISTING repository must run the index format guard
+            // itself: refuse a too-new on-disk `schema_version` with the typed
+            // RepositoryFormatTooNewError (exit 10) rather than writing into a repo
+            // this binary would misread (jit:def64ac4). A fresh init has no index.
+            if index_existed {
+                profile_result(storage.validate(), "init", *json)?;
+            }
+
+            // Every init and re-init — plain, profiled, or over an existing root —
+            // publishes through the recovered session: `run_initialization` fills
+            // only the missing neutral scaffold state (authored config/gates/rules
+            // preserved), seeds `[project]` and `rules.toml` when absent, computes
+            // the worktree `.gitattributes` merge-driver claim, and routes
+            // config/rules/schemas through one recoverable transaction. Unifying the
+            // plain re-init onto it asserts `.gitattributes` exactly like a fresh or
+            // profiled init, closing the prior re-init gap.
+            let init_result = profile_result(
                 if let Some(id) = profile.as_deref() {
-                    Some(executor.initialize_profiled_repository(&current_dir, &chosen, id))
+                    executor.initialize_profiled_repository(&current_dir, &chosen, id)
                 } else {
-                    fresh.then(|| executor.initialize_fresh_repository(&current_dir, &chosen, None))
-                }
-                .transpose(),
+                    executor.initialize_fresh_repository(&current_dir, &chosen, None)
+                },
                 "init",
                 *json,
             )?;
-            let (worktree_identity, init_warnings) = if fresh || profile.is_some() {
-                executor.initialize_worktree_identity()?
-            } else {
-                executor.init()?
-            };
+            // Machine-local worktree identity (gitignored, not part of the
+            // repository transaction) is created after the scaffold is published.
+            let (worktree_identity, init_warnings) = executor.initialize_worktree_identity()?;
             for warning in &init_warnings {
                 output_ctx.print_warning(warning)?;
             }
-            if let Some(result) = &fresh_result {
-                for warning in &result.warnings {
-                    eprintln!("Warning: {warning}");
-                }
+            for warning in &init_result.warnings {
+                eprintln!("Warning: {warning}");
             }
 
             // The worktree `.gitattributes` merge-driver claim is published as part
-            // of the init transaction itself (fresh and profiled init); its typed
-            // outcome is reported here for the `--json` created/modified path lists
-            // below. A plain re-init does not run that path and reports nothing.
-            let gitattributes_outcome = fresh_result
-                .as_ref()
-                .map(|result| result.gitattributes)
-                .unwrap_or(jit::repository_state::GitattributesStatus::NotApplicable);
+            // of the init transaction itself (every init and re-init now); its typed
+            // outcome is reported here for the `--json` created/modified path lists.
+            let gitattributes_outcome = init_result.gitattributes;
 
-            // Seed the `[project]` identity (REQ-01). The command layer owns the
-            // orchestration — existence check, default-name computation, and the
-            // store write — and is idempotent, so a re-init leaves an existing
-            // `[project]` table untouched.
-            let project_name = if let Some(result) = &fresh_result {
-                (!config_existed).then(|| result.project_name.clone())
-            } else {
-                executor.seed_project_config(&current_dir, &chosen.generate_config_toml())?
-            };
+            // The `[project]` identity is seeded inside the init transaction when
+            // `config.toml` was absent; report it as created only then. An existing
+            // `[project]` table is preserved (the scaffold is `IfAbsent`).
+            let project_name = (!config_existed).then(|| init_result.project_name.clone());
 
-            // Scaffold .jit/rules.toml (the operative ruleset) with the FIXED
-            // default ruleset derived from the repo's namespace registry + type
-            // hierarchy. A no-op when rules.toml already exists (re-init
-            // never clobbers user edits).
-            let scaffolded = if fresh_result.is_some() {
-                !rules_existed
-            } else {
-                executor.scaffold_default_rules()?
-            };
+            // `.jit/rules.toml` (the operative ruleset) is scaffolded inside the
+            // init transaction when absent; an existing file is never clobbered.
+            let scaffolded = !rules_existed;
             if scaffolded {
                 let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
             }
-            let profile_result = if let Some(result) = fresh_result {
-                result.profile
-            } else {
-                None
-            };
+            let profile_result = init_result.profile;
 
             let message = if let Some(ref t) = template {
                 format!("Initialized with '{}' hierarchy template", t.name)

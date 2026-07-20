@@ -411,13 +411,11 @@ fn test_init_json_gitattributes_has_no_stale_claims_jsonl_entry() {
     );
 }
 
-// TRANSITIONAL (jit:49adf23b increment 5): the worktree `.gitattributes` claim is
-// now published inside the fresh/profiled init transaction. A plain re-init still
-// runs the ordinary idempotent `init()` path, which does NOT perform a
-// gitattributes assertion until ordinary init migrates to the typed contract in
-// increment 7. This test's observable (a re-init reports `.gitattributes` in
-// neither created nor modified) holds in both worlds; the already-configured
-// DETECTION on re-init is pinned by increment 7 when ordinary init migrates.
+// A re-init runs the same session-backed init transaction as a fresh init
+// (jit:49adf23b increment 7 unified plain re-init onto `run_initialization`), so
+// it too claims the worktree `.gitattributes` merge driver. When the block is
+// already configured the claim is `Unchanged`, so a re-init reports
+// `.gitattributes` in neither created nor modified.
 #[test]
 fn test_init_json_reinit_reports_gitattributes_absent_from_created_paths() {
     let temp = TempDir::new().unwrap();
@@ -455,6 +453,52 @@ fn test_init_json_reinit_reports_gitattributes_absent_from_created_paths() {
     assert!(
         !modified.contains(&".gitattributes"),
         "an already-configured .gitattributes should not be reported as modified, got: {modified:?}"
+    );
+}
+
+// jit:49adf23b increment 7: pin that a PLAIN re-init asserts the worktree
+// `.gitattributes` merge-driver claim, not only a fresh init. Before the plain
+// re-init was unified onto the session-backed `run_initialization`, a re-init
+// reported `.gitattributes` as `NotApplicable` and never restored it. Here the
+// first init creates it, the file is then deleted, and the re-init must re-create
+// it — proving the claim runs on the ordinary (non-fresh, non-profiled) re-init
+// path and that Git evidence, not the fresh/existing-root distinction, gates it.
+#[test]
+fn test_init_json_reinit_reclaims_deleted_gitattributes() {
+    let temp = TempDir::new().unwrap();
+    let status = std::process::Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(temp.path())
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let first = jit_init(temp.path(), &["--json"]);
+    assert!(first.status.success());
+    let gitattributes = temp.path().join(".gitattributes");
+    assert!(gitattributes.is_file(), "fresh init creates .gitattributes");
+    fs::remove_file(&gitattributes).unwrap();
+
+    // A plain re-init (no template, no profile) over the existing root.
+    let out = jit_init(temp.path(), &["--json"]);
+    assert!(out.status.success(), "re-init failed: {out:?}");
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let created: Vec<&str> = json["created_paths"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert!(
+        created.contains(&".gitattributes"),
+        "a plain re-init must re-create the deleted .gitattributes, got: {created:?}"
+    );
+    let content = fs::read_to_string(&gitattributes).unwrap();
+    assert!(
+        content.contains(".jit/events.jsonl merge=union"),
+        "the re-created .gitattributes carries the events.jsonl merge driver, got: {content:?}"
     );
 }
 
