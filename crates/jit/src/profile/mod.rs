@@ -5,6 +5,7 @@
 //! production package inventory.
 
 mod application;
+mod apply_claims;
 mod dogfood;
 mod manifest;
 mod package;
@@ -19,6 +20,7 @@ pub use application::{
     ProfileApplicationWarning, ProfileApplyResult, ProfileListResult, ProfilePlanResult,
     ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
+pub use apply_claims::{build_profile_claims, ProfileClaimError};
 pub use dogfood::{
     jit_dogfood_gate, jit_dogfood_live_projection, jit_dogfood_package,
     jit_dogfood_planning_gate_keys, DogfoodProfileError, JIT_DOGFOOD_LIVE_SOURCE_PREFIX,

@@ -13,6 +13,7 @@ mod materialize;
 mod mutation;
 mod overlay;
 mod path;
+mod profile_apply;
 mod projection;
 mod projection_render;
 mod rule_serialize;
@@ -53,6 +54,7 @@ pub use path::{
     InjectivityProof, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
+pub use profile_apply::{derive_profile_materializations, ProfileClaims};
 pub use projection::{
     compose_projection, render_id_anchor_rows, render_invariants_markdown, require_target,
     splice_region, ProjectionError,
