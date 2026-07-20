@@ -3,23 +3,20 @@ use crate::config::{slugify_project_name, JitConfig, ProjectName};
 use crate::domain::Event;
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
-    append_profile_event_image, plan_profile_application_against, EmbeddedProfilePackage,
-    PlannedTargetAction, ProfileApplicationStatus, ProfileApplyResult, ProfileOrigin,
-    ProjectedFileMode, RepositorySnapshot, SnapshotEntry, SnapshotFile,
+    append_profile_event_image, build_profile_claims, EmbeddedProfilePackage,
+    ProfileApplicationStatus, ProfileApplyResult, ProfileOrigin,
 };
 use crate::repository_state::{
-    apply_overlay, finalize_initialization, GitattributesClaim, GitattributesStatus,
-    InitializationScaffold, ProfileContribution, ProfileTargetContribution, VirtualPath,
+    apply_overlay, derive_profile_materializations, finalize_initialization, GitattributesClaim,
+    GitattributesStatus, InitializationScaffold, ProfileContribution, ProfileTargetContribution,
+    RepositoryEntry, VirtualPath,
 };
 use crate::storage::{
-    IssueStore, JsonFileStorage, RepositoryStateStore, RepositoryStateStoreError,
-};
-use crate::validation::repository::{
-    FilesystemRepositoryView, OverlayRepositoryView, RepositoryView,
+    JsonFileStorage, RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
 };
 use anyhow::{anyhow, Context, Result};
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::path::Path;
 
 /// Result of publishing a fresh repository scaffold.
 #[derive(Debug)]
@@ -84,10 +81,16 @@ impl CommandExecutor<JsonFileStorage> {
                 self.resolve_init_config(session.as_mut(), repo_dir, template)?;
             let neutral =
                 InitializationScaffold::from_config(config.clone(), project_name.clone(), None)?;
-            let profiled = package
-                .as_ref()
-                .map(|package| self.compute_profile_contribution(package, &neutral))
-                .transpose()?;
+            let profiled = match package.as_ref() {
+                Some(package) => {
+                    match self.compute_profile_contribution(session.as_mut(), package, &neutral)? {
+                        // A retryable capture conflict: re-attempt the whole init.
+                        None => continue,
+                        Some(pair) => Some(pair),
+                    }
+                }
+                None => None,
+            };
             let (contribution, mut apply_result) = match profiled {
                 Some((contribution, result)) => (Some(contribution), Some(result)),
                 None => (None, None),
@@ -205,72 +208,96 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Compute one embedded profile's contribution to the initialization delta
-    /// through the transitional profile planner (increment-6 deletion target),
-    /// carrying its asset bytes, provenance record, and audit-log image.
+    /// through the canonical `repository_state` derivation, carrying its asset bytes,
+    /// provenance record, and audit-log image.
+    ///
+    /// The base is captured under the held session, overlaid with the neutral
+    /// scaffold state init will publish (schemas always; an existing
+    /// config/gates/rules preserved), so the profile merges over the proposed neutral
+    /// repository. Returns `Ok(None)` on a retryable capture conflict so the caller
+    /// re-attempts the whole initialization.
     fn compute_profile_contribution(
         &self,
+        session: &mut (dyn RepositoryMutationSession + '_),
         package: &EmbeddedProfilePackage<'_>,
         neutral: &InitializationScaffold,
-    ) -> Result<(ProfileContribution, ProfileApplyResult)> {
+    ) -> Result<Option<(ProfileContribution, ProfileApplyResult)>> {
         super::profile::reject_reserved_application_targets(
             package.hashes().targets.keys().map(String::as_str),
         )?;
         let metadata = &package.manifest().profile;
-        let record_path = format!(".jit/profiles/{}.json", metadata.id);
+        let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
+        let profiles_dir = VirtualPath::data("profiles")?;
+        let events_path = VirtualPath::data("events.jsonl")?;
         let neutral_files = neutral.neutral_files();
-        let captured = self.storage.capture_profile_snapshot(
-            package
-                .hashes()
-                .targets
-                .keys()
-                .map(String::as_str)
-                .chain([record_path.as_str(), ".jit/profiles", ".jit/events.jsonl"])
-                .chain(neutral_files.iter().map(|(path, _)| path.as_str())),
-        )?;
-        // The neutral overlay must reflect only the scaffold state init will
-        // actually publish: schemas are always (re)written, but an existing
-        // config/gates/rules is preserved (`IfAbsent`). Overlaying a present file
-        // with its empty default would shadow the live declarations and make the
-        // profile planner see spurious drift, so present non-schema neutral files
-        // fall through to their captured on-disk bytes.
-        let overlay_files: Vec<(String, Vec<u8>)> = neutral_files
-            .into_iter()
-            .filter(|(path, _)| path.starts_with(".jit/schemas/") || captured.entry(path).is_none())
-            .collect();
-        let mut entries = captured.entries().clone();
-        entries.insert(PathBuf::from(".jit/issues"), SnapshotEntry::Directory);
-        for (path, bytes) in &overlay_files {
-            entries.insert(
-                PathBuf::from(path),
-                SnapshotEntry::File(SnapshotFile {
-                    bytes: bytes.clone(),
-                    mode: ProjectedFileMode::Regular,
-                }),
-            );
+
+        // Capture the base broad enough for the merge, region composition, and
+        // projection re-render: package content targets, the neutral scaffold files,
+        // and the application-owned record/events/profiles paths.
+        let mut content_paths = package
+            .hashes()
+            .targets
+            .keys()
+            .map(|target| super::repo_rel_virtual_path(target))
+            .collect::<Result<Vec<_>>>()?;
+        for (path, _) in &neutral_files {
+            content_paths.push(super::repo_rel_virtual_path(path)?);
         }
-        let snapshot = RepositorySnapshot::new(captured.root(), entries)?;
-        super::profile::ensure_profile_directory(&snapshot)?;
-        let filesystem: Arc<dyn RepositoryView> = Arc::new(
-            FilesystemRepositoryView::from_jit_root(self.storage.root())?,
-        );
-        let overlay = overlay_files
-            .iter()
-            .map(|(path, bytes)| (PathBuf::from(path), Some(bytes.clone())))
-            .collect::<Vec<_>>();
-        let neutral_view: Arc<dyn RepositoryView> =
-            Arc::new(OverlayRepositoryView::new(filesystem, overlay)?);
-        let plan = plan_profile_application_against(package, &snapshot, neutral_view)?;
+        content_paths.push(record_path.clone());
+        content_paths.push(profiles_dir.clone());
+        content_paths.push(events_path.clone());
+        let base = match self.capture_proposed_base(session, &BTreeMap::new(), &content_paths)? {
+            None => return Ok(None),
+            Some(base) => base,
+        };
+
+        // The neutral overlay reflects only the scaffold state init publishes:
+        // schemas are always (re)written, but an existing config/gates/rules is
+        // preserved (`IfAbsent`). Overlaying a present file with its default would
+        // shadow the live declarations, so present non-schema neutral files fall
+        // through to their captured bytes.
+        let mut neutral_overrides: BTreeMap<VirtualPath, Option<Vec<u8>>> = BTreeMap::new();
+        for (path, bytes) in neutral_files {
+            let vpath = super::repo_rel_virtual_path(&path)?;
+            let absent = matches!(base.entry(&vpath)?, RepositoryEntry::Absent);
+            if path.starts_with(".jit/schemas/") || absent {
+                neutral_overrides.insert(vpath, Some(bytes));
+            }
+        }
+        let neutral_base = apply_overlay(&base, neutral_overrides)?;
+
+        let claims = build_profile_claims(package, &neutral_base)?;
+        let derived = derive_profile_materializations(&neutral_base, claims)?;
 
         let record = super::profile::expected_record(package);
         let record_matches =
-            super::profile::inspect_installed_record(&snapshot, &record_path, &record)?;
-        let profile_changed = !plan.is_no_op() || !record_matches;
-        let prior_events = snapshot
-            .file(".jit/events.jsonl")
-            .map_or(&[][..], |file| file.bytes.as_slice());
+            super::profile::record_matches_in_image(&neutral_base, &record_path, &record)?;
+        let ensure_profiles_dir =
+            super::profile::profile_dir_needs_creation(&neutral_base, &profiles_dir)?;
+
+        let mut targets = Vec::new();
+        let mut all_unchanged = true;
+        for (path, (bytes, mode)) in &derived {
+            if super::profile::target_action(&neutral_base, path, bytes, *mode)?
+                != crate::profile::ProfileTargetAction::Unchanged
+            {
+                all_unchanged = false;
+                targets.push(ProfileTargetContribution {
+                    path: path.clone(),
+                    bytes: bytes.clone(),
+                    mode: *mode,
+                });
+            }
+        }
+        let profile_changed = !all_unchanged || !record_matches;
+
+        let prior_events = neutral_base
+            .file_bytes(&events_path)?
+            .map(<[u8]>::to_vec)
+            .unwrap_or_default();
         let events = if profile_changed {
             let isolated_torn_tail =
-                super::profile::has_malformed_unterminated_event_tail(prior_events);
+                super::profile::has_malformed_unterminated_event_tail(&prior_events);
             let event = Event::new_profile_applied(
                 metadata.id.clone(),
                 metadata.version.clone(),
@@ -279,34 +306,22 @@ impl CommandExecutor<JsonFileStorage> {
                 package.hashes().targets.clone(),
                 isolated_torn_tail,
             );
-            append_profile_event_image(prior_events, &event)?
+            append_profile_event_image(&prior_events, &event)?
         } else {
-            prior_events.to_vec()
+            prior_events
         };
 
-        let targets = plan
-            .targets
-            .values()
-            .filter(|target| target.action != PlannedTargetAction::NoOp)
-            .map(|target| {
-                Ok(ProfileTargetContribution {
-                    path: super::repo_rel_virtual_path(&target.path)?,
-                    bytes: target.bytes.clone(),
-                    mode: super::file_mode(target.mode),
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
         let contribution = ProfileContribution {
             id: metadata.id.clone(),
             version: metadata.version.clone(),
             package_hash: package.hashes().package.clone(),
             targets,
-            record_path: VirtualPath::data(format!("profiles/{}.json", metadata.id))?,
+            record_path,
             record_bytes: record.to_bytes()?,
             record_changed: !record_matches,
             events_bytes: events,
             events_changed: profile_changed,
-            ensure_profiles_dir: snapshot.entry(".jit/profiles").is_none(),
+            ensure_profiles_dir,
         };
         let apply_result = ProfileApplyResult {
             id: metadata.id.clone(),
@@ -316,11 +331,11 @@ impl CommandExecutor<JsonFileStorage> {
             } else {
                 ProfileApplicationStatus::Unchanged
             },
-            plan_hash: plan.identity.plan_hash,
+            plan_hash: super::profile::profile_plan_hash(&derived),
             transaction_id: None,
             warnings: Vec::new(),
         };
-        Ok((contribution, apply_result))
+        Ok(Some((contribution, apply_result)))
     }
 }
 
@@ -381,7 +396,7 @@ fn git_escape_pattern(relative: &Path) -> String {
 mod tests {
     use super::*;
     use crate::profile::AppliedProfileRecord;
-    use crate::storage::discover_repository_layout;
+    use crate::storage::{discover_repository_layout, IssueStore};
     use std::fs;
     use std::path::PathBuf;
     use std::sync::{Arc, Barrier};

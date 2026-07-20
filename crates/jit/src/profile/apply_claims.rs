@@ -884,18 +884,52 @@ mod tests {
             .collect()
     }
 
+    /// Walk a worktree into a `RepositorySnapshot` for the predecessor planner.
+    fn snapshot_from_tree(root: &std::path::Path) -> crate::profile::RepositorySnapshot {
+        use crate::profile::{ProjectedFileMode, SnapshotEntry, SnapshotFile};
+        use std::path::PathBuf;
+        fn visit(
+            root: &std::path::Path,
+            dir: &std::path::Path,
+            out: &mut Vec<(PathBuf, SnapshotEntry)>,
+        ) {
+            for entry in std::fs::read_dir(dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                let relative = path.strip_prefix(root).unwrap().to_path_buf();
+                let kind = entry.file_type().unwrap();
+                if kind.is_dir() {
+                    out.push((relative.clone(), SnapshotEntry::Directory));
+                    visit(root, &path, out);
+                } else if kind.is_symlink() {
+                    out.push((
+                        relative,
+                        SnapshotEntry::Symlink {
+                            target: std::fs::read_link(&path).unwrap(),
+                        },
+                    ));
+                } else {
+                    out.push((
+                        relative,
+                        SnapshotEntry::File(SnapshotFile {
+                            bytes: std::fs::read(&path).unwrap(),
+                            mode: ProjectedFileMode::Regular,
+                        }),
+                    ));
+                }
+            }
+        }
+        let mut entries = Vec::new();
+        visit(root, root, &mut entries);
+        crate::profile::RepositorySnapshot::new(root, entries).unwrap()
+    }
+
     /// Old planner: every planned target's final `(bytes, mode)`, keyed by path.
     fn old_targets(
-        storage: &JsonFileStorage,
+        worktree: &std::path::Path,
         package: &EmbeddedProfilePackage<'_>,
     ) -> BTreeMap<String, (Vec<u8>, FileMode)> {
-        let paths = package
-            .hashes()
-            .targets
-            .keys()
-            .map(String::as_str)
-            .collect::<Vec<_>>();
-        let snapshot = storage.capture_profile_snapshot(paths).unwrap();
+        let snapshot = snapshot_from_tree(worktree);
         plan_profile_application(package, &snapshot)
             .unwrap()
             .targets
@@ -927,7 +961,7 @@ mod tests {
     fn assert_parity(package: &EmbeddedProfilePackage<'_>) {
         let temp = TempDir::new().unwrap();
         let (storage, executor) = seeded_executor(&temp);
-        let old = old_targets(&storage, package);
+        let old = old_targets(temp.path(), package);
         let new = new_targets(&executor, &storage, package);
         assert_eq!(
             new.keys().collect::<Vec<_>>(),

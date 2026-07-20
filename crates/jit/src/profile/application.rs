@@ -1,5 +1,6 @@
 use crate::domain::{Event, ProfileOrigin};
-use crate::profile::{ProfileManifest, ProjectedFileMode};
+use crate::profile::ProfileManifest;
+use crate::repository_state::FileMode;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -138,12 +139,13 @@ pub struct ProfileTargetChange {
 }
 
 impl ProfileTargetChange {
-    /// Construct a public target projection from internal planner vocabulary.
-    pub(crate) fn new(path: String, action: ProfileTargetAction, mode: ProjectedFileMode) -> Self {
+    /// Construct a public target projection from canonical repository-state
+    /// vocabulary.
+    pub(crate) fn new(path: String, action: ProfileTargetAction, mode: FileMode) -> Self {
         Self {
             path,
             action,
-            executable: mode == ProjectedFileMode::Executable,
+            executable: mode == FileMode::Executable,
         }
     }
 }

@@ -434,18 +434,6 @@ pub(crate) fn repo_rel_virtual_path(path: &str) -> Result<crate::repository_stat
     }
 }
 
-/// Translate the transitional profile planner's mode into the canonical entry mode.
-pub(crate) fn file_mode(
-    mode: crate::profile::ProjectedFileMode,
-) -> crate::repository_state::FileMode {
-    match mode {
-        crate::profile::ProjectedFileMode::Regular => crate::repository_state::FileMode::Regular,
-        crate::profile::ProjectedFileMode::Executable => {
-            crate::repository_state::FileMode::Executable
-        }
-    }
-}
-
 /// Assemble the configuration, effective rule set, and gate registry from a
 /// captured image, ready to drive the session-based materialization producers.
 ///

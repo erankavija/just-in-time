@@ -83,6 +83,9 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             .downcast_ref::<jit::profile::ProfilePlanError>()
             .is_some()
         || error
+            .downcast_ref::<jit::profile::ProfileClaimError>()
+            .is_some()
+        || error
             .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()
     {
@@ -747,6 +750,9 @@ fn profile_json_error(error: &anyhow::Error, command: &str) -> jit::output::Json
     } else if error
         .downcast_ref::<jit::profile::ProfilePlanError>()
         .is_some()
+        || error
+            .downcast_ref::<jit::profile::ProfileClaimError>()
+            .is_some()
         || error
             .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()

@@ -15,7 +15,6 @@ use crate::storage::{
 };
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -316,32 +315,6 @@ impl JsonFileStorage {
     /// just as they are for the ordinary append path.
     pub(crate) fn acquire_events_write_lock(&self) -> Result<crate::storage::lock::LockGuard> {
         self.locker.lock_exclusive(&self.root.join(".events.lock"))
-    }
-
-    /// Capture byte-exact profile target paths and their existing ancestors.
-    ///
-    /// The selected data directory is exposed through the canonical virtual
-    /// `.jit/` prefix so custom `JIT_DATA_DIR` storage uses the same planner
-    /// model. Unrelated trees such as Cargo targets or Node modules are never
-    /// read into memory.
-    pub(crate) fn capture_profile_snapshot<'a>(
-        &self,
-        paths: impl IntoIterator<Item = &'a str>,
-    ) -> Result<crate::profile::RepositorySnapshot> {
-        let repository_root = repository_root_for_storage(&self.root)?.to_path_buf();
-        let entries =
-            paths
-                .into_iter()
-                .try_fold(BTreeMap::new(), |mut entries, virtual_path| {
-                    capture_profile_path(
-                        &repository_root,
-                        &self.root,
-                        Path::new(virtual_path),
-                        &mut entries,
-                    )?;
-                    Ok::<_, anyhow::Error>(entries)
-                })?;
-        crate::profile::RepositorySnapshot::new(repository_root, entries).map_err(Into::into)
     }
 
     /// Check if the storage directory exists and is initialized.
@@ -757,101 +730,6 @@ impl JsonFileStorage {
         // Main worktree has .git as a directory
         git_path.is_file()
     }
-}
-
-fn repository_root_for_storage(storage_root: &Path) -> Result<&Path> {
-    storage_root
-        .parent()
-        .map(|parent| {
-            if parent.as_os_str().is_empty() {
-                Path::new(".")
-            } else {
-                parent
-            }
-        })
-        .context("JIT data directory has no repository parent")
-}
-
-fn capture_profile_path(
-    repository_root: &Path,
-    storage_root: &Path,
-    requested: &Path,
-    entries: &mut BTreeMap<PathBuf, crate::profile::SnapshotEntry>,
-) -> Result<()> {
-    let mut virtual_path = PathBuf::new();
-    let mut real_path = repository_root.to_path_buf();
-    for (index, component) in requested.components().enumerate() {
-        virtual_path.push(component.as_os_str());
-        if index == 0 && component.as_os_str() == ".jit" {
-            real_path = storage_root.to_path_buf();
-        } else {
-            real_path.push(component.as_os_str());
-        }
-        if entries.contains_key(&virtual_path) {
-            if !matches!(
-                entries.get(&virtual_path),
-                Some(crate::profile::SnapshotEntry::Directory)
-            ) {
-                break;
-            }
-            continue;
-        }
-        let Some(entry) = capture_profile_entry(&real_path)? else {
-            break;
-        };
-        let recurse = matches!(entry, crate::profile::SnapshotEntry::Directory);
-        entries.insert(virtual_path.clone(), entry);
-        if !recurse {
-            break;
-        }
-    }
-    Ok(())
-}
-
-fn capture_profile_entry(real_path: &Path) -> Result<Option<crate::profile::SnapshotEntry>> {
-    use crate::profile::{ProjectedFileMode, SnapshotEntry, SnapshotFile};
-
-    let metadata = match fs::symlink_metadata(real_path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => {
-            return Err(error).with_context(|| format!("Failed to inspect {}", real_path.display()))
-        }
-    };
-    if metadata.file_type().is_symlink() {
-        return Ok(Some(SnapshotEntry::Symlink {
-            target: fs::read_link(real_path)
-                .with_context(|| format!("Failed to read link {}", real_path.display()))?,
-        }));
-    }
-    if metadata.is_dir() {
-        return Ok(Some(SnapshotEntry::Directory));
-    }
-    if metadata.is_file() {
-        return Ok(Some(SnapshotEntry::File(SnapshotFile {
-            bytes: fs::read(real_path)
-                .with_context(|| format!("Failed to read {}", real_path.display()))?,
-            mode: if profile_file_is_executable(&metadata) {
-                ProjectedFileMode::Executable
-            } else {
-                ProjectedFileMode::Regular
-            },
-        })));
-    }
-    Ok(Some(SnapshotEntry::Unsupported {
-        reason: "not a regular file, directory, or symbolic link".to_string(),
-    }))
-}
-
-#[cfg(unix)]
-fn profile_file_is_executable(metadata: &fs::Metadata) -> bool {
-    use std::os::unix::fs::PermissionsExt as _;
-    metadata.permissions().mode() & 0o111 != 0
-}
-
-#[cfg(not(unix))]
-fn profile_file_is_executable(_metadata: &fs::Metadata) -> bool {
-    false
 }
 
 impl IssueStore for JsonFileStorage {
