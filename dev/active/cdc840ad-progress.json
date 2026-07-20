@@ -59,7 +59,13 @@
           "short_id": "49adf23b",
           "title": "Migrate all consumers and delete predecessors",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "in_progress",
+          "increment_status": {
+            "1-5": "done (waves 1-4 packages + init/profile session publication)",
+            "6": "done \u2014 canonical profile consumers: 6c7ca9d2 (derive_profile_materializations + build_profile_claims), b0e5beb9 (commands rewired), 3d4af231 (planner/render/snapshot/preset/view-triad deleted)",
+            "7": "done \u2014 (a) verified pre-satisfied; (b) 9153f0e5 image-projected plan content; (c) e4ac6863 finalize_config_edit + ddb574b0 re-init unification (closes the gitattributes gap, pinned test); (d) 6565df41 events via finalizer; (e) d3619a13 MutationIntent::UpdateIssue; (f) held",
+            "8": "PENDING \u2014 predecessor deletion + live-tree absence scans; IssueStore read/query-only"
+          }
         }
       ]
     },
