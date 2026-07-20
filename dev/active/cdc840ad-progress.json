@@ -1,6 +1,7 @@
 {
   "epic_id": "cdc840ad-9332-4936-9381-772318967f0f",
   "epic_short_id": "cdc840ad",
+  "last_handoff": "dev/active/cdc840ad-handoff-11.md",
   "current_wave": 5,
   "waves": [
     {
@@ -64,7 +65,7 @@
             "1-5": "done (waves 1-4 packages + init/profile session publication)",
             "6": "done \u2014 canonical profile consumers: 6c7ca9d2 (derive_profile_materializations + build_profile_claims), b0e5beb9 (commands rewired), 3d4af231 (planner/render/snapshot/preset/view-triad deleted)",
             "7": "done \u2014 (a) verified pre-satisfied; (b) 9153f0e5 image-projected plan content; (c) e4ac6863 finalize_config_edit + ddb574b0 re-init unification (closes the gitattributes gap, pinned test); (d) 6565df41 events via finalizer; (e) d3619a13 MutationIntent::UpdateIssue; (f) held",
-            "8": "PENDING \u2014 predecessor deletion + live-tree absence scans; IssueStore read/query-only"
+            "8": "IN PROGRESS \u2014 accepted commits through c9943367; captured local issue edits landed; dirty document cutover awaits review; dirty gate-registry CRUD cutover awaits fixture repair + review; ambient publisher burn-down 15 -> 13 after document acceptance target; predecessor deletion and absence scans remain"
           }
         }
       ]
