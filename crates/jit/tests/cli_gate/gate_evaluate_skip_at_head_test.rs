@@ -224,9 +224,8 @@ fn gate_updated_by(root: &Path, id: &str, key: &str) -> Option<String> {
 fn test_manual_redefine_requires_attestation_over_stale_auto_pass() {
     // Regression (jit:1d59070d F1): an auto gate passes at HEAD, then the gate is
     // redefined to manual. The lingering auto-era pass must NOT let a bare
-    // `evaluate` short-circuit — a manual gate's recorded pass may only be skipped
-    // when it is attested. Once attested with --by, a subsequent bare `evaluate`
-    // short-circuits again on the attested pass.
+    // `evaluate` short-circuit. Manual evaluation always requires and records a
+    // fresh attestation, including when the current status is already Passed.
     let (_temp, root) = setup_git_jit_repo();
     let id = define_counting_gate_and_issue(&root);
 
@@ -295,17 +294,26 @@ fn test_manual_redefine_requires_attestation_over_stale_auto_pass() {
         "attested pass records the human attestor"
     );
 
-    // Subsequent bare evaluate now short-circuits on the attested pass.
+    // Repeating the same valid attestation records fresh evidence; manual gates
+    // never inherit the automated checker skip-at-HEAD optimization.
     let again = jit()
         .current_dir(&root)
-        .args(["gate", "evaluate", &id, "counting", "--json"])
+        .args([
+            "gate",
+            "evaluate",
+            &id,
+            "counting",
+            "--by",
+            "human:alice",
+            "--json",
+        ])
         .output()
         .unwrap();
     assert_eq!(again.status.code(), Some(0));
     let json: serde_json::Value = serde_json::from_slice(&again.stdout).unwrap();
     assert_eq!(
-        json["already_passed"], true,
-        "an attested manual pass must keep short-circuiting"
+        json["already_passed"], false,
+        "a repeated manual attestation must record fresh evidence"
     );
 }
 

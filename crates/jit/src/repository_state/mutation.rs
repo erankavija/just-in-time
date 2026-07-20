@@ -20,7 +20,7 @@ use super::{
     RepositoryLayout, RepositoryLayoutError, RepositorySeed, RepositorySeedKind, SeedError,
     VirtualPath,
 };
-use crate::domain::{Assignee, Event, GateRunResult, Issue, Priority, State};
+use crate::domain::{Assignee, Event, GateRunResult, GateStatus, Issue, Priority, State};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
@@ -777,7 +777,25 @@ pub fn finalize(
                 updated.mark_done(now);
             }
             for (key, state) in &mut updated.gates_status {
-                if preimage.gates_status.get(key) != Some(state) {
+                let records_evidence = intents.iter().any(|intent| match intent {
+                    MutationIntent::RecordEvent { event, .. } => match (&**event, state.status) {
+                        (
+                            Event::GatePassed {
+                                issue_id, gate_key, ..
+                            },
+                            GateStatus::Passed,
+                        )
+                        | (
+                            Event::GateFailed {
+                                issue_id, gate_key, ..
+                            },
+                            GateStatus::Failed,
+                        ) => issue_id == &updated.id && gate_key == key,
+                        _ => false,
+                    },
+                    _ => false,
+                });
+                if records_evidence || preimage.gates_status.get(key) != Some(state) {
                     state.updated_at = now;
                 }
             }

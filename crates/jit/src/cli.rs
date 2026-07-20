@@ -1526,13 +1526,10 @@ pub enum GateCommands {
     /// `fail` on checker failure, `error` on runner error. Pre-verdict argument
     /// and lookup errors (codes 2 and 3) carry no `verdict` field.
     ///
-    /// When the gate already passed at the current HEAD commit, the checker is
-    /// skipped: the command exits 0 and reports `already_passed: true` in --json.
-    /// For a manual gate this skip applies only when the recorded pass is attested
-    /// (its attestor is a human or agent, not the automated executor); an
-    /// unattested auto-era pass — e.g. left behind when an auto gate is redefined
-    /// to manual — falls through and still requires `--by`. Use --force to re-run
-    /// the checker unconditionally.
+    /// When an automated gate already passed at the current HEAD commit, its
+    /// checker is skipped and JSON reports `already_passed: true`. Every manual
+    /// evaluation records a fresh attestation. Use --force to re-run an automated
+    /// checker unconditionally.
     #[command(visible_alias = "eval")]
     Evaluate {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
@@ -1575,11 +1572,9 @@ pub enum GateCommands {
     /// list (auto gates before it still run and record their verdict; later
     /// gates are not attempted) — it never silently passes a manual gate.
     ///
-    /// Each gate inherits the skip-if-passed-at-HEAD behaviour: a gate already
-    /// passed at the current HEAD commit is not re-run; for a manual gate the skip
-    /// applies only when the recorded pass is attested. Use --force to re-run
-    /// every gate's checker unconditionally. An issue with no required gates
-    /// succeeds (exit 0) with an empty result set.
+    /// Automated gates inherit skip-if-passed-at-HEAD; every manual gate records
+    /// a fresh attestation. Use --force to re-run every automated checker. An
+    /// issue with no required gates succeeds (exit 0) with an empty result set.
     EvaluateAll {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,

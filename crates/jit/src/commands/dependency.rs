@@ -237,7 +237,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             ));
         }
 
-        self.publish_issue_mutation(updates, events)?;
+        self.publish_ambient_issue_mutation(updates, events)?;
 
         Ok((result, warnings))
     }
@@ -273,7 +273,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 "dependency-remove".to_string(),
                 vec!["dependencies".to_string()],
             );
-            self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
+            self.publish_ambient_issue_mutation(vec![issue], vec![(1, event)])?;
             self.auto_transition_to_ready(&full_issue_id)?;
         }
 
@@ -656,7 +656,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Event::draft_dependency_reduced(issue_id, old_count, new_count, removed),
             ));
         }
-        self.publish_issue_mutation(updates, events)
+        self.publish_ambient_issue_mutation(updates, events)
     }
 
     /// Remove multiple dependencies from an issue.
@@ -764,7 +764,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 "dependency-remove".to_string(),
                 vec!["dependencies".to_string()],
             );
-            self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
+            self.publish_ambient_issue_mutation(vec![issue], vec![(1, event)])?;
             self.auto_transition_to_ready(&full_issue_id)?;
         }
 

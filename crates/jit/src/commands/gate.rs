@@ -213,21 +213,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
-
-        // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
-
-        let mut issue = self.storage.load_issue(&full_id)?;
-        if !issue.gates_required.contains(&gate_key) {
-            issue.gates_required.push(gate_key.clone());
-            // Note: Gates don't block Ready state, only Done state
-            self.publish_issue_mutation(vec![issue], Vec::new())?;
-        }
-        Ok(warnings)
+        self.add_gates(issue_id, &[gate_key])
+            .map(|(_, warnings)| warnings)
     }
 
     /// Add multiple gates to an issue atomically.
@@ -254,59 +241,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             warnings.push(warning);
         }
 
-        let registry = self.storage.load_gate_registry()?;
-        let mut issue = self.storage.load_issue(&full_id)?;
-
-        let mut added = Vec::new();
-        let mut already_exist = Vec::new();
-        let mut not_found = Vec::new();
-        let mut events = Vec::new();
-
-        // First pass: validate all gates exist in registry
-        for gate_key in gate_keys {
-            if !registry.gates.contains_key(gate_key) {
-                not_found.push(gate_key.clone());
-            }
-        }
-
-        // Atomic: fail entirely if any gate doesn't exist
-        if !not_found.is_empty() {
-            return Err(crate::storage::GateNotFoundError::new(not_found).into());
-        }
-
-        // Second pass: add gates (now safe since all are validated)
-        for gate_key in gate_keys {
-            if issue.gates_required.contains(gate_key) {
-                already_exist.push(gate_key.clone());
-            } else {
-                issue.gates_required.push(gate_key.clone());
-
-                // Initialize status if not present
-                if !issue.gates_status.contains_key(gate_key) {
-                    issue.gates_status.insert(
-                        gate_key.clone(),
-                        GateState {
-                            status: GateStatus::Pending,
-                            updated_by: None,
-                            updated_at: chrono::DateTime::default(),
-                        },
-                    );
-                }
-
-                added.push(gate_key.clone());
-
-                events.push((
-                    1,
-                    Event::draft_gate_added(full_id.clone(), gate_key.clone()),
-                ));
-            }
-        }
-
-        // Save only if at least one gate was actually added. Re-adding gates
-        // that already exist is a no-op and must not bump `updated_at`.
-        if !added.is_empty() {
-            self.publish_issue_mutation(vec![issue], events)?;
-        }
+        let CapturedIssueMutationOutcome::GatesAdded {
+            added,
+            already_exist,
+        } = self.publish_captured_issue_mutation(CapturedIssueMutation::AddGates {
+            issue_id: full_id,
+            gate_keys: gate_keys.to_vec(),
+        })?
+        else {
+            return Err(anyhow!("unexpected result from captured gate addition"));
+        };
 
         Ok((
             GateAddResult {
@@ -341,32 +285,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             warnings.push(warning);
         }
 
-        let mut issue = self.storage.load_issue(&full_id)?;
-
-        let mut removed = Vec::new();
-        let mut not_found = Vec::new();
-        let mut events = Vec::new();
-
-        for gate_key in gate_keys {
-            if issue.gates_required.contains(gate_key) {
-                issue.gates_required.retain(|g| g != gate_key);
-                issue.gates_status.remove(gate_key);
-                removed.push(gate_key.clone());
-
-                events.push((
-                    1,
-                    Event::draft_gate_removed(full_id.clone(), gate_key.clone()),
-                ));
-            } else {
-                not_found.push(gate_key.clone());
-            }
-        }
-
-        // Save only if at least one gate was actually removed. Removing gates
-        // that are not present is a no-op and must not bump `updated_at`.
-        if !removed.is_empty() {
-            self.publish_issue_mutation(vec![issue], events)?;
-        }
+        let CapturedIssueMutationOutcome::GatesRemoved { removed, not_found } = self
+            .publish_captured_issue_mutation(CapturedIssueMutation::RemoveGates {
+                issue_id: full_id,
+                gate_keys: gate_keys.to_vec(),
+            })?
+        else {
+            return Err(anyhow!("unexpected result from captured gate removal"));
+        };
 
         Ok((GateRemoveResult { removed, not_found }, warnings))
     }
@@ -374,10 +300,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Mark a gate as passed.
     ///
     /// For an automated gate this runs the checker; for a manual gate it records
-    /// the attestation. When `force` is `false` and the gate's latest run already
-    /// passed at the current `HEAD` commit, the (often expensive) checker is
-    /// skipped and the returned outcome has `already_passed == true`. Passing
-    /// `force = true` always re-runs the checker.
+    /// the attestation. Automated gates whose latest run passed at the current
+    /// `HEAD` are skipped unless `force` is set. Manual attestations are always
+    /// recorded as fresh evidence.
     ///
     /// Returns a [`GatePassOutcome`] carrying any warnings (e.g. lease warnings)
     /// and whether the checker was skipped.
@@ -404,7 +329,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             warnings.push(warning);
         }
 
-        let mut issue = self.storage.load_issue(&full_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(&gate_key) {
             return Err(GateNotRequiredError {
@@ -417,10 +342,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Load the gate registry once, up front: its mode governs both the
         // short-circuit guard below and the auto/manual arm selected further down.
         let registry = self.storage.load_gate_registry()?;
-        let gate_is_manual = registry
+        let gate = registry
             .gates
             .get(&gate_key)
-            .is_some_and(|gate| gate.mode == GateMode::Manual);
+            .ok_or_else(|| crate::storage::GateNotFoundError::single(&gate_key))?;
 
         // Skip the checker when the gate is CURRENTLY passed AND its latest run
         // passed at the current HEAD, unless --force was given. Requiring the
@@ -429,22 +354,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // passing run still lingers at this HEAD. A `None` HEAD (no git / no
         // commit) cannot prove the prior pass is still valid, so we fall through.
         //
-        // A Manual gate additionally requires the recorded pass to be attested:
-        // an auto-era pass (updated_by == AUTO_EXECUTOR), left behind when the
-        // gate was redefined from auto to manual, must NOT satisfy attestation.
-        // Such a pass falls through to the manual arm, which raises
-        // ManualGateAttestationRequiredError on a bare call and records a fresh
-        // attested run under --by.
         let recorded = issue.gates_status.get(&gate_key);
         let current_passed = matches!(recorded, Some(s) if s.status == GateStatus::Passed);
-        let attested_if_manual = !gate_is_manual
-            || matches!(
-                recorded,
-                Some(s) if s.updated_by.as_ref().is_some_and(|by| *by != *crate::gate_execution::AUTO_EXECUTOR)
-            );
-        if !force
+        if gate.mode == GateMode::Auto
+            && !force
             && current_passed
-            && attested_if_manual
             && self.gate_passed_at_head(&full_id, &gate_key)?
         {
             return Ok(GatePassOutcome {
@@ -454,29 +368,27 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Check if gate is automated - if so, run the checker instead
-        if let Some(gate) = registry.gates.get(&gate_key) {
-            if gate.mode == GateMode::Auto {
-                // Smart behavior: auto-run the checker
-                let result = self.check_gate(&full_id, &gate_key)?;
-                if result.status != GateRunStatus::Passed {
-                    return Err(GatePassFailed {
-                        issue_id: full_id,
-                        gate_key,
-                        status: result.status,
-                        exit_code: result.exit_code,
-                        result,
-                        warnings,
-                    }
-                    .into());
-                }
-                if let Some(message) = result.message {
-                    warnings.push(message);
-                }
-                return Ok(GatePassOutcome {
+        if gate.mode == GateMode::Auto {
+            // Smart behavior: auto-run the checker
+            let result = self.check_gate(&full_id, &gate_key)?;
+            if result.status != GateRunStatus::Passed {
+                return Err(GatePassFailed {
+                    issue_id: full_id,
+                    gate_key,
+                    status: result.status,
+                    exit_code: result.exit_code,
+                    result,
                     warnings,
-                    already_passed: false,
-                });
+                }
+                .into());
             }
+            if let Some(message) = result.message {
+                warnings.push(message);
+            }
+            return Ok(GatePassOutcome {
+                warnings,
+                already_passed: false,
+            });
         }
 
         // Manual gate: a pass must be attributable (jit:1d59070d REQ-03). A
@@ -492,19 +404,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .into());
         };
 
-        // Manual gate: mark as passed
-        issue.gates_status.insert(
-            gate_key.clone(),
-            GateState {
-                status: GateStatus::Passed,
-                updated_by: Some(by.clone()),
-                updated_at: chrono::DateTime::default(),
-            },
-        );
-
-        let issue_id = issue.id.clone();
-        let event = Event::draft_gate_passed(issue_id, gate_key, Some(by));
-        self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
+        self.publish_captured_issue_mutation(CapturedIssueMutation::SetManualGateStatus {
+            issue_id: full_id.clone(),
+            gate_key,
+            status: GateStatus::Passed,
+            by: Some(by),
+        })?;
 
         // Check if Gated issue can now transition to Done
         self.auto_transition_to_done(&full_id)?;
@@ -517,9 +422,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Pass every required gate for an issue in declaration order, fail-fast.
     ///
-    /// Each gate is passed via [`pass_gate`](Self::pass_gate), so it inherits the
-    /// skip-if-passed-at-`HEAD` behaviour (already-passed gates are not re-run)
-    /// and the same error classification. On the FIRST gate that does not pass,
+    /// Each gate is passed via [`pass_gate`](Self::pass_gate), so automated gates
+    /// inherit skip-if-passed-at-`HEAD` and manual gates record fresh evidence.
+    /// On the FIRST gate that does not pass,
     /// the underlying error is propagated unchanged and no later gate is
     /// attempted, so the caller can map it to the right exit code (checker
     /// failure, runner error, etc.). An issue with no required gates succeeds
@@ -607,7 +512,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             warnings.push(warning);
         }
 
-        let mut issue = self.storage.load_issue(&full_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(&gate_key) {
             return Err(anyhow!(
@@ -627,18 +532,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        issue.gates_status.insert(
-            gate_key.clone(),
-            GateState {
-                status: GateStatus::Failed,
-                updated_by: by.clone(),
-                updated_at: chrono::DateTime::default(),
-            },
-        );
-
-        let issue_id = issue.id.clone();
-        let event = Event::draft_gate_failed(issue_id, gate_key, by);
-        self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
+        self.publish_captured_issue_mutation(CapturedIssueMutation::SetManualGateStatus {
+            issue_id: full_id,
+            gate_key,
+            status: GateStatus::Failed,
+            by,
+        })?;
 
         Ok(warnings)
     }
@@ -1503,11 +1402,13 @@ enforce_leases = "off"
             "error must hint the attested form: {err}"
         );
 
-        // Nothing was written: the gate stays Pending.
+        // Nothing was written after the rejected pass: canonical gate addition
+        // left the gate Pending.
         let issue = executor.storage.load_issue(&issue_id).unwrap();
-        assert!(
-            !issue.gates_status.contains_key("manual-gate"),
-            "a rejected bare pass must not write gates_status"
+        assert_eq!(
+            issue.gates_status["manual-gate"].status,
+            GateStatus::Pending,
+            "a rejected bare pass must leave the gate Pending"
         );
     }
 }

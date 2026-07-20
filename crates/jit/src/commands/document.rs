@@ -112,7 +112,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             if is_update { "doc-update" } else { "doc-add" }.to_string(),
             vec!["documents".to_string()],
         );
-        self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
+        self.publish_ambient_issue_mutation(vec![issue], vec![(1, event)])?;
 
         Ok((
             DocumentAddResult {
@@ -168,7 +168,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             "doc-remove".to_string(),
             vec!["documents".to_string()],
         );
-        self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
+        self.publish_ambient_issue_mutation(vec![issue], vec![(1, event)])?;
 
         Ok(DocumentRemoveResult {
             issue_id: full_id,

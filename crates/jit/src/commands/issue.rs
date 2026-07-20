@@ -648,7 +648,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Event::draft_local_rule_bypassed(full_id.clone(), rule.clone()),
             )
         }));
-        self.publish_issue_mutation(if persisted { vec![issue] } else { Vec::new() }, events)?;
+        self.publish_ambient_issue_mutation(
+            if persisted { vec![issue] } else { Vec::new() },
+            events,
+        )?;
 
         // Check whether the completed publication unblocks dependents.
         if let Some(s) = state {
@@ -891,23 +894,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Validate through the one `Assignee` path so `assign` cannot persist a
         // raw, malformed assignee (this command previously skipped validation).
         let assignee: crate::domain::Assignee = assignee.parse()?;
-        let mut issue = self.storage.load_issue(&full_id)?;
-        // No-op if already assigned to the same assignee: don't bump updated_at.
-        if issue.assignee.as_ref() == Some(&assignee) {
-            return Ok(warnings);
-        }
-        issue.assignee = Some(assignee.clone());
-        // Record the first assignment time (first-occurrence only; re-assigning an
-        // already-claimed issue leaves the original stamp intact).
-        let issue_id = issue.id.clone();
-        // The assignee (and `claimed_at`) mutation above appends an
-        // `issue_claimed` event so the change is auditable (@/inv/event-log) and the
-        // lifecycle-timestamp backfill can fold it back into `claimed_at` (see
-        // `derive_lifecycle_timestamps`), matching the `claim`/lease-acquire paths.
-        self.publish_issue_mutation(
-            vec![issue],
-            vec![(1, Event::draft_issue_claimed(issue_id, assignee))],
-        )?;
+        self.publish_captured_issue_mutation(CapturedIssueMutation::Assign {
+            issue_id: full_id,
+            assignee,
+        })?;
         Ok(warnings)
     }
 
@@ -1000,7 +990,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // with the event (@/inv/event-log), and the event feeds the
         // lifecycle-timestamp backfill (`derive_lifecycle_timestamps`).
         let issue_id = issue.id.clone();
-        self.publish_issue_mutation(
+        self.publish_ambient_issue_mutation(
             vec![issue],
             vec![(1, Event::draft_issue_claimed(issue_id, actor))],
         )?;
@@ -1023,13 +1013,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             warnings.push(warning);
         }
 
-        let mut issue = self.storage.load_issue(&full_id)?;
-        // No-op if already unassigned: don't bump updated_at.
-        if issue.assignee.is_none() {
-            return Ok(warnings);
-        }
-        issue.assignee = None;
-        self.publish_issue_mutation(vec![issue], Vec::new())?;
+        self.publish_captured_issue_mutation(CapturedIssueMutation::Unassign {
+            issue_id: full_id,
+        })?;
         Ok(warnings)
     }
 
@@ -1068,7 +1054,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Event::draft_issue_released(full_id.clone(), assignee, reason.to_string()),
             ));
         }
-        self.publish_issue_mutation(vec![issue], events)?;
+        self.publish_ambient_issue_mutation(vec![issue], events)?;
 
         Ok(())
     }
@@ -1253,7 +1239,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Event::draft_local_rule_bypassed(issue_id.clone(), rule.clone()),
             )
         }));
-        self.publish_issue_mutation(
+        self.publish_ambient_issue_mutation(
             if persist {
                 vec![issue.clone()]
             } else {
@@ -1293,6 +1279,27 @@ mod tests {
 enforce_leases = "off"
 "#;
         std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+
+        let mut registry = storage.load_gate_registry().unwrap();
+        for key in ["tests", "code-review"] {
+            registry.gates.insert(
+                key.to_string(),
+                GateDefinition {
+                    version: 1,
+                    key: key.to_string(),
+                    title: key.to_string(),
+                    description: String::new(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Manual,
+                    checker: None,
+                    priority: 100,
+                    reserved: HashMap::new(),
+                    auto: false,
+                    example_integration: None,
+                },
+            );
+        }
+        storage.save_gate_registry(&registry).unwrap();
 
         crate::commands::test_helpers::memory_executor(storage)
     }

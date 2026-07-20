@@ -115,6 +115,242 @@ struct MutationPublication {
     gate_run_ids: Vec<String>,
 }
 
+/// Closed issue-local operations whose final record is derived from the issue
+/// captured by the mutation session. Ordinary commands use this instead of
+/// constructing a full-record `UpdateIssue` from an earlier storage read.
+#[derive(Clone)]
+enum CapturedIssueMutation {
+    Assign {
+        issue_id: String,
+        assignee: crate::domain::Assignee,
+    },
+    Unassign {
+        issue_id: String,
+    },
+    AddGates {
+        issue_id: String,
+        gate_keys: Vec<String>,
+    },
+    RemoveGates {
+        issue_id: String,
+        gate_keys: Vec<String>,
+    },
+    SetManualGateStatus {
+        issue_id: String,
+        gate_key: String,
+        status: GateStatus,
+        by: Option<crate::domain::Assignee>,
+    },
+}
+
+impl CapturedIssueMutation {
+    fn issue_id(&self) -> &str {
+        match self {
+            Self::Assign { issue_id, .. }
+            | Self::Unassign { issue_id }
+            | Self::AddGates { issue_id, .. }
+            | Self::RemoveGates { issue_id, .. }
+            | Self::SetManualGateStatus { issue_id, .. } => issue_id,
+        }
+    }
+
+    fn captures_gate_registry(&self) -> bool {
+        matches!(
+            self,
+            Self::AddGates { .. } | Self::SetManualGateStatus { .. }
+        )
+    }
+}
+
+enum CapturedIssueMutationOutcome {
+    Changed,
+    Unchanged,
+    GatesAdded {
+        added: Vec<String>,
+        already_exist: Vec<String>,
+    },
+    GatesRemoved {
+        removed: Vec<String>,
+        not_found: Vec<String>,
+    },
+}
+
+struct DerivedCapturedIssueMutation {
+    outcome: CapturedIssueMutationOutcome,
+    intents: Vec<crate::repository_state::MutationIntent>,
+}
+
+/// Derive the full-record low-level intent and its audit events from one captured
+/// issue. Keeping this pure makes the retry contract directly testable: every
+/// attempt receives the new image's record and cannot retain an ambient preimage.
+fn derive_captured_issue_mutation(
+    mut issue: Issue,
+    registry: &crate::declarations::GateRegistry,
+    request: &CapturedIssueMutation,
+) -> Result<DerivedCapturedIssueMutation> {
+    use crate::repository_state::MutationIntent;
+
+    let (outcome, events, changed) = match request {
+        CapturedIssueMutation::Assign { assignee, .. } => {
+            if issue.assignee.as_ref() == Some(assignee) {
+                (CapturedIssueMutationOutcome::Unchanged, Vec::new(), false)
+            } else {
+                issue.assignee = Some(assignee.clone());
+                let event = Event::draft_issue_claimed(issue.id.clone(), assignee.clone());
+                (
+                    CapturedIssueMutationOutcome::Changed,
+                    vec![(1, event)],
+                    true,
+                )
+            }
+        }
+        CapturedIssueMutation::Unassign { .. } => {
+            if issue.assignee.is_none() {
+                (CapturedIssueMutationOutcome::Unchanged, Vec::new(), false)
+            } else {
+                issue.assignee = None;
+                let event = Event::draft_issue_updated(
+                    issue.id.clone(),
+                    "issue-unassign".to_string(),
+                    vec!["assignee".to_string()],
+                );
+                (
+                    CapturedIssueMutationOutcome::Changed,
+                    vec![(1, event)],
+                    true,
+                )
+            }
+        }
+        CapturedIssueMutation::AddGates { gate_keys, .. } => {
+            let missing = gate_keys
+                .iter()
+                .filter(|key| !registry.gates.contains_key(*key))
+                .cloned()
+                .collect::<Vec<_>>();
+            if !missing.is_empty() {
+                return Err(crate::storage::GateNotFoundError::new(missing).into());
+            }
+            let mut added = Vec::new();
+            let mut already_exist = Vec::new();
+            for key in gate_keys {
+                if issue.gates_required.contains(key) {
+                    already_exist.push(key.clone());
+                    continue;
+                }
+                issue.gates_required.push(key.clone());
+                issue.gates_status.entry(key.clone()).or_insert(GateState {
+                    status: GateStatus::Pending,
+                    updated_by: None,
+                    updated_at: chrono::DateTime::default(),
+                });
+                added.push(key.clone());
+            }
+            let events = added
+                .iter()
+                .map(|key| (1, Event::draft_gate_added(issue.id.clone(), key.clone())))
+                .collect();
+            let changed = !added.is_empty();
+            (
+                CapturedIssueMutationOutcome::GatesAdded {
+                    added,
+                    already_exist,
+                },
+                events,
+                changed,
+            )
+        }
+        CapturedIssueMutation::RemoveGates { gate_keys, .. } => {
+            let mut removed = Vec::new();
+            let mut not_found = Vec::new();
+            for key in gate_keys {
+                if !issue.gates_required.contains(key) {
+                    not_found.push(key.clone());
+                    continue;
+                }
+                issue.gates_required.retain(|required| required != key);
+                issue.gates_status.remove(key);
+                removed.push(key.clone());
+            }
+            let events = removed
+                .iter()
+                .map(|key| (1, Event::draft_gate_removed(issue.id.clone(), key.clone())))
+                .collect();
+            let changed = !removed.is_empty();
+            (
+                CapturedIssueMutationOutcome::GatesRemoved { removed, not_found },
+                events,
+                changed,
+            )
+        }
+        CapturedIssueMutation::SetManualGateStatus {
+            gate_key,
+            status,
+            by,
+            ..
+        } => {
+            if !matches!(status, GateStatus::Passed | GateStatus::Failed) {
+                return Err(anyhow!("manual gate status must be passed or failed"));
+            }
+            if !issue.gates_required.contains(gate_key) {
+                return Err(gate::GateNotRequiredError {
+                    issue_id: issue.id.clone(),
+                    gate_key: gate_key.clone(),
+                }
+                .into());
+            }
+            let gate = registry
+                .gates
+                .get(gate_key)
+                .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
+            if gate.mode == GateMode::Auto {
+                return Err(anyhow!(
+                    "Gate '{}' is automated and cannot be manually changed. Use 'jit gate evaluate {} {}' to run the checker.",
+                    gate_key,
+                    issue.id,
+                    gate_key
+                ));
+            }
+            let replacement = GateState {
+                status: *status,
+                updated_by: by.clone(),
+                updated_at: chrono::DateTime::default(),
+            };
+            issue.gates_status.insert(gate_key.clone(), replacement);
+            let event = match status {
+                GateStatus::Passed => {
+                    Event::draft_gate_passed(issue.id.clone(), gate_key.clone(), by.clone())
+                }
+                GateStatus::Failed => {
+                    Event::draft_gate_failed(issue.id.clone(), gate_key.clone(), by.clone())
+                }
+                GateStatus::Pending => unreachable!("validated manual gate evidence status"),
+            };
+            (
+                CapturedIssueMutationOutcome::Changed,
+                vec![(1, event)],
+                true,
+            )
+        }
+    };
+    let intents = if changed {
+        std::iter::once(MutationIntent::UpdateIssue {
+            issue: Box::new(issue),
+        })
+        .chain(
+            events
+                .into_iter()
+                .map(|(phase, event)| MutationIntent::RecordEvent {
+                    phase,
+                    event: Box::new(event),
+                }),
+        )
+        .collect()
+    } else {
+        Vec::new()
+    };
+    Ok(DerivedCapturedIssueMutation { outcome, intents })
+}
+
 /// The unpassed gates of `issue` paired with their current status and registry
 /// mode, in the order [`Issue::get_unpassed_gates`] reports them.
 ///
@@ -706,7 +942,105 @@ impl<S: IssueStore> CommandExecutor<S> {
         ))
     }
 
-    fn publish_issue_mutation(&self, updates: Vec<Issue>, events: Vec<(u8, Event)>) -> Result<()>
+    /// Rebase one closed issue-local operation on a freshly captured record.
+    ///
+    /// The request determines its complete capture set. The caller cannot pass a
+    /// record, capture closure, or arbitrary patch. A conflict reopens a session
+    /// and derives again while retaining the operation's identity/time context.
+    fn publish_captured_issue_mutation(
+        &self,
+        request: CapturedIssueMutation,
+    ) -> Result<CapturedIssueMutationOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{
+            finalize, CaptureBudget, CaptureSpec, MutationContext, RepositoryEntry, VirtualPath,
+        };
+        use crate::storage::RepositoryStateStoreError;
+        use std::collections::BTreeSet;
+
+        let layout = self.require_layout()?;
+        let context = MutationContext::production();
+        for _ in 0..8 {
+            let mut paths = BTreeSet::from([
+                VirtualPath::data(format!("issues/{}.json", request.issue_id()))?,
+                VirtualPath::data("events.jsonl")?,
+            ]);
+            if request.captures_gate_registry() {
+                paths.insert(VirtualPath::data("gates.toml")?);
+            }
+            let spec = CaptureSpec::phase_one(
+                paths.clone(),
+                CaptureBudget {
+                    max_paths: paths.len(),
+                    max_listings: 0,
+                    max_bytes: 64 * 1024 * 1024,
+                    max_depth: 4,
+                },
+            )?;
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let image = match session.capture(spec) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let issue_path = VirtualPath::data(format!("issues/{}.json", request.issue_id()))?;
+            let issue: Issue = match image.entry(&issue_path)? {
+                RepositoryEntry::File { bytes, .. } => {
+                    serde_json::from_slice(bytes).with_context(|| {
+                        format!("failed to parse captured issue {}", request.issue_id())
+                    })?
+                }
+                RepositoryEntry::Absent => {
+                    return Err(crate::storage::IssueNotFoundError::new(request.issue_id()).into())
+                }
+                _ => return Err(anyhow!("captured issue path is not an ordinary file")),
+            };
+            if issue.id != request.issue_id() {
+                return Err(anyhow!(
+                    "captured issue identity mismatch: requested {}, found {}",
+                    request.issue_id(),
+                    issue.id
+                ));
+            }
+            let registry = if request.captures_gate_registry() {
+                let path = VirtualPath::data("gates.toml")?;
+                match image.entry(&path)? {
+                    RepositoryEntry::File { bytes, .. } => {
+                        crate::declarations::parse_gate_registry(bytes)
+                            .context("failed to parse captured gate registry")?
+                    }
+                    RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),
+                    _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
+                }
+            } else {
+                crate::declarations::GateRegistry::default()
+            };
+
+            let derived = derive_captured_issue_mutation(issue, &registry, &request)?;
+            if derived.intents.is_empty() {
+                return Ok(derived.outcome);
+            }
+            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            match session.apply(&plan) {
+                Ok(_) => return Ok(derived.outcome),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "captured issue mutation did not converge after repeated conflicts"
+        ))
+    }
+
+    /// Transitional boundary for callers that still publish records loaded before
+    /// session capture. New callers must use a closed semantic request instead.
+    fn publish_ambient_issue_mutation(
+        &self,
+        updates: Vec<Issue>,
+        events: Vec<(u8, Event)>,
+    ) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -1023,7 +1357,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let events = rules
+        let events: Vec<(u8, Event)> = rules
             .iter()
             .map(|rule| {
                 (
@@ -1032,7 +1366,18 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             })
             .collect();
-        self.publish_issue_mutation(Vec::new(), events)
+        self.publish_repository_mutation(
+            events
+                .into_iter()
+                .map(
+                    |(phase, event)| crate::repository_state::MutationIntent::RecordEvent {
+                        phase,
+                        event: Box::new(event),
+                    },
+                )
+                .collect(),
+        )
+        .map(|_| ())
     }
 
     /// The SINGLE chokepoint through which ALL issue state changes must flow.
@@ -1177,7 +1522,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             if target == State::Done {
                 events.push((2, Event::draft_issue_completed(issue_id)));
             }
-            self.publish_issue_mutation(vec![issue.clone()], events)?;
+            self.publish_ambient_issue_mutation(vec![issue.clone()], events)?;
         }
 
         // Surface the legacy-revive advisory ahead of any enforcement warnings.
@@ -1372,7 +1717,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             if force {
                 // Forced override: return one bypass event per blocked rule. The
                 // caller includes these in the same mutation as the issue update.
-                let events = blocking
+                let events: Vec<(u8, Event)> = blocking
                     .iter()
                     .map(|(rule, _)| {
                         (
@@ -1389,7 +1734,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             } else {
                 // Blocked: log the attempted transition (one event per blocking
                 // rule) BEFORE returning the error, then persist nothing.
-                let events = blocking
+                let events: Vec<(u8, Event)> = blocking
                     .iter()
                     .map(|(rule, _)| {
                         (
@@ -1398,7 +1743,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                         )
                     })
                     .collect();
-                self.publish_issue_mutation(Vec::new(), events)?;
+                self.publish_repository_mutation(
+                    events
+                        .into_iter()
+                        .map(|(phase, event)| {
+                            crate::repository_state::MutationIntent::RecordEvent {
+                                phase,
+                                event: Box::new(event),
+                            }
+                        })
+                        .collect(),
+                )?;
                 return Err(crate::errors::TransitionBlockedError::graph_rules(
                     issue.id.clone(),
                     target,
@@ -1876,6 +2231,373 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn captured_issue_spec(id: &str) -> crate::repository_state::CaptureSpec {
+        use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
+        let paths = std::collections::BTreeSet::from([
+            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
+            VirtualPath::data("events.jsonl").unwrap(),
+        ]);
+        CaptureSpec::phase_one(
+            paths,
+            CaptureBudget {
+                max_paths: 2,
+                max_listings: 0,
+                max_bytes: 1024 * 1024,
+                max_depth: 4,
+            },
+        )
+        .unwrap()
+    }
+
+    fn captured_gate_issue_spec(id: &str) -> crate::repository_state::CaptureSpec {
+        use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
+        let paths = std::collections::BTreeSet::from([
+            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
+            VirtualPath::data("events.jsonl").unwrap(),
+            VirtualPath::data("gates.toml").unwrap(),
+        ]);
+        CaptureSpec::phase_one(
+            paths,
+            CaptureBudget {
+                max_paths: 3,
+                max_listings: 0,
+                max_bytes: 1024 * 1024,
+                max_depth: 4,
+            },
+        )
+        .unwrap()
+    }
+
+    fn issue_from_image(image: &crate::repository_state::RepositoryImage, id: &str) -> Issue {
+        let path = crate::repository_state::VirtualPath::data(format!("issues/{id}.json")).unwrap();
+        serde_json::from_slice(image.file_bytes(&path).unwrap().unwrap()).unwrap()
+    }
+
+    fn event_bytes(plan: &crate::repository_state::MaterializationPlan) -> Vec<u8> {
+        plan.delta()
+            .actions()
+            .iter()
+            .find_map(|action| match action {
+                crate::repository_state::RepositoryAction::WriteFile { path, bytes, .. }
+                    if path
+                        == &crate::repository_state::VirtualPath::data("events.jsonl").unwrap() =>
+                {
+                    Some(bytes.clone())
+                }
+                _ => None,
+            })
+            .unwrap()
+    }
+
+    fn manual_gate_registry(key: &str) -> crate::declarations::GateRegistry {
+        use crate::declarations::{GateDefinition, GateMode, GateRegistry, GateStage};
+        let definition = GateDefinition {
+            version: 1,
+            key: key.to_string(),
+            title: key.to_string(),
+            description: String::new(),
+            stage: GateStage::Postcheck,
+            mode: GateMode::Manual,
+            checker: None,
+            priority: 100,
+            reserved: std::collections::HashMap::new(),
+            auto: false,
+            example_integration: None,
+        };
+        GateRegistry {
+            gates: std::collections::HashMap::from([(key.to_string(), definition)]),
+        }
+    }
+
+    fn gate_registry_from_image(
+        image: &crate::repository_state::RepositoryImage,
+    ) -> crate::declarations::GateRegistry {
+        let path = crate::repository_state::VirtualPath::data("gates.toml").unwrap();
+        crate::declarations::parse_gate_registry(image.file_bytes(&path).unwrap().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn test_captured_issue_retry_preserves_unrelated_change_and_context_identity() {
+        use crate::repository_state::{finalize, MutationContext};
+        use crate::storage::{InMemoryStorage, RepositoryStateStore, RepositoryStateStoreError};
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        let issue = crate::domain::types::fixture_issue(
+            "captured-retry-issue".to_string(),
+            "Captured retry".to_string(),
+        );
+        let id = issue.id.clone();
+        storage.save_issue(issue).unwrap();
+        let layout = storage.repository_layout();
+        let request = CapturedIssueMutation::Assign {
+            issue_id: id.clone(),
+            assignee: "agent:retry".parse().unwrap(),
+        };
+        let context = MutationContext::deterministic(
+            [7; 32],
+            chrono::DateTime::parse_from_rfc3339("2026-07-20T10:11:12Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        );
+
+        let mut first_session = storage.open_mutation_session(layout.clone()).unwrap();
+        let first_image = first_session.capture(captured_issue_spec(&id)).unwrap();
+        let first = derive_captured_issue_mutation(
+            issue_from_image(&first_image, &id),
+            &crate::declarations::GateRegistry::default(),
+            &request,
+        )
+        .unwrap();
+        let first_plan = finalize(&layout, &first_image, &context, &first.intents).unwrap();
+
+        // Model an unrelated writer between capture and apply. The stale plan
+        // conflicts instead of replacing that writer's label.
+        let mut concurrent = storage.load_issue(&id).unwrap();
+        concurrent.labels.push("owner:concurrent".to_string());
+        storage.save_issue(concurrent).unwrap();
+        assert!(matches!(
+            first_session.apply(&first_plan),
+            Err(RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+        drop(first_session);
+
+        let mut retry_session = storage.open_mutation_session(layout.clone()).unwrap();
+        let retry_image = retry_session.capture(captured_issue_spec(&id)).unwrap();
+        let retry = derive_captured_issue_mutation(
+            issue_from_image(&retry_image, &id),
+            &crate::declarations::GateRegistry::default(),
+            &request,
+        )
+        .unwrap();
+        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents).unwrap();
+        assert_eq!(
+            event_bytes(&first_plan),
+            event_bytes(&retry_plan),
+            "one operation context must keep event identity and time stable"
+        );
+        retry_session.apply(&retry_plan).unwrap();
+
+        let updated = storage.load_issue(&id).unwrap();
+        assert!(updated
+            .labels
+            .iter()
+            .any(|label| label == "owner:concurrent"));
+        assert_eq!(updated.assignee.unwrap().to_string(), "agent:retry");
+    }
+
+    #[test]
+    fn test_captured_issue_idempotent_retry_derives_true_noop() {
+        let mut issue = crate::domain::types::fixture_issue(
+            "captured-noop-issue".to_string(),
+            "Captured no-op".to_string(),
+        );
+        issue.assignee = Some("agent:same".parse().unwrap());
+        let request = CapturedIssueMutation::Assign {
+            issue_id: issue.id.clone(),
+            assignee: "agent:same".parse().unwrap(),
+        };
+        let derived = derive_captured_issue_mutation(
+            issue,
+            &crate::declarations::GateRegistry::default(),
+            &request,
+        )
+        .unwrap();
+        assert!(
+            derived.intents.is_empty(),
+            "rebased no-op must write nothing"
+        );
+        assert!(matches!(
+            derived.outcome,
+            CapturedIssueMutationOutcome::Unchanged
+        ));
+    }
+
+    #[test]
+    fn test_manual_gate_evidence_repeats_but_operation_retry_is_stable() {
+        use crate::repository_state::{finalize, MutationContext};
+        use crate::storage::{InMemoryStorage, RepositoryStateStore};
+
+        for status in [GateStatus::Passed, GateStatus::Failed] {
+            let storage = InMemoryStorage::new();
+            storage.init().unwrap();
+            storage
+                .save_gate_registry(&manual_gate_registry("review"))
+                .unwrap();
+            let mut issue = crate::domain::types::fixture_issue(
+                format!("repeat-{status:?}"),
+                "Repeated evidence".to_string(),
+            );
+            let id = issue.id.clone();
+            let actor: crate::domain::Assignee = "agent:reviewer".parse().unwrap();
+            issue.gates_required.push("review".to_string());
+            issue.gates_status.insert(
+                "review".to_string(),
+                GateState {
+                    status,
+                    updated_by: Some(actor.clone()),
+                    updated_at: chrono::DateTime::UNIX_EPOCH,
+                },
+            );
+            storage.save_issue(issue).unwrap();
+            let layout = storage.repository_layout();
+            let request = CapturedIssueMutation::SetManualGateStatus {
+                issue_id: id.clone(),
+                gate_key: "review".to_string(),
+                status,
+                by: Some(actor.clone()),
+            };
+            let first_time = chrono::DateTime::parse_from_rfc3339("2026-07-20T10:00:00Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc);
+            let first_context = MutationContext::deterministic([31; 32], first_time);
+            let mut first_session = storage.open_mutation_session(layout.clone()).unwrap();
+            let first_image = first_session
+                .capture(captured_gate_issue_spec(&id))
+                .unwrap();
+            let first = derive_captured_issue_mutation(
+                issue_from_image(&first_image, &id),
+                &gate_registry_from_image(&first_image),
+                &request,
+            )
+            .unwrap();
+            let first_plan =
+                finalize(&layout, &first_image, &first_context, &first.intents).unwrap();
+            let retry_plan =
+                finalize(&layout, &first_image, &first_context, &first.intents).unwrap();
+            assert_eq!(first_plan.delta(), retry_plan.delta());
+            first_session.apply(&first_plan).unwrap();
+            assert_eq!(
+                storage.load_issue(&id).unwrap().gates_status["review"].updated_at,
+                first_time
+            );
+
+            let second_time = chrono::DateTime::parse_from_rfc3339("2026-07-20T11:00:00Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc);
+            let second_context = MutationContext::deterministic([32; 32], second_time);
+            let mut second_session = storage.open_mutation_session(layout.clone()).unwrap();
+            let second_image = second_session
+                .capture(captured_gate_issue_spec(&id))
+                .unwrap();
+            let second = derive_captured_issue_mutation(
+                issue_from_image(&second_image, &id),
+                &gate_registry_from_image(&second_image),
+                &request,
+            )
+            .unwrap();
+            let second_plan =
+                finalize(&layout, &second_image, &second_context, &second.intents).unwrap();
+            assert_ne!(event_bytes(&first_plan), event_bytes(&second_plan));
+            second_session.apply(&second_plan).unwrap();
+
+            assert_eq!(
+                storage.load_issue(&id).unwrap().gates_status["review"].updated_at,
+                second_time
+            );
+            let events = storage.read_events().unwrap();
+            assert_eq!(events.len(), 2);
+            let evidence = events
+                .iter()
+                .map(|event| match (status, event) {
+                    (
+                        GateStatus::Passed,
+                        Event::GatePassed {
+                            id,
+                            timestamp,
+                            updated_by,
+                            ..
+                        },
+                    )
+                    | (
+                        GateStatus::Failed,
+                        Event::GateFailed {
+                            id,
+                            timestamp,
+                            updated_by,
+                            ..
+                        },
+                    ) if updated_by.as_ref() == Some(&actor) => (id, timestamp),
+                    _ => panic!("unexpected manual gate evidence: {event:?}"),
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(*evidence[0].1, first_time);
+            assert_eq!(*evidence[1].1, second_time);
+            assert_ne!(evidence[0].0, evidence[1].0);
+        }
+    }
+
+    #[test]
+    fn test_gate_add_retry_rejects_removed_registry_declaration() {
+        use crate::repository_state::{finalize, MutationContext};
+        use crate::storage::{
+            GateNotFoundError, InMemoryStorage, RepositoryStateStore, RepositoryStateStoreError,
+        };
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        storage
+            .save_gate_registry(&manual_gate_registry("review"))
+            .unwrap();
+        let issue = crate::domain::types::fixture_issue(
+            "registry-race".to_string(),
+            "Registry race".to_string(),
+        );
+        let id = issue.id.clone();
+        storage.save_issue(issue).unwrap();
+        let layout = storage.repository_layout();
+        let request = CapturedIssueMutation::AddGates {
+            issue_id: id.clone(),
+            gate_keys: vec!["review".to_string()],
+        };
+        let context = MutationContext::deterministic(
+            [41; 32],
+            chrono::DateTime::parse_from_rfc3339("2026-07-20T12:00:00Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        );
+
+        let mut first_session = storage.open_mutation_session(layout.clone()).unwrap();
+        let first_image = first_session
+            .capture(captured_gate_issue_spec(&id))
+            .unwrap();
+        let first = derive_captured_issue_mutation(
+            issue_from_image(&first_image, &id),
+            &gate_registry_from_image(&first_image),
+            &request,
+        )
+        .unwrap();
+        let stale_plan = finalize(&layout, &first_image, &context, &first.intents).unwrap();
+
+        storage
+            .save_gate_registry(&crate::declarations::GateRegistry::default())
+            .unwrap();
+        assert!(matches!(
+            first_session.apply(&stale_plan),
+            Err(RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+        drop(first_session);
+
+        let mut retry_session = storage.open_mutation_session(layout).unwrap();
+        let retry_image = retry_session
+            .capture(captured_gate_issue_spec(&id))
+            .unwrap();
+        let error = match derive_captured_issue_mutation(
+            issue_from_image(&retry_image, &id),
+            &gate_registry_from_image(&retry_image),
+            &request,
+        ) {
+            Ok(_) => panic!("retry must revalidate against the changed registry"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error.downcast_ref::<GateNotFoundError>(),
+            Some(&GateNotFoundError::Batch(vec!["review".to_string()]))
+        );
+        assert!(storage.load_issue(&id).unwrap().gates_required.is_empty());
+        assert!(storage.read_events().unwrap().is_empty());
+    }
 
     #[test]
     fn test_rules_are_parsed_once_and_cached() {

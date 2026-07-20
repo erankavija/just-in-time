@@ -401,7 +401,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Event::draft_local_rule_bypassed(issue.id.clone(), rule.clone()),
             )
         }));
-        self.publish_issue_mutation(if modified { vec![updated] } else { Vec::new() }, events)?;
+        self.publish_ambient_issue_mutation(
+            if modified { vec![updated] } else { Vec::new() },
+            events,
+        )?;
 
         Ok((modified, transition_warnings))
     }

@@ -767,7 +767,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Publish the relabel as a semantic full-issue update through the recovered
         // session; the finalizer stamps `updated_at` and reconciles the lifecycle
         // timestamps from the captured preimage.
-        self.publish_issue_mutation(vec![issue], Vec::new())
+        self.publish_ambient_issue_mutation(vec![issue], Vec::new())
     }
 
     // Note: apply_dependency_reversal is removed - we don't reverse dependencies
@@ -1903,7 +1903,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 new_count: reduced_len,
                 removed_deps,
             };
-            self.publish_issue_mutation(vec![issue], vec![(1, event)])?;
+            self.publish_ambient_issue_mutation(vec![issue], vec![(1, event)])?;
         }
 
         Ok(redundant_count)

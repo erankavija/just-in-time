@@ -46,7 +46,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|f| format!("[{}] {}", f.rule, f.message))
             .collect();
 
-        self.publish_issue_mutation(vec![issue], Vec::new())?;
+        self.publish_ambient_issue_mutation(vec![issue], Vec::new())?;
         Ok(warnings)
     }
 
