@@ -194,7 +194,12 @@ fn test_config_set_write_throughs_membership() {
     let (_temp, jit_dir) = setup_initialized_repo();
     declare_unique_squad_namespace(&jit_dir);
 
-    let executor = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let storage = JsonFileStorage::new(&jit_dir);
+    // `jit config set` publishes the repo config edit through the recovered
+    // session, so the executor needs its canonical layout.
+    let layout = jit::storage::discover_repository_layout(jit_dir.parent().unwrap(), &jit_dir)
+        .unwrap();
+    let executor = CommandExecutor::new(storage).with_layout(layout);
     executor
         .set_config("project.name", "demo-project", false)
         .unwrap();

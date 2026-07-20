@@ -162,6 +162,69 @@ pub fn resolve_dotted_key(
     Ok(current.clone())
 }
 
+/// Apply one `section.field = value` edit to a config `DocumentMut`, typing the
+/// value and rejecting an invalid post-edit `[project].name` / `[validation].strictness`.
+///
+/// The edit is preservation-safe (toml_edit keeps every unrelated byte, comment,
+/// and ordering). `project.name` is validated through [`ProjectName`] and
+/// `validation.strictness` through [`crate::validation::Strictness`] on the
+/// POST-mutation document, so a valid replacement is the repair path while any
+/// edit over a document already holding an invalid value is rejected — nothing is
+/// mutated on disk until the caller persists the returned document.
+fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str) -> Result<()> {
+    let parts: Vec<&str> = key.split('.').collect();
+    if parts.len() != 2 {
+        anyhow::bail!(
+            "Config key must be in format 'section.field' (e.g., coordination.default_ttl_secs)"
+        );
+    }
+    let (section, field) = (parts[0], parts[1]);
+
+    if doc.get(section).is_none() {
+        doc[section] = toml_edit::Item::Table(toml_edit::Table::new());
+    }
+
+    let parsed_value: toml_edit::Item = match key {
+        k if k.ends_with("_secs") || k.ends_with("_pct") || k.contains("max_") => {
+            let num: i64 = value
+                .parse()
+                .map_err(|_| anyhow!("Expected numeric value for {}", key))?;
+            toml_edit::value(num)
+        }
+        k if k.contains("enable_") || k.contains("require_") || k.contains("auto_") => {
+            let b: bool = value
+                .parse()
+                .map_err(|_| anyhow!("Expected boolean (true/false) for {}", key))?;
+            toml_edit::value(b)
+        }
+        _ => toml_edit::value(value),
+    };
+
+    doc[section][field] = parsed_value;
+
+    // REQ-03: the canonical `[project].name` is validated on EVERY document write,
+    // not only when it is the key being set.
+    if let Some(name) = doc
+        .get("project")
+        .and_then(|project| project.get("name"))
+        .and_then(|name| name.as_str())
+    {
+        let _validated: ProjectName = name.parse()?;
+    }
+
+    // Reject an unrecognized `[validation].strictness` eagerly, mirroring the
+    // load-time `deserialize_strictness` guard.
+    if let Some(strictness) = doc
+        .get("validation")
+        .and_then(|validation| validation.get("strictness"))
+        .and_then(|value| value.as_str())
+    {
+        let _validated: crate::validation::Strictness = strictness.parse()?;
+    }
+
+    Ok(())
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     /// Set a `section.field` key in the repo (or, with `global`, the user-global)
     /// `config.toml`, returning what the CLI needs to print.
@@ -174,105 +237,127 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// untouched (REQ-03). Numeric (`*_secs`/`*_pct`/`max_*`) and boolean
     /// (`enable_*`/`require_*`/`auto_*`) keys are parsed into their TOML types;
     /// any other key is stored as a string.
-    pub fn set_config(&self, key: &str, value: &str, global: bool) -> Result<ConfigSetOutcome> {
-        // Determine the target config file (path derivation only; the store owns
-        // the read/write IO).
-        let config_path = if global {
+    pub fn set_config(&self, key: &str, value: &str, global: bool) -> Result<ConfigSetOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        if global {
+            // The user-global config is outside repository materialization: read,
+            // edit, and atomically write it directly (no registry to re-derive).
             let home =
                 dirs::home_dir().ok_or_else(|| anyhow!("Could not determine home directory"))?;
-            home.join(".config/jit").join("config.toml")
-        } else {
-            config_store::repo_config_path(self.storage.root())
-        };
-
-        // Load the existing config or start an empty document (through storage).
-        let mut doc = config_store::read_config_document(&config_path)?;
-
-        // Parse the key into section.field.
-        let parts: Vec<&str> = key.split('.').collect();
-        if parts.len() != 2 {
-            anyhow::bail!("Config key must be in format 'section.field' (e.g., coordination.default_ttl_secs)");
-        }
-        let section = parts[0];
-        let field = parts[1];
-
-        // Ensure the section exists.
-        if doc.get(section).is_none() {
-            doc[section] = toml_edit::Item::Table(toml_edit::Table::new());
+            let config_path = home.join(".config/jit").join("config.toml");
+            let mut doc = config_store::read_config_document(&config_path)?;
+            edit_config_document(&mut doc, key, value)?;
+            config_store::save_config_document(&config_path, &doc)?;
+            return Ok(ConfigSetOutcome {
+                key: key.to_string(),
+                value: value.to_string(),
+                file: config_path,
+                scope: "user",
+            });
         }
 
-        // Parse and set the value based on the expected type.
-        let parsed_value: toml_edit::Item = match key {
-            k if k.ends_with("_secs") || k.ends_with("_pct") || k.contains("max_") => {
-                let num: i64 = value
-                    .parse()
-                    .map_err(|_| anyhow!("Expected numeric value for {}", key))?;
-                toml_edit::value(num)
-            }
-            k if k.contains("enable_") || k.contains("require_") || k.contains("auto_") => {
-                let b: bool = value
-                    .parse()
-                    .map_err(|_| anyhow!("Expected boolean (true/false) for {}", key))?;
-                toml_edit::value(b)
-            }
-            _ => toml_edit::value(value),
-        };
-
-        doc[section][field] = parsed_value;
-
-        // REQ-03: the canonical `[project].name` is validated on EVERY document
-        // write, not only when it is the key being set. Validating the
-        // POST-mutation document makes a valid replacement
-        // (`config set project.name good-name`) the repair path, while an
-        // unrelated set over a document that already holds an invalid name is
-        // rejected. The typed error names the offending value, and nothing is
-        // persisted before this check so a rejected write leaves the file
-        // untouched.
-        if let Some(name) = doc
-            .get("project")
-            .and_then(|project| project.get("name"))
-            .and_then(|name| name.as_str())
-        {
-            let _validated: ProjectName = name.parse()?;
-        }
-
-        // Reject an unrecognized `[validation].strictness` eagerly, on the SAME
-        // post-mutation document, so an invalid level never persists. This mirrors
-        // the load-time `deserialize_strictness` guard: `config set
-        // validation.strictness <valid>` is the repair path for a file that
-        // already holds a bad value, while any set over a document carrying an
-        // invalid strictness is rejected. Nothing is written before this check.
-        if let Some(strictness) = doc
-            .get("validation")
-            .and_then(|validation| validation.get("strictness"))
-            .and_then(|value| value.as_str())
-        {
-            let _validated: crate::validation::Strictness = strictness.parse()?;
-        }
-
-        // Persist through storage (atomic write, parent dir ensured for the
-        // user-global first-write case).
-        config_store::save_config_document(&config_path, &doc)?;
-
-        // A repo `config.toml` write republishes the default-schema projections
-        // from the (possibly changed) registry, keeping `schemas/default-*.json`
-        // current for external consumers, and write-through syncs the
-        // `namespace-unique-*` default-rule MEMBERSHIP into `rules.toml` itself so
-        // `@/rule/<name>` addressability never lags a registry edit (REQ-01/REQ-02,
-        // jit:d74a9ed1). The user-global config carries no repo registry, so
-        // neither touches these files. Both are no-ops when the repo has no
-        // materialized `rules.toml`/`schemas/` layout.
-        if !global {
-            self.refresh_default_schema_projections()?;
-            self.sync_default_rule_membership()?;
-        }
-
+        let config_path = config_store::repo_config_path(self.storage.root());
+        self.set_repo_config(key, value)?;
         Ok(ConfigSetOutcome {
             key: key.to_string(),
             value: value.to_string(),
             file: config_path,
-            scope: if global { "user" } else { "repo" },
+            scope: "repo",
         })
+    }
+
+    /// Publish a repo `config.toml` edit plus its coupled derived state through the
+    /// recovered mutation session, in one recoverable transaction.
+    ///
+    /// The edited, preservation-safe `config.toml` bytes are produced with
+    /// toml_edit over the captured document, then
+    /// [`finalize_config_edit`](crate::repository_state::finalize_config_edit)
+    /// composes them with the COMPLETE producer set — default rules and schemas
+    /// re-derive and every configured projection regenerates from the edited
+    /// configuration in the same delta, so `@/rule/<name>` addressability and the
+    /// `schemas/default-*.json` projections never lag a registry edit. The proposal
+    /// is validated by overlaying the finalized delta before it is applied.
+    fn set_repo_config(&self, key: &str, value: &str) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{
+            apply_overlay, finalize_config_edit, CaptureBudget, CaptureSpec, RepositorySeed,
+            RepositorySeedKind, VirtualPath,
+        };
+        use crate::storage::RepositoryStateStoreError;
+
+        let layout = self.require_layout()?;
+        let mut session = self.storage().open_mutation_session(layout)?;
+        let seed = RepositorySeed::new(
+            RepositorySeedKind::Command {
+                name: "config set".to_string(),
+            },
+            std::collections::BTreeMap::new(),
+            std::collections::BTreeMap::new(),
+        )?;
+        let config_vpath = VirtualPath::data("config.toml")?;
+        let budget = CaptureBudget {
+            max_paths: 16,
+            max_listings: 0,
+            max_bytes: 64 * 1024 * 1024,
+            max_depth: 6,
+        };
+
+        for _ in 0..8 {
+            // Read the current config for a preservation-safe edit from the closed
+            // image, so a concurrent edit is caught by the apply-time preimage check.
+            let config_image =
+                match session.capture(CaptureSpec::phase_one([config_vpath.clone()], budget)?) {
+                    Ok(image) => image,
+                    Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                    Err(error) => return Err(error.into()),
+                };
+            let current = super::image_repo_bytes(&config_image, ".jit/config.toml")?
+                .unwrap_or_default();
+            let mut doc = String::from_utf8(current)
+                .context("existing .jit/config.toml is not UTF-8")?
+                .parse::<toml_edit::DocumentMut>()
+                .context("existing .jit/config.toml is not valid TOML")?;
+            edit_config_document(&mut doc, key, value)?;
+            let edited_bytes = doc.to_string().into_bytes();
+
+            // Capture the whole-repository closure over the EDITED config (so a new
+            // projection source/target enters the closure), then finalize, validate
+            // the finalized-delta overlay, and publish under one held session.
+            let overrides =
+                std::iter::once((config_vpath.clone(), Some(edited_bytes.clone()))).collect();
+            let base = match self.capture_proposed_base(session.as_mut(), &overrides, &[])? {
+                None => continue,
+                Some(base) => base,
+            };
+            // Declarations are read from the config-overlaid image so the effective
+            // ruleset and projection inputs reflect the EDITED configuration (the
+            // base may not carry config.toml yet on a first-time creation).
+            let overlaid = apply_overlay(
+                &base,
+                std::iter::once((config_vpath.clone(), Some(edited_bytes.clone())))
+                    .collect::<std::collections::BTreeMap<_, _>>(),
+            )?;
+            let declarations = super::declarations_from_image(&overlaid)?;
+            let plan = finalize_config_edit(&base, &edited_bytes, declarations.borrowed(), &seed)?;
+            let proposed = apply_overlay(&base, super::validation_overlay(plan.delta()))?;
+            let validation = crate::validation::repository::validate_repository(&proposed)?;
+            if validation.rule_report.has_errors() {
+                anyhow::bail!(
+                    "config set would leave {} validation error finding(s)",
+                    validation.rule_report.error_count()
+                );
+            }
+            match session.apply(&plan) {
+                Ok(_) => return Ok(()),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        anyhow::bail!("config set did not converge after repeated capture conflicts")
     }
 
     /// Seed the repo `[project]` identity into a freshly-initialized `.jit`
@@ -543,7 +628,14 @@ schema = 1
         // F1: `jit config set validation.strictness <invalid>` must be rejected
         // eagerly, and must not overwrite a previously-valid persisted value.
         let dir = tempfile::TempDir::new().unwrap();
-        let executor = CommandExecutor::new(crate::storage::JsonFileStorage::new(dir.path()));
+        // A repo `config set` publishes through the recovered session and validates
+        // the proposed repository, so it needs an initialized, layout-backed repo.
+        let storage = crate::storage::JsonFileStorage::new(dir.path());
+        crate::storage::IssueStore::init(&storage).unwrap();
+        let layout =
+            crate::storage::discover_repository_layout(dir.path().parent().unwrap(), dir.path())
+                .unwrap();
+        let executor = CommandExecutor::new(storage).with_layout(layout);
 
         // A recognized level is accepted and persisted.
         executor

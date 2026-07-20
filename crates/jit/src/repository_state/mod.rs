@@ -157,6 +157,61 @@ pub fn derive_materializations(
     MaterializationPlan::new(image, seed, &intent, delta).map_err(Into::into)
 }
 
+/// Finalize an authored `config.toml` edit plus the complete coupled producer set
+/// as one plan — the single-declaration config-mutation session entry.
+///
+/// The command supplies the edited, preservation-safe `config.toml` bytes; this
+/// parses them through the pure configuration parser first, so a malformed edit is
+/// a typed planning error and never a published file. It then overlays the edited
+/// bytes onto the captured `base` and derives the complete owned-materialization
+/// set — default rules and their schemas, plus every configured projection — from
+/// that edited configuration, exactly as [`derive_semantic_mutation`] does. The
+/// authored `config.toml` write carries the captured base preimage, and every
+/// derived action its own base preimage, so `session.apply` revalidates against
+/// exactly what was captured; the whole set publishes under the existing
+/// [`MaterializationIntent::SemanticMutation`].
+///
+/// This is a constrained, single-declaration entry invoking the closed complete
+/// producer set — `config.toml` only, never a generic authored-bytes seam. Other
+/// authored-declaration edits adopt this same pattern per caller.
+pub fn finalize_config_edit(
+    base: &RepositoryImage,
+    edited_config_bytes: &[u8],
+    declarations: RepositoryDeclarations<'_>,
+    seed: &RepositorySeed,
+) -> Result<MaterializationPlan, RepositoryStateError> {
+    // The edit must parse before any planning: a malformed config is a typed
+    // planning error, not a published file.
+    crate::declarations::parse_configuration(edited_config_bytes).map_err(|error| {
+        RepositoryStateError::Producer(format!("invalid config.toml edit: {error:#}"))
+    })?;
+
+    let config_path = VirtualPath::data("config.toml")?;
+    let overlay = std::iter::once((config_path.clone(), Some(edited_config_bytes.to_vec())))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let overlaid = apply_overlay(base, overlay)
+        .map_err(|error| RepositoryStateError::Producer(format!("config overlay failed: {error}")))?;
+
+    // The authored config write carries the base preimage; the complete producer
+    // set derives the coupled schemas/rule-membership/projections from the edited
+    // configuration over the overlaid image (their targets keep their base
+    // preimages, since only `config.toml` is overlaid).
+    let mut actions = vec![RepositoryAction::WriteFile {
+        path: config_path.clone(),
+        owner: "authored-config".to_string(),
+        expected: ExpectedPreimage::of(
+            base.entry(&config_path)
+                .map_err(|error| RepositoryStateError::producer(error.into()))?,
+        ),
+        bytes: edited_config_bytes.to_vec(),
+        mode: FileMode::Regular,
+    }];
+    actions.extend(compose_complete(&overlaid, &declarations)?);
+    let delta = RepositoryDelta::new(base.layout(), actions)?;
+    MaterializationPlan::new(base, seed, &MaterializationIntent::SemanticMutation, delta)
+        .map_err(Into::into)
+}
+
 /// Pure derivation failure.
 #[derive(Debug, thiserror::Error)]
 pub enum RepositoryStateError {
