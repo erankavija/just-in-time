@@ -1,61 +1,43 @@
-//! Graph-template apply engine (the `jit apply` engine).
+//! Graph-template apply engine.
 //!
-//! [`apply_template`](CommandExecutor::apply_template) instantiates a
-//! [`GraphTemplate`](crate::templates::GraphTemplate) onto a container in two
-//! phases with a hard boundary between them:
+//! Expansion is pure. Publication derives issues, gates, and events from one
+//! captured repository image, then submits one typed materialization plan so the
+//! complete scaffold is published atomically. Force-refresh updates prose only;
+//! replaying transforms over a live scaffold would corrupt its dependency spine.
 //!
-//! 1. **Expand** — [`expand_template`](crate::commands::expand_template) turns
-//!    the template, a container snapshot, and the bound anchors' pre-apply
-//!    dependency snapshots into a [`TemplateDelta`]: the issues to create, the
-//!    edges to add, the edges to remove, and the anchor gates to attach. Pure:
-//!    no storage access.
-//! 2. **Commit** — the executor validates the delta (gates resolve, each
-//!    projected issue would pass write validation, the prospective graph is
-//!    acyclic) and then commits it, all while holding ONE repository write lock:
-//!    [`IssueStore::acquire_repo_write_lock`](crate::storage::IssueStore::acquire_repo_write_lock),
-//!    the outer serialization guard of every ordinary issue/dependency write, so
-//!    no other writer can interleave with the apply. A validation or write failure inside
-//!    the lock leaves the issue store as it was: created nodes are deleted and
-//!    mutated issues are rewritten from a pre-mutation snapshot, field for field
-//!    down to `updated_at`, before the error is returned. Because no concurrent
-//!    writer could land inside the window, the rollback can only undo writes the
-//!    apply itself made.
-//!
-//! Committing the delta produces the plan-before-fan-out scaffold: the
-//! `C → B → P` bracket. Nodes are created with interpolated descriptions and
-//! their declared gates; the planning node's `doc` template seeds its description
-//! with the plan-doc location to author and link (the engine attaches no document
-//! reference, so apply never leaves a reference to a not-yet-created file). Edges
-//! go through [`add_dependency`](CommandExecutor::add_dependency), so the result
-//! is acyclic and transitively reduced, and every edge write emits the same
-//! events as the ordinary dependency path.
-//!
-//! The `--force` refresh path re-seeds existing nodes' prose in place and commits
-//! no edges or transforms (the spine already exists; re-running the transform
-//! over now-scaffold-bearing live deps would corrupt it).
-//!
-//! # Domain-agnostic
-//!
-//! No `epic` / `planning` / `breakdown` literal is hardcoded. Node types, gates
-//! (preset or registry key), doc locations, descriptions, and labels all come
-//! from the template; the roles this engine reaches for by meaning (the planning
-//! and breakdown nodes) are named by the repository's
-//! [`RoleBindings`](crate::templates::RoleBindings), and the anchor the CLI binds
-//! to the positional `<container>` is named by its
-//! [`AnchorBindings`](crate::templates::AnchorBindings) (`@/inv/domain-agnostic`).
+//! Types, gates, document locations, labels, roles, and anchors come from the
+//! repository template rather than hardcoded workflow vocabulary
+//! (`@/inv/domain-agnostic`).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use super::template_expand::{
     expand_template, node_description, validate_delta_acyclic, DeltaEndpoint, InterpolationContext,
     PlannedNode, TemplateDelta,
 };
 use super::*;
+use crate::repository_state::{
+    finalize, finalize_gate_registry_edit, render_capture_closure, CaptureBudget, CaptureSpec,
+    MutationContext, MutationIntent, RepositoryEntry, RepositoryImage, VirtualPath,
+};
+use crate::storage::{
+    AmbiguousIdError, InvalidIdPrefixError, IssueNotFoundError, RepositoryStateStoreError,
+    MIN_ID_PREFIX_LENGTH,
+};
 use crate::templates::{GraphTemplate, RoleBindings};
 use serde::Serialize;
 
 /// Actor recorded on the events the apply engine appends directly.
 const APPLY_ACTOR: &str = "agent:apply";
+
+const TEMPLATE_CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
+    max_paths: 1 << 16,
+    max_listings: 2,
+    max_bytes: 512 * 1024 * 1024,
+    max_depth: 16,
+};
+
+const TEMPLATE_RETRY_LIMIT: usize = 8;
 
 /// How a template node/anchor gate NAME resolves: a registered gate PRESET
 /// bundle, or a single gate KEY declared in the gate registry (`.jit/gates.toml`).
@@ -64,10 +46,26 @@ const APPLY_ACTOR: &str = "agent:apply";
 /// `repo-validate`) be referenced from a template without being a built-in
 /// preset, keeping engine code free of any gate/container literal.
 enum TemplateGateResolution {
-    /// A registered gate preset; apply its whole bundle via `apply_gate_preset`.
-    Preset,
+    /// A registered gate preset and its captured definition.
+    Preset(crate::gate_presets::GatePresetDefinition),
     /// A single gate key in the registry; attach that one gate via `add_gates`.
     RegistryKey,
+}
+
+enum TemplateRequest<'a> {
+    Named(&'a str),
+    Explicit(&'a GraphTemplate),
+}
+
+impl TemplateRequest<'_> {
+    fn resolve(&self, config: &crate::config::JitConfig) -> Result<GraphTemplate> {
+        match self {
+            Self::Named(name) => config.templates.get(name).cloned().ok_or_else(|| {
+                anyhow!("no template '{name}' in .jit/templates.toml; declare it or check the name")
+            }),
+            Self::Explicit(template) => Ok((*template).clone()),
+        }
+    }
 }
 
 /// Outcome of applying a graph template to a container.
@@ -117,12 +115,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Apply a graph template named `template_name` to `container_id`
     /// (`jit apply <template> <container>`).
     ///
-    /// Reads the template from the cached [`TemplateRegistry`](crate::templates::TemplateRegistry)
-    /// (`.jit/templates.toml`) and delegates to
-    /// [`apply_template_with`](Self::apply_template_with). `anchor_bindings` maps
-    /// each declared anchor name to an issue id; the CLI binds the container
-    /// anchor ([`container_anchor`](Self::container_anchor)) to `container_id`
-    /// before calling.
+    /// Reads the template and default container-anchor name from the captured
+    /// `.jit/templates.toml`. `anchor_bindings` supplies explicit bindings, which
+    /// override the captured positional-container default.
     pub fn apply_template(
         &self,
         template_name: &str,
@@ -133,81 +128,21 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        // Clone the template out of the cached config: the engine mutates issues
-        // through `&self`, so it cannot hold a borrow into the config cache.
-        let template = self
-            .cached_config()?
-            .templates
-            .get(template_name)
-            .cloned()
-            .ok_or_else(|| {
-                anyhow!(
-                    "no template '{template_name}' in .jit/templates.toml; \
-                     declare it or check the name"
-                )
-            })?;
-        self.apply_template_with(&template, container_id, anchor_bindings, force)
+        self.apply_template_request(
+            TemplateRequest::Named(template_name),
+            container_id,
+            anchor_bindings,
+            force,
+        )
     }
 
     /// Apply an explicit [`GraphTemplate`] — the registry-independent core of
     /// [`apply_template`](Self::apply_template).
     ///
-    /// Separated so the engine is testable without an on-disk `templates.toml`.
-    /// The role names it locates the bracket by still come from the repository's
-    /// [`RoleBindings`] ([`template_roles`](Self::template_roles)), which default
-    /// to the shipped names when the repository declares none.
-    /// The whole call runs under ONE repository write lock — the one every
-    /// ordinary writer takes — so a concurrent writer observes the store before
-    /// the apply or after it, never midway. Steps:
-    ///
-    /// 1. **Resolve** — the container type is in the template's `applies_to`;
-    ///    every declared anchor is bound and resolves to an existing issue; each
-    ///    bound anchor's `dependencies` are snapshotted.
-    /// 2. **Expand** — [`expand_template`] turns the template plus those snapshots
-    ///    into a [`TemplateDelta`], purely.
-    /// 3. **Validate the delta** — every node AND anchor gate resolves (as a gate
-    ///    preset OR a registry gate key), every projected node write would pass
-    ///    validation, the prospective post-apply graph is acyclic, and the
-    ///    container is not already-applied unless `force`. Any failure aborts
-    ///    BEFORE the first write.
-    /// 4. **Commit the delta** — create the nodes with their gates, wire the
-    ///    `add_edges` and drop the `remove_edges` via
-    ///    [`add_dependency`](Self::add_dependency) /
-    ///    [`remove_dependency`](Self::remove_dependency) (cycle-checked,
-    ///    transitively reduced, event-emitting), then attach the anchor gates. A
-    ///    failure at any point restores the pre-mutation issue snapshot before the
-    ///    error is returned.
-    ///
-    /// Under `force`, an already-applied container takes the refresh path instead:
-    /// each existing node's prose is re-seeded in place, with the same
-    /// restore-on-failure guarantee.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    /// use jit::templates::TemplateRegistry;
-    /// use std::collections::BTreeMap;
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic"]
-    /// [[template.nodes]]
-    /// role = "planning"
-    /// type = "planning"
-    /// description = "Plan {container.title}."
-    /// "#;
-    /// let registry = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
-    /// let template = registry.get("plan").unwrap();
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let bindings = BTreeMap::from([("container".to_string(), "epic-123".to_string())]);
-    /// let (result, _warnings) =
-    ///     executor.apply_template_with(template, "epic-123", &bindings, false).unwrap();
-    /// assert_eq!(result.template, "plan");
-    /// ```
+    /// This request value is explicit, but all repository declarations and issue
+    /// records still come from one bounded captured image. Fresh application and
+    /// `--force` refresh both publish one typed transaction; a conflict recaptures
+    /// and re-derives while preserving operation-scoped identifiers and time.
     pub fn apply_template_with(
         &self,
         template: &GraphTemplate,
@@ -218,580 +153,1248 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        // One repository write lock for the whole apply: the reads that validation
-        // depends on (the store snapshot the cycle check simulates over, the
-        // already-applied probe) and every write that follows are serialized
-        // against every other writer. It is the SAME lock the ordinary
-        // issue/dependency write path takes as its outer serialization guard, so no
-        // concurrent `jit issue create` / `jit dep add` can interleave: a mutation
-        // landing between the snapshot and the writes could otherwise invalidate
-        // the checks the writes rely on, and the compensating rollback would
-        // revert work this apply never made. Reentrant, so the nested storage
-        // writes below take it again without deadlocking.
-        let _repo_lock = self.storage.acquire_repo_write_lock()?;
+        self.apply_template_request(
+            TemplateRequest::Explicit(template),
+            container_id,
+            anchor_bindings,
+            force,
+        )
+    }
 
-        // The repository's names for the bracket roles. Cloned rather than
-        // borrowed so the config cache is not held across the writes below.
-        let roles = self.template_roles()?.clone();
+    fn apply_template_request(
+        &self,
+        request: TemplateRequest<'_>,
+        container_id: &str,
+        anchor_bindings: &BTreeMap<String, String>,
+        force: bool,
+    ) -> Result<(TemplateApplyResult, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let layout = self.require_layout()?;
+        let context = MutationContext::production();
+        for _ in 0..TEMPLATE_RETRY_LIMIT {
+            let (lease_targets, lease_mode) = {
+                let mut session = self.storage.open_mutation_session(layout.clone())?;
+                let Some(image) =
+                    capture_template_image(&mut *session, &context, &request, container_id)?
+                else {
+                    continue;
+                };
+                let captured = derive_captured_template_apply(
+                    &image,
+                    &request,
+                    container_id,
+                    anchor_bindings,
+                    force,
+                    &context,
+                )?;
+                (
+                    existing_template_lease_targets(
+                        &captured.issues,
+                        &captured.derived.lease_targets,
+                    ),
+                    self.config_manager
+                        .enforcement_mode_from_config(&captured.config)?,
+                )
+            };
+            let warnings = template_lease_warnings(lease_mode, &lease_targets)?;
 
-        // === 1. Resolve the container and the anchor bindings ===
-        let full_container_id = self.storage.resolve_issue_id(container_id)?;
-        let container = self.storage.load_issue(&full_container_id)?;
-
-        // Container type ∈ applies_to.
-        match label_utils::type_label_value(&container.labels) {
-            Some(ty) if template.applies_to.iter().any(|a| a == ty) => {}
-            Some(ty) => {
-                return Err(anyhow!(
-                    "template '{}' does not apply to container type '{ty}'; \
-                     applies_to: {}",
-                    template.name,
-                    template.applies_to.join(", ")
-                ))
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some(image) =
+                capture_template_image(&mut *session, &context, &request, container_id)?
+            else {
+                continue;
+            };
+            let mut captured = derive_captured_template_apply(
+                &image,
+                &request,
+                container_id,
+                anchor_bindings,
+                force,
+                &context,
+            )?;
+            if self
+                .config_manager
+                .enforcement_mode_from_config(&captured.config)?
+                != lease_mode
+                || existing_template_lease_targets(
+                    &captured.issues,
+                    &captured.derived.lease_targets,
+                ) != lease_targets
+            {
+                continue;
             }
-            None => {
-                return Err(anyhow!(
-                    "container {full_container_id} has no type: label; \
-                     template '{}' applies to: {}",
-                    template.name,
-                    template.applies_to.join(", ")
-                ))
+            if captured.derived.intents.is_empty() {
+                return Ok((captured.derived.result, warnings));
+            }
+            captured.declarations.gates = captured.derived.registry;
+            let edits_gate_registry = captured
+                .derived
+                .intents
+                .iter()
+                .any(|intent| matches!(intent, MutationIntent::EditGateRegistry { .. }));
+            let plan = if edits_gate_registry
+                && image
+                    .file_bytes(&VirtualPath::data("config.toml")?)?
+                    .is_some()
+            {
+                finalize_gate_registry_edit(
+                    &layout,
+                    &image,
+                    &context,
+                    &captured.derived.intents,
+                    captured.declarations.borrowed(),
+                )?
+            } else {
+                // An absent config is a supported default repository, so there is
+                // no authored declaration document for repository validation to
+                // parse. The same typed finalizer still owns every issue, gate
+                // declaration, and event byte.
+                finalize(&layout, &image, &context, &captured.derived.intents)?
+            };
+            match session.apply(&plan) {
+                Ok(_) => return Ok((captured.derived.result, warnings)),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
             }
         }
+        Err(anyhow!(
+            "template apply did not converge after repeated capture conflicts"
+        ))
+    }
+}
 
-        // Every declared anchor is bound and resolves to an existing issue.
-        // Resolve into full ids so the snapshot and result are unambiguous.
-        let mut resolved_bindings: BTreeMap<String, String> = BTreeMap::new();
-        for anchor in &template.anchors {
+fn captured_anchor_bindings(
+    request: &TemplateRequest<'_>,
+    config: &crate::config::JitConfig,
+    container_id: &str,
+    explicit: &BTreeMap<String, String>,
+) -> BTreeMap<String, String> {
+    let mut bindings = explicit.clone();
+    if matches!(request, TemplateRequest::Named(_)) {
+        bindings
+            .entry(config.templates.anchors.container_anchor().to_string())
+            .or_insert_with(|| container_id.to_string());
+    }
+    bindings
+}
+
+fn existing_template_lease_targets(issues: &[Issue], targets: &[String]) -> Vec<String> {
+    let existing = issues
+        .iter()
+        .map(|issue| issue.id.as_str())
+        .collect::<HashSet<_>>();
+    targets
+        .iter()
+        .filter(|id| existing.contains(id.as_str()))
+        .cloned()
+        .collect()
+}
+
+fn template_lease_warnings(
+    mode: crate::config::EnforcementMode,
+    targets: &[String],
+) -> Result<Vec<String>> {
+    use crate::agent_config::resolve_agent_id;
+    use crate::config::EnforcementMode;
+    use crate::storage::claim_coordinator::ClaimsIndex;
+    use crate::storage::worktree_paths::WorktreePaths;
+
+    if mode == EnforcementMode::Off {
+        return Ok(Vec::new());
+    }
+    let claims = WorktreePaths::detect()
+        .ok()
+        .map(|paths| ClaimsIndex::load(&paths))
+        .transpose()?;
+    let agent = resolve_agent_id(None).ok();
+    let now = chrono::Utc::now();
+    let mut warnings = Vec::new();
+    for id in targets {
+        let active = claims.as_ref().is_some_and(|claims| {
+            claims.leases.iter().any(|lease| {
+                lease.issue_id == *id
+                    && lease.expires_at.is_none_or(|expires| expires > now)
+                    && !claims.is_stale(lease)
+                    && agent
+                        .as_ref()
+                        .is_none_or(|agent_id| lease.agent_id == *agent_id)
+            })
+        });
+        if active {
+            continue;
+        }
+        let message =
+            format!("No active lease for issue {id}.\nAcquire lease with: jit claim acquire {id}");
+        match mode {
+            EnforcementMode::Warn => warnings.push(message),
+            EnforcementMode::Strict => return Err(anyhow!(message)),
+            EnforcementMode::Off => unreachable!(),
+        }
+    }
+    Ok(warnings)
+}
+
+struct DerivedTemplateApply {
+    result: TemplateApplyResult,
+    registry: crate::declarations::GateRegistry,
+    intents: Vec<MutationIntent>,
+    lease_targets: Vec<String>,
+}
+
+struct CapturedTemplateApply {
+    config: crate::config::JitConfig,
+    declarations: super::ImageDeclarations,
+    issues: Vec<Issue>,
+    derived: DerivedTemplateApply,
+}
+
+fn derive_captured_template_apply(
+    image: &RepositoryImage,
+    request: &TemplateRequest<'_>,
+    container_id: &str,
+    anchor_bindings: &BTreeMap<String, String>,
+    force: bool,
+    context: &MutationContext,
+) -> Result<CapturedTemplateApply> {
+    let config = template_config_from_image(image)?;
+    let template = request.resolve(&config)?;
+    let bindings = captured_anchor_bindings(request, &config, container_id, anchor_bindings);
+    let issues = parse_template_issues(image)?;
+    let presets = parse_template_presets(image)?;
+    let registry = parse_template_gate_registry(image)?;
+    let declarations = template_declarations_from_image(image, &config)?;
+    let derived = derive_template_apply(
+        &template,
+        container_id,
+        &bindings,
+        force,
+        &config.templates.roles,
+        &issues,
+        registry,
+        &presets,
+        &config,
+        &declarations.rules,
+        context,
+    )?;
+    Ok(CapturedTemplateApply {
+        config,
+        declarations,
+        issues,
+        derived,
+    })
+}
+
+struct FreshTemplateDerivation {
+    created: BTreeMap<String, String>,
+    candidate: BTreeMap<String, Issue>,
+    created_order: Vec<String>,
+    lease_targets: Vec<String>,
+}
+
+fn template_fixed_paths() -> Result<Vec<VirtualPath>> {
+    [
+        "config.toml",
+        "index.json",
+        "events.jsonl",
+        "gates.toml",
+        "templates.toml",
+        "rules.toml",
+        "invariants.toml",
+        "issues",
+        "config/gate-presets",
+    ]
+    .into_iter()
+    .map(|path| VirtualPath::data(path).map_err(Into::into))
+    .collect()
+}
+
+fn capture_template_image(
+    session: &mut dyn crate::storage::RepositoryMutationSession,
+    context: &MutationContext,
+    request: &TemplateRequest<'_>,
+    container_id: &str,
+) -> Result<Option<RepositoryImage>> {
+    let presets_dir = VirtualPath::data("config/gate-presets")?;
+    let issues_dir = VirtualPath::data("issues")?;
+    let mut first_spec = CaptureSpec::phase_one(template_fixed_paths()?, TEMPLATE_CAPTURE_BUDGET)?;
+    first_spec.discover_listing(presets_dir.clone())?;
+    let first = match session.capture(first_spec) {
+        Ok(image) => image,
+        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    let discovered_index = parse_template_index(&first)?;
+    let discovered_presets = listed_json_paths(&first, &presets_dir)?;
+    let closure = template_declaration_closure(&first)?;
+
+    let mut spec = CaptureSpec::phase_one(template_fixed_paths()?, TEMPLATE_CAPTURE_BUDGET)?;
+    let mut discovered_paths = discovered_index
+        .all_ids
+        .iter()
+        .map(|id| VirtualPath::data(format!("issues/{id}.json")).map_err(Into::into))
+        .collect::<Result<Vec<_>>>()?;
+    discovered_paths.extend(discovered_presets.iter().cloned());
+    discovered_paths.extend(closure.iter().cloned());
+    spec.discover_paths(discovered_paths)?;
+    spec.discover_listing(issues_dir)?;
+    spec.discover_listing(presets_dir.clone())?;
+    let mut image = match session.capture(spec.clone()) {
+        Ok(image) => image,
+        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    if !template_static_capture_matches(
+        &image,
+        &discovered_index,
+        &presets_dir,
+        &discovered_presets,
+        &closure,
+    )? {
+        return Ok(None);
+    }
+
+    let derived = template_operation_capture_paths(&image, context, request, container_id)?;
+    if derived
+        .iter()
+        .all(|path| image.capture_spec().contains_path(path))
+    {
+        return Ok(Some(image));
+    }
+    spec.discover_paths(derived.iter().cloned())?;
+    image = match session.capture(spec) {
+        Ok(image) => image,
+        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    if !template_static_capture_matches(
+        &image,
+        &discovered_index,
+        &presets_dir,
+        &discovered_presets,
+        &closure,
+    )? || template_operation_capture_paths(&image, context, request, container_id)? != derived
+    {
+        return Ok(None);
+    }
+    Ok(Some(image))
+}
+
+fn template_static_capture_matches(
+    image: &RepositoryImage,
+    index: &crate::repository_state::RepositoryIndex,
+    presets_dir: &VirtualPath,
+    presets: &[VirtualPath],
+    closure: &[VirtualPath],
+) -> Result<bool> {
+    let captured = parse_template_index(image)?;
+    Ok(captured.all_ids == index.all_ids
+        && captured.deleted_ids == index.deleted_ids
+        && listed_json_paths(image, presets_dir)? == presets
+        && template_declaration_closure(image)? == closure)
+}
+
+fn template_declaration_closure(image: &RepositoryImage) -> Result<Vec<VirtualPath>> {
+    let config = template_config_from_image(image)?;
+    let rules = image
+        .file_bytes(&VirtualPath::data("rules.toml")?)?
+        .map(std::str::from_utf8)
+        .transpose()?;
+    render_capture_closure(&config, &[], rules)
+}
+
+fn template_operation_capture_paths(
+    image: &RepositoryImage,
+    context: &MutationContext,
+    request: &TemplateRequest<'_>,
+    container_id: &str,
+) -> Result<Vec<VirtualPath>> {
+    let config = template_config_from_image(image)?;
+    let template = request.resolve(&config)?;
+    let issues = parse_template_issues(image)?;
+    let full_container_id = resolve_template_issue_id(&issues, container_id)?;
+    let container = template_issue(&issues, &full_container_id)?;
+    let mut paths = template
+        .nodes
+        .iter()
+        .filter(|node| node.role == config.templates.roles.planning_role())
+        .filter_map(|node| node.doc.as_deref())
+        .map(|document| {
+            let rendered = render_template_document_path(document, container);
+            VirtualPath::worktree(rendered).map_err(Into::into)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let already_applied =
+        find_captured_breakdown(&template, &config.templates.roles, container, &issues).is_some();
+    if !already_applied {
+        paths.extend(
+            (0..template.nodes.len())
+                .map(|index| {
+                    VirtualPath::data(format!(
+                        "issues/{}.json",
+                        context.identifier_at(index as u64)
+                    ))
+                })
+                .collect::<std::result::Result<Vec<_>, _>>()?,
+        );
+    }
+    paths.extend(template_document_parent_paths(&paths)?);
+    paths.sort();
+    paths.dedup();
+    Ok(paths)
+}
+
+fn render_template_document_path(template: &str, container: &Issue) -> String {
+    let hard_criteria = container
+        .description
+        .lines()
+        .map(str::trim)
+        .map(|line| line.trim_start_matches(['-', '*', '+']).trim())
+        .filter(|line| line.starts_with("[hard]"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    template
+        .replace("{container.id}", &container.id)
+        .replace("{container.short_id}", &container.short_id())
+        .replace("{container.title}", &container.title)
+        .replace("{container.hard_criteria}", &hard_criteria)
+}
+
+fn template_document_parent_paths(paths: &[VirtualPath]) -> Result<Vec<VirtualPath>> {
+    let mut parents = Vec::new();
+    for path in paths
+        .iter()
+        .filter(|path| path.root_class() == crate::repository_state::RepositoryRootClass::Worktree)
+    {
+        let mut parent = path.relative().as_path().parent();
+        while let Some(relative) = parent {
+            if relative.as_os_str().is_empty() {
+                break;
+            }
+            parents.push(VirtualPath::worktree(relative)?);
+            parent = relative.parent();
+        }
+    }
+    Ok(parents)
+}
+
+fn template_config_from_image(image: &RepositoryImage) -> Result<crate::config::JitConfig> {
+    let config_path = VirtualPath::data("config.toml")?;
+    let mut config = match image.file_bytes(&config_path)? {
+        Some(_) => crate::repository_state::assemble_config(image)?,
+        None => toml::from_str("")?,
+    };
+    let hierarchy_types = config
+        .type_hierarchy
+        .as_ref()
+        .map(|hierarchy| {
+            hierarchy
+                .types
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    config.templates = match image.file_bytes(&VirtualPath::data("templates.toml")?)? {
+        Some(bytes) => crate::templates::TemplateRegistry::from_toml_str(
+            std::str::from_utf8(bytes)?,
+            &hierarchy_types,
+        )?,
+        None => crate::templates::TemplateRegistry::empty(),
+    };
+    Ok(config)
+}
+
+fn template_declarations_from_image(
+    image: &RepositoryImage,
+    config: &crate::config::JitConfig,
+) -> Result<super::ImageDeclarations> {
+    if image
+        .file_bytes(&VirtualPath::data("config.toml")?)?
+        .is_some()
+    {
+        return super::declarations_from_image(image);
+    }
+    let namespaces = crate::config_manager::namespaces_from_config(config);
+    let rules = match image.file_bytes(&VirtualPath::data("rules.toml")?)? {
+        Some(bytes) => {
+            let content = std::str::from_utf8(bytes)?;
+            let schemas: Vec<_> = crate::declarations::rules::RuleSet::schema_requests(content)?
+                .into_iter()
+                .map(|request| {
+                    let path = VirtualPath::data(&request.reference)?;
+                    let bytes = image.file_bytes(&path)?.ok_or_else(|| {
+                        anyhow!("captured rule schema '{}' is absent", request.reference)
+                    })?;
+                    Ok((request.reference, bytes.to_vec()))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let parsed =
+                crate::declarations::rules::RuleSet::parse(content, Some(config), schemas)?;
+            crate::repository_state::reconcile_default_rules_with_config(parsed, &namespaces)
+        }
+        None => crate::repository_state::default_ruleset(&namespaces),
+    };
+    Ok(super::ImageDeclarations {
+        configuration: crate::declarations::parse_configuration(b"")?,
+        gates: parse_template_gate_registry(image)?,
+        rules,
+    })
+}
+
+fn parse_template_index(
+    image: &RepositoryImage,
+) -> Result<crate::repository_state::RepositoryIndex> {
+    image
+        .file_bytes(&VirtualPath::data("index.json")?)?
+        .ok_or_else(|| anyhow!("index.json is absent during template apply"))
+        .and_then(crate::storage::json::parse_repository_index)
+}
+
+fn listed_json_paths(image: &RepositoryImage, dir: &VirtualPath) -> Result<Vec<VirtualPath>> {
+    let Some(listing) = image.listing_fingerprints().get(dir) else {
+        return Err(anyhow!("complete listing is absent for {dir:?}"));
+    };
+    listing
+        .children()
+        .keys()
+        .filter(|name| name.ends_with(".json"))
+        .map(|name| {
+            VirtualPath::data(format!("{}/{}", dir.relative().as_str(), name)).map_err(Into::into)
+        })
+        .collect()
+}
+
+fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
+    let index = parse_template_index(image)?;
+    let dir = VirtualPath::data("issues")?;
+    let listing = image
+        .listing_fingerprints()
+        .get(&dir)
+        .ok_or_else(|| anyhow!("complete issues listing is absent from template capture"))?;
+    let indexed = index
+        .all_ids
+        .iter()
+        .map(|id| format!("{id}.json"))
+        .collect::<BTreeSet<_>>();
+    let listed = listing
+        .children()
+        .keys()
+        .filter(|name| name.ends_with(".json"))
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    if indexed != listed {
+        return Err(anyhow!(
+            "issues directory membership does not match captured index"
+        ));
+    }
+    index
+        .all_ids
+        .iter()
+        .map(|id| {
+            let path = VirtualPath::data(format!("issues/{id}.json"))?;
+            let bytes = image
+                .file_bytes(&path)?
+                .ok_or_else(|| IssueNotFoundError::new(id))?;
+            let issue: Issue = serde_json::from_slice(bytes)
+                .with_context(|| format!("failed to parse captured issue {id}"))?;
+            if issue.id != *id {
+                return Err(anyhow!(
+                    "indexed issue {id} contains mismatched embedded id {}",
+                    issue.id
+                ));
+            }
+            Ok(issue)
+        })
+        .collect()
+}
+
+fn parse_template_gate_registry(
+    image: &RepositoryImage,
+) -> Result<crate::declarations::GateRegistry> {
+    match image.entry(&VirtualPath::data("gates.toml")?)? {
+        RepositoryEntry::File { bytes, .. } => Ok(crate::declarations::parse_gate_registry(bytes)?),
+        RepositoryEntry::Absent => Ok(crate::declarations::GateRegistry::default()),
+        _ => Err(anyhow!("captured gate registry is not an ordinary file")),
+    }
+}
+
+fn parse_template_presets(
+    image: &RepositoryImage,
+) -> Result<HashMap<String, crate::gate_presets::GatePresetDefinition>> {
+    let dir = VirtualPath::data("config/gate-presets")?;
+    let mut presets = crate::gate_presets::BuiltinPresets::load()?;
+    let mut custom_names = HashSet::new();
+    for path in listed_json_paths(image, &dir)? {
+        let bytes = image
+            .file_bytes(&path)?
+            .ok_or_else(|| anyhow!("listed custom preset is absent: {path:?}"))?;
+        let preset: crate::gate_presets::GatePresetDefinition = serde_json::from_slice(bytes)
+            .with_context(|| format!("failed to parse custom preset {path:?}"))?;
+        preset.validate().map_err(|_| {
+            crate::errors::InvalidArgumentError::new(format!(
+                "invalid custom gate preset in {path:?}"
+            ))
+        })?;
+        if !custom_names.insert(preset.name.clone()) {
+            return Err(crate::errors::InvalidArgumentError::new(format!(
+                "duplicate custom gate preset name '{}' in captured preset directory",
+                preset.name
+            ))
+            .into());
+        }
+        presets.insert(preset.name.clone(), preset);
+    }
+    Ok(presets)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn derive_template_apply(
+    template: &GraphTemplate,
+    container_id: &str,
+    anchor_bindings: &BTreeMap<String, String>,
+    force: bool,
+    roles: &RoleBindings,
+    issues: &[Issue],
+    mut registry: crate::declarations::GateRegistry,
+    presets: &HashMap<String, crate::gate_presets::GatePresetDefinition>,
+    config: &crate::config::JitConfig,
+    rules: &crate::declarations::rules::RuleSet,
+    context: &MutationContext,
+) -> Result<DerivedTemplateApply> {
+    let original_registry = registry.clone();
+    let full_container_id = resolve_template_issue_id(issues, container_id)?;
+    let container = template_issue(issues, &full_container_id)?.clone();
+    match label_utils::type_label_value(&container.labels) {
+        Some(ty) if template.applies_to.iter().any(|allowed| allowed == ty) => {}
+        Some(ty) => {
+            return Err(anyhow!(
+                "template '{}' does not apply to container type '{ty}'; applies_to: {}",
+                template.name,
+                template.applies_to.join(", ")
+            ))
+        }
+        None => {
+            return Err(anyhow!(
+                "container {full_container_id} has no type: label; template '{}' applies to: {}",
+                template.name,
+                template.applies_to.join(", ")
+            ))
+        }
+    }
+
+    let resolved_bindings = template
+        .anchors
+        .iter()
+        .map(|anchor| {
             let bound = anchor_bindings.get(&anchor.name).ok_or_else(|| {
                 anyhow!(
-                    "template '{}' anchor '{}' is not bound; \
-                     bind it with --anchor {}=<id>",
+                    "template '{}' anchor '{}' is not bound; bind it with --anchor {}=<id>",
                     template.name,
                     anchor.name,
                     anchor.name
                 )
             })?;
-            let full = self.storage.resolve_issue_id(bound).with_context(|| {
+            let full = resolve_template_issue_id(issues, bound).with_context(|| {
                 format!(
-                    "template '{}' anchor '{}' is bound to '{bound}', which does not resolve \
-                     to an existing issue",
+                    "template '{}' anchor '{}' is bound to '{bound}', which does not resolve to an existing issue",
                     template.name, anchor.name
                 )
             })?;
-            // A bound id must name a real issue, not just resolve syntactically.
-            self.storage.load_issue(&full).with_context(|| {
-                format!(
-                    "template '{}' anchor '{}' is bound to '{bound}', which does not name an \
-                     existing issue",
-                    template.name, anchor.name
-                )
-            })?;
-            resolved_bindings.insert(anchor.name.clone(), full);
-        }
-
-        // Every gate NAME declared across the template's nodes must resolve BEFORE
-        // the first mutation — either as a registered gate PRESET bundle or as a
-        // single gate KEY in the gate registry (`.jit/gates.toml`).
-        // `apply_gate_preset` / `add_gates` resolve lazily during instantiation, so
-        // an unknown name would otherwise fail after nodes are persisted. Resolve
-        // it read-only up front.
-        for node in &template.nodes {
-            for gate in &node.gates {
-                self.resolve_template_gate(gate).with_context(|| {
-                    format!(
-                        "template '{}' node '{}' references gate '{gate}', which is neither a \
-                         registered gate preset nor a gate defined in the registry",
-                        template.name, node.role
-                    )
-                })?;
-            }
-        }
-
-        // Anchor gates (jit:2614ecf2 — REQ-13) resolve the SAME way (preset OR
-        // registry gate key) before any mutation, so an unknown anchor gate fails
-        // up front rather than after the bound anchor issue is mutated. This is
-        // what makes a config-declared gate like `repo-validate` usable from an
-        // anchor without being a built-in preset.
-        for anchor in &template.anchors {
-            for gate in &anchor.gates {
-                self.resolve_template_gate(gate).with_context(|| {
-                    format!(
-                        "template '{}' anchor '{}' references gate '{gate}', which is neither a \
-                         registered gate preset nor a gate defined in the registry",
-                        template.name, anchor.name
-                    )
-                })?;
-            }
-        }
-
-        // Already-applied detection: the breakdown node carries
-        // `brackets:<container-short-id>` and sits among the container's deps.
-        let existing_breakdown = self.find_applied_breakdown(template, &roles, &container)?;
-        if existing_breakdown.is_some() && !force {
-            return Err(anyhow!(
-                "container {full_container_id} already has template '{}' applied; \
-                 pass --force to refresh the existing nodes in place",
-                template.name
-            ));
-        }
-
-        // Legacy P-only bracket detection: a container scaffolded by the removed
-        // `jit plan` carries a planning node but no breakdown node. A fresh apply
-        // would create a SECOND planning node, and the `move-upstream-to-role`
-        // transform would demote the old planning node into the new one's deps —
-        // a duplicate, malformed bracket. Detect a pre-existing planning-typed
-        // dependency (with no breakdown node) and reject with guidance. (`--force`
-        // targets the refresh path, which requires a breakdown node to locate the
-        // bracket, so it cannot adopt a legacy P-only container either.)
-        if existing_breakdown.is_none() {
-            if let Some(planning_type) = template.planning_type(&roles) {
-                let existing_planning = container.dependencies.iter().find_map(|dep_id| {
-                    let dep = self.storage.load_issue(dep_id).ok()?;
-                    (label_utils::type_label_value(&dep.labels) == Some(planning_type))
-                        .then_some(dep)
-                });
-                if let Some(planning) = existing_planning {
-                    return Err(anyhow!(
-                        "container {full_container_id} already has a planning node ({}) but no \
-                         breakdown node — a legacy P-only bracket. Applying '{}' would create a \
-                         duplicate planning node. Remove the legacy planning node and its \
-                         container edge first, then re-apply.",
-                        planning.short_id(),
-                        template.name
-                    ));
-                }
-            }
-        }
-
-        // Snapshot each bound anchor's dependencies BEFORE any mutation. (The
-        // container's own deps are part of this when it is a bound anchor; the
-        // `move-upstream-to-role` transform consumes exactly these pre-apply sets.)
-        let anchor_dependency_snapshots: BTreeMap<String, Vec<String>> = resolved_bindings
-            .iter()
-            .map(|(name, full_id)| {
-                Ok((name.clone(), self.storage.load_issue(full_id)?.dependencies))
-            })
-            .collect::<Result<_>>()?;
-
-        // The whole-store snapshot the commit phase rolls back to, and the edge set
-        // the prospective-cycle check simulates over. Taken inside the lock, so it
-        // is the exact state the writes are about to mutate.
-        let pre_apply_issues = self.storage.list_issues()?;
-
-        let mut warnings = Vec::new();
-        let created_node_ids_by_role = match existing_breakdown {
-            // === Force refresh: update existing nodes in place, no duplicates ===
-            // Edges + transforms are NOT re-run here: they were wired by the
-            // original fresh apply, the nodes already exist among the container's
-            // deps, and a re-run transform would snapshot the (now scaffold-bearing)
-            // live deps and move `B` onto `P`, breaking the spine. Refresh only
-            // re-seeds prose.
-            Some(breakdown_id) => self
-                .refresh_template_nodes(template, &roles, &breakdown_id, &container)
-                .map_err(|e| self.restore_or_report(&pre_apply_issues, e))?,
-
-            // === Expand, validate the delta, then commit it ===
-            None => {
-                let delta = expand_template(
-                    template,
-                    &container,
-                    &resolved_bindings,
-                    &anchor_dependency_snapshots,
-                )?;
-                self.prevalidate_delta(template, &delta, &pre_apply_issues)?;
-                self.commit_delta(&delta, &mut warnings)
-                    .map_err(|e| self.restore_or_report(&pre_apply_issues, e))?
-            }
-        };
-
-        Ok((
-            TemplateApplyResult {
-                template: template.name.clone(),
-                anchor_bindings: resolved_bindings,
-                created_node_ids_by_role,
-                anchor_dependency_snapshots,
-            },
-            warnings,
-        ))
-    }
-
-    /// Validate a [`TemplateDelta`] against the pre-apply store, read-only, so the
-    /// commit phase can only fail on I/O.
-    ///
-    /// Two checks, both of which would otherwise surface mid-commit:
-    ///
-    /// - **Node writes.** `create_issue` runs the effective local rules over the
-    ///   FINAL issue shape, including the always-enforced canonical
-    ///   `namespace:value` label-format rule. A delta whose first node is valid but
-    ///   whose LATER node interpolates to a rejected label must fail before the
-    ///   first node is persisted, so each planned node is projected into the issue
-    ///   it would persist and run through the same
-    ///   [`validate_for_write`](Self::validate_for_write).
-    /// - **Acyclicity.** The commit phase adds edges one at a time, so a cycle
-    ///   formed by a LATER edge would surface after earlier writes landed;
-    ///   [`validate_delta_acyclic`] simulates the whole prospective graph instead.
-    ///   Reachable for templates whose anchor edges and `move-upstream-to-role`
-    ///   transform can close a loop through existing issues; a rejection carries
-    ///   the typed [`GraphError::CycleDetected`](crate::graph::GraphError) so it
-    ///   classifies as a validation failure (exit 4).
-    fn prevalidate_delta(
-        &self,
-        template: &GraphTemplate,
-        delta: &TemplateDelta,
-        pre_apply_issues: &[Issue],
-    ) -> Result<()> {
-        for planned in &delta.creates {
-            let projected = project_planned_issue(planned);
-            // Any validation failure for a projected node is reported as an
-            // argument error (exit 2) carrying this message verbatim. Mapping
-            // (rather than wrapping) keeps the inner error's type from shifting the
-            // exit code via downcast.
-            self.validate_for_write(&projected, false).map_err(|_| {
-                crate::errors::InvalidArgumentError::new(format!(
-                    "template '{}' node '{}' would create an invalid issue",
-                    template.name, planned.role
-                ))
-            })?;
-        }
-
-        let store_deps: BTreeMap<String, Vec<String>> = pre_apply_issues
-            .iter()
-            .map(|i| (i.id.clone(), i.dependencies.clone()))
-            .collect();
-        validate_delta_acyclic(delta, store_deps).map_err(|e| {
-            // Keep the typed `GraphError::CycleDetected` in the chain so the
-            // failure classifies as a validation error (exit 4); add the
-            // template-specific context for the user-facing message.
-            e.context(format!(
-                "applying template '{}' would create a dependency cycle; \
-                 no nodes were created",
-                template.name
+            Ok((anchor.name.clone(), full))
+        })
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    let anchor_dependency_snapshots = resolved_bindings
+        .iter()
+        .map(|(name, id)| {
+            Ok((
+                name.clone(),
+                template_issue(issues, id)?.dependencies.clone(),
             ))
         })
+        .collect::<Result<BTreeMap<_, _>>>()?;
+
+    let existing_breakdown = find_captured_breakdown(template, roles, &container, issues);
+    if existing_breakdown.is_some() && !force {
+        return Err(anyhow!(
+            "container {full_container_id} already has template '{}' applied; pass --force to refresh the existing nodes in place",
+            template.name
+        ));
+    }
+    if existing_breakdown.is_none() {
+        if let Some(planning_type) = template.planning_type(roles) {
+            if let Some(planning) = container.dependencies.iter().find_map(|id| {
+                template_issue(issues, id).ok().filter(|issue| {
+                    label_utils::type_label_value(&issue.labels) == Some(planning_type)
+                })
+            }) {
+                return Err(anyhow!(
+                    "container {full_container_id} already has a planning node ({}) but no breakdown node — a legacy P-only bracket. Applying '{}' would create a duplicate planning node. Remove the legacy planning node and its container edge first, then re-apply.",
+                    planning.short_id(),
+                    template.name
+                ));
+            }
+        }
     }
 
-    /// Commit a validated [`TemplateDelta`]: create its nodes (with gates), wire
-    /// its `add_edges`, drop its `remove_edges`, then attach its anchor gates.
-    /// Returns role → created issue id.
-    ///
-    /// Every edge goes through [`add_dependency`](Self::add_dependency) /
-    /// [`remove_dependency`](Self::remove_dependency), the ordinary dependency
-    /// path: cycle-checked, eagerly transitively reduced, and event-emitting.
-    /// Adds precede removals so transitive reduction never strands an edge
-    /// mid-operation.
-    ///
-    /// The caller holds the repository lock and restores the pre-mutation snapshot
-    /// if this returns an error.
-    fn commit_delta(
-        &self,
-        delta: &TemplateDelta,
-        warnings: &mut Vec<String>,
-    ) -> Result<BTreeMap<String, String>>
-    where
-        S: crate::storage::RepositoryStateStore,
+    let mut events = Vec::new();
+    let FreshTemplateDerivation {
+        created: created_node_ids_by_role,
+        candidate,
+        created_order,
+        lease_targets,
+    } = if let Some(breakdown_id) = existing_breakdown {
+        let (mapping, updates) = derive_template_refresh(
+            template,
+            roles,
+            &breakdown_id,
+            &container,
+            issues,
+            &mut events,
+        )?;
+        FreshTemplateDerivation {
+            created: mapping,
+            candidate: updates,
+            created_order: Vec::new(),
+            lease_targets: Vec::new(),
+        }
+    } else {
+        let delta = expand_template(
+            template,
+            &container,
+            &resolved_bindings,
+            &anchor_dependency_snapshots,
+        )?;
+        prevalidate_captured_delta(template, &delta, issues)?;
+        derive_fresh_template(
+            template,
+            &delta,
+            issues,
+            &mut registry,
+            presets,
+            config,
+            rules,
+            context,
+            &mut events,
+        )?
+    };
+
+    let original = issues
+        .iter()
+        .map(|issue| (issue.id.as_str(), issue))
+        .collect::<HashMap<_, _>>();
+    let created_ids = created_order.iter().cloned().collect::<HashSet<_>>();
+    let mut intents = created_order
+        .iter()
+        .map(|id| {
+            Ok(MutationIntent::CreateIssue {
+                draft: Box::new(candidate.get(id).cloned().ok_or_else(|| {
+                    anyhow!("internal error: missing finalized template node {id}")
+                })?),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    intents.extend(
+        candidate
+            .values()
+            .filter(|issue| {
+                !created_ids.contains(&issue.id)
+                    && original
+                        .get(issue.id.as_str())
+                        .is_some_and(|old| *old != *issue)
+            })
+            .cloned()
+            .map(|issue| MutationIntent::UpdateIssue {
+                issue: Box::new(issue),
+            }),
+    );
+    if registry != original_registry {
+        intents.push(MutationIntent::EditGateRegistry {
+            registry: Box::new(registry.clone()),
+        });
+    }
+    intents.extend(
+        events
+            .into_iter()
+            .map(|(phase, event)| MutationIntent::RecordEvent {
+                phase,
+                event: Box::new(event),
+            }),
+    );
+
+    Ok(DerivedTemplateApply {
+        result: TemplateApplyResult {
+            template: template.name.clone(),
+            anchor_bindings: resolved_bindings,
+            created_node_ids_by_role,
+            anchor_dependency_snapshots,
+        },
+        registry,
+        intents,
+        lease_targets,
+    })
+}
+
+fn resolve_template_issue_id(issues: &[Issue], partial: &str) -> Result<String> {
+    let normalized = partial.to_lowercase().replace('-', "");
+    if normalized.len() < MIN_ID_PREFIX_LENGTH {
+        return Err(InvalidIdPrefixError::new(partial).into());
+    }
+    let matches = issues
+        .iter()
+        .filter(|issue| {
+            issue
+                .id
+                .replace('-', "")
+                .to_lowercase()
+                .starts_with(&normalized)
+        })
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [] => Err(IssueNotFoundError::new(partial).into()),
+        [issue] => Ok(issue.id.clone()),
+        _ => Err(AmbiguousIdError::issue(
+            partial,
+            matches
+                .iter()
+                .map(|issue| format!("{} | {}", issue.short_id(), issue.title)),
+        )
+        .into()),
+    }
+}
+
+fn template_issue<'a>(issues: &'a [Issue], id: &str) -> Result<&'a Issue> {
+    issues
+        .iter()
+        .find(|issue| issue.id == id)
+        .ok_or_else(|| IssueNotFoundError::new(id).into())
+}
+
+fn find_captured_breakdown(
+    template: &GraphTemplate,
+    roles: &RoleBindings,
+    container: &Issue,
+    issues: &[Issue],
+) -> Option<String> {
+    let breakdown = template.breakdown_node(roles)?;
+    let bracket = format!("brackets:{}", container.short_id());
+    issues
+        .iter()
+        .find(|issue| {
+            label_utils::type_label_value(&issue.labels) == Some(breakdown.type_name.as_str())
+                && issue.labels.contains(&bracket)
+        })
+        .map(|issue| issue.id.clone())
+}
+
+fn prevalidate_captured_delta(
+    template: &GraphTemplate,
+    delta: &TemplateDelta,
+    issues: &[Issue],
+) -> Result<()> {
+    let dependencies = issues
+        .iter()
+        .map(|issue| (issue.id.clone(), issue.dependencies.clone()))
+        .collect();
+    validate_delta_acyclic(delta, dependencies).map_err(|error| {
+        error.context(format!(
+            "applying template '{}' would create a dependency cycle; no nodes were created",
+            template.name
+        ))
+    })
+}
+
+fn derive_template_refresh(
+    template: &GraphTemplate,
+    roles: &RoleBindings,
+    breakdown_id: &str,
+    container: &Issue,
+    issues: &[Issue],
+    events: &mut Vec<(u8, Event)>,
+) -> Result<(BTreeMap<String, String>, BTreeMap<String, Issue>)> {
+    let context = InterpolationContext::for_container(container);
+    let mut mapping =
+        BTreeMap::from([(roles.breakdown_role().to_string(), breakdown_id.to_string())]);
+    if let Some(node) = template.breakdown_node(roles) {
+        let breakdown = template_issue(issues, breakdown_id)?;
+        for role in &node.depends_on {
+            let Some(dependency_node) = template.node(role) else {
+                continue;
+            };
+            if let Some(issue) = breakdown.dependencies.iter().find_map(|id| {
+                template_issue(issues, id).ok().filter(|issue| {
+                    label_utils::type_label_value(&issue.labels)
+                        == Some(dependency_node.type_name.as_str())
+                })
+            }) {
+                mapping.insert(role.clone(), issue.id.clone());
+            }
+        }
+    }
+    if let Some(missing) = template
+        .nodes
+        .iter()
+        .find(|node| !mapping.contains_key(&node.role))
     {
-        let mut created: BTreeMap<String, String> = BTreeMap::new();
-        for planned in &delta.creates {
-            let (node_id, mut create_warnings) = self.create_issue(
-                planned.title.clone(),
-                planned.description.clone(),
-                planned.priority,
-                vec![],
-                planned.labels.clone(),
-                None,
-                None,
-                false,
-            )?;
-            warnings.append(&mut create_warnings);
-            self.attach_template_gates(&planned.gates, &node_id, warnings)?;
-            created.insert(planned.role.clone(), node_id);
-        }
-
-        for edge in &delta.add_edges {
-            let (_, mut w) = self.add_dependency(
-                &resolve_endpoint(&edge.dependent, &created)?,
-                &resolve_endpoint(&edge.dependency, &created)?,
-            )?;
-            warnings.append(&mut w);
-        }
-
-        for edge in &delta.remove_edges {
-            let mut w = self.remove_dependency(
-                &resolve_endpoint(&edge.dependent, &created)?,
-                &resolve_endpoint(&edge.dependency, &created)?,
-            )?;
-            warnings.append(&mut w);
-        }
-
-        for attachment in &delta.anchor_gates {
-            self.attach_template_gates(&attachment.gates, &attachment.anchor_issue_id, warnings)?;
-        }
-
-        Ok(created)
+        return Err(anyhow!(
+            "cannot --force refresh template '{}': its '{}' node could not be located from the existing bracket (the applied bracket is broken or incomplete); the bracket must be repaired before it can be refreshed",
+            template.name,
+            missing.role
+        ));
     }
-
-    /// Roll the issue store back to `pre_apply_issues` after a failed commit, and
-    /// return the error the caller reports.
-    ///
-    /// All-or-nothing by COMPENSATION rather than a write-ahead journal: the apply
-    /// holds the repository lock across the whole sequence, so the only observer of
-    /// an intermediate state is this process, and the pre-mutation snapshot it
-    /// already holds is enough to undo the sequence. Reverting mutated issues
-    /// precedes deleting created ones, so no restored issue ever names an
-    /// already-deleted node.
-    ///
-    /// The append-only event log keeps the events of the attempted apply and gains
-    /// the compensating `issue_updated` / `issue_deleted` events, so the audit
-    /// trail records both directions (`@/inv/event-log`).
-    ///
-    /// When the rollback itself fails, the returned error says so and names both
-    /// causes: the store may be left partially applied and needs manual repair.
-    fn restore_or_report(&self, pre_apply_issues: &[Issue], cause: anyhow::Error) -> anyhow::Error {
-        match self.restore_issue_snapshot(pre_apply_issues) {
-            Ok(()) => cause,
-            Err(restore_error) => anyhow!(
-                "apply failed ({cause:#}) and rolling it back also failed \
-                 ({restore_error:#}); the issue store may be left partially applied \
-                 and needs manual repair"
-            ),
-        }
-    }
-
-    /// Restore the issue store to `pre_apply_issues`: rewrite every issue the
-    /// apply touched back to its snapshot, then delete every issue it created.
-    ///
-    /// A touched issue is rewritten through
-    /// [`restore_issue_verbatim`](crate::storage::IssueStore::restore_issue_verbatim), so its
-    /// `updated_at` returns to the snapshot's value along with its content.
-    /// `save_issue` would stamp the restoring write with the current time and
-    /// leave a fresh `updated_at` on an issue the failed apply promised to leave
-    /// alone (REQ-2). The compensating `issue_updated` event names the CONTENT
-    /// fields the apply had changed, so an apply that only moved the timestamp
-    /// logs no event.
-    fn restore_issue_snapshot(&self, pre_apply_issues: &[Issue]) -> Result<()> {
-        let prior: BTreeMap<&str, &Issue> = pre_apply_issues
-            .iter()
-            .map(|issue| (issue.id.as_str(), issue))
-            .collect();
-
-        for current in self.storage.list_issues()? {
-            match prior.get(current.id.as_str()) {
-                Some(original) => {
-                    if current != **original {
-                        self.storage.restore_issue_verbatim((*original).clone())?;
-                        let fields = changed_fields(original, &current);
-                        if !fields.is_empty() {
-                            self.storage.append_event(
-                                &crate::domain::Event::draft_issue_updated(
-                                    current.id.clone(),
-                                    APPLY_ACTOR.to_string(),
-                                    fields,
-                                ),
-                            )?;
-                        }
-                    }
-                }
-                None => {
-                    self.storage.delete_issue(&current.id)?;
-                    self.storage
-                        .append_event(&crate::domain::Event::draft_issue_deleted(current.id))?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Refresh an already-applied template's nodes IN PLACE (the `--force` path).
-    ///
-    /// Locates each role's existing node from the breakdown node found by
-    /// [`find_applied_breakdown`](Self::find_applied_breakdown): the breakdown
-    /// node itself, and every node reached through the breakdown node's template
-    /// `depends_on` (e.g. the planning node via `B → P`). Re-interpolates each
-    /// node's description / doc against the current container and writes them back
-    /// without creating duplicate nodes. Gates are NOT re-attached (idempotent
-    /// attach is the commit path's job; a refresh only re-seeds prose).
-    ///
-    /// Every template role MUST map to an existing issue: a bracket that has lost
-    /// its planning node (or any role) is broken, and refreshing it partially
-    /// would silently report success while leaving stale prose. Such a case
-    /// returns an error rather than a partial result (APPA-03).
-    fn refresh_template_nodes(
-        &self,
-        template: &GraphTemplate,
-        roles: &RoleBindings,
-        breakdown_id: &str,
-        container: &Issue,
-    ) -> Result<BTreeMap<String, String>> {
-        let context = InterpolationContext::for_container(container);
-        let mut existing: BTreeMap<String, String> = BTreeMap::new();
-        existing.insert(roles.breakdown_role().to_string(), breakdown_id.to_string());
-
-        // Reach the breakdown node's template `depends_on` roles through the
-        // persisted breakdown issue's dependencies, matching each role's node by
-        // its `type:` label. The plan template wires `B → P`, so this resolves P.
-        if let Some(breakdown_node) = template.breakdown_node(roles) {
-            let breakdown_node_issue = self.storage.load_issue(breakdown_id)?;
-            for dep_role in &breakdown_node.depends_on {
-                if let Some(dep_node) = template.node(dep_role) {
-                    if let Some(dep_id) =
-                        self.find_dep_by_type(&breakdown_node_issue, &dep_node.type_name)?
-                    {
-                        existing.insert(dep_role.clone(), dep_id);
-                    }
-                }
-            }
-        }
-
-        // Every template role must have been located, or the existing bracket is
-        // broken/incomplete: fail rather than refresh a subset and report success.
-        if let Some(missing) = template
-            .nodes
-            .iter()
-            .find(|n| !existing.contains_key(&n.role))
-        {
-            return Err(anyhow!(
-                "cannot --force refresh template '{}': its '{}' node could not be located \
-                 from the existing bracket (the applied bracket is broken or incomplete); \
-                 the bracket must be repaired before it can be refreshed",
+    let mut updates = BTreeMap::new();
+    for node in &template.nodes {
+        let id = mapping.get(&node.role).ok_or_else(|| {
+            anyhow!(
+                "internal error: template '{}' role '{}' vanished during refresh",
                 template.name,
-                missing.role
+                node.role
+            )
+        })?;
+        let mut issue = template_issue(issues, id)?.clone();
+        let description = node_description(node, &context.with_doc(node));
+        if issue.description == description {
+            continue;
+        }
+        issue.description = description;
+        updates.insert(id.clone(), issue);
+        events.push((
+            1,
+            Event::draft_issue_updated(
+                id.clone(),
+                APPLY_ACTOR.to_string(),
+                vec!["description".to_string()],
+            ),
+        ));
+    }
+    Ok((mapping, updates))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn derive_fresh_template(
+    template: &GraphTemplate,
+    delta: &TemplateDelta,
+    issues: &[Issue],
+    registry: &mut crate::declarations::GateRegistry,
+    presets: &HashMap<String, crate::gate_presets::GatePresetDefinition>,
+    config: &crate::config::JitConfig,
+    rules: &crate::declarations::rules::RuleSet,
+    context: &MutationContext,
+    events: &mut Vec<(u8, Event)>,
+) -> Result<FreshTemplateDerivation> {
+    let created_order = (0..delta.creates.len())
+        .map(|index| context.identifier_at(index as u64))
+        .collect::<Vec<_>>();
+    let created = delta
+        .creates
+        .iter()
+        .zip(&created_order)
+        .map(|(planned, id)| (planned.role.clone(), id.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let mut candidate = issues
+        .iter()
+        .cloned()
+        .map(|issue| (issue.id.clone(), issue))
+        .collect::<BTreeMap<_, _>>();
+    let mut lease_targets = Vec::new();
+
+    for (planned, id) in delta.creates.iter().zip(&created_order) {
+        let mut issue = project_planned_issue(planned);
+        issue.id = id.clone();
+        attach_captured_gates(
+            &planned.gates,
+            &mut issue,
+            registry,
+            presets,
+            events,
+            &mut lease_targets,
+        )
+        .with_context(|| {
+            format!(
+                "template '{}' node '{}' references invalid gate(s): {}",
+                template.name,
+                planned.role,
+                planned.gates.join(", ")
+            )
+        })?;
+        validate_captured_issue_write(&issue, config, rules).map_err(|_| {
+            crate::errors::InvalidArgumentError::new(format!(
+                "template '{}' node '{}' would create an invalid issue",
+                template.name, planned.role
+            ))
+        })?;
+        candidate.insert(id.clone(), issue);
+    }
+
+    for edge in &delta.add_edges {
+        add_captured_template_edge(
+            &mut candidate,
+            &resolve_endpoint(&edge.dependent, &created)?,
+            &resolve_endpoint(&edge.dependency, &created)?,
+            events,
+            &mut lease_targets,
+        )?;
+    }
+    for edge in &delta.remove_edges {
+        remove_captured_template_edge(
+            &mut candidate,
+            &resolve_endpoint(&edge.dependent, &created)?,
+            &resolve_endpoint(&edge.dependency, &created)?,
+            events,
+            &mut lease_targets,
+        )?;
+    }
+    for attachment in &delta.anchor_gates {
+        let issue = candidate
+            .get_mut(&attachment.anchor_issue_id)
+            .ok_or_else(|| IssueNotFoundError::new(&attachment.anchor_issue_id))?;
+        attach_captured_gates(
+            &attachment.gates,
+            issue,
+            registry,
+            presets,
+            events,
+            &mut lease_targets,
+        )
+        .with_context(|| {
+            format!(
+                "template '{}' anchor references invalid gate(s): {}",
+                template.name,
+                attachment.gates.join(", ")
+            )
+        })?;
+    }
+    Ok(FreshTemplateDerivation {
+        created,
+        candidate,
+        created_order,
+        lease_targets,
+    })
+}
+
+fn validate_captured_issue_write(
+    issue: &Issue,
+    config: &crate::config::JitConfig,
+    rules: &crate::declarations::rules::RuleSet,
+) -> Result<()> {
+    let format = match config.validation.as_ref() {
+        Some(validation) => validation.content_format()?,
+        None => crate::domain::ContentFormat::Markdown,
+    };
+    let strictness = match config.validation.as_ref() {
+        Some(validation) => validation.strictness()?,
+        None => crate::validation::Strictness::Loose,
+    };
+    let evaluation = crate::validation::evaluate_local(issue, rules, format)
+        .map_err(|error| anyhow!("rule evaluation failed: {error}"))?
+        .with_strictness(strictness);
+    if evaluation.blocking_rules().is_empty() {
+        Ok(())
+    } else {
+        Err(crate::errors::ValidationFailedError::new(
+            evaluation
+                .rejection_message()
+                .unwrap_or_else(|| "blocked by validation rule(s)".to_string()),
+        )
+        .into())
+    }
+}
+
+fn resolve_captured_gate(
+    name: &str,
+    registry: &crate::declarations::GateRegistry,
+    presets: &HashMap<String, crate::gate_presets::GatePresetDefinition>,
+) -> Result<TemplateGateResolution> {
+    if let Some(preset) = presets.get(name) {
+        return Ok(TemplateGateResolution::Preset(preset.clone()));
+    }
+    if registry.gates.contains_key(name) {
+        return Ok(TemplateGateResolution::RegistryKey);
+    }
+    Err(anyhow!(
+        "gate '{name}' is neither a registered gate preset nor a gate defined in the registry"
+    ))
+}
+
+fn attach_captured_gates(
+    names: &[String],
+    issue: &mut Issue,
+    registry: &mut crate::declarations::GateRegistry,
+    presets: &HashMap<String, crate::gate_presets::GatePresetDefinition>,
+    events: &mut Vec<(u8, Event)>,
+    lease_targets: &mut Vec<String>,
+) -> Result<()> {
+    for name in names {
+        let keys = match resolve_captured_gate(name, registry, presets)? {
+            TemplateGateResolution::Preset(preset) => {
+                // The legacy preset path checked once before registry edits and
+                // once again when attaching the resulting keys.
+                lease_targets.extend([issue.id.clone(), issue.id.clone()]);
+                preset
+                    .gates
+                    .into_iter()
+                    .map(|template| {
+                        let gate = template.to_gate();
+                        if !registry.gates.contains_key(&gate.key) {
+                            events
+                                .push((0, Event::draft_gate_definition_created(gate.key.clone())));
+                            registry.gates.insert(gate.key.clone(), gate.clone());
+                        }
+                        gate.key
+                    })
+                    .collect::<Vec<_>>()
+            }
+            TemplateGateResolution::RegistryKey => {
+                lease_targets.push(issue.id.clone());
+                vec![name.clone()]
+            }
+        };
+        for key in keys {
+            if issue.gates_required.contains(&key) {
+                continue;
+            }
+            issue.gates_required.push(key.clone());
+            issue.gates_status.insert(
+                key.clone(),
+                GateState {
+                    status: GateStatus::Pending,
+                    updated_by: None,
+                    updated_at: chrono::DateTime::default(),
+                },
+            );
+            events.push((1, Event::draft_gate_added(issue.id.clone(), key)));
+        }
+    }
+    Ok(())
+}
+
+fn add_captured_template_edge(
+    issues: &mut BTreeMap<String, Issue>,
+    from: &str,
+    to: &str,
+    events: &mut Vec<(u8, Event)>,
+    lease_targets: &mut Vec<String>,
+) -> Result<()> {
+    lease_targets.push(from.to_string());
+    let refs = issues.values().collect::<Vec<_>>();
+    DependencyGraph::new(&refs).validate_add_dependency(from, to)?;
+    let before = issues
+        .get(from)
+        .ok_or_else(|| IssueNotFoundError::new(from))?
+        .dependencies
+        .iter()
+        .cloned()
+        .collect::<HashSet<_>>();
+    if before.contains(to) {
+        return Ok(());
+    }
+    issues
+        .get_mut(from)
+        .ok_or_else(|| IssueNotFoundError::new(from))?
+        .dependencies
+        .push(to.to_string());
+
+    let reductions = {
+        let refs = issues.values().collect::<Vec<_>>();
+        let graph = DependencyGraph::new(&refs);
+        issues
+            .keys()
+            .map(|id| (id.clone(), graph.compute_transitive_reduction(id)))
+            .collect::<BTreeMap<_, _>>()
+    };
+    for (id, reduced) in reductions {
+        let newly_added = if id == from {
+            reduced.difference(&before).cloned().collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        let blocks = newly_added.iter().any(|dependency| {
+            issues.get(dependency).is_some_and(|dependency| {
+                !is_dependency_met(dependency.state, dependency.archived_from)
+            })
+        });
+        let issue = issues
+            .get_mut(&id)
+            .ok_or_else(|| IssueNotFoundError::new(&id))?;
+        let old = issue.dependencies.iter().cloned().collect::<HashSet<_>>();
+        if old == reduced {
+            continue;
+        }
+        let mut removed = old.difference(&reduced).cloned().collect::<Vec<_>>();
+        removed.sort();
+        issue.dependencies = reduced.iter().cloned().collect();
+        issue.dependencies.sort();
+        if id == from {
+            if issue.state == State::Ready && blocks {
+                issue.state = State::Backlog;
+                events.push((
+                    1,
+                    Event::draft_issue_state_changed(id.clone(), State::Ready, State::Backlog),
+                ));
+            }
+            events.push((
+                2,
+                Event::draft_issue_updated(
+                    id,
+                    "dependency-add".to_string(),
+                    vec!["dependencies".to_string()],
+                ),
+            ));
+        } else {
+            events.push((
+                3,
+                Event::draft_dependency_reduced(id, old.len(), reduced.len(), removed),
             ));
         }
-
-        for node in &template.nodes {
-            // The completeness check above guarantees every role is present, so
-            // this branch is unreachable in practice; return a contextual error
-            // rather than panic (library code must not `expect`).
-            let node_id = existing.get(&node.role).cloned().ok_or_else(|| {
-                anyhow!(
-                    "internal error: template '{}' role '{}' was not located during \
-                     --force refresh despite passing the completeness check",
-                    template.name,
-                    node.role
-                )
-            })?;
-            let node_context = context.with_doc(node);
-
-            let mut issue = self.storage.load_issue(&node_id)?;
-            issue.description = node_description(node, &node_context);
-            self.storage.save_issue(issue)?;
-            self.storage
-                .append_event(&crate::domain::Event::draft_issue_updated(
-                    node_id.clone(),
-                    APPLY_ACTOR.to_string(),
-                    vec!["description".to_string()],
-                ))?;
-        }
-        Ok(existing)
     }
+    Ok(())
+}
 
-    /// Resolve a template node/anchor gate `name` to either a registered gate
-    /// PRESET bundle or a single gate KEY declared in the gate registry
-    /// (`.jit/gates.toml`), PREFERRING the preset.
-    ///
-    /// Config-declared gates (e.g. `repo-validate`) are usable from template
-    /// anchors/nodes this way without being built-in presets. Returns an error
-    /// when the name is neither, so callers keep the existing hard failure for an
-    /// unknown gate. Pure read; performs no mutation.
-    fn resolve_template_gate(&self, name: &str) -> Result<TemplateGateResolution> {
-        // Prefer a preset bundle; fall back to a single registry gate key ONLY
-        // when `name` is genuinely not a known preset. Any OTHER error from
-        // preset loading (e.g. a malformed custom preset under
-        // `.jit/config/gate-presets/`) must propagate with context rather than be
-        // silently treated as "not a preset" — otherwise a broken preset config
-        // could let `jit apply` succeed by accidentally matching a registry key.
-        match self.storage.get_gate_preset(name) {
-            Ok(_) => return Ok(TemplateGateResolution::Preset),
-            Err(e)
-                if e.downcast_ref::<crate::storage::PresetNotFoundError>()
-                    .is_some() =>
-            {
-                // Not a registered preset — fall through to the registry-key lookup.
-            }
-            Err(e) => return Err(e),
+fn remove_captured_template_edge(
+    issues: &mut BTreeMap<String, Issue>,
+    from: &str,
+    to: &str,
+    events: &mut Vec<(u8, Event)>,
+    lease_targets: &mut Vec<String>,
+) -> Result<()> {
+    lease_targets.push(from.to_string());
+    let remaining = {
+        let issue = issues
+            .get_mut(from)
+            .ok_or_else(|| IssueNotFoundError::new(from))?;
+        let before = issue.dependencies.len();
+        issue.dependencies.retain(|dependency| dependency != to);
+        if issue.dependencies.len() == before {
+            return Ok(());
         }
-        if self.storage.load_gate_registry()?.gates.contains_key(name) {
-            return Ok(TemplateGateResolution::RegistryKey);
-        }
-        Err(anyhow!(
-            "gate '{name}' is neither a registered gate preset nor a gate defined in the registry"
-        ))
+        issue.dependencies.clone()
+    };
+    events.push((
+        2,
+        Event::draft_issue_updated(
+            from.to_string(),
+            "dependency-remove".to_string(),
+            vec!["dependencies".to_string()],
+        ),
+    ));
+    let all_met = remaining.iter().all(|dependency| {
+        issues
+            .get(dependency)
+            .is_some_and(|dependency| is_dependency_met(dependency.state, dependency.archived_from))
+    });
+    let issue = issues
+        .get_mut(from)
+        .ok_or_else(|| IssueNotFoundError::new(from))?;
+    let ready = issue.state == State::Backlog && all_met;
+    if ready {
+        issue.state = State::Ready;
+        events.push((
+            3,
+            Event::draft_issue_state_changed(from.to_string(), State::Backlog, State::Ready),
+        ));
     }
-
-    /// Attach each named template gate to `issue_id`, collecting any lease
-    /// warnings. Each name resolves through
-    /// [`resolve_template_gate`](Self::resolve_template_gate) to either a gate
-    /// PRESET (applied as a bundle via `apply_gate_preset`) or a single gate KEY
-    /// in the registry (attached via `add_gates`, the same effect as
-    /// `jit gate add <issue> <key>`). Shared by node- and anchor-gate attachment
-    /// (jit:2614ecf2 — REQ-13) so both flow through the same resolution.
-    fn attach_template_gates(
-        &self,
-        gates: &[String],
-        issue_id: &str,
-        warnings: &mut Vec<String>,
-    ) -> Result<()>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        for gate in gates {
-            let mut w = match self.resolve_template_gate(gate)? {
-                TemplateGateResolution::Preset => {
-                    self.apply_gate_preset(issue_id, gate, None, false, false, &[])?
-                        .1
-                }
-                TemplateGateResolution::RegistryKey => {
-                    self.add_gates(issue_id, std::slice::from_ref(gate))?.1
-                }
-            };
-            warnings.append(&mut w);
-        }
-        Ok(())
-    }
-
-    /// Locate an already-applied template's breakdown node `B` for `container`:
-    /// the issue carrying the breakdown node's `type:` label AND the
-    /// `brackets:<container-short-id>` label the template seeds onto it.
-    ///
-    /// Returns the breakdown node's full id, or `None` when the template has not
-    /// been applied (no such issue). Only `B` carries the `brackets:<C-short-id>` label, so
-    /// the pair uniquely identifies an applied bracket.
-    ///
-    /// The lookup is **store-wide**, not limited to `container.dependencies`: a
-    /// fresh apply wires `C → B` directly, but a subsequent breakdown splices the
-    /// spine `C → sink … → B` and relies on transitive reduction to DROP the direct
-    /// `C → B` edge — after which `B` is still in `C`'s closure but no longer a
-    /// direct dependency. Scanning only direct deps would then miss `B` and let
-    /// `--force` take the fresh-apply path, duplicating `P` + `B`. Matching by the
-    /// unique label pair across the store finds `B` regardless of edge distance.
-    fn find_applied_breakdown(
-        &self,
-        template: &GraphTemplate,
-        roles: &RoleBindings,
-        container: &Issue,
-    ) -> Result<Option<String>> {
-        let Some(breakdown_node) = template.breakdown_node(roles) else {
-            return Ok(None);
-        };
-        let bracket_label = format!("brackets:{}", container.short_id());
-        let found = self.storage.list_issues()?.into_iter().find(|issue| {
-            label_utils::type_label_value(&issue.labels) == Some(breakdown_node.type_name.as_str())
-                && issue.labels.iter().any(|l| l == &bracket_label)
-        });
-        Ok(found.map(|issue| issue.id))
-    }
-
-    /// Find the first dependency of `issue` carrying the given `type:` label.
-    fn find_dep_by_type(&self, issue: &Issue, type_name: &str) -> Result<Option<String>> {
-        for dep_id in &issue.dependencies {
-            let dep = self.storage.load_issue(dep_id)?;
-            if label_utils::type_label_value(&dep.labels) == Some(type_name) {
-                return Ok(Some(dep.id));
-            }
-        }
-        Ok(None)
-    }
+    Ok(())
 }
 
 /// The issue id a [`DeltaEndpoint`] names: the id created for its role, or the
@@ -821,42 +1424,6 @@ fn project_planned_issue(planned: &PlannedNode) -> Issue {
     // by `create_issue`; replicate so state-keyed rules see the same shape.
     issue.state = State::Ready;
     issue
-}
-
-/// The names of the fields in which `current` differs from `original`, ignoring
-/// storage-owned timestamps.
-///
-/// Drives the rollback's event log: an empty result means the apply changed no
-/// content on this issue, so undoing it warrants no compensating event. The names
-/// are the ones the `issue_updated` event records. Whether the restoring WRITE
-/// happens is a separate question, decided on the whole `Issue` value.
-fn changed_fields(original: &Issue, current: &Issue) -> Vec<String> {
-    [
-        ("title", original.title != current.title),
-        ("description", original.description != current.description),
-        ("state", original.state != current.state),
-        ("priority", original.priority != current.priority),
-        ("assignee", original.assignee != current.assignee),
-        (
-            "dependencies",
-            original.dependencies != current.dependencies,
-        ),
-        (
-            "gates_required",
-            original.gates_required != current.gates_required,
-        ),
-        (
-            "gates_status",
-            original.gates_status != current.gates_status,
-        ),
-        ("labels", original.labels != current.labels),
-        ("documents", original.documents != current.documents),
-        ("context", original.context != current.context),
-    ]
-    .into_iter()
-    .filter(|(_, differs)| *differs)
-    .map(|(field, _)| field.to_string())
-    .collect()
 }
 
 #[cfg(test)]
@@ -905,28 +1472,5 @@ mod tests {
         assert!(
             resolve_endpoint(&DeltaEndpoint::CreatedRole("missing".to_string()), &created).is_err()
         );
-    }
-
-    #[test]
-    fn test_changed_fields_is_empty_for_an_untouched_issue() {
-        let issue = crate::domain::types::fixture_issue("T".to_string(), "d".to_string());
-        let mut same = issue.clone();
-        // A storage-owned timestamp bump is not a content change.
-        same.updated_at = chrono::Utc::now();
-        assert!(changed_fields(&issue, &same).is_empty());
-    }
-
-    #[test]
-    fn test_changed_fields_names_every_mutated_field() {
-        let original = crate::domain::types::fixture_issue("T".to_string(), "d".to_string());
-        let mut current = original.clone();
-        current.dependencies = vec!["u1".to_string()];
-        current.state = State::InProgress;
-        current.gates_required = vec!["cargo-ci".to_string()];
-        let fields = changed_fields(&original, &current);
-        assert!(fields.contains(&"dependencies".to_string()), "{fields:?}");
-        assert!(fields.contains(&"state".to_string()), "{fields:?}");
-        assert!(fields.contains(&"gates_required".to_string()), "{fields:?}");
-        assert!(!fields.contains(&"title".to_string()), "{fields:?}");
     }
 }

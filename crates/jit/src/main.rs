@@ -3276,14 +3276,12 @@ fn run() -> Result<()> {
             force,
             json,
         } => {
-            // Parse the repeatable `--anchor role=id` pairs. The repository's
-            // container anchor (`.jit/templates.toml`'s `[anchors] container`) is
-            // auto-bound to the positional `<container>`; an explicit
-            // `--anchor <that-anchor>=…` overrides it, being applied after the
+            // Parse the repeatable `--anchor role=id` pairs. Named apply resolves
+            // the positional container's default anchor from its captured
+            // template declaration; these explicit bindings override that
             // default.
             let mut bindings: std::collections::BTreeMap<String, String> =
                 std::collections::BTreeMap::new();
-            bindings.insert(executor.container_anchor()?.to_string(), container.clone());
             for pair in &anchor {
                 let (role, id) = pair.split_once('=').ok_or_else(|| {
                     anyhow!("malformed --anchor '{pair}'; expected role=id (with an '=')")

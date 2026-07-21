@@ -6,12 +6,11 @@
 //! `spec`, the breakdown role is `split`, and the container anchor is `target`.
 //! No engine-known name appears as a role or anchor anywhere in the fixture.
 //!
-//! Driving the subprocess is what exercises the auto-bind: `jit apply <template>
-//! <container>` fills the container anchor from the repository's `[anchors]`
-//! table (`crates/jit/src/main.rs`, the `Commands::Apply` arm) before calling
-//! `apply_template`, which itself binds nothing. `apply_template` aborts before
-//! its first write unless EVERY declared anchor is bound, so a `jit apply` that
-//! reached for the shipped anchor name would leave `target` unbound and fail.
+//! Driving the subprocess is what exercises the auto-bind: named apply captures
+//! the repository's `[anchors]` table and binds its container anchor to the
+//! positional container. `apply_template` aborts before its first write unless
+//! EVERY declared anchor is bound, so reaching for the shipped anchor name would
+//! leave `target` unbound and fail.
 //! `test_apply_aborts_when_the_bound_anchor_names_no_declared_anchor` pins that
 //! failure directly; the other tests pass no `--anchor` flag and assert the
 //! reported `anchor_bindings` carry exactly `target`.
@@ -314,4 +313,42 @@ fn test_apply_force_refreshes_the_bracket_through_the_configured_bindings() {
         1,
         "--force must not duplicate the planning node"
     );
+}
+
+#[test]
+fn test_explicit_bindings_override_captured_default_and_bind_secondary_anchor() {
+    let templates = RENAMED_BINDINGS_TEMPLATE.replacen(
+        "  [[template.nodes]]",
+        "  [[template.anchors]]\n  name = \"reviewer\"\n\n  [[template.nodes]]",
+        1,
+    );
+    let temp = setup_repo(&templates);
+    let positional = create_epic(&temp, "Positional epic");
+    let target = create_epic(&temp, "Target epic");
+    let reviewer = create_epic(&temp, "Reviewer epic");
+    let target_binding = format!("target={target}");
+    let reviewer_binding = format!("reviewer={reviewer}");
+
+    let out = jit_json(
+        &temp,
+        &[
+            "apply",
+            "plan",
+            &positional,
+            "--anchor",
+            &target_binding,
+            "--anchor",
+            &reviewer_binding,
+            "--json",
+        ],
+    );
+    let bindings = data(&out)["anchor_bindings"].as_object().unwrap();
+    assert_eq!(bindings["target"].as_str(), Some(target.as_str()));
+    assert_eq!(bindings["reviewer"].as_str(), Some(reviewer.as_str()));
+
+    let split = data(&out)["created_node_ids_by_role"]["split"]
+        .as_str()
+        .unwrap();
+    assert!(dep_ids(&temp, &target).iter().any(|id| id == split));
+    assert!(!dep_ids(&temp, &positional).iter().any(|id| id == split));
 }

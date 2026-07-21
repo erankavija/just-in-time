@@ -650,6 +650,9 @@ pub fn finalize(
             } else {
                 issue.first_ready_at = None;
             }
+            for gate in issue.gates_status.values_mut() {
+                gate.updated_at = now;
+            }
             actions.push(write_issue_action(image, &issue)?);
             index_creations.push(id.clone());
             pending_events.push(PendingEvent {
@@ -1352,6 +1355,71 @@ mod tests {
             retry.hash(),
             "semantic plan hashes must be stable across retries"
         );
+    }
+
+    #[test]
+    fn test_create_issue_stamps_all_gate_evidence_with_operation_time() {
+        let mut draft = map_order_draft(false);
+        let preserved = draft
+            .gates_status
+            .iter()
+            .map(|(key, gate)| (key.clone(), (gate.status, gate.updated_by.clone())))
+            .collect::<HashMap<_, _>>();
+        let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
+            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+            all_ids: Vec::new(),
+            deleted_ids: Vec::new(),
+        })
+        .unwrap();
+        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let image = image_with(vec![
+            (
+                VirtualPath::data("issues").unwrap(),
+                RepositoryEntry::Absent,
+            ),
+            (index_path().unwrap(), file_entry(&index_bytes)),
+            (events_path().unwrap(), RepositoryEntry::Absent),
+            (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
+        ]);
+
+        // Deliberately prove the finalizer owns these values rather than accepting
+        // caller timestamps embedded in the draft.
+        for gate in draft.gates_status.values_mut() {
+            gate.updated_at = DateTime::parse_from_rfc3339("2001-02-03T04:05:06Z")
+                .unwrap()
+                .with_timezone(&Utc);
+        }
+        let plan = finalize(
+            &layout(),
+            &image,
+            &ctx(),
+            &[MutationIntent::CreateIssue {
+                draft: Box::new(draft),
+            }],
+        )
+        .unwrap();
+        let created: Issue = plan
+            .delta()
+            .actions()
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::WriteFile { path, bytes, .. }
+                    if path == &issue_path(&created_id).unwrap() =>
+                {
+                    serde_json::from_slice(bytes).ok()
+                }
+                _ => None,
+            })
+            .unwrap();
+
+        assert_eq!(created.gates_status.len(), 2);
+        for (key, gate) in created.gates_status {
+            assert_eq!(gate.updated_at, fixed_instant());
+            assert_eq!(
+                (gate.status, gate.updated_by),
+                preserved.get(&key).cloned().unwrap()
+            );
+        }
     }
 
     #[test]
