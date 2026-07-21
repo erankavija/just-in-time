@@ -65,6 +65,16 @@ kind = "enforced"
 enforced-by = "@/gate/code-review"
 
 [[invariants]]
+id = "semantic-test-assertions"
+statement = "Tests assert observable semantic properties or relationships; exact field-name inventories and literal-value assertions are confined to one canonical suite for an intentionally stable external contract."
+kind = "advisory"
+
+[[invariants]]
+id = "shared-test-contracts"
+statement = "Frequently repeated setup and interface behavior use shared fixtures and conformance suites; every implementation of an interface runs the same behavioral contract, while implementation-specific tests cover only implementation-specific behavior."
+kind = "advisory"
+
+[[invariants]]
 id = "bounded-rust-build-footprint"
 statement = "Rust test topology stays bounded to a small number of cohesive suites rather than one Cargo target per test file, build profiles stay compact rather than embedding a full debugger payload in every test executable, dependency features stay intentional rather than pulling in unused remote-resolution or duplicate TLS infrastructure, and integration-test target count and active test-executable bytes remain within automatically enforced budgets."
 kind = "enforced"
