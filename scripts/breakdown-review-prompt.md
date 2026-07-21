@@ -22,8 +22,9 @@ Repeat the finest-tier assignment simulation:
 | Key / issue | One outcome | Bounded consumer family | Observable test boundary | One focused implementation/review cycle | No inner decomposition | No mixed deliverables | Result |
 |---|---|---|---|---|---|---|---|
 
-Fail any non-passing row or unresolved sizing warning. A shared `landing_group` or
-single final landing never excuses oversized implementation work. Do not recount
+Fail any non-passing row or unresolved sizing warning. Judge every visible
+per-code override. A shared `landing_group` or single final landing never excuses
+oversized implementation work. Do not recount
 criterion labels; the separate coverage gate owns deterministic coverage.
 
 Check `run_history` cumulatively. Superseded prose/issues must be replaced, not

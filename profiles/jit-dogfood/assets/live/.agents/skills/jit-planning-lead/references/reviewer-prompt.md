@@ -24,8 +24,10 @@ Produce an assignment-simulation row for every finest-tier entry:
 | Key | One outcome | One bounded consumer family | Observable test boundary | One focused cycle | No inner decomposition | No mixed deliverables | Result |
 |---|---|---|---|---|---|---|---|
 
-Fail any row that does not pass or any unresolved sizing warning without concrete
-indivisibility evidence. Also fail overlaps, gaps, wrong ordering, broken
+Fail any row that does not pass or any unresolved sizing warning. Judge every
+visible per-code override and fail vague or cross-cutting waivers. Also fail
+missing hierarchy/source universes, invented refs, tier-laundered leaves,
+malformed/duplicate contract headings, overlaps, gaps, wrong ordering, broken
 intermediate states, unmitigated risks, or stale prior findings. Require the author
 to replace defective contracts/tasks, remove superseded prose, regenerate, and
 rerun all checks.

@@ -273,13 +273,21 @@ Validate the manifest, check the generated region, and run native validation
 without allocating ids or writing issues/events:
 
 ```bash
+.agents/skills/jit-planning-lead/scripts/breakdown_manifest.py validate \
+  dev/active/<C-id>-breakdown.json --config .jit/config.toml \
+  --plan dev/active/<C-id>-plan.md \
+  --known-source <every-valid-source-id> ... \
+  --required-source <mandatory-source-id> ... --deny-warnings
 jit issue batch-create --from-json dev/active/<C-id>-breakdown.json --dry-run --json
 ```
 
 Then drive `P` through `plan-review`. Review fails missing/invalid manifests,
 stale generated output, duplicated task prose, and non-worker-sized terminal
-tasks. The built-in placeholder is not approval; replace it as described in Step
-4. Correct the manifest first, regenerate the plan, and rerun validation.
+tasks. Missing hierarchy/source universes, invented references, tier-laundered
+leaves, and malformed/duplicate contract headings also fail. Per-code sizing
+overrides remain visible for reviewer judgment. The built-in placeholder is not
+approval; replace it as described in Step 4. Correct the manifest first,
+regenerate the plan, and rerun validation.
 
 ## Step 7 — Break down after the plan checkpoint
 

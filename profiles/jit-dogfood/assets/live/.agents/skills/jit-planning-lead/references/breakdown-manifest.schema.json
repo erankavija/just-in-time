@@ -13,6 +13,13 @@
       "not": { "pattern": "^(?:[a-z]+-?)?[0-9]+$" }
     },
     "semanticKeys": { "type": "array", "items": { "$ref": "#/$defs/semanticKey" }, "uniqueItems": true },
+    "warningOverrides": {
+      "type": "object",
+      "propertyNames": {
+        "enum": ["acceptance-clusters", "broad-quantifier", "implementation-release", "independent-verbs", "mixed-deliverables", "multiple-consumer-families", "multiple-test-boundaries", "weak-worker-sized-reason"]
+      },
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
     "terminal": {
       "type": "object",
       "additionalProperties": false,
@@ -20,7 +27,8 @@
       "properties": {
         "consumer_family": { "type": "string", "minLength": 1 },
         "test_boundary": { "type": "string", "minLength": 1 },
-        "worker_sized_reason": { "type": "string", "minLength": 1 }
+        "worker_sized_reason": { "type": "string", "minLength": 1 },
+        "warning_overrides": { "$ref": "#/$defs/warningOverrides" }
       }
     },
     "planning": {

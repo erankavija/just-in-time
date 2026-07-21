@@ -19,7 +19,18 @@ KEY = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 ORDINAL = re.compile(r"^(?:[a-z]+-?)?\d+$")
 REQUIRED = {"key", "title", "description", "type", "priority", "labels", "gates", "depends_on", "planning"}
 PLANNING = {"outcome", "contract_refs", "source_refs", "landing_group", "terminal"}
-TERMINAL = {"consumer_family", "test_boundary", "worker_sized_reason"}
+TERMINAL_REQUIRED = {"consumer_family", "test_boundary", "worker_sized_reason"}
+TERMINAL_ALLOWED = TERMINAL_REQUIRED | {"warning_overrides"}
+WARNING_CODES = {
+    "acceptance-clusters",
+    "broad-quantifier",
+    "implementation-release",
+    "independent-verbs",
+    "mixed-deliverables",
+    "multiple-consumer-families",
+    "multiple-test-boundaries",
+    "weak-worker-sized-reason",
+}
 
 
 def load(path):
@@ -29,11 +40,16 @@ def load(path):
 def type_levels(config_path, explicit):
     if explicit:
         return set(explicit), None
+    if tomllib is None:
+        raise ValueError("cannot resolve terminal types: Python tomllib is unavailable; pass --terminal-type")
     path = Path(config_path)
-    if not path.exists() or tomllib is None:
-        return set(), None
+    if not path.is_file():
+        raise ValueError(f"cannot resolve terminal types: config not found at {path}; pass --terminal-type")
     types = tomllib.loads(path.read_text()).get("type_hierarchy", {}).get("types", {})
-    return ({name for name, level in types.items() if level == max(types.values())}, set(types)) if types else (set(), None)
+    if not types or not all(isinstance(name, str) and isinstance(level, int) for name, level in types.items()):
+        raise ValueError("cannot resolve terminal types: config has no valid type hierarchy; pass --terminal-type")
+    finest = max(types.values())
+    return {name for name, level in types.items() if level == finest}, types
 
 
 def strings(value):
@@ -74,39 +90,79 @@ def sizing_warnings(entry):
     outcome = str(planning.get("outcome", "")).lower()
     text = f"{title} {outcome}"
     description = entry.get("description") if isinstance(entry.get("description"), str) else ""
-    evidence = terminal["worker_sized_reason"].lower().startswith("indivisible because")
     warnings = []
-    if re.search(r"\b(all|every|entire|repo-wide|across the (?:repo|codebase|project))\b", text) and not evidence:
-        warnings.append("uses a broad quantifier")
+    if re.search(r"\b(all|every|entire|repo-wide|across the (?:repo|codebase|project))\b", text):
+        warnings.append(("broad-quantifier", "uses a broad quantifier"))
     verb = r"(?:add|build|create|define|delete|deploy|document|implement|migrate|publish|release|remove|render|update|validate|wire)"
     independent_verbs = any(
         re.search(rf"\b{verb}\w*\b.*(?:[;,.]|\band\b).*\b{verb}\w*\b", field)
         for field in (title, outcome)
     )
-    if independent_verbs and not evidence:
-        warnings.append("states multiple independent verbs")
+    if independent_verbs:
+        warnings.append(("independent-verbs", "states multiple independent verbs"))
     if re.search(r"[,/]|\band\b", terminal["consumer_family"].lower()):
-        warnings.append("names more than one consumer family")
+        warnings.append(("multiple-consumer-families", "names more than one consumer family"))
     if re.search(r"[,/]|\band\b", terminal["test_boundary"].lower()):
-        warnings.append("names more than one test boundary")
+        warnings.append(("multiple-test-boundaries", "names more than one test boundary"))
     categories = sum(bool(re.search(rf"\b{word}\w*\b", text)) for word in ("foundation", "migrat", "delet", "document", "releas"))
-    if categories > 1 and not evidence:
-        warnings.append("mixes independently testable deliverable categories")
-    if len(re.findall(r"^###\s+", description, re.MULTILINE)) >= 3 and not evidence:
-        warnings.append("contains three or more acceptance clusters")
-    if re.search(r"\b(implement|migrate|update)\w*\b", text) and re.search(r"\b(release|publish|deploy)\w*\b", text) and not evidence:
-        warnings.append("combines implementation with release work")
+    if categories > 1:
+        warnings.append(("mixed-deliverables", "mixes independently testable deliverable categories"))
+    if len(re.findall(r"^###\s+", description, re.MULTILINE)) >= 3:
+        warnings.append(("acceptance-clusters", "contains three or more acceptance clusters"))
+    if re.search(r"\b(implement|migrate|update)\w*\b", text) and re.search(r"\b(release|publish|deploy)\w*\b", text):
+        warnings.append(("implementation-release", "combines implementation with release work"))
     if len(terminal["worker_sized_reason"].split()) < 4:
-        warnings.append("does not explain why the work fits one focused cycle")
+        warnings.append(("weak-worker-sized-reason", "does not explain why the work fits one focused cycle"))
     return warnings
 
 
-def validate(entries, terminal_types, known_types, required_sources, required_criteria, contracts):
-    errors, warnings = [], []
+def contract_ids(plan):
+    section = list(re.finditer(r"^## Shared architectural contracts\s*$", plan, re.MULTILINE))
+    if len(section) != 1:
+        return set(), ["plan must contain exactly one '## Shared architectural contracts' section"]
+    start = section[0].end()
+    following = re.search(r"^##\s+", plan[start:], re.MULTILINE)
+    end = start + following.start() if following else len(plan)
+    body = plan[start:end]
+    heading = re.compile(r"^###\s+`([a-z][a-z0-9]*(?:-[a-z0-9]+)*)`\s+—\s+\S.*$", re.MULTILINE)
+    ids = heading.findall(body)
+    errors = []
+    if len(ids) != len(set(ids)):
+        errors.append("shared architectural contract ids must be unique")
+    for line in body.splitlines():
+        if line.startswith("### ") and not heading.fullmatch(line):
+            errors.append(f"malformed shared contract heading: {line}")
+    outside = plan[:start] + plan[end:]
+    if re.search(r"^###\s+`[^`]+`", outside, re.MULTILINE):
+        errors.append("contract-like heading appears outside the shared architectural contracts section")
+    return set(ids), errors
+
+
+def reaches_finer(key, level, by_key, type_levels):
+    dependencies = by_key[key].get("depends_on", [])
+    pending = list(dependencies) if strings(dependencies) else []
+    seen = set()
+    while pending:
+        dependency = pending.pop()
+        if dependency in seen or dependency not in by_key:
+            continue
+        seen.add(dependency)
+        candidate = by_key[dependency]
+        candidate_level = type_levels.get(candidate.get("type"))
+        if candidate_level is not None and candidate_level > level:
+            return True
+        dependencies = candidate.get("depends_on", [])
+        if strings(dependencies):
+            pending.extend(dependencies)
+    return False
+
+
+def validate(entries, terminal_types, type_levels, known_sources, required_sources, required_criteria, contracts, contract_errors=()):
+    errors, warnings, overridden = list(contract_errors), [], []
     if not isinstance(entries, list):
-        return ["manifest root must be a bare JSON array"], []
+        return ["manifest root must be a bare JSON array"], [], []
     if not entries:
-        return ["manifest must contain at least one issue"], []
+        return ["manifest must contain at least one issue"], [], []
     keys = [entry.get("key") for entry in entries if isinstance(entry, dict) and isinstance(entry.get("key"), str)]
     if len(keys) != len(set(keys)):
         errors.append("keys must be unique")
@@ -141,8 +197,10 @@ def validate(entries, terminal_types, known_types, required_sources, required_cr
             for dep in dependencies:
                 if dep not in key_set:
                     errors.append(f"{at}.depends_on references unknown key '{dep}'")
-        if known_types and isinstance(entry.get("type"), str) and entry.get("type") not in known_types:
+        if type_levels and isinstance(entry.get("type"), str) and entry.get("type") not in type_levels:
             errors.append(f"{at}.type '{entry.get('type')}' is not configured")
+        if type_levels is None and isinstance(entry.get("type"), str) and entry.get("type") not in terminal_types:
+            errors.append(f"{at}.type cannot be checked for non-terminal aggregation without a hierarchy config")
         if isinstance(entry.get("description"), str) and "## Success Criteria" not in entry["description"]:
             errors.append(f"{at}.description lacks ## Success Criteria")
         planning = entry.get("planning")
@@ -162,6 +220,8 @@ def validate(entries, terminal_types, known_types, required_sources, required_cr
             for contract in planning["contract_refs"]:
                 if not KEY.fullmatch(contract):
                     errors.append(f"{at}.planning.contract_refs contains non-semantic id '{contract}'")
+                elif contracts is None:
+                    errors.append(f"{at}.planning.contract_refs cannot be checked without --plan")
                 elif contracts is not None and contract not in contracts:
                     errors.append(f"{at}.planning.contract_refs names undeclared contract '{contract}'")
         if not strings(planning.get("source_refs")) or not planning.get("source_refs"):
@@ -176,22 +236,55 @@ def validate(entries, terminal_types, known_types, required_sources, required_cr
         if is_terminal and not isinstance(terminal, dict):
             errors.append(f"{at}.planning.terminal is required for finest-tier issues")
         if terminal is not None:
-            if not isinstance(terminal, dict) or set(terminal) != TERMINAL or not all(isinstance(terminal.get(f), str) and terminal[f].strip() for f in TERMINAL):
-                errors.append(f"{at}.planning.terminal must contain exactly consumer_family, test_boundary, worker_sized_reason")
-            elif is_terminal:
-                warnings.extend(f"{at}: {warning}" for warning in sizing_warnings(entry))
+            valid_terminal = (
+                isinstance(terminal, dict)
+                and TERMINAL_REQUIRED <= set(terminal) <= TERMINAL_ALLOWED
+                and all(isinstance(terminal.get(field), str) and terminal[field].strip() for field in TERMINAL_REQUIRED)
+            )
+            if not valid_terminal:
+                errors.append(f"{at}.planning.terminal must contain consumer_family, test_boundary, worker_sized_reason, and optional warning_overrides")
+            else:
+                overrides = terminal.get("warning_overrides", {})
+                if not isinstance(overrides, dict) or any(code not in WARNING_CODES or not isinstance(reason, str) or not reason.strip() for code, reason in overrides.items()):
+                    errors.append(f"{at}.planning.terminal.warning_overrides must map stable warning codes to non-empty reasons")
+                    overrides = {}
+                findings = sizing_warnings(entry) if is_terminal else []
+                found_codes = {code for code, _ in findings}
+                for code, message in findings:
+                    if code in overrides:
+                        overridden.append(f"{at}: {code} overridden: {overrides[code]}")
+                    else:
+                        warnings.append(f"{at}: {code}: {message}")
+                unused = set(overrides) - found_codes
+                if unused:
+                    errors.append(f"{at}.planning.terminal.warning_overrides has unused codes: {', '.join(sorted(unused))}")
     if cycle(key_set, entries):
         errors.append("depends_on graph contains a cycle")
     missing_sources = set(required_sources) - covered
     if missing_sources:
         errors.append(f"source coverage missing: {', '.join(sorted(missing_sources))}")
+    undeclared_required_sources = set(required_sources) - set(known_sources)
+    if undeclared_required_sources:
+        errors.append(f"required sources are outside the known-source universe: {', '.join(sorted(undeclared_required_sources))}")
+    unknown_sources = covered - set(known_sources)
+    if unknown_sources:
+        errors.append(f"unknown source refs: {', '.join(sorted(unknown_sources))}")
     missing_criteria = set(required_criteria) - satisfied
     if missing_criteria:
         errors.append(f"satisfies coverage missing: {', '.join(sorted(missing_criteria))}")
     unknown_criteria = satisfied - set(required_criteria) if required_criteria else set()
     if unknown_criteria:
         errors.append(f"unknown satisfies labels: {', '.join(sorted(unknown_criteria))}")
-    return errors, warnings
+    if type_levels:
+        by_key = {entry["key"]: entry for entry in entries if isinstance(entry, dict) and isinstance(entry.get("key"), str)}
+        finest = max(type_levels.values())
+        for index, entry in enumerate(entries):
+            issue_type = entry.get("type") if isinstance(entry, dict) else None
+            level = type_levels.get(issue_type) if isinstance(issue_type, str) else None
+            key = entry.get("key") if isinstance(entry, dict) else None
+            if level is not None and level < finest and isinstance(key, str) and key in by_key and not reaches_finer(key, level, by_key, type_levels):
+                errors.append(f"entry[{index}] non-finest issue must depend on a strictly finer in-manifest descendant")
+    return errors, warnings, overridden
 
 
 def cell(value):
@@ -236,6 +329,7 @@ def main():
     check.add_argument("manifest")
     check.add_argument("--config", default=".jit/config.toml")
     check.add_argument("--terminal-type", action="append", default=[])
+    check.add_argument("--known-source", action="append", required=True)
     check.add_argument("--required-source", action="append", default=[])
     check.add_argument("--required-criterion", action="append", default=[])
     check.add_argument("--plan")
@@ -252,14 +346,28 @@ def main():
         if args.command == "render":
             render(args)
             return
-        terminal, known = type_levels(args.config, args.terminal_type)
+        terminal, levels = type_levels(args.config, args.terminal_type)
         contracts = None
+        contract_errors = []
         if args.plan:
             plan = Path(args.plan).read_text()
-            contracts = set(re.findall(r"^###\s+`([a-z][a-z0-9-]*)`", plan, re.MULTILINE))
-        errors, warnings = validate(load(args.manifest), terminal, known, args.required_source, args.required_criterion, contracts)
-        result = {"valid": not errors and not (args.deny_warnings and warnings), "errors": errors, "warnings": warnings}
-        print(json.dumps(result, indent=2) if args.json else "\n".join([*(f"error: {e}" for e in errors), *(f"warning: {w}" for w in warnings)]) or "valid")
+            contracts, contract_errors = contract_ids(plan)
+        errors, warnings, overridden = validate(
+            load(args.manifest), terminal, levels, args.known_source, args.required_source,
+            args.required_criterion, contracts, contract_errors
+        )
+        result = {
+            "valid": not errors and not (args.deny_warnings and warnings),
+            "errors": errors,
+            "warnings": warnings,
+            "overridden_warnings": overridden,
+        }
+        lines = [
+            *(f"error: {error}" for error in errors),
+            *(f"warning: {warning}" for warning in warnings),
+            *(f"overridden: {override}" for override in overridden),
+        ]
+        print(json.dumps(result, indent=2) if args.json else "\n".join(lines) or "valid")
         if not result["valid"]:
             sys.exit(1)
     except (OSError, ValueError, json.JSONDecodeError) as error:

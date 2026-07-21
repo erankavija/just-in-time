@@ -16,6 +16,10 @@ semantic keys, concrete membership/coverage labels and gates, and real dependenc
 edges. `planning.source_refs` provides total criterion/design/finding coverage;
 `contract_refs` names contracts defined once in the plan.
 
+Keep a complete known-source universe and distinguish mandatory coverage from
+optional design/finding references. Every non-finest entry must aggregate a
+strictly finer in-manifest descendant; never use a higher tier to hide leaf work.
+
 Refine every finest-tier entry horizontally until a one-worker simulation passes:
 one outcome, bounded consumer family, observable test boundary, one focused
 implementation/review cycle, no internal decomposition, and no mixed foundation,
@@ -30,6 +34,9 @@ criterion approach; named contracts; generated overview; material risks and owne
 decisions; investigation links. Cite exhaustive inventories instead of copying
 them. Do not copy issue bodies, task criteria, DAG prose, or review history.
 
-Run manifest validation with all criteria as required sources and warnings denied,
-render write then check, and native batch-create dry-run. Fix failures before
-returning. Return only both paths, counts, and unresolved owner decisions.
+Run manifest validation with the complete known-source universe, mandatory
+criteria as required sources, and warnings denied. A necessary exception names
+only the affected stable code in `terminal.warning_overrides`; its reason remains
+reviewer-visible. Never use `worker_sized_reason` as a global waiver. Then render
+write/check and run native batch-create dry-run. Fix failures before returning.
+Return only both paths, counts, and unresolved owner decisions.

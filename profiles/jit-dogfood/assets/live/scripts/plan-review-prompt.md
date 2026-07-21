@@ -28,8 +28,10 @@ Check every edge and simulate assigning every finest-tier entry to one worker:
 
 Fail any non-passing row. `landing_group` is integration metadata only. Broad
 quantifiers, independent verbs, several component families, three acceptance
-clusters, and implementation plus release require a split or concrete evidence
-of indivisibility. Lack of a finer configured type is never evidence.
+clusters, and implementation plus release require a split or a concrete per-code
+override that remains visible here. Reject global incantations, missing
+hierarchy/source universes, invented refs, tier-laundered leaves, and malformed or
+duplicate contract headings.
 
 Verify prior findings were resolved by replacement and consolidation. Report
 blocking findings with artifact/code citations and exact corrections. End with

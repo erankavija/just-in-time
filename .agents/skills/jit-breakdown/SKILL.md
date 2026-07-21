@@ -37,7 +37,8 @@ Run all checks without mutation:
 
 ```bash
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py validate \
-  <manifest> --config .jit/config.toml --required-source <criterion-id> ... \
+  <manifest> --config .jit/config.toml --known-source <every-valid-source-id> ... \
+  --required-source <mandatory-source-id> ... \
   --required-criterion <criterion-id> ... --deny-warnings
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py render \
   <manifest> <plan> --check                 # bracketed work
@@ -46,11 +47,13 @@ jit issue batch-create --from-json <manifest> --dry-run --json
 
 Reject malformed fields, semantic-key violations, unknown/cyclic edges,
 incomplete criterion coverage, stale generated output, or unresolved sizing
-warnings. Every issue description is the final standalone body. Every finest-tier
+warnings. Missing hierarchy config, invented sources, non-aggregating non-finest
+entries, and malformed/duplicate contract headings also fail. Every issue
+description is the final standalone body. Every finest-tier
 entry must pass the one-worker assignment simulation: one outcome, bounded
 consumer family, observable test boundary, focused implementation/review cycle,
 no inner decomposition, and no mixed deliverable categories. `landing_group`
-never changes that judgment.
+never changes that judgment. Per-code warning overrides stay visible for review.
 
 ## 3. Create once
 

@@ -31,6 +31,11 @@ empty), non-empty `source_refs`, optional `landing_group`, and terminal metadata
 Every finest-tier issue has exactly one scalar `consumer_family`, one scalar
 `test_boundary`, and a concrete `worker_sized_reason`.
 
+Enumerate every valid criterion, finding, and design-section source id before
+validation. Non-finest entries aggregate strictly finer descendants. If a sizing
+heuristic is genuinely indivisible, override only its stable code with a concrete
+`warning_overrides` reason; the override remains visible to review.
+
 Before returning, simulate assigning every finest-tier entry to one worker. Split
 horizontally until it has one outcome, one bounded consumer family, one observable
 test boundary, fits one focused implementation/review cycle, needs no internal

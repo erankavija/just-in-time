@@ -55,7 +55,8 @@ the deterministic helper rather than retyping its rules:
 ```bash
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py validate \
   dev/active/<C>-breakdown.json --config .jit/config.toml \
-  --plan dev/active/<C>-plan.md --required-source <criterion-id> ... \
+  --plan dev/active/<C>-plan.md --known-source <every-valid-source-id> ... \
+  --required-source <mandatory-source-id> ... \
   --required-criterion <criterion-id> ... --deny-warnings
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py render \
   dev/active/<C>-breakdown.json dev/active/<C>-plan.md --write
@@ -79,10 +80,13 @@ independently testable foundation, migration, deletion, documentation, or releas
 deliverables. A shared `landing_group` is integration metadata, never permission
 to merge work. No finer configured type is required to split an oversized task.
 
-Sizing heuristics warn on broad quantifiers, independent verbs, multiple consumer
+Every non-finest manifest entry must depend transitively on a strictly finer
+entry; relabeling executable work never suppresses terminal checks. Sizing
+heuristics warn on broad quantifiers, independent verbs, multiple consumer
 families, three or more acceptance clusters, mixed deliverable classes, and
-implementation plus release. Split the task or record concrete indivisibility
-evidence in `worker_sized_reason`; unresolved warnings fail review.
+implementation plus release. Split the task or add a reason under that warning's
+stable `warning_overrides` code. Overrides remain visible and require reviewer
+approval; `worker_sized_reason` is not an escape hatch.
 
 ## 4. Review and approve P
 
