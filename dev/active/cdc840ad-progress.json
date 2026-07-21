@@ -294,9 +294,11 @@
     {
       "category": "rework-exceeded",
       "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-21T23:46:00+03:00",
+      "resolved_at": "2026-07-22T00:03:37+03:00",
       "situation": "After the reset rework counter reached two, independent review of the central listing-budget correction found one bounded overlap defect: a listed child that is itself a requested nested listing root is counted twice toward max_paths.",
+      "resolution": "Invoker selected option 1 and authorized one narrow guided correction with a counter reset, limited to nested-listing overlap accounting, one regression, and independent verification.",
       "recommendation": "Authorize one narrow guided correction and counter reset: include requested listing roots in the overlap exclusion, add one nested-listing regression, rerun focused image/backend tests, and perform one independent verification."
     }
   ],
@@ -305,7 +307,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 2
+    "49adf23b": 1
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
