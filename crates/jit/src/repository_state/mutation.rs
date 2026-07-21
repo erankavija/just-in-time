@@ -20,6 +20,7 @@ use super::{
     RepositoryLayout, RepositoryLayoutError, RepositorySeed, RepositorySeedKind, SeedError,
     VirtualPath,
 };
+use crate::declarations::GateRegistry;
 use crate::domain::{Assignee, Event, GateRunResult, GateStatus, Issue, Priority, State};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -326,6 +327,13 @@ pub enum MutationIntent {
         /// Existing issue carrying reconstructed historical lifecycle fields.
         issue: Box<Issue>,
     },
+    /// Replace the authored gate registry with a structured proposal derived
+    /// from the registry in the captured image. The finalizer owns canonical
+    /// declaration serialization; callers cannot submit repository bytes.
+    EditGateRegistry {
+        /// Complete proposed registry after one closed semantic edit.
+        registry: Box<GateRegistry>,
+    },
     /// Delete an issue that ALREADY EXISTS in the captured image. The finalizer
     /// removes the issue record and transfers its id from active to deleted index
     /// membership in the same delta. Audit events remain explicit intents so the
@@ -387,6 +395,9 @@ pub enum MutationError {
     /// A record could not be serialized.
     #[error("failed to serialize repository record: {0}")]
     Serialize(#[from] serde_json::Error),
+    /// An authored gate registry could not be serialized canonically.
+    #[error(transparent)]
+    GateDeclaration(#[from] crate::declarations::GateDeclarationError),
     /// The closed semantic seed was invalid.
     #[error(transparent)]
     Seed(#[from] SeedError),
@@ -833,6 +844,33 @@ pub fn finalize(
                 expected: expected_of(image, &path)?,
             });
             index_deletions.push(issue_id.clone());
+        }
+    }
+
+    // Authored gate declarations are serialized only by the neutral declaration
+    // owner. A registry edit remains an explicit typed record mutation; the
+    // command cannot smuggle arbitrary repository bytes through this finalizer.
+    for intent in intents {
+        if let MutationIntent::EditGateRegistry { registry } = intent {
+            let path = VirtualPath::data("gates.toml")?;
+            let bytes = crate::declarations::serialize_gate_registry(registry)?;
+            let current = image.entry(&path)?;
+            if !matches!(
+                current,
+                crate::repository_state::RepositoryEntry::File {
+                    bytes: current_bytes,
+                    mode: FileMode::Regular,
+                    ..
+                } if current_bytes == &bytes
+            ) {
+                actions.push(RepositoryAction::WriteFile {
+                    path,
+                    owner: OWNER.to_string(),
+                    expected: ExpectedPreimage::of(current),
+                    bytes,
+                    mode: FileMode::Regular,
+                });
+            }
         }
     }
 

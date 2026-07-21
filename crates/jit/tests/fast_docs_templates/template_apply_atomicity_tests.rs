@@ -157,6 +157,9 @@ impl<S: IssueStore> IssueStore for FaultyStore<S> {
     fn root(&self) -> &std::path::Path {
         self.inner.root()
     }
+    fn is_file_backed(&self) -> bool {
+        self.inner.is_file_backed()
+    }
     fn read_repo_file(&self, rel_path: &str) -> Result<Option<String>, PathReadError> {
         self.inner.read_repo_file(rel_path)
     }
@@ -309,6 +312,11 @@ fn fixture<S: IssueStore + jit::storage::RepositoryStateStore>(
 ) -> (CommandExecutor<FaultyStore<S>>, String, String) {
     std::env::set_var("JIT_TEST_MODE", "1");
     store.init().unwrap();
+    if store.is_file_backed() {
+        std::fs::write(store.root().join("config.toml"), "").unwrap();
+    } else {
+        store.write_repo_file(".jit/config.toml", "").unwrap();
+    }
     let layout =
         jit::storage::discover_repository_layout(store.root().parent().unwrap(), store.root())
             .unwrap();
@@ -810,6 +818,7 @@ impl jit::storage::RepositoryStateStore for StallingStore {
 fn json_fixture(store: StallingStore) -> (CommandExecutor<StallingStore>, String, String) {
     std::env::set_var("JIT_TEST_MODE", "1");
     store.init().unwrap();
+    std::fs::write(store.root().join("config.toml"), "").unwrap();
     let layout =
         jit::storage::discover_repository_layout(store.root().parent().unwrap(), store.root())
             .unwrap();

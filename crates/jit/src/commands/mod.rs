@@ -899,6 +899,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                         paths.insert(VirtualPath::data(format!("issues/{issue_id}.json"))?);
                         paths.insert(VirtualPath::data("index.json")?);
                     }
+                    MutationIntent::EditGateRegistry { .. } => {
+                        paths.insert(VirtualPath::data("gates.toml")?);
+                    }
                     MutationIntent::RecordGateRun { .. } => {}
                     MutationIntent::RecordEvent { .. } => {
                         paths.insert(VirtualPath::data("events.jsonl")?);

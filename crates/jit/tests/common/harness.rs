@@ -24,6 +24,10 @@ impl TestHarness {
 
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
+        // Session-backed declaration mutations capture config from the same
+        // aggregate image as gates/events; an empty file is the minimal valid
+        // repository declaration set for generic harness tests.
+        storage.write_repo_file(".jit/config.toml", "").unwrap();
         // A synthetic canonical layout so session-backed mutations (e.g. the
         // validate-fix path) can open the in-memory mutation session. The in-memory
         // backend models its state in one aggregate map keyed by virtual path and
@@ -78,12 +82,19 @@ scope = \"project\"
 source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
 source-of-truth = \"registry-first\"
 ";
+        // Query paths still load declarations through ConfigManager's filesystem
+        // reader, while mutation paths capture the aggregate in-memory image.
+        // Keep both fixture views coherent until the read-side storage facade is
+        // consolidated.
         std::fs::create_dir_all(self.storage.root()).unwrap();
         std::fs::write(
             self.storage.root().join("config.toml"),
             CANONICAL_ITEM_KINDS,
         )
         .unwrap();
+        self.storage
+            .write_repo_file(".jit/config.toml", CANONICAL_ITEM_KINDS)
+            .unwrap();
         self
     }
 

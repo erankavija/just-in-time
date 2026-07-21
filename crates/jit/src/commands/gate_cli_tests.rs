@@ -15,14 +15,16 @@ mod tests {
         storage.init().unwrap();
 
         // Create config with enforcement off for test backward compatibility
-        std::fs::create_dir_all(storage.root()).unwrap();
         let config_toml = r#"
 [worktree]
 enforce_leases = "off"
 "#;
-        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+        storage
+            .write_repo_file(".jit/config.toml", config_toml)
+            .unwrap();
 
-        CommandExecutor::new(storage)
+        let layout = storage.repository_layout();
+        CommandExecutor::new(storage).with_layout(layout)
     }
 
     // Test: jit gate define <key> --title "Title" --description "Desc" --stage postcheck --mode manual

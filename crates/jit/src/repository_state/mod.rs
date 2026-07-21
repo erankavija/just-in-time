@@ -52,6 +52,55 @@ pub use mutation::{
     FixedMutationClock, IdAuthority, MutationClock, MutationContext, MutationError, MutationIntent,
     SystemMutationClock,
 };
+
+/// Finalize one typed gate-registry edit, its audit event, and every coupled
+/// declaration-derived materialization into one recoverable plan.
+///
+/// `declarations.gates` must be the proposed registry represented by the edit
+/// intent. The base image remains the expected preimage for every action; an
+/// overlay is used only while deriving projections so their contents reflect the
+/// proposed registry before anything is published.
+pub fn finalize_gate_registry_edit(
+    layout: &RepositoryLayout,
+    base: &RepositoryImage,
+    context: &MutationContext,
+    intents: &[MutationIntent],
+    declarations: RepositoryDeclarations<'_>,
+) -> anyhow::Result<MaterializationPlan> {
+    let registry = intents
+        .iter()
+        .find_map(|intent| match intent {
+            MutationIntent::EditGateRegistry { registry } => Some(&**registry),
+            _ => None,
+        })
+        .ok_or_else(|| anyhow::anyhow!("gate registry finalization requires one typed edit"))?;
+    if intents
+        .iter()
+        .filter(|intent| matches!(intent, MutationIntent::EditGateRegistry { .. }))
+        .count()
+        != 1
+    {
+        anyhow::bail!("gate registry finalization requires exactly one typed edit");
+    }
+    if declarations.gates != registry {
+        anyhow::bail!("gate registry edit and projection declarations disagree");
+    }
+
+    let record_plan = finalize(layout, base, context, intents)?;
+    let gate_path = VirtualPath::data("gates.toml")?;
+    let gate_bytes = crate::declarations::serialize_gate_registry(registry)?;
+    let overlaid = apply_overlay(base, std::iter::once((gate_path, Some(gate_bytes))))?;
+    let mut actions = record_plan.delta().actions().to_vec();
+    actions.extend(compose_complete(&overlaid, &declarations)?);
+    let delta = RepositoryDelta::new(layout, actions)?;
+    let seed = context.repository_seed(intents)?;
+    Ok(MaterializationPlan::new(
+        base,
+        &seed,
+        &MaterializationIntent::SemanticMutation,
+        delta,
+    )?)
+}
 pub use overlay::{apply_overlay, OverlayError};
 pub use path::{
     InjectivityProof, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,

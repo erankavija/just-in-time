@@ -205,6 +205,209 @@ impl GateUpdate {
     }
 }
 
+#[derive(Clone)]
+enum CapturedGateRegistryMutation {
+    Define(GateDefinition),
+    Update { key: String, update: GateUpdate },
+    Remove { key: String },
+}
+
+enum CapturedGateRegistryOutcome {
+    Defined,
+    Updated(Box<GateDefinition>),
+    Removed,
+}
+
+struct DerivedGateRegistryMutation {
+    registry: crate::declarations::GateRegistry,
+    event: Event,
+    outcome: CapturedGateRegistryOutcome,
+}
+
+fn updated_gate_definition(current: GateDefinition, update: GateUpdate) -> Result<GateDefinition> {
+    use crate::declarations::GateChecker;
+
+    let final_mode = update.mode.unwrap_or(current.mode);
+    let any_checker_field = update.checker_command.is_some()
+        || update.timeout.is_some()
+        || update.pass_context.is_some()
+        || !update.working_dir.is_keep()
+        || !update.prompt.is_keep()
+        || !update.prompt_file.is_keep()
+        || !update.env.is_keep();
+    let merged_checker = if current.checker.is_some() || any_checker_field {
+        if !any_checker_field
+            && matches!(
+                current.checker,
+                Some(GateChecker::RepositoryValidation)
+                    | Some(GateChecker::IssueValidation)
+                    | Some(GateChecker::LabelTargetValidation { .. })
+                    | Some(GateChecker::ReviewPlaceholder)
+            )
+        {
+            current.checker.clone()
+        } else {
+            let (
+                mut command,
+                mut timeout_seconds,
+                mut working_dir,
+                mut env,
+                mut pass_context,
+                mut prompt,
+                mut prompt_file,
+            ) = match current.checker.clone() {
+                Some(GateChecker::Exec {
+                    command,
+                    timeout_seconds,
+                    working_dir,
+                    env,
+                    pass_context,
+                    prompt,
+                    prompt_file,
+                }) => (
+                    command,
+                    timeout_seconds,
+                    working_dir,
+                    env,
+                    pass_context,
+                    prompt,
+                    prompt_file,
+                ),
+                Some(_) | None => (
+                    String::new(),
+                    300,
+                    None,
+                    std::collections::HashMap::new(),
+                    false,
+                    None,
+                    None,
+                ),
+            };
+            if let Some(value) = update.checker_command {
+                command = value;
+            }
+            if let Some(value) = update.timeout {
+                timeout_seconds = value;
+            }
+            if let Some(value) = update.pass_context {
+                pass_context = value;
+            }
+            working_dir = match update.working_dir {
+                FieldEdit::Keep => working_dir,
+                FieldEdit::Set(value) => Some(value),
+                FieldEdit::Clear => None,
+            };
+            prompt = match update.prompt {
+                FieldEdit::Keep => prompt,
+                FieldEdit::Set(value) => Some(value),
+                FieldEdit::Clear => None,
+            };
+            prompt_file = match update.prompt_file {
+                FieldEdit::Keep => prompt_file,
+                FieldEdit::Set(value) => Some(value),
+                FieldEdit::Clear => None,
+            };
+            env = match update.env {
+                FieldEdit::Keep => env,
+                FieldEdit::Set(value) => value,
+                FieldEdit::Clear => std::collections::HashMap::new(),
+            };
+            Some(GateChecker::Exec {
+                command,
+                timeout_seconds,
+                working_dir,
+                env,
+                pass_context,
+                prompt,
+                prompt_file,
+            })
+        }
+    } else {
+        None
+    };
+    let final_checker = (final_mode != GateMode::Manual)
+        .then_some(merged_checker)
+        .flatten();
+    let has_valid_checker = match &final_checker {
+        Some(GateChecker::Exec { command, .. }) => !command.is_empty(),
+        Some(_) => true,
+        None => false,
+    };
+    if final_mode == GateMode::Auto && !has_valid_checker {
+        return Err(anyhow!(
+            "Automated gates must have a checker configured. Add --checker-command or use --mode manual"
+        ));
+    }
+
+    Ok(GateDefinition {
+        version: current.version,
+        key: current.key,
+        title: update.title.unwrap_or(current.title),
+        description: update.description.unwrap_or(current.description),
+        stage: update.stage.unwrap_or(current.stage),
+        mode: final_mode,
+        checker: final_checker,
+        priority: update.priority.unwrap_or(current.priority),
+        reserved: current.reserved,
+        auto: final_mode == GateMode::Auto,
+        example_integration: current.example_integration,
+    })
+}
+
+fn derive_gate_registry_mutation(
+    mut registry: crate::declarations::GateRegistry,
+    request: &CapturedGateRegistryMutation,
+) -> Result<DerivedGateRegistryMutation> {
+    let (event, outcome) = match request {
+        CapturedGateRegistryMutation::Define(definition) => {
+            if registry.gates.contains_key(&definition.key) {
+                return Err(
+                    crate::storage::GateAlreadyExistsError::new(definition.key.as_str()).into(),
+                );
+            }
+            registry
+                .gates
+                .insert(definition.key.clone(), definition.clone());
+            (
+                Event::draft_gate_definition_created(definition.key.clone()),
+                CapturedGateRegistryOutcome::Defined,
+            )
+        }
+        CapturedGateRegistryMutation::Update { key, update } => {
+            let current = registry
+                .gates
+                .get(key)
+                .cloned()
+                .ok_or_else(|| crate::storage::GateNotFoundError::by_key(key))?;
+            let updated = updated_gate_definition(current, update.clone())?;
+            registry.gates.insert(key.clone(), updated.clone());
+            (
+                Event::draft_gate_definition_updated(key.clone()),
+                CapturedGateRegistryOutcome::Updated(Box::new(updated)),
+            )
+        }
+        CapturedGateRegistryMutation::Remove { key } => {
+            if registry.gates.remove(key).is_none() {
+                return Err(crate::storage::GateNotFoundError::by_key(key).into());
+            }
+            (
+                Event::draft_gate_definition_removed(key.clone()),
+                CapturedGateRegistryOutcome::Removed,
+            )
+        }
+    };
+    // Normalize through the declaration-owned serializer now so projection input
+    // exactly matches what the authored file will contain (including null-valued
+    // reserved-entry stripping).
+    let bytes = crate::declarations::serialize_gate_registry(&registry)?;
+    let registry = crate::declarations::parse_gate_registry(&bytes)?;
+    Ok(DerivedGateRegistryMutation {
+        registry,
+        event,
+        outcome,
+    })
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     /// Add a single gate to an issue.
     ///
@@ -547,6 +750,94 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(registry.gates.into_values().collect())
     }
 
+    fn publish_gate_registry_mutation(
+        &self,
+        request: CapturedGateRegistryMutation,
+    ) -> Result<CapturedGateRegistryOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{
+            assemble_config, finalize_gate_registry_edit, render_capture_closure, CaptureBudget,
+            CaptureSpec, MutationContext, MutationIntent, RepositoryEntry, VirtualPath,
+        };
+        use crate::storage::RepositoryStateStoreError;
+
+        let layout = self.require_layout()?;
+        let context = MutationContext::production();
+        let budget = CaptureBudget {
+            max_paths: 4096,
+            max_listings: 64,
+            max_bytes: 256 * 1024 * 1024,
+            max_depth: 16,
+        };
+        let registries = || -> Result<[VirtualPath; 5]> {
+            Ok([
+                VirtualPath::data("config.toml")?,
+                VirtualPath::data("invariants.toml")?,
+                VirtualPath::data("rules.toml")?,
+                VirtualPath::data("gates.toml")?,
+                VirtualPath::data("events.jsonl")?,
+            ])
+        };
+
+        for _ in 0..8 {
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let image_one = match session.capture(CaptureSpec::phase_one(registries()?, budget)?) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let config = assemble_config(&image_one)?;
+            let rules_text = super::image_repo_bytes(&image_one, ".jit/rules.toml")?
+                .map(String::from_utf8)
+                .transpose()?;
+            let closure = render_capture_closure(&config, &[], rules_text.as_deref())?;
+            let mut spec = CaptureSpec::phase_one(registries()?, budget)?;
+            spec.discover_paths(closure)?;
+            let image = match session.capture(spec) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let gates_path = VirtualPath::data("gates.toml")?;
+            let registry = match image.entry(&gates_path)? {
+                RepositoryEntry::File { bytes, .. } => {
+                    crate::declarations::parse_gate_registry(bytes)?
+                }
+                RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),
+                _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
+            };
+            let derived = derive_gate_registry_mutation(registry, &request)?;
+            let mut declarations = super::declarations_from_image(&image)?;
+            declarations.gates = derived.registry.clone();
+            let intents = vec![
+                MutationIntent::EditGateRegistry {
+                    registry: Box::new(derived.registry),
+                },
+                MutationIntent::RecordEvent {
+                    phase: 1,
+                    event: Box::new(derived.event),
+                },
+            ];
+            let plan = finalize_gate_registry_edit(
+                &layout,
+                &image,
+                &context,
+                &intents,
+                declarations.borrowed(),
+            )?;
+            match session.apply(&plan) {
+                Ok(_) => return Ok(derived.outcome),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "gate registry mutation did not converge after repeated conflicts"
+        ))
+    }
+
     pub fn add_gate_definition(
         &self,
         key: String,
@@ -555,28 +846,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         auto: bool,
         example_integration: Option<String>,
         stage: crate::declarations::GateStage,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Global operation - enforce common history with main
         crate::commands::worktree::enforce_main_only_operations()?;
 
-        let mut registry = self.storage.load_gate_registry()?;
-
-        if registry.gates.contains_key(&key) {
-            return Err(crate::storage::GateAlreadyExistsError::new(key.as_str()).into());
-        }
-
-        registry.gates.insert(
-            key.clone(),
+        self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Define(
             GateDefinition {
                 version: 1,
-                key: key.clone(),
+                key,
                 title,
                 description,
                 stage,
                 mode: if auto {
-                    crate::declarations::GateMode::Auto
+                    GateMode::Auto
                 } else {
-                    crate::declarations::GateMode::Manual
+                    GateMode::Manual
                 },
                 checker: None,
                 priority: 100,
@@ -584,14 +871,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 auto,
                 example_integration,
             },
-        );
-
-        self.storage.save_gate_registry(&registry)?;
-
-        // @/inv/event-log: registry-scoped audit entry for the definition create.
-        self.storage
-            .append_event(&Event::draft_gate_definition_created(key))?;
-
+        ))?;
         Ok(())
     }
 
@@ -614,15 +894,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         checker: Option<crate::declarations::GateChecker>,
         priority: u32,
         example_integration: Option<String>,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Global operation - enforce common history with main
         crate::commands::worktree::enforce_main_only_operations()?;
-
-        let mut registry = self.storage.load_gate_registry()?;
-
-        if registry.gates.contains_key(&key) {
-            return Err(crate::storage::GateAlreadyExistsError::new(key.as_str()).into());
-        }
 
         // Validate: auto gates must have checker
         if mode == crate::declarations::GateMode::Auto && checker.is_none() {
@@ -638,11 +915,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             checker
         };
 
-        registry.gates.insert(
-            key.clone(),
+        self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Define(
             GateDefinition {
                 version: 1,
-                key: key.clone(),
+                key,
                 title,
                 description,
                 stage,
@@ -653,14 +929,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 auto: mode == crate::declarations::GateMode::Auto,
                 example_integration,
             },
-        );
-
-        self.storage.save_gate_registry(&registry)?;
-
-        // @/inv/event-log: registry-scoped audit entry for the definition create.
-        self.storage
-            .append_event(&Event::draft_gate_definition_created(key))?;
-
+        ))?;
         Ok(())
     }
 
@@ -669,11 +938,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Each set field of `update` replaces the gate's current value; every
     /// unprovided field keeps its current value; the clearable checker fields
     /// ([`FieldEdit::Clear`]) reset to none/empty. The gate KEY is its identity
-    /// and is never modified. The write goes through
-    /// [`save_gate_registry`](crate::storage::IssueStore::save_gate_registry)
-    /// (the canonical atomic temp-file + rename primitive), a
-    /// `gate_definition_updated` event is appended, and no per-issue
-    /// `gates_status` is touched — this edits the registry definition only.
+    /// and is never modified. The authored registry, its
+    /// `gate_definition_updated` audit event, and configured derived projections
+    /// publish through one repository-state transaction; no per-issue
+    /// `gates_status` is touched.
     ///
     /// Updating a key that is not in the registry is a typed
     /// [`GateNotFoundError`](crate::storage::GateNotFoundError) (exit code `3`).
@@ -687,31 +955,27 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// ```
     /// use jit::commands::{CommandExecutor, GateUpdate};
-    /// use jit::declarations::{GateDefinition, GateMode, GateStage};
+    /// use jit::declarations::{GateMode, GateStage};
     /// use jit::{InMemoryStorage, IssueStore};
     ///
     /// std::env::set_var("JIT_TEST_MODE", "1"); // skip the main-history guard
-    /// let executor = CommandExecutor::new(InMemoryStorage::new());
-    ///
-    /// // Seed a gate in the registry.
-    /// let mut registry = executor.storage().load_gate_registry().unwrap();
-    /// registry.gates.insert(
-    ///     "tests".to_string(),
-    ///     GateDefinition {
-    ///         version: 1,
-    ///         key: "tests".to_string(),
-    ///         title: "Old title".to_string(),
-    ///         description: "Desc".to_string(),
-    ///         stage: GateStage::Postcheck,
-    ///         mode: GateMode::Manual,
-    ///         checker: None,
-    ///         priority: 100,
-    ///         reserved: Default::default(),
-    ///         auto: false,
-    ///         example_integration: None,
-    ///     },
-    /// );
-    /// executor.storage().save_gate_registry(&registry).unwrap();
+    /// let storage = InMemoryStorage::new();
+    /// storage.init().unwrap();
+    /// storage.write_repo_file(".jit/config.toml", "").unwrap();
+    /// let layout = storage.repository_layout();
+    /// let executor = CommandExecutor::new(storage).with_layout(layout);
+    /// executor
+    ///     .define_gate(
+    ///         "tests".to_string(),
+    ///         "Old title".to_string(),
+    ///         "Desc".to_string(),
+    ///         GateStage::Postcheck,
+    ///         GateMode::Manual,
+    ///         None,
+    ///         100,
+    ///         None,
+    ///     )
+    ///     .unwrap();
     ///
     /// // Update only the title; every other field is preserved.
     /// let updated = executor
@@ -726,185 +990,31 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// assert_eq!(updated.title, "All Tests Pass");
     /// assert_eq!(updated.description, "Desc");
     /// ```
-    pub fn update_gate(&self, key: &str, update: GateUpdate) -> Result<GateDefinition> {
-        use crate::declarations::{GateChecker, GateMode};
-
+    pub fn update_gate(&self, key: &str, update: GateUpdate) -> Result<GateDefinition>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Global operation - enforce common history with main (mirrors define_gate).
         crate::commands::worktree::enforce_main_only_operations()?;
-
-        let mut registry = self.storage.load_gate_registry()?;
-
-        let current = registry
-            .gates
-            .get(key)
-            .cloned()
-            .ok_or_else(|| crate::storage::GateNotFoundError::by_key(key))?;
-
-        let final_mode = update.mode.unwrap_or(current.mode);
-
-        // Decompose the existing checker (if any) and apply per-field overrides,
-        // so an unprovided checker field is preserved. A new checker is only
-        // synthesized when the gate had none AND at least one checker field is
-        // set or cleared.
-        let any_checker_field = update.checker_command.is_some()
-            || update.timeout.is_some()
-            || update.pass_context.is_some()
-            || !update.working_dir.is_keep()
-            || !update.prompt.is_keep()
-            || !update.prompt_file.is_keep()
-            || !update.env.is_keep();
-
-        let merged_checker = if current.checker.is_some() || any_checker_field {
-            if !any_checker_field
-                && matches!(
-                    current.checker,
-                    Some(GateChecker::RepositoryValidation)
-                        | Some(GateChecker::IssueValidation)
-                        | Some(GateChecker::LabelTargetValidation { .. })
-                        | Some(GateChecker::ReviewPlaceholder)
-                )
-            {
-                current.checker.clone()
-            } else {
-                let (
-                    mut command,
-                    mut timeout_seconds,
-                    mut working_dir,
-                    mut env,
-                    mut pass_context,
-                    mut prompt,
-                    mut prompt_file,
-                ) = match current.checker.clone() {
-                    Some(GateChecker::Exec {
-                        command,
-                        timeout_seconds,
-                        working_dir,
-                        env,
-                        pass_context,
-                        prompt,
-                        prompt_file,
-                    }) => (
-                        command,
-                        timeout_seconds,
-                        working_dir,
-                        env,
-                        pass_context,
-                        prompt,
-                        prompt_file,
-                    ),
-                    Some(_) | None => (
-                        String::new(),
-                        300u64,
-                        None,
-                        std::collections::HashMap::new(),
-                        false,
-                        None,
-                        None,
-                    ),
-                };
-                if let Some(c) = update.checker_command {
-                    command = c;
-                }
-                if let Some(t) = update.timeout {
-                    timeout_seconds = t;
-                }
-                if let Some(pc) = update.pass_context {
-                    pass_context = pc;
-                }
-                working_dir = match update.working_dir {
-                    FieldEdit::Keep => working_dir,
-                    FieldEdit::Set(v) => Some(v),
-                    FieldEdit::Clear => None,
-                };
-                prompt = match update.prompt {
-                    FieldEdit::Keep => prompt,
-                    FieldEdit::Set(v) => Some(v),
-                    FieldEdit::Clear => None,
-                };
-                prompt_file = match update.prompt_file {
-                    FieldEdit::Keep => prompt_file,
-                    FieldEdit::Set(v) => Some(v),
-                    FieldEdit::Clear => None,
-                };
-                env = match update.env {
-                    FieldEdit::Keep => env,
-                    FieldEdit::Set(m) => m,
-                    FieldEdit::Clear => std::collections::HashMap::new(),
-                };
-                Some(GateChecker::Exec {
-                    command,
-                    timeout_seconds,
-                    working_dir,
-                    env,
-                    pass_context,
-                    prompt,
-                    prompt_file,
-                })
-            }
-        } else {
-            None
-        };
-
-        // Manual gates carry no checker (mirror define_gate).
-        let final_checker = if final_mode == GateMode::Manual {
-            None
-        } else {
-            merged_checker
-        };
-
-        // Automated gates must have a valid checker (mirror define_gate).
-        let has_valid_checker = match &final_checker {
-            Some(GateChecker::Exec { command, .. }) => !command.is_empty(),
-            Some(_) => true,
-            None => false,
-        };
-        if final_mode == GateMode::Auto && !has_valid_checker {
-            return Err(anyhow!(
-                "Automated gates must have a checker configured. Add --checker-command or use --mode manual"
-            ));
+        match self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Update {
+            key: key.to_string(),
+            update,
+        })? {
+            CapturedGateRegistryOutcome::Updated(updated) => Ok(*updated),
+            _ => unreachable!("update request has one outcome"),
         }
-
-        let updated = GateDefinition {
-            version: current.version,
-            key: current.key.clone(),
-            title: update.title.unwrap_or(current.title),
-            description: update.description.unwrap_or(current.description),
-            stage: update.stage.unwrap_or(current.stage),
-            mode: final_mode,
-            checker: final_checker,
-            priority: update.priority.unwrap_or(current.priority),
-            reserved: current.reserved,
-            auto: final_mode == GateMode::Auto,
-            example_integration: current.example_integration,
-        };
-
-        registry.gates.insert(updated.key.clone(), updated.clone());
-        self.storage.save_gate_registry(&registry)?;
-
-        // @/inv/event-log: registry-scoped audit entry for the definition edit.
-        self.storage
-            .append_event(&Event::draft_gate_definition_updated(updated.key.clone()))?;
-
-        Ok(updated)
     }
 
-    pub fn remove_gate_definition(&self, key: &str) -> Result<()> {
+    pub fn remove_gate_definition(&self, key: &str) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         // Global operation - enforce common history with main
         crate::commands::worktree::enforce_main_only_operations()?;
 
-        let mut registry = self.storage.load_gate_registry()?;
-
-        if !registry.gates.contains_key(key) {
-            return Err(crate::storage::GateNotFoundError::by_key(key).into());
-        }
-
-        registry.gates.remove(key);
-        self.storage.save_gate_registry(&registry)?;
-
-        // @/inv/event-log: registry-scoped audit entry for the definition removal.
-        self.storage
-            .append_event(&Event::draft_gate_definition_removed(key.to_string()))?;
-
+        self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Remove {
+            key: key.to_string(),
+        })?;
         Ok(())
     }
 
@@ -1123,12 +1233,13 @@ mod tests {
         storage.init().unwrap();
 
         // Create config with enforcement off for test backward compatibility
-        std::fs::create_dir_all(storage.root()).unwrap();
         let config_toml = r#"
 [worktree]
 enforce_leases = "off"
 "#;
-        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+        storage
+            .write_repo_file(".jit/config.toml", config_toml)
+            .unwrap();
 
         crate::commands::test_helpers::memory_executor(storage)
     }
@@ -1410,5 +1521,280 @@ enforce_leases = "off"
             GateStatus::Pending,
             "a rejected bare pass must leave the gate Pending"
         );
+    }
+
+    #[derive(Default)]
+    struct OneFailure(std::sync::Mutex<Option<crate::storage::TransactionFailurePoint>>);
+
+    impl crate::storage::TransactionFailureInjector for OneFailure {
+        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+            let mut selected = self.0.lock().unwrap();
+            if selected.as_ref() == Some(point) {
+                selected.take();
+                return Err(std::io::Error::other("injected gate registry failure"));
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_gate_definition_apply_failure_recovers_registry_and_event_together() {
+        use crate::storage::RepositoryStateStore;
+
+        let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
+            crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+        ))));
+        let storage = InMemoryStorage::with_repository_state_failures(failures);
+        storage.write_repo_file(".jit/config.toml", "").unwrap();
+        let recovered = storage.without_repository_state_failures();
+        let layout = storage.repository_layout();
+        let executor = CommandExecutor::new(storage).with_layout(layout.clone());
+
+        assert!(executor
+            .define_gate(
+                "atomic-review".to_string(),
+                "Atomic review".to_string(),
+                "Must publish with its event".to_string(),
+                GateStage::Postcheck,
+                GateMode::Manual,
+                None,
+                100,
+                None,
+            )
+            .is_err());
+
+        // Opening the next clean session performs recovery of any prepared
+        // aggregate residue before the read assertions.
+        drop(
+            recovered
+                .open_mutation_session(layout)
+                .expect("recovery converges"),
+        );
+        assert!(recovered.load_gate_registry().unwrap().gates.is_empty());
+        assert!(recovered.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_gate_definition_updates_configured_projection_in_same_mutation() {
+        let storage = InMemoryStorage::new();
+        storage
+            .write_repo_file(
+                ".jit/config.toml",
+                r#"
+[item_kinds.gate]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = []
+scope = "project"
+source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
+source-of-truth = "registry-first"
+
+[item_kinds.rule]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = []
+scope = "project"
+source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "description" }
+source-of-truth = "registry-first"
+
+[projection.gates]
+kind = ["rule", "gate"]
+mode = "separate-file"
+target = "gates.md"
+style = "full"
+"#,
+            )
+            .unwrap();
+        storage.write_repo_file(".jit/rules.toml", "").unwrap();
+        let layout = storage.repository_layout();
+        let executor = CommandExecutor::new(storage).with_layout(layout);
+
+        executor
+            .define_gate(
+                "projected-review".to_string(),
+                "Projected review".to_string(),
+                "Rendered from the registry".to_string(),
+                GateStage::Postcheck,
+                GateMode::Manual,
+                None,
+                100,
+                None,
+            )
+            .unwrap();
+
+        let projection = executor
+            .storage
+            .read_repo_file("gates.md")
+            .unwrap()
+            .expect("configured projection is materialized");
+        assert!(projection.contains("projected-review"));
+        let event = executor.storage.read_events().unwrap().pop().unwrap();
+        match event {
+            Event::GateDefinitionCreated { id, timestamp, .. } => {
+                assert!(!id.is_empty());
+                assert_ne!(timestamp, chrono::DateTime::UNIX_EPOCH);
+            }
+            other => panic!("unexpected registry event: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_gate_registry_retry_rederives_over_concurrent_definition() {
+        use crate::repository_state::{
+            finalize_gate_registry_edit, CaptureBudget, CaptureSpec, MutationContext,
+            MutationIntent, VirtualPath,
+        };
+        use crate::storage::{RepositoryStateStore, RepositoryStateStoreError};
+
+        let storage = InMemoryStorage::new();
+        storage.write_repo_file(".jit/config.toml", "").unwrap();
+        let layout = storage.repository_layout();
+        let spec = || {
+            CaptureSpec::phase_one(
+                [
+                    VirtualPath::data("config.toml").unwrap(),
+                    VirtualPath::data("invariants.toml").unwrap(),
+                    VirtualPath::data("rules.toml").unwrap(),
+                    VirtualPath::data("gates.toml").unwrap(),
+                    VirtualPath::data("events.jsonl").unwrap(),
+                ],
+                CaptureBudget {
+                    max_paths: 5,
+                    max_listings: 0,
+                    max_bytes: 1024 * 1024,
+                    max_depth: 4,
+                },
+            )
+            .unwrap()
+        };
+        let request = CapturedGateRegistryMutation::Define(GateDefinition {
+            version: 1,
+            key: "ours".to_string(),
+            title: "Ours".to_string(),
+            description: String::new(),
+            stage: GateStage::Postcheck,
+            mode: GateMode::Manual,
+            checker: None,
+            priority: 100,
+            reserved: HashMap::new(),
+            auto: false,
+            example_integration: None,
+        });
+        let context = MutationContext::deterministic(
+            [72; 32],
+            chrono::DateTime::parse_from_rfc3339("2026-07-20T12:34:56Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        );
+        let derive_plan = |image: &crate::repository_state::RepositoryImage| {
+            let gates = match image
+                .entry(&VirtualPath::data("gates.toml").unwrap())
+                .unwrap()
+            {
+                crate::repository_state::RepositoryEntry::File { bytes, .. } => {
+                    crate::declarations::parse_gate_registry(bytes).unwrap()
+                }
+                crate::repository_state::RepositoryEntry::Absent => Default::default(),
+                other => panic!("unexpected gate registry entry: {other:?}"),
+            };
+            let derived = derive_gate_registry_mutation(gates, &request).unwrap();
+            let mut declarations = crate::commands::declarations_from_image(image).unwrap();
+            declarations.gates = derived.registry.clone();
+            let intents = vec![
+                MutationIntent::EditGateRegistry {
+                    registry: Box::new(derived.registry),
+                },
+                MutationIntent::RecordEvent {
+                    phase: 1,
+                    event: Box::new(derived.event),
+                },
+            ];
+            finalize_gate_registry_edit(&layout, image, &context, &intents, declarations.borrowed())
+                .unwrap()
+        };
+        let event_bytes = |plan: &crate::repository_state::MaterializationPlan| {
+            plan.delta()
+                .actions()
+                .iter()
+                .find_map(|action| match action {
+                    crate::repository_state::RepositoryAction::WriteFile {
+                        path, bytes, ..
+                    } if path == &VirtualPath::data("events.jsonl").unwrap() => Some(bytes.clone()),
+                    _ => None,
+                })
+                .unwrap()
+        };
+
+        let mut first_session = storage.open_mutation_session(layout.clone()).unwrap();
+        let first_image = first_session.capture(spec()).unwrap();
+        let first_plan = derive_plan(&first_image);
+
+        let mut concurrent = crate::declarations::GateRegistry::default();
+        concurrent.gates.insert(
+            "theirs".to_string(),
+            GateDefinition {
+                version: 1,
+                key: "theirs".to_string(),
+                title: "Theirs".to_string(),
+                description: String::new(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+                priority: 100,
+                reserved: HashMap::new(),
+                auto: false,
+                example_integration: None,
+            },
+        );
+        storage.save_gate_registry(&concurrent).unwrap();
+        assert!(matches!(
+            first_session.apply(&first_plan),
+            Err(RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+        drop(first_session);
+
+        let mut retry_session = storage.open_mutation_session(layout.clone()).unwrap();
+        let retry_image = retry_session.capture(spec()).unwrap();
+        let retry_plan = derive_plan(&retry_image);
+        assert_eq!(event_bytes(&first_plan), event_bytes(&retry_plan));
+        retry_session.apply(&retry_plan).unwrap();
+
+        let registry = storage.load_gate_registry().unwrap();
+        assert!(registry.gates.contains_key("ours"));
+        assert!(registry.gates.contains_key("theirs"));
+        let event = storage.read_events().unwrap().pop().unwrap();
+        match event {
+            Event::GateDefinitionCreated { id, timestamp, .. } => {
+                assert!(!id.is_empty());
+                assert_ne!(timestamp, chrono::DateTime::UNIX_EPOCH);
+            }
+            other => panic!("unexpected registry event: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_gate_registry_missing_update_and_remove_keep_typed_errors() {
+        for request in [
+            CapturedGateRegistryMutation::Update {
+                key: "missing-update".to_string(),
+                update: GateUpdate {
+                    title: Some("No gate".to_string()),
+                    ..Default::default()
+                },
+            },
+            CapturedGateRegistryMutation::Remove {
+                key: "missing-remove".to_string(),
+            },
+        ] {
+            let error = match derive_gate_registry_mutation(Default::default(), &request) {
+                Ok(_) => panic!("missing gate unexpectedly accepted"),
+                Err(error) => error,
+            };
+            assert!(error
+                .downcast_ref::<crate::storage::GateNotFoundError>()
+                .is_some());
+        }
     }
 }
