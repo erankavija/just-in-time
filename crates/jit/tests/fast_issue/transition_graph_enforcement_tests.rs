@@ -32,17 +32,28 @@ fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     CommandExecutor::new(storage).with_layout(layout)
 }
 
-/// Save an issue directly into storage at a given state, bypassing validation.
+/// Create canonical membership, then seed the test-specific labels and state.
 fn seed_issue(
     executor: &CommandExecutor<InMemoryStorage>,
     title: &str,
     labels: &[&str],
     state: State,
 ) -> String {
-    let mut issue = crate::fixture_issue(title.to_string(), String::new());
+    let (id, _) = executor
+        .create_issue(
+            title.to_string(),
+            String::new(),
+            jit::domain::Priority::Normal,
+            vec![],
+            vec![],
+            None,
+            None,
+            false,
+        )
+        .unwrap();
+    let mut issue = executor.storage().load_issue(&id).unwrap();
     issue.labels = labels.iter().map(|s| s.to_string()).collect();
     issue.state = state;
-    let id = issue.id.clone();
     executor.storage().save_issue(issue).unwrap();
     id
 }

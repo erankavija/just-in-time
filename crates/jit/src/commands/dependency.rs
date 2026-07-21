@@ -2,7 +2,56 @@
 
 use super::*;
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
-use std::collections::HashSet;
+use crate::repository_state::{
+    finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, RepositoryEntry,
+    RepositoryImage, VirtualPath,
+};
+use crate::storage::{
+    AmbiguousIdError, InvalidIdPrefixError, IssueNotFoundError, RepositoryStateStoreError,
+    MIN_ID_PREFIX_LENGTH,
+};
+use std::collections::{BTreeSet, HashSet};
+
+const DEPENDENCY_CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
+    max_paths: 1 << 16,
+    max_listings: 1,
+    max_bytes: 512 * 1024 * 1024,
+    max_depth: 8,
+};
+
+#[derive(Clone)]
+enum CapturedDependencyMutation {
+    Single {
+        issue_id: String,
+        dependency_id: String,
+        policy: RedundancyPolicy,
+    },
+    Batch {
+        issue_id: String,
+        dependency_ids: Vec<String>,
+        policy: RedundancyPolicy,
+    },
+    ReduceAll {
+        dry_run: bool,
+    },
+}
+
+enum CapturedDependencyOutcome {
+    Single {
+        result: DependencyAddResult,
+        warning: Option<String>,
+    },
+    Batch(DependenciesAddResult),
+    Reduced {
+        count: usize,
+        messages: Vec<String>,
+    },
+}
+
+struct DerivedDependencyMutation {
+    outcome: CapturedDependencyOutcome,
+    intents: Vec<MutationIntent>,
+}
 
 /// Result of adding multiple dependencies.
 ///
@@ -69,177 +118,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        // Resolve both IDs first
-        let full_issue_id = self.storage.resolve_issue_id(issue_id)?;
-        let full_dep_id = self.storage.resolve_issue_id(dep_id)?;
-
-        // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_issue_id)? {
-            warnings.push(warning);
-        }
-
-        // Load all issues and build graph for analysis
-        // Note: Storage layer handles locking internally
-        let issues = self.storage.list_issues()?;
-        let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let graph = DependencyGraph::new(&issue_refs);
-
-        // Check for cycles (DAG validation) — the existing write-time guard.
-        graph.validate_add_dependency(&full_issue_id, &full_dep_id)?;
-
-        // Idempotent: an already-present edge is a no-op (no reduction, no event).
-        let from_issue = self.storage.load_issue(&full_issue_id)?;
-        if from_issue.dependencies.contains(&full_dep_id.to_string()) {
-            return Ok((DependencyAddResult::AlreadyExists, warnings));
-        }
-
-        // Build the candidate graph WITH the new edge and reuse the same
-        // transitive-reduction property `jit validate` enforces
-        // (`find_redundant_edges`) to detect any violation the edge would
-        // introduce BEFORE persisting it — the write-time analogue of cycle
-        // detection above.
-        let mut candidate_issues = issues.clone();
-        if let Some(candidate_from) = candidate_issues.iter_mut().find(|i| i.id == full_issue_id) {
-            candidate_from.dependencies.push(full_dep_id.to_string());
-        }
-        let candidate_refs: Vec<&Issue> = candidate_issues.iter().collect();
-        let candidate_graph = DependencyGraph::new(&candidate_refs);
-        let redundant = candidate_graph.find_redundant_edges();
-
-        if !redundant.is_empty() && policy == RedundancyPolicy::Reject {
-            return Err(RedundantDependencyError::new(
-                (full_issue_id.clone(), full_dep_id.clone()),
-                redundant,
-            )
-            .into());
-        }
-
-        // Non-redundant edge (redundant empty) OR Reduce policy: apply the add and
-        // drop any now-redundant edge(s), leaving the graph transitively reduced.
-        self.apply_reduced_dependency_add(
-            &issues,
-            &candidate_issues,
-            &full_issue_id,
-            &full_dep_id,
-            warnings,
-        )
-    }
-
-    /// Persist a dependency add whose candidate graph is reduced in place.
-    ///
-    /// Sets every changed node's dependencies to its transitive reduction over
-    /// the candidate graph, demotes the source issue when the new edge blocks it,
-    /// and event-logs each change. The source issue gains the new edge (a
-    /// `dependency-add` update event) unless the edge was itself redundant, in
-    /// which case it is a no-op [`DependencyAddResult::Skipped`]. Other nodes only
-    /// ever LOSE now-redundant edges; because dropping a redundant edge preserves
-    /// reachability, no readiness transition is needed for them — each such drop
-    /// is recorded as a `dependency_reduced` event, mirroring `jit validate --fix`.
-    fn apply_reduced_dependency_add(
-        &self,
-        original_issues: &[Issue],
-        candidate_issues: &[Issue],
-        full_issue_id: &str,
-        full_dep_id: &str,
-        warnings: Vec<String>,
-    ) -> Result<(DependencyAddResult, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use std::collections::HashSet;
-
-        let candidate_refs: Vec<&Issue> = candidate_issues.iter().collect();
-        let graph = DependencyGraph::new(&candidate_refs);
-        let mut updates = Vec::new();
-        let mut events = Vec::new();
-
-        let original_deps = |id: &str| -> HashSet<String> {
-            original_issues
-                .iter()
-                .find(|i| i.id == id)
-                .map(|i| i.dependencies.iter().cloned().collect())
-                .unwrap_or_default()
-        };
-
-        // --- Source issue: gains the new edge unless the edge is itself redundant.
-        let reduced_from = graph.compute_transitive_reduction(full_issue_id);
-        let result = if reduced_from == original_deps(full_issue_id) {
-            // The new edge was itself redundant and nothing else on the source
-            // changed: the reduced graph equals the original, so the add is a no-op.
-            DependencyAddResult::Skipped {
-                reason: "transitive (already reachable via other dependencies)".to_string(),
+        match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Single {
+            issue_id: issue_id.to_string(),
+            dependency_id: dep_id.to_string(),
+            policy,
+        })? {
+            CapturedDependencyOutcome::Single { result, warning } => {
+                Ok((result, warning.into_iter().collect()))
             }
-        } else {
-            let mut from_issue = self.storage.load_issue(full_issue_id)?;
-            from_issue.dependencies = reduced_from.iter().cloned().collect();
-            let from_id = from_issue.id.clone();
-
-            // If the new dependency blocks a Ready issue, demote it to Backlog.
-            //
-            // INTENTIONAL direct state write (does NOT route through
-            // `apply_state_transition`): this is an automatic invariant-maintaining
-            // demotion, not a user-initiated forward transition. Adding an unmet
-            // dependency to a Ready issue MUST move it to Backlog to keep the DAG
-            // invariant (a Ready issue cannot have an unmet dependency).
-            // Subjecting this to graph-rule enforcement could BLOCK the demotion and
-            // leave the issue Ready with an unmet dependency — a corrupt state. So it
-            // bypasses the chokepoint deliberately. Only the ADDED edge can demote;
-            // the reachability-preserving edges dropped below never do.
-            let dep_issue = self.storage.load_issue(full_dep_id)?;
-            if from_issue.state == State::Ready
-                && !is_dependency_met(dep_issue.state, dep_issue.archived_from)
-            {
-                let old_state = from_issue.state;
-                from_issue.state = State::Backlog;
-
-                events.push((
-                    1,
-                    Event::draft_issue_state_changed(from_id.clone(), old_state, State::Backlog),
-                ));
-            }
-            updates.push(from_issue);
-            events.push((
-                2,
-                Event::draft_issue_updated(
-                    from_id,
-                    "dependency-add".to_string(),
-                    vec!["dependencies".to_string()],
-                ),
-            ));
-            DependencyAddResult::Added
-        };
-
-        // --- Other nodes: drop the edges the new edge made redundant.
-        for candidate in candidate_issues {
-            if candidate.id == full_issue_id {
-                continue;
-            }
-            let reduced = graph.compute_transitive_reduction(&candidate.id);
-            if reduced == original_deps(&candidate.id) {
-                continue;
-            }
-            let mut issue = self.storage.load_issue(&candidate.id)?;
-            let old_count = issue.dependencies.len();
-            let removed: Vec<String> = issue
-                .dependencies
-                .iter()
-                .filter(|d| !reduced.contains(*d))
-                .cloned()
-                .collect();
-            issue.dependencies = reduced.iter().cloned().collect();
-            let new_count = issue.dependencies.len();
-            let issue_id = issue.id.clone();
-            updates.push(issue);
-            events.push((
-                3,
-                Event::draft_dependency_reduced(issue_id, old_count, new_count, removed),
-            ));
+            _ => unreachable!("single dependency request returns a single outcome"),
         }
-
-        self.publish_ambient_issue_mutation(updates, events)?;
-
-        Ok((result, warnings))
     }
 
     /// Remove a dependency from an issue.
@@ -326,337 +214,125 @@ impl<S: IssueStore> CommandExecutor<S> {
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));
         }
-
-        let full_issue_id = self.storage.resolve_issue_id(issue_id)?;
-
-        // `DependenciesAddResult` carries no warnings field (matching the
-        // batch's pre-existing contract); the call still matters for its
-        // `Strict`-mode error, so its `Option<String>` warning is discarded.
-        self.require_active_lease(&full_issue_id)?;
-
-        let issues = self.storage.list_issues()?;
-        let original_deps_of = |id: &str| -> HashSet<String> {
-            issues
-                .iter()
-                .find(|i| i.id == id)
-                .map(|i| i.dependencies.iter().cloned().collect())
-                .unwrap_or_default()
-        };
-        let from_deps = original_deps_of(&full_issue_id);
-
-        // ---- Phase 1: resolve every target id. -----------------------------
-        // A dep_id that fails to resolve (too-short prefix, ambiguous, or not
-        // found) is rejected now: there is no full id to place in the
-        // candidate graph phase 2 validates, so it can never reach phase 2.
-        // This runs for every dep_id regardless of whether an earlier one
-        // already failed, so a batch mixing a resolution failure with a
-        // graph-validation failure names both (REQ-02).
-        let mut already_exist: Vec<String> = Vec::new();
-        let mut new_edges: Vec<(String, String)> = Vec::new(); // (as-supplied text, full id)
-        let mut rejected: Vec<(String, anyhow::Error)> = Vec::new();
-        let mut seen: HashSet<String> = HashSet::new();
-
-        for dep_id in dep_ids {
-            match self.storage.resolve_issue_id(dep_id) {
-                Ok(full_dep_id) => {
-                    if from_deps.contains(&full_dep_id) || !seen.insert(full_dep_id.clone()) {
-                        already_exist.push(dep_id.clone());
-                    } else {
-                        new_edges.push((dep_id.clone(), full_dep_id));
-                    }
-                }
-                Err(e) => rejected.push((dep_id.clone(), e)),
-            }
+        match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Batch {
+            issue_id: issue_id.to_string(),
+            dependency_ids: dep_ids.to_vec(),
+            policy,
+        })? {
+            CapturedDependencyOutcome::Batch(result) => Ok(result),
+            _ => unreachable!("batch dependency request returns a batch outcome"),
         }
-
-        // ---- Phase 2: validate every resolved edge against the WOULD-BE ----
-        // final graph: every edge of this call applied to `full_issue_id` at
-        // once, not one at a time.
-        let mut candidate_issues = issues.clone();
-        if let Some(from) = candidate_issues.iter_mut().find(|i| i.id == full_issue_id) {
-            for (_, full_dep_id) in &new_edges {
-                from.dependencies.push(full_dep_id.clone());
-            }
-        }
-        let candidate_refs: Vec<&Issue> = candidate_issues.iter().collect();
-        let candidate_graph = DependencyGraph::new(&candidate_refs);
-
-        // Cycle check. The underlying reachability check starts at the
-        // TARGET and stops the instant it visits `full_issue_id` — it never
-        // inspects `full_issue_id`'s own outgoing edges — so validating
-        // against the graph that already carries every sibling pending edge
-        // gives the identical answer as validating one at a time. This is the
-        // literal would-be-final graph the doc comment above promises.
-        for (dep_id_text, full_dep_id) in &new_edges {
-            if let Err(e) = candidate_graph.validate_add_dependency(&full_issue_id, full_dep_id) {
-                rejected.push((dep_id_text.clone(), e.into()));
-            }
-        }
-        let cycle_failed: HashSet<&str> = rejected
-            .iter()
-            .filter(|(text, _)| new_edges.iter().any(|(t, _)| t == text))
-            .map(|(text, _)| text.as_str())
-            .collect();
-
-        // Redundancy analysis needs an ACYCLIC graph to be well-defined, so it
-        // runs over `valid_new_edges` (every new edge EXCEPT the ones that
-        // just failed the cycle check above) rather than skipping entirely
-        // when any edge fails that check — a batch mixing a cycle-failing
-        // edge with an independently redundant one must still name BOTH
-        // (REQ-02), not just the cycle edge.
-        let valid_new_edges: Vec<(String, String)> = new_edges
-            .iter()
-            .filter(|(text, _)| !cycle_failed.contains(text.as_str()))
-            .cloned()
-            .collect();
-
-        let mut skipped: Vec<(String, String)> = Vec::new();
-        let mut reduced_from = from_deps.clone();
-
-        if !valid_new_edges.is_empty() {
-            // Built from `valid_new_edges` only, so this candidate graph is
-            // guaranteed acyclic even when a sibling cycle-failing edge was
-            // excluded above (cycle validity never depends on OTHER pending
-            // edges from the same `full_issue_id` — see the cycle-check
-            // comment above — so dropping just the cycle-failing edges here
-            // cannot itself introduce a cycle).
-            let mut acyclic_candidate_issues = issues.clone();
-            if let Some(from) = acyclic_candidate_issues
-                .iter_mut()
-                .find(|i| i.id == full_issue_id)
-            {
-                for (_, full_dep_id) in &valid_new_edges {
-                    from.dependencies.push(full_dep_id.clone());
-                }
-            }
-            let acyclic_candidate_refs: Vec<&Issue> = acyclic_candidate_issues.iter().collect();
-            let acyclic_candidate_graph = DependencyGraph::new(&acyclic_candidate_refs);
-
-            let redundant = acyclic_candidate_graph.find_redundant_edges();
-
-            // Self-redundant: one of OUR new edges is itself already reachable
-            // via `full_issue_id`'s other dependencies. Precisely attributable
-            // to that one edge; under `Reduce` it is silently dropped
-            // (Skipped), under `Reject` it names that edge.
-            let self_redundant: HashSet<&str> = redundant
-                .iter()
-                .filter(|(from, to)| {
-                    from == &full_issue_id
-                        && valid_new_edges.iter().any(|(_, full_id)| full_id == to)
-                })
-                .map(|(_, to)| to.as_str())
-                .collect();
-
-            for (dep_id_text, full_dep_id) in &valid_new_edges {
-                if self_redundant.contains(full_dep_id.as_str()) {
-                    match policy {
-                        RedundancyPolicy::Reject => rejected.push((
-                            dep_id_text.clone(),
-                            RedundantDependencyError::new(
-                                (full_issue_id.clone(), full_dep_id.clone()),
-                                redundant.clone(),
-                            )
-                            .into(),
-                        )),
-                        RedundancyPolicy::Reduce => skipped.push((
-                            dep_id_text.clone(),
-                            "transitive (already reachable via other dependencies)".to_string(),
-                        )),
-                    }
-                }
-            }
-
-            // Shadowing a PRE-EXISTING edge on a DIFFERENT node (or a
-            // pre-existing edge of `full_issue_id` itself that isn't one of
-            // our new edges) — jit:7a50e021's original "shadows an existing
-            // edge" case, e.g. a new Y -> Z edge making a pre-existing X -> Z
-            // edge redundant via X -> Y -> Z. Unlike the self-redundant case
-            // above, this needs precise per-edge attribution (REQ-02): only
-            // Y -> Z is at fault here, a sibling Y -> W in the same batch must
-            // NOT be named just because the batch as a whole gets rejected.
-            //
-            // A shadow path can only ever leave `full_issue_id` through ONE
-            // outgoing edge — once a path exits via edge A, a DAG can never
-            // route it back through `full_issue_id` to also use edge B — so
-            // testing each new edge ALONE (against the graph as it stood
-            // before this call, ignoring every sibling — cycle-failing ones
-            // included, since `valid_new_edges` already excludes them)
-            // precisely identifies which edge(s) independently introduce a
-            // given shadow. This is deliberately NOT the combined graph: the
-            // self-redundant check above needs the combination to catch a
-            // redundancy that only emerges from two new edges together, but a
-            // shadow of a pre-existing edge elsewhere never does (its cause is
-            // always a single new edge, checkable in isolation).
-            if policy == RedundancyPolicy::Reject {
-                for (dep_id_text, full_dep_id) in &valid_new_edges {
-                    if self_redundant.contains(full_dep_id.as_str()) {
-                        continue; // already attributed above
-                    }
-                    let mut singleton_issues = issues.clone();
-                    if let Some(from) = singleton_issues.iter_mut().find(|i| i.id == full_issue_id)
-                    {
-                        from.dependencies.push(full_dep_id.clone());
-                    }
-                    let singleton_refs: Vec<&Issue> = singleton_issues.iter().collect();
-                    let singleton_redundant =
-                        DependencyGraph::new(&singleton_refs).find_redundant_edges();
-                    if !singleton_redundant.is_empty() {
-                        rejected.push((
-                            dep_id_text.clone(),
-                            RedundantDependencyError::new(
-                                (full_issue_id.clone(), full_dep_id.clone()),
-                                singleton_redundant,
-                            )
-                            .into(),
-                        ));
-                    }
-                }
-            }
-            // Under `Reduce`, a shadow of a pre-existing edge elsewhere needs
-            // no handling here: `apply_batch_dependency_add`'s "other nodes"
-            // loop drops the shadowed edge automatically.
-
-            reduced_from = acyclic_candidate_graph.compute_transitive_reduction(&full_issue_id);
-        }
-
-        if !rejected.is_empty() {
-            return Err(DependencyBatchRejectedError::new(full_issue_id, rejected).into());
-        }
-
-        // ---- Nothing rejected: apply. ---------------------------------------
-        // Reaching here means `rejected` was empty, so `cycle_failed` was
-        // empty too (any cycle failure is pushed into `rejected` above) —
-        // `valid_new_edges` therefore equals `new_edges` exactly, and
-        // `candidate_issues` (built from ALL of `new_edges`) is the same
-        // candidate graph `acyclic_candidate_graph` was built from. Using the
-        // original `new_edges`/`candidate_issues` below is thus equivalent,
-        // not a divergent view of the batch.
-        if reduced_from == from_deps {
-            // Every requested edge reduced away (all skipped, or there was
-            // nothing new to add): the dependency set is unchanged, so there is
-            // nothing to persist or event-log.
-            return Ok(DependenciesAddResult {
-                added: Vec::new(),
-                already_exist,
-                skipped,
-            });
-        }
-
-        let added_full_ids: HashSet<String> =
-            reduced_from.difference(&from_deps).cloned().collect();
-        let added: Vec<String> = new_edges
-            .iter()
-            .filter(|(_, full_id)| added_full_ids.contains(full_id))
-            .map(|(text, _)| text.clone())
-            .collect();
-
-        self.apply_batch_dependency_add(&issues, &candidate_issues, &full_issue_id, &reduced_from)?;
-
-        Ok(DependenciesAddResult {
-            added,
-            already_exist,
-            skipped,
-        })
     }
 
-    /// Persist a validated batch dependency add whose candidate graph is
-    /// reduced in place.
-    ///
-    /// Mirrors [`apply_reduced_dependency_add`](Self::apply_reduced_dependency_add)
-    /// but for a whole batch of new edges applied to `full_issue_id` at once:
-    /// sets `full_issue_id`'s dependencies to `reduced_from` (its transitive
-    /// reduction over `candidate_issues`), demotes it when any newly-added
-    /// dependency is outside a terminal state (`Done` or `Rejected`), and drops
-    /// now-redundant edges from every other node exactly like the single-edge
-    /// path. Only called once every edge in the batch has already validated, so
-    /// this never partially applies.
-    fn apply_batch_dependency_add(
-        &self,
-        original_issues: &[Issue],
-        candidate_issues: &[Issue],
-        full_issue_id: &str,
-        reduced_from: &HashSet<String>,
-    ) -> Result<()>
+    /// Repair every transitive-reduction violation from one captured graph.
+    pub(super) fn reduce_all_dependencies(&self, dry_run: bool) -> Result<(usize, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let candidate_refs: Vec<&Issue> = candidate_issues.iter().collect();
-        let graph = DependencyGraph::new(&candidate_refs);
-        let mut updates = Vec::new();
-        let mut events = Vec::new();
+        match self.publish_captured_dependency_mutation(CapturedDependencyMutation::ReduceAll {
+            dry_run,
+        })? {
+            CapturedDependencyOutcome::Reduced { count, messages } => Ok((count, messages)),
+            _ => unreachable!("reduction repair returns a reduction outcome"),
+        }
+    }
 
-        let original_deps = |id: &str| -> HashSet<String> {
-            original_issues
-                .iter()
-                .find(|i| i.id == id)
-                .map(|i| i.dependencies.iter().cloned().collect())
-                .unwrap_or_default()
+    /// Capture the complete active issue graph and publish one dependency mutation.
+    ///
+    /// The index is the sole discovery authority. The second phase captures every
+    /// indexed record, the complete issues-directory listing, and the event log;
+    /// semantic derivation reads only that closed image. A conflict restarts both
+    /// phases in a fresh recovered session while reusing one mutation context.
+    fn publish_captured_dependency_mutation(
+        &self,
+        request: CapturedDependencyMutation,
+    ) -> Result<CapturedDependencyOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let layout = self.require_layout()?;
+        let index_path = VirtualPath::data("index.json")?;
+        let events_path = VirtualPath::data("events.jsonl")?;
+        let issues_path = VirtualPath::data("issues")?;
+        // Lease coordination precedes the repository guard and runs once. The
+        // mutation request is then pinned to that captured full id, so retries
+        // cannot retarget a short prefix to another issue.
+        let (expected_source, warning) = match &request {
+            CapturedDependencyMutation::Single { issue_id, .. }
+            | CapturedDependencyMutation::Batch { issue_id, .. } => {
+                let mut resolved = None;
+                for _ in 0..8 {
+                    let mut preflight = self.storage.open_mutation_session(layout.clone())?;
+                    if let Some((_, issues)) = capture_dependency_attempt(
+                        preflight.as_mut(),
+                        &index_path,
+                        &events_path,
+                        &issues_path,
+                    )? {
+                        resolved = Some(resolve_captured_issue_id(&issues, issue_id)?);
+                        break;
+                    }
+                }
+                let full_id = resolved.ok_or_else(|| {
+                    anyhow!("dependency preflight did not converge after repeated conflicts")
+                })?;
+                let warning = self.require_active_lease(&full_id)?;
+                (Some(full_id), warning)
+            }
+            CapturedDependencyMutation::ReduceAll { .. } => (None, None),
         };
-
-        // --- Source issue: gains the reduced set of new edges.
-        let old_from_deps = original_deps(full_issue_id);
-        let mut from_issue = self.storage.load_issue(full_issue_id)?;
-        from_issue.dependencies = reduced_from.iter().cloned().collect();
-        let from_id = from_issue.id.clone();
-
-        // If any newly-added dependency is unmet, a Ready issue must demote
-        // to Backlog (INV: a Ready issue cannot have an unmet dependency).
-        // See the single-edge path for why this bypasses
-        // `apply_state_transition` deliberately.
-        let mut any_unmet = false;
-        for full_dep_id in reduced_from.difference(&old_from_deps) {
-            let dep_issue = self.storage.load_issue(full_dep_id)?;
-            if !is_dependency_met(dep_issue.state, dep_issue.archived_from) {
-                any_unmet = true;
-                break;
+        let request = match request {
+            CapturedDependencyMutation::Single {
+                dependency_id,
+                policy,
+                ..
+            } => CapturedDependencyMutation::Single {
+                issue_id: expected_source
+                    .ok_or_else(|| anyhow!("single dependency preflight returned no source"))?,
+                dependency_id,
+                policy,
+            },
+            CapturedDependencyMutation::Batch {
+                dependency_ids,
+                policy,
+                ..
+            } => CapturedDependencyMutation::Batch {
+                issue_id: expected_source
+                    .ok_or_else(|| anyhow!("batch dependency preflight returned no source"))?,
+                dependency_ids,
+                policy,
+            },
+            CapturedDependencyMutation::ReduceAll { dry_run } => {
+                CapturedDependencyMutation::ReduceAll { dry_run }
             }
-        }
+        };
+        let context = MutationContext::production();
 
-        if from_issue.state == State::Ready && any_unmet {
-            let old_state = from_issue.state;
-            from_issue.state = State::Backlog;
-            events.push((
-                1,
-                Event::draft_issue_state_changed(from_id.clone(), old_state, State::Backlog),
-            ));
-        }
-        updates.push(from_issue);
-        events.push((
-            2,
-            Event::draft_issue_updated(
-                from_id,
-                "dependency-add".to_string(),
-                vec!["dependencies".to_string()],
-            ),
-        ));
-
-        // --- Other nodes: drop the edges the new edges made redundant.
-        for candidate in candidate_issues {
-            if candidate.id == full_issue_id {
+        for _ in 0..8 {
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some((image, issues)) = capture_dependency_attempt(
+                session.as_mut(),
+                &index_path,
+                &events_path,
+                &issues_path,
+            )?
+            else {
                 continue;
+            };
+            let derived = derive_dependency_mutation(&issues, &request, warning.clone())?;
+            if derived.intents.is_empty() {
+                return Ok(derived.outcome);
             }
-            let reduced = graph.compute_transitive_reduction(&candidate.id);
-            if reduced == original_deps(&candidate.id) {
-                continue;
+            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            match session.apply(&plan) {
+                Ok(_) => return Ok(derived.outcome),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
             }
-            let mut issue = self.storage.load_issue(&candidate.id)?;
-            let old_count = issue.dependencies.len();
-            let removed: Vec<String> = issue
-                .dependencies
-                .iter()
-                .filter(|d| !reduced.contains(*d))
-                .cloned()
-                .collect();
-            issue.dependencies = reduced.iter().cloned().collect();
-            let new_count = issue.dependencies.len();
-            let issue_id = issue.id.clone();
-            updates.push(issue);
-            events.push((
-                3,
-                Event::draft_dependency_reduced(issue_id, old_count, new_count, removed),
-            ));
         }
-        self.publish_ambient_issue_mutation(updates, events)
+        Err(anyhow!(
+            "dependency mutation did not converge after repeated capture conflicts"
+        ))
     }
 
     /// Remove multiple dependencies from an issue.
@@ -769,5 +445,639 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(DependenciesRemoveResult { removed, not_found })
+    }
+}
+
+fn capture_dependency_attempt(
+    session: &mut dyn crate::storage::RepositoryMutationSession,
+    index_path: &VirtualPath,
+    events_path: &VirtualPath,
+    issues_path: &VirtualPath,
+) -> Result<Option<(RepositoryImage, Vec<Issue>)>> {
+    let first = match session.capture(CaptureSpec::phase_one(
+        [index_path.clone()],
+        DEPENDENCY_CAPTURE_BUDGET,
+    )?) {
+        Ok(image) => image,
+        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    let discovered = parse_captured_index(&first, index_path)?;
+    let mut spec = CaptureSpec::phase_one(
+        [index_path.clone(), events_path.clone()],
+        DEPENDENCY_CAPTURE_BUDGET,
+    )?;
+    spec.discover_paths(
+        discovered
+            .all_ids
+            .iter()
+            .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+            .collect::<Result<Vec<_>, _>>()?,
+    )?;
+    spec.discover_listing(issues_path.clone())?;
+    let image = match session.capture(spec) {
+        Ok(image) => image,
+        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    let captured = parse_captured_index(&image, index_path)?;
+    if captured.all_ids != discovered.all_ids || captured.deleted_ids != discovered.deleted_ids {
+        return Ok(None);
+    }
+    let issues = parse_captured_issues(&image, issues_path, &captured.all_ids)?;
+    Ok(Some((image, issues)))
+}
+
+fn parse_captured_index(
+    image: &RepositoryImage,
+    path: &VirtualPath,
+) -> Result<crate::repository_state::RepositoryIndex> {
+    let bytes = image
+        .file_bytes(path)?
+        .ok_or_else(|| anyhow!("index.json is absent during dependency mutation"))?;
+    crate::storage::json::parse_repository_index(bytes)
+}
+
+fn parse_captured_issues(
+    image: &RepositoryImage,
+    issues_path: &VirtualPath,
+    active_ids: &[String],
+) -> Result<Vec<Issue>> {
+    let listing = image
+        .listing_fingerprints()
+        .get(issues_path)
+        .ok_or_else(|| anyhow!("complete issues listing is absent from dependency capture"))?;
+    let mut issues = active_ids
+        .iter()
+        .map(|id| {
+            let path = VirtualPath::data(format!("issues/{id}.json"))?;
+            let bytes = match image.entry(&path)? {
+                RepositoryEntry::File { bytes, .. } => bytes,
+                RepositoryEntry::Absent => return Err(IssueNotFoundError::new(id).into()),
+                _ => return Err(anyhow!("indexed issue {id} is not an ordinary file")),
+            };
+            let issue: Issue = serde_json::from_slice(bytes)
+                .with_context(|| format!("failed to parse captured issue {id}"))?;
+            if issue.id != *id {
+                return Err(anyhow!(
+                    "indexed issue {id} contains mismatched embedded id {}",
+                    issue.id
+                ));
+            }
+            Ok(issue)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let indexed_files = active_ids
+        .iter()
+        .map(|id| format!("{id}.json"))
+        .collect::<BTreeSet<_>>();
+    let listed_files = listing
+        .children()
+        .keys()
+        .filter(|name| name.ends_with(".json"))
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    if indexed_files != listed_files {
+        return Err(anyhow!(
+            "issues directory membership does not match captured index"
+        ));
+    }
+    issues.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(issues)
+}
+
+fn resolve_captured_issue_id(issues: &[Issue], partial_id: &str) -> Result<String> {
+    let normalized = partial_id.to_lowercase().replace('-', "");
+    if normalized.len() < MIN_ID_PREFIX_LENGTH {
+        return Err(InvalidIdPrefixError::new(partial_id).into());
+    }
+    let matches = issues
+        .iter()
+        .filter(|issue| {
+            issue
+                .id
+                .replace('-', "")
+                .to_lowercase()
+                .starts_with(&normalized)
+        })
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [] => Err(IssueNotFoundError::new(partial_id).into()),
+        [issue] => Ok(issue.id.clone()),
+        _ => Err(AmbiguousIdError::issue(
+            partial_id,
+            matches
+                .iter()
+                .map(|issue| format!("{} | {}", issue.short_id(), issue.title)),
+        )
+        .into()),
+    }
+}
+
+fn captured_issue<'a>(issues: &'a [Issue], id: &str) -> Result<&'a Issue> {
+    issues
+        .iter()
+        .find(|issue| issue.id == id)
+        .ok_or_else(|| IssueNotFoundError::new(id).into())
+}
+
+fn derive_dependency_mutation(
+    issues: &[Issue],
+    request: &CapturedDependencyMutation,
+    warning: Option<String>,
+) -> Result<DerivedDependencyMutation> {
+    match request {
+        CapturedDependencyMutation::Single {
+            issue_id,
+            dependency_id,
+            policy,
+        } => derive_single_dependency_add(issues, issue_id, dependency_id, *policy, warning),
+        CapturedDependencyMutation::Batch {
+            issue_id,
+            dependency_ids,
+            policy,
+        } => derive_batch_dependency_add(issues, issue_id, dependency_ids, *policy),
+        CapturedDependencyMutation::ReduceAll { dry_run } => {
+            derive_dependency_repair(issues, *dry_run)
+        }
+    }
+}
+
+fn derive_single_dependency_add(
+    issues: &[Issue],
+    issue_id: &str,
+    dependency_id: &str,
+    policy: RedundancyPolicy,
+    warning: Option<String>,
+) -> Result<DerivedDependencyMutation> {
+    let full_issue_id = resolve_captured_issue_id(issues, issue_id)?;
+    let full_dependency_id = resolve_captured_issue_id(issues, dependency_id)?;
+    let graph = dependency_graph(issues);
+    graph.validate_add_dependency(&full_issue_id, &full_dependency_id)?;
+    let from = captured_issue(issues, &full_issue_id)?;
+    if from.dependencies.contains(&full_dependency_id) {
+        return Ok(DerivedDependencyMutation {
+            outcome: CapturedDependencyOutcome::Single {
+                result: DependencyAddResult::AlreadyExists,
+                warning,
+            },
+            intents: Vec::new(),
+        });
+    }
+
+    let candidate = candidate_issues(issues, &full_issue_id, [&full_dependency_id])?;
+    let candidate_graph = dependency_graph(&candidate);
+    let mut redundant = candidate_graph.find_redundant_edges();
+    redundant.sort();
+    if !redundant.is_empty() && policy == RedundancyPolicy::Reject {
+        return Err(
+            RedundantDependencyError::new((full_issue_id, full_dependency_id), redundant).into(),
+        );
+    }
+    let reduced = candidate_graph.compute_transitive_reduction(&full_issue_id);
+    let original = dependency_set(from);
+    let result = if reduced == original {
+        DependencyAddResult::Skipped {
+            reason: "transitive (already reachable via other dependencies)".to_string(),
+        }
+    } else {
+        DependencyAddResult::Added
+    };
+    let intents = if reduced == original {
+        Vec::new()
+    } else {
+        derive_reduced_graph_intents(issues, &candidate, Some((&full_issue_id, &reduced)))?
+    };
+    Ok(DerivedDependencyMutation {
+        outcome: CapturedDependencyOutcome::Single { result, warning },
+        intents,
+    })
+}
+
+fn derive_batch_dependency_add(
+    issues: &[Issue],
+    issue_id: &str,
+    dependency_ids: &[String],
+    policy: RedundancyPolicy,
+) -> Result<DerivedDependencyMutation> {
+    let full_issue_id = resolve_captured_issue_id(issues, issue_id)?;
+    let from_deps = dependency_set(captured_issue(issues, &full_issue_id)?);
+    let mut already_exist = Vec::new();
+    let mut new_edges = Vec::new();
+    let mut rejected = Vec::new();
+    let mut seen = HashSet::new();
+
+    for (ordinal, dependency_id) in dependency_ids.iter().enumerate() {
+        match resolve_captured_issue_id(issues, dependency_id) {
+            Ok(full_id) if from_deps.contains(&full_id) || !seen.insert(full_id.clone()) => {
+                already_exist.push(dependency_id.clone());
+            }
+            Ok(full_id) => new_edges.push((ordinal, dependency_id.clone(), full_id)),
+            Err(error) => rejected.push((ordinal, dependency_id.clone(), error)),
+        }
+    }
+
+    let candidate = candidate_issues(
+        issues,
+        &full_issue_id,
+        new_edges.iter().map(|(_, _, full_id)| full_id),
+    )?;
+    let candidate_graph = dependency_graph(&candidate);
+    let mut cycle_failed = HashSet::new();
+    for (ordinal, text, full_id) in &new_edges {
+        if let Err(error) = candidate_graph.validate_add_dependency(&full_issue_id, full_id) {
+            cycle_failed.insert(*ordinal);
+            rejected.push((*ordinal, text.clone(), error.into()));
+        }
+    }
+    let valid_edges = new_edges
+        .iter()
+        .filter(|(ordinal, _, _)| !cycle_failed.contains(ordinal))
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut skipped = Vec::new();
+    let mut reduced_from = from_deps.clone();
+    let mut acyclic_candidate = issues.to_vec();
+
+    if !valid_edges.is_empty() {
+        acyclic_candidate = candidate_issues(
+            issues,
+            &full_issue_id,
+            valid_edges.iter().map(|(_, _, full_id)| full_id),
+        )?;
+        let graph = dependency_graph(&acyclic_candidate);
+        let mut redundant = graph.find_redundant_edges();
+        redundant.sort();
+        let self_redundant = redundant
+            .iter()
+            .filter(|(from, to)| {
+                from == &full_issue_id && valid_edges.iter().any(|(_, _, full_id)| full_id == to)
+            })
+            .map(|(_, to)| to.clone())
+            .collect::<HashSet<_>>();
+
+        for (ordinal, text, full_id) in &valid_edges {
+            if self_redundant.contains(full_id) {
+                match policy {
+                    RedundancyPolicy::Reject => rejected.push((
+                        *ordinal,
+                        text.clone(),
+                        RedundantDependencyError::new(
+                            (full_issue_id.clone(), full_id.clone()),
+                            redundant.clone(),
+                        )
+                        .into(),
+                    )),
+                    RedundancyPolicy::Reduce => skipped.push((
+                        text.clone(),
+                        "transitive (already reachable via other dependencies)".to_string(),
+                    )),
+                }
+            }
+        }
+
+        if policy == RedundancyPolicy::Reject {
+            for (ordinal, text, full_id) in &valid_edges {
+                if self_redundant.contains(full_id) {
+                    continue;
+                }
+                let singleton = candidate_issues(issues, &full_issue_id, [full_id])?;
+                let mut singleton_redundant = dependency_graph(&singleton).find_redundant_edges();
+                singleton_redundant.sort();
+                if !singleton_redundant.is_empty() {
+                    rejected.push((
+                        *ordinal,
+                        text.clone(),
+                        RedundantDependencyError::new(
+                            (full_issue_id.clone(), full_id.clone()),
+                            singleton_redundant,
+                        )
+                        .into(),
+                    ));
+                }
+            }
+        }
+        reduced_from = graph.compute_transitive_reduction(&full_issue_id);
+    }
+
+    if !rejected.is_empty() {
+        rejected.sort_by_key(|(ordinal, _, _)| *ordinal);
+        return Err(DependencyBatchRejectedError::new(
+            full_issue_id,
+            rejected
+                .into_iter()
+                .map(|(_, dependency_id, error)| (dependency_id, error))
+                .collect(),
+        )
+        .into());
+    }
+    let added_ids = reduced_from
+        .difference(&from_deps)
+        .cloned()
+        .collect::<HashSet<_>>();
+    let added = new_edges
+        .iter()
+        .filter(|(_, _, full_id)| added_ids.contains(full_id))
+        .map(|(_, text, _)| text.clone())
+        .collect();
+    let intents = if reduced_from == from_deps {
+        Vec::new()
+    } else {
+        derive_reduced_graph_intents(
+            issues,
+            &acyclic_candidate,
+            Some((&full_issue_id, &reduced_from)),
+        )?
+    };
+    Ok(DerivedDependencyMutation {
+        outcome: CapturedDependencyOutcome::Batch(DependenciesAddResult {
+            added,
+            already_exist,
+            skipped,
+        }),
+        intents,
+    })
+}
+
+fn derive_dependency_repair(issues: &[Issue], dry_run: bool) -> Result<DerivedDependencyMutation> {
+    let graph = dependency_graph(issues);
+    let reductions = issues
+        .iter()
+        .filter_map(|issue| {
+            let reduced = graph.compute_transitive_reduction(&issue.id);
+            let removed = issue.dependencies.len().saturating_sub(reduced.len());
+            (removed > 0).then_some((issue, reduced, removed))
+        })
+        .collect::<Vec<_>>();
+    let count = reductions.iter().map(|(_, _, count)| count).sum();
+    let messages = if dry_run {
+        Vec::new()
+    } else {
+        reductions
+            .iter()
+            .map(|(issue, _, fixed)| {
+                format!(
+                    "Fixed {} redundant {} in issue {}",
+                    fixed,
+                    if *fixed == 1 {
+                        "dependency"
+                    } else {
+                        "dependencies"
+                    },
+                    &issue.id[..8.min(issue.id.len())]
+                )
+            })
+            .collect()
+    };
+    let intents = if dry_run || reductions.is_empty() {
+        Vec::new()
+    } else {
+        derive_reduced_graph_intents(issues, issues, None)?
+    };
+    Ok(DerivedDependencyMutation {
+        outcome: CapturedDependencyOutcome::Reduced { count, messages },
+        intents,
+    })
+}
+
+fn candidate_issues<'a>(
+    issues: &[Issue],
+    source_id: &str,
+    dependencies: impl IntoIterator<Item = &'a String>,
+) -> Result<Vec<Issue>> {
+    let mut candidate = issues.to_vec();
+    let source = candidate
+        .iter_mut()
+        .find(|issue| issue.id == source_id)
+        .ok_or_else(|| IssueNotFoundError::new(source_id))?;
+    source
+        .dependencies
+        .extend(dependencies.into_iter().cloned());
+    source.dependencies.sort();
+    source.dependencies.dedup();
+    Ok(candidate)
+}
+
+fn dependency_graph(issues: &[Issue]) -> DependencyGraph<'_, Issue> {
+    DependencyGraph::new(&issues.iter().collect::<Vec<_>>())
+}
+
+fn dependency_set(issue: &Issue) -> HashSet<String> {
+    issue.dependencies.iter().cloned().collect()
+}
+
+fn derive_reduced_graph_intents(
+    original: &[Issue],
+    candidate: &[Issue],
+    source: Option<(&str, &HashSet<String>)>,
+) -> Result<Vec<MutationIntent>> {
+    let graph = dependency_graph(candidate);
+    let mut updates = Vec::new();
+    let mut events = Vec::new();
+
+    for candidate_issue in candidate {
+        let original_issue = captured_issue(original, &candidate_issue.id)?;
+        let original_deps = dependency_set(original_issue);
+        let reduced = match source {
+            Some((source_id, source_reduced)) if source_id == candidate_issue.id => {
+                source_reduced.clone()
+            }
+            _ => graph.compute_transitive_reduction(&candidate_issue.id),
+        };
+        if reduced == original_deps {
+            continue;
+        }
+        let mut issue = original_issue.clone();
+        let mut removed = original_deps
+            .difference(&reduced)
+            .cloned()
+            .collect::<Vec<_>>();
+        removed.sort();
+        issue.dependencies = reduced.iter().cloned().collect();
+        issue.dependencies.sort();
+        let issue_id = issue.id.clone();
+
+        if source.is_some_and(|(source_id, _)| source_id == issue_id) {
+            let added = reduced.difference(&original_deps);
+            let any_unmet = added
+                .map(|dependency_id| captured_issue(original, dependency_id))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .any(|dependency| !is_dependency_met(dependency.state, dependency.archived_from));
+            if issue.state == State::Ready && any_unmet {
+                issue.state = State::Backlog;
+                events.push(MutationIntent::RecordEvent {
+                    phase: 1,
+                    event: Box::new(Event::draft_issue_state_changed(
+                        issue_id.clone(),
+                        State::Ready,
+                        State::Backlog,
+                    )),
+                });
+            }
+            events.push(MutationIntent::RecordEvent {
+                phase: 2,
+                event: Box::new(Event::draft_issue_updated(
+                    issue_id,
+                    "dependency-add".to_string(),
+                    vec!["dependencies".to_string()],
+                )),
+            });
+        } else {
+            events.push(MutationIntent::RecordEvent {
+                phase: 3,
+                event: Box::new(Event::draft_dependency_reduced(
+                    issue_id,
+                    original_deps.len(),
+                    reduced.len(),
+                    removed,
+                )),
+            });
+        }
+        updates.push(MutationIntent::UpdateIssue {
+            issue: Box::new(issue),
+        });
+    }
+    updates.extend(events);
+    Ok(updates)
+}
+
+#[cfg(test)]
+mod captured_tests {
+    use super::*;
+    use crate::storage::{InMemoryStorage, IssueStore, RepositoryStateStore};
+
+    fn capture(
+        storage: &InMemoryStorage,
+    ) -> (
+        Box<dyn crate::storage::RepositoryMutationSession>,
+        RepositoryImage,
+        Vec<Issue>,
+    ) {
+        let mut session = storage
+            .open_mutation_session(storage.repository_layout())
+            .unwrap();
+        let (image, issues) = capture_dependency_attempt(
+            session.as_mut(),
+            &VirtualPath::data("index.json").unwrap(),
+            &VirtualPath::data("events.jsonl").unwrap(),
+            &VirtualPath::data("issues").unwrap(),
+        )
+        .unwrap()
+        .unwrap();
+        (session, image, issues)
+    }
+
+    fn event_bytes(plan: &crate::repository_state::MaterializationPlan) -> &[u8] {
+        plan.delta()
+            .actions()
+            .iter()
+            .find_map(|action| match action {
+                crate::repository_state::RepositoryAction::WriteFile { path, bytes, .. }
+                    if path == &VirtualPath::data("events.jsonl").unwrap() =>
+                {
+                    Some(bytes.as_slice())
+                }
+                _ => None,
+            })
+            .unwrap()
+    }
+
+    fn seed_index(storage: &InMemoryStorage, ids: &[&str]) {
+        storage.add_repo_file(
+            ".jit/index.json",
+            &serde_json::json!({
+                "schema_version": 2,
+                "all_ids": ids,
+                "deleted_ids": []
+            })
+            .to_string(),
+        );
+    }
+
+    #[test]
+    fn test_dependency_capture_budget_is_fixed() {
+        assert_eq!(DEPENDENCY_CAPTURE_BUDGET.max_paths, 1 << 16);
+        assert_eq!(DEPENDENCY_CAPTURE_BUDGET.max_listings, 1);
+    }
+
+    #[test]
+    fn test_dependency_retry_rederives_and_preserves_concurrent_issue_change() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
+        source.state = State::Ready;
+        let source_id = source.id.clone();
+        storage.save_issue(source).unwrap();
+        let dependency = crate::domain::types::fixture_issue("dependency".into(), String::new());
+        let dependency_id = dependency.id.clone();
+        storage.save_issue(dependency).unwrap();
+        seed_index(&storage, &[&source_id, &dependency_id]);
+        let request = CapturedDependencyMutation::Single {
+            issue_id: source_id.clone(),
+            dependency_id: dependency_id.clone(),
+            policy: RedundancyPolicy::Reduce,
+        };
+        let context = MutationContext::deterministic(
+            [29; 32],
+            chrono::DateTime::parse_from_rfc3339("2026-07-21T10:11:12Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        );
+
+        let (mut first_session, first_image, first_issues) = capture(&storage);
+        let first = derive_dependency_mutation(&first_issues, &request, None).unwrap();
+        let first_plan =
+            finalize(first_image.layout(), &first_image, &context, &first.intents).unwrap();
+
+        let mut concurrent = storage.load_issue(&source_id).unwrap();
+        concurrent.labels.push("owner:concurrent".into());
+        storage.save_issue(concurrent).unwrap();
+        assert!(matches!(
+            first_session.apply(&first_plan),
+            Err(RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+        drop(first_session);
+
+        let (mut retry_session, retry_image, retry_issues) = capture(&storage);
+        let retry = derive_dependency_mutation(&retry_issues, &request, None).unwrap();
+        let retry_plan =
+            finalize(retry_image.layout(), &retry_image, &context, &retry.intents).unwrap();
+        assert_eq!(event_bytes(&retry_plan), event_bytes(&first_plan));
+        retry_session.apply(&retry_plan).unwrap();
+
+        let updated = storage.load_issue(&source_id).unwrap();
+        assert!(updated
+            .labels
+            .iter()
+            .any(|label| label == "owner:concurrent"));
+        assert_eq!(updated.dependencies, vec![dependency_id]);
+        assert_eq!(updated.state, State::Backlog);
+    }
+
+    #[test]
+    fn test_dependency_capture_reports_indexed_missing_record_as_typed_error() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        let issue = crate::domain::types::fixture_issue("missing".into(), String::new());
+        let id = issue.id.clone();
+        storage.save_issue(issue).unwrap();
+        seed_index(&storage, &[&id]);
+        storage
+            .repository_state()
+            .entries
+            .remove(&VirtualPath::data(format!("issues/{id}.json")).unwrap());
+
+        let mut session = storage
+            .open_mutation_session(storage.repository_layout())
+            .unwrap();
+        let error = capture_dependency_attempt(
+            session.as_mut(),
+            &VirtualPath::data("index.json").unwrap(),
+            &VirtualPath::data("events.jsonl").unwrap(),
+            &VirtualPath::data("issues").unwrap(),
+        )
+        .unwrap_err();
+        assert_eq!(error.downcast_ref::<IssueNotFoundError>().unwrap().id(), id);
     }
 }

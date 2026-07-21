@@ -1851,64 +1851,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    /// Fix transitive reduction violations by removing redundant dependencies.
-    ///
-    /// Returns the number of redundant edges removed (not issues fixed).
-    fn fix_transitive_reduction(
-        &mut self,
-        graph: &DependencyGraph<Issue>,
-        issue_id: &str,
-        dry_run: bool,
-    ) -> Result<usize>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let mut issue = self.storage.load_issue(issue_id)?;
-
-        if issue.dependencies.is_empty() {
-            return Ok(0);
-        }
-
-        let reduced = graph.compute_transitive_reduction(issue_id);
-        let current_len = issue.dependencies.len();
-        let reduced_len = reduced.len();
-
-        if current_len == reduced_len {
-            // No redundancies
-            return Ok(0);
-        }
-
-        let redundant_count = current_len - reduced_len;
-
-        if !dry_run {
-            let reduced_set: std::collections::HashSet<String> = reduced.iter().cloned().collect();
-            let removed_deps: Vec<String> = issue
-                .dependencies
-                .iter()
-                .filter(|d| !reduced_set.contains(*d))
-                .cloned()
-                .collect();
-
-            issue.dependencies = reduced.into_iter().collect();
-
-            // The dependency-reduced event is an inline-variant event: an empty id
-            // and a placeholder timestamp the finalizer overwrites when it assigns
-            // identity and stamps the single mutation time. The reduced issue and
-            // the event publish through one recovered-session transaction.
-            let event = Event::DependencyReduced {
-                id: String::new(),
-                issue_id: issue.id.clone(),
-                timestamp: chrono::DateTime::from_timestamp(0, 0).expect("epoch is valid"),
-                old_count: current_len,
-                new_count: reduced_len,
-                removed_deps,
-            };
-            self.publish_ambient_issue_mutation(vec![issue], vec![(1, event)])?;
-        }
-
-        Ok(redundant_count)
-    }
-
     /// Fix transitive reduction violations for all issues.
     ///
     /// Returns count of redundant edges fixed (or that would be fixed if dry_run).
@@ -1916,37 +1858,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let issues = self.storage.list_issues()?;
-        let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let graph = DependencyGraph::new(&issue_refs);
-
-        let mut total_redundancies = 0;
-        let mut messages = Vec::new();
-
-        for issue in &issues {
-            if issue.dependencies.is_empty() {
-                continue;
-            }
-
-            let fixed_count = self.fix_transitive_reduction(&graph, &issue.id, dry_run)?;
-            if fixed_count > 0 {
-                total_redundancies += fixed_count;
-                if !dry_run {
-                    messages.push(format!(
-                        "Fixed {} redundant {} in issue {}",
-                        fixed_count,
-                        if fixed_count == 1 {
-                            "dependency"
-                        } else {
-                            "dependencies"
-                        },
-                        &issue.id[..8.min(issue.id.len())]
-                    ));
-                }
-            }
-        }
-
-        Ok((total_redundancies, messages))
+        self.reduce_all_dependencies(dry_run)
     }
 
     /// Check for and fix pending state transitions.

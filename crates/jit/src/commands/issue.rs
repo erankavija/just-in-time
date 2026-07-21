@@ -2109,12 +2109,23 @@ enforce_leases = "off"
     fn test_add_dependency_logs_issue_updated_event() {
         let executor = setup();
 
-        let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
-        let a_id = a.id.clone();
-        executor.storage.save_issue(a).unwrap();
-        let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
-        let b_id = b.id.clone();
-        executor.storage.save_issue(b).unwrap();
+        let create = |title: &str| {
+            executor
+                .create_issue(
+                    title.to_string(),
+                    "Test".to_string(),
+                    crate::domain::Priority::Normal,
+                    vec![],
+                    vec![],
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap()
+                .0
+        };
+        let a_id = create("A");
+        let b_id = create("B");
 
         let events_before = executor.storage.read_events().unwrap().len();
         executor.add_dependency(&a_id, &b_id).unwrap();
@@ -2141,12 +2152,23 @@ enforce_leases = "off"
     fn test_remove_dependency_logs_issue_updated_event() {
         let executor = setup();
 
-        let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
-        let a_id = a.id.clone();
-        executor.storage.save_issue(a).unwrap();
-        let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
-        let b_id = b.id.clone();
-        executor.storage.save_issue(b).unwrap();
+        let create = |title: &str| {
+            executor
+                .create_issue(
+                    title.to_string(),
+                    "Test".to_string(),
+                    crate::domain::Priority::Normal,
+                    vec![],
+                    vec![],
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap()
+                .0
+        };
+        let a_id = create("A");
+        let b_id = create("B");
         executor.add_dependency(&a_id, &b_id).unwrap();
 
         // Snapshot AFTER the add so we isolate the removal's event.
