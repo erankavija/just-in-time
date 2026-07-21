@@ -1,58 +1,38 @@
 # Breakdown Review
 
-You are an ADVERSARIAL reviewer auditing a **breakdown** — the child issues created from an approved plan — against the design and the project's content standards. Your job is to FIND defects, not to bless the work. Assume there are problems and dig for them. This is read-only: do **not** modify any issue or file.
+Adversarially compare the created breakdown with the authoritative JSON manifest.
+Find container `C` from the gated breakdown node's `brackets:` label, locate `P`
+and its linked plan/manifest, traverse the full implementation graph, and read
+content standards. This is read-only.
 
-## What you are reviewing
+Fail a missing manifest; never reconstruct authority from Markdown. Run manifest
+validation, renderer `--check`, native batch dry-run, and `jit validate`.
 
-The gated issue is the **breakdown node**. From it:
+Using the creation key→UUID evidence and stored records, verify:
 
-- Read its `brackets:<C-short-id>` label to find the container `C`.
-- Traverse `C`'s subtree with `jit graph deps <C> --depth 8` and `jit issue show <id> --json` — the stories/tasks this breakdown created.
-- Read the **design document** linked to `C`'s planning child (the `type:planning` issue's `documents` path) — this is the spec the breakdown must implement.
-- Read `.jit/reference/content-standards.md` — the canonical content standards.
+- exactly one issue per manifest entry, with no missing/extra/merged/split work;
+- exact title, standalone description, type, priority, labels, and gates;
+- exact intra-manifest edges, neither missing nor over-constraining;
+- exact manifest-source→B, C→manifest-sink, and external re-home edges;
+- `planning` was not persisted or emitted by batch export;
+- every issue meets content standards and every root can start on a blank workspace.
 
-Cite concrete issue short-ids, fields, and design-doc sections — not vague advice.
+Repeat the finest-tier assignment simulation:
 
-## What to check
+| Key / issue | One outcome | Bounded consumer family | Observable test boundary | One focused implementation/review cycle | No inner decomposition | No mixed deliverables | Result |
+|---|---|---|---|---|---|---|---|
 
-Each area is verdict-affecting; a serious defect in any one is a blocking failure.
+Fail any non-passing row or unresolved sizing warning. A shared `landing_group` or
+single final landing never excuses oversized implementation work. Do not recount
+criterion labels; the separate coverage gate owns deterministic coverage.
 
-### Content standards (per issue)
+Check `run_history` cumulatively. Superseded prose/issues must be replaced, not
+accumulated. For each blocking finding give the exact manifest correction and any
+graph reconciliation; shared-contract changes must return to plan-review. End
+with exactly one line and no following text:
 
-- Every issue has a verifiable `## Success Criteria` section (outcomes, not actions), a **clean title** (no ordinals like `T1`/`S0:`, no `feat(...)`/`type:` prefixes or parent IDs), a self-contained description (no cross-references to siblings, no DAG duplicated in prose), and correct **kebab-slug** membership labels (each `type:story`/`type:epic` carries its own identifying label; no JIT short IDs as slugs).
+`VERDICT: PASS`
 
-### Coverage vs the design
+or
 
-- Every work item in the design is present as an issue; map each design item to an issue. Flag anything **missing, extra, mis-scoped, or wrongly merged/split**.
-
-### Dependency DAG correctness
-
-- Compare the implemented edges (transitive reachability) against the design's intended ordering. **Both** failure modes are blocking: a **missing** prerequisite (a task can start before work it genuinely needs) and an **over-constraint** (false serialization that kills parallelism the design intends). Name the specific wrong/missing edge.
-- **Blank-workspace reachability:** for every issue with no prerequisites (a root of the subgraph), ask *"could an agent begin this on a fresh workspace, with none of the sibling tasks having run?"* If no — because it writes into a crate, directory, or project skeleton another task creates — that missing structural edge is a blocking defect. A wrong root stalls the fan-out exactly the way a wrong chain does.
-- Do **not** count `[hard]`-criterion coverage — that is the separate coverage gate's job.
-
-### Structural integrity
-
-- Decomposition **depth suits the work size** (large work is multi-level — epic → story → task — not a flat layer of leaves); the spine/containment is intact; this breakdown introduced no isolated or dangling issues. (Repository-wide `jit validate` greenness is enforced separately at container completion, not by the per-issue `jit-validate` gate — here, judge structure and levels.)
-- **A flat layer is acceptable when the design states a rationale that holds.** When the approved plan explicitly chooses a flat tier and records why (e.g. every leaf is one coherent, independently landable deliverable and intermediate containers would each own a single child), judge that rationale on its merits instead of requiring layers mechanically. Fail the shape only when the rationale is absent or does not hold — a leaf that bundles several distinct deliverables, or one whose scope exceeds what a single owner can coherently land, contradicts the "one coherent deliverable" claim and remains a blocking defect. Name which leaf breaks the rationale and why.
-
-## Prior review feedback
-
-If `run_history` is non-empty, check whether the most recent run's findings were addressed; unresolved blocking feedback is itself a failure.
-
-## Output
-
-Provide a structured markdown review with a section per area above, plus a per-item coverage table (design item → issue → matches?). Be specific; quote the offending text. Distinguish blocking failures from minor/advisory notes; minor issues are noted but do not by themselves fail the review.
-
-For **every blocking finding, propose a concrete, actionable fix** — the exact remediation, not vague advice. This review is read-only, so you do not apply the change; you hand the breakdown owner a diff they can apply directly. Examples:
-
-- Dependency: `jit dep add <issue> <prereq>` (missing edge) or `jit dep rm <issue> <wrong-prereq>` (over-constraint), naming the specific short-ids.
-- Content standards: the precise text to add/rewrite (e.g. the missing `## Success Criteria` lines, the criterion made machine-verifiable, the retitled issue without its ordinal prefix).
-- Coverage-vs-design: the missing issue to create (title + type + which design item) or the merge/split to perform.
-
-A blocking finding without a concrete proposed fix is incomplete.
-
-End your response with exactly one of these lines:
-VERDICT: PASS
-VERDICT: FAIL
-No text may follow the verdict line.
+`VERDICT: FAIL`

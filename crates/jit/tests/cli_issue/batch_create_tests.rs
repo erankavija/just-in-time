@@ -47,6 +47,24 @@ fn run_batch(temp: &TempDir, file: &std::path::Path, json: bool) -> std::process
         .unwrap()
 }
 
+fn run_dry_batch(temp: &TempDir, file: &std::path::Path, json: bool) -> std::process::Output {
+    let mut args = vec![
+        "issue",
+        "batch-create",
+        "--from-json",
+        file.to_str().unwrap(),
+        "--dry-run",
+    ];
+    if json {
+        args.push("--json");
+    }
+    Command::new(jit_binary())
+        .args(args)
+        .current_dir(temp.path())
+        .output()
+        .unwrap()
+}
+
 fn count_issues(temp: &TempDir) -> usize {
     let output = Command::new(jit_binary())
         .args(["query", "all", "--json"])
@@ -306,4 +324,64 @@ fn test_batch_create_human_output_lists_key_to_id() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("only ->"), "human output: {stdout}");
+}
+
+#[test]
+fn test_batch_create_dry_run_reports_manifest_without_mutating_repository() {
+    let temp = setup_test_repo();
+    let file = write_batch(
+        &temp,
+        r#"[
+          {"key":"contract","title":"Contract","planning":{"outcome":"Define it"}},
+          {"key":"consumer","title":"Consumer","depends_on":["contract"],
+           "planning":{"outcome":"Use it"}}
+        ]"#,
+    );
+    let events = std::fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
+    let index = std::fs::read(temp.path().join(".jit/index.json")).unwrap();
+
+    let output = run_dry_batch(&temp, &file, true);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["valid"], true);
+    assert_eq!(value["dry_run"], true);
+    assert_eq!(value["issue_count"], 2);
+    assert_eq!(value["dependency_count"], 1);
+    assert_eq!(value["keys"], serde_json::json!(["contract", "consumer"]));
+    assert_eq!(count_issues(&temp), 0);
+    assert_eq!(
+        std::fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
+        events
+    );
+    assert_eq!(
+        std::fs::read(temp.path().join(".jit/index.json")).unwrap(),
+        index
+    );
+
+    assert!(run_batch(&temp, &file, true).status.success());
+    assert_eq!(count_issues(&temp), 2);
+}
+
+#[test]
+fn test_batch_create_dry_run_human_output_and_validation_error_match_creation() {
+    let temp = setup_test_repo();
+    let valid = write_batch(&temp, r#"[{"key":"only","title":"Only"}]"#);
+    let output = run_dry_batch(&temp, &valid, false);
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("no changes made"));
+
+    let invalid = write_batch(
+        &temp,
+        r#"[{"key":"dup","title":"One"},{"key":"dup","title":"Two"}]"#,
+    );
+    let dry = run_dry_batch(&temp, &invalid, false);
+    let create = run_batch(&temp, &invalid, false);
+    assert_eq!(dry.status.code(), Some(2));
+    assert_eq!(dry.status.code(), create.status.code());
+    assert_eq!(dry.stderr, create.stderr);
+    assert_eq!(count_issues(&temp), 0);
 }

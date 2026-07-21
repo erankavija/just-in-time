@@ -286,8 +286,8 @@ gates = ["repo-validate"]
 role = "planning"
 type = "planning"
 gates = ["plan-review"]
-doc = "docs/plans/{container.short_id}-plan.md"
-description = "Plan {container.title} ({container.short_id}) against every hard success criterion, write the plan at {doc}, and link it to this planning issue."
+doc = "dev/active/{container.short_id}-plan.md"
+description = "Plan {container.title} ({container.short_id}) against every hard success criterion, write the concise design at {doc} and its authoritative sibling breakdown manifest, and link both to this planning issue."
 
 [[contribution.value.nodes]]
 role = "breakdown"
@@ -479,6 +479,15 @@ target = ".agents/skills/jit-planning-lead/references/reviewer-prompt.md"
 [[asset]]
 source = "assets/live/.agents/skills/jit-planning-lead/references/synthesizer-prompt.md"
 target = ".agents/skills/jit-planning-lead/references/synthesizer-prompt.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-planning-lead/references/breakdown-manifest.schema.json"
+target = ".agents/skills/jit-planning-lead/references/breakdown-manifest.schema.json"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-planning-lead/scripts/breakdown_manifest.py"
+target = ".agents/skills/jit-planning-lead/scripts/breakdown_manifest.py"
+executable = true
 
 [[asset]]
 source = "assets/live/.agents/skills/jit-project-lead/SKILL.md"

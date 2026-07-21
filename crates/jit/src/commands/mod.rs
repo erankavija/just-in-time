@@ -65,7 +65,8 @@ pub mod test_helpers;
 
 pub use archive::ArchiveExecutionHooks;
 pub use batch_create::{
-    BatchCreateOutcome, BatchIssueDef, BatchValidationError, BatchValidationProblem,
+    BatchCreateOutcome, BatchDryRunOutcome, BatchIssueDef, BatchValidationError,
+    BatchValidationProblem,
 };
 pub use breakdown::{BracketBreakdownResult, BracketChild};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};

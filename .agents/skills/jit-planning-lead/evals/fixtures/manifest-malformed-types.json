@@ -1,0 +1,18 @@
+[
+  {
+    "key": [],
+    "title": 7,
+    "description": false,
+    "type": ["task"],
+    "priority": {},
+    "labels": 1,
+    "gates": null,
+    "depends_on": "task",
+    "planning": {
+      "outcome": [],
+      "contract_refs": 1,
+      "source_refs": 2,
+      "terminal": []
+    }
+  }
+]

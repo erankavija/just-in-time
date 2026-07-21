@@ -1,0 +1,10 @@
+[
+  {
+    "key":"alpha-work","title":"Alpha","description":"Alpha.\n\n## Success Criteria\n\n- Done.","type":"task","priority":"normal","labels":[],"gates":["cargo-ci"],"depends_on":["beta-work"],
+    "planning":{"outcome":"Alpha","contract_refs":[],"source_refs":["REQ-01"],"terminal":{"consumer_family":"alpha","test_boundary":"alpha test","worker_sized_reason":"One change."}}
+  },
+  {
+    "key":"beta-work","title":"Beta","description":"Beta.\n\n## Success Criteria\n\n- Done.","type":"task","priority":"normal","labels":[],"gates":["cargo-ci"],"depends_on":["alpha-work"],
+    "planning":{"outcome":"Beta","contract_refs":[],"source_refs":["REQ-02"],"terminal":{"consumer_family":"beta","test_boundary":"beta test","worker_sized_reason":"One change."}}
+  }
+]

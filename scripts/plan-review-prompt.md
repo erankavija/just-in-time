@@ -1,56 +1,42 @@
 # Plan Review
 
-You are a senior engineer and architect reviewing a **plan** before any implementation work fans out. The plan is the design for a larger piece of work; your job is to judge whether it is sound, complete, and executable *before* a team commits effort to it. A flawed plan caught here is far cheaper than one caught in code review.
+Adversarially review the planning issue, its container criteria, linked concise
+plan, linked authoritative breakdown JSON, investigation sources, dependencies,
+and `run_history`. Read actual code and `.jit/reference/content-standards.md`.
+This is read-only.
 
-## What you are reviewing
+Fail if either artifact is missing, empty, or unlinked. A Markdown-only plan is
+not decomposable. Run the manifest helper's validation with warnings denied and
+all container criteria required, renderer `--check`, and:
 
-The issue under review is a **planning issue**. Read, in full:
+```bash
+jit issue batch-create --from-json <manifest> --dry-run --json
+```
 
-- The issue's stated **success / acceptance criteria** (`issue.description`). Note any criticality markers (e.g. `[hard]`) — these are non-negotiable.
-- The **linked design document(s)** referenced in `issue.documents` — open the file(s) at those paths and read them completely. This is the substance of the plan.
-- The issue's **dependencies** (`issue.dependencies`) — the work this builds on.
+Any structural/native validation error, cycle, coverage gap, stale generated
+region, unresolved sizing warning, or unresolved source/contract reference fails.
 
-Review the plan against the criteria *and against the actual codebase*. Cite concrete design-document sections and concrete files/paths — not vague advice.
+Check the plan's architecture, criterion approach, risks, and decisions against
+the code. It must be concise: copied issue bodies, exhaustive consumer/file
+inventories, repeated acceptance criteria, hand-written task/DAG views, review
+history, or append-only correction sections are blocking accumulation.
 
-## What to check
+Check every edge and simulate assigning every finest-tier entry to one worker:
 
-Each area below is verdict-affecting. A serious defect in any one is a blocking failure.
+| Key | One outcome | Bounded consumer family | Observable test boundary | One focused implementation/review cycle | No inner decomposition | No mixed foundation/migration/deletion/docs/release work | Result |
+|---|---|---|---|---|---|---|---|
 
-### Plan document present and linked
+Fail any non-passing row. `landing_group` is integration metadata only. Broad
+quantifiers, independent verbs, several component families, three acceptance
+clusters, and implementation plus release require a split or concrete evidence
+of indivisibility. Lack of a finer configured type is never evidence.
 
-- The planning issue's description states where the plan must live (its plan-doc location) and that it must be linked to this node. Confirm a plan document actually exists at that location **and** is linked via `issue.documents`. If the plan is missing, empty, or unlinked, the review shall fail — there is nothing to decompose behind, and the author is responsible for placing and linking it.
+Verify prior findings were resolved by replacement and consolidation. Report
+blocking findings with artifact/code citations and exact corrections. End with
+exactly one line and no following text:
 
-### Completeness against the criteria
+`VERDICT: PASS`
 
-- Every success criterion — especially every `[hard]` / critical one — must be addressed by the plan. If any is unaddressed, hand-waved, or only partially covered, the review shall fail.
-- The plan must not silently narrow or drop stated scope.
+or
 
-### Technical soundness and architectural fit
-
-- The approach must be **correct** and must actually achieve the criteria. If the design cannot work as described, the review shall fail.
-- The plan must respect the project's **architecture and separation of concerns** and reuse the right existing primitives rather than reinventing or crossing boundaries. Read the relevant code to confirm the plan's claims about the system are accurate. A plan built on a mistaken understanding of the codebase shall fail.
-- Stale or contradicted assumptions about existing behavior are blocking.
-
-### Decomposition and dependencies
-
-- The proposed breakdown must be **coherent**: tasks well-scoped, each independently implementable and testable, with no overlaps or gaps.
-- **Dependency edges and ordering/waves must be correct** — no task depending on work sequenced after it, no missing prerequisite. A decomposition with real gaps or ordering errors shall fail.
-- Judge the decomposition **qualitatively**. Do not perform exhaustive criterion-to-task coverage counting — that is enforced separately by the coverage gate. Flag obvious coverage holes, but the deterministic check is not your job.
-
-### Risks and actionability
-
-- Material **risks, unknowns, and open questions** must be surfaced and carry a mitigation or a decision. An unmitigated major risk, or a load-bearing open question left unresolved, is a blocking failure.
-- The plan must be **actionable**: an engineer should be able to execute each task from it without re-deriving the design. Vague or under-specified critical tasks shall fail.
-
-## Prior review feedback
-
-If `run_history` is non-empty, check whether the issues raised in the most recent run have been addressed in the current plan. Flag any unresolved items; unaddressed prior blocking feedback is itself a failure.
-
-## Output
-
-Provide a structured review in markdown with a section per area above. Be specific — cite design-document sections and concrete file paths and line-level observations. Distinguish blocking failures from minor/advisory notes; minor and stylistic issues should be noted but do not by themselves fail the review.
-
-End your response with exactly one of these lines:
-VERDICT: PASS
-VERDICT: FAIL
-No text may follow the verdict line.
+`VERDICT: FAIL`

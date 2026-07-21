@@ -386,6 +386,10 @@ mod tests {
             .collect();
         // Live consumers are packaged from `assets/live/`.
         assert!(live.contains(".agents/skills/jit-manage/SKILL.md"));
+        assert!(live.contains(
+            ".agents/skills/jit-planning-lead/references/breakdown-manifest.schema.json"
+        ));
+        assert!(live.contains(".agents/skills/jit-planning-lead/scripts/breakdown_manifest.py"));
         assert!(live.contains("scripts/ai-review.sh"));
         let regions: BTreeSet<&str> = package
             .manifest()

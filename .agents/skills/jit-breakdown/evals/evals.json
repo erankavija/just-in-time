@@ -1,0 +1,31 @@
+{
+  "skill_name": "jit-breakdown",
+  "setup_script": "evals/setup-test-repo.sh",
+  "notes": "Fresh isolated repositories. Breakdown only; no implementation. Bracket cases must use the linked manifest directly and plain cases must author the same schema before one batch create.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "bracket-manifest-batch-and-rehome",
+      "setup_scenario": "research-and-plan",
+      "prompt": "In the isolated repo, seed a bracketed epic with an approved concise plan, valid linked manifest, and one recorded external dependency re-home. Use jit-breakdown to instantiate it.",
+      "expected_output": "One batch creates the exact issues and intra-edges; returned keys wire sources to B, sinks to C, and the external dependency to its target. Stored issues omit planning, graph verification passes, and both breakdown gates pass.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "plain-breakdown-same-manifest",
+      "setup_scenario": "research-and-plan",
+      "prompt": "Create a non-breakable story with a linked specification, then use jit-breakdown. Do not implement its work.",
+      "expected_output": "Plain analysis writes the canonical bare manifest with semantic keys and worker-sized terminals, validates/dry-runs it, creates one batch, wires configured containment, and verifies exact fidelity.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "markdown-only-hard-cutover",
+      "setup_scenario": "research-and-plan",
+      "prompt": "Seed a bracketed epic whose P has an approved linked Markdown plan but no breakdown JSON, then invoke jit-breakdown.",
+      "expected_output": "The skill stops before mutation with an actionable missing-manifest error. It does not reinterpret Markdown, synthesize a backfill, create issues, or alter edges.",
+      "files": []
+    }
+  ]
+}

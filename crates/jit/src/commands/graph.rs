@@ -337,6 +337,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     labels,
                     gates: issue.gates_required.clone(),
                     depends_on,
+                    planning: None,
                 }
             })
             .collect();

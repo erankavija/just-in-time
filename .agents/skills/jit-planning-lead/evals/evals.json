@@ -1,7 +1,7 @@
 {
   "skill_name": "jit-planning-lead",
   "setup_script": "evals/setup-test-repo.sh",
-  "notes": "Each eval requires a fresh test repo created by setup-test-repo.sh (it stands up the plan-before-fan-out bracket: the `plan` template, the coverage rule, the type hierarchy, and the four bracket gates). The runner cd's into the test repo before starting. The jit binary is at /home/vkaskivuo/.cargo/bin/jit. The scenario agent reads the PRODUCTION jit-planning-lead skill from ~/.agents/skills/jit-planning-lead/SKILL.md (a stable symlink to the main repo) and the composed jit-breakdown skill from ~/.agents/skills/jit-breakdown/SKILL.md. MCP disabled so the run cannot reach the project's production .jit/. The three scenarios map one-to-one to the skill's three entry paths: research-and-plan, plan-from-existing, plan-from-import. All are planning + breakdown only — a run must NOT implement the planned work.",
+  "notes": "Each eval uses a fresh isolated repo and the production planning/breakdown skills. All runs are planning plus breakdown only. Every success case must link a concise plan and authoritative JSON manifest, pass manifest/render/native dry-run checks, create the exact batch graph, and leave no copied issue bodies or exhaustive inventories in the plan.",
   "evals": [
     {
       "id": 1,
@@ -28,6 +28,42 @@
       "prompt": "You are a planning lead. Your working directory is a test project at {REPO_PATH}. The jit binary is at /home/vkaskivuo/.cargo/bin/jit. Read the jit-planning-lead skill at ~/.agents/skills/jit-planning-lead/SKILL.md and its references, and the composed jit-breakdown skill at ~/.agents/skills/jit-breakdown/SKILL.md, and follow them. An EXTERNAL planning document exists in this repo at notes/ttl-cache-design.md — it is NOT yet entered into jit. Take the plan-from-import entry path: ingest and reconcile that document into a jit container (create the container issue with [hard] REQ-NN success criteria derived from the note, verifying its claims against the project), scaffold the plan bracket, produce and review the plan through its plan-review gate (the plan must reference the imported note's external knowledge), break the container down so every [hard] criterion is covered by a child (satisfies:REQ-NN), and drive the breakdown gates. Planning and breakdown ONLY — do NOT implement any of the planned work. When done, write a completion report to {REPO_PATH}/COMPLETION_REPORT.md that includes a 'Command / Gate-Invocation Log' section listing the gates you defined and executed and explicitly affirming that no build/test runner (e.g. pytest) was invoked.",
       "setup_scenario": "plan-from-import",
       "expected_output": "The external design note notes/ttl-cache-design.md is reconciled into a container issue (type:epic) whose `## Success Criteria` section holds `[hard] REQ-NN` criteria derived from the note's stated requirements (TTL expiry-as-miss, max-size LRU eviction, get_or_compute, hit/miss statistics). The plan bracket is scaffolded on the container via `jit apply plan` (planning node P and breakdown node B on the C -> B -> P spine). A plan document exists at P's plan-doc path (dev/active/<container-short-id>-plan.md), is linked to P, and P is done with its plan-review gate passed; the plan (or a linked planning artifact) references the imported note as its external knowledge source. The breakdown created impl children that are non-breakable leaves and together carry a `satisfies:REQ-NN` label for every `[hard]` criterion of the container; B's coverage-preview and breakdown-review gates passed and B is done. No implementation code for the cache was written (planning and breakdown only). `jit validate` passes on the final repo.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "small-shallow-manifest",
+      "entry_path": "research-and-plan",
+      "prompt": "Plan a small Python slug-normalization helper in the isolated repo. Produce the reviewed two-artifact contract and complete breakdown, but no implementation.",
+      "setup_scenario": "research-and-plan",
+      "expected_output": "A shallow semantic-key manifest is linked with its concise plan; every leaf has terminal metadata and passes assignment simulation, renderer check, native dry-run, exact batch creation, and bracket wiring.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "synthetic-cross-cutting-cutover",
+      "entry_path": "research-and-plan",
+      "prompt": "Plan a hard cutover from a scattered legacy result envelope used by library, CLI, tests, fixtures, and docs to one typed result contract. Use a synthetic consumer sweep; do not inspect or modify cdc840ad. Planning and breakdown only.",
+      "setup_scenario": "research-and-plan",
+      "expected_output": "The investigation owns the exhaustive synthetic consumer inventory; the concise plan defines shared contracts once; the manifest splits consumer families into dependency-correct worker leaves and contains no broad migrate-all terminal.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "name": "oversized-consumer-migration",
+      "entry_path": "research-and-plan",
+      "prompt": "The initial idea is one task: 'migrate all consumers, remove the old API, document it, and publish'. Plan it without implementation.",
+      "setup_scenario": "research-and-plan",
+      "expected_output": "The initial oversized task fails lint/assignment simulation and is replaced by horizontally split siblings; no warning is excused by a landing group or lack of a finer type.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "name": "shared-landing-group",
+      "entry_path": "research-and-plan",
+      "prompt": "Plan two independently testable small renderer changes that must share one final integration landing. Planning and breakdown only.",
+      "setup_scenario": "research-and-plan",
+      "expected_output": "Two worker-sized terminals share one landing_group but remain separate issues; validation is lint-clean and the group creates no dependency or sizing exemption.",
       "files": []
     }
   ]

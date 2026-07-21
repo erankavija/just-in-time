@@ -686,10 +686,8 @@ pub enum IssueCommands {
     /// (duplicate/unknown keys, unknown `depends_on` references, cycles,
     /// type/label/gate validity, priority parse). On any validation failure it
     /// creates ZERO issues and exits 2, listing every offending entry. On success
-    /// it creates all issues and dependency edges and returns a `{key: id}` map.
-    ///
-    /// The write phase is NOT atomic: if a write fails partway, the partial
-    /// `{key: id}` map and the failing step are reported; recovery is manual.
+    /// it atomically publishes all issues and edges and returns a `{key: id}` map.
+    /// `--dry-run` executes the same validation without ids, writes, or events.
     ///
     /// Schema (array of objects):
     ///   key         (required) symbolic key, unique within the file
@@ -700,6 +698,7 @@ pub enum IssueCommands {
     ///   labels      (optional, array of "namespace:value")
     ///   gates       (optional, array of registered gate keys)
     ///   depends_on  (optional, array of symbolic keys in the same file)
+    ///   planning    (optional opaque authoring metadata; never persisted/exported)
     ///
     /// Example file:
     ///   [
@@ -713,6 +712,10 @@ pub enum IssueCommands {
         /// Path to the JSON file containing the array of issue definitions.
         #[arg(long)]
         from_json: std::path::PathBuf,
+
+        /// Validate the batch without allocating ids or writing repository state.
+        #[arg(long)]
+        dry_run: bool,
 
         #[arg(long)]
         json: bool,
@@ -2902,7 +2905,6 @@ impl IssueCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
             Self::Create { .. }
-            | Self::BatchCreate { .. }
             | Self::Update { .. }
             | Self::Delete { .. }
             | Self::Assign { .. }
@@ -2911,6 +2913,7 @@ impl IssueCommands {
             | Self::Reject { .. }
             | Self::Release { .. }
             | Self::ClaimNext { .. } => true,
+            Self::BatchCreate { dry_run, .. } => !*dry_run,
             Self::Search { .. }
             | Self::Show { .. }
             | Self::Status { .. }
@@ -3236,6 +3239,12 @@ mod recovery_dispatch_tests {
         }
         .requires_recovery_dispatch());
         assert!(!Commands::Status { json: false }.requires_recovery_dispatch());
+        assert!(!Commands::Issue(IssueCommands::BatchCreate {
+            from_json: "batch.json".into(),
+            dry_run: true,
+            json: false,
+        })
+        .requires_recovery_dispatch());
         assert!(!Commands::Serve {
             port: 3000,
             stop: false,

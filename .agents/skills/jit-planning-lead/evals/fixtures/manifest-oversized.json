@@ -1,0 +1,19 @@
+[
+  {
+    "key": "migrate-consumers",
+    "title": "Migrate all consumers and release",
+    "description": "Change every consumer.\n\n## Success Criteria\n\n### Libraries\n- Updated.\n### CLIs\n- Updated.\n### Release\n- Published.",
+    "type": "task",
+    "priority": "high",
+    "labels": ["component:planning"],
+    "gates": ["cargo-ci"],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Migrate every component and publish the release",
+      "contract_refs": [],
+      "source_refs": ["REQ-03"],
+      "landing_group": "cutover",
+      "terminal": {"consumer_family":"libraries, CLIs, and documentation","test_boundary":"workspace tests","worker_sized_reason":"Large final landing."}
+    }
+  }
+]
