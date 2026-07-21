@@ -2,11 +2,11 @@
 
 ## Shared architectural contracts
 
-### `manifest-contract` — Manifest contract
+### `manifest-contract` [plan-fixed] — Manifest contract
 
 One shared contract.
 
-### `generated-overview` — Generated overview
+### `generated-overview` [plan-fixed] — Generated overview
 
 One renderer contract.
 

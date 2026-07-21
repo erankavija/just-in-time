@@ -13,7 +13,7 @@
       "contract_refs": ["generated-overview"],
       "source_refs": ["REQ-02"],
       "landing_group": "plan-renderer",
-      "terminal": {"consumer_family":"Markdown table readers","test_boundary":"golden table fixture","worker_sized_reason":"One renderer surface with one golden test."}
+      "terminal": {"consumer_family":"Markdown table readers","test_boundary":"golden table fixture","worker_sized_reason":"One renderer surface with one golden test.","footprint":{"touches":["plan generated region"]}}
     }
   },
   {
@@ -30,7 +30,7 @@
       "contract_refs": ["generated-overview"],
       "source_refs": ["REQ-02"],
       "landing_group": "plan-renderer",
-      "terminal": {"consumer_family":"Markdown graph readers","test_boundary":"golden Mermaid fixture","worker_sized_reason":"One renderer surface with one golden test."}
+      "terminal": {"consumer_family":"Markdown graph readers","test_boundary":"golden Mermaid fixture","worker_sized_reason":"One renderer surface with one golden test.","footprint":{"touches":["plan generated region"]}}
     }
   }
 ]

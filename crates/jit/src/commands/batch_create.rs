@@ -706,6 +706,40 @@ mod tests {
     }
 
     #[test]
+    fn test_collect_batch_problems_matches_shared_structural_conformance_fixture() {
+        #[derive(serde::Deserialize)]
+        struct Suite {
+            cases: Vec<Case>,
+        }
+        #[derive(serde::Deserialize)]
+        struct Case {
+            name: String,
+            expected: Vec<String>,
+            issues: Vec<BatchIssueDef>,
+        }
+
+        let suite: Suite = serde_json::from_str(include_str!(
+            "../../tests/fixtures/batch-structural-conformance.json"
+        ))
+        .unwrap();
+        for case in suite.cases {
+            let actual = executor()
+                .collect_batch_problems(&case.issues)
+                .unwrap()
+                .into_iter()
+                .filter_map(|problem| match problem {
+                    BatchValidationProblem::DuplicateKey { .. } => Some("duplicate-key"),
+                    BatchValidationProblem::UnknownDependency { .. } => Some("unknown-dependency"),
+                    BatchValidationProblem::Cycle { .. } => Some("cycle"),
+                    _ => None,
+                })
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            assert_eq!(actual, case.expected, "shared case '{}'", case.name);
+        }
+    }
+
+    #[test]
     fn test_batch_create_validation_failure_creates_nothing() {
         let exec = executor();
         let defs = vec![def("a", &[]), def("a", &[])]; // duplicate key

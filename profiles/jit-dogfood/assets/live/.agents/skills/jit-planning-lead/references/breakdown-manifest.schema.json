@@ -20,14 +20,29 @@
       },
       "additionalProperties": { "type": "string", "minLength": 1 }
     },
+    "footprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "creates": { "$ref": "#/$defs/strings" },
+        "touches": { "$ref": "#/$defs/strings" },
+        "uncertainty": { "type": "string", "minLength": 1 }
+      },
+      "anyOf": [
+        { "required": ["creates"], "properties": { "creates": { "minItems": 1 } } },
+        { "required": ["touches"], "properties": { "touches": { "minItems": 1 } } },
+        { "required": ["uncertainty"] }
+      ]
+    },
     "terminal": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["consumer_family", "test_boundary", "worker_sized_reason"],
+      "required": ["consumer_family", "test_boundary", "worker_sized_reason", "footprint"],
       "properties": {
         "consumer_family": { "type": "string", "minLength": 1 },
         "test_boundary": { "type": "string", "minLength": 1 },
         "worker_sized_reason": { "type": "string", "minLength": 1 },
+        "footprint": { "$ref": "#/$defs/footprint" },
         "warning_overrides": { "$ref": "#/$defs/warningOverrides" }
       }
     },
@@ -38,6 +53,7 @@
       "properties": {
         "outcome": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[^\\r\\n]+$" },
         "contract_refs": { "$ref": "#/$defs/semanticKeys" },
+        "produces_contracts": { "$ref": "#/$defs/semanticKeys" },
         "source_refs": { "$ref": "#/$defs/strings", "minItems": 1 },
         "landing_group": { "$ref": "#/$defs/semanticKey" },
         "terminal": { "$ref": "#/$defs/terminal" }

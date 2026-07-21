@@ -19,13 +19,16 @@ Using the creation key→UUID evidence and stored records, verify:
 
 Repeat the finest-tier assignment simulation:
 
-| Key / issue | One outcome | Bounded consumer family | Observable test boundary | One focused implementation/review cycle | No inner decomposition | No mixed deliverables | Result |
-|---|---|---|---|---|---|---|---|
+| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused implementation/review cycle | No inner decomposition | No mixed deliverables | Result |
+|---|---|---|---|---|---|---|---|---|
 
 Fail any non-passing row or unresolved sizing warning. Judge every visible
 per-code override. A shared `landing_group` or single final landing never excuses
 oversized implementation work. Do not recount
 criterion labels; the separate coverage gate owns deterministic coverage.
+
+Recheck contract modes, unique producer reachability, and all footprint
+creates/touches, uncertainties, and overlap advisories against the created graph.
 
 Check `run_history` cumulatively. Superseded prose/issues must be replaced, not
 accumulated. For each blocking finding give the exact manifest correction and any

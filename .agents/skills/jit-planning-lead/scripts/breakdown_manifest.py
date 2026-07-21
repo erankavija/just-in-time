@@ -18,8 +18,9 @@ END = "<!-- jit:breakdown-overview:end -->"
 KEY = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 ORDINAL = re.compile(r"^(?:[a-z]+-?)?\d+$")
 REQUIRED = {"key", "title", "description", "type", "priority", "labels", "gates", "depends_on", "planning"}
-PLANNING = {"outcome", "contract_refs", "source_refs", "landing_group", "terminal"}
-TERMINAL_REQUIRED = {"consumer_family", "test_boundary", "worker_sized_reason"}
+PLANNING = {"outcome", "contract_refs", "produces_contracts", "source_refs", "landing_group", "terminal"}
+TERMINAL_TEXT = {"consumer_family", "test_boundary", "worker_sized_reason"}
+TERMINAL_REQUIRED = TERMINAL_TEXT | {"footprint"}
 TERMINAL_ALLOWED = TERMINAL_REQUIRED | {"warning_overrides"}
 WARNING_CODES = {
     "acceptance-clusters",
@@ -81,6 +82,35 @@ def cycle(keys, entries):
     return any(visit(node) for node in graph)
 
 
+def structural_codes(entries):
+    if not isinstance(entries, list):
+        return ["invalid-root"]
+    keys = [entry.get("key") for entry in entries if isinstance(entry, dict) and isinstance(entry.get("key"), str)]
+    codes = []
+    if len(keys) != len(set(keys)):
+        codes.append("duplicate-key")
+    known = set(keys)
+    if any(
+        dependency not in known
+        for entry in entries if isinstance(entry, dict)
+        for dependency in entry.get("depends_on", []) if isinstance(dependency, str)
+    ):
+        codes.append("unknown-dependency")
+    if cycle(known, entries):
+        codes.append("cycle")
+    return codes
+
+
+def check_conformance(path):
+    suite = load(path)
+    failures = []
+    for case in suite.get("cases", []):
+        actual = structural_codes(case.get("issues"))
+        if actual != case.get("expected"):
+            failures.append({"name": case.get("name"), "expected": case.get("expected"), "actual": actual})
+    return failures
+
+
 def sizing_warnings(entry):
     planning = entry["planning"]
     terminal = planning.get("terminal")
@@ -116,7 +146,7 @@ def sizing_warnings(entry):
     return warnings
 
 
-def contract_ids(plan):
+def contract_modes(plan):
     section = list(re.finditer(r"^## Shared architectural contracts\s*$", plan, re.MULTILINE))
     if len(section) != 1:
         return set(), ["plan must contain exactly one '## Shared architectural contracts' section"]
@@ -124,8 +154,13 @@ def contract_ids(plan):
     following = re.search(r"^##\s+", plan[start:], re.MULTILINE)
     end = start + following.start() if following else len(plan)
     body = plan[start:end]
-    heading = re.compile(r"^###\s+`([a-z][a-z0-9]*(?:-[a-z0-9]+)*)`\s+—\s+\S.*$", re.MULTILINE)
-    ids = heading.findall(body)
+    heading = re.compile(
+        r"^###\s+`([a-z][a-z0-9]*(?:-[a-z0-9]+)*)`\s+"
+        r"\[(plan-fixed|implementation-produced)\]\s+—\s+\S.*$",
+        re.MULTILINE,
+    )
+    declarations = heading.findall(body)
+    ids = [contract for contract, _ in declarations]
     errors = []
     if len(ids) != len(set(ids)):
         errors.append("shared architectural contract ids must be unique")
@@ -135,7 +170,36 @@ def contract_ids(plan):
     outside = plan[:start] + plan[end:]
     if re.search(r"^###\s+`[^`]+`", outside, re.MULTILINE):
         errors.append("contract-like heading appears outside the shared architectural contracts section")
-    return set(ids), errors
+    return dict(declarations), errors
+
+
+def footprint_is_valid(footprint):
+    if not isinstance(footprint, dict) or not set(footprint) <= {"creates", "touches", "uncertainty"}:
+        return False
+    creates, touches, uncertainty = footprint.get("creates", []), footprint.get("touches", []), footprint.get("uncertainty")
+    return (
+        strings(creates)
+        and strings(touches)
+        and (uncertainty is None or isinstance(uncertainty, str) and uncertainty.strip())
+        and bool(creates or touches or uncertainty)
+    )
+
+
+def dependency_reachable(key, target, by_key):
+    dependencies = by_key.get(key, {}).get("depends_on", [])
+    pending = list(dependencies) if strings(dependencies) else []
+    seen = set()
+    while pending:
+        dependency = pending.pop()
+        if dependency == target:
+            return True
+        if dependency in seen or dependency not in by_key:
+            continue
+        seen.add(dependency)
+        dependencies = by_key[dependency].get("depends_on", [])
+        if strings(dependencies):
+            pending.extend(dependencies)
+    return False
 
 
 def reaches_finer(key, level, by_key, type_levels):
@@ -158,11 +222,11 @@ def reaches_finer(key, level, by_key, type_levels):
 
 
 def validate(entries, terminal_types, type_levels, known_sources, required_sources, required_criteria, contracts, contract_errors=()):
-    errors, warnings, overridden = list(contract_errors), [], []
+    errors, warnings, overridden, advisories = list(contract_errors), [], [], []
     if not isinstance(entries, list):
-        return ["manifest root must be a bare JSON array"], [], []
+        return ["manifest root must be a bare JSON array"], [], [], []
     if not entries:
-        return ["manifest must contain at least one issue"], [], []
+        return ["manifest must contain at least one issue"], [], [], []
     keys = [entry.get("key") for entry in entries if isinstance(entry, dict) and isinstance(entry.get("key"), str)]
     if len(keys) != len(set(keys)):
         errors.append("keys must be unique")
@@ -224,6 +288,11 @@ def validate(entries, terminal_types, type_levels, known_sources, required_sourc
                     errors.append(f"{at}.planning.contract_refs cannot be checked without --plan")
                 elif contracts is not None and contract not in contracts:
                     errors.append(f"{at}.planning.contract_refs names undeclared contract '{contract}'")
+        produces = planning.get("produces_contracts", [])
+        if not strings(produces):
+            errors.append(f"{at}.planning.produces_contracts must be a unique string array")
+        elif any(not KEY.fullmatch(contract) for contract in produces):
+            errors.append(f"{at}.planning.produces_contracts must contain semantic ids")
         if not strings(planning.get("source_refs")) or not planning.get("source_refs"):
             errors.append(f"{at}.planning.source_refs must be a non-empty unique string array")
         if strings(planning.get("source_refs")):
@@ -239,10 +308,11 @@ def validate(entries, terminal_types, type_levels, known_sources, required_sourc
             valid_terminal = (
                 isinstance(terminal, dict)
                 and TERMINAL_REQUIRED <= set(terminal) <= TERMINAL_ALLOWED
-                and all(isinstance(terminal.get(field), str) and terminal[field].strip() for field in TERMINAL_REQUIRED)
+                and all(isinstance(terminal.get(field), str) and terminal[field].strip() for field in TERMINAL_TEXT)
+                and footprint_is_valid(terminal.get("footprint"))
             )
             if not valid_terminal:
-                errors.append(f"{at}.planning.terminal must contain consumer_family, test_boundary, worker_sized_reason, and optional warning_overrides")
+                errors.append(f"{at}.planning.terminal must contain consumer_family, test_boundary, worker_sized_reason, a non-empty footprint, and optional warning_overrides")
             else:
                 overrides = terminal.get("warning_overrides", {})
                 if not isinstance(overrides, dict) or any(code not in WARNING_CODES or not isinstance(reason, str) or not reason.strip() for code, reason in overrides.items()):
@@ -260,6 +330,32 @@ def validate(entries, terminal_types, type_levels, known_sources, required_sourc
                     errors.append(f"{at}.planning.terminal.warning_overrides has unused codes: {', '.join(sorted(unused))}")
     if cycle(key_set, entries):
         errors.append("depends_on graph contains a cycle")
+    by_key = {entry["key"]: entry for entry in entries if isinstance(entry, dict) and isinstance(entry.get("key"), str)}
+    if contracts is not None:
+        producers = {}
+        for entry in by_key.values():
+            planning = entry.get("planning")
+            if not isinstance(planning, dict) or not strings(planning.get("produces_contracts", [])):
+                continue
+            for contract in planning.get("produces_contracts", []):
+                if contract not in contracts:
+                    errors.append(f"entry '{entry['key']}' produces undeclared contract '{contract}'")
+                elif contracts[contract] == "plan-fixed":
+                    errors.append(f"entry '{entry['key']}' cannot produce plan-fixed contract '{contract}'")
+                producers.setdefault(contract, []).append(entry["key"])
+        for contract, mode in contracts.items():
+            if mode == "implementation-produced" and len(producers.get(contract, [])) != 1:
+                errors.append(f"implementation-produced contract '{contract}' must have exactly one producer")
+        for entry in by_key.values():
+            planning = entry.get("planning")
+            if not isinstance(planning, dict) or not strings(planning.get("contract_refs")):
+                continue
+            for contract in planning["contract_refs"]:
+                candidates = producers.get(contract, [])
+                if contracts.get(contract) == "implementation-produced" and len(candidates) == 1:
+                    producer = candidates[0]
+                    if producer != entry["key"] and not dependency_reachable(entry["key"], producer, by_key):
+                        errors.append(f"entry '{entry['key']}' references contract '{contract}' without depending on producer '{producer}'")
     missing_sources = set(required_sources) - covered
     if missing_sources:
         errors.append(f"source coverage missing: {', '.join(sorted(missing_sources))}")
@@ -276,7 +372,6 @@ def validate(entries, terminal_types, type_levels, known_sources, required_sourc
     if unknown_criteria:
         errors.append(f"unknown satisfies labels: {', '.join(sorted(unknown_criteria))}")
     if type_levels:
-        by_key = {entry["key"]: entry for entry in entries if isinstance(entry, dict) and isinstance(entry.get("key"), str)}
         finest = max(type_levels.values())
         for index, entry in enumerate(entries):
             issue_type = entry.get("type") if isinstance(entry, dict) else None
@@ -284,7 +379,21 @@ def validate(entries, terminal_types, type_levels, known_sources, required_sourc
             key = entry.get("key") if isinstance(entry, dict) else None
             if level is not None and level < finest and isinstance(key, str) and key in by_key and not reaches_finer(key, level, by_key, type_levels):
                 errors.append(f"entry[{index}] non-finest issue must depend on a strictly finer in-manifest descendant")
-    return errors, warnings, overridden
+    footprints = {}
+    for entry in by_key.values():
+        terminal = entry.get("planning", {}).get("terminal") if isinstance(entry.get("planning"), dict) else None
+        footprint = terminal.get("footprint") if isinstance(terminal, dict) else None
+        if not footprint_is_valid(footprint):
+            continue
+        if footprint.get("uncertainty"):
+            advisories.append(f"entry '{entry['key']}' footprint uncertainty: {footprint['uncertainty']}")
+        for kind in ("creates", "touches"):
+            for path in footprint.get(kind, []):
+                footprints.setdefault(path, []).append(f"{entry['key']}:{kind}")
+    for path, owners in footprints.items():
+        if len(owners) > 1:
+            advisories.append(f"footprint overlap '{path}': {', '.join(owners)}")
+    return errors, warnings, overridden, advisories
 
 
 def cell(value):
@@ -292,10 +401,16 @@ def cell(value):
 
 
 def overview(entries):
-    rows = ["| Key | Title | Type | Outcome | Contracts | Sources | Landing | Depends on |", "|---|---|---|---|---|---|---|---|"]
+    rows = ["| Key | Title | Type | Outcome | Contracts | Sources | Footprint | Landing | Depends on |", "|---|---|---|---|---|---|---|---|---|"]
     for entry in entries:
         p = entry["planning"]
-        values = (entry["key"], entry["title"], entry["type"], p["outcome"], ", ".join(p["contract_refs"]) or "—", ", ".join(p["source_refs"]), p.get("landing_group", "—"), ", ".join(entry["depends_on"]) or "—")
+        footprint = p.get("terminal", {}).get("footprint", {})
+        footprint_text = "; ".join([
+            *(f"creates {path}" for path in footprint.get("creates", [])),
+            *(f"touches {path}" for path in footprint.get("touches", [])),
+            *([f"uncertain: {footprint['uncertainty']}"] if footprint.get("uncertainty") else []),
+        ]) or "—"
+        values = (entry["key"], entry["title"], entry["type"], p["outcome"], ", ".join(p["contract_refs"]) or "—", ", ".join(p["source_refs"]), footprint_text, p.get("landing_group", "—"), ", ".join(entry["depends_on"]) or "—")
         rows.append("| " + " | ".join(map(cell, values)) + " |")
     nodes = [f'    N{i}["{entry["key"]}: {entry["title"].replace(chr(34), chr(39))}"]' for i, entry in enumerate(entries)]
     indexes = {entry["key"]: i for i, entry in enumerate(entries)}
@@ -341,18 +456,28 @@ def main():
     mode = draw.add_mutually_exclusive_group(required=True)
     mode.add_argument("--write", action="store_true")
     mode.add_argument("--check", action="store_true")
+    suite = sub.add_parser("conformance")
+    suite.add_argument("fixture")
+    suite.add_argument("--json", action="store_true")
     args = parser.parse_args()
     try:
         if args.command == "render":
             render(args)
+            return
+        if args.command == "conformance":
+            failures = check_conformance(args.fixture)
+            result = {"valid": not failures, "failures": failures}
+            print(json.dumps(result, indent=2) if args.json else "valid" if not failures else json.dumps(failures, indent=2))
+            if failures:
+                sys.exit(1)
             return
         terminal, levels = type_levels(args.config, args.terminal_type)
         contracts = None
         contract_errors = []
         if args.plan:
             plan = Path(args.plan).read_text()
-            contracts, contract_errors = contract_ids(plan)
-        errors, warnings, overridden = validate(
+            contracts, contract_errors = contract_modes(plan)
+        errors, warnings, overridden, advisories = validate(
             load(args.manifest), terminal, levels, args.known_source, args.required_source,
             args.required_criterion, contracts, contract_errors
         )
@@ -361,11 +486,13 @@ def main():
             "errors": errors,
             "warnings": warnings,
             "overridden_warnings": overridden,
+            "advisories": advisories,
         }
         lines = [
             *(f"error: {error}" for error in errors),
             *(f"warning: {warning}" for warning in warnings),
             *(f"overridden: {override}" for override in overridden),
+            *(f"advisory: {advisory}" for advisory in advisories),
         ]
         print(json.dumps(result, indent=2) if args.json else "\n".join(lines) or "valid")
         if not result["valid"]:

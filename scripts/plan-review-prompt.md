@@ -23,8 +23,8 @@ history, or append-only correction sections are blocking accumulation.
 
 Check every edge and simulate assigning every finest-tier entry to one worker:
 
-| Key | One outcome | Bounded consumer family | Observable test boundary | One focused implementation/review cycle | No inner decomposition | No mixed foundation/migration/deletion/docs/release work | Result |
-|---|---|---|---|---|---|---|---|
+| Key | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused implementation/review cycle | No inner decomposition | No mixed foundation/migration/deletion/docs/release work | Result |
+|---|---|---|---|---|---|---|---|---|
 
 Fail any non-passing row. `landing_group` is integration metadata only. Broad
 quantifiers, independent verbs, several component families, three acceptance
@@ -32,6 +32,11 @@ clusters, and implementation plus release require a split or a concrete per-code
 override that remains visible here. Reject global incantations, missing
 hierarchy/source universes, invented refs, tier-laundered leaves, and malformed or
 duplicate contract headings.
+
+Plan-fixed contracts must have no producer. Every implementation-produced
+contract must have exactly one producer transitively reachable by each consumer.
+Inspect all footprint creates/touches, uncertainties, and overlap advisories;
+greenfield work must disclose created paths.
 
 Verify prior findings were resolved by replacement and consolidation. Report
 blocking findings with artifact/code citations and exact corrections. End with

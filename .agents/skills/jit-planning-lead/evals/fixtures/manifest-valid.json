@@ -15,7 +15,8 @@
       "terminal": {
         "consumer_family": "planning skill resources",
         "test_boundary": "manifest fixture validation",
-        "worker_sized_reason": "One schema and its focused validator tests."
+        "worker_sized_reason": "One schema and its focused validator tests.",
+        "footprint": {"touches": ["breakdown-manifest.schema.json"]}
       }
     }
   }

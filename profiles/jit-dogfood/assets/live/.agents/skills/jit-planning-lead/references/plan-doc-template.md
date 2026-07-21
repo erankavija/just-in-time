@@ -14,9 +14,11 @@
 
 ## Shared architectural contracts
 
-### `<semantic-contract-id>` — <name>
+### `<semantic-contract-id>` [plan-fixed] — <name>
 
-<One definition consumed through manifest `planning.contract_refs`; cite code or investigation.>
+<One definition consumed through `contract_refs`; implementation-produced
+contracts use `[implementation-produced]` instead and name one producer through
+`produces_contracts`. Cite code or investigation.>
 
 ## Generated decomposition overview
 

@@ -14,7 +14,10 @@ accepted directly by `jit issue batch-create`. Each entry contains every native
 field plus `planning`; its `description` is the complete final issue body. Use
 semantic keys, concrete membership/coverage labels and gates, and real dependency
 edges. `planning.source_refs` provides total criterion/design/finding coverage;
-`contract_refs` names contracts defined once in the plan.
+`contract_refs` names contracts defined once in the plan. Mark each plan heading
+`plan-fixed` or `implementation-produced`; the latter has exactly one manifest
+producer named by `produces_contracts`, and every consumer depends transitively
+on that producer.
 
 Keep a complete known-source universe and distinguish mandatory coverage from
 optional design/finding references. Every non-finest entry must aggregate a
@@ -26,6 +29,10 @@ implementation/review cycle, no internal decomposition, and no mixed foundation,
 migration, deletion, documentation, or release deliverables. Never use lack of a
 finer type or one final landing as justification. `landing_group` records shared
 integration only.
+
+Every terminal declares a `footprint`: non-empty `creates` and/or `touches`, or a
+concrete `uncertainty` reason. New files belong in `creates`; greenfield work has
+no exemption. Footprints and exact overlaps remain reviewer-visible advisories.
 
 ## Plan
 

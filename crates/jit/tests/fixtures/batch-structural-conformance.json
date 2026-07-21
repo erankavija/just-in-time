@@ -1,0 +1,8 @@
+{
+  "cases": [
+    {"name":"valid-chain","expected":[],"issues":[{"key":"contract","title":"Contract"},{"key":"consumer","title":"Consumer","depends_on":["contract"]}]},
+    {"name":"duplicate-key","expected":["duplicate-key"],"issues":[{"key":"same","title":"First"},{"key":"same","title":"Second"}]},
+    {"name":"unknown-dependency","expected":["unknown-dependency"],"issues":[{"key":"consumer","title":"Consumer","depends_on":["missing"]}]},
+    {"name":"dependency-cycle","expected":["cycle"],"issues":[{"key":"alpha","title":"Alpha","depends_on":["beta"]},{"key":"beta","title":"Beta","depends_on":["alpha"]}]}
+  ]
+}

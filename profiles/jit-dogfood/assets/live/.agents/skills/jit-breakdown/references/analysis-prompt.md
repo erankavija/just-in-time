@@ -27,9 +27,15 @@ and exact `satisfies:<id>` credits; gates are concrete configured keys. Express
 relationships only in `depends_on`.
 
 `planning` supplies one concise `outcome`, semantic `contract_refs` (possibly
-empty), non-empty `source_refs`, optional `landing_group`, and terminal metadata.
+empty), optional `produces_contracts`, non-empty `source_refs`, optional
+`landing_group`, and terminal metadata.
 Every finest-tier issue has exactly one scalar `consumer_family`, one scalar
 `test_boundary`, and a concrete `worker_sized_reason`.
+
+Each terminal also discloses non-empty `footprint.creates`/`touches` or a concrete
+`uncertainty` reason. Greenfield files use `creates`. Plan-fixed contracts have no
+producer; each implementation-produced contract has exactly one producer and
+every consumer depends transitively on it.
 
 Enumerate every valid criterion, finding, and design-section source id before
 validation. Non-finest entries aggregate strictly finer descendants. If a sizing

@@ -53,7 +53,8 @@ description is the final standalone body. Every finest-tier
 entry must pass the one-worker assignment simulation: one outcome, bounded
 consumer family, observable test boundary, focused implementation/review cycle,
 no inner decomposition, and no mixed deliverable categories. `landing_group`
-never changes that judgment. Per-code warning overrides stay visible for review.
+never changes that judgment. Per-code warning overrides and terminal footprints
+stay visible for review. Contract modes and producer reachability must be exact.
 
 ## 3. Create once
 

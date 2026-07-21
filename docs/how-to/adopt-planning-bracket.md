@@ -285,8 +285,11 @@ Then drive `P` through `plan-review`. Review fails missing/invalid manifests,
 stale generated output, duplicated task prose, and non-worker-sized terminal
 tasks. Missing hierarchy/source universes, invented references, tier-laundered
 leaves, and malformed/duplicate contract headings also fail. Per-code sizing
-overrides remain visible for reviewer judgment. The built-in placeholder is not
-approval; replace it as described in Step 4. Correct the manifest first,
+overrides remain visible for reviewer judgment. Shared contracts are marked
+`plan-fixed` or `implementation-produced`; produced contracts require one
+dependency-reachable producer. Each terminal discloses created/touched paths or
+footprint uncertainty, including greenfield files. The built-in placeholder is
+not approval; replace it as described in Step 4. Correct the manifest first,
 regenerate the plan, and rerun validation.
 
 ## Step 7 — Break down after the plan checkpoint

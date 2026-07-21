@@ -13,7 +13,7 @@
       "contract_refs": [],
       "source_refs": ["REQ-03"],
       "landing_group": "cutover",
-      "terminal": {"consumer_family":"libraries, CLIs, and documentation","test_boundary":"workspace tests","worker_sized_reason":"Large final landing."}
+      "terminal": {"consumer_family":"libraries, CLIs, and documentation","test_boundary":"workspace tests","worker_sized_reason":"Large final landing.","footprint":{"uncertainty":"The migration footprint is not bounded."}}
     }
   }
 ]

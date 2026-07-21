@@ -16,13 +16,15 @@ inventories, duplicated acceptance criteria, hand-written graph views, append-on
 correction sections, or accumulated review history are blocking.
 
 Verify technical claims against code and layer boundaries. Verify every manifest
-edge and each source/contract reference. `landing_group` is integration metadata,
-not a sizing exemption.
+edge and each source/contract reference. Plan-fixed contracts have no producer;
+implementation-produced contracts have exactly one reachable producer.
+`landing_group` is integration metadata, not a sizing exemption. Inspect every
+footprint and overlap/uncertainty advisory.
 
 Produce an assignment-simulation row for every finest-tier entry:
 
-| Key | One outcome | One bounded consumer family | Observable test boundary | One focused cycle | No inner decomposition | No mixed deliverables | Result |
-|---|---|---|---|---|---|---|---|
+| Key | One outcome | One bounded consumer family | Observable test boundary | Footprint credible | One focused cycle | No inner decomposition | No mixed deliverables | Result |
+|---|---|---|---|---|---|---|---|---|
 
 Fail any row that does not pass or any unresolved sizing warning. Judge every
 visible per-code override and fail vague or cross-cutting waivers. Also fail

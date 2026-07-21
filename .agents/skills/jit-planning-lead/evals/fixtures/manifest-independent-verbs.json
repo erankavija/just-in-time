@@ -15,7 +15,8 @@
       "terminal": {
         "consumer_family": "parser",
         "test_boundary": "parser contract test",
-        "worker_sized_reason": "One focused implementation cycle is claimed."
+        "worker_sized_reason": "One focused implementation cycle is claimed.",
+        "footprint": {"touches": ["parser", "renderer"]}
       }
     }
   }

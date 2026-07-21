@@ -77,8 +77,13 @@ terminal issue has exactly one primary outcome, one bounded consumer family, one
 observable test boundary, and work one agent can implement and review in one
 focused cycle without another decomposition. A terminal must not combine
 independently testable foundation, migration, deletion, documentation, or release
-deliverables. A shared `landing_group` is integration metadata, never permission
-to merge work. No finer configured type is required to split an oversized task.
+deliverables. It must disclose non-empty footprint `creates`/`touches`, or concrete
+uncertainty. A shared `landing_group` is integration metadata, never permission to
+merge work. No finer configured type is required to split an oversized task.
+
+Mark every plan contract `plan-fixed` or `implementation-produced`. The latter
+has exactly one `produces_contracts` owner transitively reachable from every
+consumer; a plan-fixed contract has none.
 
 Every non-finest manifest entry must depend transitively on a strictly finer
 entry; relabeling executable work never suppresses terminal checks. Sizing

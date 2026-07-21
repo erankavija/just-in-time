@@ -1,14 +1,16 @@
 # Plan
 
-### `outside-contract` — Outside
+### `outside-contract` [plan-fixed] — Outside
 
 ## Shared architectural contracts
 
-### `manifest-contract` — First
+### `manifest-contract` [plan-fixed] — First
 
-### `manifest-contract` — Duplicate
+### `manifest-contract` [plan-fixed] — Duplicate
 
 ### malformed-contract
+
+### `wrong-mode` [produced] — Wrong mode
 
 ## Generated decomposition overview
 
