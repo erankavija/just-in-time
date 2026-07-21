@@ -637,6 +637,41 @@ impl RepositoryImage {
                 return Err(CaptureError::IncompleteListing(path.clone()));
             }
         }
+        let mut listing_only_paths = BTreeSet::new();
+        let mut listing_bytes = 0_u64;
+        for (parent, listing) in &listings {
+            for name in listing.children().keys() {
+                listing_bytes =
+                    listing_bytes.saturating_add(u64::try_from(name.len()).unwrap_or(u64::MAX));
+                let child = listing_child_path(parent, name)?;
+                if child.relative().depth() > spec.budget.max_depth {
+                    return Err(CaptureError::DepthBudgetExceeded(child));
+                }
+                let already_requested = spec.contains_path(&child)
+                    || spec.listings.contains(&child)
+                    || spec.linked_worktree.contains(&child)
+                    || (child.root_class() == RepositoryRootClass::Worktree
+                        && spec
+                            .pinned
+                            .iter()
+                            .any(|(_, path)| path == child.relative().as_str()));
+                if !already_requested {
+                    listing_only_paths.insert(child);
+                }
+            }
+        }
+        let path_count = spec
+            .paths()
+            .count()
+            .saturating_add(spec.pinned.len())
+            .saturating_add(spec.linked_worktree.len())
+            .saturating_add(listing_only_paths.len());
+        if path_count > spec.budget.max_paths {
+            return Err(CaptureError::PathBudgetExceeded {
+                actual: path_count,
+                maximum: spec.budget.max_paths,
+            });
+        }
         for (request, evidence) in &pinned {
             if !spec.pinned.contains(request) {
                 return Err(CaptureError::UnexpectedPinnedEvidence(request.clone()));
@@ -660,7 +695,8 @@ impl RepositoryImage {
                 return Err(CaptureError::IncompleteLinkedEvidence(path.clone()));
             }
         }
-        let byte_count = captured_byte_count(&entries, &pinned, &linked_worktree);
+        let byte_count =
+            captured_byte_count(&entries, &pinned, &linked_worktree).saturating_add(listing_bytes);
         if byte_count > spec.budget.max_bytes {
             return Err(CaptureError::ByteBudgetExceeded {
                 actual: byte_count,
@@ -767,6 +803,19 @@ fn validate_listing_name(name: &str) -> Result<(), CaptureError> {
         return Err(CaptureError::InvalidListingName(name.into()));
     }
     Ok(())
+}
+
+fn listing_child_path(parent: &VirtualPath, name: &str) -> Result<VirtualPath, CaptureError> {
+    let relative = if parent.relative().is_root() {
+        name.to_owned()
+    } else {
+        format!("{}/{name}", parent.relative().as_str())
+    };
+    match parent.root_class() {
+        RepositoryRootClass::Worktree => VirtualPath::worktree(relative),
+        RepositoryRootClass::Data => VirtualPath::data(relative),
+    }
+    .map_err(Into::into)
 }
 
 fn validate_pinned_request(revision: &str, path: &str) -> Result<(), CaptureError> {
@@ -1672,6 +1721,153 @@ mod tests {
             ),
             Err(CaptureError::ListingFingerprintMismatch)
         ));
+    }
+
+    fn close_listing(
+        path: &str,
+        children: &[&str],
+        exact: &[&str],
+        budget: CaptureBudget,
+    ) -> Result<RepositoryImage, CaptureError> {
+        let path = VirtualPath::data(path)?;
+        let identities = children
+            .iter()
+            .map(|name| Ok(((*name).to_owned(), EntryIdentity::for_bytes(*name, b"")?)))
+            .collect::<Result<BTreeMap<_, _>, CaptureError>>()?;
+        let entries = exact
+            .iter()
+            .map(|name| {
+                let identity = identities.get(*name).unwrap().clone();
+                Ok((
+                    VirtualPath::data(format!("{path}/{name}", path = path.relative().as_str()))?,
+                    RepositoryEntry::File {
+                        identity,
+                        bytes: Vec::new(),
+                        mode: FileMode::Regular,
+                    },
+                ))
+            })
+            .collect::<Result<BTreeMap<_, _>, CaptureError>>()?;
+        let mut spec = CaptureSpec::phase_one(entries.keys().cloned(), budget)?;
+        spec.discover_listing(path.clone())?;
+        RepositoryImage::close(
+            layout(),
+            spec,
+            entries,
+            BTreeMap::from([(path, ListingFingerprint::new(identities)?)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+    }
+
+    fn listing_budget(max_paths: usize, max_bytes: u64, max_depth: usize) -> CaptureBudget {
+        CaptureBudget {
+            max_paths,
+            max_listings: 1,
+            max_bytes,
+            max_depth,
+        }
+    }
+
+    #[test]
+    fn test_close_charges_listing_only_children_to_path_budget() {
+        let result = close_listing(
+            "issues",
+            &["one.json", "two.json"],
+            &[],
+            listing_budget(1, 64, 2),
+        );
+
+        assert!(matches!(
+            result,
+            Err(CaptureError::PathBudgetExceeded {
+                actual: 2,
+                maximum: 1
+            })
+        ));
+    }
+
+    #[test]
+    fn test_close_counts_exact_listed_child_once() {
+        let result = close_listing(
+            "issues",
+            &["one.json"],
+            &["one.json"],
+            listing_budget(1, 64, 2),
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_close_does_not_charge_listed_child_that_is_a_listing_root() {
+        let root = VirtualPath::data("").unwrap();
+        let issues = VirtualPath::data("issues").unwrap();
+        let identity = EntryIdentity::for_bytes("issues", b"directory").unwrap();
+        let mut spec = CaptureSpec::phase_one(
+            [],
+            CaptureBudget {
+                max_paths: 0,
+                max_listings: 2,
+                max_bytes: 6,
+                max_depth: 1,
+            },
+        )
+        .unwrap();
+        spec.discover_listing(root.clone()).unwrap();
+        spec.discover_listing(issues.clone()).unwrap();
+
+        let result = RepositoryImage::close(
+            layout(),
+            spec,
+            BTreeMap::new(),
+            BTreeMap::from([
+                (
+                    root,
+                    ListingFingerprint::new(BTreeMap::from([("issues".into(), identity.clone())]))
+                        .unwrap(),
+                ),
+                (
+                    issues,
+                    ListingFingerprint::for_directory(identity, BTreeMap::new()).unwrap(),
+                ),
+            ]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_close_charges_multibyte_listing_names_to_byte_budget() {
+        let result = close_listing("issues", &["é"], &[], listing_budget(1, 1, 2));
+
+        assert!(matches!(
+            result,
+            Err(CaptureError::ByteBudgetExceeded {
+                actual: 2,
+                maximum: 1
+            })
+        ));
+    }
+
+    #[test]
+    fn test_close_enforces_depth_for_listed_children() {
+        let result = close_listing("issues", &["one.json"], &[], listing_budget(1, 64, 1));
+
+        assert!(matches!(
+            result,
+            Err(CaptureError::DepthBudgetExceeded(path))
+                if path == VirtualPath::data("issues/one.json").unwrap()
+        ));
+    }
+
+    #[test]
+    fn test_close_empty_listing_costs_no_path_or_bytes() {
+        let result = close_listing("issues", &[], &[], listing_budget(0, 0, 1));
+
+        assert!(result.is_ok());
     }
 
     #[test]

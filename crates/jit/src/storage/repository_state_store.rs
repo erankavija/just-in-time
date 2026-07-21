@@ -2566,6 +2566,98 @@ mod tests {
         assert!(memory_session.capture(spec()).is_err());
     }
 
+    fn capture_listing_errors(
+        children: &[(&str, &[u8])],
+        budget: CaptureBudget,
+    ) -> [RepositoryStateStoreError; 2] {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir_all(data.join("issues")).unwrap();
+        for (name, bytes) in children {
+            std::fs::write(data.join("issues").join(name), bytes).unwrap();
+        }
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        let spec = || {
+            let mut spec = CaptureSpec::phase_one([], budget).unwrap();
+            spec.discover_listing(VirtualPath::data("issues").unwrap())
+                .unwrap();
+            spec
+        };
+
+        let json = JsonFileStorage::new(&data);
+        let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
+        let json_error = json_session.capture(spec()).unwrap_err();
+
+        let memory = InMemoryStorage::new();
+        seed_memory_existing(&memory, &[]);
+        {
+            let mut state = memory.repository_state();
+            state.entries.insert(
+                VirtualPath::data("issues").unwrap(),
+                RepositoryEntry::Directory {
+                    identity: EntryIdentity::for_bytes("mem-issues", b"directory").unwrap(),
+                    mode: FileMode::Executable,
+                },
+            );
+            for (name, bytes) in children {
+                let path = VirtualPath::data(format!("issues/{name}")).unwrap();
+                state.entries.insert(
+                    path.clone(),
+                    RepositoryEntry::File {
+                        identity: EntryIdentity::for_bytes(format!("mem:{path:?}"), bytes).unwrap(),
+                        bytes: bytes.to_vec(),
+                        mode: FileMode::Regular,
+                    },
+                );
+            }
+        }
+        let mut memory_session = memory.open_mutation_session(layout).unwrap();
+        let memory_error = memory_session.capture(spec()).unwrap_err();
+        [json_error, memory_error]
+    }
+
+    #[test]
+    fn test_conformance_listing_rogue_children_exceed_path_budget_on_both_backends() {
+        for error in capture_listing_errors(
+            &[("one.json", b"one"), ("two.json", b"two")],
+            CaptureBudget {
+                max_paths: 1,
+                max_listings: 1,
+                max_bytes: 64,
+                max_depth: 2,
+            },
+        ) {
+            assert!(matches!(
+                error,
+                RepositoryStateStoreError::Capture(CaptureError::PathBudgetExceeded {
+                    actual: 2,
+                    maximum: 1
+                })
+            ));
+        }
+    }
+
+    #[test]
+    fn test_conformance_listing_rogue_name_bytes_exceed_budget_on_both_backends() {
+        for error in capture_listing_errors(
+            &[("é", b"content")],
+            CaptureBudget {
+                max_paths: 1,
+                max_listings: 1,
+                max_bytes: 1,
+                max_depth: 2,
+            },
+        ) {
+            assert!(matches!(
+                error,
+                RepositoryStateStoreError::Capture(CaptureError::ByteBudgetExceeded {
+                    actual: 2,
+                    maximum: 1
+                })
+            ));
+        }
+    }
+
     #[test]
     fn test_conformance_empty_delta_ignores_armed_injectors() {
         for point in [
