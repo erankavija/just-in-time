@@ -126,7 +126,7 @@ impl AssetScanner {
                     let mut hasher = Sha256::new();
                     hasher.update(bytes);
                     asset.asset_type = AssetType::Local;
-                    asset.mime_type = detect_mime_type(path);
+                    asset.mime_type = Self::detect_mime_type(path);
                     asset.content_hash = Some(format!("{:x}", hasher.finalize()));
                 }
                 Ok(asset)
@@ -145,6 +145,24 @@ impl AssetScanner {
             registry,
             repo_root: repo_root.to_path_buf(),
         }
+    }
+
+    /// Detect the MIME type represented by a supported asset extension.
+    pub(crate) fn detect_mime_type(path: &Path) -> Option<String> {
+        path.extension().and_then(|ext| {
+            let ext_str = ext.to_string_lossy().to_lowercase();
+            match ext_str.as_str() {
+                "png" => Some("image/png"),
+                "jpg" | "jpeg" => Some("image/jpeg"),
+                "gif" => Some("image/gif"),
+                "svg" => Some("image/svg+xml"),
+                "pdf" => Some("application/pdf"),
+                "md" | "markdown" => Some("text/markdown"),
+                "txt" => Some("text/plain"),
+                _ => None,
+            }
+            .map(String::from)
+        })
     }
 
     /// Scan a document for asset references
@@ -198,7 +216,7 @@ impl AssetScanner {
         // Check if file exists
         let full_path = self.repo_root.join(&resolved);
         let (asset_type, mime_type, content_hash) = if full_path.exists() && full_path.is_file() {
-            let mime = detect_mime_type(&resolved);
+            let mime = Self::detect_mime_type(&resolved);
             let hash = compute_file_hash(&full_path).ok();
             (AssetType::Local, mime, hash)
         } else {
@@ -313,24 +331,6 @@ fn normalize_path(path: &Path) -> PathBuf {
         }
     }
     components.iter().collect()
-}
-
-/// Detect MIME type from file extension
-fn detect_mime_type(path: &Path) -> Option<String> {
-    path.extension().and_then(|ext| {
-        let ext_str = ext.to_string_lossy().to_lowercase();
-        match ext_str.as_str() {
-            "png" => Some("image/png"),
-            "jpg" | "jpeg" => Some("image/jpeg"),
-            "gif" => Some("image/gif"),
-            "svg" => Some("image/svg+xml"),
-            "pdf" => Some("application/pdf"),
-            "md" | "markdown" => Some("text/markdown"),
-            "txt" => Some("text/plain"),
-            _ => None,
-        }
-        .map(String::from)
-    })
 }
 
 /// Compute SHA256 hash of file content
@@ -486,18 +486,21 @@ mod tests {
     #[test]
     fn test_detect_mime_type() {
         assert_eq!(
-            detect_mime_type(Path::new("image.png")),
+            AssetScanner::detect_mime_type(Path::new("image.png")),
             Some("image/png".to_string())
         );
         assert_eq!(
-            detect_mime_type(Path::new("photo.jpg")),
+            AssetScanner::detect_mime_type(Path::new("photo.jpg")),
             Some("image/jpeg".to_string())
         );
         assert_eq!(
-            detect_mime_type(Path::new("doc.pdf")),
+            AssetScanner::detect_mime_type(Path::new("doc.pdf")),
             Some("application/pdf".to_string())
         );
-        assert_eq!(detect_mime_type(Path::new("file.unknown")), None);
+        assert_eq!(
+            AssetScanner::detect_mime_type(Path::new("file.unknown")),
+            None
+        );
     }
 
     #[test]

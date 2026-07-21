@@ -2,6 +2,44 @@
 
 use super::*;
 
+const DOCUMENT_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
+    crate::repository_state::CaptureBudget {
+        max_paths: 256,
+        max_listings: 0,
+        max_bytes: 64 * 1024 * 1024,
+        max_depth: 8,
+    };
+
+struct DerivedDocumentMutation<T> {
+    outcome: T,
+    intents: Vec<crate::repository_state::MutationIntent>,
+}
+
+struct CapturedDocumentScan {
+    format: Option<String>,
+    assets: Vec<crate::document::Asset>,
+    required_paths: std::collections::BTreeSet<crate::repository_state::VirtualPath>,
+    warning: Option<DocumentScanWarning>,
+}
+
+enum DocumentScanWarning {
+    Missing(String),
+    Failed(String),
+}
+
+enum DocumentScanSource {
+    Worktree(crate::repository_state::VirtualPath),
+    Pinned { revision: String, path: String },
+}
+
+impl DocumentScanWarning {
+    fn message(&self) -> &str {
+        match self {
+            Self::Missing(message) | Self::Failed(message) => message,
+        }
+    }
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     #[allow(clippy::too_many_arguments)] // CLI command parameters - refactoring would reduce clarity
     pub fn add_document_reference(
@@ -16,112 +54,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::document::{AdapterRegistry, AssetScanner};
-        use crate::domain::DocumentReference;
-        use std::path::Path;
-
-        let mut warnings = Vec::new();
-
         let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let mut issue = self.storage.load_issue(&full_id)?;
-
-        // Get repository root (parent of .jit directory)
-        let repo_root = self
-            .storage
-            .root()
-            .parent()
-            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
-
-        // Detect format and scan assets unless --skip-scan
-        let (format, assets) = if skip_scan {
-            (None, Vec::new())
-        } else if let Ok((content, _)) = self.storage.read_path_text(path, None) {
-            // Detect format using adapter registry
-            let registry = AdapterRegistry::with_builtins();
-            let format = registry
-                .resolve(path, &content)
-                .map(|adapter| adapter.id().to_string());
-
-            // Scan for assets
-            let assets = if format.is_some() {
-                let scanner = AssetScanner::new(registry, repo_root);
-                scanner
-                    .scan_document(Path::new(path), &content)
-                    .unwrap_or_else(|e| {
-                        warnings.push(format!("Failed to scan assets: {}", e));
-                        Vec::new()
-                    })
-            } else {
-                Vec::new()
-            };
-
-            (format, assets)
-        } else {
-            // File doesn't exist or can't be read - skip scanning but don't fail
-            warnings.push(format!(
-                "Could not read document at {} - skipping asset scan",
-                path
-            ));
-            (None, Vec::new())
-        };
-
-        // Identity is (issue, path): re-adding a path already linked to this
-        // issue refreshes that entry in place instead of appending a
-        // duplicate. `commit` is always taken from this invocation, exactly as
-        // on a fresh add — a supplied value pins the reference, an omitted one
-        // records it unpinned (read as the current version), so a re-run
-        // re-points a stale pin at the present state instead of preserving it.
-        // `label`/`doc_type` are descriptive metadata and follow the
-        // partial-update convention of `issue update` — an omitted flag
-        // (`None`) leaves the existing value alone rather than clearing it —
-        // while `format`/`assets` are always the freshly computed scan
-        // result (or empty, under `--skip-scan`), mirroring a fresh add.
-        let existing_index = issue.documents.iter().position(|d| d.path == path);
-        let is_update = existing_index.is_some();
-
-        let doc_ref = match existing_index {
-            Some(idx) => {
-                let existing = &issue.documents[idx];
-                DocumentReference {
-                    path: path.to_string(),
-                    commit: commit.map(String::from),
-                    label: label.map(String::from).or_else(|| existing.label.clone()),
-                    doc_type: doc_type
-                        .map(String::from)
-                        .or_else(|| existing.doc_type.clone()),
-                    format,
-                    assets,
-                }
-            }
-            None => DocumentReference {
-                path: path.to_string(),
-                commit: commit.map(String::from),
-                label: label.map(String::from),
-                doc_type: doc_type.map(String::from),
-                format,
-                assets,
-            },
-        };
-
-        match existing_index {
-            Some(idx) => issue.documents[idx] = doc_ref.clone(),
-            None => issue.documents.push(doc_ref.clone()),
-        }
-        let event = crate::domain::Event::draft_issue_updated(
-            full_id.clone(),
-            if is_update { "doc-update" } else { "doc-add" }.to_string(),
-            vec!["documents".to_string()],
-        );
-        self.publish_ambient_issue_mutation(vec![issue], vec![(1, event)])?;
-
-        Ok((
-            DocumentAddResult {
-                issue_id: full_id,
-                document: doc_ref,
-                updated: is_update,
-            },
-            warnings,
-        ))
+        self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)
     }
 
     pub fn list_document_references(
@@ -147,33 +81,147 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let mut issue = self.storage.load_issue(&full_id)?;
+        self.publish_document_remove(&full_id, path)
+    }
 
-        let original_len = issue.documents.len();
-        issue.documents.retain(|doc| doc.path != path);
+    /// Add or refresh one document reference from a coherent repository image.
+    /// Asset discovery may expand the capture once; a changed document that
+    /// reveals additional assets restarts from a fresh session.
+    #[allow(clippy::too_many_arguments)]
+    fn publish_document_add(
+        &self,
+        issue_id: &str,
+        path: &str,
+        commit: Option<&str>,
+        label: Option<&str>,
+        doc_type: Option<&str>,
+        skip_scan: bool,
+    ) -> Result<(DocumentAddResult, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{finalize, MutationContext, VirtualPath};
+        use crate::storage::{validate_repo_relative_path, RepositoryStateStoreError};
+        use std::collections::BTreeSet;
 
-        if issue.documents.len() == original_len {
-            // Generic NotFoundError: a document-reference not-found has no dedicated
-            // domain type (unlike issue/gate/preset/gate-run/repository/lease). Still
-            // downcastable -> exit 3; message preserved verbatim.
-            return Err(crate::errors::NotFoundError::new(format!(
-                "Document reference {} not found in issue {}",
-                path, full_id
-            ))
-            .into());
+        validate_repo_relative_path(path)?;
+        let layout = self.require_layout()?;
+        let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
+        let events_path = VirtualPath::data("events.jsonl")?;
+        let document_path = VirtualPath::worktree(path)
+            .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
+        let source = match commit {
+            Some(revision) => DocumentScanSource::Pinned {
+                revision: revision.to_string(),
+                path: path.to_string(),
+            },
+            None => DocumentScanSource::Worktree(document_path),
+        };
+        let context = MutationContext::production();
+
+        for _ in 0..8 {
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let initial_paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
+            let initial_spec = if skip_scan {
+                document_capture_spec(initial_paths)?
+            } else {
+                document_scan_capture_spec(initial_paths, &source, &BTreeSet::new())?
+            };
+            let image = match session.capture(initial_spec) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+
+            let initial_scan = if skip_scan {
+                CapturedDocumentScan::empty()
+            } else {
+                scan_document_source(&layout, &image, path, &source)?
+            };
+            let captured_asset_paths = initial_scan.required_paths.clone();
+            let (image, scan) = if captured_asset_paths.is_empty() {
+                (image, initial_scan)
+            } else {
+                let expanded_paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
+                let spec =
+                    document_scan_capture_spec(expanded_paths, &source, &captured_asset_paths)?;
+                let image = match session.capture(spec) {
+                    Ok(image) => image,
+                    Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                    Err(error) => return Err(error.into()),
+                };
+                let scan = scan_document_source(&layout, &image, path, &source)?;
+                if !scan.required_paths.is_subset(&captured_asset_paths) {
+                    continue;
+                }
+                (image, scan)
+            };
+            let scan = hydrate_document_scan(&layout, &image, &source, scan)?;
+
+            let issue = captured_issue(&image, &issue_path, issue_id)?;
+            let derived = derive_document_add(
+                issue,
+                path,
+                commit,
+                label,
+                doc_type,
+                scan.format,
+                scan.assets,
+            );
+            let warnings = scan
+                .warning
+                .as_ref()
+                .map(|warning| warning.message().to_string())
+                .into_iter()
+                .collect();
+            if derived.intents.is_empty() {
+                return Ok((derived.outcome, warnings));
+            }
+            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            match session.apply(&plan) {
+                Ok(_) => return Ok((derived.outcome, warnings)),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
         }
+        Err(anyhow!(
+            "document add did not converge after repeated capture conflicts"
+        ))
+    }
 
-        let event = crate::domain::Event::draft_issue_updated(
-            full_id.clone(),
-            "doc-remove".to_string(),
-            vec!["documents".to_string()],
-        );
-        self.publish_ambient_issue_mutation(vec![issue], vec![(1, event)])?;
+    /// Remove one path-selected document reference and its event atomically.
+    fn publish_document_remove(&self, issue_id: &str, path: &str) -> Result<DocumentRemoveResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{finalize, MutationContext, VirtualPath};
+        use crate::storage::RepositoryStateStoreError;
+        use std::collections::BTreeSet;
 
-        Ok(DocumentRemoveResult {
-            issue_id: full_id,
-            path: path.to_string(),
-        })
+        let layout = self.require_layout()?;
+        let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
+        let events_path = VirtualPath::data("events.jsonl")?;
+        let context = MutationContext::production();
+        for _ in 0..8 {
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
+            let image = match session.capture(document_capture_spec(paths)?) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let issue = captured_issue(&image, &issue_path, issue_id)?;
+            let derived = derive_document_remove(issue, path)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            match session.apply(&plan) {
+                Ok(_) => return Ok(derived.outcome),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "document removal did not converge after repeated capture conflicts"
+        ))
     }
 
     pub fn show_document_content(
@@ -682,17 +730,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue = self.storage.load_issue(&full_id)?;
 
         // Find the document in the issue
-        let doc_index = issue
+        let document = issue
             .documents
             .iter()
-            .position(|d| d.path == path)
+            .find(|document| document.path == path)
             .ok_or_else(|| anyhow!("Document '{}' not linked to issue {}", path, issue_id))?;
 
         // Rescan if requested
         let assets = if rescan {
-            self.rescan_document_assets(&full_id, path, doc_index, &mut warnings)?
+            self.rescan_document_assets(&full_id, path, &mut warnings)?
         } else {
-            issue.documents[doc_index].assets.clone()
+            document.assets.clone()
         };
 
         // Categorize assets
@@ -737,133 +785,84 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &str,
         path: &str,
-        document_index: usize,
         warnings: &mut Vec<String>,
     ) -> Result<Vec<crate::document::Asset>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::document::{AdapterRegistry, AssetScanner};
-        use crate::repository_state::{
-            finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, VirtualPath,
-        };
+        use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
         use crate::storage::RepositoryStateStoreError;
-        use std::collections::BTreeSet;
-        use std::path::Path;
 
         let layout = self.require_layout()?;
         let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
         let document_path = VirtualPath::worktree(path)?;
         let events_path = VirtualPath::data("events.jsonl")?;
+        let source = DocumentScanSource::Worktree(document_path);
 
         // Operation-scoped so a fresh-session retry cannot resample the update
         // timestamp or audit-event identity.
         let context = MutationContext::production();
         for _ in 0..8 {
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let mut initial = CaptureSpec::phase_one(
-                [issue_path.clone(), events_path.clone()],
-                CaptureBudget {
-                    max_paths: 64,
-                    max_listings: 0,
-                    max_bytes: 64 * 1024 * 1024,
-                    max_depth: 8,
-                },
+            let initial = document_scan_capture_spec(
+                [issue_path.clone(), events_path.clone()]
+                    .into_iter()
+                    .collect(),
+                &source,
+                &Default::default(),
             )?;
-            initial.discover_paths([document_path.clone()])?;
             let image = match session.capture(initial) {
                 Ok(image) => image,
                 Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
                 Err(error) => return Err(error.into()),
             };
-            let Some(issue_bytes) = image.file_bytes(&issue_path)? else {
-                return Err(anyhow!(
-                    "issue {issue_id} disappeared during document rescan"
-                ));
-            };
-            let issue: Issue = serde_json::from_slice(issue_bytes)?;
+            let issue = captured_issue(&image, &issue_path, issue_id)?;
             let current_assets = issue
                 .documents
-                .get(document_index)
-                .filter(|document| document.path == path)
+                .iter()
+                .find(|document| document.path == path)
                 .ok_or_else(|| anyhow!("document '{path}' changed during rescan"))?
                 .assets
                 .clone();
-            let Some(document_bytes) = image.file_bytes(&document_path)? else {
-                warnings.push(format!("Could not read document at {path}"));
-                return Ok(current_assets);
-            };
-            let content = std::str::from_utf8(document_bytes)
-                .map_err(|error| anyhow!("document '{path}' is not UTF-8: {error}"))?;
-            let repo_root = layout.worktree_root();
-            let scanner = AssetScanner::new(AdapterRegistry::with_builtins(), repo_root);
-            let discovered = match scanner.discover_assets(Path::new(path), content) {
-                Ok(assets) => assets,
-                Err(error) => {
-                    warnings.push(format!("Failed to scan assets: {error}"));
-                    return Ok(Vec::new());
-                }
-            };
-            let expanded_paths = discovered
-                .iter()
-                .filter_map(|asset| asset.resolved_path.as_ref())
-                .map(VirtualPath::worktree)
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                .collect::<BTreeSet<_>>();
-            let mut expanded = CaptureSpec::phase_one(
-                [issue_path.clone(), events_path.clone()],
-                CaptureBudget {
-                    max_paths: expanded_paths.len().saturating_add(18),
-                    max_listings: 0,
-                    max_bytes: 64 * 1024 * 1024,
-                    max_depth: 8,
-                },
-            )?;
-            expanded.discover_paths(
-                expanded_paths
-                    .iter()
-                    .cloned()
-                    .chain([document_path.clone()]),
+            let initial_scan = scan_document_source(&layout, &image, path, &source)?;
+            if let Some(warning) = initial_scan.warning {
+                warnings.push(warning.message().to_string());
+                return Ok(match warning {
+                    DocumentScanWarning::Missing(_) => current_assets,
+                    DocumentScanWarning::Failed(_) => Vec::new(),
+                });
+            }
+            let expanded_paths = initial_scan.required_paths;
+            let expanded = document_scan_capture_spec(
+                [issue_path.clone(), events_path.clone()]
+                    .into_iter()
+                    .collect(),
+                &source,
+                &expanded_paths,
             )?;
             let image = match session.capture(expanded) {
                 Ok(image) => image,
                 Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
                 Err(error) => return Err(error.into()),
             };
-            let Some(issue_bytes) = image.file_bytes(&issue_path)? else {
-                continue;
-            };
-            let mut issue: Issue = serde_json::from_slice(issue_bytes)?;
+            let mut issue = captured_issue(&image, &issue_path, issue_id)?;
             let document = issue
                 .documents
-                .get_mut(document_index)
-                .filter(|document| document.path == path)
+                .iter_mut()
+                .find(|document| document.path == path)
                 .ok_or_else(|| anyhow!("document '{path}' changed during rescan"))?;
-            let Some(document_bytes) = image.file_bytes(&document_path)? else {
-                warnings.push(format!("Could not read document at {path}"));
-                return Ok(document.assets.clone());
-            };
-            let content = std::str::from_utf8(document_bytes)
-                .map_err(|error| anyhow!("document '{path}' is not UTF-8: {error}"))?;
-            let discovered = match scanner.discover_assets(Path::new(path), content) {
-                Ok(assets) => assets,
-                Err(error) => {
-                    warnings.push(format!("Failed to scan assets: {error}"));
-                    return Ok(Vec::new());
-                }
-            };
-            let required_paths = discovered
-                .iter()
-                .filter_map(|asset| asset.resolved_path.as_ref())
-                .map(VirtualPath::worktree)
-                .collect::<Result<BTreeSet<_>, _>>()?;
-            if !required_paths.is_subset(&expanded_paths) {
+            let scan = scan_document_source(&layout, &image, path, &source)?;
+            if !scan.required_paths.is_subset(&expanded_paths) {
                 continue;
             }
-            let scanned = scanner
-                .hydrate_assets_from_image(discovered, &image)
-                .map_err(|error| anyhow!("failed to scan assets: {error}"))?;
+            if let Some(warning) = scan.warning {
+                warnings.push(warning.message().to_string());
+                return Ok(match warning {
+                    DocumentScanWarning::Missing(_) => document.assets.clone(),
+                    DocumentScanWarning::Failed(_) => Vec::new(),
+                });
+            }
+            let scanned = hydrate_document_scan(&layout, &image, &source, scan)?.assets;
             if document.assets == scanned {
                 return Ok(scanned);
             }
@@ -1154,6 +1153,319 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 }
 
+impl CapturedDocumentScan {
+    fn empty() -> Self {
+        Self {
+            format: None,
+            assets: Vec::new(),
+            required_paths: std::collections::BTreeSet::new(),
+            warning: None,
+        }
+    }
+}
+
+fn document_capture_spec(
+    paths: std::collections::BTreeSet<crate::repository_state::VirtualPath>,
+) -> Result<crate::repository_state::CaptureSpec> {
+    use crate::repository_state::{CaptureSpec, RepositoryRootClass};
+
+    let (worktree_paths, data_paths): (Vec<_>, Vec<_>) = paths
+        .into_iter()
+        .partition(|path| path.root_class() == RepositoryRootClass::Worktree);
+    let mut spec = CaptureSpec::phase_one(data_paths, DOCUMENT_CAPTURE_BUDGET)?;
+    spec.discover_paths(worktree_paths)?;
+    Ok(spec)
+}
+
+fn document_scan_capture_spec(
+    data_paths: std::collections::BTreeSet<crate::repository_state::VirtualPath>,
+    source: &DocumentScanSource,
+    asset_paths: &std::collections::BTreeSet<crate::repository_state::VirtualPath>,
+) -> Result<crate::repository_state::CaptureSpec> {
+    let mut spec = document_capture_spec(data_paths)?;
+    match source {
+        DocumentScanSource::Worktree(document_path) => {
+            spec.discover_paths(asset_paths.iter().cloned().chain([document_path.clone()]))?
+        }
+        DocumentScanSource::Pinned { revision, path } => {
+            spec.discover_pinned(revision, path)?;
+            for asset_path in asset_paths {
+                spec.discover_pinned(revision, asset_path.relative().as_path().to_string_lossy())?;
+            }
+        }
+    }
+    Ok(spec)
+}
+
+fn captured_issue(
+    image: &crate::repository_state::RepositoryImage,
+    issue_path: &crate::repository_state::VirtualPath,
+    expected_id: &str,
+) -> Result<Issue> {
+    use crate::repository_state::RepositoryEntry;
+
+    let issue = match image.entry(issue_path)? {
+        RepositoryEntry::File { bytes, .. } => serde_json::from_slice::<Issue>(bytes)
+            .with_context(|| format!("failed to parse captured issue {expected_id}"))?,
+        RepositoryEntry::Absent => {
+            return Err(crate::storage::IssueNotFoundError::new(expected_id).into())
+        }
+        _ => return Err(anyhow!("captured issue path is not an ordinary file")),
+    };
+    if issue.id != expected_id {
+        return Err(anyhow!(
+            "captured issue identity mismatch: requested {expected_id}, found {}",
+            issue.id
+        ));
+    }
+    Ok(issue)
+}
+
+/// Discover one document exclusively from the supplied image.
+/// The returned paths are the complete local closure observed in that image.
+fn scan_document_from_image(
+    layout: &crate::repository_state::RepositoryLayout,
+    image: &crate::repository_state::RepositoryImage,
+    path: &str,
+    document_path: &crate::repository_state::VirtualPath,
+) -> Result<CapturedDocumentScan> {
+    let Some(bytes) = image.file_bytes(document_path)? else {
+        return Ok(CapturedDocumentScan {
+            warning: Some(DocumentScanWarning::Missing(format!(
+                "Could not read document at {path} - skipping asset scan"
+            ))),
+            ..CapturedDocumentScan::empty()
+        });
+    };
+    scan_document_bytes(layout, path, bytes)
+}
+
+fn scan_document_source(
+    layout: &crate::repository_state::RepositoryLayout,
+    image: &crate::repository_state::RepositoryImage,
+    path: &str,
+    source: &DocumentScanSource,
+) -> Result<CapturedDocumentScan> {
+    match source {
+        DocumentScanSource::Worktree(document_path) => {
+            scan_document_from_image(layout, image, path, document_path)
+        }
+        DocumentScanSource::Pinned { revision, path } => {
+            let evidence = image
+                .pinned_evidence()
+                .get(&(revision.clone(), path.clone()))
+                .ok_or_else(|| anyhow!("pinned evidence for '{path}' at '{revision}' is absent"))?;
+            let Some(bytes) = evidence.bytes() else {
+                return Ok(CapturedDocumentScan {
+                    warning: Some(DocumentScanWarning::Missing(format!(
+                        "Could not read document at {path} from {revision} - skipping asset scan"
+                    ))),
+                    ..CapturedDocumentScan::empty()
+                });
+            };
+            scan_document_bytes(layout, path, bytes)
+        }
+    }
+}
+
+fn scan_document_bytes(
+    layout: &crate::repository_state::RepositoryLayout,
+    path: &str,
+    bytes: &[u8],
+) -> Result<CapturedDocumentScan> {
+    use crate::document::{AdapterRegistry, AssetScanner};
+    use crate::repository_state::VirtualPath;
+    use std::collections::BTreeSet;
+    use std::path::Path;
+
+    let content = std::str::from_utf8(bytes)
+        .map_err(|error| anyhow!("document '{path}' is not UTF-8: {error}"))?;
+    let registry = AdapterRegistry::with_builtins();
+    let format = registry
+        .resolve(path, content)
+        .map(|adapter| adapter.id().to_string());
+    let Some(_) = format else {
+        return Ok(CapturedDocumentScan::empty());
+    };
+    let scanner = AssetScanner::new(registry, layout.worktree_root());
+    let discovered = match scanner.discover_assets(Path::new(path), content) {
+        Ok(discovered) => discovered,
+        Err(error) => {
+            return Ok(CapturedDocumentScan {
+                format,
+                warning: Some(DocumentScanWarning::Failed(format!(
+                    "Failed to scan assets: {error}"
+                ))),
+                ..CapturedDocumentScan::empty()
+            })
+        }
+    };
+    let required_paths = discovered
+        .iter()
+        .filter_map(|asset| asset.resolved_path.as_ref())
+        .map(VirtualPath::worktree)
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    Ok(CapturedDocumentScan {
+        format,
+        assets: discovered,
+        required_paths,
+        warning: None,
+    })
+}
+
+fn hydrate_document_scan(
+    layout: &crate::repository_state::RepositoryLayout,
+    image: &crate::repository_state::RepositoryImage,
+    source: &DocumentScanSource,
+    mut scan: CapturedDocumentScan,
+) -> Result<CapturedDocumentScan> {
+    if scan.warning.is_none() {
+        match source {
+            DocumentScanSource::Worktree(_) => {
+                let scanner = crate::document::AssetScanner::new(
+                    crate::document::AdapterRegistry::with_builtins(),
+                    layout.worktree_root(),
+                );
+                scan.assets = scanner
+                    .hydrate_assets_from_image(scan.assets, image)
+                    .map_err(|error| anyhow!("failed to scan assets: {error}"))?;
+            }
+            DocumentScanSource::Pinned { revision, .. } => {
+                use crate::document::AssetType;
+                use sha2::{Digest, Sha256};
+
+                for asset in &mut scan.assets {
+                    let Some(path) = asset.resolved_path.as_ref() else {
+                        continue;
+                    };
+                    let key = (revision.clone(), path.to_string_lossy().into_owned());
+                    let evidence = image.pinned_evidence().get(&key).ok_or_else(|| {
+                        anyhow!("pinned evidence for '{}' at '{revision}' is absent", key.1)
+                    })?;
+                    if let Some(bytes) = evidence.bytes() {
+                        asset.asset_type = AssetType::Local;
+                        asset.mime_type = crate::document::AssetScanner::detect_mime_type(path);
+                        asset.content_hash = Some(format!("{:x}", Sha256::digest(bytes)));
+                    }
+                }
+            }
+        }
+    }
+    Ok(scan)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn derive_document_add(
+    mut issue: Issue,
+    path: &str,
+    commit: Option<&str>,
+    label: Option<&str>,
+    doc_type: Option<&str>,
+    format: Option<String>,
+    assets: Vec<crate::document::Asset>,
+) -> DerivedDocumentMutation<DocumentAddResult> {
+    use crate::domain::DocumentReference;
+    use crate::repository_state::MutationIntent;
+
+    let existing_index = issue
+        .documents
+        .iter()
+        .position(|document| document.path == path);
+    let updated = existing_index.is_some();
+    let document = match existing_index {
+        Some(index) => {
+            let existing = &issue.documents[index];
+            DocumentReference {
+                path: path.to_string(),
+                commit: commit.map(String::from),
+                label: label.map(String::from).or_else(|| existing.label.clone()),
+                doc_type: doc_type
+                    .map(String::from)
+                    .or_else(|| existing.doc_type.clone()),
+                format,
+                assets,
+            }
+        }
+        None => DocumentReference {
+            path: path.to_string(),
+            commit: commit.map(String::from),
+            label: label.map(String::from),
+            doc_type: doc_type.map(String::from),
+            format,
+            assets,
+        },
+    };
+    let outcome = DocumentAddResult {
+        issue_id: issue.id.clone(),
+        document: document.clone(),
+        updated,
+    };
+    if existing_index.is_some_and(|index| issue.documents[index] == document) {
+        return DerivedDocumentMutation {
+            outcome,
+            intents: Vec::new(),
+        };
+    }
+    match existing_index {
+        Some(index) => issue.documents[index] = document,
+        None => issue.documents.push(document),
+    }
+    let event = crate::domain::Event::draft_issue_updated(
+        issue.id.clone(),
+        if updated { "doc-update" } else { "doc-add" }.to_string(),
+        vec!["documents".to_string()],
+    );
+    DerivedDocumentMutation {
+        outcome,
+        intents: vec![
+            MutationIntent::UpdateIssue {
+                issue: Box::new(issue),
+            },
+            MutationIntent::RecordEvent {
+                phase: 1,
+                event: Box::new(event),
+            },
+        ],
+    }
+}
+
+fn derive_document_remove(
+    mut issue: Issue,
+    path: &str,
+) -> Result<DerivedDocumentMutation<DocumentRemoveResult>> {
+    use crate::repository_state::MutationIntent;
+
+    if !issue.documents.iter().any(|document| document.path == path) {
+        return Err(crate::errors::NotFoundError::new(format!(
+            "Document reference {path} not found in issue {}",
+            issue.id
+        ))
+        .into());
+    }
+    issue.documents.retain(|document| document.path != path);
+    let outcome = DocumentRemoveResult {
+        issue_id: issue.id.clone(),
+        path: path.to_string(),
+    };
+    let event = crate::domain::Event::draft_issue_updated(
+        issue.id.clone(),
+        "doc-remove".to_string(),
+        vec!["documents".to_string()],
+    );
+    Ok(DerivedDocumentMutation {
+        outcome,
+        intents: vec![
+            MutationIntent::UpdateIssue {
+                issue: Box::new(issue),
+            },
+            MutationIntent::RecordEvent {
+                phase: 1,
+                event: Box::new(event),
+            },
+        ],
+    })
+}
+
 /// Check if an asset exists in git repository
 fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -> bool {
     if let Some(repo) = repo {
@@ -1176,7 +1488,32 @@ fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -
 mod tests {
     use super::*;
     use crate::domain::DocumentReference;
-    use crate::storage::InMemoryStorage;
+    use crate::repository_state::{
+        finalize, CaptureSpec, MutationContext, RepositoryAction, VirtualPath,
+    };
+    use crate::storage::{
+        InMemoryStorage, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
+    };
+    use std::collections::BTreeSet;
+
+    fn capture_spec(paths: impl IntoIterator<Item = VirtualPath>) -> CaptureSpec {
+        document_capture_spec(paths.into_iter().collect::<BTreeSet<_>>()).unwrap()
+    }
+
+    fn event_bytes(plan: &crate::repository_state::MaterializationPlan) -> Vec<u8> {
+        plan.delta()
+            .actions()
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::WriteFile { path, bytes, .. }
+                    if path == &VirtualPath::data("events.jsonl").unwrap() =>
+                {
+                    Some(bytes.clone())
+                }
+                _ => None,
+            })
+            .unwrap()
+    }
 
     #[test]
     fn test_document_rescan_uses_image_and_identical_inventory_is_noop() {
@@ -1215,5 +1552,178 @@ mod tests {
         assert_eq!(second.assets, first.assets);
         assert_eq!(storage.read_events().unwrap().len(), event_count);
         assert_eq!(storage.load_issue(&id).unwrap().updated_at, updated_at);
+    }
+
+    #[test]
+    fn test_document_add_retry_rederives_assets_and_preserves_unrelated_issue_changes() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        let mut issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
+        issue.documents.push(DocumentReference {
+            path: "docs/other.md".into(),
+            commit: None,
+            label: None,
+            doc_type: None,
+            format: None,
+            assets: Vec::new(),
+        });
+        let id = issue.id.clone();
+        storage.save_issue(issue).unwrap();
+        storage.add_repo_file("docs/guide.md", "![old](./old.png)\n");
+        storage.add_repo_file("docs/old.png", "old bytes");
+        storage.add_repo_file("docs/new.png", "new bytes");
+
+        let layout = storage.repository_layout();
+        let issue_path = VirtualPath::data(format!("issues/{id}.json")).unwrap();
+        let events_path = VirtualPath::data("events.jsonl").unwrap();
+        let document_path = VirtualPath::worktree("docs/guide.md").unwrap();
+        let old_asset_path = VirtualPath::worktree("docs/old.png").unwrap();
+        let expected_time = chrono::DateTime::parse_from_rfc3339("2026-07-20T13:14:15Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let context = MutationContext::deterministic([91; 32], expected_time);
+
+        let mut first_session = storage.open_mutation_session(layout.clone()).unwrap();
+        let first_image = first_session
+            .capture(capture_spec([
+                issue_path.clone(),
+                events_path.clone(),
+                document_path.clone(),
+                old_asset_path,
+            ]))
+            .unwrap();
+        let first_scan =
+            scan_document_from_image(&layout, &first_image, "docs/guide.md", &document_path)
+                .unwrap();
+        assert!(first_scan
+            .required_paths
+            .contains(&VirtualPath::worktree("docs/old.png").unwrap()));
+        let source = DocumentScanSource::Worktree(document_path.clone());
+        let first_scan = hydrate_document_scan(&layout, &first_image, &source, first_scan).unwrap();
+        let first = derive_document_add(
+            captured_issue(&first_image, &issue_path, &id).unwrap(),
+            "docs/guide.md",
+            None,
+            None,
+            None,
+            first_scan.format,
+            first_scan.assets,
+        );
+        let first_plan = finalize(&layout, &first_image, &context, &first.intents).unwrap();
+
+        let mut concurrent = storage.load_issue(&id).unwrap();
+        concurrent.labels.push("owner:concurrent".into());
+        storage.save_issue(concurrent).unwrap();
+        storage.add_repo_file("docs/guide.md", "![new](./new.png)\n");
+        assert!(matches!(
+            first_session.apply(&first_plan),
+            Err(RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+        drop(first_session);
+
+        let new_asset_path = VirtualPath::worktree("docs/new.png").unwrap();
+        let mut retry_session = storage.open_mutation_session(layout.clone()).unwrap();
+        let retry_image = retry_session
+            .capture(capture_spec([
+                issue_path.clone(),
+                events_path,
+                document_path.clone(),
+                new_asset_path,
+            ]))
+            .unwrap();
+        let retry_scan =
+            scan_document_from_image(&layout, &retry_image, "docs/guide.md", &document_path)
+                .unwrap();
+        assert!(retry_scan
+            .required_paths
+            .contains(&VirtualPath::worktree("docs/new.png").unwrap()));
+        let retry_scan = hydrate_document_scan(&layout, &retry_image, &source, retry_scan).unwrap();
+        let retry = derive_document_add(
+            captured_issue(&retry_image, &issue_path, &id).unwrap(),
+            "docs/guide.md",
+            None,
+            None,
+            None,
+            retry_scan.format,
+            retry_scan.assets,
+        );
+        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents).unwrap();
+        assert_eq!(event_bytes(&first_plan), event_bytes(&retry_plan));
+        retry_session.apply(&retry_plan).unwrap();
+
+        let updated = storage.load_issue(&id).unwrap();
+        assert!(updated
+            .labels
+            .iter()
+            .any(|label| label == "owner:concurrent"));
+        assert!(updated
+            .documents
+            .iter()
+            .any(|document| document.path == "docs/other.md"));
+        let guide = updated
+            .documents
+            .iter()
+            .find(|document| document.path == "docs/guide.md")
+            .unwrap();
+        assert_eq!(guide.assets.len(), 1);
+        assert_eq!(guide.assets[0].original_path, "./new.png");
+        assert_eq!(
+            guide.assets[0].asset_type,
+            crate::document::AssetType::Local
+        );
+        assert_eq!(updated.updated_at, expected_time);
+    }
+
+    #[test]
+    fn test_document_remove_from_concurrent_image_preserves_other_fields() {
+        let mut issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
+        issue.labels.push("owner:concurrent".into());
+        issue.documents.extend(
+            ["docs/remove.md", "docs/keep.md"].map(|path| DocumentReference {
+                path: path.into(),
+                commit: None,
+                label: None,
+                doc_type: None,
+                format: None,
+                assets: Vec::new(),
+            }),
+        );
+
+        let derived = derive_document_remove(issue, "docs/remove.md").unwrap();
+        let updated = derived
+            .intents
+            .iter()
+            .find_map(|intent| match intent {
+                crate::repository_state::MutationIntent::UpdateIssue { issue } => Some(issue),
+                _ => None,
+            })
+            .unwrap();
+        assert!(updated
+            .labels
+            .iter()
+            .any(|label| label == "owner:concurrent"));
+        assert_eq!(updated.documents.len(), 1);
+        assert_eq!(updated.documents[0].path, "docs/keep.md");
+    }
+
+    #[test]
+    fn test_document_add_preserves_typed_invalid_path_error() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        let issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
+        let id = issue.id.clone();
+        storage.save_issue(issue).unwrap();
+        let executor =
+            CommandExecutor::new(storage.clone()).with_layout(storage.repository_layout());
+
+        let error = executor
+            .add_document_reference(&id, "../outside.md", None, None, None, false)
+            .unwrap_err();
+        assert!(matches!(
+            error.downcast_ref::<crate::storage::PathReadError>(),
+            Some(crate::storage::PathReadError::InvalidPath(_))
+        ));
+        assert!(storage.load_issue(&id).unwrap().documents.is_empty());
+        assert!(storage.read_events().unwrap().is_empty());
     }
 }

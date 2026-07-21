@@ -103,7 +103,7 @@ fn test_add_document_reference_same_path_updates_in_place() {
 }
 
 #[test]
-fn test_add_document_reference_same_path_logs_update_event_not_add() {
+fn test_add_document_reference_same_path_identical_is_noop() {
     let h = TestHarness::new();
     let id = h.create_issue("Doc re-add event tag");
 
@@ -112,24 +112,15 @@ fn test_add_document_reference_same_path_logs_update_event_not_add() {
         .unwrap();
     assert_last_event_is_documents_update(&h, &id, "doc-add");
 
+    let issue_before = h.storage.load_issue(&id).unwrap();
+    let events_before = h.storage.read_events().unwrap();
     h.executor
         .add_document_reference(&id, "docs/spec.md", None, None, None, true)
         .unwrap();
-    assert_last_event_is_documents_update(&h, &id, "doc-update");
-
-    // Exactly one `doc-add` and one `doc-update` tag among the `documents`
-    // mutations - not two `doc-add`s.
-    let events = h.storage.read_events().unwrap();
-    let doc_tags: Vec<_> = events
-        .iter()
-        .filter_map(|e| match e {
-            Event::IssueUpdated {
-                updated_by, fields, ..
-            } if fields.contains(&"documents".to_string()) => Some(updated_by.as_str()),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(doc_tags, vec!["doc-add", "doc-update"]);
+    let issue_after = h.storage.load_issue(&id).unwrap();
+    assert_eq!(issue_after.updated_at, issue_before.updated_at);
+    assert_eq!(issue_after.documents, issue_before.documents);
+    assert_eq!(h.storage.read_events().unwrap(), events_before);
 }
 
 #[test]
@@ -163,6 +154,7 @@ fn test_add_document_reference_same_path_refreshes_given_metadata() {
     assert_eq!(result.document.commit.as_deref(), Some("abc1234"));
     assert_eq!(result.document.label.as_deref(), Some("Final"));
     assert_eq!(result.document.doc_type.as_deref(), Some("spec"));
+    assert_last_event_is_documents_update(&h, &id, "doc-update");
 
     let listed = h.executor.list_document_references(&id).unwrap();
     assert_eq!(listed.documents.len(), 1);
@@ -236,4 +228,121 @@ fn test_add_document_reference_new_path_appends() {
         })
         .collect();
     assert_eq!(add_tags, vec!["doc-add", "doc-add"]);
+}
+
+#[test]
+fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
+    use jit::commands::CommandExecutor;
+    use jit::storage::{discover_repository_layout, JsonFileStorage};
+    use sha2::{Digest, Sha256};
+
+    let temp = tempfile::tempdir().unwrap();
+    let repo = git2::Repository::init(temp.path()).unwrap();
+    std::fs::create_dir_all(temp.path().join("docs")).unwrap();
+    std::fs::write(temp.path().join("docs/guide.md"), "![pinned](./logo.png)\n").unwrap();
+    std::fs::write(temp.path().join("docs/logo.png"), b"pinned asset").unwrap();
+    let mut index = repo.index().unwrap();
+    index
+        .add_path(std::path::Path::new("docs/guide.md"))
+        .unwrap();
+    index
+        .add_path(std::path::Path::new("docs/logo.png"))
+        .unwrap();
+    let tree_id = index.write_tree().unwrap();
+    let tree = repo.find_tree(tree_id).unwrap();
+    let signature = git2::Signature::now("JIT test", "jit@example.invalid").unwrap();
+    let revision = repo
+        .commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            "pinned document",
+            &tree,
+            &[],
+        )
+        .unwrap()
+        .to_string();
+
+    let storage = JsonFileStorage::new(temp.path().join(".jit"));
+    storage.init().unwrap();
+    let issue = crate::fixture_issue("Pinned docs".into(), String::new());
+    let id = issue.id.clone();
+    storage.save_issue(issue).unwrap();
+    let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
+    let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
+
+    std::fs::write(
+        temp.path().join("docs/guide.md"),
+        "![working](./working.png)\n",
+    )
+    .unwrap();
+    std::fs::write(temp.path().join("docs/logo.png"), b"working asset").unwrap();
+    std::fs::write(temp.path().join("docs/working.png"), b"working only").unwrap();
+
+    let (result, warnings) = executor
+        .add_document_reference(&id, "docs/guide.md", Some(&revision), None, None, false)
+        .unwrap();
+
+    assert!(warnings.is_empty());
+    assert_eq!(result.document.assets.len(), 1);
+    let asset = &result.document.assets[0];
+    let pinned_hash = format!("{:x}", Sha256::digest(b"pinned asset"));
+    assert_eq!(asset.original_path, "./logo.png");
+    assert_eq!(asset.asset_type, jit::document::AssetType::Local);
+    assert_eq!(asset.content_hash.as_deref(), Some(pinned_hash.as_str()));
+}
+
+#[test]
+fn test_add_document_rejects_asset_closure_over_fixed_budget_without_writes() {
+    let h = TestHarness::new();
+    let id = h.create_issue("Bounded document scan");
+    let content = (0..300)
+        .map(|index| format!("![asset](./asset-{index}.png)"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    h.storage.add_repo_file("docs/guide.md", &content);
+    let issue_before = h.storage.load_issue(&id).unwrap();
+    let events_before = h.storage.read_events().unwrap();
+
+    let error = h
+        .executor
+        .add_document_reference(&id, "docs/guide.md", None, None, None, false)
+        .unwrap_err();
+
+    assert!(matches!(
+        error.downcast_ref::<jit::repository_state::CaptureError>(),
+        Some(jit::repository_state::CaptureError::PathBudgetExceeded {
+            actual: 303,
+            maximum: 256
+        })
+    ));
+    assert_eq!(h.storage.load_issue(&id).unwrap(), issue_before);
+    assert_eq!(h.storage.read_events().unwrap(), events_before);
+}
+
+#[test]
+fn test_add_document_rejects_malformed_utf8_without_writes() {
+    use jit::commands::CommandExecutor;
+    use jit::storage::{discover_repository_layout, JsonFileStorage};
+
+    let temp = tempfile::tempdir().unwrap();
+    let storage = JsonFileStorage::new(temp.path().join(".jit"));
+    storage.init().unwrap();
+    let issue = crate::fixture_issue("Malformed document".into(), String::new());
+    let id = issue.id.clone();
+    storage.save_issue(issue).unwrap();
+    std::fs::create_dir_all(temp.path().join("docs")).unwrap();
+    std::fs::write(temp.path().join("docs/guide.md"), [0xff, 0xfe]).unwrap();
+    let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
+    let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
+    let issue_before = storage.load_issue(&id).unwrap();
+    let events_before = storage.read_events().unwrap();
+
+    let error = executor
+        .add_document_reference(&id, "docs/guide.md", None, None, None, false)
+        .unwrap_err();
+
+    assert!(error.to_string().contains("is not UTF-8"));
+    assert_eq!(storage.load_issue(&id).unwrap(), issue_before);
+    assert_eq!(storage.read_events().unwrap(), events_before);
 }
