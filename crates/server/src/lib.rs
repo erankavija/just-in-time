@@ -15,7 +15,8 @@ pub mod watcher;
 pub use routes::create_routes;
 
 use anyhow::{Context, Result};
-use jit::storage::{JsonFileStorage, RecoveryCoordinator, RecoverySession};
+use jit::repository_state::RepositoryLayout;
+use jit::storage::{JsonFileStorage, RepositoryMutationSession, RepositoryStateStore};
 use listenfd::ListenFd;
 use std::net::TcpListener;
 use std::path::Path;
@@ -64,9 +65,11 @@ pub fn resolve_listener(bind_addr: &str) -> Result<(TcpListener, ListenerSource)
 /// any command executor or configuration cache.
 pub fn prepare_server_storage(
     data_dir: impl AsRef<Path>,
-) -> Result<(JsonFileStorage, RecoverySession)> {
+    layout: RepositoryLayout,
+) -> Result<(JsonFileStorage, Box<dyn RepositoryMutationSession>)> {
     let storage = JsonFileStorage::new(data_dir);
-    let recovery_session = RecoveryCoordinator::recover_before_services(&storage)
+    let recovery_session = storage
+        .open_mutation_session(layout)
         .context("Failed to recover pending repository transaction state")?;
     storage.validate().map_err(|error| {
         anyhow::anyhow!(
@@ -114,9 +117,10 @@ mod recovery_startup_tests {
         )
         .unwrap();
 
-        let (_storage, session) =
-            prepare_server_storage(temp.path().join(".jit")).expect("startup recovery");
-        assert_eq!(session.report().recovered_count(), 1);
+        let data = temp.path().join(".jit");
+        let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let (_storage, session) = prepare_server_storage(&data, layout).expect("startup recovery");
+        assert_eq!(session.recovery_report().recovered_count(), 1);
         assert!(!temp.path().join(".jit-bootstrap").exists());
     }
 }

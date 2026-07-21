@@ -697,7 +697,7 @@ impl FileTransactionKernel {
 
     /// Remove worktree-side companions whose owning internal transaction is gone.
     /// Called after internal-journal recovery under the data-root guards.
-    pub(crate) fn sweep_orphan_companions(&self, _guard: &RepoWriteGuard) -> Result<()> {
+    pub(crate) fn sweep_orphan_companions(&self, _guard: &RepoWriteGuard) -> Result<Vec<String>> {
         repository_check(&*self.injector, FailurePoint::RepositorySweepCompanions)?;
         sweep_orphan_companions(self.repository_roots()?)
     }
@@ -707,7 +707,7 @@ impl FileTransactionKernel {
         guard: &RepoWriteGuard,
         location: TransactionControlLocation,
         id: &str,
-    ) -> Result<FileTransactionOutcome> {
+    ) -> Result<RepositoryRecoveryDisposition> {
         let roots = self.repository_roots()?;
         let Some((base, transactions, transaction)) =
             open_repository_transaction_dir(roots, location, id)?
@@ -725,10 +725,7 @@ impl FileTransactionKernel {
         if location == TransactionControlLocation::ExternalBootstrap
             && companion_marker_owner(&transaction)?.is_some()
         {
-            return Ok(FileTransactionOutcome {
-                plan_hash: String::new(),
-                recovery_state: RecoveryState::Clean,
-            });
+            return Ok(RepositoryRecoveryDisposition::SkippedCompanion);
         }
         if metadata_optional(&transaction, JOURNAL_FILE)?.is_none() {
             // No durable journal means nothing was ever published (publication
@@ -742,7 +739,8 @@ impl FileTransactionKernel {
                 transaction,
                 location,
                 id,
-            );
+            )
+            .map(|_| RepositoryRecoveryDisposition::Recovered);
         }
         let bytes = transaction.read(JOURNAL_FILE)?;
         let version = serde_json::from_slice::<serde_json::Value>(&bytes)?
@@ -750,7 +748,9 @@ impl FileTransactionKernel {
             .and_then(serde_json::Value::as_u64);
         if version == Some(u64::from(JOURNAL_VERSION)) {
             drop((transaction, transactions, base));
-            return self.recover(guard, id);
+            return self
+                .recover(guard, id)
+                .map(|_| RepositoryRecoveryDisposition::Recovered);
         }
         let journal: RepositoryTransactionJournal = serde_json::from_slice(&bytes)?;
         // A foreign-owner external journal is another data root's absent-root
@@ -762,10 +762,7 @@ impl FileTransactionKernel {
         if location == TransactionControlLocation::ExternalBootstrap
             && journal.owner_digest != repository_owner_digest(&roots.layout)
         {
-            return Ok(FileTransactionOutcome {
-                plan_hash: String::new(),
-                recovery_state: RecoveryState::Clean,
-            });
+            return Ok(RepositoryRecoveryDisposition::SkippedForeignOwner);
         }
         let stages = open_existing_dir(&transaction, "stages")?;
         let backups = open_existing_dir(&transaction, "backups")?;
@@ -786,6 +783,7 @@ impl FileTransactionKernel {
             companion,
         };
         recover_repository_journal(roots, control, journal, id, &*self.injector)
+            .map(|_| RepositoryRecoveryDisposition::Recovered)
     }
 
     pub(crate) fn execute_repository_delta(
@@ -813,6 +811,17 @@ impl FileTransactionKernel {
             .into()
         })
     }
+}
+
+/// Result of inspecting one repository transaction control during recovery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RepositoryRecoveryDisposition {
+    /// This session recovered or cleaned the named control.
+    Recovered,
+    /// The external control is a companion owned by internal recovery/sweeping.
+    SkippedCompanion,
+    /// The external journal belongs to a different selected data root.
+    SkippedForeignOwner,
 }
 
 struct ControlDirs {
@@ -1120,24 +1129,25 @@ fn internal_transaction_exists(roots: &RepositoryKernelRoots, id: &str) -> Resul
 /// data-root guards. A companion whose marker names a different owner belongs to
 /// another data root sharing this worktree and is left untouched — only that
 /// owner can decide whether its transaction is live or orphaned.
-fn sweep_orphan_companions(roots: &RepositoryKernelRoots) -> Result<()> {
+fn sweep_orphan_companions(roots: &RepositoryKernelRoots) -> Result<Vec<String>> {
     if metadata_optional(&roots.worktree, BOOTSTRAP_DIR)?.is_none() {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let bootstrap = open_existing_dir(&roots.worktree, BOOTSTRAP_DIR)?;
     let Some(transactions_meta) = metadata_optional(&bootstrap, "transactions")? else {
-        return Ok(());
+        return Ok(Vec::new());
     };
     if !transactions_meta.is_dir() {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let owner = repository_owner_digest(&roots.layout);
     let transactions = open_existing_dir(&bootstrap, "transactions")?;
-    let ids = transactions
+    let mut ids = transactions
         .entries()?
         .filter_map(Result::ok)
         .filter_map(|entry| entry.file_name().into_string().ok())
         .collect::<Vec<_>>();
+    ids.sort();
     let mut orphans = Vec::new();
     for id in ids {
         let transaction = open_existing_dir(&transactions, &id)?;
@@ -1149,10 +1159,11 @@ fn sweep_orphan_companions(roots: &RepositoryKernelRoots) -> Result<()> {
     }
     drop(transactions);
     drop(bootstrap);
-    for id in orphans {
-        remove_companion_control(roots, &id)?;
+    orphans.sort();
+    for id in &orphans {
+        remove_companion_control(roots, id)?;
     }
-    Ok(())
+    Ok(orphans)
 }
 
 /// Open a transaction's base, transactions, and `id` directories without

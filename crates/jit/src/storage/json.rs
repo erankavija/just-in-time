@@ -9,20 +9,25 @@
 use crate::declarations::GateRegistry;
 use crate::domain::{parse_known_events, Event, Issue};
 use crate::repository_state::{
-    RepositoryIndex, RepositoryIndexError, SUPPORTED_INDEX_SCHEMA_VERSION,
+    RepositoryIndex, RepositoryIndexError, RepositoryLayout, SUPPORTED_INDEX_SCHEMA_VERSION,
 };
 use crate::storage::{
     AmbiguousIdError, FileLocker, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
-    IssueStore, RecoveryCoordinator, RecoverySession, RepoWriteGuard, RepoWriteLock,
-    RepositoryFormatTooNewError, RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
+    IssueStore, RecoveryDispatchReport, RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError,
+    RepositoryMutationSession, RepositoryNotFoundError, RepositoryStateStore, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::collections::{hash_map::Entry, HashMap};
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread::ThreadId;
 use std::time::Duration;
 
 const ISSUES_DIR: &str = "issues";
@@ -31,6 +36,122 @@ const GATES_FILE: &str = "gates.toml";
 const EVENTS_FILE: &str = "events.jsonl";
 const GATE_RUNS_DIR: &str = "gate-runs";
 const GATE_RUN_RESULT_FILE: &str = "result.json";
+
+static NEXT_RETENTION_ID: AtomicU64 = AtomicU64::new(1);
+
+thread_local! {
+    /// Mutation sessions contain thread-scoped lock-order guards and therefore
+    /// remain on the thread that opened them. Shared storage clones carry only
+    /// the owner thread id used to reject cross-thread release/reentry.
+    static RETAINED_MUTATION_SESSIONS:
+        RefCell<HashMap<u64, Box<dyn RepositoryMutationSession>>> = RefCell::new(HashMap::new());
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum RetainedSessionState {
+    #[default]
+    Idle,
+    Active(ThreadId),
+    Suspended(ThreadId),
+}
+
+/// A nested external-process request encountered a suspended startup session.
+#[derive(Debug, thiserror::Error)]
+#[error("an external process is already running outside the retained mutation session")]
+pub struct RetainedSessionSuspendedError;
+
+/// Thread-bound owner of one retained startup mutation session.
+///
+/// Dropping the guard releases the session and clears its ownership metadata,
+/// including on ordinary error unwinds. It is deliberately not `Send` because
+/// the session's lock-order guard is thread-scoped.
+#[must_use = "dropping the guard releases startup mutation serialization"]
+pub struct RetainedMutationSessionGuard {
+    retention_id: u64,
+    state: Arc<Mutex<RetainedSessionState>>,
+    recovery_report: RecoveryDispatchReport,
+    active: bool,
+    _not_send: std::marker::PhantomData<Rc<()>>,
+}
+
+impl RetainedMutationSessionGuard {
+    /// Recovery completed before this retained session became available.
+    pub fn recovery_report(&self) -> &RecoveryDispatchReport {
+        &self.recovery_report
+    }
+
+    /// Explicitly release this session before the end of its dispatch scope.
+    pub fn release(mut self) -> Result<()> {
+        self.release_inner()
+    }
+
+    fn release_inner(&mut self) -> Result<()> {
+        if !self.active {
+            return Ok(());
+        }
+        self.active = false;
+        let current = std::thread::current().id();
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        match *state {
+            RetainedSessionState::Idle => return Ok(()),
+            RetainedSessionState::Active(owner) if owner == current => {}
+            RetainedSessionState::Suspended(owner) if owner == current => {
+                *state = RetainedSessionState::Idle;
+                return Ok(());
+            }
+            RetainedSessionState::Active(_) | RetainedSessionState::Suspended(_) => {
+                anyhow::bail!(
+                    "A retained mutation session can only be released by its opening thread"
+                )
+            }
+        }
+        let session = RETAINED_MUTATION_SESSIONS
+            .with(|sessions| sessions.borrow_mut().remove(&self.retention_id));
+        let missing = session.is_none();
+        drop(session);
+        *state = RetainedSessionState::Idle;
+        if missing {
+            anyhow::bail!("The retained mutation session is missing from its opening thread");
+        }
+        Ok(())
+    }
+}
+
+impl Drop for RetainedMutationSessionGuard {
+    fn drop(&mut self) {
+        let _ = self.release_inner();
+    }
+}
+
+struct RetainedSessionSuspension {
+    state: Arc<Mutex<RetainedSessionState>>,
+    owner: ThreadId,
+    active: bool,
+}
+
+impl RetainedSessionSuspension {
+    fn restored(&mut self) {
+        self.active = false;
+    }
+}
+
+impl Drop for RetainedSessionSuspension {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if *state == RetainedSessionState::Suspended(self.owner) {
+            *state = RetainedSessionState::Idle;
+        }
+    }
+}
 
 type Index = RepositoryIndex;
 
@@ -128,13 +249,14 @@ pub struct JsonFileStorage {
     /// Shared by every clone of this instance, so a nested write inside a
     /// sequence that already holds the lock reenters it instead of deadlocking.
     repo_lock: Arc<RepoWriteLock>,
-    /// Startup recovery boundary retained by CLI mutation dispatch.
+    /// Identity of this storage's thread-local retained-session slot.
+    retention_id: u64,
+    /// Lifecycle state of the canonical retained mutation session.
     ///
-    /// External checker execution temporarily removes and drops this session,
-    /// then reacquires it and recovers any journals before checker results are
-    /// persisted. Clones share the slot so the command executor sees the same
-    /// boundary installed by `main`.
-    recovery_session: Arc<Mutex<Option<RecoverySession>>>,
+    /// The session itself is deliberately not shared or `Send`: its lock-order
+    /// guard is thread-scoped. Clones use this metadata to fail cross-thread
+    /// access instead of silently running outside the retained boundary.
+    retained_state: Arc<Mutex<RetainedSessionState>>,
     repository_state_failures: Arc<dyn crate::storage::TransactionFailureInjector>,
     /// Canonical layout of the live mutation session, shared by every clone so
     /// reentry is admitted only for the same selected roots.
@@ -176,7 +298,8 @@ impl JsonFileStorage {
                 Some(Arc::clone(&bootstrap_lock)),
             ),
             bootstrap_lock,
-            recovery_session: Arc::new(Mutex::new(None)),
+            retention_id: NEXT_RETENTION_ID.fetch_add(1, Ordering::Relaxed),
+            retained_state: Arc::new(Mutex::new(RetainedSessionState::Idle)),
             repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
             active_mutation_layout: Arc::new(Default::default()),
             root,
@@ -207,36 +330,46 @@ impl JsonFileStorage {
         Arc::clone(&self.active_mutation_layout)
     }
 
-    /// Retain the startup recovery boundary for this storage and every clone.
+    /// Open and retain this storage's canonical startup mutation session.
     ///
-    /// CLI mutation dispatch installs the session after pre-service recovery.
-    /// At most one session may be retained for one storage instance.
-    pub fn retain_recovery_session(&self, session: RecoverySession) -> Result<()> {
-        let mut retained = self
-            .recovery_session
+    /// The session is opened from `self` for exactly `layout`; callers cannot
+    /// inject a foreign session. It remains on the opening thread because its
+    /// repository lock-order state is thread-scoped.
+    pub fn open_and_retain_mutation_session(
+        &self,
+        layout: RepositoryLayout,
+    ) -> Result<RetainedMutationSessionGuard> {
+        let current = std::thread::current().id();
+        let mut state = self
+            .retained_state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if retained.is_some() {
-            anyhow::bail!("A recovery session is already retained for this storage");
+        if *state != RetainedSessionState::Idle {
+            anyhow::bail!("A mutation session is already retained for this storage");
         }
-        *retained = Some(session);
-        Ok(())
-    }
-
-    /// Release the retained startup recovery boundary, dropping its lock guards.
-    ///
-    /// Returns `true` when a session was retained and has now been dropped.
-    /// The foreground `serve` path uses this to hand the bootstrap → repository
-    /// chain to the server child before blocking on it: pre-service recovery
-    /// has already run on this process, and the child performs its own recovery
-    /// under the ordinary cross-process chain, so retaining the guards while
-    /// waiting on the child would deadlock the child against the parent.
-    pub fn release_recovery_session(&self) -> bool {
-        let mut retained = self
-            .recovery_session
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        retained.take().is_some()
+        let session = self.open_mutation_session(layout)?;
+        let report = session.recovery_report().clone();
+        let inserted = RETAINED_MUTATION_SESSIONS.with(|sessions| {
+            let mut sessions = sessions.borrow_mut();
+            match sessions.entry(self.retention_id) {
+                Entry::Vacant(entry) => {
+                    entry.insert(session);
+                    true
+                }
+                Entry::Occupied(_) => false,
+            }
+        });
+        if !inserted {
+            anyhow::bail!("A mutation session slot is already occupied for this storage");
+        }
+        *state = RetainedSessionState::Active(current);
+        Ok(RetainedMutationSessionGuard {
+            retention_id: self.retention_id,
+            state: Arc::clone(&self.retained_state),
+            recovery_report: report,
+            active: true,
+            _not_send: std::marker::PhantomData,
+        })
     }
 
     /// Acquire only the repository-sibling bootstrap lock.
@@ -280,6 +413,10 @@ impl JsonFileStorage {
     /// just as they are for the ordinary append path.
     pub(crate) fn acquire_events_write_lock(&self) -> Result<crate::storage::lock::LockGuard> {
         self.locker.lock_exclusive(&self.root.join(".events.lock"))
+    }
+
+    pub(crate) fn events_lock_spec(&self) -> (FileLocker, PathBuf) {
+        (self.locker.clone(), self.root.join(".events.lock"))
     }
 
     /// Check if the storage directory exists and is initialized.
@@ -761,26 +898,82 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn run_external_process<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
-        let mut retained = self
-            .recovery_session
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let Some(session) = retained.take() else {
-            return operation();
+        let current = std::thread::current().id();
+        {
+            let mut state = self
+                .retained_state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            match *state {
+                RetainedSessionState::Idle => {
+                    drop(state);
+                    return operation();
+                }
+                RetainedSessionState::Active(owner) if owner == current => {
+                    *state = RetainedSessionState::Suspended(current);
+                }
+                RetainedSessionState::Suspended(_) => {
+                    return Err(RetainedSessionSuspendedError.into());
+                }
+                RetainedSessionState::Active(_) => {
+                    anyhow::bail!(
+                        "An external process can only suspend a retained mutation session on its opening thread"
+                    )
+                }
+            }
+        }
+        let session = RETAINED_MUTATION_SESSIONS
+            .with(|sessions| sessions.borrow_mut().remove(&self.retention_id));
+        let Some(session) = session else {
+            let mut state = self
+                .retained_state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            *state = RetainedSessionState::Idle;
+            anyhow::bail!("The retained mutation session is missing from its opening thread");
+        };
+        let mut suspension = RetainedSessionSuspension {
+            state: Arc::clone(&self.retained_state),
+            owner: current,
+            active: true,
         };
 
         // External checkers may invoke mutating jit subprocesses. Release the
         // process-local session guards before spawning them so those subprocesses
         // acquire the ordinary cross-process bootstrap → repository chain.
+        let layout = session.layout().clone();
         drop(session);
         let operation_result = operation();
 
         // Re-establish the boundary before the caller can persist a verdict.
         // This also repairs a journal left by a checker-side mutation that
         // crashed after preparing or committing its transaction.
-        match RecoveryCoordinator::recover_before_services(self) {
+        match self.open_mutation_session(layout) {
             Ok(session) => {
-                *retained = Some(session);
+                let inserted = RETAINED_MUTATION_SESSIONS.with(|sessions| {
+                    let mut sessions = sessions.borrow_mut();
+                    match sessions.entry(self.retention_id) {
+                        Entry::Vacant(entry) => {
+                            entry.insert(session);
+                            true
+                        }
+                        Entry::Occupied(_) => false,
+                    }
+                });
+                if !inserted {
+                    anyhow::bail!("The retained mutation session slot became occupied");
+                }
+                let mut state = self
+                    .retained_state
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                if *state != RetainedSessionState::Suspended(current) {
+                    RETAINED_MUTATION_SESSIONS
+                        .with(|sessions| sessions.borrow_mut().remove(&self.retention_id));
+                    anyhow::bail!("The retained mutation session suspension was lost");
+                }
+                *state = RetainedSessionState::Active(current);
+                suspension.restored();
                 operation_result
             }
             Err(recovery_error) => {
@@ -792,7 +985,7 @@ impl IssueStore for JsonFileStorage {
                          the external process also failed: {operation_error:#}"
                     ),
                 };
-                Err(recovery_error.context(context))
+                Err(anyhow::Error::new(recovery_error).context(context))
             }
         }
     }
@@ -1395,6 +1588,140 @@ mod tests {
     use crate::declarations::GateDefinition;
     use crate::storage::IssueStore;
     use tempfile::TempDir;
+
+    fn retained_storage() -> (
+        TempDir,
+        RepositoryLayout,
+        JsonFileStorage,
+        RetainedMutationSessionGuard,
+    ) {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        let storage = JsonFileStorage::new(&data);
+        storage.init().unwrap();
+        let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let retained = storage
+            .open_and_retain_mutation_session(layout.clone())
+            .unwrap();
+        (temp, layout, storage, retained)
+    }
+
+    #[test]
+    fn test_external_process_reopens_retained_canonical_session() {
+        let (temp, _, storage, retained) = retained_storage();
+
+        let competing = RepoWriteLock::for_lock_path(
+            temp.path().join(".jit-bootstrap.lock"),
+            std::time::Duration::from_millis(100),
+        );
+        storage
+            .run_external_process(|| {
+                let _guard = competing.acquire()?;
+                Ok(())
+            })
+            .unwrap();
+        assert!(storage
+            .run_external_process::<()>(|| anyhow::bail!("checker failed"))
+            .is_err());
+
+        assert!(
+            competing.acquire().is_err(),
+            "the canonical session must be retained again before returning"
+        );
+        drop(retained);
+    }
+
+    #[test]
+    fn test_retained_session_rejects_other_layout_and_thread() {
+        let other_worktree = TempDir::new().unwrap();
+        let (_temp, _, storage, retained) = retained_storage();
+
+        let other_layout =
+            crate::storage::discover_repository_layout(other_worktree.path(), storage.root())
+                .unwrap();
+        assert!(matches!(
+            storage.open_mutation_session(other_layout),
+            Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+
+        let other_thread = storage.clone();
+        assert!(
+            std::thread::spawn(move || other_thread.run_external_process(|| Ok(())))
+                .join()
+                .unwrap()
+                .is_err()
+        );
+        drop(retained);
+    }
+
+    #[test]
+    fn test_retained_startup_session_allows_event_publication() {
+        let (_temp, _, storage, retained) = retained_storage();
+
+        let event = Event::IssueCreated {
+            id: "startup-event".to_string(),
+            issue_id: "issue-id".to_string(),
+            timestamp: chrono::Utc::now(),
+            title: "Created after startup recovery".to_string(),
+            priority: crate::domain::Priority::Normal,
+        };
+        storage.append_event(&event).unwrap();
+
+        assert_eq!(storage.read_events().unwrap(), vec![event]);
+        drop(retained);
+    }
+
+    #[test]
+    fn test_retained_guard_error_unwind_clears_session_and_order_state() {
+        fn fail_after_retaining(storage: JsonFileStorage, layout: RepositoryLayout) -> Result<()> {
+            let _retained = storage.open_and_retain_mutation_session(layout)?;
+            anyhow::bail!("dispatch failed")
+        }
+
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::new(&data);
+
+        assert!(fail_after_retaining(storage, layout.clone()).is_err());
+        let reopened = JsonFileStorage::new(&data);
+        let session = reopened.open_mutation_session(layout).unwrap();
+        drop(session);
+        assert!(crate::storage::guard_order::CoordinationOrderGuard::enter().is_ok());
+    }
+
+    #[test]
+    fn test_nested_external_process_fails_typed_without_deadlock() {
+        let (_temp, _, storage, retained) = retained_storage();
+
+        storage
+            .run_external_process(|| {
+                let error = storage.run_external_process(|| Ok(())).unwrap_err();
+                assert!(error
+                    .downcast_ref::<RetainedSessionSuspendedError>()
+                    .is_some());
+                Ok(())
+            })
+            .unwrap();
+
+        drop(retained);
+    }
+
+    #[test]
+    fn test_external_process_panic_does_not_leave_stale_owner() {
+        let (_temp, layout, storage, retained) = retained_storage();
+
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _: Result<()> = storage.run_external_process(|| panic!("checker panic"));
+        }));
+        assert!(panic.is_err());
+        drop(retained);
+
+        let session = storage.open_mutation_session(layout).unwrap();
+        drop(session);
+        assert!(crate::storage::guard_order::CoordinationOrderGuard::enter().is_ok());
+    }
 
     fn assert_direct_writer_waits_for_repository_guard(
         storage: &JsonFileStorage,

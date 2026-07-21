@@ -184,17 +184,21 @@ impl<S: IssueStore> IssueStore for FaultyStore<S> {
     }
 }
 
-struct FaultyMutationSession<'a> {
-    inner: Box<dyn jit::storage::RepositoryMutationSession + 'a>,
+struct FaultyMutationSession {
+    inner: Box<dyn jit::storage::RepositoryMutationSession>,
     fail_on: SavePredicate,
     armed: Arc<AtomicBool>,
     fired: Arc<AtomicBool>,
     saved: Arc<Mutex<Vec<String>>>,
 }
 
-impl jit::storage::RepositoryMutationSession for FaultyMutationSession<'_> {
+impl jit::storage::RepositoryMutationSession for FaultyMutationSession {
     fn layout(&self) -> &jit::repository_state::RepositoryLayout {
         self.inner.layout()
+    }
+
+    fn recovery_report(&self) -> &jit::storage::RecoveryDispatchReport {
+        self.inner.recovery_report()
     }
 
     fn capture(
@@ -250,7 +254,7 @@ impl<S: IssueStore + jit::storage::RepositoryStateStore> jit::storage::Repositor
         &self,
         layout: jit::repository_state::RepositoryLayout,
     ) -> Result<
-        Box<dyn jit::storage::RepositoryMutationSession + '_>,
+        Box<dyn jit::storage::RepositoryMutationSession>,
         jit::storage::RepositoryStateStoreError,
     > {
         Ok(Box::new(FaultyMutationSession {
@@ -744,8 +748,8 @@ impl IssueStore for StallingStore {
     }
 }
 
-struct StallingMutationSession<'a> {
-    inner: Box<dyn jit::storage::RepositoryMutationSession + 'a>,
+struct StallingMutationSession {
+    inner: Box<dyn jit::storage::RepositoryMutationSession>,
     stall_on: SavePredicate,
     stall_for: Duration,
     armed: Arc<AtomicBool>,
@@ -753,9 +757,13 @@ struct StallingMutationSession<'a> {
     stalling: Arc<(Mutex<bool>, Condvar)>,
 }
 
-impl jit::storage::RepositoryMutationSession for StallingMutationSession<'_> {
+impl jit::storage::RepositoryMutationSession for StallingMutationSession {
     fn layout(&self) -> &jit::repository_state::RepositoryLayout {
         self.inner.layout()
+    }
+
+    fn recovery_report(&self) -> &jit::storage::RecoveryDispatchReport {
+        self.inner.recovery_report()
     }
 
     fn capture(
@@ -800,7 +808,7 @@ impl jit::storage::RepositoryStateStore for StallingStore {
         &self,
         layout: jit::repository_state::RepositoryLayout,
     ) -> Result<
-        Box<dyn jit::storage::RepositoryMutationSession + '_>,
+        Box<dyn jit::storage::RepositoryMutationSession>,
         jit::storage::RepositoryStateStoreError,
     > {
         Ok(Box::new(StallingMutationSession {

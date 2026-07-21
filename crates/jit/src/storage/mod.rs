@@ -28,7 +28,6 @@ pub mod lock;
 pub mod lock_cleanup;
 pub mod memory;
 pub mod path_errors;
-pub mod recovery_coordinator;
 pub mod reference;
 pub mod repo_lock;
 pub mod repository_state_store;
@@ -64,15 +63,14 @@ pub use file_transaction::{
     FileTransactionKernel, FileTransactionOutcome, FileTransactionPlan, TransactionControlLocation,
 };
 pub use git_revision::{GitRevisionError, GitRevisionResolver, PinnedArtifactRead};
-pub use json::JsonFileStorage;
+pub use json::{JsonFileStorage, RetainedMutationSessionGuard, RetainedSessionSuspendedError};
 pub use lock::FileLocker;
 pub use path_errors::{validate_repo_relative_path, PathReadError};
-pub use recovery_coordinator::{RecoveryCoordinator, RecoveryDispatchReport, RecoverySession};
 pub use reference::{render_reference_markdown, GateRunField, REFERENCE_PATH};
 pub use repo_lock::{RepoWriteGuard, RepoWriteLock};
 pub use repository_state_store::{
-    discover_repository_layout, RepositoryApplyOutcome, RepositoryMutationSession,
-    RepositoryStateStore, RepositoryStateStoreError,
+    discover_repository_layout, RecoveryDispatchReport, RepositoryApplyOutcome,
+    RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
 };
 pub use transaction_action::TransactionAction;
 pub use transaction_journal::TransactionDecision;
@@ -118,7 +116,7 @@ pub trait IssueStore: Clone {
     /// timeout.
     fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard>;
 
-    /// Run an external process outside any startup recovery session retained by
+    /// Run an external process outside any startup mutation session retained by
     /// this backend, then restore recovery serialization before returning.
     ///
     /// File-backed CLI storage overrides this to release the bootstrap and

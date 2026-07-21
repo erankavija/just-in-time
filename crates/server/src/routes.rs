@@ -1025,13 +1025,41 @@ mod tests {
     use super::*;
     use axum_test::TestServer;
     use jit::domain::Priority;
-    use jit::storage::InMemoryStorage;
+    use jit::storage::{InMemoryStorage, RepositoryStateStore};
 
     use crate::watcher::ChangeTracker;
 
+    fn test_executor<S>(storage: S) -> Arc<CommandExecutor<S>>
+    where
+        S: IssueStore + RepositoryStateStore,
+    {
+        let layout = if storage.is_file_backed() {
+            let data_root = storage.root();
+            let worktree_root = data_root
+                .parent()
+                .expect("a file-backed test data root has a worktree parent");
+            jit::storage::discover_repository_layout(worktree_root, data_root).unwrap()
+        } else {
+            jit::repository_state::RepositoryLayout::new(
+                jit::repository_state::RepositoryRootEvidence::new(
+                    storage.root(),
+                    format!("test-worktree:{}", storage.root().display()),
+                    true,
+                ),
+                jit::repository_state::RepositoryRootEvidence::new(
+                    storage.root().join(".jit"),
+                    format!("test-data:{}", storage.root().display()),
+                    true,
+                ),
+            )
+            .unwrap()
+        };
+        Arc::new(CommandExecutor::new(storage).with_layout(layout))
+    }
+
     fn create_test_app() -> TestServer {
         let storage = InMemoryStorage::new();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
             executor,
@@ -1073,7 +1101,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_issues_with_data() {
         let storage = InMemoryStorage::new();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
 
         // Create test issues
         let (_id1, _) = executor
@@ -1128,7 +1156,7 @@ enforce_leases = "off"
 "#;
         std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
 
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
 
         // Create issues with dependencies
         let (id1, _) = executor
@@ -1188,7 +1216,7 @@ enforce_leases = "off"
         )
         .unwrap();
 
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         let new = |title: &str| {
             executor
                 .create_issue(
@@ -1237,7 +1265,7 @@ enforce_leases = "off"
         )
         .unwrap();
 
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         let new = |title: &str, labels: Vec<String>| {
             executor
                 .create_issue(
@@ -1304,7 +1332,7 @@ enforce_leases = "off"
         )
         .unwrap();
 
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         executor
             .create_issue(
                 "Untyped".to_string(),
@@ -1339,7 +1367,7 @@ enforce_leases = "off"
     #[tokio::test]
     async fn test_get_status() {
         let storage = InMemoryStorage::new();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
 
         let (_id, _) = executor
             .create_issue(
@@ -1481,7 +1509,7 @@ pattern = '^v\d+\.\d+$'
         .unwrap();
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
             executor,
@@ -1553,7 +1581,7 @@ pattern = '^v\d+\.\d+$'
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
 
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
 
         // Keep tempdir alive for the duration of the test.
@@ -1643,7 +1671,7 @@ pattern = '^v\d+\.\d+$'
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
 
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
 
         // Create an issue.
         let (id, _) = executor
@@ -1762,7 +1790,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
 
         let (id, _) = executor
             .create_issue(
@@ -1836,7 +1864,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         Box::leak(Box::new(temp));
 
         let tracker = Arc::new(ChangeTracker::new(16));
@@ -1893,7 +1921,7 @@ pattern = '^v\d+\.\d+$'
     #[tokio::test]
     async fn test_get_changes_reflects_tracker_state() {
         let storage = InMemoryStorage::new();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
 
         // Simulate a change
@@ -1998,7 +2026,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         // Keep tempdir alive.
         Box::leak(Box::new(temp));
 
@@ -2041,7 +2069,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         Box::leak(Box::new(temp));
 
         let tracker = Arc::new(ChangeTracker::new(16));
@@ -2097,7 +2125,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
 
         let (id, _) = executor
             .create_issue(
@@ -2155,7 +2183,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
 
         let doc_rel = "bench/results.csv";
         let doc_content = "prime,n,kernel\n31,1024,C\n";
@@ -2228,7 +2256,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
 
         let (id, _) = executor
             .create_issue(
@@ -2282,7 +2310,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
 
         let doc_rel = "bench/results.csv";
         let doc_content = "prime,n,kernel\n7,256,F\n";
@@ -2489,7 +2517,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
             executor,
@@ -2630,7 +2658,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
 
         let (id, _) = executor
             .create_issue(
@@ -2741,7 +2769,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
             executor,
@@ -2797,7 +2825,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
         let (id, _) = executor
             .create_issue(
                 "Symlink escape repro".to_string(),
@@ -2863,7 +2891,7 @@ pattern = '^v\d+\.\d+$'
 
         let storage = JsonFileStorage::new(&jit_dir);
         storage.init().unwrap();
-        let executor = Arc::new(CommandExecutor::new(storage));
+        let executor = test_executor(storage);
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {

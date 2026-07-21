@@ -796,13 +796,17 @@ impl FailingSaveStorage {
     }
 }
 
-struct FailingMutationSession<'a> {
-    inner: Box<dyn jit::storage::RepositoryMutationSession + 'a>,
+struct FailingMutationSession {
+    inner: Box<dyn jit::storage::RepositoryMutationSession>,
 }
 
-impl jit::storage::RepositoryMutationSession for FailingMutationSession<'_> {
+impl jit::storage::RepositoryMutationSession for FailingMutationSession {
     fn layout(&self) -> &jit::repository_state::RepositoryLayout {
         self.inner.layout()
+    }
+
+    fn recovery_report(&self) -> &jit::storage::RecoveryDispatchReport {
+        self.inner.recovery_report()
     }
 
     fn capture(
@@ -828,7 +832,7 @@ impl jit::storage::RepositoryStateStore for FailingSaveStorage {
         &self,
         layout: jit::repository_state::RepositoryLayout,
     ) -> Result<
-        Box<dyn jit::storage::RepositoryMutationSession + '_>,
+        Box<dyn jit::storage::RepositoryMutationSession>,
         jit::storage::RepositoryStateStoreError,
     > {
         Ok(Box::new(FailingMutationSession {

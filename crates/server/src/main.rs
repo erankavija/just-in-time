@@ -58,26 +58,24 @@ async fn main() -> Result<()> {
 
     info!("Starting JIT API Server...");
 
-    // Recover before validation or command-service construction.
-    let (storage, recovery_session) = prepare_server_storage(&args.data_dir)?;
+    // Discover one Git-optional repository layout before recovery, validation,
+    // or command-service construction. The selected worktree comes from the
+    // process boundary, never from the data directory's parent.
+    let data_dir_path = std::path::Path::new(&args.data_dir);
+    let worktree_paths = jit::storage::worktree_paths::WorktreePaths::detect()
+        .context("failed to discover repository worktree layout")?;
+    let worktree_root = worktree_paths.worktree_root;
+    let executor_layout = jit::storage::discover_repository_layout(&worktree_root, data_dir_path)
+        .context("failed to construct repository layout")?;
+    let (storage, recovery_session) =
+        prepare_server_storage(data_dir_path, executor_layout.clone())?;
 
     info!("Using JIT repository at: {}", args.data_dir);
-    // Construct the executor over its canonical layout so any session-opening
-    // command reached in-process mutates through the repository-mount boundary
-    // (the worktree root is the parent of the selected data root for the D-10
-    // single-mount topology). Layout construction is mandatory even for today's
-    // read-only HTTP surface so future mutation paths cannot inherit a fallback.
-    let data_dir_path = std::path::Path::new(&args.data_dir);
-    let worktree = data_dir_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("repository data directory has no parent worktree"))?;
-    let executor_layout = jit::storage::discover_repository_layout(worktree, data_dir_path)
-        .context("failed to construct repository layout")?;
     let executor = Arc::new(CommandExecutor::new(storage).with_layout(executor_layout));
-    if recovery_session.report().recovered_count() > 0 {
+    if recovery_session.recovery_report().recovered_count() > 0 {
         info!(
             "Recovered {} pending transaction(s) before server startup",
-            recovery_session.report().recovered_count()
+            recovery_session.recovery_report().recovered_count()
         );
     }
     // The current HTTP surface is read-only. Release startup serialization
@@ -90,14 +88,10 @@ async fn main() -> Result<()> {
     let tracker = Arc::new(tracker);
     info!("Watching {} for changes", args.data_dir);
 
-    // Derive project name from the data directory's parent (the repo root)
-    let project_name = std::path::Path::new(&args.data_dir)
-        .canonicalize()
-        .ok()
-        .and_then(|p| {
-            p.parent()
-                .and_then(|parent| parent.file_name().map(|n| n.to_string_lossy().into_owned()))
-        })
+    // The display name follows the already-discovered repository boundary.
+    let project_name = worktree_root
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| "jit".to_string());
 
     let state = AppState {

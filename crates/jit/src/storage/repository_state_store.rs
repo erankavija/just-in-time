@@ -10,10 +10,11 @@ use crate::repository_state::{
     RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RepositoryRootEvidence,
     RootRelativePath, VirtualPath,
 };
+use crate::storage::file_transaction::RepositoryRecoveryDisposition;
 use crate::storage::memory::{MemoryRecoveryResidue, MemoryRepositoryState};
 use crate::storage::{
-    FileTransactionKernel, InMemoryStorage, IssueStore, JsonFileStorage, RepoWriteGuard,
-    TransactionControlLocation, TransactionFailurePoint,
+    FileLocker, FileTransactionKernel, InMemoryStorage, IssueStore, JsonFileStorage,
+    RepoWriteGuard, TransactionControlLocation, TransactionFailurePoint,
 };
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
@@ -31,6 +32,22 @@ pub struct RepositoryApplyOutcome {
     pub transaction_hash: String,
     /// Number of normalized actions applied.
     pub actions_applied: usize,
+}
+
+/// Transaction journals recovered while opening one repository mutation session.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RecoveryDispatchReport {
+    /// External journals or orphan controls recovered in deterministic id order.
+    pub external_transactions: Vec<String>,
+    /// Internal data-root journals recovered in deterministic id order.
+    pub internal_transactions: Vec<String>,
+}
+
+impl RecoveryDispatchReport {
+    /// Total number of transaction journals recovered.
+    pub fn recovered_count(&self) -> usize {
+        self.external_transactions.len() + self.internal_transactions.len()
+    }
 }
 
 /// Storage/session failures with retryable conflicts kept distinguishable.
@@ -115,6 +132,8 @@ impl Drop for LayoutReentry {
 pub trait RepositoryMutationSession {
     /// Canonical layout held by this session.
     fn layout(&self) -> &RepositoryLayout;
+    /// Recovery completed before this session became available for capture.
+    fn recovery_report(&self) -> &RecoveryDispatchReport;
     /// Capture one complete bounded image after recovery has converged.
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError>;
     /// Revalidate the complete image and publish one complete semantic plan.
@@ -130,7 +149,7 @@ pub trait RepositoryStateStore {
     fn open_mutation_session(
         &self,
         layout: RepositoryLayout,
-    ) -> Result<Box<dyn RepositoryMutationSession + '_>, RepositoryStateStoreError>;
+    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError>;
 }
 
 /// Acquire no-follow root evidence and construct the canonical layout.
@@ -213,6 +232,7 @@ impl CapabilityRoots {
 
 struct JsonMutationSession {
     layout: RepositoryLayout,
+    recovery_report: RecoveryDispatchReport,
     roots: CapabilityRoots,
     kernel: FileTransactionKernel,
     /// Worktree-root bootstrap lock, held outermost so the worktree-side
@@ -220,15 +240,16 @@ struct JsonMutationSession {
     _worktree_bootstrap_guard: RepoWriteGuard,
     _bootstrap_guard: RepoWriteGuard,
     _repository_guard: Option<RepoWriteGuard>,
-    _events_guard: Option<crate::storage::lock::LockGuard>,
+    events_lock: Option<(FileLocker, PathBuf)>,
     _reentry: LayoutReentry,
     _order_guard: crate::storage::guard_order::RepositoryOrderGuard,
     captured: Option<RepositoryImage>,
 }
 
-struct MemoryMutationSession<'a> {
+struct MemoryMutationSession {
     layout: RepositoryLayout,
-    storage: &'a InMemoryStorage,
+    storage: InMemoryStorage,
+    recovery_report: RecoveryDispatchReport,
     _guard: RepoWriteGuard,
     _reentry: LayoutReentry,
     _order_guard: crate::storage::guard_order::RepositoryOrderGuard,
@@ -239,7 +260,7 @@ impl RepositoryStateStore for JsonFileStorage {
     fn open_mutation_session(
         &self,
         layout: RepositoryLayout,
-    ) -> Result<Box<dyn RepositoryMutationSession + '_>, RepositoryStateStoreError> {
+    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
         if lexical_absolute(self.root())? != layout.data_root() {
             return Err(
                 RepositoryLayoutError::OutsideRepositoryRoots(self.root().to_path_buf()).into(),
@@ -285,7 +306,7 @@ impl RepositoryStateStore for JsonFileStorage {
             Arc::clone(&injector),
         )?;
         injector.check(&TransactionFailurePoint::RepositoryRecoveryExternal)?;
-        recover_location(
+        let external_transactions = recover_location(
             &recovery_kernel,
             &bootstrap_guard,
             TransactionControlLocation::ExternalBootstrap,
@@ -307,31 +328,45 @@ impl RepositoryStateStore for JsonFileStorage {
             Arc::clone(&injector),
         )?;
 
-        let (repository_guard, events_guard) = if roots.data.is_some() {
-            let repository_guard = self.acquire_repo_write_lock_raw()?;
-            let events_guard = self.acquire_events_write_lock()?;
-            injector.check(&TransactionFailurePoint::RepositoryRecoveryInternal)?;
-            recover_location(
-                &kernel,
-                &repository_guard,
-                TransactionControlLocation::InternalRepository,
-            )?;
-            // After internal-journal recovery, reclaim worktree-side companions
-            // left orphaned by a crash whose internal transaction is already gone.
-            kernel.sweep_orphan_companions(&repository_guard)?;
-            (Some(repository_guard), Some(events_guard))
-        } else {
-            (None, None)
-        };
+        let (repository_guard, internal_transactions, external_transactions) =
+            if roots.data.is_some() {
+                let repository_guard = self.acquire_repo_write_lock_raw()?;
+                let _events_guard = self.acquire_events_write_lock()?;
+                injector.check(&TransactionFailurePoint::RepositoryRecoveryInternal)?;
+                let internal_transactions = recover_location(
+                    &kernel,
+                    &repository_guard,
+                    TransactionControlLocation::InternalRepository,
+                )?;
+                // After internal-journal recovery, reclaim worktree-side companions
+                // left orphaned by a crash whose internal transaction is already gone.
+                let swept_companions = kernel.sweep_orphan_companions(&repository_guard)?;
+                let mut external_transactions = external_transactions;
+                external_transactions.extend(swept_companions);
+                external_transactions.sort();
+                external_transactions.dedup();
+                (
+                    Some(repository_guard),
+                    internal_transactions,
+                    external_transactions,
+                )
+            } else {
+                (None, Vec::new(), external_transactions)
+            };
+        let events_lock = roots.data.as_ref().map(|_| self.events_lock_spec());
 
         Ok(Box::new(JsonMutationSession {
             layout,
+            recovery_report: RecoveryDispatchReport {
+                external_transactions,
+                internal_transactions,
+            },
             roots,
             kernel,
             _worktree_bootstrap_guard: worktree_bootstrap_guard,
             _bootstrap_guard: bootstrap_guard,
             _repository_guard: repository_guard,
-            _events_guard: events_guard,
+            events_lock,
             _reentry: reentry,
             _order_guard: order_guard,
             captured: None,
@@ -343,7 +378,7 @@ impl RepositoryStateStore for InMemoryStorage {
     fn open_mutation_session(
         &self,
         layout: RepositoryLayout,
-    ) -> Result<Box<dyn RepositoryMutationSession + '_>, RepositoryStateStoreError> {
+    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
         self.active_mutation_layout().enter(&layout)?;
         let reentry = LayoutReentry(self.active_mutation_layout());
         let order_guard = crate::storage::guard_order::RepositoryOrderGuard::enter();
@@ -366,7 +401,8 @@ impl RepositoryStateStore for InMemoryStorage {
         }
         Ok(Box::new(MemoryMutationSession {
             layout,
-            storage: self,
+            storage: self.clone(),
+            recovery_report: RecoveryDispatchReport::default(),
             _guard: guard,
             _reentry: reentry,
             _order_guard: order_guard,
@@ -378,6 +414,10 @@ impl RepositoryStateStore for InMemoryStorage {
 impl RepositoryMutationSession for JsonMutationSession {
     fn layout(&self) -> &RepositoryLayout {
         &self.layout
+    }
+
+    fn recovery_report(&self) -> &RecoveryDispatchReport {
+        &self.recovery_report
     }
 
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
@@ -407,6 +447,16 @@ impl RepositoryMutationSession for JsonMutationSession {
                 path: first_image_difference(image, &current),
             });
         }
+        // Recovery takes this finer lock only while it edits the event log.
+        // Acquire it again for publication, rather than retaining it for the
+        // whole session: ordinary command dispatch legitimately reenters the
+        // repository guard and may append events while the startup session is
+        // retained.
+        let _events_guard = self
+            .events_lock
+            .as_ref()
+            .map(|(locker, path)| locker.lock_exclusive(path))
+            .transpose()?;
         let guard = self
             ._repository_guard
             .as_ref()
@@ -424,9 +474,13 @@ impl RepositoryMutationSession for JsonMutationSession {
     }
 }
 
-impl RepositoryMutationSession for MemoryMutationSession<'_> {
+impl RepositoryMutationSession for MemoryMutationSession {
     fn layout(&self) -> &RepositoryLayout {
         &self.layout
+    }
+
+    fn recovery_report(&self) -> &RecoveryDispatchReport {
+        &self.recovery_report
     }
 
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
@@ -552,11 +606,21 @@ fn recover_location(
     kernel: &FileTransactionKernel,
     guard: &RepoWriteGuard,
     location: TransactionControlLocation,
-) -> Result<(), RepositoryStateStoreError> {
-    for id in kernel.pending_repository_transactions(location)? {
-        kernel.recover_repository_transaction(guard, location, &id)?;
-    }
-    Ok(())
+) -> Result<Vec<String>, RepositoryStateStoreError> {
+    let transactions = kernel.pending_repository_transactions(location)?;
+    transactions
+        .into_iter()
+        .filter_map(
+            |id| match kernel.recover_repository_transaction(guard, location, &id) {
+                Ok(RepositoryRecoveryDisposition::Recovered) => Some(Ok(id)),
+                Ok(
+                    RepositoryRecoveryDisposition::SkippedCompanion
+                    | RepositoryRecoveryDisposition::SkippedForeignOwner,
+                ) => None,
+                Err(error) => Some(Err(RepositoryStateStoreError::Transaction(error))),
+            },
+        )
+        .collect()
 }
 
 fn map_transaction_error(
@@ -1832,6 +1896,30 @@ mod tests {
     }
 
     #[test]
+    fn test_session_reports_recovered_transactions() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        let layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(
+            &data,
+            SelectedFailures::one(TransactionFailurePoint::RepositoryCleanup),
+        );
+        let mut session = storage.open_mutation_session(layout).unwrap();
+        let image = session.capture(initial_spec()).unwrap();
+        let delta = initialization_delta(image.layout());
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
+        drop(session);
+
+        let recovered_layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let recovered = JsonFileStorage::new(&data)
+            .open_mutation_session(recovered_layout)
+            .unwrap();
+        assert_eq!(recovered.recovery_report().recovered_count(), 1);
+        assert_eq!(recovered.recovery_report().external_transactions.len(), 1);
+        assert!(recovered.recovery_report().internal_transactions.is_empty());
+    }
+
+    #[test]
     fn test_delete_recovery_refuses_post_crash_occupant() {
         let temp = TempDir::new().unwrap();
         let data = temp.path().join(".jit");
@@ -2826,6 +2914,7 @@ mod tests {
             .unwrap()
             .unwrap()
             .path();
+        let transaction_id = companion.file_name().unwrap().to_str().unwrap().to_string();
         assert!(companion.join("companion").is_file());
         assert!(companion.join("stages").is_dir());
         assert!(companion.join("backups").is_dir());
@@ -2835,9 +2924,14 @@ mod tests {
         );
 
         // Recovery reclaims the companion and converges to the published state.
-        JsonFileStorage::new(&data)
+        let recovered = JsonFileStorage::new(&data)
             .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
             .unwrap();
+        assert!(recovered.recovery_report().external_transactions.is_empty());
+        assert_eq!(
+            recovered.recovery_report().internal_transactions,
+            vec![transaction_id]
+        );
         assert!(!worktree.path().join(".jit-bootstrap").exists());
         assert_eq!(
             std::fs::read(worktree.path().join("out.txt")).unwrap(),
@@ -2946,13 +3040,20 @@ mod tests {
         // Fabricate a companion OWNED BY THIS data root whose internal transaction
         // never existed. Its marker records the owner digest the running session
         // recomputes, so the sweep recognizes it as its own orphan.
-        fabricate_companion(worktree.path(), "orphan-id", &owner_digest_of(&layout));
+        let owner = owner_digest_of(&layout);
+        fabricate_companion(worktree.path(), "z-orphan", &owner);
+        fabricate_companion(worktree.path(), "a-orphan", &owner);
 
         // Opening a session skips the companion in external recovery, then the
         // orphan sweep (data-root guards held) removes it.
-        JsonFileStorage::new(&data)
+        let recovered = JsonFileStorage::new(&data)
             .open_mutation_session(layout)
             .unwrap();
+        assert_eq!(
+            recovered.recovery_report().external_transactions,
+            vec!["a-orphan", "z-orphan"]
+        );
+        assert!(recovered.recovery_report().internal_transactions.is_empty());
         assert!(!worktree.path().join(".jit-bootstrap").exists());
     }
 
@@ -2993,9 +3094,13 @@ mod tests {
             "a-different-data-root-owner-digest",
         );
 
-        JsonFileStorage::new(&data)
+        let recovered = JsonFileStorage::new(&data)
             .open_mutation_session(layout)
             .unwrap();
+        assert_eq!(
+            recovered.recovery_report(),
+            &RecoveryDispatchReport::default()
+        );
 
         // The foreign companion survives — this session never reaps another data
         // root's transaction, so it cannot destroy a live companion's backup.
@@ -3035,9 +3140,13 @@ mod tests {
 
         // Open succeeds (does not fail against the foreign journal) and leaves the
         // foreign residue intact for its owning data root's session.
-        JsonFileStorage::new(&data)
+        let recovered = JsonFileStorage::new(&data)
             .open_mutation_session(layout)
             .unwrap();
+        assert_eq!(
+            recovered.recovery_report(),
+            &RecoveryDispatchReport::default()
+        );
         assert!(worktree
             .path()
             .join(".jit-bootstrap/transactions/foreign-journal/journal.json")

@@ -1848,22 +1848,8 @@ fn run() -> Result<()> {
     };
 
     let storage = JsonFileStorage::new(&jit_dir);
-    // Recovery is deliberately ahead of repository validation and
-    // CommandExecutor construction: both can load state a pending journal is
-    // responsible for repairing. Keep the session alive through dispatch so
-    // mutating CLI commands retain bootstrap → repository serialization until
-    // their last write.
-    let recovery_session = requires_recovery_dispatch
-        .then(|| jit::storage::RecoveryCoordinator::recover_before_services(&storage))
-        .transpose()?;
-    let transactions_recovered = recovery_session
-        .as_ref()
-        .map(|session| session.report().recovered_count())
-        .unwrap_or(0);
-    if let Some(session) = recovery_session {
-        storage.retain_recovery_session(session)?;
-    }
-    // Construct the executor over its canonical repository layout: the Git-optional
+    // Construct the canonical repository layout before any recovery or service
+    // reads: the Git-optional
     // worktree root (falling back to the current directory outside Git) plus the
     // selected data root. Session-opening commands mutate through exactly this
     // layout; the worktree root always comes from this boundary, never inferred
@@ -1874,6 +1860,32 @@ fn run() -> Result<()> {
     let executor_layout =
         jit::storage::discover_repository_layout(worktree_paths.worktree_root, &jit_dir)
             .context("failed to construct repository layout")?;
+    // Session opening is the one recovery boundary. Ordinary mutation dispatch
+    // asks storage to open and retain its own exact session, so no caller can
+    // inject a foreign session. Claim mutation is the deliberate exception:
+    // its command opens the retained operation session only after coordination.
+    let mut retained_mutation_session = None;
+    let transactions_recovered = if requires_recovery_dispatch {
+        if matches!(&command, Commands::Claim(_)) {
+            // Claim mutation enters coordination first, then opens its own
+            // recovered repository session. This unretained startup open repairs
+            // residue before validation without inverting coordinator -> repository.
+            let session = jit::storage::RepositoryStateStore::open_mutation_session(
+                &storage,
+                executor_layout.clone(),
+            )?;
+            let recovered = session.recovery_report().recovered_count();
+            drop(session);
+            recovered
+        } else {
+            let guard = storage.open_and_retain_mutation_session(executor_layout.clone())?;
+            let recovered = guard.recovery_report().recovered_count();
+            retained_mutation_session = Some(guard);
+            recovered
+        }
+    } else {
+        0
+    };
     let mut executor = CommandExecutor::new(storage.clone()).with_layout(executor_layout);
 
     match &command {
@@ -7145,13 +7157,15 @@ fn run() -> Result<()> {
                             cmd.arg("--web-dir").arg(web);
                         }
                     }
-                    // Release this process's startup recovery boundary before
+                    // Release this process's startup mutation session before
                     // spawning the server we then block on. Pre-service recovery
                     // already ran on the parent; the server child runs its own
                     // recovery under the ordinary bootstrap → repository chain,
                     // so holding the guards across `child.wait()` would deadlock
                     // the child against the parent for the parent's lifetime.
-                    storage.release_recovery_session();
+                    if let Some(guard) = retained_mutation_session.take() {
+                        guard.release()?;
+                    }
 
                     // Hand the bound socket to the child (inherited fd on
                     // Unix); it adopts this exact socket instead of re-binding.
