@@ -280,6 +280,14 @@
       "situation": "Independent review found two blocking document-capture defects (pinned adds borrowed worktree bytes and capture budgets were self-sized) and three startup-recovery ownership/reporting defects (foreign-session adoption, a Send session over thread-local guard state, and skipped controls counted as recovered) after the issue rework count reached two.",
       "resolution": "Invoker selected option 1 and authorized one narrowly guided escalation. The counter was reset once; the correction is limited to these reviewed defects and requires independent re-review before further consumer cutover.",
       "recommendation": "Correct only the reviewed document and startup-recovery defects with fixed bounds, explicit ownership, exact reports, focused regressions, and net deletion where practical."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "open",
+      "opened_at": "2026-07-21T22:25:24+03:00",
+      "situation": "After the reset rework counter reached two, independent review of the captured dependency add/reduction slice found two bounded blockers: three legacy test fixtures omit canonical index membership and now fail closed capture, and mixed batch rejection categories are accumulated by validation phase rather than original request order.",
+      "recommendation": "Authorize one narrow guided correction and counter reset: migrate only the three affected fixtures to canonical repository-state seeding, carry original request ordinals through batch rejection and sort once, add one mixed-category ordering regression, then perform one independent verification. Do not weaken capture or add a fallback."
     }
   ],
   "rework_counts": {
