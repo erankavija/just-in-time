@@ -110,6 +110,7 @@ impl CommandExecutor<JsonFileStorage> {
                 session.as_mut(),
                 &probe_overrides,
                 &extra_paths,
+                None,
             )? {
                 None => continue,
                 Some(base) => base,
@@ -121,11 +122,15 @@ impl CommandExecutor<JsonFileStorage> {
             // Re-capture the base with the exact write set so the validation closure
             // and the delta's preimages come from one coherent image, then finalize,
             // validate, and publish under the same held session.
-            let base =
-                match self.capture_proposed_base(session.as_mut(), &delta_overlay, &extra_paths)? {
-                    None => continue,
-                    Some(base) => base,
-                };
+            let base = match self.capture_proposed_base(
+                session.as_mut(),
+                &delta_overlay,
+                &extra_paths,
+                None,
+            )? {
+                None => continue,
+                Some(base) => base,
+            };
             let plan = finalize_initialization(&base, &scaffold, &context)?;
             let proposed = apply_overlay(&base, delta_overlay)?;
             let validation = crate::validation::repository::validate_repository(&proposed)?;
@@ -248,10 +253,11 @@ impl CommandExecutor<JsonFileStorage> {
         content_paths.push(record_path.clone());
         content_paths.push(profiles_dir.clone());
         content_paths.push(events_path.clone());
-        let base = match self.capture_proposed_base(session, &BTreeMap::new(), &content_paths)? {
-            None => return Ok(None),
-            Some(base) => base,
-        };
+        let base =
+            match self.capture_proposed_base(session, &BTreeMap::new(), &content_paths, None)? {
+                None => return Ok(None),
+                Some(base) => base,
+            };
 
         // The neutral overlay reflects only the scaffold state init publishes:
         // schemas are always (re)written, but an existing config/gates/rules is

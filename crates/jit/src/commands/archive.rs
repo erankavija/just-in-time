@@ -653,16 +653,13 @@ impl CommandExecutor<JsonFileStorage> {
         // the artifact commit point, so a rerun after a mid-flight failure (which
         // left the container Done/Rejected) still reaches Archived.
         if let PlanTarget::Container { id } = plan.target() {
-            let mut container = self.storage.load_issue(id)?;
-            if container.state != crate::domain::State::Archived {
-                self.apply_state_transition(
-                    &mut container,
-                    crate::domain::State::Archived,
-                    false,
-                    true,
-                    |_| {},
-                )?;
-            }
+            self.publish_captured_state_transition(
+                id,
+                crate::domain::State::Archived,
+                false,
+                false,
+                false,
+            )?;
         }
 
         Ok(ArchiveExecutionResult {

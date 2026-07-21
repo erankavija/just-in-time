@@ -223,7 +223,7 @@ impl MutationContext {
     }
 
     /// Sample the single mutation timestamp on first use; memoized thereafter.
-    fn timestamp(&self) -> DateTime<Utc> {
+    pub(crate) fn timestamp(&self) -> DateTime<Utc> {
         match self.sampled.get() {
             Some(instant) => instant,
             None => {

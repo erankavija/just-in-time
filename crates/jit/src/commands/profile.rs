@@ -181,6 +181,7 @@ impl CommandExecutor<JsonFileStorage> {
                 session.as_mut(),
                 &probe_overrides,
                 &extra_paths,
+                None,
             )? {
                 None => continue,
                 Some(base) => base,
@@ -189,11 +190,15 @@ impl CommandExecutor<JsonFileStorage> {
                 finalize_profile_application(&probe, contribution, &context)?.delta(),
             );
 
-            let base =
-                match self.capture_proposed_base(session.as_mut(), &delta_overlay, &extra_paths)? {
-                    None => continue,
-                    Some(base) => base,
-                };
+            let base = match self.capture_proposed_base(
+                session.as_mut(),
+                &delta_overlay,
+                &extra_paths,
+                None,
+            )? {
+                None => continue,
+                Some(base) => base,
+            };
             let plan = finalize_profile_application(&base, contribution, &context)?;
             let proposed = apply_overlay(&base, delta_overlay).map_err(anyhow::Error::from)?;
             let validation = crate::validation::repository::validate_repository(&proposed)
@@ -255,10 +260,11 @@ impl CommandExecutor<JsonFileStorage> {
         content_paths.push(profiles_dir.clone());
         content_paths.push(events_path.clone());
 
-        let base = match self.capture_proposed_base(session, &BTreeMap::new(), &content_paths)? {
-            None => return Ok(None),
-            Some(base) => base,
-        };
+        let base =
+            match self.capture_proposed_base(session, &BTreeMap::new(), &content_paths, None)? {
+                None => return Ok(None),
+                Some(base) => base,
+            };
 
         let claims = build_profile_claims(package, &base)?;
         let derived = derive_profile_materializations(&base, claims)?;

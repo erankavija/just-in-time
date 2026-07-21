@@ -135,6 +135,17 @@ impl InMemoryStorage {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn with_repository_state_failure_view(
+        &self,
+        failures: Arc<dyn crate::storage::TransactionFailureInjector>,
+    ) -> Self {
+        Self {
+            repository_state_failures: failures,
+            ..self.clone()
+        }
+    }
+
     pub(crate) fn repository_state(&self) -> std::sync::MutexGuard<'_, MemoryRepositoryState> {
         self.repository_state
             .lock()
@@ -235,6 +246,10 @@ impl InMemoryStorage {
     /// Canonical `Data(...)` identity for one issue record.
     fn issue_vpath(id: &str) -> VirtualPath {
         VirtualPath::data(format!("issues/{id}.json")).expect("issue record path is canonical")
+    }
+
+    fn index_vpath() -> VirtualPath {
+        VirtualPath::data("index.json").expect("issue index path is canonical")
     }
 
     /// Canonical `Data(...)` identity for one gate-run result.
@@ -385,11 +400,20 @@ impl InMemoryStorage {
     fn persist_issue(&self, issue: Issue) -> Result<()> {
         let _repo_lock = self.repo_lock.acquire()?;
         let bytes = serialize_issue(&issue).map_err(|e| anyhow!("{e}"))?;
-        Self::put_data_entry(
-            &mut self.repository_state(),
-            Self::issue_vpath(&issue.id),
-            bytes,
-        );
+        let mut state = self.repository_state();
+        let mut index = Self::data_entry_bytes(&state, &Self::index_vpath())
+            .map(|bytes| crate::repository_state::RepositoryIndex::parse(&bytes))
+            .transpose()
+            .map_err(|error| anyhow!(error))?
+            .unwrap_or_default();
+        if !index.all_ids.contains(&issue.id) {
+            index.all_ids.push(issue.id.clone());
+            index.all_ids.sort();
+        }
+        index.deleted_ids.retain(|id| id != &issue.id);
+        let index_bytes = index.to_pretty_bytes()?;
+        Self::put_data_entry(&mut state, Self::issue_vpath(&issue.id), bytes);
+        Self::put_data_entry(&mut state, Self::index_vpath(), index_bytes);
         Ok(())
     }
 }
@@ -484,9 +508,22 @@ impl IssueStore for InMemoryStorage {
         let _repo_lock = self.repo_lock.acquire()?;
         let mut state = self.repository_state();
         let vpath = Self::issue_vpath(id);
-        if state.entries.remove(&vpath).is_none() {
+        if !state.entries.contains_key(&vpath) {
             return Err(IssueNotFoundError::new(id).into());
         }
+        let mut index = Self::data_entry_bytes(&state, &Self::index_vpath())
+            .map(|bytes| crate::repository_state::RepositoryIndex::parse(&bytes))
+            .transpose()
+            .map_err(|error| anyhow!(error))?
+            .unwrap_or_default();
+        index.all_ids.retain(|active| active != id);
+        if !index.deleted_ids.iter().any(|deleted| deleted == id) {
+            index.deleted_ids.push(id.to_string());
+            index.deleted_ids.sort();
+        }
+        let index_bytes = index.to_pretty_bytes()?;
+        state.entries.remove(&vpath);
+        Self::put_data_entry(&mut state, Self::index_vpath(), index_bytes);
         Ok(())
     }
 
@@ -843,6 +880,28 @@ mod tests {
     }
 
     #[test]
+    fn test_delete_issue_malformed_index_leaves_repository_unchanged() {
+        let storage = InMemoryStorage::new();
+        let issue =
+            crate::domain::types::fixture_issue("Delete me".to_string(), "Test".to_string());
+        storage.save_issue(issue.clone()).unwrap();
+        {
+            let mut state = storage.repository_state();
+            InMemoryStorage::put_data_entry(
+                &mut state,
+                InMemoryStorage::index_vpath(),
+                b"not valid JSON".to_vec(),
+            );
+        }
+        let before = storage.repository_state().entries.clone();
+
+        let result = storage.delete_issue(&issue.id);
+
+        assert!(result.is_err());
+        assert_eq!(storage.repository_state().entries, before);
+    }
+
+    #[test]
     fn test_list_issues() {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
@@ -962,6 +1021,21 @@ mod tests {
         let issues2 = storage2.list_issues().unwrap();
         assert_eq!(issues1.len(), 2);
         assert_eq!(issues2.len(), 2);
+    }
+
+    #[test]
+    fn test_save_issue_updates_canonical_index_membership() {
+        let storage = InMemoryStorage::new();
+        let issue = crate::domain::types::fixture_issue("Indexed".to_string(), String::new());
+
+        storage.save_issue(issue.clone()).unwrap();
+
+        let state = storage.repository_state();
+        let bytes = InMemoryStorage::data_entry_bytes(&state, &InMemoryStorage::index_vpath())
+            .expect("legacy save publishes index bytes");
+        let index = crate::repository_state::RepositoryIndex::parse(&bytes).unwrap();
+        assert_eq!(index.all_ids, vec![issue.id]);
+        assert!(index.deleted_ids.is_empty());
     }
 
     #[test]

@@ -4,9 +4,60 @@
 
 use crate::commands::CommandExecutor;
 use crate::storage::{InMemoryStorage, IssueStore};
+use std::sync::{Arc, Mutex};
+
+pub(crate) enum OpenRaceAction {
+    Save(Box<crate::domain::Issue>),
+    Delete(String),
+}
+
+struct OpenRace {
+    trigger: usize,
+    opens: std::sync::atomic::AtomicUsize,
+    storage: Mutex<Option<InMemoryStorage>>,
+    action: Mutex<Option<OpenRaceAction>>,
+}
+
+impl crate::storage::TransactionFailureInjector for OpenRace {
+    fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+        if point == &crate::storage::TransactionFailurePoint::RepositoryRecoveryExternal
+            && self.opens.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1 == self.trigger
+        {
+            let storage = self.storage.lock().unwrap().clone().unwrap();
+            match self.action.lock().unwrap().take().unwrap() {
+                OpenRaceAction::Save(issue) => storage.save_issue(*issue).unwrap(),
+                OpenRaceAction::Delete(id) => storage.delete_issue(&id).unwrap(),
+            }
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn with_open_race(
+    storage: InMemoryStorage,
+    trigger: usize,
+    action: OpenRaceAction,
+) -> InMemoryStorage {
+    let race = Arc::new(OpenRace {
+        trigger,
+        opens: std::sync::atomic::AtomicUsize::new(0),
+        storage: Mutex::new(None),
+        action: Mutex::new(Some(action)),
+    });
+    let raced = storage.with_repository_state_failure_view(race.clone());
+    *race.storage.lock().unwrap() = Some(raced.clone());
+    raced
+}
 
 /// Attach the explicit synthetic layout to an in-memory executor fixture.
 pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
+    if storage
+        .read_repo_file(".jit/config.toml")
+        .expect("memory fixture config path is valid")
+        .is_none()
+    {
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+    }
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
 }
@@ -20,8 +71,6 @@ pub fn setup_with_enforcement(mode: &str) -> CommandExecutor<InMemoryStorage> {
     let storage = InMemoryStorage::new();
     storage.init().unwrap();
 
-    // Create config directory and enforcement config
-    std::fs::create_dir_all(storage.root()).unwrap();
     let config_toml = format!(
         r#"
 [worktree]
@@ -29,7 +78,7 @@ enforce_leases = "{}"
 "#,
         mode
     );
-    std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+    storage.add_repo_file(".jit/config.toml", &config_toml);
 
     memory_executor(storage)
 }

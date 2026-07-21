@@ -333,7 +333,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             // the finalized-delta overlay, and publish under one held session.
             let overrides =
                 std::iter::once((config_vpath.clone(), Some(edited_bytes.clone()))).collect();
-            let base = match self.capture_proposed_base(session.as_mut(), &overrides, &[])? {
+            let base = match self.capture_proposed_base(session.as_mut(), &overrides, &[], None)? {
                 None => continue,
                 Some(base) => base,
             };

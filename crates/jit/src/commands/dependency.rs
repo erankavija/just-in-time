@@ -2,22 +2,12 @@
 
 use super::*;
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
-use crate::repository_state::{
-    finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, RepositoryEntry,
-    RepositoryImage, VirtualPath,
-};
+use crate::repository_state::{finalize, MutationContext, MutationIntent};
 use crate::storage::{
     AmbiguousIdError, InvalidIdPrefixError, IssueNotFoundError, RepositoryStateStoreError,
     MIN_ID_PREFIX_LENGTH,
 };
-use std::collections::{BTreeSet, HashSet};
-
-const DEPENDENCY_CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
-    max_paths: 1 << 16,
-    max_listings: 1,
-    max_bytes: 512 * 1024 * 1024,
-    max_depth: 8,
-};
+use std::collections::HashSet;
 
 #[derive(Clone)]
 enum CapturedDependencyMutation {
@@ -34,6 +24,26 @@ enum CapturedDependencyMutation {
     ReduceAll {
         dry_run: bool,
     },
+    RemoveSingle {
+        issue_id: String,
+        dependency_id: String,
+    },
+    RemoveBatch {
+        issue_id: String,
+        dependency_ids: Vec<String>,
+    },
+}
+
+impl CapturedDependencyMutation {
+    fn issue_id(&self) -> &str {
+        match self {
+            Self::Single { issue_id, .. }
+            | Self::Batch { issue_id, .. }
+            | Self::RemoveSingle { issue_id, .. }
+            | Self::RemoveBatch { issue_id, .. } => issue_id,
+            Self::ReduceAll { .. } => "",
+        }
+    }
 }
 
 enum CapturedDependencyOutcome {
@@ -46,11 +56,16 @@ enum CapturedDependencyOutcome {
         count: usize,
         messages: Vec<String>,
     },
+    RemovedSingle {
+        warning: Option<String>,
+    },
+    RemovedBatch(DependenciesRemoveResult),
 }
 
 struct DerivedDependencyMutation {
     outcome: CapturedDependencyOutcome,
     intents: Vec<MutationIntent>,
+    error_after_apply: Option<crate::errors::TransitionBlockedError>,
 }
 
 /// Result of adding multiple dependencies.
@@ -137,35 +152,17 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_issue_id = self.storage.resolve_issue_id(issue_id)?;
-        let full_dep_id = self.storage.resolve_issue_id(dep_id)?;
-
-        // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_issue_id)? {
-            warnings.push(warning);
+        match self.publish_captured_dependency_mutation(
+            CapturedDependencyMutation::RemoveSingle {
+                issue_id: issue_id.to_string(),
+                dependency_id: dep_id.to_string(),
+            },
+        )? {
+            CapturedDependencyOutcome::RemovedSingle { warning } => {
+                Ok(warning.into_iter().collect())
+            }
+            _ => unreachable!("single removal returns a single-removal outcome"),
         }
-
-        let mut issue = self.storage.load_issue(&full_issue_id)?;
-        let before = issue.dependencies.len();
-        issue.dependencies.retain(|d| d != &full_dep_id);
-        let removed = issue.dependencies.len() != before;
-
-        // Only persist (and event-log) when an edge was actually removed: a no-op
-        // removal (edge absent) must not bump `updated_at` or emit an event, the
-        // same no-change contract as `update_issue`. Removing an edge can unblock
-        // the issue, so the readiness check runs only on the real-change path.
-        if removed {
-            let event = Event::draft_issue_updated(
-                full_issue_id.clone(),
-                "dependency-remove".to_string(),
-                vec!["dependencies".to_string()],
-            );
-            self.publish_ambient_issue_mutation(vec![issue], vec![(1, event)])?;
-            self.auto_transition_to_ready(&full_issue_id)?;
-        }
-
-        Ok(warnings)
     }
 
     /// Add multiple dependencies to an issue, dropping now-redundant edge(s).
@@ -250,88 +247,284 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let layout = self.require_layout()?;
-        let index_path = VirtualPath::data("index.json")?;
-        let events_path = VirtualPath::data("events.jsonl")?;
-        let issues_path = VirtualPath::data("issues")?;
-        // Lease coordination precedes the repository guard and runs once. The
-        // mutation request is then pinned to that captured full id, so retries
-        // cannot retarget a short prefix to another issue.
-        let (expected_source, warning) = match &request {
-            CapturedDependencyMutation::Single { issue_id, .. }
-            | CapturedDependencyMutation::Batch { issue_id, .. } => {
-                let mut resolved = None;
-                for _ in 0..8 {
-                    let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                    if let Some((_, issues)) = capture_dependency_attempt(
-                        preflight.as_mut(),
-                        &index_path,
-                        &events_path,
-                        &issues_path,
-                    )? {
-                        resolved = Some(resolve_captured_issue_id(&issues, issue_id)?);
-                        break;
-                    }
-                }
-                let full_id = resolved.ok_or_else(|| {
-                    anyhow!("dependency preflight did not converge after repeated conflicts")
-                })?;
-                let warning = self.require_active_lease(&full_id)?;
-                (Some(full_id), warning)
-            }
-            CapturedDependencyMutation::ReduceAll { .. } => (None, None),
-        };
         let request = match request {
-            CapturedDependencyMutation::Single {
-                dependency_id,
-                policy,
-                ..
-            } => CapturedDependencyMutation::Single {
-                issue_id: expected_source
-                    .ok_or_else(|| anyhow!("single dependency preflight returned no source"))?,
-                dependency_id,
-                policy,
-            },
-            CapturedDependencyMutation::Batch {
-                dependency_ids,
-                policy,
-                ..
-            } => CapturedDependencyMutation::Batch {
-                issue_id: expected_source
-                    .ok_or_else(|| anyhow!("batch dependency preflight returned no source"))?,
-                dependency_ids,
-                policy,
-            },
-            CapturedDependencyMutation::ReduceAll { dry_run } => {
-                CapturedDependencyMutation::ReduceAll { dry_run }
+            removal @ (CapturedDependencyMutation::RemoveSingle { .. }
+            | CapturedDependencyMutation::RemoveBatch { .. }) => {
+                return self.publish_captured_dependency_removal(removal)
             }
+            request => request,
         };
+        let layout = self.require_layout()?;
         let context = MutationContext::production();
 
         for _ in 0..8 {
+            let (expected_source, expected_lease_mode, enforce_lease) = {
+                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
+                let Some(image) = self.capture_proposed_base(
+                    preflight.as_mut(),
+                    &std::collections::BTreeMap::new(),
+                    &[],
+                    None,
+                )?
+                else {
+                    continue;
+                };
+                let issues = super::captured_active_issues(&image)?;
+                let source = match &request {
+                    CapturedDependencyMutation::Single { issue_id, .. }
+                    | CapturedDependencyMutation::Batch { issue_id, .. } => {
+                        Some(resolve_captured_issue_id(&issues, issue_id)?)
+                    }
+                    CapturedDependencyMutation::ReduceAll { .. } => None,
+                    CapturedDependencyMutation::RemoveSingle { .. }
+                    | CapturedDependencyMutation::RemoveBatch { .. } => {
+                        unreachable!("removals use the captured removal coordinator")
+                    }
+                };
+                let config = crate::repository_state::assemble_config(&image)?;
+                (
+                    source,
+                    self.config_manager.enforcement_mode_from_config(&config)?,
+                    matches!(request, CapturedDependencyMutation::Single { .. }),
+                )
+            };
+            let claims_guard = enforce_lease
+                .then(|| claims_mutation_guard(&layout))
+                .transpose()?
+                .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some((image, issues)) = capture_dependency_attempt(
+            let Some(image) = self.capture_proposed_base(
                 session.as_mut(),
-                &index_path,
-                &events_path,
-                &issues_path,
+                &std::collections::BTreeMap::new(),
+                &[],
+                None,
             )?
             else {
                 continue;
             };
-            let derived = derive_dependency_mutation(&issues, &request, warning.clone())?;
+            let issues = super::captured_active_issues(&image)?;
+            let current_source = match &request {
+                CapturedDependencyMutation::Single { issue_id, .. }
+                | CapturedDependencyMutation::Batch { issue_id, .. } => {
+                    Some(resolve_captured_issue_id(&issues, issue_id)?)
+                }
+                CapturedDependencyMutation::ReduceAll { .. } => None,
+                _ => unreachable!("removals use the captured removal coordinator"),
+            };
+            let config = crate::repository_state::assemble_config(&image)?;
+            if current_source != expected_source
+                || (enforce_lease
+                    && self.config_manager.enforcement_mode_from_config(&config)?
+                        != expected_lease_mode)
+            {
+                continue;
+            }
+            let lease_warnings = if enforce_lease {
+                captured_lease_warnings(
+                    expected_lease_mode,
+                    std::slice::from_ref(
+                        expected_source
+                            .as_ref()
+                            .ok_or_else(|| anyhow!("missing source"))?,
+                    ),
+                    &issues,
+                    claims_guard.as_ref(),
+                )?
+            } else {
+                Vec::new()
+            };
+            let pinned_request = match &request {
+                CapturedDependencyMutation::Single {
+                    dependency_id,
+                    policy,
+                    ..
+                } => CapturedDependencyMutation::Single {
+                    issue_id: expected_source.clone().expect("single add has a source"),
+                    dependency_id: dependency_id.clone(),
+                    policy: *policy,
+                },
+                CapturedDependencyMutation::Batch {
+                    dependency_ids,
+                    policy,
+                    ..
+                } => CapturedDependencyMutation::Batch {
+                    issue_id: expected_source.clone().expect("batch add has a source"),
+                    dependency_ids: dependency_ids.clone(),
+                    policy: *policy,
+                },
+                CapturedDependencyMutation::ReduceAll { dry_run } => {
+                    CapturedDependencyMutation::ReduceAll { dry_run: *dry_run }
+                }
+                _ => unreachable!("removals use the captured removal coordinator"),
+            };
+            let warning = lease_warnings.into_iter().next();
+            let derived = derive_dependency_mutation(&issues, &pinned_request, warning)?;
             if derived.intents.is_empty() {
-                return Ok(derived.outcome);
+                return match derived.error_after_apply {
+                    Some(error) => Err(error.into()),
+                    None => Ok(derived.outcome),
+                };
             }
             let plan = finalize(&layout, &image, &context, &derived.intents)?;
             match session.apply(&plan) {
-                Ok(_) => return Ok(derived.outcome),
+                Ok(_) => {
+                    return match derived.error_after_apply {
+                        Some(error) => Err(error.into()),
+                        None => Ok(derived.outcome),
+                    }
+                }
                 Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
                 Err(error) => return Err(error.into()),
             }
         }
         Err(anyhow!(
             "dependency mutation did not converge after repeated capture conflicts"
+        ))
+    }
+
+    fn publish_captured_dependency_removal(
+        &self,
+        request: CapturedDependencyMutation,
+    ) -> Result<CapturedDependencyOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use std::collections::BTreeMap;
+
+        let layout = self.require_layout()?;
+        let context = MutationContext::production();
+        for _ in 0..8 {
+            let (resolved_request, expected_lease_mode, enforce_lease) = {
+                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
+                let Some(image) =
+                    self.capture_proposed_base(preflight.as_mut(), &BTreeMap::new(), &[], None)?
+                else {
+                    continue;
+                };
+                let issues = super::captured_active_issues(&image)?;
+                let resolved = match &request {
+                    CapturedDependencyMutation::RemoveSingle {
+                        issue_id,
+                        dependency_id,
+                    } => CapturedDependencyMutation::RemoveSingle {
+                        issue_id: resolve_captured_issue_id(&issues, issue_id)?,
+                        dependency_id: resolve_captured_issue_id(&issues, dependency_id)?,
+                    },
+                    CapturedDependencyMutation::RemoveBatch {
+                        issue_id,
+                        dependency_ids,
+                    } => CapturedDependencyMutation::RemoveBatch {
+                        issue_id: resolve_captured_issue_id(&issues, issue_id)?,
+                        dependency_ids: dependency_ids.clone(),
+                    },
+                    _ => unreachable!("removal coordinator receives only removals"),
+                };
+                let config = crate::repository_state::assemble_config(&image)?;
+                (
+                    resolved,
+                    self.config_manager.enforcement_mode_from_config(&config)?,
+                    matches!(request, CapturedDependencyMutation::RemoveSingle { .. }),
+                )
+            };
+            let claims_guard = enforce_lease
+                .then(|| claims_mutation_guard(&layout))
+                .transpose()?
+                .flatten();
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some(image) =
+                self.capture_proposed_base(session.as_mut(), &BTreeMap::new(), &[], None)?
+            else {
+                continue;
+            };
+            let issues = super::captured_active_issues(&image)?;
+            let declarations = super::declarations_from_image(&image)?;
+            let config = crate::repository_state::assemble_config(&image)?;
+            if enforce_lease
+                && self.config_manager.enforcement_mode_from_config(&config)? != expected_lease_mode
+            {
+                continue;
+            }
+            let recaptured_request = match &request {
+                CapturedDependencyMutation::RemoveSingle {
+                    issue_id,
+                    dependency_id,
+                } => CapturedDependencyMutation::RemoveSingle {
+                    issue_id: resolve_captured_issue_id(&issues, issue_id)?,
+                    dependency_id: resolve_captured_issue_id(&issues, dependency_id)?,
+                },
+                CapturedDependencyMutation::RemoveBatch {
+                    issue_id,
+                    dependency_ids,
+                } => CapturedDependencyMutation::RemoveBatch {
+                    issue_id: resolve_captured_issue_id(&issues, issue_id)?,
+                    dependency_ids: dependency_ids.clone(),
+                },
+                _ => unreachable!("removal coordinator receives only removals"),
+            };
+            if recaptured_request.issue_id() != resolved_request.issue_id()
+                || matches!(
+                    (&recaptured_request, &resolved_request),
+                    (
+                        CapturedDependencyMutation::RemoveSingle {
+                            dependency_id: current,
+                            ..
+                        },
+                        CapturedDependencyMutation::RemoveSingle {
+                            dependency_id: expected,
+                            ..
+                        }
+                    ) if current != expected
+                )
+            {
+                return Err(anyhow!(
+                    "dependency removal target resolution changed during coordinated publication"
+                ));
+            }
+            let plan_content = super::validate::plan_content_from_image(&image, &issues)?;
+            let warning = if enforce_lease {
+                captured_lease_warnings(
+                    expected_lease_mode,
+                    &[resolved_request.issue_id().to_string()],
+                    &issues,
+                    claims_guard.as_ref(),
+                )?
+                .into_iter()
+                .next()
+            } else {
+                None
+            };
+            let derived = derive_dependency_removal(
+                &issues,
+                &resolved_request,
+                warning,
+                super::CapturedTransitionEvidence {
+                    issues: &issues,
+                    declarations: &declarations,
+                    config: &config,
+                    plan_content: &plan_content,
+                    context: &context,
+                },
+            )?;
+            if derived.intents.is_empty() {
+                return match derived.error_after_apply {
+                    Some(error) => Err(error.into()),
+                    None => Ok(derived.outcome),
+                };
+            }
+            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            match session.apply(&plan) {
+                Ok(_) => {
+                    return match derived.error_after_apply {
+                        Some(error) => Err(error.into()),
+                        None => Ok(derived.outcome),
+                    }
+                }
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "dependency removal did not converge after repeated capture conflicts"
         ))
     }
 
@@ -355,195 +548,19 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        // Validate input
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));
         }
-
-        let full_issue_id = self.storage.resolve_issue_id(issue_id)?;
-        let mut issue = self.storage.load_issue(&full_issue_id)?;
-
-        let mut removed = Vec::new();
-        let mut not_found = Vec::new();
-
-        for dep_id in dep_ids {
-            let normalized = dep_id.to_lowercase().replace('-', "");
-
-            // An exact stored id is always unambiguous, even when it is also a
-            // prefix of another stored id.
-            let exact = issue
-                .dependencies
-                .iter()
-                .find(|stored| stored.as_str() == dep_id.as_str())
-                .cloned();
-
-            let stored_match = if let Some(exact) = exact {
-                Some(exact)
-            } else {
-                // No exact match: validate the target id the SAME way
-                // `resolve_issue_id` validates `<from>`, so both id arguments of
-                // `dep rm` are checked identically (jit:a05b87ae). A sub-4-char
-                // prefix is a typed argument error (exit 2), not a silent
-                // "not found" (exit 0).
-                if normalized.len() < 4 {
-                    return Err(crate::storage::InvalidIdPrefixError::new(dep_id.clone()).into());
-                }
-
-                // Match by normalized prefix, collecting ALL matches so an
-                // ambiguous prefix is rejected the way `resolve_issue_id` rejects
-                // it, rather than silently removing whichever edge happens to
-                // appear first (jit:f847df3f).
-                let matches: Vec<String> = issue
-                    .dependencies
-                    .iter()
-                    .filter(|stored| {
-                        stored
-                            .to_lowercase()
-                            .replace('-', "")
-                            .starts_with(&normalized)
-                    })
-                    .cloned()
-                    .collect();
-
-                match matches.as_slice() {
-                    [] => None,
-                    [only] => Some(only.clone()),
-                    _ => {
-                        return Err(crate::storage::AmbiguousIdError::dependency(
-                            dep_id.clone(),
-                            matches,
-                        )
-                        .into());
-                    }
-                }
-            };
-
-            match stored_match {
-                Some(full_dep_id) => {
-                    issue.dependencies.retain(|d| d != &full_dep_id);
-                    removed.push(dep_id.clone());
-                }
-                None => {
-                    not_found.push(dep_id.clone());
-                }
-            }
+        match self.publish_captured_dependency_mutation(
+            CapturedDependencyMutation::RemoveBatch {
+                issue_id: issue_id.to_string(),
+                dependency_ids: dep_ids.to_vec(),
+            },
+        )? {
+            CapturedDependencyOutcome::RemovedBatch(result) => Ok(result),
+            _ => unreachable!("batch removal returns a batch-removal outcome"),
         }
-
-        // Only persist (and event-log) when at least one edge was actually
-        // removed: a no-op `jit dep rm` (every target absent) must not bump
-        // `updated_at` or emit an event, the same no-change contract as
-        // `update_issue`. Removing edges can unblock the issue, so the readiness
-        // check runs only on the real-change path.
-        if !removed.is_empty() {
-            let event = Event::draft_issue_updated(
-                full_issue_id.clone(),
-                "dependency-remove".to_string(),
-                vec!["dependencies".to_string()],
-            );
-            self.publish_ambient_issue_mutation(vec![issue], vec![(1, event)])?;
-            self.auto_transition_to_ready(&full_issue_id)?;
-        }
-
-        Ok(DependenciesRemoveResult { removed, not_found })
     }
-}
-
-fn capture_dependency_attempt(
-    session: &mut dyn crate::storage::RepositoryMutationSession,
-    index_path: &VirtualPath,
-    events_path: &VirtualPath,
-    issues_path: &VirtualPath,
-) -> Result<Option<(RepositoryImage, Vec<Issue>)>> {
-    let first = match session.capture(CaptureSpec::phase_one(
-        [index_path.clone()],
-        DEPENDENCY_CAPTURE_BUDGET,
-    )?) {
-        Ok(image) => image,
-        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-        Err(error) => return Err(error.into()),
-    };
-    let discovered = parse_captured_index(&first, index_path)?;
-    let mut spec = CaptureSpec::phase_one(
-        [index_path.clone(), events_path.clone()],
-        DEPENDENCY_CAPTURE_BUDGET,
-    )?;
-    spec.discover_paths(
-        discovered
-            .all_ids
-            .iter()
-            .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-            .collect::<Result<Vec<_>, _>>()?,
-    )?;
-    spec.discover_listing(issues_path.clone())?;
-    let image = match session.capture(spec) {
-        Ok(image) => image,
-        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-        Err(error) => return Err(error.into()),
-    };
-    let captured = parse_captured_index(&image, index_path)?;
-    if captured.all_ids != discovered.all_ids || captured.deleted_ids != discovered.deleted_ids {
-        return Ok(None);
-    }
-    let issues = parse_captured_issues(&image, issues_path, &captured.all_ids)?;
-    Ok(Some((image, issues)))
-}
-
-fn parse_captured_index(
-    image: &RepositoryImage,
-    path: &VirtualPath,
-) -> Result<crate::repository_state::RepositoryIndex> {
-    let bytes = image
-        .file_bytes(path)?
-        .ok_or_else(|| anyhow!("index.json is absent during dependency mutation"))?;
-    crate::storage::json::parse_repository_index(bytes)
-}
-
-fn parse_captured_issues(
-    image: &RepositoryImage,
-    issues_path: &VirtualPath,
-    active_ids: &[String],
-) -> Result<Vec<Issue>> {
-    let listing = image
-        .listing_fingerprints()
-        .get(issues_path)
-        .ok_or_else(|| anyhow!("complete issues listing is absent from dependency capture"))?;
-    let mut issues = active_ids
-        .iter()
-        .map(|id| {
-            let path = VirtualPath::data(format!("issues/{id}.json"))?;
-            let bytes = match image.entry(&path)? {
-                RepositoryEntry::File { bytes, .. } => bytes,
-                RepositoryEntry::Absent => return Err(IssueNotFoundError::new(id).into()),
-                _ => return Err(anyhow!("indexed issue {id} is not an ordinary file")),
-            };
-            let issue: Issue = serde_json::from_slice(bytes)
-                .with_context(|| format!("failed to parse captured issue {id}"))?;
-            if issue.id != *id {
-                return Err(anyhow!(
-                    "indexed issue {id} contains mismatched embedded id {}",
-                    issue.id
-                ));
-            }
-            Ok(issue)
-        })
-        .collect::<Result<Vec<_>>>()?;
-    let indexed_files = active_ids
-        .iter()
-        .map(|id| format!("{id}.json"))
-        .collect::<BTreeSet<_>>();
-    let listed_files = listing
-        .children()
-        .keys()
-        .filter(|name| name.ends_with(".json"))
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    if indexed_files != listed_files {
-        return Err(anyhow!(
-            "issues directory membership does not match captured index"
-        ));
-    }
-    issues.sort_by(|left, right| left.id.cmp(&right.id));
-    Ok(issues)
 }
 
 fn resolve_captured_issue_id(issues: &[Issue], partial_id: &str) -> Result<String> {
@@ -600,7 +617,171 @@ fn derive_dependency_mutation(
         CapturedDependencyMutation::ReduceAll { dry_run } => {
             derive_dependency_repair(issues, *dry_run)
         }
+        CapturedDependencyMutation::RemoveSingle { .. }
+        | CapturedDependencyMutation::RemoveBatch { .. } => {
+            unreachable!("removals use their captured derivation")
+        }
     }
+}
+
+fn derive_dependency_removal(
+    issues: &[Issue],
+    request: &CapturedDependencyMutation,
+    warning: Option<String>,
+    evidence: super::CapturedTransitionEvidence<'_>,
+) -> Result<DerivedDependencyMutation> {
+    let (source_id, removed, outcome) = match request {
+        CapturedDependencyMutation::RemoveSingle {
+            issue_id,
+            dependency_id,
+        } => {
+            let issue = captured_issue(issues, issue_id)?;
+            let removed = if issue.dependencies.contains(dependency_id) {
+                vec![dependency_id.clone()]
+            } else {
+                Vec::new()
+            };
+            (
+                issue_id.clone(),
+                removed,
+                CapturedDependencyOutcome::RemovedSingle { warning },
+            )
+        }
+        CapturedDependencyMutation::RemoveBatch {
+            issue_id,
+            dependency_ids,
+        } => {
+            let issue = captured_issue(issues, issue_id)?;
+            let mut removed = Vec::new();
+            let mut reported_removed = Vec::new();
+            let mut not_found = Vec::new();
+            for requested in dependency_ids {
+                let normalized = requested.to_lowercase().replace('-', "");
+                let exact = issue
+                    .dependencies
+                    .iter()
+                    .filter(|stored| !removed.contains(*stored))
+                    .find(|stored| stored.as_str() == requested.as_str())
+                    .cloned();
+                let matched = match exact {
+                    Some(exact) => Some(exact),
+                    None => {
+                        if normalized.len() < MIN_ID_PREFIX_LENGTH {
+                            return Err(InvalidIdPrefixError::new(requested).into());
+                        }
+                        let matches = issue
+                            .dependencies
+                            .iter()
+                            .filter(|stored| !removed.contains(*stored))
+                            .filter(|stored| {
+                                stored
+                                    .to_lowercase()
+                                    .replace('-', "")
+                                    .starts_with(&normalized)
+                            })
+                            .cloned()
+                            .collect::<Vec<_>>();
+                        match matches.as_slice() {
+                            [] => None,
+                            [only] => Some(only.clone()),
+                            _ => {
+                                return Err(AmbiguousIdError::dependency(requested, matches).into())
+                            }
+                        }
+                    }
+                };
+                match matched {
+                    Some(id) => {
+                        removed.push(id);
+                        reported_removed.push(requested.clone());
+                    }
+                    None => not_found.push(requested.clone()),
+                }
+            }
+            (
+                issue_id.clone(),
+                removed,
+                CapturedDependencyOutcome::RemovedBatch(DependenciesRemoveResult {
+                    removed: reported_removed,
+                    not_found,
+                }),
+            )
+        }
+        _ => unreachable!("removal derivation receives only removals"),
+    };
+    if removed.is_empty() {
+        return Ok(DerivedDependencyMutation {
+            outcome,
+            intents: Vec::new(),
+            error_after_apply: None,
+        });
+    }
+
+    let mut issue = captured_issue(issues, &source_id)?.clone();
+    issue
+        .dependencies
+        .retain(|dependency| !removed.contains(dependency));
+    let mut candidate = issues.to_vec();
+    *candidate
+        .iter_mut()
+        .find(|candidate| candidate.id == source_id)
+        .ok_or_else(|| IssueNotFoundError::new(&source_id))? = issue.clone();
+    let resolved = crate::domain::queries::build_issue_map(&candidate);
+    let mut intents = vec![MutationIntent::RecordEvent {
+        phase: 1,
+        event: Box::new(Event::draft_issue_updated(
+            source_id.clone(),
+            "dependency-remove".to_string(),
+            vec!["dependencies".to_string()],
+        )),
+    }];
+    if issue.should_auto_transition_to_ready(&resolved) {
+        match super::derive_state_transition(issue.clone(), State::Ready, false, evidence)? {
+            super::DerivedStateTransition::Applied {
+                issue: transitioned,
+                events,
+                ..
+            } => {
+                issue = *transitioned;
+                intents.extend(events.into_iter().map(|(phase, event)| {
+                    MutationIntent::RecordEvent {
+                        phase: phase.saturating_add(1),
+                        event: Box::new(event),
+                    }
+                }));
+            }
+            super::DerivedStateTransition::GraphBlocked { error, events } => {
+                intents.extend(events.into_iter().map(|(phase, event)| {
+                    MutationIntent::RecordEvent {
+                        phase: phase.saturating_add(1),
+                        event: Box::new(event),
+                    }
+                }));
+                intents.insert(
+                    0,
+                    MutationIntent::UpdateIssue {
+                        issue: Box::new(issue),
+                    },
+                );
+                return Ok(DerivedDependencyMutation {
+                    outcome,
+                    intents,
+                    error_after_apply: Some(error),
+                });
+            }
+        }
+    }
+    intents.insert(
+        0,
+        MutationIntent::UpdateIssue {
+            issue: Box::new(issue),
+        },
+    );
+    Ok(DerivedDependencyMutation {
+        outcome,
+        intents,
+        error_after_apply: None,
+    })
 }
 
 fn derive_single_dependency_add(
@@ -622,6 +803,7 @@ fn derive_single_dependency_add(
                 warning,
             },
             intents: Vec::new(),
+            error_after_apply: None,
         });
     }
 
@@ -651,6 +833,7 @@ fn derive_single_dependency_add(
     Ok(DerivedDependencyMutation {
         outcome: CapturedDependencyOutcome::Single { result, warning },
         intents,
+        error_after_apply: None,
     })
 }
 
@@ -796,6 +979,7 @@ fn derive_batch_dependency_add(
             skipped,
         }),
         intents,
+        error_after_apply: None,
     })
 }
 
@@ -837,6 +1021,7 @@ fn derive_dependency_repair(issues: &[Issue], dry_run: bool) -> Result<DerivedDe
     Ok(DerivedDependencyMutation {
         outcome: CapturedDependencyOutcome::Reduced { count, messages },
         intents,
+        error_after_apply: None,
     })
 }
 
@@ -947,137 +1132,249 @@ mod captured_tests {
     use super::*;
     use crate::storage::{InMemoryStorage, IssueStore, RepositoryStateStore};
 
-    fn capture(
-        storage: &InMemoryStorage,
-    ) -> (
-        Box<dyn crate::storage::RepositoryMutationSession>,
-        RepositoryImage,
-        Vec<Issue>,
-    ) {
-        let mut session = storage
-            .open_mutation_session(storage.repository_layout())
-            .unwrap();
-        let (image, issues) = capture_dependency_attempt(
-            session.as_mut(),
-            &VirtualPath::data("index.json").unwrap(),
-            &VirtualPath::data("events.jsonl").unwrap(),
-            &VirtualPath::data("issues").unwrap(),
-        )
-        .unwrap()
-        .unwrap();
-        (session, image, issues)
-    }
+    #[derive(Default)]
+    struct OneFailure(std::sync::Mutex<Option<crate::storage::TransactionFailurePoint>>);
 
-    fn event_bytes(plan: &crate::repository_state::MaterializationPlan) -> &[u8] {
-        plan.delta()
-            .actions()
-            .iter()
-            .find_map(|action| match action {
-                crate::repository_state::RepositoryAction::WriteFile { path, bytes, .. }
-                    if path == &VirtualPath::data("events.jsonl").unwrap() =>
-                {
-                    Some(bytes.as_slice())
-                }
-                _ => None,
-            })
-            .unwrap()
-    }
-
-    fn seed_index(storage: &InMemoryStorage, ids: &[&str]) {
-        storage.add_repo_file(
-            ".jit/index.json",
-            &serde_json::json!({
-                "schema_version": 2,
-                "all_ids": ids,
-                "deleted_ids": []
-            })
-            .to_string(),
-        );
+    impl crate::storage::TransactionFailureInjector for OneFailure {
+        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+            let mut selected = self.0.lock().unwrap();
+            if selected.as_ref() == Some(point) {
+                selected.take();
+                return Err(std::io::Error::other("injected dependency removal failure"));
+            }
+            Ok(())
+        }
     }
 
     #[test]
-    fn test_dependency_capture_budget_is_fixed() {
-        assert_eq!(DEPENDENCY_CAPTURE_BUDGET.max_paths, 1 << 16);
-        assert_eq!(DEPENDENCY_CAPTURE_BUDGET.max_listings, 1);
-    }
-
-    #[test]
-    fn test_dependency_retry_rederives_and_preserves_concurrent_issue_change() {
+    fn test_dependency_add_rederives_and_preserves_concurrent_issue_change() {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
-        let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
-        source.state = State::Ready;
-        let source_id = source.id.clone();
-        storage.save_issue(source).unwrap();
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let dependency = crate::domain::types::fixture_issue("dependency".into(), String::new());
         let dependency_id = dependency.id.clone();
         storage.save_issue(dependency).unwrap();
-        seed_index(&storage, &[&source_id, &dependency_id]);
-        let request = CapturedDependencyMutation::Single {
-            issue_id: source_id.clone(),
-            dependency_id: dependency_id.clone(),
-            policy: RedundancyPolicy::Reduce,
-        };
-        let context = MutationContext::deterministic(
-            [29; 32],
-            chrono::DateTime::parse_from_rfc3339("2026-07-21T10:11:12Z")
-                .unwrap()
-                .with_timezone(&chrono::Utc),
+        let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
+        source.state = State::Ready;
+        let source_id = source.id.clone();
+        storage.save_issue(source.clone()).unwrap();
+        source.title = "concurrent title".to_string();
+        let storage = crate::commands::test_helpers::with_open_race(
+            storage,
+            2,
+            crate::commands::test_helpers::OpenRaceAction::Save(Box::new(source)),
         );
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
-        let (mut first_session, first_image, first_issues) = capture(&storage);
-        let first = derive_dependency_mutation(&first_issues, &request, None).unwrap();
-        let first_plan =
-            finalize(first_image.layout(), &first_image, &context, &first.intents).unwrap();
+        executor.add_dependency(&source_id, &dependency_id).unwrap();
 
-        let mut concurrent = storage.load_issue(&source_id).unwrap();
-        concurrent.labels.push("owner:concurrent".into());
-        storage.save_issue(concurrent).unwrap();
-        assert!(matches!(
-            first_session.apply(&first_plan),
-            Err(RepositoryStateStoreError::RetryableConflict { .. })
-        ));
-        drop(first_session);
-
-        let (mut retry_session, retry_image, retry_issues) = capture(&storage);
-        let retry = derive_dependency_mutation(&retry_issues, &request, None).unwrap();
-        let retry_plan =
-            finalize(retry_image.layout(), &retry_image, &context, &retry.intents).unwrap();
-        assert_eq!(event_bytes(&retry_plan), event_bytes(&first_plan));
-        retry_session.apply(&retry_plan).unwrap();
-
-        let updated = storage.load_issue(&source_id).unwrap();
-        assert!(updated
-            .labels
-            .iter()
-            .any(|label| label == "owner:concurrent"));
+        let updated = executor.storage.load_issue(&source_id).unwrap();
+        assert_eq!(updated.title, "concurrent title");
         assert_eq!(updated.dependencies, vec![dependency_id]);
         assert_eq!(updated.state, State::Backlog);
+        let events = executor.storage.read_events().unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].get_type(), "issue_state_changed");
+        assert_eq!(events[1].get_type(), "issue_updated");
+        let first = serde_json::to_value(&events[0]).unwrap();
+        let second = serde_json::to_value(&events[1]).unwrap();
+        assert_eq!(first["timestamp"], second["timestamp"]);
     }
 
     #[test]
-    fn test_dependency_capture_reports_indexed_missing_record_as_typed_error() {
+    fn test_dependency_removal_and_auto_ready_recover_together() {
+        let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
+            crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+        ))));
+        let storage = InMemoryStorage::with_repository_state_failures(failures);
+        storage.add_repo_file(".jit/config.toml", "");
+        let recovered = storage.without_repository_state_failures();
+        let layout = storage.repository_layout();
+
+        let mut dependency =
+            crate::domain::types::fixture_issue("dependency".into(), String::new());
+        dependency.state = State::Done;
+        let dependency_id = dependency.id.clone();
+        storage.save_issue(dependency).unwrap();
+        let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
+        source.state = State::Backlog;
+        source.dependencies = vec![dependency_id.clone()];
+        let source_id = source.id.clone();
+        storage.save_issue(source).unwrap();
+
+        let executor = CommandExecutor::new(storage).with_layout(layout.clone());
+        assert!(executor
+            .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
+            .is_err());
+
+        drop(recovered.open_mutation_session(layout.clone()).unwrap());
+        let unchanged = recovered.load_issue(&source_id).unwrap();
+        assert_eq!(unchanged.state, State::Backlog);
+        assert_eq!(unchanged.dependencies, vec![dependency_id.clone()]);
+        assert!(recovered.read_events().unwrap().is_empty());
+
+        let executor = CommandExecutor::new(recovered.clone()).with_layout(layout);
+        executor
+            .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
+            .unwrap();
+        let updated = recovered.load_issue(&source_id).unwrap();
+        assert_eq!(updated.state, State::Ready);
+        assert!(updated.dependencies.is_empty());
+        let events = recovered.read_events().unwrap();
+        assert!(events
+            .iter()
+            .any(|event| event.get_type() == "issue_updated"));
+        assert!(events
+            .iter()
+            .any(|event| event.get_type() == "issue_state_changed"));
+    }
+
+    #[test]
+    fn test_dependency_removal_graph_block_commits_edge_and_attempt_event() {
+        let storage = InMemoryStorage::new();
+        storage.add_repo_file(".jit/config.toml", "");
+        storage.add_repo_file(
+            ".jit/rules.toml",
+            r#"
+[[rules]]
+name = "ready-needs-design"
+when = { type = "epic", state = "ready" }
+severity = "error"
+enforce = true
+assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
+"#,
+        );
+        let layout = storage.repository_layout();
+
+        let mut dependency =
+            crate::domain::types::fixture_issue("dependency".into(), String::new());
+        dependency.state = State::Done;
+        let dependency_id = dependency.id.clone();
+        storage.save_issue(dependency).unwrap();
+        let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
+        source.state = State::Backlog;
+        source.labels = vec!["type:epic".into()];
+        source.dependencies = vec![dependency_id.clone()];
+        let source_id = source.id.clone();
+        storage.save_issue(source).unwrap();
+
+        let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
+        let error = executor
+            .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
+            .expect_err("the ready graph rule blocks only the automatic transition");
+        assert!(error
+            .downcast_ref::<crate::errors::TransitionBlockedError>()
+            .is_some());
+
+        let updated = storage.load_issue(&source_id).unwrap();
+        assert_eq!(updated.state, State::Backlog);
+        assert!(updated.dependencies.is_empty());
+        let event_types = storage
+            .read_events()
+            .unwrap()
+            .into_iter()
+            .map(|event| event.get_type().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(event_types, vec!["issue_updated", "transition_blocked"]);
+    }
+
+    #[test]
+    fn test_dependency_removal_duplicate_alias_is_not_found_after_first_match() {
+        let storage = InMemoryStorage::new();
+        storage.add_repo_file(".jit/config.toml", "");
+        let layout = storage.repository_layout();
+        let dependency = crate::domain::types::fixture_issue("dependency".into(), String::new());
+        let dependency_id = dependency.id.clone();
+        storage.save_issue(dependency).unwrap();
+        let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
+        source.dependencies = vec![dependency_id.clone()];
+        let source_id = source.id.clone();
+        storage.save_issue(source).unwrap();
+        let prefix = dependency_id[..8].to_string();
+
+        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let result = executor
+            .remove_dependencies(&source_id, &[dependency_id.clone(), prefix.clone()])
+            .unwrap();
+        assert_eq!(result.removed, vec![dependency_id]);
+        assert_eq!(result.not_found, vec![prefix]);
+    }
+
+    #[test]
+    fn test_single_removal_rejects_dependency_prefix_that_becomes_ambiguous() {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
-        let issue = crate::domain::types::fixture_issue("missing".into(), String::new());
-        let id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
-        seed_index(&storage, &[&id]);
-        storage
-            .repository_state()
-            .entries
-            .remove(&VirtualPath::data(format!("issues/{id}.json")).unwrap());
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        let mut dependency = crate::domain::types::fixture_issue("dep".into(), String::new());
+        dependency.id = "22221111111111111111111111111111".to_string();
+        let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
+        source.id = "11111111111111111111111111111111".to_string();
+        source.dependencies = vec![dependency.id.clone()];
+        storage.save_issue(source.clone()).unwrap();
+        storage.save_issue(dependency).unwrap();
+        let mut collision = crate::domain::types::fixture_issue("collision".into(), String::new());
+        collision.id = "22222222222222222222222222222222".to_string();
+        let storage = crate::commands::test_helpers::with_open_race(
+            storage,
+            2,
+            crate::commands::test_helpers::OpenRaceAction::Save(Box::new(collision)),
+        );
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+        let events_before = executor.storage.read_events().unwrap();
 
-        let mut session = storage
-            .open_mutation_session(storage.repository_layout())
-            .unwrap();
-        let error = capture_dependency_attempt(
-            session.as_mut(),
-            &VirtualPath::data("index.json").unwrap(),
-            &VirtualPath::data("events.jsonl").unwrap(),
-            &VirtualPath::data("issues").unwrap(),
-        )
-        .unwrap_err();
-        assert_eq!(error.downcast_ref::<IssueNotFoundError>().unwrap().id(), id);
+        let error = executor
+            .remove_dependency(&source.id, "2222")
+            .expect_err("recaptured dependency prefix must become ambiguous");
+
+        assert!(error
+            .downcast_ref::<crate::storage::AmbiguousIdError>()
+            .is_some());
+        assert_eq!(
+            executor
+                .storage
+                .load_issue(&source.id)
+                .unwrap()
+                .dependencies,
+            source.dependencies
+        );
+        assert_eq!(executor.storage.read_events().unwrap(), events_before);
+    }
+
+    #[test]
+    fn test_single_removal_rejects_dependency_deleted_between_phases() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        let mut dependency = crate::domain::types::fixture_issue("dep".into(), String::new());
+        dependency.id = "22221111111111111111111111111111".to_string();
+        let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
+        source.id = "11111111111111111111111111111111".to_string();
+        source.dependencies = vec![dependency.id.clone()];
+        storage.save_issue(source.clone()).unwrap();
+        storage.save_issue(dependency.clone()).unwrap();
+        let storage = crate::commands::test_helpers::with_open_race(
+            storage,
+            2,
+            crate::commands::test_helpers::OpenRaceAction::Delete(dependency.id),
+        );
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+        let events_before = executor.storage.read_events().unwrap();
+
+        let error = executor
+            .remove_dependency(&source.id, "2222")
+            .expect_err("deleted recaptured dependency must be rejected");
+
+        assert!(error
+            .downcast_ref::<crate::storage::IssueNotFoundError>()
+            .is_some());
+        assert_eq!(
+            executor
+                .storage
+                .load_issue(&source.id)
+                .unwrap()
+                .dependencies,
+            source.dependencies
+        );
+        assert_eq!(executor.storage.read_events().unwrap(), events_before);
     }
 }

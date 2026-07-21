@@ -1,7 +1,7 @@
 //! Issue CRUD operations and lifecycle management
 
 use super::*;
-use crate::errors::{DeletionNotConfirmedError, TransitionBlockedError, TransitionBlocker};
+use crate::errors::{DeletionNotConfirmedError, TransitionBlocker};
 use crate::storage::StorageWarning;
 
 /// How `update_issue` should apply a new description value.
@@ -28,6 +28,23 @@ impl DescriptionUpdate {
             DescriptionUpdate::Append(text) => format!("{existing}\n\n{text}"),
         }
     }
+}
+
+pub(super) fn blocking_dependencies(
+    issue: &Issue,
+    resolved_issues: &std::collections::HashMap<String, &Issue>,
+) -> Vec<TransitionBlocker> {
+    issue
+        .dependencies
+        .iter()
+        .filter_map(|dep_id| match resolved_issues.get(dep_id).copied() {
+            Some(dependency) if is_dependency_met(dependency.state, dependency.archived_from) => {
+                None
+            }
+            Some(dependency) => Some(TransitionBlocker::dependency(dependency.clone())),
+            None => Some(TransitionBlocker::missing_dependency(dep_id.clone())),
+        })
+        .collect()
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -125,8 +142,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // final state (e.g. `when = { state = "ready" }`) see the shape that
         // will be persisted.
         //
-        // INTENTIONAL direct state write (does NOT route through
-        // `apply_state_transition`): this is the INITIAL state of an issue being
+        // INTENTIONAL direct state write: this is the INITIAL state of an issue being
         // constructed, not a transition of an existing persisted issue. There is
         // no prior state to transition from, no dependency neighborhood yet (the
         // issue has no dependencies by construction here), and `validate_for_write`
@@ -134,7 +150,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if issue.dependencies.is_empty() {
             issue.state = State::Ready;
             // This direct write is the issue's INITIAL Ready state, so it does not
-            // pass through the `apply_state_transition` chokepoint that stamps
+            // pass through captured transition derivation that stamps
             // `first_ready_at` for later transitions. Stamp it here so a
             // dependency-free issue that is born Ready still records when it
             // became workable (first-occurrence semantics via `mark_first_ready`).
@@ -379,28 +395,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
-    /// The dependencies that hold a transition back: every dependency unmet by
-    /// [`is_dependency_met`], plus every dependency id that resolves to no issue.
-    pub(super) fn blocking_dependencies(
-        &self,
-        issue: &Issue,
-        resolved_issues: &std::collections::HashMap<String, &Issue>,
-    ) -> Vec<TransitionBlocker> {
-        issue
-            .dependencies
-            .iter()
-            .filter_map(|dep_id| match resolved_issues.get(dep_id).copied() {
-                Some(dependency)
-                    if is_dependency_met(dependency.state, dependency.archived_from) =>
-                {
-                    None
-                }
-                Some(dependency) => Some(TransitionBlocker::dependency(dependency.clone())),
-                None => Some(TransitionBlocker::missing_dependency(dep_id.clone())),
-            })
-            .collect()
-    }
-
     /// Update issue fields.
     ///
     /// Note: This function has 9 parameters (exceeds clippy's 7-parameter guideline).
@@ -428,230 +422,26 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(id)?;
-
-        // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
-
-        let mut issue = self.storage.load_issue(&full_id)?;
-
-        // Snapshot the editable fields so we can later tell whether the edits
-        // actually changed anything. Idempotent flags (re-setting the same
-        // title, adding an existing label, removing a missing one) must not
-        // count as a change, otherwise a gate-blocked `--state done` retry
-        // would still bump `updated_at` and emit a false progress signal.
-        let original_title = issue.title.clone();
-        let original_description = issue.description.clone();
-        let original_priority = issue.priority;
-        let original_labels = issue.labels.clone();
-        let original_content_format = issue.content_format;
-
-        if let Some(t) = title {
-            issue.title = t;
-        }
-        if let Some(op) = description {
-            issue.description = op.apply(&issue.description);
-        }
-        if let Some(p) = priority {
-            issue.priority = p;
-        }
-        if let Some(new_cf) = content_format {
-            // `Some(None)` clears to inherit; `Some(Some(fmt))` sets the override.
-            issue.content_format = new_cf;
-        }
-
-        // Handle label operations. Label format / uniqueness / registry are
-        // enforced solely by `validate_for_write` against the FINAL shape below
-        // (a0f0f342 migration) — no inline format/uniqueness check here.
-        for label_str in &add_labels {
-            if !issue.labels.contains(label_str) {
-                issue.labels.push(label_str.clone());
-            }
-        }
-        for label in &remove_labels {
-            issue.labels.retain(|l| l != label);
-        }
-
-        // REQ-02: an explicit `--type <kind>` rewrites the issue's `type:<kind>`
-        // label in place, replacing any existing `type:*` label. The command
-        // layer owns this (the CLI only forwards the typed value). Runs after the
-        // generic add/remove so the typed flag is authoritative for the `type`
-        // namespace. Kind validity is enforced below via `reject_undeclared_type`
-        // on the final shape, through the rule engine.
-        let explicit_type = issue_type.is_some();
-        if let Some(kind) = issue_type {
-            issue
-                .labels
-                .retain(|label| !label_utils::is_type_label(label));
-            issue.labels.push(label_utils::type_label(&kind));
-        }
-
-        // REQ-02: when `--type` was explicitly provided, hard-reject an undeclared
-        // kind through the SAME rule engine the write uses
-        // (`type-hierarchy-known`), which only warns on the normal path.
-        // Scoped to the explicit-type path so non-`--type` updates keep warn-only
-        // behavior; runs before any persistence so a bad type changes nothing. The
-        // `type` rule is state-independent, so evaluating against the pre-transition
-        // shape here matches what the projected write below would report.
-        if explicit_type {
-            self.reject_undeclared_type(&issue)?;
-        }
-
-        // Which editable fields actually changed (not merely whether edit flags
-        // were provided). Drives whether a gate-blocked `--state done` must still
-        // persist the issue to keep real edits, and supplies the `issue_updated`
-        // event's field list (mirroring `bulk_update`, which logs the same event
-        // for content edits).
-        let mut changed_fields = Vec::new();
-        if issue.title != original_title {
-            changed_fields.push("title".to_string());
-        }
-        if issue.description != original_description {
-            changed_fields.push("description".to_string());
-        }
-        if issue.priority != original_priority {
-            changed_fields.push("priority".to_string());
-        }
-        if issue.labels != original_labels {
-            changed_fields.push("labels".to_string());
-        }
-        if issue.content_format != original_content_format {
-            changed_fields.push("content_format".to_string());
-        }
-        let has_field_edits = !changed_fields.is_empty();
-
-        let old_state = issue.state;
-
-        // Resolve the requested state transition's TARGET WITHOUT mutating
-        // `issue.state` yet, so the actual state change is performed by the
-        // chokepoint (`apply_state_transition`), which owns the dependency/gate
-        // guards and graph enforcement. `issue.state` is projected into the target
-        // only for the `validate_for_write` shape below, then restored.
-        //
-        // A `--state done` request against unpassed gates resolves to `Gated`
-        // instead: the diversion (`gate_blocked`) persists the gated shape and
-        // returns the gate-blocking error. Resolving it here means the chokepoint
-        // is entered with the target actually being landed. The dependency guard
-        // runs first so a dependency-blocked issue reports its dependencies rather
-        // than diverting to Gated.
-        let mut gate_blocked = false;
-        let mut target_state: Option<State> = None;
-        if let Some(s) = state {
-            if s == State::Done {
-                let issues = self.storage.list_issues()?;
-                let resolved = crate::domain::queries::build_issue_map(&issues);
-
-                let blockers = self.blocking_dependencies(&issue, &resolved);
-                if !blockers.is_empty() {
-                    return Err(TransitionBlockedError::dependencies(
-                        issue.id.clone(),
-                        State::Done,
-                        issue.state,
-                        blockers,
-                    )
-                    .into());
-                }
-
-                // If gates not passed, the final shape is Gated, not Done.
-                if issue.has_unpassed_gates() {
-                    target_state = Some(State::Gated);
-                    gate_blocked = true;
-                } else {
-                    target_state = Some(State::Done);
-                }
-            } else {
-                target_state = Some(s);
-            }
-        }
-
-        // Single write-time validation entry point against the FINAL shape
-        // (field edits + resolved state transition applied). The target state is
-        // projected onto a temporary value only for validation; the real
-        // mutation happens via the chokepoint below. Runs BEFORE any persistence
-        // so a blocked write changes nothing; any `--force` bypass events are
-        // deferred (published with the write in the persisted case, or as the
-        // sole effect of a forced no-op override).
-        if let Some(t) = target_state {
-            issue.state = t;
-        }
-        let validation = self.validate_for_write(&issue, force)?;
-        issue.state = old_state;
-        warnings.extend(validation.warnings);
-
-        // Gate-blocked `--state done`: persist the projected Gated shape (only
-        // when something changed) and return the gate-blocking error. Bypass
-        // events are emitted from inside that path in the same publication when
-        // it persists (or alone for a forced no-op override). The diversion
-        // routes through the chokepoint against the GATED target state, with
-        // the user's --force preserved for graph-rule bypass.
-        if gate_blocked {
-            let persist = has_field_edits || old_state != State::Gated;
-            return self.handle_gate_blocking(
-                &mut issue,
-                old_state,
-                persist,
-                &changed_fields,
-                &validation.bypassed_rules,
+        let warnings = self
+            .publish_captured_field_update(CapturedFieldUpdate {
+                issue_id: id.to_string(),
+                title,
+                description,
+                priority,
+                state,
+                add_labels,
+                remove_labels,
+                content_format,
+                issue_type,
+                add_gates: Vec::new(),
+                remove_gates: Vec::new(),
+                assignee: None,
+                unassign: false,
+                bulk: false,
                 force,
-            );
-        }
-
-        // Apply the resolved state transition through the SINGLE chokepoint, which
-        // runs transition-time graph-rule enforcement (CC-2) and mutates
-        // `issue.state`. `persist = false`: this path batches the state change
-        // with any field edits into one publication below (and emits the
-        // state-change event there), so the chokepoint only enforces + mutates.
-        // A blocking enforce rule returns a `TransitionBlockedError` (exit 4) and
-        // persists nothing; non-blocking findings surface as warnings.
-        let mut graph_bypass_events = Vec::new();
-        if let Some(t) = target_state {
-            let (transition_warnings, events) =
-                self.apply_state_transition(&mut issue, t, force, false, |_| {})?;
-            warnings.extend(transition_warnings);
-            graph_bypass_events = events;
-        }
-
-        // Persist only when something actually changed: real field edits or a
-        // genuine state transition. A pure no-op `issue update` (e.g. only
-        // idempotent gate/assignee flags, already handled upstream) must not
-        // bump `updated_at` and emit a false progress signal.
-        let persisted = has_field_edits || old_state != issue.state;
-        let mut events = graph_bypass_events;
-        if persisted {
-            let new_state = issue.state;
-            if old_state != new_state {
-                events.push((
-                    1,
-                    Event::draft_issue_state_changed(full_id.clone(), old_state, new_state),
-                ));
-                if new_state == State::Done {
-                    events.push((2, Event::draft_issue_completed(full_id.clone())));
-                }
-            }
-            if !changed_fields.is_empty() {
-                events.push((
-                    3,
-                    Event::draft_issue_updated(
-                        full_id.clone(),
-                        "issue-update".to_string(),
-                        changed_fields,
-                    ),
-                ));
-            }
-        }
-        events.extend(validation.bypassed_rules.iter().map(|rule| {
-            (
-                9,
-                Event::draft_local_rule_bypassed(full_id.clone(), rule.clone()),
-            )
-        }));
-        self.publish_ambient_issue_mutation(
-            if persisted { vec![issue] } else { Vec::new() },
-            events,
-        )?;
+                enforce_lease: true,
+            })?
+            .warnings;
 
         // Check whether the completed publication unblocks dependents.
         if let Some(s) = state {
@@ -702,13 +492,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// of deletion, not a user-initiated edit to the dependent — like
     /// `add_dependency`'s Ready-to-Backlog demotion, it intentionally bypasses
     /// the active-lease check on the dependents; only the issue actually being
-    /// deleted is lease-checked (above). Each dependent's rewrite is its own
-    /// atomic (temp+rename) file write with its own `issue_updated` event, so a
-    /// crash mid-cascade cannot corrupt an individual file, only leave later
-    /// dependents stale. `jit dep rm` (which matches a raw stored dependency id
-    /// without requiring target resolution) and `jit issue show --json`'s
-    /// `dangling_dependency_ids` field remain as defense-in-depth for that case
-    /// and for any legacy data that predates this fix.
+    /// deleted is lease-checked (above). The dependent rewrites, deletion, index
+    /// update, and audit events publish through one recovered repository delta,
+    /// so recovery retains either the complete old graph or the complete new
+    /// graph. `jit dep rm` (which matches a raw stored dependency id without
+    /// requiring target resolution) and `jit issue show --json`'s
+    /// `dangling_dependency_ids` field remain as defense-in-depth for legacy or
+    /// externally edited data.
     pub fn delete_issue(&self, id: &str) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
@@ -779,101 +569,25 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// deliberately bypasses validation. Local rules are enforced on the
     /// content-bearing write paths (`create_issue`, `update_issue`, bulk update)
     /// via `validate_for_write`. Transition-time GRAPH-rule enforcement (CC-2) and
-    /// the actual state mutation/publication are delegated to the single
-    /// `apply_state_transition` chokepoint (which skips enforcement for
+    /// the actual state mutation/publication are delegated to captured transition
+    /// derivation (which skips enforcement for
     /// `Rejected`), so this path never sets `issue.state` directly.
     pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(id)?;
-
-        // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
+        let outcome = self.publish_captured_state_transition(
+            id,
+            new_state,
+            false,
+            new_state == State::Done,
+            true,
+        )?;
+        if new_state == State::Gated {
+            self.run_postchecks(&outcome.target_id)?;
         }
 
-        let issue = self.storage.load_issue(&full_id)?;
-        let old_state = issue.state;
-
-        // Handle prechecks for Ready -> InProgress transition
-        if old_state == State::Ready && new_state == State::InProgress {
-            self.run_prechecks(&full_id)?;
-        }
-
-        // Reload issue after prechecks (which may have modified it)
-        let mut issue = self.storage.load_issue(&full_id)?;
-
-        // Resolve the targets that need per-path handling before the chokepoint:
-        // the gate diversion into `Gated`, and the postcheck run that follows an
-        // explicit `--state gated`. Everything else — the dependency and gate
-        // guards, graph-rule enforcement (CC-2), the state mutation, the save, and
-        // the audit logging — belongs to the single chokepoint
-        // (`apply_state_transition`), as does the rejection/no-op policy. This
-        // state-only path carries no content edits and no `--force`.
-        match new_state {
-            State::Done => {
-                // The dependency guard runs ahead of the gate check so a
-                // dependency-blocked issue reports its dependencies rather than
-                // diverting to Gated.
-                let issues = self.storage.list_issues()?;
-                let resolved = crate::domain::queries::build_issue_map(&issues);
-
-                let blockers = self.blocking_dependencies(&issue, &resolved);
-                if !blockers.is_empty() {
-                    return Err(TransitionBlockedError::dependencies(
-                        issue.id.clone(),
-                        State::Done,
-                        issue.state,
-                        blockers,
-                    )
-                    .into());
-                }
-
-                // If gates not passed, transition to Gated and return error.
-                // This path never carries field edits, so a retry on an
-                // already-gated issue is a pure no-op (no save, no event).
-                if issue.has_unpassed_gates() {
-                    let persist = old_state != State::Gated;
-                    // This path runs no local-rule validation, so there are no
-                    // bypassed rules to log; it also carries no --force flag.
-                    return self.handle_gate_blocking(
-                        &mut issue,
-                        old_state,
-                        persist,
-                        &[],
-                        &[],
-                        false,
-                    );
-                }
-            }
-            State::Gated => {
-                // Move to Gated through the chokepoint (enforces a
-                // `when = { state = "gated" }` rule, saves, and logs), then run
-                // postchecks which may auto-transition to Done (also enforced via
-                // the chokepoint inside `auto_transition_to_done`).
-                warnings.extend(
-                    self.apply_state_transition(&mut issue, State::Gated, false, true, |_| {})?
-                        .0,
-                );
-
-                // Run postchecks (which may auto-transition to Done)
-                self.run_postchecks(&full_id)?;
-                return Ok(warnings);
-            }
-            _ => {}
-        }
-
-        // Apply the transition through the chokepoint: enforce (CC-2), mutate,
-        // save, and log. `Rejected`'s validation bypass and the no-op guard are
-        // handled inside it.
-        warnings.extend(
-            self.apply_state_transition(&mut issue, new_state, false, true, |_| {})?
-                .0,
-        );
-
-        Ok(warnings)
+        Ok(outcome.warnings)
     }
 
     /// Assign an issue to someone.
@@ -910,92 +624,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use super::claim::check_issue_lease;
-
-        let full_id = self.storage.resolve_issue_id(id)?;
-        let issue = self.storage.load_issue(&full_id)?;
-
-        // Parse the claimant up front so a pre-existing assignee can be compared
-        // against it. Claiming an issue already assigned to a DIFFERENT assignee
-        // still hard-fails exactly as before (REQ-02); claiming one already
-        // assigned to the SAME assignee is idempotent and falls through to the
-        // normal claim flow below (REQ-01) instead of erroring, so an assignment
-        // made while dependencies were still unmet can be promoted into a real
-        // claim once they reach a terminal state.
         let claimant: crate::domain::Assignee = assignee.parse()?;
-        if let Some(existing) = &issue.assignee {
-            if existing != &claimant {
-                return Err(anyhow!(
-                    "Issue {full_id} is already assigned to {existing}; refusing to claim as \
-                     {claimant} (re-claiming as {existing} succeeds and promotes it to in_progress)"
-                ));
-            }
-        }
-
-        // Check for existing lease held by another agent.
-        // Use both short and full ID since leases may store either. Collect the
-        // relocation warning from the identity load (the first call fixes the
-        // recorded path, so the second observes none).
-        let short_id = issue.short_id();
-        let (lease_short, mut warnings) = check_issue_lease(&short_id, Some(&assignee))?;
-        let (lease_full, warnings_full) = check_issue_lease(&full_id, Some(&assignee))?;
-        warnings.extend(warnings_full);
-        let conflicting_lease = lease_short.or(lease_full);
-
-        if let Some(lease) = conflicting_lease {
-            let expires_str = lease
-                .expires_at
-                .map(|t| t.format("%Y-%m-%d %H:%M:%S UTC").to_string())
-                .unwrap_or_else(|| "indefinitely".to_string());
-            return Err(anyhow!(
-                "Issue {} is currently leased by {} {}.\n\
-                 Use 'jit claim acquire' to properly coordinate work.",
-                id,
-                lease.agent_id,
-                expires_str
-            ));
-        }
-
-        let old_state = issue.state;
-
-        // If Ready, try to transition to InProgress first (this enforces prechecks).
-        // Backlog issues remain blocked until their dependencies are terminal.
-        if old_state == State::Ready {
-            self.update_issue_state(&full_id, State::InProgress)?;
-        } else if old_state == State::Backlog {
-            let issues = self.storage.list_issues()?;
-            let resolved = crate::domain::queries::build_issue_map(&issues);
-            let blockers = self.blocking_dependencies(&issue, &resolved);
-            if !blockers.is_empty() {
-                return Err(TransitionBlockedError::dependencies(
-                    issue.id.clone(),
-                    State::InProgress,
-                    issue.state,
-                    blockers,
-                )
-                .into());
-            }
-        }
-
-        // If we get here, prechecks passed (or issue wasn't Ready)
-        // Now assign the issue. `claimant` was already validated through the one
-        // `Assignee` path above and is reused here (and for the event below) so
-        // it cannot diverge from the stored assignee.
-        let actor = claimant;
-        let mut issue = self.storage.load_issue(&full_id)?;
-        issue.assignee = Some(actor.clone());
-        // Record the first claim time (first-occurrence only; a re-claim by the
-        // same assignee leaves the original stamp intact). This stamp and the
-        // `issue_claimed` event below are coupled: the mutation persists together
-        // with the event (@/inv/event-log), and the event feeds the
-        // lifecycle-timestamp backfill (`derive_lifecycle_timestamps`).
-        let issue_id = issue.id.clone();
-        self.publish_ambient_issue_mutation(
-            vec![issue],
-            vec![(1, Event::draft_issue_claimed(issue_id, actor))],
-        )?;
-
-        Ok(warnings)
+        // The captured claim owns the precheck capture/checker/recapture loop so
+        // checker success and coordinator evidence cannot be applied to a
+        // different source state or short-id target.
+        self.publish_captured_claim(id.to_string(), claimant)
     }
 
     /// Unassign an issue.
@@ -1024,39 +657,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = self.storage.resolve_issue_id(id)?;
-        let mut issue = self.storage.load_issue(&full_id)?;
-        let old_assignee = issue.assignee.clone();
-
-        // If in progress, transition back to ready THROUGH the chokepoint, which
-        // enforces graph rules, clears the assignee in the same issue update, and
-        // logs the state-change event atomically. Releasing back to Ready
-        // is a regression and ordinarily matches no done/gated-scoped enforce
-        // rule, but routing it here keeps the invariant that no command sets
-        // `issue.state` directly.
-        let old_state = issue.state;
-        let mut graph_bypass_events = Vec::new();
-        if old_state == State::InProgress {
-            let (_, bypass_events) =
-                self.apply_state_transition(&mut issue, State::Ready, false, false, |_| {})?;
-            graph_bypass_events = bypass_events;
-        }
-        issue.assignee = None;
-        let mut events = graph_bypass_events;
-        if old_state == State::InProgress {
-            events.push((
-                1,
-                Event::draft_issue_state_changed(full_id.clone(), old_state, State::Ready),
-            ));
-        }
-        if let Some(assignee) = old_assignee {
-            events.push((
-                2,
-                Event::draft_issue_released(full_id.clone(), assignee, reason.to_string()),
-            ));
-        }
-        self.publish_ambient_issue_mutation(vec![issue], events)?;
-
-        Ok(())
+        self.publish_captured_release(full_id, reason.to_string())
     }
 
     pub fn claim_next(
@@ -1094,20 +695,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let issues = self.storage.list_issues()?;
-        let resolved = crate::domain::queries::build_issue_map(&issues);
-
-        let mut issue = self.storage.load_issue(&full_id)?;
-
-        if issue.should_auto_transition_to_ready(&resolved) {
-            // Route the auto-promotion through the chokepoint (enforce + save +
-            // log). Dependencies are already satisfied (the predicate checked),
-            // so this is the dep guard for this path.
-            self.apply_state_transition(&mut issue, State::Ready, false, true, |_| {})?;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        self.publish_captured_auto_transition(full_id, State::Ready)
     }
 
     pub(super) fn auto_transition_to_done(&self, issue_id: &str) -> Result<bool>
@@ -1115,22 +703,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let mut issue = self.storage.load_issue(&full_id)?;
-
-        if issue.should_auto_transition_to_done() {
-            // Route the gates-pass auto-done through the chokepoint. It runs
-            // transition-time graph-rule enforcement (CC-2) BEFORE the Done shape
-            // persists: a blocking enforce rule (e.g. an enforce-at-done coverage
-            // rule) returns a `TransitionBlockedError` (exit 4) and persists
-            // nothing, leaving the issue Gated with the findings reported. Without
-            // this an auto gate-pass could complete an issue past an
-            // enforce-at-done rule. This path carries no `--force`. The chokepoint
-            // also emits the state-change AND `issue_completed` events.
-            self.apply_state_transition(&mut issue, State::Done, false, true, |_| {})?;
-
+        if self.publish_captured_auto_transition(full_id, State::Done)? {
             // Check if any dependent issues can now transition to ready
             self.check_auto_transitions()?;
-
             Ok(true)
         } else {
             Ok(false)
@@ -1154,109 +729,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(())
     }
-
-    /// Helper to handle gate blocking when transitioning to Done.
-    ///
-    /// Moves the issue to `Gated` and returns a gate-blocking error with clear
-    /// feedback. Persistence and audit logging are conditional:
-    ///
-    /// - `persist` is the caller's decision about whether anything actually
-    ///   changed (a genuine transition into `Gated`, or accompanying field
-    ///   edits that must not be lost). When false, the call is a pure no-op —
-    ///   e.g. retrying `--state done` on an already-`Gated` issue with no other
-    ///   edits — and the issue is neither published (no `updated_at` bump) nor
-    ///   logged.
-    /// - The `issue_state_changed` event is only appended for a real transition
-    ///   (`old_state != Gated`); a `gated -> gated` no-op must never be logged,
-    ///   as it would corrupt the audit log for metrics and stalled-work
-    ///   detection that read `events.jsonl`.
-    /// - `bypassed_rules` lists the `enforce` rules a `--force` write overrode;
-    ///   one `LocalRuleBypassed` event is emitted per entry whenever the list is
-    ///   non-empty (a deliberate override always merits an audit entry, even on a
-    ///   forced no-op). The issue and events share one recoverable publication.
-    fn handle_gate_blocking(
-        &self,
-        issue: &mut Issue,
-        old_state: State,
-        persist: bool,
-        changed_fields: &[String],
-        bypassed_rules: &[String],
-        force: bool,
-    ) -> Result<Vec<String>>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let registry = self.storage.load_gate_registry()?;
-        let gate_blockers = unpassed_gate_blockers(issue, &registry);
-        // The gate-diversion path lands the issue in `gated`, so it enforces
-        // graph rules against THAT target state via the chokepoint, exactly
-        // like an explicit `--state gated` transition. Rules keyed on the
-        // originally requested state (e.g. `state = "done"`) still do not fire
-        // here — the diversion's target is `gated`, not `done` (see
-        // `test_gated_diversion_runs_before_graph_enforcement`). A blocking
-        // `state = "gated"` enforce rule therefore blocks the diversion before
-        // anything persists. Persistence and the state-changed event are
-        // handled below (not by the chokepoint) because this path may carry
-        // field edits in the same publication and is a no-op for an already-gated
-        // issue.
-        let mut diversion_warnings = Vec::new();
-        let mut graph_bypass_events = Vec::new();
-        if old_state != State::Gated {
-            issue.state = old_state;
-            // Non-blocking findings ride on the gate-blocking error returned
-            // below (TransitionBlockedError::with_warnings) so they surface in
-            // both the rendered message and the JSON details.
-            let (warnings, bypass_events) =
-                self.apply_state_transition(issue, State::Gated, force, false, |_| {})?;
-            diversion_warnings = warnings;
-            graph_bypass_events = bypass_events;
-        }
-        issue.state = State::Gated;
-
-        let issue_id = issue.id.clone();
-        let mut events = graph_bypass_events;
-        if persist {
-            if old_state != State::Gated {
-                events.push((
-                    1,
-                    Event::draft_issue_state_changed(issue_id.clone(), old_state, State::Gated),
-                ));
-            }
-            if !changed_fields.is_empty() {
-                events.push((
-                    2,
-                    Event::draft_issue_updated(
-                        issue_id.clone(),
-                        "issue-update".to_string(),
-                        changed_fields.to_vec(),
-                    ),
-                ));
-            }
-        }
-        events.extend(bypassed_rules.iter().map(|rule| {
-            (
-                9,
-                Event::draft_local_rule_bypassed(issue_id.clone(), rule.clone()),
-            )
-        }));
-        self.publish_ambient_issue_mutation(
-            if persist {
-                vec![issue.clone()]
-            } else {
-                Vec::new()
-            },
-            events,
-        )?;
-
-        Err(TransitionBlockedError::gates(
-            issue.id.clone(),
-            State::Done,
-            State::Gated,
-            gate_blockers,
-        )
-        .with_warnings(diversion_warnings)
-        .into())
-    }
 }
 
 #[cfg(test)]
@@ -1273,12 +745,11 @@ mod tests {
         storage.init().unwrap();
 
         // Create config with enforcement off for test backward compatibility
-        std::fs::create_dir_all(storage.root()).unwrap();
         let config_toml = r#"
 [worktree]
 enforce_leases = "off"
 "#;
-        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+        storage.add_repo_file(".jit/config.toml", config_toml);
 
         let mut registry = storage.load_gate_registry().unwrap();
         for key in ["tests", "code-review"] {
@@ -1530,6 +1001,145 @@ enforce_leases = "off"
             issue.assignee,
             Some("agent:first".parse().unwrap()),
             "rejected claim must not disturb the original assignee"
+        );
+    }
+
+    #[test]
+    fn test_captured_graph_blocked_claim_is_typed_and_does_not_assign() {
+        let storage = InMemoryStorage::new();
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_repo_file(
+            ".jit/rules.toml",
+            r#"
+[[rules]]
+name = "epic-claim-needs-design"
+when = { type = "epic", state = "in_progress" }
+severity = "error"
+enforce = true
+assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
+"#,
+        );
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+        let mut issue = crate::domain::types::fixture_issue("Epic".to_string(), String::new());
+        issue.state = State::Ready;
+        issue.labels = vec!["type:epic".to_string()];
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+
+        let error = executor
+            .publish_captured_claim(issue_id.clone(), "agent:test".parse().unwrap())
+            .expect_err("the graph rule must block the claim");
+        assert!(
+            error
+                .downcast_ref::<crate::errors::TransitionBlockedError>()
+                .is_some(),
+            "expected typed transition block, got: {error:#}"
+        );
+        let after = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(after.state, State::Ready);
+        assert_eq!(after.assignee, None);
+        let event_types = executor
+            .storage
+            .read_events()
+            .unwrap()
+            .into_iter()
+            .map(|event| event.get_type().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(event_types, vec!["transition_blocked"]);
+    }
+
+    #[test]
+    fn test_captured_same_assignee_in_progress_reclaim_is_exact_noop() {
+        let executor = setup();
+        let mut issue = crate::domain::types::fixture_issue("Task".to_string(), String::new());
+        issue.state = State::InProgress;
+        issue.assignee = Some("agent:test".parse().unwrap());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        let before = executor.storage.load_issue(&issue_id).unwrap();
+        let events_before = executor.storage.read_events().unwrap();
+
+        let outcome = executor
+            .publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Claim {
+                issue_id: issue_id.clone(),
+                assignee: "agent:test".parse().unwrap(),
+            })
+            .unwrap();
+        assert!(!outcome.changed);
+        assert_eq!(executor.storage.load_issue(&issue_id).unwrap(), before);
+        assert_eq!(executor.storage.read_events().unwrap(), events_before);
+    }
+
+    #[test]
+    fn test_claim_rechecks_ready_precheck_classification_after_preflight_race() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        let mut registry = storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "manual-start".to_string(),
+            GateDefinition {
+                version: 1,
+                key: "manual-start".to_string(),
+                title: "Manual start".to_string(),
+                description: String::new(),
+                stage: GateStage::Precheck,
+                mode: GateMode::Manual,
+                checker: None,
+                priority: 1,
+                reserved: HashMap::new(),
+                auto: false,
+                example_integration: None,
+            },
+        );
+        storage.save_gate_registry(&registry).unwrap();
+        let mut issue = crate::domain::types::fixture_issue("Race".to_string(), String::new());
+        issue.gates_required.push("manual-start".to_string());
+        let issue_id = issue.id.clone();
+        storage.save_issue(issue.clone()).unwrap();
+        issue.state = State::Ready;
+        let storage = crate::commands::test_helpers::with_open_race(
+            storage,
+            2,
+            crate::commands::test_helpers::OpenRaceAction::Save(Box::new(issue)),
+        );
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+
+        let error = executor
+            .publish_captured_claim(issue_id.clone(), "agent:test".parse().unwrap())
+            .expect_err("the newly required manual precheck must block the claim");
+
+        assert!(error
+            .downcast_ref::<crate::errors::TransitionBlockedError>()
+            .is_some());
+        let after = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(after.state, State::Ready);
+        assert_eq!(after.assignee, None);
+        assert!(executor.storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_gated_postchecks_use_canonical_transition_target_after_short_id_race() {
+        let executor = setup();
+        let mut issue = crate::domain::types::fixture_issue("Target".to_string(), String::new());
+        issue.id = "abcd1111111111111111111111111111".to_string();
+        issue.state = State::InProgress;
+        executor.storage.save_issue(issue.clone()).unwrap();
+
+        let outcome = executor
+            .publish_captured_state_transition("abcd", State::Gated, false, false, true)
+            .unwrap();
+        let mut collision =
+            crate::domain::types::fixture_issue("Collision".to_string(), String::new());
+        collision.id = "abcd2222222222222222222222222222".to_string();
+        executor.storage.save_issue(collision).unwrap();
+
+        assert!(executor.storage.resolve_issue_id("abcd").is_err());
+        executor.run_postchecks(&outcome.target_id).unwrap();
+        assert_eq!(outcome.target_id, issue.id);
+        assert_eq!(
+            executor.storage.load_issue(&issue.id).unwrap().state,
+            State::Done
         );
     }
 

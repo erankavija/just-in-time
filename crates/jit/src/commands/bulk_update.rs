@@ -210,8 +210,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Note: this does NOT call `update_issue_state()` (it skips that path's
     /// prechecks/postchecks/gate-diversion — see the DESIGN DECISION below), but
-    /// the literal state change is routed through the single
-    /// `apply_state_transition` chokepoint, so the dependency and gate guards and
+    /// the literal state change is routed through the captured transition
+    /// derivation, so the dependency and gate guards and
     /// transition-time graph-rule enforcement (CC-2) hold on the bulk path with
     /// exactly the semantics of a single-issue transition (jit bc86f54c,
     /// jit b6eb2585). A blocked transition or a blocking enforce rule fails THIS
@@ -226,187 +226,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        // Validate first (includes local rule enforcement on the post-update
-        // shape, so `jit issue update --filter` cannot bypass enforce rules).
-        // Bypass events are carried into the same mutation as the issue write.
-        let validation = self.validate_update(issue, operations, force)?;
-
-        // Check if any changes needed
-        let changes = self.compute_changes(issue, operations)?;
-        if changes.is_empty() {
-            // No field changes to persist, but a `--force` override of an
-            // enforce rule must still be audited even on a no-op write.
-            // (`log_rule_bypasses` is a no-op when `bypassed_rules` is empty.)
-            self.log_rule_bypasses(&issue.id, &validation.bypassed_rules)?;
-            return Ok((false, Vec::new()));
-        }
-
-        // Load fresh copy of issue
-        let mut updated = self.storage.load_issue(&issue.id)?;
-
-        // Field edits other than the state change, reported in the `issue_updated`
-        // event exactly as the single-issue update path reports them: the state
-        // change is audited by its own `issue_state_changed` event, never twice.
-        let mut modified_fields = Vec::new();
-        // Warnings from non-enforcing graph rules fired during the state transition.
-        let mut transition_warnings: Vec<String> = Vec::new();
-        // Pending state-change events: captured here and published atomically with
-        // the issue write, so a failed mutation leaves no ghost audit entry.
-        let mut pending_state_events: Vec<Event> = Vec::new();
-        // Pending claim event for a first assignee set on this update, emitted with
-        // the same deferred-after-save discipline. Coupled to the `claimed_at`
-        // stamp below (@/inv/event-log) and folded by the lifecycle-timestamp
-        // backfill (`derive_lifecycle_timestamps`), matching the claim/assign paths.
-        let mut pending_claim_event: Option<Event> = None;
-
-        // Apply state change
-        //
-        // DESIGN DECISION: Bulk operations use literal state transitions.
-        //
-        // Unlike single-issue updates (`update_issue_state()`), bulk updates do NOT:
-        // - Run prechecks automatically (Ready → InProgress)
-        // - Run postchecks automatically (Gated state)
-        // - Auto-transition to Gated when attempting Done with unpassed gates
-        //
-        // Rationale:
-        // 1. Predictability: Users get exactly the state they specify (no surprises)
-        // 2. Performance: Avoiding gate execution for many issues
-        // 3. Safety: Explicit control for large-scale changes
-        // 4. Composability: Users can layer operations (bulk update → bulk gate status)
-        // 5. Precedent: Bulk tools (SQL UPDATE, jq, sed) use literal semantics
-        //
-        // The chokepoint's dependency and gate guards still hold (a bulk `done`
-        // over an issue with unpassed gates fails that item rather than moving it
-        // to Gated), but there is no automatic gate execution or state
-        // orchestration.
-        //
-        // See issue 40f594a7 for full decision rationale.
-        let mut state_changed = false;
-        if let Some(new_state) = operations.state {
-            if updated.state != new_state {
-                let old_state = updated.state;
-                // Route the literal state change through the single chokepoint, so
-                // the dependency and gate guards and graph-rule enforcement (CC-2)
-                // run on the bulk path with exactly the semantics of a single-issue
-                // transition. A blocked transition or a blocking enforce rule
-                // returns an error, failing THIS issue's update (recorded in
-                // `errors` by the caller, which continues with the remaining
-                // matched issues). Non-enforcing rules return warnings that are
-                // surfaced in `BulkUpdateResult::warnings`.
-                // `persist = false`: the combined issue write and transition events
-                // are published below in one mutation alongside the field edits.
-                let (warnings, bypass_events) =
-                    self.apply_state_transition(&mut updated, new_state, force, false, |_| {})?;
-                transition_warnings.extend(warnings);
-                pending_state_events.extend(bypass_events.into_iter().map(|(_, event)| event));
-                state_changed = true;
-
-                // Carry the transition events into the same mutation as the issue
-                // write. The sequence mirrors the chokepoint's own `persist = true`
-                // audit: state change, then completion when the issue lands Done.
-                pending_state_events.push(Event::draft_issue_state_changed(
-                    issue.id.clone(),
-                    old_state,
-                    new_state,
-                ));
-                if new_state == State::Done {
-                    pending_state_events.push(Event::draft_issue_completed(issue.id.clone()));
-                }
-            }
-        }
-
-        // Apply label changes
-        for label in &operations.add_labels {
-            if !updated.labels.contains(label) {
-                updated.labels.push(label.clone());
-                modified_fields.push(format!("label:+{}", label));
-            }
-        }
-
-        for label in &operations.remove_labels {
-            if let Some(pos) = updated.labels.iter().position(|l| l == label) {
-                updated.labels.remove(pos);
-                modified_fields.push(format!("label:-{}", label));
-            }
-        }
-
-        // Apply gate changes
-        for gate_key in &operations.add_gates {
-            if !updated.gates_required.contains(gate_key) {
-                updated.gates_required.push(gate_key.clone());
-                modified_fields.push(format!("gate:+{}", gate_key));
-            }
-        }
-
-        for gate_key in &operations.remove_gates {
-            if let Some(pos) = updated.gates_required.iter().position(|g| g == gate_key) {
-                updated.gates_required.remove(pos);
-                updated.gates_status.remove(gate_key);
-                modified_fields.push(format!("gate:-{}", gate_key));
-            }
-        }
-
-        // Apply assignee change. The format was already checked in
-        // `validate_update`; parsing here routes the value through the one
-        // `Assignee` path so the stored field is never a raw string.
-        if let Some(ref assignee) = operations.assignee {
-            let assignee: crate::domain::Assignee = assignee.parse()?;
-            if updated.assignee.as_ref() != Some(&assignee) {
-                updated.assignee = Some(assignee.clone());
-                // Stamp the first claim time (first-occurrence only) and defer the
-                // coupled `issue_claimed` event, so this bulk assignment records
-                // `claimed_at` exactly like the single-issue claim/assign paths.
-                pending_claim_event =
-                    Some(Event::draft_issue_claimed(updated.id.clone(), assignee));
-                modified_fields.push("assignee".to_string());
-            }
-        } else if operations.unassign && updated.assignee.is_some() {
-            updated.assignee = None;
-            modified_fields.push("assignee".to_string());
-        }
-
-        // Apply priority change
-        if let Some(new_priority) = operations.priority {
-            if updated.priority != new_priority {
-                updated.priority = new_priority;
-                modified_fields.push("priority".to_string());
-            }
-        }
-
-        // Save if modified
-        let modified = state_changed || !modified_fields.is_empty();
-        let mut events = pending_state_events
-            .into_iter()
-            .enumerate()
-            .map(|(index, event)| (index as u8 + 1, event))
-            .collect::<Vec<_>>();
-        if modified {
-            if let Some(event) = pending_claim_event {
-                events.push((4, event));
-            }
-            if !modified_fields.is_empty() {
-                events.push((
-                    5,
-                    Event::draft_issue_updated(
-                        issue.id.clone(),
-                        "bulk-update".to_string(),
-                        modified_fields,
-                    ),
-                ));
-            }
-        }
-        events.extend(validation.bypassed_rules.iter().map(|rule| {
-            (
-                9,
-                Event::draft_local_rule_bypassed(issue.id.clone(), rule.clone()),
-            )
-        }));
-        self.publish_ambient_issue_mutation(
-            if modified { vec![updated] } else { Vec::new() },
-            events,
-        )?;
-
-        Ok((modified, transition_warnings))
+        self.publish_captured_bulk_update(issue.id.clone(), operations, force)
     }
 
     /// Preview bulk update without applying changes (dry-run)
@@ -554,8 +374,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Validate the field operations of an update: gate keys, assignee format, and
     /// the local rules evaluated against the post-update shape. The dependency and
-    /// gate guards on a state change live in the `apply_state_transition`
-    /// chokepoint, which the write path routes the state change through.
+    /// gate guards on a state change live in the captured transition derivation.
     ///
     /// Returns the [`WriteValidation`] outcome (non-blocking warnings plus any
     /// `--force`-bypassed enforce rules). The caller emits the bypass events only
@@ -587,9 +406,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             crate::labels::validate_assignee_format(assignee)?;
         }
 
-        // The dependency and gate guards on a state change belong to the
-        // `apply_state_transition` chokepoint, which the write path routes every
-        // bulk state change through.
+        // The captured mutation coordinator owns dependency and gate guards.
 
         // Enforce declarative local rules (and the legacy validator) against the
         // POST-update shape so the batch path (`jit issue update --filter`)

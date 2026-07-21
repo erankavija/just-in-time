@@ -25,9 +25,18 @@ fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
     storage.init().unwrap();
-    std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("config.toml"), "").unwrap();
-    std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+    storage.add_repo_file(".jit/config.toml", "");
+    storage.add_repo_file(".jit/rules.toml", rules_toml);
+    storage.add_repo_file(
+        ".jit/gates.toml",
+        r#"[[gates]]
+key = "tests"
+title = "Tests"
+description = ""
+stage = "postcheck"
+mode = "manual"
+"#,
+    );
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
 }

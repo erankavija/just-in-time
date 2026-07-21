@@ -249,11 +249,15 @@ impl ClaimsIndex {
 
     /// Check if lease is stale (for indefinite leases)
     pub fn is_stale(&self, lease: &Lease) -> bool {
+        self.is_stale_at(lease, Utc::now())
+    }
+
+    fn is_stale_at(&self, lease: &Lease, now: DateTime<Utc>) -> bool {
         if lease.ttl_secs > 0 {
             return false; // Finite leases use expiration, not staleness
         }
 
-        let elapsed = Utc::now().signed_duration_since(lease.last_beat);
+        let elapsed = now.signed_duration_since(lease.last_beat);
         elapsed.num_seconds() as u64 > self.stale_threshold_secs
     }
 
@@ -279,6 +283,80 @@ pub struct ClaimCoordinator {
     /// [`SystemClock`] (the real system clock) in production; tests inject a
     /// deterministic clock so TTL boundaries are exercised without real delays.
     clock: Arc<dyn Clock>,
+}
+
+/// Stable read view of claims held across one repository mutation attempt.
+///
+/// The private guards enforce and retain the coordinator -> repository order;
+/// callers may inspect the snapshot but cannot mutate the control plane through
+/// this value.
+pub(crate) struct ClaimsMutationGuard {
+    index: ClaimsIndex,
+    now: DateTime<Utc>,
+    _order: crate::storage::guard_order::CoordinationOrderGuard,
+    _lock: crate::storage::lock::LockGuard,
+}
+
+impl ClaimsMutationGuard {
+    fn resolved_active_leases<'a>(
+        &'a self,
+        canonical_issue_id: &str,
+        resolve_issue_id: impl Fn(&str) -> Result<String>,
+    ) -> Result<Vec<&'a Lease>> {
+        let requested = canonical_issue_id.to_lowercase().replace('-', "");
+        self.index
+            .leases
+            .iter()
+            .filter(|lease| !lease.is_expired(self.now) && !self.index.is_stale_at(lease, self.now))
+            .filter(|lease| {
+                let stored = lease.issue_id.to_lowercase().replace('-', "");
+                stored.len() >= crate::storage::MIN_ID_PREFIX_LENGTH
+                    && requested.starts_with(&stored)
+            })
+            .map(|lease| resolve_issue_id(&lease.issue_id).map(|resolved| (lease, resolved)))
+            .collect::<Result<Vec<_>>>()
+            .map(|leases| {
+                leases
+                    .into_iter()
+                    .filter_map(|(lease, resolved)| {
+                        (resolved == canonical_issue_id).then_some(lease)
+                    })
+                    .collect()
+            })
+    }
+
+    pub(crate) fn has_active_lease(
+        &self,
+        canonical_issue_id: &str,
+        current_agent: Option<&str>,
+        resolve_issue_id: impl Fn(&str) -> Result<String>,
+    ) -> Result<bool> {
+        Ok(self
+            .resolved_active_leases(canonical_issue_id, resolve_issue_id)?
+            .into_iter()
+            .any(|lease| current_agent.is_none_or(|agent| lease.agent_id.as_str() == agent)))
+    }
+
+    /// Resolve active persisted spellings against the final captured issue set
+    /// and return the first lease conflicting with `current_agent`.
+    pub(crate) fn conflicting_lease(
+        &self,
+        canonical_issue_id: &str,
+        current_agent: Option<&str>,
+        resolve_issue_id: impl Fn(&str) -> Result<String>,
+    ) -> Result<Option<Lease>> {
+        let conflict = self
+            .resolved_active_leases(canonical_issue_id, resolve_issue_id)?
+            .into_iter()
+            .find(|lease| current_agent.is_none_or(|agent| lease.agent_id.as_str() != agent))
+            .cloned();
+        Ok(conflict)
+    }
+
+    /// Non-fatal diagnostics observed in the held control-plane snapshot.
+    pub(crate) fn warnings(&self) -> Vec<StorageWarning> {
+        self.index.warnings()
+    }
 }
 
 impl ClaimCoordinator {
@@ -330,6 +408,34 @@ impl ClaimCoordinator {
         fs::create_dir_all(self.paths.shared_jit.join("locks"))
             .context("Failed to create locks directory")?;
         Ok(())
+    }
+
+    /// Lock claim evidence for one repository mutation attempt.
+    ///
+    /// The returned inspection guard holds the mandatory coordination-order
+    /// marker and the claims lock until it is dropped. It deliberately performs
+    /// no reconciliation or eviction: writers own those mutations, while this
+    /// read path only needs a stable control-plane snapshot across repository
+    /// capture and apply.
+    pub(crate) fn lock_claims_for_repository_mutation(&self) -> Result<ClaimsMutationGuard> {
+        let order = crate::storage::guard_order::CoordinationOrderGuard::enter()
+            .map_err(|error| anyhow::anyhow!("{error}"))?;
+        let lock_path = self.paths.shared_jit.join("locks/claims.lock");
+        let lock_parent = lock_path
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("claims lock path has no parent"))?;
+        fs::create_dir_all(lock_parent)?;
+        let lock = self
+            .locker
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+        let now = self.clock.now();
+        let index = self.rebuild_index_from_log_at(now, true)?;
+        Ok(ClaimsMutationGuard {
+            index,
+            now,
+            _order: order,
+            _lock: lock,
+        })
     }
 
     /// Acquire a claim on an issue (atomic operation)
@@ -2313,6 +2419,31 @@ mod tests {
             content.contains("heartbeat"),
             "Audit log should contain heartbeat operation"
         );
+    }
+
+    #[test]
+    fn test_claims_mutation_guard_replays_log_and_holds_lock_without_repair() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        let issue_id = "abcd1111111111111111111111111111";
+        coordinator.acquire_claim(issue_id, 600).unwrap();
+        let index_path = temp_dir.path().join(".git/jit/claims.index.json");
+        fs::remove_file(&index_path).unwrap();
+
+        let guard = coordinator.lock_claims_for_repository_mutation().unwrap();
+
+        assert!(guard
+            .has_active_lease(issue_id, Some("agent:test"), |raw| Ok(raw.to_string()))
+            .unwrap());
+        assert!(
+            !index_path.exists(),
+            "inspection must not repair derived state"
+        );
+        let lock_path = temp_dir.path().join(".git/jit/locks/claims.lock");
+        let contender = FileLocker::new(StdDuration::from_millis(10));
+        assert!(contender.try_lock_exclusive(&lock_path).unwrap().is_none());
+        drop(guard);
+        assert!(contender.try_lock_exclusive(&lock_path).unwrap().is_some());
     }
 }
 

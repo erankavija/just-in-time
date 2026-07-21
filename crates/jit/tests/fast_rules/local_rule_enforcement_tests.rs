@@ -448,7 +448,7 @@ fn test_update_gate_blocked_force_logs_bypass_and_persists_gated() {
     // UNPASSED gate AND a violated `enforce` rule, updated with `--force
     // --state done`. The Done transition diverts to `Gated` (unpassed gate), the
     // forced enforce-rule bypass is still audited, yet the call returns Err
-    // (gate-blocked). This is the audit-sensitive `handle_gate_blocking` path.
+    // (gate-blocked). This is the audit-sensitive captured transition path.
     let executor = executor_with_rules(
         r#"
 [[rules]]

@@ -200,7 +200,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let mut session = self.storage().open_mutation_session(layout)?;
         for _ in 0..8 {
-            match self.capture_proposed_base(session.as_mut(), overrides, &[])? {
+            match self.capture_proposed_base(session.as_mut(), overrides, &[], None)? {
                 None => continue,
                 Some(base) if overrides.is_empty() => return Ok(base),
                 Some(base) => return Ok(apply_overlay(&base, overrides.clone())?),
@@ -231,6 +231,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
+        precheck_target: Option<&str>,
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, VirtualPath,
@@ -303,10 +304,64 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         full_config.templates = effective_templates(&image_two, &config, &effective)?;
         let (worktree_docs, pinned) = document_capture_closure(&issues, &full_config)?;
         phase_three.discover_paths(worktree_docs)?;
+        if let Some(raw_target) = precheck_target {
+            let target = super::resolve_issue_from_capture(&issues, raw_target)?;
+            let issue = issues
+                .iter()
+                .find(|issue| issue.id == target)
+                .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target))?;
+            let gates = match effective(&image_two, ".jit/gates.toml")? {
+                Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
+                None => crate::declarations::GateRegistry::default(),
+            };
+            let prompt_paths = issue
+                .gates_required
+                .iter()
+                .filter_map(|key| gates.gates.get(key))
+                .filter(|gate| {
+                    gate.stage == crate::declarations::GateStage::Precheck
+                        && gate.mode == crate::declarations::GateMode::Auto
+                })
+                .filter_map(|gate| gate.checker.as_ref())
+                .filter_map(|checker| match checker {
+                    crate::declarations::GateChecker::Exec {
+                        pass_context: true,
+                        prompt_file: Some(path),
+                        ..
+                    } => Some(path),
+                    _ => None,
+                });
+            phase_three.discover_paths(
+                prompt_paths
+                    .map(|path| super::repo_rel_virtual_path(path))
+                    .collect::<Result<Vec<_>>>()?,
+            )?;
+            let gate_runs = VirtualPath::data("gate-runs")?;
+            phase_three.discover_paths([gate_runs.clone()])?;
+            phase_three.discover_listing(gate_runs)?;
+        }
         phase_three.discover_paths(extra_paths.iter().cloned())?;
         for (revision, path) in pinned {
             phase_three.discover_pinned(revision, path)?;
         }
+        let image_three = match session.capture(phase_three.clone()) {
+            Ok(base) => base,
+            Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        if precheck_target.is_none() {
+            return Ok(Some(image_three));
+        }
+
+        let gate_runs = VirtualPath::data("gate-runs")?;
+        let run_paths = image_three
+            .listing_fingerprints()
+            .get(&gate_runs)
+            .into_iter()
+            .flat_map(|listing| listing.children().keys())
+            .map(|run_id| VirtualPath::data(format!("gate-runs/{run_id}/result.json")))
+            .collect::<Result<Vec<_>, _>>()?;
+        phase_three.discover_paths(run_paths)?;
         match session.capture(phase_three) {
             Ok(base) => Ok(Some(base)),
             Err(RepositoryStateStoreError::RetryableConflict { .. }) => Ok(None),
@@ -605,7 +660,7 @@ fn document_capture_closure(issues: &[Issue], config: &JitConfig) -> Result<Docu
 /// rather than the live filesystem. A not-yet-authored plan whose planning node is
 /// not `done` is omitted (a freshly-applied bracket validates cleanly before its
 /// plan exists); a missing plan whose planning node is `done` is an error.
-fn plan_content_from_image(
+pub(crate) fn plan_content_from_image(
     image: &crate::repository_state::RepositoryImage,
     emit_for: &[Issue],
 ) -> Result<std::collections::HashMap<String, String>> {
@@ -1511,7 +1566,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Graph rules: select those whose `when` matches SOME in-slice issue,
         // minus the repo-wide kinds (R2 / CC-2a), then evaluate over the slice.
-        // This mirrors `enforce_transition_graph_rules`' select-then-slice
+        // This mirrors transition-time graph-rule select-then-slice
         // precision, but membership here is the bracket subtree, not a
         // transition neighborhood.
         let graph_rules: Vec<&crate::declarations::rules::Rule> = ruleset

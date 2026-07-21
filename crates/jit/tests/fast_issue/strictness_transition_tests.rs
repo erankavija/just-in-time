@@ -42,13 +42,11 @@ fn executor(strictness: &str, rules_toml: &str) -> CommandExecutor<InMemoryStora
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
     storage.init().unwrap();
-    std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(
-        storage.root().join("config.toml"),
-        format!("[validation]\nstrictness = \"{strictness}\"\n"),
-    )
-    .unwrap();
-    std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+    storage.add_repo_file(
+        ".jit/config.toml",
+        &format!("[validation]\nstrictness = \"{strictness}\"\n"),
+    );
+    storage.add_repo_file(".jit/rules.toml", rules_toml);
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
 }

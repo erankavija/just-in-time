@@ -180,6 +180,851 @@ struct DerivedCapturedIssueMutation {
     intents: Vec<crate::repository_state::MutationIntent>,
 }
 
+/// Pure result of deriving one lifecycle transition from a closed repository
+/// image. Graph-rule refusals carry their audit append so the coordinator can
+/// commit the attempted transition before returning the typed error.
+enum DerivedStateTransition {
+    Applied {
+        issue: Box<Issue>,
+        warnings: Vec<String>,
+        events: PhasedEvents,
+        changed: bool,
+    },
+    GraphBlocked {
+        error: crate::errors::TransitionBlockedError,
+        events: PhasedEvents,
+    },
+}
+
+struct CapturedTransitionEvidence<'a> {
+    issues: &'a [Issue],
+    declarations: &'a ImageDeclarations,
+    config: &'a JitConfig,
+    plan_content: &'a std::collections::HashMap<String, String>,
+    context: &'a crate::repository_state::MutationContext,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PrecheckEvidence {
+    inputs: Vec<(
+        crate::repository_state::VirtualPath,
+        Option<crate::repository_state::EntryIdentity>,
+    )>,
+    validation_view: Option<PrecheckValidationView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PrecheckValidationView {
+    listings: std::collections::BTreeMap<
+        crate::repository_state::VirtualPath,
+        crate::repository_state::ListingFingerprint,
+    >,
+    pinned: std::collections::BTreeMap<
+        (String, String),
+        crate::repository_state::PinnedDocumentEvidence,
+    >,
+    linked: std::collections::BTreeMap<
+        crate::repository_state::VirtualPath,
+        crate::repository_state::LinkedWorktreeEvidence,
+    >,
+}
+
+impl PrecheckEvidence {
+    fn matches(&self, image: &crate::repository_state::RepositoryImage) -> Result<bool> {
+        let inputs = self
+            .inputs
+            .iter()
+            .map(|(path, _)| {
+                image
+                    .entry(path)
+                    .map(|entry| (path.clone(), entry.identity().cloned()))
+            })
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let validation_view = self
+            .validation_view
+            .as_ref()
+            .map(|_| PrecheckValidationView {
+                listings: image.listing_fingerprints().clone(),
+                pinned: image.pinned_evidence().clone(),
+                linked: image.linked_worktree_evidence().clone(),
+            });
+        Ok(inputs == self.inputs && validation_view == self.validation_view)
+    }
+}
+
+struct CapturedPrecheckPlan {
+    evidence: PrecheckEvidence,
+    prompts: std::collections::HashMap<String, String>,
+}
+
+struct CachedPrecheckExecution {
+    target_id: String,
+    evidence: PrecheckEvidence,
+    execution: gate_check::PrecheckExecution,
+}
+
+fn captured_precheck_plan(
+    image: &crate::repository_state::RepositoryImage,
+    issue: &Issue,
+    registry: &crate::declarations::GateRegistry,
+) -> Result<CapturedPrecheckPlan> {
+    use crate::declarations::{GateChecker, GateStage};
+    use crate::repository_state::VirtualPath;
+    use std::collections::{BTreeSet, HashMap};
+
+    let gates = issue
+        .gates_required
+        .iter()
+        .filter_map(|key| registry.gates.get(key).map(|gate| (key, gate)))
+        .filter(|(_, gate)| gate.stage == GateStage::Precheck)
+        .collect::<Vec<_>>();
+    let broad_builtin = gates.iter().any(|(_, gate)| {
+        gate.mode == GateMode::Auto
+            && !matches!(gate.checker, Some(GateChecker::Exec { .. }))
+            && !matches!(gate.checker, Some(GateChecker::ReviewPlaceholder))
+    });
+    let mut paths = if broad_builtin {
+        image.entries().keys().cloned().collect::<BTreeSet<_>>()
+    } else {
+        BTreeSet::from([
+            VirtualPath::data(format!("issues/{}.json", issue.id))?,
+            VirtualPath::data("gates.toml")?,
+        ])
+    };
+    if !broad_builtin {
+        paths.extend(
+            issue
+                .dependencies
+                .iter()
+                .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+                .collect::<std::result::Result<Vec<_>, _>>()?,
+        );
+        for (path, entry) in image.entries() {
+            let relative = path.relative().as_str();
+            if relative.starts_with("gate-runs/") && relative.ends_with("/result.json") {
+                if let crate::repository_state::RepositoryEntry::File { bytes, .. } = entry {
+                    let run: crate::domain::GateRunResult = serde_json::from_slice(bytes)?;
+                    if run.issue_id == issue.id {
+                        paths.insert(path.clone());
+                    }
+                }
+            }
+        }
+    }
+    let mut prompts = HashMap::new();
+    for (key, gate) in gates {
+        if gate.mode != GateMode::Auto {
+            continue;
+        }
+        if let Some(GateChecker::Exec {
+            pass_context: true,
+            prompt_file: Some(path),
+            ..
+        }) = &gate.checker
+        {
+            let path = repo_rel_virtual_path(path)?;
+            let bytes = image
+                .file_bytes(&path)?
+                .ok_or_else(|| anyhow!("captured precheck prompt file '{:?}' is missing", path))?;
+            prompts.insert(key.clone(), String::from_utf8(bytes.to_vec())?);
+            paths.insert(path);
+        }
+    }
+    let inputs = paths
+        .into_iter()
+        .map(|path| {
+            image
+                .entry(&path)
+                .map(|entry| (path, entry.identity().cloned()))
+        })
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let validation_view = broad_builtin.then(|| PrecheckValidationView {
+        listings: image.listing_fingerprints().clone(),
+        pinned: image.pinned_evidence().clone(),
+        linked: image.linked_worktree_evidence().clone(),
+    });
+    Ok(CapturedPrecheckPlan {
+        evidence: PrecheckEvidence {
+            inputs,
+            validation_view,
+        },
+        prompts,
+    })
+}
+
+fn claims_mutation_guard(
+    layout: &crate::repository_state::RepositoryLayout,
+) -> Result<Option<crate::storage::claim_coordinator::ClaimsMutationGuard>> {
+    use crate::storage::worktree_paths::WorktreePaths;
+    use crate::storage::{ClaimCoordinator, FileLocker};
+    use std::time::Duration;
+
+    let in_git = std::process::Command::new("git")
+        .arg("-C")
+        .arg(layout.worktree_root())
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .output()
+        .is_ok_and(|output| output.status.success());
+    if !in_git {
+        return Ok(None);
+    }
+    let paths = WorktreePaths::detect_from(layout.worktree_root())?;
+    let agent = crate::agent_config::resolve_agent_id(None)
+        .unwrap_or_else(|_| "system:lease-check".to_string());
+    let worktree_id = crate::storage::worktree_identity::read_worktree_id(layout.worktree_root())?
+        .unwrap_or_else(|| layout.worktree_root().display().to_string());
+    let coordinator = ClaimCoordinator::new(
+        paths,
+        FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        )),
+        worktree_id,
+        agent,
+    );
+    coordinator.lock_claims_for_repository_mutation().map(Some)
+}
+
+fn captured_lease_warnings(
+    mode: crate::config::EnforcementMode,
+    targets: &[String],
+    issues: &[Issue],
+    guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
+) -> Result<Vec<String>> {
+    use crate::agent_config::resolve_agent_id;
+    use crate::config::EnforcementMode;
+
+    if mode == EnforcementMode::Off {
+        return Ok(Vec::new());
+    }
+    let agent = resolve_agent_id(None).ok();
+    let mut warnings = Vec::new();
+    for id in targets {
+        let active = guard
+            .map(|guard| {
+                guard.has_active_lease(id, agent.as_deref(), |raw| {
+                    resolve_issue_from_capture(issues, raw)
+                })
+            })
+            .transpose()?
+            .unwrap_or(false);
+        if active {
+            continue;
+        }
+        let message =
+            format!("No active lease for issue {id}.\nAcquire lease with: jit claim acquire {id}");
+        match mode {
+            EnforcementMode::Warn => warnings.push(message),
+            EnforcementMode::Strict => return Err(anyhow!(message)),
+            EnforcementMode::Off => unreachable!(),
+        }
+    }
+    Ok(warnings)
+}
+
+fn ensure_claim_available(
+    guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
+    target: &str,
+    assignee: &crate::domain::Assignee,
+    issues: &[Issue],
+) -> Result<()> {
+    let Some(lease) = guard
+        .map(|guard| {
+            guard.conflicting_lease(target, Some(&assignee.to_string()), |raw| {
+                resolve_issue_from_capture(issues, raw)
+            })
+        })
+        .transpose()?
+        .flatten()
+    else {
+        return Ok(());
+    };
+    let expires = lease
+        .expires_at
+        .map(|time| time.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+        .unwrap_or_else(|| "indefinitely".to_string());
+    Err(anyhow!(
+        "Issue {} is currently leased by {} {}.\nUse 'jit claim acquire' to properly coordinate work.",
+        target,
+        lease.agent_id,
+        expires
+    ))
+}
+
+#[derive(Clone)]
+enum CapturedLifecycleMutation {
+    State {
+        issue_id: String,
+        target: State,
+        force: bool,
+        divert_unpassed_gates: bool,
+        enforce_lease: bool,
+    },
+    Claim {
+        issue_id: String,
+        assignee: crate::domain::Assignee,
+    },
+    Release {
+        issue_id: String,
+        reason: String,
+    },
+    AutoReady {
+        issue_id: String,
+    },
+    AutoDone {
+        issue_id: String,
+    },
+}
+
+impl CapturedLifecycleMutation {
+    fn issue_id(&self) -> &str {
+        match self {
+            Self::State { issue_id, .. }
+            | Self::Claim { issue_id, .. }
+            | Self::Release { issue_id, .. }
+            | Self::AutoReady { issue_id }
+            | Self::AutoDone { issue_id } => issue_id,
+        }
+    }
+}
+
+fn lifecycle_requires_prechecks(request: &CapturedLifecycleMutation, issue: &Issue) -> bool {
+    issue.state == State::Ready
+        && matches!(
+            request,
+            CapturedLifecycleMutation::State {
+                target: State::InProgress,
+                ..
+            } | CapturedLifecycleMutation::Claim { .. }
+        )
+}
+
+struct CapturedLifecycleOutcome {
+    target_id: String,
+    changed: bool,
+    warnings: Vec<String>,
+    storage_warnings: Vec<crate::storage::StorageWarning>,
+}
+
+#[derive(Clone)]
+struct CapturedFieldUpdate {
+    issue_id: String,
+    title: Option<String>,
+    description: Option<DescriptionUpdate>,
+    priority: Option<Priority>,
+    state: Option<State>,
+    add_labels: Vec<String>,
+    remove_labels: Vec<String>,
+    content_format: Option<Option<crate::domain::ContentFormat>>,
+    issue_type: Option<String>,
+    add_gates: Vec<String>,
+    remove_gates: Vec<String>,
+    assignee: Option<crate::domain::Assignee>,
+    unassign: bool,
+    bulk: bool,
+    force: bool,
+    enforce_lease: bool,
+}
+
+struct DerivedFieldUpdate {
+    changed: bool,
+    warnings: Vec<String>,
+    intents: Vec<crate::repository_state::MutationIntent>,
+    error_after_apply: Option<crate::errors::TransitionBlockedError>,
+}
+
+struct CapturedFieldUpdateOutcome {
+    changed: bool,
+    warnings: Vec<String>,
+}
+
+fn derive_write_validation(
+    issue: &Issue,
+    declarations: &ImageDeclarations,
+    config: &JitConfig,
+    force: bool,
+) -> Result<WriteValidation> {
+    let repo_format = config
+        .validation
+        .as_ref()
+        .map(crate::config::ValidationConfig::content_format)
+        .transpose()?
+        .unwrap_or(crate::domain::ContentFormat::Markdown);
+    let strictness = config
+        .validation
+        .as_ref()
+        .map(crate::config::ValidationConfig::strictness)
+        .transpose()?
+        .unwrap_or_default();
+    let evaluation = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)
+        .map_err(|error| anyhow!("rule evaluation failed: {error}"))?
+        .with_strictness(strictness);
+    let blocking = evaluation.blocking_rules();
+    if !blocking.is_empty() && !force {
+        return Err(crate::errors::ValidationFailedError::new(
+            evaluation
+                .rejection_message()
+                .unwrap_or_else(|| "blocked by validation rule(s)".to_string()),
+        )
+        .into());
+    }
+    Ok(WriteValidation {
+        warnings: evaluation.warnings(),
+        bypassed_rules: blocking,
+    })
+}
+
+/// Derive one state transition without storage access.
+fn derive_state_transition(
+    mut issue: Issue,
+    target: State,
+    force: bool,
+    evidence: CapturedTransitionEvidence<'_>,
+) -> Result<DerivedStateTransition> {
+    use crate::declarations::rules::{RuleScope, Severity};
+    use crate::validation::graph::evaluate_graph;
+    use std::collections::HashSet;
+
+    let old_state = issue.state;
+    if old_state == target {
+        return Ok(DerivedStateTransition::Applied {
+            issue: Box::new(issue),
+            warnings: Vec::new(),
+            events: Vec::new(),
+            changed: false,
+        });
+    }
+
+    let mut warnings = Vec::new();
+    if old_state == State::Archived {
+        match issue.archived_from {
+            Some(origin) if target != origin => {
+                return Err(crate::errors::TransitionBlockedError::archived_revive(
+                    issue.id.clone(),
+                    target,
+                    origin,
+                )
+                .into());
+            }
+            None => warnings.push(format!(
+                "issue {} was archived before its pre-archive state was recorded; reviving to \
+                 '{}' without a verified origin",
+                issue.short_id(),
+                target.as_str()
+            )),
+            Some(_) => {}
+        }
+    }
+
+    if matches!(target, State::Ready | State::Done) {
+        let blockers = issue::blocking_dependencies(
+            &issue,
+            &crate::domain::queries::build_issue_map(evidence.issues),
+        );
+        if !blockers.is_empty() {
+            return Err(crate::errors::TransitionBlockedError::dependencies(
+                issue.id.clone(),
+                target,
+                old_state,
+                blockers,
+            )
+            .into());
+        }
+        if target == State::Done && issue.has_unpassed_gates() {
+            return Err(crate::errors::TransitionBlockedError::gates(
+                issue.id.clone(),
+                target,
+                old_state,
+                unpassed_gate_blockers(&issue, &evidence.declarations.gates),
+            )
+            .into());
+        }
+    }
+
+    let mut bypass_events = Vec::new();
+    if !matches!(target, State::Rejected | State::Archived) {
+        let mut projected = issue.clone();
+        projected.state = target;
+        let rules = evidence
+            .declarations
+            .rules
+            .rules
+            .iter()
+            .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
+            .filter(|rule| !rule.assert.is_repo_wide_at_transition())
+            .filter(|rule| rule.when.matches(&projected))
+            .collect::<Vec<_>>();
+        if !rules.is_empty() {
+            let refs = evidence.issues.iter().collect::<Vec<_>>();
+            let graph = DependencyGraph::new(&refs);
+            let mut ids = HashSet::from([projected.id.clone()]);
+            ids.extend(
+                graph
+                    .get_transitive_dependents(&projected.id)
+                    .into_iter()
+                    .map(|candidate| candidate.id.clone()),
+            );
+            ids.extend(
+                graph
+                    .get_transitive_dependencies(&projected.id)
+                    .into_iter()
+                    .map(|candidate| candidate.id.clone()),
+            );
+            let slice = evidence
+                .issues
+                .iter()
+                .filter(|candidate| ids.contains(&candidate.id))
+                .map(|candidate| {
+                    if candidate.id == projected.id {
+                        projected.clone()
+                    } else {
+                        candidate.clone()
+                    }
+                })
+                .collect::<Vec<_>>();
+            let namespaces = crate::config_manager::namespaces_from_config(evidence.config);
+            let hierarchy = crate::repository_state::hierarchy_config(&namespaces);
+            let repo_format = evidence
+                .config
+                .validation
+                .as_ref()
+                .map(crate::config::ValidationConfig::content_format)
+                .transpose()?
+                .unwrap_or(crate::domain::ContentFormat::Markdown);
+            let strictness = evidence
+                .config
+                .validation
+                .as_ref()
+                .map(crate::config::ValidationConfig::strictness)
+                .transpose()?
+                .unwrap_or_default();
+            let enforcing = rules
+                .iter()
+                .filter(|rule| rule.enforce)
+                .map(|rule| rule.name.as_str())
+                .collect::<HashSet<_>>();
+            let findings = evaluate_graph(
+                &rules,
+                &slice,
+                &hierarchy,
+                repo_format,
+                evidence.context.timestamp(),
+                evidence.plan_content,
+            );
+            let mut blocking = Vec::new();
+            for finding in findings {
+                let config_error = finding.is_config_error();
+                let pertains =
+                    config_error || finding.issue_id.as_deref() == Some(projected.id.as_str());
+                if pertains
+                    && strictness.blocks(
+                        enforcing.contains(finding.finding.rule.as_str()),
+                        finding.finding.severity,
+                    )
+                {
+                    let message = if config_error {
+                        format!(
+                            "rule '{}' is misconfigured: {}; fix the rule or use --force",
+                            finding.finding.rule, finding.finding.message
+                        )
+                    } else {
+                        finding.finding.message.clone()
+                    };
+                    blocking.push((finding.finding.rule, message));
+                } else {
+                    warnings.push(format!(
+                        "[{}] {}",
+                        finding.finding.rule, finding.finding.message
+                    ));
+                }
+            }
+            if !blocking.is_empty() {
+                let events = blocking
+                    .iter()
+                    .map(|(rule, _)| {
+                        (
+                            1,
+                            if force {
+                                Event::draft_graph_rule_bypassed(
+                                    issue.id.clone(),
+                                    target,
+                                    rule.clone(),
+                                )
+                            } else {
+                                Event::draft_transition_blocked(
+                                    issue.id.clone(),
+                                    target,
+                                    rule.clone(),
+                                )
+                            },
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                if force {
+                    bypass_events = events;
+                } else {
+                    return Ok(DerivedStateTransition::GraphBlocked {
+                        error: crate::errors::TransitionBlockedError::graph_rules(
+                            issue.id.clone(),
+                            target,
+                            old_state,
+                            blocking,
+                        ),
+                        events,
+                    });
+                }
+            }
+        }
+    }
+
+    issue.state = target;
+    if target == State::Archived {
+        issue.archived_from = Some(old_state);
+    } else if old_state == State::Archived {
+        issue.archived_from = None;
+    }
+    bypass_events.push((
+        2,
+        Event::draft_issue_state_changed(issue.id.clone(), old_state, target),
+    ));
+    if target == State::Done {
+        bypass_events.push((3, Event::draft_issue_completed(issue.id.clone())));
+    }
+    Ok(DerivedStateTransition::Applied {
+        issue: Box::new(issue),
+        warnings,
+        events: bypass_events,
+        changed: true,
+    })
+}
+
+fn derive_field_update(
+    original: Issue,
+    request: &CapturedFieldUpdate,
+    evidence: CapturedTransitionEvidence<'_>,
+) -> Result<DerivedFieldUpdate> {
+    use crate::repository_state::MutationIntent;
+
+    let mut issue = original.clone();
+    if let Some(title) = &request.title {
+        issue.title = title.clone();
+    }
+    if let Some(description) = &request.description {
+        issue.description = description.clone().apply(&issue.description);
+    }
+    if let Some(priority) = request.priority {
+        issue.priority = priority;
+    }
+    if let Some(content_format) = request.content_format {
+        issue.content_format = content_format;
+    }
+    for label in &request.add_labels {
+        if !issue.labels.contains(label) {
+            issue.labels.push(label.clone());
+        }
+    }
+    for label in &request.remove_labels {
+        issue.labels.retain(|candidate| candidate != label);
+    }
+    let missing_gates = request
+        .add_gates
+        .iter()
+        .filter(|key| !evidence.declarations.gates.gates.contains_key(*key))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !missing_gates.is_empty() {
+        return Err(crate::storage::GateNotFoundError::new(missing_gates).into());
+    }
+    for gate in &request.add_gates {
+        if !issue.gates_required.contains(gate) {
+            issue.gates_required.push(gate.clone());
+        }
+    }
+    for gate in &request.remove_gates {
+        issue.gates_required.retain(|candidate| candidate != gate);
+        issue.gates_status.remove(gate);
+    }
+    if let Some(assignee) = &request.assignee {
+        issue.assignee = Some(assignee.clone());
+    } else if request.unassign {
+        issue.assignee = None;
+    }
+    if let Some(kind) = &request.issue_type {
+        issue
+            .labels
+            .retain(|label| !label_utils::is_type_label(label));
+        issue.labels.push(label_utils::type_label(kind));
+    }
+
+    let mut changed_fields = Vec::new();
+    if issue.title != original.title {
+        changed_fields.push("title".to_string());
+    }
+    if issue.description != original.description {
+        changed_fields.push("description".to_string());
+    }
+    if issue.priority != original.priority {
+        changed_fields.push("priority".to_string());
+    }
+    if issue.labels != original.labels {
+        changed_fields.push("labels".to_string());
+    }
+    if issue.content_format != original.content_format {
+        changed_fields.push("content_format".to_string());
+    }
+    if issue.gates_required != original.gates_required {
+        changed_fields.push("gates".to_string());
+    }
+    if issue.assignee != original.assignee {
+        changed_fields.push("assignee".to_string());
+    }
+
+    let mut gate_error = None;
+    let target = match request.state {
+        Some(State::Done) if issue.has_unpassed_gates() => {
+            let blockers = issue::blocking_dependencies(
+                &issue,
+                &crate::domain::queries::build_issue_map(evidence.issues),
+            );
+            if !blockers.is_empty() {
+                return Err(crate::errors::TransitionBlockedError::dependencies(
+                    issue.id.clone(),
+                    State::Done,
+                    original.state,
+                    blockers,
+                )
+                .into());
+            }
+            gate_error = Some(crate::errors::TransitionBlockedError::gates(
+                issue.id.clone(),
+                State::Done,
+                State::Gated,
+                unpassed_gate_blockers(&issue, &evidence.declarations.gates),
+            ));
+            Some(State::Gated)
+        }
+        target => target,
+    };
+
+    let mut projected = issue.clone();
+    if let Some(target) = target {
+        projected.state = target;
+    }
+    let validation = derive_write_validation(
+        &projected,
+        evidence.declarations,
+        evidence.config,
+        request.force,
+    )?;
+    if request.issue_type.is_some() {
+        let repo_format = evidence
+            .config
+            .validation
+            .as_ref()
+            .map(crate::config::ValidationConfig::content_format)
+            .transpose()?
+            .unwrap_or(crate::domain::ContentFormat::Markdown);
+        let explicit_type = crate::validation::evaluate_local(
+            &projected,
+            &evidence.declarations.rules,
+            repo_format,
+        )
+        .map_err(|error| anyhow!("rule evaluation failed: {error}"))?;
+        if let Some(finding) = explicit_type
+            .findings()
+            .into_iter()
+            .find(|finding| finding.rule == "type-hierarchy-known")
+        {
+            return Err(crate::errors::ValidationFailedError::new(finding.message.clone()).into());
+        }
+    }
+
+    let mut warnings = validation.warnings;
+    let mut events = Vec::new();
+    if let Some(target) = target {
+        match derive_state_transition(
+            issue,
+            target,
+            request.force,
+            CapturedTransitionEvidence { ..evidence },
+        )? {
+            DerivedStateTransition::Applied {
+                issue: transitioned,
+                warnings: transition_warnings,
+                events: transition_events,
+                ..
+            } => {
+                issue = *transitioned;
+                warnings.extend(transition_warnings);
+                events.extend(transition_events);
+            }
+            DerivedStateTransition::GraphBlocked {
+                error,
+                events: blocked_events,
+            } => {
+                return Ok(DerivedFieldUpdate {
+                    changed: false,
+                    warnings,
+                    intents: blocked_events
+                        .into_iter()
+                        .map(|(phase, event)| MutationIntent::RecordEvent {
+                            phase,
+                            event: Box::new(event),
+                        })
+                        .collect(),
+                    error_after_apply: Some(error),
+                });
+            }
+        }
+    }
+
+    let changed = !changed_fields.is_empty() || issue.state != original.state;
+    if issue.assignee != original.assignee {
+        if let Some(assignee) = issue.assignee.clone() {
+            events.push((4, Event::draft_issue_claimed(issue.id.clone(), assignee)));
+        }
+    }
+    if !changed_fields.is_empty() {
+        events.push((
+            5,
+            Event::draft_issue_updated(
+                issue.id.clone(),
+                if request.bulk {
+                    "bulk-update".to_string()
+                } else {
+                    "issue-update".to_string()
+                },
+                changed_fields,
+            ),
+        ));
+    }
+    events.extend(
+        validation
+            .bypassed_rules
+            .into_iter()
+            .map(|rule| (9, Event::draft_local_rule_bypassed(issue.id.clone(), rule))),
+    );
+    let intents = changed
+        .then(|| MutationIntent::UpdateIssue {
+            issue: Box::new(issue),
+        })
+        .into_iter()
+        .chain(
+            events
+                .into_iter()
+                .map(|(phase, event)| MutationIntent::RecordEvent {
+                    phase,
+                    event: Box::new(event),
+                }),
+        )
+        .collect();
+    Ok(DerivedFieldUpdate {
+        changed,
+        warnings,
+        intents,
+        error_after_apply: gate_error,
+    })
+}
+
 /// Derive the full-record low-level intent and its audit events from one captured
 /// issue. Keeping this pure makes the retry contract directly testable: every
 /// attempt receives the new image's record and cannot retain an ambient preimage.
@@ -546,7 +1391,7 @@ pub enum RedundancyPolicy {
 /// is persisted. It carries the non-blocking warnings to surface to the caller
 /// and the list of `enforce` rules that a `--force` write is bypassing. The
 /// bypass events are intentionally NOT emitted during validation: the caller
-/// emits them (via `log_rule_bypasses`) only AFTER the write succeeds, so a save
+/// emits them through the captured mutation only after validation succeeds, so a save
 /// that fails never leaves a false "bypass happened" entry in the audit log.
 #[derive(Debug, Clone, Default)]
 pub struct WriteValidation {
@@ -731,6 +1576,73 @@ pub(crate) fn declarations_from_image(
     })
 }
 
+/// Parse the active issue set from the captured index and issue records.
+fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> Result<Vec<Issue>> {
+    use crate::repository_state::{RepositoryEntry, VirtualPath};
+
+    let index_path = VirtualPath::data("index.json")?;
+    let index_bytes = image
+        .file_bytes(&index_path)?
+        .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
+    let index = crate::storage::json::parse_repository_index(index_bytes)?;
+    let mut issues = index
+        .all_ids
+        .iter()
+        .map(|id| {
+            let path = VirtualPath::data(format!("issues/{id}.json"))?;
+            let bytes = match image.entry(&path)? {
+                RepositoryEntry::File { bytes, .. } => bytes,
+                RepositoryEntry::Absent => {
+                    return Err(crate::storage::IssueNotFoundError::new(id).into())
+                }
+                _ => return Err(anyhow!("indexed issue {id} is not an ordinary file")),
+            };
+            let issue: Issue = serde_json::from_slice(bytes)
+                .with_context(|| format!("failed to parse captured issue {id}"))?;
+            if issue.id != *id {
+                return Err(anyhow!(
+                    "indexed issue {id} contains mismatched embedded id {}",
+                    issue.id
+                ));
+            }
+            Ok(issue)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    issues.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(issues)
+}
+
+fn resolve_issue_from_capture(issues: &[Issue], requested: &str) -> Result<String> {
+    if let Some(issue) = issues.iter().find(|issue| issue.id == requested) {
+        return Ok(issue.id.clone());
+    }
+    let normalized = requested.to_lowercase().replace('-', "");
+    if normalized.len() < crate::storage::MIN_ID_PREFIX_LENGTH {
+        return Err(crate::storage::InvalidIdPrefixError::new(requested).into());
+    }
+    let matches = issues
+        .iter()
+        .filter(|issue| {
+            issue
+                .id
+                .to_lowercase()
+                .replace('-', "")
+                .starts_with(&normalized)
+        })
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [] => Err(crate::storage::IssueNotFoundError::new(requested).into()),
+        [issue] => Ok(issue.id.clone()),
+        _ => Err(crate::storage::AmbiguousIdError::issue(
+            requested,
+            matches
+                .iter()
+                .map(|issue| format!("{} | {}", issue.short_id(), issue.title)),
+        )
+        .into()),
+    }
+}
+
 /// Executes CLI commands with business logic and validation.
 ///
 /// Generic over storage backend to support different implementations
@@ -817,7 +1729,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             .clone()
             .ok_or_else(|| anyhow!("no repository layout configured for this command"))
     }
-
     /// Publish one closed set of repository-owned issue/gate-run/audit intents.
     ///
     /// Capture paths are derived solely from the typed intents, so command callers
@@ -1348,195 +2259,686 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
-    /// Publish one [`Event::LocalRuleBypassed`] per bypassed `enforce` rule.
-    ///
-    /// Pass the rule names from [`WriteValidation::bypassed_rules`]. A non-empty
-    /// list means the caller explicitly forced an override, which always merits an
-    /// audit entry — including a forced no-op write that changed no other field.
-    /// Overrides accompanying an issue write travel in that write's mutation plan;
-    /// this event-only helper is for the no-op case. It is a no-op when `rules` is
-    /// empty (ordinary writes, rejections, and read-only/preview runs log nothing).
-    fn log_rule_bypasses(&self, issue_id: &str, rules: &[String]) -> Result<()>
+    fn publish_captured_field_update(
+        &self,
+        request: CapturedFieldUpdate,
+    ) -> Result<CapturedFieldUpdateOutcome>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let events: Vec<(u8, Event)> = rules
-            .iter()
-            .map(|rule| {
+        use crate::repository_state::{finalize, MutationContext};
+        use crate::storage::RepositoryStateStoreError;
+        use std::collections::BTreeMap;
+
+        let layout = self.require_layout()?;
+        let context = MutationContext::production();
+        for _ in 0..8 {
+            let (expected_target, expected_lease_mode) = {
+                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
+                let Some(image) =
+                    self.capture_proposed_base(preflight.as_mut(), &BTreeMap::new(), &[], None)?
+                else {
+                    continue;
+                };
+                let issues = captured_active_issues(&image)?;
+                let target = resolve_issue_from_capture(&issues, &request.issue_id)?;
+                let config = crate::repository_state::assemble_config(&image)?;
                 (
-                    9,
-                    Event::draft_local_rule_bypassed(issue_id.to_string(), rule.clone()),
+                    target,
+                    self.config_manager.enforcement_mode_from_config(&config)?,
                 )
-            })
-            .collect();
-        self.publish_repository_mutation(
-            events
-                .into_iter()
-                .map(
-                    |(phase, event)| crate::repository_state::MutationIntent::RecordEvent {
-                        phase,
-                        event: Box::new(event),
-                    },
-                )
-                .collect(),
-        )
-        .map(|_| ())
+            };
+            let claims_guard = request
+                .enforce_lease
+                .then(|| claims_mutation_guard(&layout))
+                .transpose()?
+                .flatten();
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some(image) =
+                self.capture_proposed_base(session.as_mut(), &BTreeMap::new(), &[], None)?
+            else {
+                continue;
+            };
+            let issues = captured_active_issues(&image)?;
+            if resolve_issue_from_capture(&issues, &request.issue_id)? != expected_target {
+                continue;
+            }
+            let issue = issues
+                .iter()
+                .find(|issue| issue.id == expected_target)
+                .cloned()
+                .ok_or_else(|| crate::storage::IssueNotFoundError::new(&expected_target))?;
+            let declarations = declarations_from_image(&image)?;
+            let config = crate::repository_state::assemble_config(&image)?;
+            if request.enforce_lease
+                && self.config_manager.enforcement_mode_from_config(&config)? != expected_lease_mode
+            {
+                continue;
+            }
+            let lease_warnings = if request.enforce_lease {
+                captured_lease_warnings(
+                    expected_lease_mode,
+                    std::slice::from_ref(&expected_target),
+                    &issues,
+                    claims_guard.as_ref(),
+                )?
+            } else {
+                Vec::new()
+            };
+            let plan_content = validate::plan_content_from_image(&image, &issues)?;
+            let mut effective_request = request.clone();
+            effective_request.issue_id = expected_target;
+            let mut derived = derive_field_update(
+                issue,
+                &effective_request,
+                CapturedTransitionEvidence {
+                    issues: &issues,
+                    declarations: &declarations,
+                    config: &config,
+                    plan_content: &plan_content,
+                    context: &context,
+                },
+            )?;
+            let mut lease_warnings = lease_warnings;
+            lease_warnings.append(&mut derived.warnings);
+            derived.warnings = lease_warnings;
+            if derived.intents.is_empty() {
+                return match derived.error_after_apply {
+                    Some(error) => Err(error.with_warnings(derived.warnings).into()),
+                    None => Ok(CapturedFieldUpdateOutcome {
+                        changed: derived.changed,
+                        warnings: derived.warnings,
+                    }),
+                };
+            }
+            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            match session.apply(&plan) {
+                Ok(_) => {
+                    return match derived.error_after_apply {
+                        Some(error) => Err(error.with_warnings(derived.warnings).into()),
+                        None => Ok(CapturedFieldUpdateOutcome {
+                            changed: derived.changed,
+                            warnings: derived.warnings,
+                        }),
+                    }
+                }
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "issue update did not converge after repeated capture conflicts"
+        ))
     }
 
-    /// The SINGLE chokepoint through which ALL issue state changes must flow.
-    ///
-    /// ALL issue state changes must flow through this function; do not set
-    /// `issue.state` directly in command code. Centralizing the transition here
-    /// guarantees that transition-time graph-rule enforcement (CC-2) cannot be
-    /// bypassed by a new code path that forgets to wire it in — the bug class that
-    /// motivated this refactor (jit bc86f54c), where bulk update set
-    /// `issue.state` directly and slipped past an enforcing graph rule.
-    ///
-    /// Responsibilities, in order:
-    ///
-    /// 1. **No-op guard.** If `issue.state == target` there is nothing to
-    ///    transition: returns `Ok(vec![])` without enforcing, saving, or logging.
-    /// 2. **Archived revive guard (`jit:45a140ae`).** Leaving
-    ///    [`State::Archived`] is a revive: it may only restore the recorded
-    ///    pre-archive origin ([`Issue::archived_from`]). Targeting any other state
-    ///    returns a
-    ///    [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
-    ///    4, `ArchivedRevive` blocker) and persists NOTHING, so the archive
-    ///    round-trip cannot resurrect a completed issue into the active lifecycle.
-    ///    A legacy Archived record with no recorded origin keeps the prior
-    ///    unconstrained revive but returns an advisory warning.
-    /// 3. **Dependency and gate guards.** Runs
-    ///    [`transition_blockers`](Self::transition_blockers): a transition into
-    ///    [`State::Ready`] or [`State::Done`] requires every dependency met, and
-    ///    [`State::Done`] additionally requires every required gate passed
-    ///    (`@/inv/gate-semantics`). A blocker returns a
-    ///    [`TransitionBlockedError`](crate::errors::TransitionBlockedError)
-    ///    carrying the structured blockers and persists NOTHING. Callers that
-    ///    divert an unpassed-gate `done` into `gated` resolve that target BEFORE
-    ///    calling in, so they reach the chokepoint with the target they intend to
-    ///    land; the guard is a pure read, so running it there as well is
-    ///    idempotent.
-    /// 4. **Graph-rule enforcement.** Runs
-    ///    [`enforce_transition_graph_rules`](Self::enforce_transition_graph_rules)
-    ///    on the issue projected into its TARGET state, EXCEPT when `target` is
-    ///    [`State::Rejected`] or [`State::Archived`] — rejection and
-    ///    archival/parking deliberately bypass validation (abandoning or retiring
-    ///    an issue must not be gated on coverage). That policy is encoded HERE, not
-    ///    at call sites, so no caller can accidentally enforce (or fail to skip) on
-    ///    those targets. A blocking enforce rule returns a
-    ///    [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
-    ///    4) and persists NOTHING; non-blocking findings are returned as warnings.
-    /// 5. **State mutation.** Sets `issue.state = target`, and maintains
-    ///    [`Issue::archived_from`]: entering [`State::Archived`] records the state
-    ///    left behind, reviving out of it clears the field.
-    /// 6. **Persistence + audit (when `persist`).** When `persist` is true, the
-    ///    issue and its `issue_state_changed` event (plus `issue_completed` when
-    ///    landing [`State::Done`]) publish in one recoverable delta.
-    ///
-    /// # The `persist` flag
-    ///
-    /// State-only paths ask the chokepoint to publish; paths combining a state
-    /// change with other edits pass `persist = false` and publish their complete
-    /// intent set afterward.
-    ///
-    /// `before_publish` runs after successful enforcement and state
-    /// mutation but before publication when `persist` is true, letting a caller
-    /// include additional fields in the same issue update.
-    fn apply_state_transition(
+    fn publish_captured_bulk_update(
         &self,
-        issue: &mut Issue,
-        target: State,
+        issue_id: String,
+        operations: &UpdateOperations,
         force: bool,
-        persist: bool,
-        before_publish: impl FnOnce(&mut Issue),
-    ) -> Result<(Vec<String>, PhasedEvents)>
+    ) -> Result<(bool, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let old_state = issue.state;
+        let outcome = self.publish_captured_field_update(CapturedFieldUpdate {
+            issue_id,
+            title: None,
+            description: None,
+            priority: operations.priority,
+            state: operations.state,
+            add_labels: operations.add_labels.clone(),
+            remove_labels: operations.remove_labels.clone(),
+            content_format: None,
+            issue_type: None,
+            add_gates: operations.add_gates.clone(),
+            remove_gates: operations.remove_gates.clone(),
+            assignee: operations.assignee.as_deref().map(str::parse).transpose()?,
+            unassign: operations.unassign,
+            bulk: true,
+            force,
+            enforce_lease: false,
+        })?;
+        Ok((outcome.changed, outcome.warnings))
+    }
 
-        // No-op: nothing to transition, enforce, publish, or log.
-        if old_state == target {
-            return Ok((Vec::new(), Vec::new()));
-        }
+    fn publish_captured_state_transition(
+        &self,
+        issue_id: &str,
+        target: State,
+        force: bool,
+        divert_unpassed_gates: bool,
+        enforce_lease: bool,
+    ) -> Result<CapturedLifecycleOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::State {
+            issue_id: issue_id.to_string(),
+            target,
+            force,
+            divert_unpassed_gates,
+            enforce_lease,
+        })
+    }
 
-        // Archived is terminality-preserving (`jit:45a140ae`): a revive out of
-        // Archived may only restore the recorded pre-archive origin, so the
-        // archive round-trip cannot resurrect a completed issue into the active
-        // lifecycle. A legacy Archived record (no recorded origin) keeps the prior
-        // unconstrained revive, with an advisory warning.
-        let mut revive_warnings = Vec::new();
-        if old_state == State::Archived {
-            match issue.archived_from {
-                Some(origin) if target != origin => {
-                    return Err(crate::errors::TransitionBlockedError::archived_revive(
+    fn publish_captured_claim(
+        &self,
+        issue_id: String,
+        assignee: crate::domain::Assignee,
+    ) -> Result<Vec<crate::storage::StorageWarning>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        Ok(self
+            .publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Claim {
+                issue_id,
+                assignee,
+            })?
+            .storage_warnings)
+    }
+
+    fn publish_captured_release(&self, issue_id: String, reason: String) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Release {
+            issue_id,
+            reason,
+        })?;
+        Ok(())
+    }
+
+    fn publish_captured_auto_transition(&self, issue_id: String, target: State) -> Result<bool>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let request = match target {
+            State::Ready => CapturedLifecycleMutation::AutoReady { issue_id },
+            State::Done => CapturedLifecycleMutation::AutoDone { issue_id },
+            _ => {
+                return Err(anyhow!(
+                    "unsupported automatic transition target '{}'",
+                    target.as_str()
+                ))
+            }
+        };
+        Ok(self.publish_captured_lifecycle_mutation(request)?.changed)
+    }
+
+    fn publish_captured_lifecycle_mutation(
+        &self,
+        request: CapturedLifecycleMutation,
+    ) -> Result<CapturedLifecycleOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{finalize, MutationContext, MutationIntent};
+        use crate::storage::RepositoryStateStoreError;
+        use std::collections::BTreeMap;
+
+        let layout = self.require_layout()?;
+        let context = MutationContext::production();
+        let mut cached_precheck = None::<CachedPrecheckExecution>;
+        for _ in 0..8 {
+            let (
+                expected_target,
+                expected_precheck_required,
+                expected_precheck,
+                precheck_image,
+                precheck_issue,
+                precheck_registry,
+                expected_lease_mode,
+                enforce_lease,
+            ) = {
+                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
+                let Some(image) = self.capture_proposed_base(
+                    preflight.as_mut(),
+                    &BTreeMap::new(),
+                    &[],
+                    Some(request.issue_id()),
+                )?
+                else {
+                    continue;
+                };
+                let issues = captured_active_issues(&image)?;
+                let target_id = resolve_issue_from_capture(&issues, request.issue_id())?;
+                let issue = issues
+                    .iter()
+                    .find(|issue| issue.id == target_id)
+                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target_id))?;
+                let should_precheck = lifecycle_requires_prechecks(&request, issue);
+                let enforce_lease = matches!(
+                    &request,
+                    CapturedLifecycleMutation::State {
+                        enforce_lease: true,
+                        ..
+                    }
+                );
+                let config = crate::repository_state::assemble_config(&image)?;
+                let registry = declarations_from_image(&image)?.gates;
+                let plan = should_precheck
+                    .then(|| captured_precheck_plan(&image, issue, &registry))
+                    .transpose()?;
+                (
+                    target_id,
+                    should_precheck,
+                    plan,
+                    image,
+                    issue.clone(),
+                    registry,
+                    self.config_manager.enforcement_mode_from_config(&config)?,
+                    enforce_lease,
+                )
+            };
+            let coordinate_claims =
+                enforce_lease || matches!(request, CapturedLifecycleMutation::Claim { .. });
+            if coordinate_claims {
+                let preflight_issues = captured_active_issues(&precheck_image)?;
+                let preliminary_guard = claims_mutation_guard(&layout)?;
+                if enforce_lease {
+                    captured_lease_warnings(
+                        expected_lease_mode,
+                        std::slice::from_ref(&expected_target),
+                        &preflight_issues,
+                        preliminary_guard.as_ref(),
+                    )?;
+                }
+                if let CapturedLifecycleMutation::Claim { assignee, .. } = &request {
+                    ensure_claim_available(
+                        preliminary_guard.as_ref(),
+                        &expected_target,
+                        assignee,
+                        &preflight_issues,
+                    )?;
+                }
+            }
+            if let Some(plan) = &expected_precheck {
+                let reuse = cached_precheck.as_ref().is_some_and(|cached| {
+                    cached.target_id == expected_target && cached.evidence == plan.evidence
+                });
+                if !reuse {
+                    cached_precheck = Some(CachedPrecheckExecution {
+                        target_id: expected_target.clone(),
+                        evidence: plan.evidence.clone(),
+                        execution: self.execute_captured_prechecks(
+                            &precheck_image,
+                            &precheck_issue,
+                            &precheck_registry,
+                            &plan.prompts,
+                        )?,
+                    });
+                }
+            }
+            let precheck_runs = cached_precheck
+                .as_ref()
+                .filter(|_| expected_precheck.is_some())
+                .map(|cached| cached.execution.runs.clone())
+                .unwrap_or_default();
+            let precheck_has_error = cached_precheck
+                .as_ref()
+                .filter(|_| expected_precheck.is_some())
+                .is_some_and(|cached| cached.execution.error.is_some());
+            let precheck_run_paths = (0..precheck_runs.len())
+                .flat_map(|index| {
+                    let id = context.identifier_at(index as u64);
+                    [
+                        format!("gate-runs/{id}"),
+                        format!("gate-runs/{id}/result.json"),
+                    ]
+                })
+                .map(crate::repository_state::VirtualPath::data)
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+
+            let claims_guard = coordinate_claims
+                .then(|| claims_mutation_guard(&layout))
+                .transpose()?
+                .flatten();
+
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some(image) = self.capture_proposed_base(
+                session.as_mut(),
+                &BTreeMap::new(),
+                &precheck_run_paths,
+                Some(request.issue_id()),
+            )?
+            else {
+                continue;
+            };
+            let issues = captured_active_issues(&image)?;
+            if resolve_issue_from_capture(&issues, request.issue_id())? != expected_target {
+                continue;
+            }
+            let mut issue = issues
+                .iter()
+                .find(|issue| issue.id == expected_target)
+                .cloned()
+                .ok_or_else(|| crate::storage::IssueNotFoundError::new(&expected_target))?;
+            let config = crate::repository_state::assemble_config(&image)?;
+            if enforce_lease
+                && self.config_manager.enforcement_mode_from_config(&config)? != expected_lease_mode
+            {
+                continue;
+            }
+            let current_precheck_required = lifecycle_requires_prechecks(&request, &issue);
+            if current_precheck_required != expected_precheck_required {
+                continue;
+            }
+            if let Some(expected) = &expected_precheck {
+                let evidence_matches = if expected.evidence.validation_view.is_some() {
+                    expected.evidence.matches(&image)?
+                } else {
+                    let current_registry = declarations_from_image(&image)?.gates;
+                    captured_precheck_plan(&image, &issue, &current_registry)?.evidence
+                        == expected.evidence
+                };
+                if !evidence_matches {
+                    continue;
+                }
+            }
+            let mut external_warnings = if enforce_lease {
+                captured_lease_warnings(
+                    expected_lease_mode,
+                    std::slice::from_ref(&expected_target),
+                    &issues,
+                    claims_guard.as_ref(),
+                )?
+            } else {
+                Vec::new()
+            };
+            let storage_warnings = claims_guard
+                .as_ref()
+                .map_or_else(Vec::new, |guard| guard.warnings());
+            if let CapturedLifecycleMutation::Claim { assignee, .. } = &request {
+                ensure_claim_available(claims_guard.as_ref(), &expected_target, assignee, &issues)?;
+            }
+            let mut precheck_events = Vec::new();
+            if expected_precheck.is_some() {
+                for result in &precheck_runs {
+                    let (state, by) = gate_check::gate_state_from_run(result)?;
+                    let status = state.status;
+                    issue.gates_status.insert(result.gate_key.clone(), state);
+                    precheck_events.push((
+                        1,
+                        if status == GateStatus::Passed {
+                            Event::draft_gate_passed(issue.id.clone(), result.gate_key.clone(), by)
+                        } else {
+                            Event::draft_gate_failed(issue.id.clone(), result.gate_key.clone(), by)
+                        },
+                    ));
+                }
+            }
+            if precheck_has_error {
+                if precheck_runs.is_empty() {
+                    let error = cached_precheck
+                        .take()
+                        .and_then(|cached| cached.execution.error)
+                        .ok_or_else(|| anyhow!("precheck execution lost its recorded error"))?;
+                    return Err(error);
+                }
+                let intents = std::iter::once(MutationIntent::UpdateIssue {
+                    issue: Box::new(issue),
+                })
+                .chain(
+                    precheck_runs
+                        .into_iter()
+                        .map(|draft| MutationIntent::RecordGateRun {
+                            draft: Box::new(draft),
+                        }),
+                )
+                .chain(precheck_events.into_iter().map(|(phase, event)| {
+                    MutationIntent::RecordEvent {
+                        phase,
+                        event: Box::new(event),
+                    }
+                }))
+                .collect::<Vec<_>>();
+                let plan = finalize(&layout, &image, &context, &intents)?;
+                match session.apply(&plan) {
+                    Ok(_) => {
+                        let error = cached_precheck
+                            .take()
+                            .and_then(|cached| cached.execution.error)
+                            .ok_or_else(|| anyhow!("precheck execution lost its recorded error"))?;
+                        return Err(error);
+                    }
+                    Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                    Err(apply_error) => return Err(apply_error.into()),
+                }
+            }
+            let prechecks_changed = !precheck_runs.is_empty();
+            let (target, force, divert) = match &request {
+                CapturedLifecycleMutation::State {
+                    target,
+                    force,
+                    divert_unpassed_gates,
+                    ..
+                } => (*target, *force, *divert_unpassed_gates),
+                CapturedLifecycleMutation::Claim { assignee, .. } => {
+                    if let Some(existing) = &issue.assignee {
+                        if existing != assignee {
+                            return Err(anyhow!(
+                                "Issue {} is already assigned to {existing}; refusing to claim as \
+                                 {assignee} (re-claiming as {existing} succeeds and promotes it to in_progress)",
+                                issue.id,
+                            ));
+                        }
+                        if issue.state == State::InProgress {
+                            return Ok(CapturedLifecycleOutcome {
+                                target_id: expected_target.clone(),
+                                changed: false,
+                                warnings: Vec::new(),
+                                storage_warnings,
+                            });
+                        }
+                    }
+                    if issue.state == State::Backlog {
+                        let blockers = issue::blocking_dependencies(
+                            &issue,
+                            &crate::domain::queries::build_issue_map(&issues),
+                        );
+                        if !blockers.is_empty() {
+                            return Err(crate::errors::TransitionBlockedError::dependencies(
+                                issue.id.clone(),
+                                State::InProgress,
+                                issue.state,
+                                blockers,
+                            )
+                            .into());
+                        }
+                    }
+                    (
+                        if issue.state == State::Ready {
+                            State::InProgress
+                        } else {
+                            issue.state
+                        },
+                        false,
+                        false,
+                    )
+                }
+                CapturedLifecycleMutation::Release { .. } => (
+                    if issue.state == State::InProgress {
+                        State::Ready
+                    } else {
+                        issue.state
+                    },
+                    false,
+                    false,
+                ),
+                CapturedLifecycleMutation::AutoReady { .. } => {
+                    let resolved = crate::domain::queries::build_issue_map(&issues);
+                    if !issue.should_auto_transition_to_ready(&resolved) {
+                        return Ok(CapturedLifecycleOutcome {
+                            target_id: expected_target.clone(),
+                            changed: false,
+                            warnings: Vec::new(),
+                            storage_warnings,
+                        });
+                    }
+                    (State::Ready, false, false)
+                }
+                CapturedLifecycleMutation::AutoDone { .. } => {
+                    if !issue.should_auto_transition_to_done() {
+                        return Ok(CapturedLifecycleOutcome {
+                            target_id: expected_target.clone(),
+                            changed: false,
+                            warnings: Vec::new(),
+                            storage_warnings,
+                        });
+                    }
+                    (State::Done, false, false)
+                }
+            };
+            let declarations = declarations_from_image(&image)?;
+            let mut after_apply_error = None;
+            let effective_target = if divert && target == State::Done && issue.has_unpassed_gates()
+            {
+                let blockers = issue::blocking_dependencies(
+                    &issue,
+                    &crate::domain::queries::build_issue_map(&issues),
+                );
+                if !blockers.is_empty() {
+                    return Err(crate::errors::TransitionBlockedError::dependencies(
                         issue.id.clone(),
                         target,
-                        origin,
+                        issue.state,
+                        blockers,
                     )
                     .into());
                 }
-                None => revive_warnings.push(format!(
-                    "issue {} was archived before its pre-archive state was recorded; reviving to \
-                     '{}' without a verified origin",
-                    issue.short_id(),
-                    target.as_str()
-                )),
-                Some(_) => {}
+                after_apply_error = Some(crate::errors::TransitionBlockedError::gates(
+                    issue.id.clone(),
+                    State::Done,
+                    State::Gated,
+                    unpassed_gate_blockers(&issue, &declarations.gates),
+                ));
+                State::Gated
+            } else {
+                target
+            };
+            let plan_content = validate::plan_content_from_image(&image, &issues)?;
+            let (mut warnings, mut events, mut update, blocked) = if issue.state == effective_target
+            {
+                (Vec::new(), Vec::new(), None, None)
+            } else {
+                match derive_state_transition(
+                    issue.clone(),
+                    effective_target,
+                    force,
+                    CapturedTransitionEvidence {
+                        issues: &issues,
+                        declarations: &declarations,
+                        config: &config,
+                        plan_content: &plan_content,
+                        context: &context,
+                    },
+                )? {
+                    DerivedStateTransition::Applied {
+                        issue,
+                        warnings,
+                        events,
+                        changed,
+                    } => (warnings, events, changed.then_some(*issue), None),
+                    DerivedStateTransition::GraphBlocked { error, events } => {
+                        (Vec::new(), events, None, Some(error))
+                    }
+                }
+            };
+            events.extend(precheck_events);
+            if prechecks_changed && update.is_none() {
+                update = Some(issue.clone());
+            }
+            warnings.append(&mut external_warnings);
+            if blocked.is_none() {
+                let record = update.as_mut().unwrap_or(&mut issue);
+                match &request {
+                    CapturedLifecycleMutation::Claim { assignee, .. } => {
+                        record.assignee = Some(assignee.clone());
+                        events.push((
+                            4,
+                            Event::draft_issue_claimed(record.id.clone(), assignee.clone()),
+                        ));
+                        if update.is_none() {
+                            update = Some(issue);
+                        }
+                    }
+                    CapturedLifecycleMutation::Release { reason, .. } => {
+                        if let Some(assignee) = record.assignee.take() {
+                            events.push((
+                                4,
+                                Event::draft_issue_released(
+                                    record.id.clone(),
+                                    assignee,
+                                    reason.clone(),
+                                ),
+                            ));
+                            if update.is_none() {
+                                update = Some(issue);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            let changed = update.is_some();
+            let intents = update
+                .into_iter()
+                .map(|issue| MutationIntent::UpdateIssue {
+                    issue: Box::new(issue),
+                })
+                .chain(
+                    precheck_runs
+                        .into_iter()
+                        .map(|draft| MutationIntent::RecordGateRun {
+                            draft: Box::new(draft),
+                        }),
+                )
+                .chain(
+                    events
+                        .into_iter()
+                        .map(|(phase, event)| MutationIntent::RecordEvent {
+                            phase,
+                            event: Box::new(event),
+                        }),
+                )
+                .collect::<Vec<_>>();
+            if intents.is_empty() {
+                return match after_apply_error {
+                    Some(error) => Err(error.into()),
+                    None => Ok(CapturedLifecycleOutcome {
+                        target_id: expected_target.clone(),
+                        changed,
+                        warnings,
+                        storage_warnings,
+                    }),
+                };
+            }
+            let plan = finalize(&layout, &image, &context, &intents)?;
+            match session.apply(&plan) {
+                Ok(_) => {
+                    if let Some(error) = blocked.or(after_apply_error) {
+                        return Err(error.with_warnings(std::mem::take(&mut warnings)).into());
+                    }
+                    return Ok(CapturedLifecycleOutcome {
+                        target_id: expected_target.clone(),
+                        changed,
+                        warnings,
+                        storage_warnings,
+                    });
+                }
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
             }
         }
-
-        // Dependency and gate guards, ahead of any mutation.
-        self.transition_blockers(issue, target)?;
-
-        // Rejection and archival deliberately bypass graph-rule enforcement:
-        // abandoning or retiring/parking an issue must not be gated on rules such
-        // as coverage. Every other target runs enforcement against the TARGET-state
-        // projection of the issue.
-        let (warnings, bypass_events) = if matches!(target, State::Rejected | State::Archived) {
-            (Vec::new(), Vec::new())
-        } else {
-            let mut projected = issue.clone();
-            projected.state = target;
-            self.enforce_transition_graph_rules(&projected, target, force)?
-        };
-
-        // Enforcement passed (or was bypassed/skipped): land the new state.
-        issue.state = target;
-
-        // Maintain the pre-archive origin (`jit:45a140ae`): entering Archived
-        // records the state left behind (never Archived — the no-op guard above
-        // rules that out); leaving Archived (revive) clears it, so `archived_from`
-        // is `Some` only while the issue is Archived.
-        if target == State::Archived {
-            issue.archived_from = Some(old_state);
-        } else if old_state == State::Archived {
-            issue.archived_from = None;
-        }
-
-        if persist {
-            before_publish(issue);
-            let issue_id = issue.id.clone();
-            let mut events = bypass_events.clone();
-            events.push((
-                1,
-                Event::draft_issue_state_changed(issue_id.clone(), old_state, target),
-            ));
-            if target == State::Done {
-                events.push((2, Event::draft_issue_completed(issue_id)));
-            }
-            self.publish_ambient_issue_mutation(vec![issue.clone()], events)?;
-        }
-
-        // Surface the legacy-revive advisory ahead of any enforcement warnings.
-        revive_warnings.extend(warnings);
-        Ok((revive_warnings, bypass_events))
+        Err(anyhow!(
+            "lifecycle mutation did not converge after repeated capture conflicts"
+        ))
     }
 
     /// The dependency and gate guards a transition must clear, evaluated against
     /// `issue` in its CURRENT state.
     ///
-    /// Invoked exclusively by [`apply_state_transition`](Self::apply_state_transition):
+    /// Used by the read-only bulk preview path.
     /// entering [`State::Ready`] or [`State::Done`] requires every dependency to
     /// have reached a terminal state, and entering [`State::Done`] additionally
     /// requires every required gate to have passed (`@/inv/gate-semantics`).
@@ -1553,7 +2955,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let issues = self.storage.list_issues()?;
         let resolved = crate::domain::queries::build_issue_map(&issues);
-        let blockers = self.blocking_dependencies(issue, &resolved);
+        let blockers = issue::blocking_dependencies(issue, &resolved);
         if !blockers.is_empty() {
             return Err(crate::errors::TransitionBlockedError::dependencies(
                 issue.id.clone(),
@@ -1576,238 +2978,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(())
-    }
-
-    /// Enforce the graph rules applicable to an issue at a state transition (CC-2).
-    ///
-    /// Invoked exclusively by [`apply_state_transition`](Self::apply_state_transition),
-    /// the single chokepoint for state changes; command code never calls this
-    /// directly. `issue` MUST already carry its TARGET state so a rule selector
-    /// keyed on `state` (e.g. `when = { state = "done" }`) matches only at the
-    /// transition that lands that state.
-    ///
-    /// Behavior (CC-2 / CC-2a):
-    ///
-    /// - Selects `RuleScope::Graph` rules (severity != `off`) whose `when` matches the
-    ///   issue in its target state, SKIPPING rules with repo-wide semantics
-    ///   ([`Assertion::is_repo_wide_at_transition`]) — those stay `jit validate`
-    ///   concerns because they need the whole repository, not a slice.
-    /// - Evaluates the selected rules over the issue's dependency NEIGHBORHOOD
-    ///   (the issue plus its transitive dependencies and dependents), not
-    ///   `list_issues()` wholesale, via [`DependencyGraph`] reachability.
-    /// - Whether a finding ATTRIBUTED to this issue BLOCKS the transition is the
-    ///   repo-wide [`Strictness`](crate::validation::Strictness) decision applied
-    ///   to the finding's rule `enforce` flag and severity — the SAME modulator as
-    ///   the write path. Under the default
-    ///   [`Loose`](crate::validation::Strictness::Loose) level that is an
-    ///   `enforce = true` / `error` finding; [`Strict`](crate::validation::Strictness::Strict)
-    ///   widens it to any violation and [`Permissive`](crate::validation::Strictness::Permissive)
-    ///   blocks nothing. A blocking finding publishes one
-    ///   [`Event::TransitionBlocked`] per rule (the attempted transition is the
-    ///   auditable act) and returns a
-    ///   [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
-    ///   4), unless `force` is set.
-    /// - With `force`, blocking findings do NOT block; one
-    ///   [`Event::GraphRuleBypassed`] is returned per overridden rule for the
-    ///   caller to publish atomically with the issue update.
-    /// - A `config-error` finding (a malformed rule: bad regex, missing key) whose
-    ///   selector applies to this issue BLOCKS whenever the strictness/enforce
-    ///   decision blocks it — a broken guard must not silently pass. The blocker
-    ///   message makes clear the rule itself is misconfigured.
-    /// - Findings the strictness decision does not block (and findings attributed
-    ///   to OTHER issues in the slice) never block; their `[rule] message` strings
-    ///   are returned as warnings for the caller to surface.
-    fn enforce_transition_graph_rules(
-        &self,
-        issue: &Issue,
-        target: State,
-        force: bool,
-    ) -> Result<(Vec<String>, PhasedEvents)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::declarations::rules::{RuleScope, Severity};
-        use crate::validation::graph::evaluate_graph;
-
-        let ruleset = self.effective_rules()?;
-
-        // Graph rules that apply to THIS issue in its target state, minus the
-        // repo-wide ones that cannot be evaluated correctly on a slice.
-        let rules: Vec<&crate::declarations::rules::Rule> = ruleset
-            .rules
-            .iter()
-            .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
-            .filter(|rule| !rule.assert.is_repo_wide_at_transition())
-            .filter(|rule| rule.when.matches(issue))
-            .collect();
-
-        // Nothing to enforce: skip the (potentially large) store read entirely.
-        if rules.is_empty() {
-            return Ok((Vec::new(), Vec::new()));
-        }
-
-        // Neighborhood slice: the issue plus its transitive dependency closure in
-        // BOTH directions. This is what coverage/reference rules need (the issue's
-        // children/parents); rules are evaluated over this narrowed slice rather
-        // than the whole issue set.
-        let slice = self.transition_neighborhood(issue)?;
-
-        let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-        let hierarchy = crate::repository_state::hierarchy_config(namespaces);
-        let repo_format = self.repo_content_format()?;
-
-        // Resolve external plan docs for the neighborhood from the captured
-        // validation image so closure-time coverage honors a container whose
-        // criteria live in an external plan file too (closed-read, no live
-        // filesystem).
-        let plan_content = self.image_plan_content(&slice)?;
-
-        let findings = evaluate_graph(
-            &rules,
-            &slice,
-            &hierarchy,
-            repo_format,
-            chrono::Utc::now(),
-            &plan_content,
-        );
-
-        // Per-rule `enforce` flag, looked up by rule name so the strictness
-        // modulator can read it per finding. A finding whose rule is not in the
-        // selected set (should not happen) is treated as non-enforcing.
-        let enforcing: std::collections::HashSet<&str> = rules
-            .iter()
-            .filter(|r| r.enforce)
-            .map(|r| r.name.as_str())
-            .collect();
-
-        // Repo-wide strictness modulates which violations block this transition,
-        // exactly as on the write path: loose blocks only an enforced error,
-        // strict blocks any violation, permissive blocks nothing.
-        let strictness = self.validation_strictness()?;
-
-        let mut blocking: Vec<(String, String)> = Vec::new();
-        let mut warnings: Vec<String> = Vec::new();
-        for gf in &findings {
-            // A config-error finding (issue_id = None, e.g. a bad id-pattern regex
-            // or a missing key) carries no issue attribution, but it means the
-            // rule itself is broken. If the strictness/enforce decision blocks it,
-            // the broken guard must BLOCK the transition rather than degrade to a
-            // warning — a typo in an enforcing rule must not silently disable the
-            // guard. (The rule is already known to apply to this issue: `rules`
-            // was filtered by `when.matches(issue)`.)
-            let is_config_error = gf.is_config_error();
-            let attributed_to_self = gf.issue_id.as_deref() == Some(issue.id.as_str());
-            let pertains = attributed_to_self || is_config_error;
-            let rule_enforces = enforcing.contains(gf.finding.rule.as_str());
-            let is_blocker = pertains && strictness.blocks(rule_enforces, gf.finding.severity);
-            if is_blocker {
-                let message = if is_config_error {
-                    // Make clear the rule itself is misconfigured, not the issue.
-                    format!(
-                        "rule '{}' is misconfigured: {}; fix the rule or use --force",
-                        gf.finding.rule, gf.finding.message
-                    )
-                } else {
-                    gf.finding.message.clone()
-                };
-                blocking.push((gf.finding.rule.clone(), message));
-            } else {
-                warnings.push(format!("[{}] {}", gf.finding.rule, gf.finding.message));
-            }
-        }
-
-        if !blocking.is_empty() {
-            if force {
-                // Forced override: return one bypass event per blocked rule. The
-                // caller includes these in the same mutation as the issue update.
-                let events: Vec<(u8, Event)> = blocking
-                    .iter()
-                    .map(|(rule, _)| {
-                        (
-                            1,
-                            Event::draft_graph_rule_bypassed(
-                                issue.id.clone(),
-                                target,
-                                rule.clone(),
-                            ),
-                        )
-                    })
-                    .collect();
-                return Ok((warnings, events));
-            } else {
-                // Blocked: log the attempted transition (one event per blocking
-                // rule) BEFORE returning the error, then persist nothing.
-                let events: Vec<(u8, Event)> = blocking
-                    .iter()
-                    .map(|(rule, _)| {
-                        (
-                            1,
-                            Event::draft_transition_blocked(issue.id.clone(), target, rule.clone()),
-                        )
-                    })
-                    .collect();
-                self.publish_repository_mutation(
-                    events
-                        .into_iter()
-                        .map(|(phase, event)| {
-                            crate::repository_state::MutationIntent::RecordEvent {
-                                phase,
-                                event: Box::new(event),
-                            }
-                        })
-                        .collect(),
-                )?;
-                return Err(crate::errors::TransitionBlockedError::graph_rules(
-                    issue.id.clone(),
-                    target,
-                    issue.state,
-                    blocking,
-                )
-                .into());
-            }
-        }
-
-        Ok((warnings, Vec::new()))
-    }
-
-    /// Build the dependency-neighborhood issue slice for transition-time graph
-    /// evaluation (CC-2a): the issue itself, every issue it transitively depends
-    /// on, and every issue that transitively depends on it.
-    ///
-    /// The passed `issue` already carries its TARGET state, so the slice contains
-    /// that projected shape (not the stale persisted copy) for the issue under
-    /// transition; all OTHER members are the persisted issues from the store.
-    /// Built from [`DependencyGraph`] reachability so the rule evaluators see only
-    /// the reachable slice, not every issue. (The graph itself is built from
-    /// `list_issues()`, so the read is repo-wide; the narrowing is in what gets
-    /// materialized and evaluated.)
-    fn transition_neighborhood(&self, issue: &Issue) -> Result<Vec<Issue>> {
-        use std::collections::HashSet;
-
-        let all = self.storage.list_issues()?;
-        let refs: Vec<&Issue> = all.iter().collect();
-        let graph = DependencyGraph::new(&refs);
-
-        // Ids in the neighborhood: self + transitive deps + transitive dependents.
-        // Building the graph still reads every issue (`list_issues()`), but only
-        // the reachable slice is materialized and handed to the rule evaluators.
-        let mut ids: HashSet<String> = HashSet::new();
-        ids.insert(issue.id.clone());
-        for dep in graph.get_transitive_dependents(&issue.id) {
-            ids.insert(dep.id.clone());
-        }
-        for dep in graph.get_transitive_dependencies(&issue.id) {
-            ids.insert(dep.id.clone());
-        }
-
-        // Materialize the slice, substituting the target-state projection of the
-        // issue under transition for its persisted copy.
-        let slice = all
-            .into_iter()
-            .filter(|i| ids.contains(&i.id))
-            .map(|i| if i.id == issue.id { issue.clone() } else { i })
-            .collect();
-        Ok(slice)
     }
 
     /// Initialize a new jit repository in the current directory.
@@ -2234,6 +3404,130 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn precheck_evidence_fixture() -> (
+        crate::storage::InMemoryStorage,
+        CommandExecutor<crate::storage::InMemoryStorage>,
+        String,
+    ) {
+        use crate::declarations::{GateChecker, GateDefinition, GateRegistry, GateStage};
+        use crate::storage::IssueStore;
+        use std::collections::HashMap;
+
+        let storage = crate::storage::InMemoryStorage::new();
+        storage.init().unwrap();
+        storage.add_repo_file(".jit/config.toml", "");
+        storage.add_repo_file("start-prompt.md", "captured prompt");
+        let mut registry = GateRegistry::default();
+        registry.gates.insert(
+            "auto-start".to_string(),
+            GateDefinition {
+                version: 1,
+                key: "auto-start".to_string(),
+                title: "Auto start".to_string(),
+                description: String::new(),
+                stage: GateStage::Precheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "true".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: true,
+                    prompt: None,
+                    prompt_file: Some("start-prompt.md".to_string()),
+                }),
+                priority: 1,
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        registry.gates.insert(
+            "manual-start".to_string(),
+            GateDefinition {
+                version: 1,
+                key: "manual-start".to_string(),
+                title: "Manual start".to_string(),
+                description: String::new(),
+                stage: GateStage::Precheck,
+                mode: GateMode::Manual,
+                checker: None,
+                priority: 2,
+                reserved: HashMap::new(),
+                auto: false,
+                example_integration: None,
+            },
+        );
+        storage.save_gate_registry(&registry).unwrap();
+        let mut issue = crate::domain::types::fixture_issue("checked".to_string(), String::new());
+        issue.state = State::Ready;
+        issue.gates_required = vec!["auto-start".to_string(), "manual-start".to_string()];
+        issue.gates_status.insert(
+            "manual-start".to_string(),
+            GateState {
+                status: GateStatus::Passed,
+                updated_by: Some("human:reviewer".parse().unwrap()),
+                updated_at: chrono::Utc::now(),
+            },
+        );
+        let issue_id = issue.id.clone();
+        storage.save_issue(issue).unwrap();
+        let executor =
+            CommandExecutor::new(storage.clone()).with_layout(storage.repository_layout());
+        (storage, executor, issue_id)
+    }
+
+    fn capture_precheck_plan(
+        executor: &CommandExecutor<crate::storage::InMemoryStorage>,
+        issue_id: &str,
+    ) -> CapturedPrecheckPlan {
+        use crate::storage::RepositoryStateStore;
+        let mut session = executor
+            .storage
+            .open_mutation_session(executor.require_layout().unwrap())
+            .unwrap();
+        let image = executor
+            .capture_proposed_base(
+                session.as_mut(),
+                &std::collections::BTreeMap::new(),
+                &[],
+                Some(issue_id),
+            )
+            .unwrap()
+            .unwrap();
+        let issue = captured_active_issues(&image)
+            .unwrap()
+            .into_iter()
+            .find(|issue| issue.id == issue_id)
+            .unwrap();
+        let registry = declarations_from_image(&image).unwrap().gates;
+        captured_precheck_plan(&image, &issue, &registry).unwrap()
+    }
+
+    fn prior_precheck_run(issue_id: &str) -> crate::domain::GateRunResult {
+        crate::domain::GateRunResult {
+            schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
+            run_id: "prior-run".to_string(),
+            gate_key: "auto-start".to_string(),
+            stage: crate::declarations::GateStage::Precheck,
+            issue_id: issue_id.to_string(),
+            commit: None,
+            branch: None,
+            tree_dirty: None,
+            status: crate::domain::GateRunStatus::Passed,
+            started_at: chrono::Utc::now(),
+            completed_at: Some(chrono::Utc::now()),
+            duration_ms: Some(1),
+            exit_code: Some(0),
+            stdout: String::new(),
+            stderr: String::new(),
+            command: "true".to_string(),
+            by: None,
+            message: None,
+            findings: None,
+        }
+    }
 
     fn captured_issue_spec(id: &str) -> crate::repository_state::CaptureSpec {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
@@ -2907,20 +4201,78 @@ enforce_leases = "strict"
         assert!(result.is_ok());
     }
 
-    // Agent identity verification tests
     #[test]
-    fn test_check_active_lease_verifies_agent_identity() {
-        // This test documents the agent identity verification behavior.
-        // Since check_active_lease() now uses resolve_agent_id(),
-        // it verifies agent ownership in multi-agent scenarios:
-        //
-        // 1. If JIT_AGENT_ID is set (or --agent-id / ~/.config/jit/agent.toml),
-        //    only leases belonging to that agent count as active.
-        // 2. If not set (single-user mode), any valid lease counts.
-        //
-        // This prevents Agent A from modifying issues claimed by Agent B.
-        //
-        // Full workflow testing requires integration tests with git repos
-        // and actual claims.index.json files.
+    fn test_precheck_evidence_detects_manual_status_mutation() {
+        use crate::storage::IssueStore;
+        let (storage, executor, issue_id) = precheck_evidence_fixture();
+        let before = capture_precheck_plan(&executor, &issue_id).evidence;
+
+        let mut issue = storage.load_issue(&issue_id).unwrap();
+        issue.gates_status.get_mut("manual-start").unwrap().status = GateStatus::Failed;
+        storage.save_issue(issue).unwrap();
+
+        assert_ne!(capture_precheck_plan(&executor, &issue_id).evidence, before);
+    }
+
+    #[test]
+    fn test_precheck_evidence_detects_run_history_mutation() {
+        let (storage, executor, issue_id) = precheck_evidence_fixture();
+        let before = capture_precheck_plan(&executor, &issue_id).evidence;
+        let run = prior_precheck_run(&issue_id);
+        storage.add_repo_file(
+            ".jit/gate-runs/prior-run/result.json",
+            &serde_json::to_string(&run).unwrap(),
+        );
+
+        assert_ne!(capture_precheck_plan(&executor, &issue_id).evidence, before);
+    }
+
+    #[test]
+    fn test_precheck_evidence_detects_prompt_mutation_and_preserves_captured_bytes() {
+        let (storage, executor, issue_id) = precheck_evidence_fixture();
+        let before = capture_precheck_plan(&executor, &issue_id);
+        assert_eq!(before.prompts["auto-start"], "captured prompt");
+
+        storage.add_repo_file("start-prompt.md", "mutated prompt");
+        let after = capture_precheck_plan(&executor, &issue_id);
+
+        assert_eq!(after.prompts["auto-start"], "mutated prompt");
+        assert_ne!(after.evidence, before.evidence);
+    }
+
+    #[test]
+    fn test_claims_guard_uses_explicit_layout_not_process_cwd() {
+        use crate::storage::worktree_paths::WorktreePaths;
+        use crate::storage::{ClaimCoordinator, FileLocker};
+        use std::time::Duration;
+
+        let repo = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir(repo.path().join(".jit")).unwrap();
+        assert!(std::process::Command::new("git")
+            .arg("init")
+            .arg("-q")
+            .arg(repo.path())
+            .status()
+            .unwrap()
+            .success());
+        let paths = WorktreePaths::detect_from(repo.path()).unwrap();
+        let coordinator = ClaimCoordinator::new(
+            paths,
+            FileLocker::new(Duration::from_secs(1)),
+            "wt:test".to_string(),
+            "agent:test".to_string(),
+        );
+        coordinator.init().unwrap();
+        let issue_id = "abcd1111111111111111111111111111";
+        coordinator.acquire_claim(issue_id, 600).unwrap();
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), repo.path().join(".jit"))
+                .unwrap();
+
+        let guard = claims_mutation_guard(&layout).unwrap().unwrap();
+
+        assert!(guard
+            .has_active_lease(issue_id, None, |raw| Ok(raw.to_string()))
+            .unwrap());
     }
 }
