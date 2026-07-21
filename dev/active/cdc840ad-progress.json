@@ -284,9 +284,11 @@
     {
       "category": "rework-exceeded",
       "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-21T22:25:24+03:00",
+      "resolved_at": "2026-07-21T22:37:09+03:00",
       "situation": "After the reset rework counter reached two, independent review of the captured dependency add/reduction slice found two bounded blockers: three legacy test fixtures omit canonical index membership and now fail closed capture, and mixed batch rejection categories are accumulated by validation phase rather than original request order.",
+      "resolution": "Invoker selected option 1 and authorized one narrow guided correction with a counter reset, limited to canonical fixture seeding, request-ordered batch findings, one regression, and independent verification.",
       "recommendation": "Authorize one narrow guided correction and counter reset: migrate only the three affected fixtures to canonical repository-state seeding, carry original request ordinals through batch rejection and sort once, add one mixed-category ordering regression, then perform one independent verification. Do not weaken capture or add a fallback."
     }
   ],
@@ -295,7 +297,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 2
+    "49adf23b": 1
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
