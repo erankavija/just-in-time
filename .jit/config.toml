@@ -226,10 +226,8 @@ target = "docs/reference/rules-and-gates.md"
 style = "full"
 
 [projection.charter]
-# id-anchor dogfood: the charter decision log (`@/charter/D-N`, markdown-first over
-# the vision charter) renders `- **D-N** — <one-liner>` bullets into the
-# "### Charter Decisions" region of AGENTS.md (CLAUDE.md is a symlink to it), so the
-# always-loaded agent context carries the decision log without hand-copying (D-6).
+# Project the markdown-first vision charter's addressable decision log into
+# always-loaded agent context without hand-copying (`@/charter/D-6`).
 kind = "charter"
 mode = "region"
 target = "AGENTS.md"

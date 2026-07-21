@@ -25,7 +25,7 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - D-4: git optional for core commands, required only for claims and leases
 - D-5: A milestone-tier steward skill sits above the epic-level execution lead
 - D-6: Each item kind declares its own source of truth (markdown-first or registry-first)
-- D-7: Charter decisions are addressable `@/charter/D-N` items over the vision charter
+- D-7: Charter decisions are project-addressable items over the vision charter
 - D-8: Ship an adoption-focused profile MVP in v1.0 and defer the complete profile lifecycle
 - D-9: Remove redundant release surfaces without removing product capabilities
 - D-10: Support one Docker topology that serves the API and web UI from a repository mount

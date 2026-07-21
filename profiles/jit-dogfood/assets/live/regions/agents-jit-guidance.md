@@ -1,4 +1,4 @@
-### Project invariants
+## Project Invariants
 
 <!-- jit:invariants:begin -->
 _No invariants declared._
