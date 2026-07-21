@@ -65,7 +65,7 @@
             "1-5": "done (waves 1-4 packages + init/profile session publication)",
             "6": "done \u2014 canonical profile consumers: 6c7ca9d2 (derive_profile_materializations + build_profile_claims), b0e5beb9 (commands rewired), 3d4af231 (planner/render/snapshot/preset/view-triad deleted)",
             "7": "done \u2014 (a) verified pre-satisfied; (b) 9153f0e5 image-projected plan content; (c) e4ac6863 finalize_config_edit + ddb574b0 re-init unification (closes the gitattributes gap, pinned test); (d) 6565df41 events via finalizer; (e) d3619a13 MutationIntent::UpdateIssue; (f) held",
-            "8": "IN PROGRESS \u2014 accepted gate-registry CRUD 0c799014, document link publication e33d69e7, and canonical startup recovery ebbb22ef; independent reviews pass. The duplicate RecoveryCoordinator is deleted. Thirteen ambient publisher calls remain; captured dependency add/reduction is the next bounded slice, with removals held for transition cutover. Predecessor deletion and absence scans remain."
+            "8": "IN PROGRESS \u2014 accepted gate-registry CRUD 0c799014, document link publication e33d69e7, canonical startup recovery ebbb22ef, captured dependency add/reduction f1382bb6, atomic template application edadf8ea, and bounded captured listings 5925d837. The transition cutover is frozen after final review failed at rework count 2; an invoker escalation is open. Predecessor deletion and absence scans remain."
           }
         }
       ]
@@ -300,6 +300,14 @@
       "situation": "After the reset rework counter reached two, independent review of the central listing-budget correction found one bounded overlap defect: a listed child that is itself a requested nested listing root is counted twice toward max_paths.",
       "resolution": "Invoker selected option 1 and authorized one narrow guided correction with a counter reset, limited to nested-listing overlap accounting, one regression, and independent verification.",
       "recommendation": "Authorize one narrow guided correction and counter reset: include requested listing roots in the overlap exclusion, add one nested-listing regression, rerun focused image/backend tests, and perform one independent verification."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "open",
+      "opened_at": "2026-07-22T01:23:16+03:00",
+      "situation": "After the transition cutover rework counter reached two, final independent review found five correctness gaps: Ready precheck classification can change without detection; precheck evidence omits consumed gate status, run history, and prompt-file bytes; lease evidence uses ambient cwd without the coordinator/claims lock; dependency removal does not re-resolve raw IDs on recapture; and postchecks re-resolve a short ID after commit. The diff passes its focused 20-test matrix, formatting, and Clippy, but duplicates full-repository preflight/recapture and grows by 752 net lines while retaining those evidence holes.",
+      "recommendation": "Authorize one narrow guided correction and counter reset: recompute precheck classification on recapture; replace blanket output exclusions with purpose-specific checker evidence that captures manual statuses, relevant run history, checker outputs, and prompt-file bytes; acquire the explicit-layout coordinator and claims lock across capture and publication; re-resolve original dependency IDs; return the canonical lifecycle ID for postchecks; delete duplicated blocking logic where practical; add focused adversarial regressions; then require independent verification."
     }
   ],
   "rework_counts": {
