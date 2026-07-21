@@ -65,7 +65,7 @@
             "1-5": "done (waves 1-4 packages + init/profile session publication)",
             "6": "done \u2014 canonical profile consumers: 6c7ca9d2 (derive_profile_materializations + build_profile_claims), b0e5beb9 (commands rewired), 3d4af231 (planner/render/snapshot/preset/view-triad deleted)",
             "7": "done \u2014 (a) verified pre-satisfied; (b) 9153f0e5 image-projected plan content; (c) e4ac6863 finalize_config_edit + ddb574b0 re-init unification (closes the gitattributes gap, pinned test); (d) 6565df41 events via finalizer; (e) d3619a13 MutationIntent::UpdateIssue; (f) held",
-            "8": "IN PROGRESS \u2014 accepted commits through c9943367; captured local issue edits landed; dirty document cutover awaits review; dirty gate-registry CRUD cutover awaits fixture repair + review; ambient publisher burn-down 15 -> 13 after document acceptance target; predecessor deletion and absence scans remain"
+            "8": "IN PROGRESS \u2014 accepted gate-registry CRUD 0c799014, document link publication e33d69e7, and canonical startup recovery ebbb22ef; independent reviews pass. The duplicate RecoveryCoordinator is deleted. Thirteen ambient publisher calls remain; captured dependency add/reduction is the next bounded slice, with removals held for transition cutover. Predecessor deletion and absence scans remain."
           }
         }
       ]
@@ -270,6 +270,16 @@
       "situation": "After the two invoker-authorized lifecycle/index rework attempts, lifecycle repair and shared index validation pass, but final review found aggregated membership applies lower-priority HEAD/main tombstones globally and can hide a higher-priority locally restored issue. Main-worktree discovery also swallows nonzero git failures and retains structural unwraps.",
       "resolution": "Invoker authorized a narrow lead-owned correction with conflict/error regressions and one independent verification.",
       "recommendation": "Authorize one lead-owned narrow correction: preserve local then HEAD then main membership precedence per ID, type absence separately from Git/I/O/structural failure without unwraps, add conflict and malformed-main regressions, then perform one independent verification before resuming the broader consumer cutover."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "resolved",
+      "opened_at": "2026-07-21T21:25:05+03:00",
+      "resolved_at": "2026-07-21T21:25:05+03:00",
+      "situation": "Independent review found two blocking document-capture defects (pinned adds borrowed worktree bytes and capture budgets were self-sized) and three startup-recovery ownership/reporting defects (foreign-session adoption, a Send session over thread-local guard state, and skipped controls counted as recovered) after the issue rework count reached two.",
+      "resolution": "Invoker selected option 1 and authorized one narrowly guided escalation. The counter was reset once; the correction is limited to these reviewed defects and requires independent re-review before further consumer cutover.",
+      "recommendation": "Correct only the reviewed document and startup-recovery defects with fixed bounds, explicit ownership, exact reports, focused regressions, and net deletion where practical."
     }
   ],
   "rework_counts": {
