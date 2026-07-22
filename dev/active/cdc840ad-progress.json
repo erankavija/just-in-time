@@ -65,7 +65,7 @@
             "1-5": "done (waves 1-4 packages + init/profile session publication)",
             "6": "done \u2014 canonical profile consumers: 6c7ca9d2 (derive_profile_materializations + build_profile_claims), b0e5beb9 (commands rewired), 3d4af231 (planner/render/snapshot/preset/view-triad deleted)",
             "7": "done \u2014 (a) verified pre-satisfied; (b) 9153f0e5 image-projected plan content; (c) e4ac6863 finalize_config_edit + ddb574b0 re-init unification (closes the gitattributes gap, pinned test); (d) 6565df41 events via finalizer; (e) d3619a13 MutationIntent::UpdateIssue; (f) held",
-            "8": "BLOCKED ON EXTERNAL REVIEW AUTHORIZATION \u2014 prompt-path adapter fix 2ead106d is independently reviewed and cargo-ci passes at corrected source (3,755 tests). code-review now reaches its configured checker, but execution is paused before egress because scripts/ai-review.sh invokes external codex exec with repository review context. Explicit informed authorization is required; no checker ran and no data was sent."
+            "8": "REWORK 1 \u2014 external code-review ran with authorization. MCP evidence is now recorded passing. Remaining blocker F1: .gitattributes claim detection uses substring matching, so commented or unrelated text can masquerade as the required merge-driver rule. Rework is limited to exact line/block semantics plus adversarial preservation tests."
           }
         }
       ]
@@ -417,7 +417,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 0
+    "49adf23b": 1
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
