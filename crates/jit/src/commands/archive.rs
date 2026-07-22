@@ -3,8 +3,9 @@
 use super::CommandExecutor;
 use crate::domain::artifact_classifier::{
     artifact_destination_root, artifact_mirror_destination, classify_artifacts,
-    preferred_container_destination_root, ArtifactClassificationInventory,
-    ArtifactClassificationPolicy, ArtifactLocation, ArtifactLocationFacts,
+    preferred_container_destination_root, validate_proposed_layout,
+    ArtifactClassificationInventory, ArtifactClassificationPolicy, ArtifactLocation,
+    ArtifactLocationFacts,
 };
 use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
 use crate::domain::artifact_inventory::{
@@ -13,8 +14,8 @@ use crate::domain::artifact_inventory::{
 };
 use crate::domain::artifact_plan::{
     normalize_artifact_path, ArchiveCandidates, ArtifactAction, ArtifactPlan, BlockerCode,
-    ContentIdentity, EdgeKind, EdgeResolutionMode, PendingDeletion, PlanBlocker, PlanTarget,
-    PlanWarning, ReferenceChange, WarningCode,
+    ContentIdentity, PendingDeletion, PlanBlocker, PlanTarget, PlanWarning, ReferenceChange,
+    WarningCode,
 };
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Event, Issue};
@@ -25,7 +26,6 @@ use crate::storage::{
 };
 use anyhow::{anyhow, bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
 enum ArchiveTarget<'a> {
     Document(&'a str),
@@ -988,77 +988,6 @@ fn rollback_reference_changes<H: ArchiveExecutionHooks>(
     cause.context("archive aborted; every applied reference change was reverted")
 }
 
-fn validate_proposed_layout(plan: &ArtifactPlan) -> Result<()> {
-    let by_source = plan
-        .artifacts()
-        .iter()
-        .map(|artifact| (artifact.source(), artifact))
-        .collect::<BTreeMap<_, _>>();
-    for parent in plan.artifacts() {
-        for edge in parent
-            .edges()
-            .iter()
-            .filter(|edge| edge.kind == EdgeKind::Supported)
-        {
-            let Some(target_source) = edge.target.as_deref() else {
-                continue;
-            };
-            if parent.warnings().iter().any(|warning| {
-                warning.code == WarningCode::MissingEdgeTarget
-                    && warning.path.as_deref() == Some(target_source)
-            }) {
-                continue;
-            }
-            let target = by_source.get(target_source).ok_or_else(|| {
-                anyhow!("supported archive edge target is absent from plan: {target_source}")
-            })?;
-            let available = proposed_available_paths(target);
-            for parent_path in proposed_available_paths(parent) {
-                let resolved = match edge.resolution_mode {
-                    EdgeResolutionMode::Relative => {
-                        let parent_dir = Path::new(&parent_path).parent().unwrap_or(Path::new(""));
-                        normalize_artifact_path(&parent_dir.join(&edge.reference).to_string_lossy())
-                    }
-                    EdgeResolutionMode::RootRelative => {
-                        normalize_artifact_path(edge.reference.trim_start_matches('/'))
-                    }
-                    EdgeResolutionMode::External => continue,
-                };
-                if !available.contains(&resolved) {
-                    bail!(
-                        "supported edge {} from {} resolves to {} in the proposed layout, not an available target location ({})",
-                        edge.reference,
-                        parent.source(),
-                        resolved,
-                        available.iter().cloned().collect::<Vec<_>>().join(", ")
-                    );
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-fn proposed_available_paths(
-    artifact: &crate::domain::artifact_plan::ArtifactPlanEntry,
-) -> BTreeSet<String> {
-    match artifact.action() {
-        ArtifactAction::Move => artifact
-            .destination()
-            .map(str::to_string)
-            .into_iter()
-            .collect(),
-        ArtifactAction::Copy => [Some(artifact.source()), artifact.destination()]
-            .into_iter()
-            .flatten()
-            .map(str::to_string)
-            .collect(),
-        ArtifactAction::Retain | ArtifactAction::Block => {
-            BTreeSet::from([artifact.source().to_string()])
-        }
-    }
-}
-
 fn canonicalize_warnings(warnings: &mut Vec<PlanWarning>) {
     warnings.sort_by(|left, right| {
         (left.code.as_str(), left.path.as_deref())
@@ -1746,48 +1675,6 @@ mod tests {
             executor.storage.load_issue(&ids[0]).unwrap().documents[0].path,
             "archive/fixtures/root.md"
         );
-    }
-
-    #[test]
-    fn test_proposed_layout_rejects_relative_edge_that_will_not_resolve_before_metadata() {
-        use crate::domain::artifact_plan::{
-            ArtifactEdge, ArtifactPlanEntry, ArtifactVersion, PolicyStatus,
-        };
-        let identity = ContentIdentity::from_bytes(b"root");
-        let parent = ArtifactPlanEntry::new(
-            "fixtures/root.md",
-            ArtifactVersion::WorkingTree,
-            ArtifactAction::Move,
-        )
-        .with_content_identity(identity.clone())
-        .with_destination("archive/fixtures/root.md")
-        .with_edges(vec![ArtifactEdge {
-            reference: "target.png".into(),
-            target: Some("fixtures/target.png".into()),
-            kind: EdgeKind::Supported,
-            resolution_mode: EdgeResolutionMode::Relative,
-        }])
-        .with_pending_deletions(vec![PendingDeletion {
-            source: "fixtures/root.md".into(),
-            content_identity: identity,
-        }]);
-        let target = ArtifactPlanEntry::new(
-            "fixtures/target.png",
-            ArtifactVersion::WorkingTree,
-            ArtifactAction::Retain,
-        );
-        let plan = ArtifactPlan::new(
-            PlanTarget::Document {
-                path: "fixtures/root.md".into(),
-            },
-            "archive",
-            PolicyStatus::Configured,
-            vec![parent, target],
-            Vec::new(),
-            Vec::new(),
-        )
-        .unwrap();
-        assert!(validate_proposed_layout(&plan).is_err());
     }
 
     #[test]

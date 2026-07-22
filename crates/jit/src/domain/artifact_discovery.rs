@@ -103,8 +103,26 @@ pub enum ArtifactEvidence {
     Symlink,
     /// A non-file, non-directory filesystem object.
     Unsupported,
+    /// A directory captured with the stated listing completeness.
+    Directory {
+        /// Whether no entries, immediate children, or recursive files were captured.
+        scope: ArtifactListingScope,
+        /// Canonical repository-relative paths covered by `scope`.
+        entries: Vec<String>,
+    },
     /// The requested path escaped or violated repository-relative syntax.
     InvalidPath,
+}
+
+/// Completeness of entries captured for directory evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArtifactListingScope {
+    /// Only the directory's own kind was inspected.
+    MetadataOnly,
+    /// Every immediate child path was captured.
+    ImmediateChildren,
+    /// Every recursive non-directory entry was captured.
+    RecursiveFiles,
 }
 
 /// Archive-specific captured evidence keyed by normalized worktree path.
@@ -158,6 +176,7 @@ pub fn expand_artifact_closure(
                 ArtifactEvidence::Missing
                 | ArtifactEvidence::Symlink
                 | ArtifactEvidence::Unsupported
+                | ArtifactEvidence::Directory { .. }
                 | ArtifactEvidence::InvalidPath,
             ) => {}
         }
@@ -226,7 +245,7 @@ pub fn discover_archive_artifacts(
                 }
                 continue;
             }
-            Some(ArtifactEvidence::Unsupported) => {
+            Some(ArtifactEvidence::Unsupported | ArtifactEvidence::Directory { .. }) => {
                 for parent in referencing.get(&path).into_iter().flatten() {
                     append_warning(
                         working.get_mut(parent).ok_or_else(|| {

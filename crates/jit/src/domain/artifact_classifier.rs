@@ -5,6 +5,9 @@
 //! destination/source constraint calculus without performing I/O.
 
 use crate::config::DocumentationConfig;
+use crate::domain::artifact_discovery::{
+    ArtifactEvidence, ArtifactEvidenceMap, ArtifactListingScope,
+};
 use crate::domain::artifact_plan::{
     normalize_artifact_path, ArtifactAction, ArtifactEdge, ArtifactOwner, ArtifactPlan,
     ArtifactPlanEntry, ArtifactProvenance, ArtifactVersion, BlockerCode, ContentIdentity, EdgeKind,
@@ -16,7 +19,9 @@ use crate::domain::Issue;
 use crate::domain::State;
 use crate::domain::SHORT_ID_LENGTH;
 use crate::labels::type_value_of;
+use anyhow::{anyhow, bail};
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
 /// Explicit documentation policy used by the classifier.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,6 +156,225 @@ pub struct ArtifactClassificationFacts {
     pub container_destination: ContainerDestinationState,
 }
 
+/// Marker-backed destination chosen from a closed evidence snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedContainerDestination {
+    /// The frozen marker-backed, legacy, or newly preferred destination root.
+    pub destination_root: String,
+    /// Every marker-backed root when duplicate ownership makes execution unsafe.
+    pub conflicting_roots: Vec<String>,
+}
+
+/// Stable failures while resolving a container destination from closed evidence.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum ArtifactEvidenceError {
+    /// A path implied by complete evidence was not itself captured.
+    #[error("archive evidence is incomplete for {path}")]
+    IncompleteEvidence { path: String },
+    /// The archive root was captured with a listing that cannot prove its children.
+    #[error("archive evidence for {path} is not an immediate-child listing")]
+    WrongListingScope { path: String },
+    /// The legacy destination does not identify an archive root.
+    #[error("container archive destination has no archive root")]
+    MissingArchiveRoot,
+}
+
+/// Resolve marker ownership, legacy fallback, and preferred placement from closed evidence.
+pub fn resolve_container_destination(
+    preferred_root: &str,
+    legacy_root: &str,
+    container_id: &str,
+    evidence: &ArtifactEvidenceMap,
+) -> Result<ResolvedContainerDestination, ArtifactEvidenceError> {
+    let archive_root = Path::new(legacy_root)
+        .parent()
+        .ok_or(ArtifactEvidenceError::MissingArchiveRoot)?;
+    let archive_root = normalize_artifact_path(&archive_root.to_string_lossy());
+    let children = match required_resolution_evidence(evidence, &archive_root)? {
+        ArtifactEvidence::Directory { scope, entries } => {
+            if *scope != ArtifactListingScope::ImmediateChildren {
+                return Err(ArtifactEvidenceError::WrongListingScope { path: archive_root });
+            }
+            entries.as_slice()
+        }
+        ArtifactEvidence::Missing
+        | ArtifactEvidence::Symlink
+        | ArtifactEvidence::Unsupported
+        | ArtifactEvidence::File(_)
+        | ArtifactEvidence::InvalidPath => &[],
+    };
+    let mut matching_roots = Vec::new();
+    for child in children {
+        if matches!(
+            required_resolution_evidence(evidence, child)?,
+            ArtifactEvidence::Directory { .. }
+        ) {
+            let marker = format!("{child}/.jit-container");
+            if matches!(
+                required_resolution_evidence(evidence, &marker)?,
+                ArtifactEvidence::File(owner) if owner.trim_ascii() == container_id.as_bytes()
+            ) {
+                matching_roots.push(child.clone());
+            }
+        }
+    }
+    matching_roots.sort();
+    if let Some(destination_root) = matching_roots.first().cloned() {
+        let conflicting_roots = if matching_roots.len() > 1 {
+            matching_roots
+        } else {
+            Vec::new()
+        };
+        return Ok(ResolvedContainerDestination {
+            destination_root,
+            conflicting_roots,
+        });
+    }
+
+    Ok(ResolvedContainerDestination {
+        destination_root: if matches!(
+            required_resolution_evidence(evidence, legacy_root)?,
+            ArtifactEvidence::Missing
+        ) {
+            preferred_root
+        } else {
+            legacy_root
+        }
+        .to_string(),
+        conflicting_roots: Vec::new(),
+    })
+}
+
+fn required_resolution_evidence<'a>(
+    evidence: &'a ArtifactEvidenceMap,
+    path: &str,
+) -> Result<&'a ArtifactEvidence, ArtifactEvidenceError> {
+    evidence
+        .get(path)
+        .ok_or_else(|| ArtifactEvidenceError::IncompleteEvidence {
+            path: path.to_string(),
+        })
+}
+
+/// Derive source, mirror, and container occupancy facts from closed evidence.
+pub fn classification_facts_from_evidence(
+    target: &PlanTarget,
+    destination_root: &str,
+    artifacts: &[ArtifactPlanEntry],
+    policy: &ArtifactClassificationPolicy,
+    embedded_owners: Vec<EmbeddedArtifactOwner>,
+    evidence: &ArtifactEvidenceMap,
+) -> anyhow::Result<ArtifactClassificationFacts> {
+    let inspect_destinations = !policy.archive_root.is_empty();
+    let locations = artifacts
+        .iter()
+        .filter(|artifact| artifact.version() == &ArtifactVersion::WorkingTree)
+        .map(|artifact| {
+            let source = artifact.source();
+            let destination = artifact_mirror_destination(destination_root, source);
+            Ok((
+                source.to_string(),
+                ArtifactLocationFacts {
+                    source: location_from_evidence(source, evidence)?,
+                    destination: if inspect_destinations {
+                        location_from_evidence(&destination, evidence)?
+                    } else {
+                        ArtifactLocation::Missing
+                    },
+                },
+            ))
+        })
+        .collect::<anyhow::Result<BTreeMap<_, _>>>()?;
+    let container_destination = match target {
+        PlanTarget::Container { id } if inspect_destinations => {
+            container_destination_from_evidence(destination_root, id, artifacts, evidence)?
+        }
+        _ => ContainerDestinationState::Absent,
+    };
+    Ok(ArtifactClassificationFacts {
+        locations,
+        embedded_owners,
+        container_destination,
+    })
+}
+
+fn location_from_evidence(
+    path: &str,
+    evidence: &ArtifactEvidenceMap,
+) -> anyhow::Result<ArtifactLocation> {
+    Ok(match required_evidence(evidence, path)? {
+        ArtifactEvidence::File(bytes) => {
+            ArtifactLocation::Regular(ContentIdentity::from_bytes(bytes))
+        }
+        ArtifactEvidence::Missing => ArtifactLocation::Missing,
+        ArtifactEvidence::Symlink => ArtifactLocation::Symlink,
+        ArtifactEvidence::Unsupported
+        | ArtifactEvidence::Directory { .. }
+        | ArtifactEvidence::InvalidPath => ArtifactLocation::Unsupported,
+    })
+}
+
+fn container_destination_from_evidence(
+    destination_root: &str,
+    container_id: &str,
+    artifacts: &[ArtifactPlanEntry],
+    evidence: &ArtifactEvidenceMap,
+) -> anyhow::Result<ContainerDestinationState> {
+    let entries = match required_evidence(evidence, destination_root)? {
+        ArtifactEvidence::Missing => return Ok(ContainerDestinationState::Absent),
+        ArtifactEvidence::Symlink => return Ok(ContainerDestinationState::Symlink),
+        ArtifactEvidence::File(_)
+        | ArtifactEvidence::Unsupported
+        | ArtifactEvidence::InvalidPath => {
+            return Ok(ContainerDestinationState::MarkerlessWithUnaccountedEntries)
+        }
+        ArtifactEvidence::Directory { scope, entries } => {
+            if *scope != ArtifactListingScope::RecursiveFiles {
+                bail!("archive evidence for {destination_root} is not a recursive listing");
+            }
+            entries
+        }
+    };
+    let marker_path = format!("{destination_root}/.jit-container");
+    match required_evidence(evidence, &marker_path)? {
+        ArtifactEvidence::Symlink => return Ok(ContainerDestinationState::Symlink),
+        ArtifactEvidence::File(owner) => {
+            let owner = std::str::from_utf8(owner.trim_ascii())
+                .map_err(|_| anyhow!("container marker is not valid UTF-8: {marker_path}"))?;
+            return Ok(if owner == container_id {
+                ContainerDestinationState::OwnedByTarget
+            } else {
+                ContainerDestinationState::OwnedByOther(owner.to_string())
+            });
+        }
+        ArtifactEvidence::Unsupported
+        | ArtifactEvidence::Directory { .. }
+        | ArtifactEvidence::InvalidPath => {
+            return Ok(ContainerDestinationState::MarkerlessWithUnaccountedEntries)
+        }
+        ArtifactEvidence::Missing => {}
+    }
+    let accounted = artifacts
+        .iter()
+        .filter(|artifact| artifact.version() == &ArtifactVersion::WorkingTree)
+        .map(|artifact| artifact_mirror_destination(destination_root, artifact.source()))
+        .collect::<BTreeSet<_>>();
+    Ok(if entries.iter().all(|entry| accounted.contains(entry)) {
+        ContainerDestinationState::MarkerlessAccounted
+    } else {
+        ContainerDestinationState::MarkerlessWithUnaccountedEntries
+    })
+}
+
+fn required_evidence<'a>(
+    evidence: &'a ArtifactEvidenceMap,
+    path: &str,
+) -> anyhow::Result<&'a ArtifactEvidence> {
+    evidence
+        .get(path)
+        .ok_or_else(|| anyhow!("archive evidence is missing for {path}"))
+}
+
 /// Inventory data accepted from recursive discovery.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactClassificationInventory {
@@ -278,6 +502,76 @@ pub fn classify_artifacts(
         plan_blockers,
         Vec::new(),
     )
+}
+
+/// Verify that every supported edge still resolves to an available path after execution.
+pub fn validate_proposed_layout(plan: &ArtifactPlan) -> anyhow::Result<()> {
+    let by_source = plan
+        .artifacts()
+        .iter()
+        .map(|artifact| (artifact.source(), artifact))
+        .collect::<BTreeMap<_, _>>();
+    for parent in plan.artifacts() {
+        for edge in parent
+            .edges()
+            .iter()
+            .filter(|edge| edge.kind == EdgeKind::Supported)
+        {
+            let Some(target_source) = edge.target.as_deref() else {
+                continue;
+            };
+            if parent.warnings().iter().any(|warning| {
+                warning.code == WarningCode::MissingEdgeTarget
+                    && warning.path.as_deref() == Some(target_source)
+            }) {
+                continue;
+            }
+            let target = by_source.get(target_source).ok_or_else(|| {
+                anyhow!("supported archive edge target is absent from plan: {target_source}")
+            })?;
+            let available = proposed_available_paths(target);
+            for parent_path in proposed_available_paths(parent) {
+                let resolved = match edge.resolution_mode {
+                    EdgeResolutionMode::Relative => {
+                        let parent_dir = Path::new(&parent_path).parent().unwrap_or(Path::new(""));
+                        normalize_artifact_path(&parent_dir.join(&edge.reference).to_string_lossy())
+                    }
+                    EdgeResolutionMode::RootRelative => {
+                        normalize_artifact_path(edge.reference.trim_start_matches('/'))
+                    }
+                    EdgeResolutionMode::External => continue,
+                };
+                if !available.contains(&resolved) {
+                    bail!(
+                        "supported edge {} from {} resolves to {} in the proposed layout, not an available target location ({})",
+                        edge.reference,
+                        parent.source(),
+                        resolved,
+                        available.iter().cloned().collect::<Vec<_>>().join(", ")
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn proposed_available_paths(artifact: &ArtifactPlanEntry) -> BTreeSet<String> {
+    match artifact.action() {
+        ArtifactAction::Move => artifact
+            .destination()
+            .map(str::to_string)
+            .into_iter()
+            .collect(),
+        ArtifactAction::Copy => [Some(artifact.source()), artifact.destination()]
+            .into_iter()
+            .flatten()
+            .map(str::to_string)
+            .collect(),
+        ArtifactAction::Retain | ArtifactAction::Block => {
+            BTreeSet::from([artifact.source().to_string()])
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -908,6 +1202,241 @@ mod tests {
             kind: EdgeKind::Supported,
             resolution_mode: mode,
         }
+    }
+
+    fn directory(scope: ArtifactListingScope, entries: &[&str]) -> ArtifactEvidence {
+        ArtifactEvidence::Directory {
+            scope,
+            entries: entries.iter().map(|entry| (*entry).to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn test_destination_resolution_uses_marker_freeze_legacy_fallback_and_duplicate_evidence() {
+        let cases = [
+            (
+                vec!["archive/abcdef12-old"],
+                vec![("archive/abcdef12-old", format!(" \n{CONTAINER}\t"))],
+                false,
+                "archive/abcdef12-old",
+                Vec::new(),
+            ),
+            (Vec::new(), Vec::new(), true, "archive/abcdef12", Vec::new()),
+            (
+                vec!["archive/abcdef12-a", "archive/abcdef12-b"],
+                vec![
+                    ("archive/abcdef12-a", CONTAINER.to_string()),
+                    ("archive/abcdef12-b", CONTAINER.to_string()),
+                ],
+                false,
+                "archive/abcdef12-a",
+                vec!["archive/abcdef12-a", "archive/abcdef12-b"],
+            ),
+        ];
+        for (children, markers, legacy_exists, expected, conflicts) in cases {
+            let mut evidence = ArtifactEvidenceMap::from([(
+                "archive".to_string(),
+                directory(ArtifactListingScope::ImmediateChildren, &children),
+            )]);
+            children.iter().for_each(|child| {
+                evidence.insert(
+                    (*child).to_string(),
+                    directory(ArtifactListingScope::MetadataOnly, &[]),
+                );
+            });
+            markers.into_iter().for_each(|(root, owner)| {
+                evidence.insert(
+                    format!("{root}/.jit-container"),
+                    ArtifactEvidence::File(owner.into_bytes()),
+                );
+            });
+            evidence
+                .entry("archive/abcdef12".into())
+                .or_insert_with(|| {
+                    if legacy_exists {
+                        directory(ArtifactListingScope::MetadataOnly, &[])
+                    } else {
+                        ArtifactEvidence::Missing
+                    }
+                });
+            let resolved = resolve_container_destination(
+                "archive/abcdef12-new",
+                "archive/abcdef12",
+                CONTAINER,
+                &evidence,
+            )
+            .unwrap();
+            assert_eq!(resolved.destination_root, expected);
+            assert_eq!(resolved.conflicting_roots, conflicts);
+        }
+    }
+
+    #[test]
+    fn test_destination_resolution_rejects_missing_immediate_child_evidence() {
+        let evidence = ArtifactEvidenceMap::from([
+            (
+                "archive".into(),
+                directory(ArtifactListingScope::ImmediateChildren, &["archive/unread"]),
+            ),
+            ("archive/abcdef12".into(), ArtifactEvidence::Missing),
+        ]);
+        assert_eq!(
+            resolve_container_destination("archive/new", "archive/abcdef12", CONTAINER, &evidence,),
+            Err(ArtifactEvidenceError::IncompleteEvidence {
+                path: "archive/unread".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_destination_resolution_rejects_missing_directory_marker_evidence() {
+        let evidence = ArtifactEvidenceMap::from([
+            (
+                "archive".into(),
+                directory(
+                    ArtifactListingScope::ImmediateChildren,
+                    &["archive/unmarked"],
+                ),
+            ),
+            (
+                "archive/unmarked".into(),
+                directory(ArtifactListingScope::MetadataOnly, &[]),
+            ),
+            ("archive/abcdef12".into(), ArtifactEvidence::Missing),
+        ]);
+        assert_eq!(
+            resolve_container_destination("archive/new", "archive/abcdef12", CONTAINER, &evidence,),
+            Err(ArtifactEvidenceError::IncompleteEvidence {
+                path: "archive/unmarked/.jit-container".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_evidence_listing_scopes_are_not_interchangeable() {
+        let resolution = ArtifactEvidenceMap::from([
+            (
+                "archive".into(),
+                directory(ArtifactListingScope::RecursiveFiles, &[]),
+            ),
+            ("archive/abcdef12".into(), ArtifactEvidence::Missing),
+        ]);
+        assert!(resolve_container_destination(
+            "archive/new",
+            "archive/abcdef12",
+            CONTAINER,
+            &resolution
+        )
+        .is_err());
+
+        let artifact = embedded("docs/a.md");
+        let evidence = ArtifactEvidenceMap::from([
+            ("docs/a.md".into(), ArtifactEvidence::File(b"a".to_vec())),
+            ("archive/docs/a.md".into(), ArtifactEvidence::Missing),
+            (
+                "archive".into(),
+                directory(ArtifactListingScope::ImmediateChildren, &[]),
+            ),
+        ]);
+        assert!(classification_facts_from_evidence(
+            &PlanTarget::Container {
+                id: CONTAINER.into()
+            },
+            "archive",
+            &[artifact],
+            &ArtifactClassificationPolicy::configured(vec![], vec![], "archive"),
+            Vec::new(),
+            &evidence,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn test_classification_evidence_derives_locations_and_recursive_occupancy() {
+        let artifact = embedded("docs/a.md");
+        for (entries, expected) in [
+            (
+                vec!["archive/docs/a.md"],
+                ContainerDestinationState::MarkerlessAccounted,
+            ),
+            (
+                vec!["archive/docs/a.md", "archive/foreign"],
+                ContainerDestinationState::MarkerlessWithUnaccountedEntries,
+            ),
+        ] {
+            let evidence = ArtifactEvidenceMap::from([
+                (
+                    "docs/a.md".into(),
+                    ArtifactEvidence::File(b"source".to_vec()),
+                ),
+                (
+                    "archive/docs/a.md".into(),
+                    ArtifactEvidence::File(b"mirror".to_vec()),
+                ),
+                (
+                    "archive".into(),
+                    directory(ArtifactListingScope::RecursiveFiles, &entries),
+                ),
+                ("archive/.jit-container".into(), ArtifactEvidence::Missing),
+            ]);
+            let facts = classification_facts_from_evidence(
+                &PlanTarget::Container {
+                    id: CONTAINER.into(),
+                },
+                "archive",
+                std::slice::from_ref(&artifact),
+                &ArtifactClassificationPolicy::configured(vec![], vec![], "archive"),
+                Vec::new(),
+                &evidence,
+            )
+            .unwrap();
+            assert_eq!(facts.container_destination, expected);
+            assert_eq!(
+                facts.locations["docs/a.md"],
+                ArtifactLocationFacts {
+                    source: ArtifactLocation::Regular(identity(b"source")),
+                    destination: ArtifactLocation::Regular(identity(b"mirror")),
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_proposed_layout_rejects_broken_relative_edge() {
+        let content_identity = identity(b"root");
+        let parent = ArtifactPlanEntry::new(
+            "fixtures/root.md",
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Move,
+        )
+        .with_content_identity(content_identity.clone())
+        .with_destination("archive/fixtures/root.md")
+        .with_edges(vec![edge(
+            "target.png",
+            "fixtures/target.png",
+            EdgeResolutionMode::Relative,
+        )])
+        .with_pending_deletions(vec![PendingDeletion {
+            source: "fixtures/root.md".into(),
+            content_identity,
+        }]);
+        let target = ArtifactPlanEntry::new(
+            "fixtures/target.png",
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Retain,
+        );
+        let plan = ArtifactPlan::new(
+            PlanTarget::Document {
+                path: "fixtures/root.md".into(),
+            },
+            "archive",
+            PolicyStatus::Configured,
+            vec![parent, target],
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+        assert!(validate_proposed_layout(&plan).is_err());
     }
 
     fn locations(

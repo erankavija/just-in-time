@@ -45,10 +45,7 @@ pub mod worktree_paths;
 // Re-export for convenience
 pub use artifact_discovery::{discover_archive_artifacts, ArtifactDiscoveryError};
 pub use artifact_mutation::{ArtifactMutationError, StagedArtifact, VerifiedArtifact};
-pub use artifact_planning::{
-    collect_artifact_classification_facts, resolve_container_destination,
-    ResolvedContainerDestination,
-};
+pub use artifact_planning::{collect_artifact_classification_facts, resolve_container_destination};
 pub use claim_coordinator::{ClaimAcquireLimits, ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
 pub use errors::{

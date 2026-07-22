@@ -5,14 +5,12 @@ use crate::domain::artifact_classifier::EmbeddedArtifactOwner;
 use crate::domain::artifact_discovery::{
     discover_archive_artifacts as derive_archive_artifacts, expand_artifact_closure,
     ArtifactClosure, ArtifactClosureState, ArtifactDiscoveryError as DomainDiscoveryError,
-    ArtifactEvidence, ArtifactEvidenceMap, ParsedArtifact,
+    ArtifactEvidenceMap, ArtifactListingScope, ParsedArtifact,
 };
 use crate::domain::artifact_inventory::ExplicitRootInventory;
 use crate::domain::artifact_plan::ArtifactVersion;
 use crate::domain::Issue;
-use crate::storage::artifact_planning::{
-    read_working_tree_path_without_symlinks, WorkingTreeDiscoveryRead,
-};
+use crate::storage::artifact_planning::inspect_artifact_evidence;
 use crate::storage::{IssueStore, PathReadError};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
@@ -63,16 +61,12 @@ fn collect_closure_evidence<S: IssueStore>(
             ArtifactClosure::Needs { paths, state } => (paths, state),
         };
         for path in paths {
-            let fact = match read_working_tree_path_without_symlinks(storage, &path) {
-                Ok(WorkingTreeDiscoveryRead::Bytes(bytes)) => ArtifactEvidence::File(bytes),
-                Ok(WorkingTreeDiscoveryRead::Symlink) => ArtifactEvidence::Symlink,
-                Ok(WorkingTreeDiscoveryRead::Unsupported) => ArtifactEvidence::Unsupported,
-                Err(PathReadError::NotFound(_)) => ArtifactEvidence::Missing,
-                Err(PathReadError::InvalidPath(_) | PathReadError::OutsideRepoRoot(_)) => {
-                    ArtifactEvidence::InvalidPath
-                }
-                Err(source) => return Err(ArtifactDiscoveryError::Read { path, source }),
-            };
+            let fact =
+                match inspect_artifact_evidence(storage, &path, ArtifactListingScope::MetadataOnly)
+                {
+                    Ok(fact) => fact,
+                    Err(source) => return Err(ArtifactDiscoveryError::Read { path, source }),
+                };
             evidence.insert(path, fact);
         }
         state = next;
