@@ -65,7 +65,7 @@
             "1-5": "done (waves 1-4 packages + init/profile session publication)",
             "6": "done \u2014 canonical profile consumers: 6c7ca9d2 (derive_profile_materializations + build_profile_claims), b0e5beb9 (commands rewired), 3d4af231 (planner/render/snapshot/preset/view-triad deleted)",
             "7": "done \u2014 (a) verified pre-satisfied; (b) 9153f0e5 image-projected plan content; (c) e4ac6863 finalize_config_edit + ddb574b0 re-init unification (closes the gitattributes gap, pinned test); (d) 6565df41 events via finalizer; (e) d3619a13 MutationIntent::UpdateIssue; (f) held",
-            "8": "BLOCKED ON SHARED POLICY \u2014 final publisher deletion landed at 1a661786 (net 381 lines deleted). Independent semantic and architecture reviews pass; formatting, strict Clippy, MCP 54/9, focused/cumulative Rust suites, and exact predecessor absence scans pass. The workspace suite has one pre-existing failure: AGENTS.md expresses selective public-API examples semantically but lacks two exact phrases required by fast_docs_templates. Explicit invoker authorization is required before changing shared repository agent policy."
+            "8": "REWORK 2 \u2014 authorized AGENTS clarification passes fast_docs_templates. The first complete workspace run to reach doctests exposed four package-attributable examples that still construct an empty InMemoryStorage and now fail closed because captured config.toml is absent. Correction is limited to canonical doctest fixture setup in graph/issue/query examples; production behavior remains accepted and unchanged."
           }
         }
       ]
@@ -384,8 +384,10 @@
     {
       "category": "shared-infrastructure",
       "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-22T19:07:59+03:00",
+      "resolved_at": "2026-07-22T21:21:03+03:00",
+      "resolution": "Invoker selected option 1 and authorized the one-line AGENTS.md semantic clarification, followed by the documentation target, full workspace suite, and issue gates.",
       "situation": "The reviewed publisher deletion package is committed and all package-attributable validation passes. Full cargo test stops at the pre-existing fast_docs_templates policy assertion because AGENTS.md already says examples are only for non-obvious behavior and prefers one type- or module-level walkthrough, but does not contain the exact required phrases 'Do not require an example for every public API' and 'tautological examples'. AGENTS.md and the assertion were unchanged by 49adf23b. Changing AGENTS.md is shared repository agent policy and requires invoker authorization.",
       "recommendation": "Authorize a one-line semantic clarification to the existing Public API documentation bullet: explicitly prohibit requiring examples for every public API and avoid tautological examples, without changing the existing non-obvious-only policy. Then rerun fast_docs_templates and the full workspace suite before issue gates."
     }
@@ -395,7 +397,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 1
+    "49adf23b": 2
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
