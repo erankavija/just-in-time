@@ -132,9 +132,6 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn save_issue(&self, issue: Issue) -> Result<()> {
         self.inner.save_issue(issue)
     }
-    fn restore_issue_verbatim(&self, issue: Issue) -> Result<()> {
-        self.inner.restore_issue_verbatim(issue)
-    }
     fn load_issue(&self, id: &str) -> Result<Issue> {
         self.inner.load_issue(id)
     }

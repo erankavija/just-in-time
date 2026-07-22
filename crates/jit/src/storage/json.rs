@@ -501,9 +501,7 @@ impl JsonFileStorage {
     /// Write `issue` to its file and register it in the index, taking the
     /// repository, index and issue locks in that order.
     ///
-    /// The single write path behind [`IssueStore::save_issue`] and
-    /// [`IssueStore::restore_issue_verbatim`], which differ only in whether the
-    /// caller's `updated_at` is stamped before the write reaches here.
+    /// The write path behind [`IssueStore::save_issue`].
     fn persist_issue(&self, issue: &Issue) -> Result<()> {
         let issue_path = self.issue_path(&issue.id);
         let index_lock_path = self.root.join(".index.lock");
@@ -936,10 +934,6 @@ impl IssueStore for JsonFileStorage {
     fn save_issue(&self, mut issue: Issue) -> Result<()> {
         // Update the updated_at timestamp (storage responsibility)
         issue.updated_at = chrono::Utc::now();
-        self.persist_issue(&issue)
-    }
-
-    fn restore_issue_verbatim(&self, issue: Issue) -> Result<()> {
         self.persist_issue(&issue)
     }
 

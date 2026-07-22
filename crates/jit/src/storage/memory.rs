@@ -486,13 +486,9 @@ impl InMemoryStorage {
 
     /// Insert `issue` under the repository write lock.
     ///
-    /// The single write path behind [`IssueStore::save_issue`] and
-    /// [`IssueStore::restore_issue_verbatim`], which differ only in whether the
-    /// caller's `updated_at` is stamped before the write reaches here. Both
-    /// backends must agree on that, or the atomicity tests over this one prove
-    /// nothing about [`JsonFileStorage`](crate::storage::JsonFileStorage). The
-    /// issue is persisted as its canonical bytes in the aggregate image, exactly
-    /// as a mutation session publishes it.
+    /// The write path behind [`IssueStore::save_issue`]. The issue is persisted
+    /// as its canonical bytes in the aggregate image, exactly as a mutation
+    /// session publishes it.
     fn persist_issue(&self, issue: Issue) -> Result<()> {
         let _repo_lock = self.repo_lock.acquire()?;
         let bytes = serialize_issue(&issue).map_err(|e| anyhow!("{e}"))?;
@@ -528,10 +524,6 @@ impl IssueStore for InMemoryStorage {
     fn save_issue(&self, mut issue: Issue) -> Result<()> {
         // Update the updated_at timestamp (storage responsibility)
         issue.updated_at = chrono::Utc::now();
-        self.persist_issue(issue)
-    }
-
-    fn restore_issue_verbatim(&self, issue: Issue) -> Result<()> {
         self.persist_issue(issue)
     }
 

@@ -167,12 +167,13 @@ MAX_SAME_FINDING_REPEATS=3 escalation budget.
 unchanged") failed R1 (apply held `.git/jit/locks/apply.lock` while ordinary
 writers hold `.jit/.index.lock`, so the lock excluded nobody; confirmed against
 `storage/json.rs:508` and `commands/mod.rs:1054`) and R2 (rollback restored via
-`save_issue`, which stamps `updated_at`). Fixed with
-`IssueStore::restore_issue_verbatim` (now in `storage/mod.rs:180` with a trait
-test). A byte-comparison property test over injected write failures would have
-caught the R2 leak on first run; it would **not** have caught R1, which is a
-cross-process interleaving hole a single-process test never exercises. So a
-store-unchanged property (P11) halves this class; it does not close it.
+`save_issue`, which stamps `updated_at`). At the time this was fixed with a
+verbatim compensating write; aggregate repository deltas later replaced that
+escape hatch by publishing or rolling back the complete captured state. A
+byte-comparison property test over injected write failures would have caught the
+R2 leak on first run; it would **not** have caught R1, which is a cross-process
+interleaving hole a single-process test never exercises. So a store-unchanged
+property (P11) halves this class; it does not close it.
 
 ### F6. Tests that reproduce production logic — VERIFIED
 
