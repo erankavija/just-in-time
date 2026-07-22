@@ -3257,7 +3257,6 @@ mod tests {
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         storage.add_repo_file(".jit/issues/existing.json", "{}");
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
@@ -3298,7 +3297,6 @@ mod tests {
         use std::collections::HashMap;
 
         let storage = crate::storage::InMemoryStorage::new();
-        storage.init().unwrap();
         storage.add_repo_file(".jit/config.toml", "");
         storage.add_repo_file("start-prompt.md", "captured prompt");
         let mut registry = GateRegistry::default();
@@ -3503,7 +3501,6 @@ mod tests {
         use crate::storage::{InMemoryStorage, RepositoryStateStore, RepositoryStateStoreError};
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         let issue = crate::domain::types::fixture_issue(
             "captured-retry-issue".to_string(),
             "Captured retry".to_string(),
@@ -3601,7 +3598,6 @@ mod tests {
 
         for status in [GateStatus::Passed, GateStatus::Failed] {
             let storage = InMemoryStorage::new();
-            storage.init().unwrap();
             storage
                 .save_gate_registry(&manual_gate_registry("review"))
                 .unwrap();
@@ -3771,7 +3767,6 @@ mod tests {
         };
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         storage
             .save_gate_registry(&manual_gate_registry("review"))
             .unwrap();
@@ -3840,7 +3835,6 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
 
         let rules_path = storage.root().join("rules.toml");
@@ -3894,7 +3888,6 @@ assert = { require-doc-type = { doc-type = "design" } }
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
 
         let config_path = storage.root().join("config.toml");
@@ -3945,7 +3938,6 @@ unique = false
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         // No rules.toml written.
 
@@ -3959,7 +3951,6 @@ unique = false
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
 
         // A rule whose assert table has no kind is a genuine config error and
@@ -3987,7 +3978,6 @@ assert = {}
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         // Create a test issue
         let issue =
@@ -4016,7 +4006,6 @@ enforce_leases = "off"
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         // Create a test issue
         let issue =
@@ -4037,7 +4026,6 @@ enforce_leases = "off"
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         // Create a test issue
         let issue =
@@ -4068,7 +4056,6 @@ enforce_leases = "strict"
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         // Create a test issue
         let issue =

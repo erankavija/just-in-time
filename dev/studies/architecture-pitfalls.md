@@ -161,11 +161,13 @@ executor.create_issue(
 
 **Note:** This will be standardized in v1.0 (breaking change)
 
-### Pitfall 4: JsonFileStorage::new() Doesn't Return Result
+### Pitfall 4: Storage Construction Does Not Initialize a Repository
 
 **Symptom:** `.unwrap()` doesn't work on `JsonFileStorage::new()`
 
-**Why:** Constructor never fails, path validation happens on first use
+**Why:** The constructor only records the data path. Repository initialization
+is a command operation with an explicit, validated layout and a recovered
+mutation session.
 
 **Fix:**
 ```rust
@@ -173,11 +175,12 @@ executor.create_issue(
 let storage = JsonFileStorage::new(path).unwrap();  // ❌ No unwrap needed
 
 // Correct:
-let storage = JsonFileStorage::new(path);           // ✅ Returns Self directly
-storage.init()?;                                    // ✅ Validate with init()
+let storage = JsonFileStorage::new(&jit_root);
+let layout = discover_repository_layout(&repo_root, storage.root())?;
+CommandExecutor::new(storage)
+    .with_layout(layout)
+    .initialize_fresh_repository(&repo_root, &HierarchyTemplate::default(), None)?;
 ```
-
-**Note:** `try_new()` variant may be added in future for immediate validation
 
 ## Testing Patterns
 
@@ -189,9 +192,8 @@ use jit::storage::InMemoryStorage;
 #[test]
 fn test_something() {
     let storage = InMemoryStorage::new();  // ✅ 10-100x faster than JSON
-    storage.init().unwrap();
-    
-    let executor = CommandExecutor::new(storage);
+    let layout = storage.repository_layout();
+    let executor = CommandExecutor::new(storage).with_layout(layout);
     // ... test logic
 }
 ```

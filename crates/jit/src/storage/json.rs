@@ -34,7 +34,6 @@ use std::time::Duration;
 
 const ISSUES_DIR: &str = "issues";
 const INDEX_FILE: &str = "index.json";
-const GATES_FILE: &str = "gates.toml";
 const EVENTS_FILE: &str = "events.jsonl";
 const GATE_RUNS_DIR: &str = "gate-runs";
 
@@ -837,48 +836,6 @@ impl JsonFileStorage {
 }
 
 impl IssueStore for JsonFileStorage {
-    fn init(&self) -> Result<()> {
-        let _repo_lock = self.repo_lock.acquire()?;
-        // `init` is the one command that does not pass through `validate()`, so
-        // it must run the same format guard itself: re-initializing over an
-        // EXISTING repository whose `index.json` is newer than this binary
-        // supports must fail fast rather than scaffold/write into data it cannot
-        // safely read (jit:def64ac4 REQ-02). A fresh directory (no index yet) is
-        // a new repository and proceeds normally.
-        let index_path = self.root.join(INDEX_FILE);
-        if index_path.exists() {
-            self.load_index()?; // applies the shared format/invariant validation
-        }
-
-        let issues_dir = self.root.join(ISSUES_DIR);
-
-        fs::create_dir_all(&issues_dir).context("Failed to create issues directory")?;
-
-        // Create index.json if it doesn't exist
-        if !index_path.exists() {
-            let index = Index::default();
-            self.write_json(&index_path, &index)?;
-        }
-
-        // Create gates.toml if it doesn't exist
-        let gates_path = self.root.join(GATES_FILE);
-        if !gates_path.exists() {
-            let registry = GateRegistry::default();
-            crate::storage::gate_store::save_gate_registry(&self.root, &registry)?;
-        }
-
-        // Create events.jsonl if it doesn't exist
-        let events_path = self.root.join(EVENTS_FILE);
-        if !events_path.exists() {
-            fs::File::create(&events_path).context("Failed to create events file")?;
-        }
-
-        // Repository config scaffolding belongs to the recovered, layout-aware
-        // initialization transaction rather than this legacy storage initializer.
-
-        Ok(())
-    }
-
     fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard> {
         self.repo_lock.acquire()
     }
@@ -1623,7 +1580,16 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let data = temp.path().join(".jit");
         let storage = JsonFileStorage::new(&data);
-        storage.init().unwrap();
+        let initial_layout =
+            crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        crate::commands::CommandExecutor::new(storage.clone())
+            .with_layout(initial_layout)
+            .initialize_fresh_repository(
+                temp.path(),
+                &crate::hierarchy_templates::HierarchyTemplate::default(),
+                None,
+            )
+            .unwrap();
         let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
         let retained = storage
             .open_and_retain_mutation_session(layout.clone())
@@ -1777,15 +1743,12 @@ mod tests {
     }
 
     fn setup_storage() -> (TempDir, JsonFileStorage) {
-        let temp_dir = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp_dir.path());
-        (temp_dir, storage)
+        crate::test_utils::setup_test_repo().unwrap()
     }
 
     #[test]
     fn test_read_events_skips_structurally_valid_retired_tags_but_keeps_strict_records() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
         let known = Event::IssueCreated {
             id: "known-event".to_string(),
             issue_id: "issue-id".to_string(),
@@ -1818,22 +1781,11 @@ mod tests {
     }
 
     #[test]
-    fn test_init_creates_directory_structure() {
-        let (_temp, storage) = setup_storage();
-
-        storage.init().unwrap();
-
-        assert!(storage.root.join(ISSUES_DIR).exists());
-        assert!(storage.root.join(INDEX_FILE).exists());
-        assert!(storage.root.join(GATES_FILE).exists());
-    }
-
-    #[test]
     fn test_read_repo_file_present_absent_and_path_safety() {
         // Repo root is the parent of the .jit dir, so create storage at temp/.jit.
         let temp = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir(storage.root()).unwrap();
 
         // Absent -> None (graceful).
         assert!(storage
@@ -1868,7 +1820,7 @@ mod tests {
         use crate::storage::PathReadError;
         let temp = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir(storage.root()).unwrap();
 
         // A nested target is written atomically, creating intermediate dirs; a
         // round-trip read returns the same content.
@@ -1908,7 +1860,7 @@ mod tests {
     fn test_write_repo_file_waits_for_repository_guard() {
         let temp = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir(storage.root()).unwrap();
 
         assert_direct_writer_waits_for_repository_guard(&storage, |storage| {
             storage
@@ -1932,7 +1884,7 @@ mod tests {
         let repo = TempDir::new().unwrap();
         let outside = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir(storage.root()).unwrap();
 
         // `repo/docs -> outside/` (an existing symlinked directory segment).
         std::os::unix::fs::symlink(outside.path(), repo.path().join("docs")).unwrap();
@@ -1949,21 +1901,10 @@ mod tests {
     }
 
     #[test]
-    fn test_init_is_idempotent() {
-        let (_temp, storage) = setup_storage();
-
-        storage.init().unwrap();
-        storage.init().unwrap();
-
-        assert!(storage.root.join(ISSUES_DIR).exists());
-    }
-
-    #[test]
     fn test_list_gate_runs_errors_on_corrupt_result() {
         // A corrupt result.json must surface a contextual error (naming the
         // offending path), not be silently dropped from the listing.
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
 
         let run_dir = storage.root.join("gate-runs").join("corrupt-run");
         fs::create_dir_all(&run_dir).unwrap();
@@ -1997,7 +1938,6 @@ mod tests {
     #[test]
     fn test_list_gate_runs_ignores_noncanonical_nested_result_shape() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
         let nested = storage.root.join("gate-runs/outer/nested/result.json");
         fs::create_dir_all(nested.parent().unwrap()).unwrap();
         fs::write(nested, "{ not valid json").unwrap();
@@ -2033,7 +1973,6 @@ mod tests {
     #[test]
     fn test_gate_run_readers_reject_non_file_result_object() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
         fs::create_dir_all(storage.root.join("gate-runs/directory-run/result.json")).unwrap();
 
         for error in [
@@ -2050,7 +1989,6 @@ mod tests {
     #[test]
     fn test_gate_run_readers_reject_symlinked_result_object() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
         let run_dir = storage.root.join("gate-runs/symlink-run");
         fs::create_dir_all(&run_dir).unwrap();
         let target = storage.root.join("target.json");
@@ -2149,7 +2087,6 @@ mod tests {
     #[test]
     fn test_save_and_load_issue() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
 
         let issue = crate::domain::types::fixture_issue(
             "Test Issue".to_string(),
@@ -2168,7 +2105,6 @@ mod tests {
     #[test]
     fn test_save_issue_updates_index() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         storage.save_issue(issue.clone()).unwrap();
@@ -2180,7 +2116,6 @@ mod tests {
     #[test]
     fn test_save_issue_twice_doesnt_duplicate_in_index() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
 
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         storage.save_issue(issue.clone()).unwrap();
@@ -2198,7 +2133,6 @@ mod tests {
     #[test]
     fn test_list_issues_returns_all_issues() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
 
         let issue1 =
             crate::domain::types::fixture_issue("Issue 1".to_string(), "Desc 1".to_string());
@@ -2217,7 +2151,6 @@ mod tests {
     #[test]
     fn test_load_nonexistent_issue_returns_error() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
 
         let result = storage.load_issue("nonexistent");
         assert!(result.is_err());
@@ -2226,7 +2159,6 @@ mod tests {
     #[test]
     fn test_gate_registry_operations() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
 
         let mut registry = storage.load_gate_registry().unwrap();
         assert!(registry.gates.is_empty());
@@ -2260,9 +2192,8 @@ mod tests {
         use std::sync::Arc;
         use std::thread;
 
-        let temp_dir = TempDir::new().unwrap();
-        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
-        storage.init().unwrap();
+        let (_temp_dir, storage) = setup_storage();
+        let storage = Arc::new(storage);
 
         let num_threads = 10;
         let issues_per_thread = 5;
@@ -2305,9 +2236,8 @@ mod tests {
         use std::sync::Arc;
         use std::thread;
 
-        let temp_dir = TempDir::new().unwrap();
-        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
-        storage.init().unwrap();
+        let (_temp_dir, storage) = setup_storage();
+        let storage = Arc::new(storage);
 
         // Create two issues
         let issue1 =
@@ -2357,9 +2287,8 @@ mod tests {
         use std::sync::Arc;
         use std::thread;
 
-        let temp_dir = TempDir::new().unwrap();
-        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
-        storage.init().unwrap();
+        let (_temp_dir, storage) = setup_storage();
+        let storage = Arc::new(storage);
 
         let issue = crate::domain::types::fixture_issue(
             "Test Issue".to_string(),
@@ -2400,9 +2329,8 @@ mod tests {
         use std::sync::{Arc, Barrier};
         use std::thread;
 
-        let temp_dir = TempDir::new().unwrap();
-        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
-        storage.init().unwrap();
+        let (_temp_dir, storage) = setup_storage();
+        let storage = Arc::new(storage);
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
         let issue_id = issue.id.clone();
@@ -2452,9 +2380,8 @@ mod tests {
         use std::sync::Arc;
         use std::thread;
 
-        let temp_dir = TempDir::new().unwrap();
-        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
-        storage.init().unwrap();
+        let (_temp_dir, storage) = setup_storage();
+        let storage = Arc::new(storage);
 
         // Create base issue
         let base = crate::domain::types::fixture_issue("Base".to_string(), "Desc".to_string());
@@ -2498,9 +2425,8 @@ mod tests {
         use std::sync::{Arc, Barrier};
         use std::thread;
 
-        let temp_dir = TempDir::new().unwrap();
-        let storage = Arc::new(JsonFileStorage::new(temp_dir.path()));
-        storage.init().unwrap();
+        let (_temp_dir, storage) = setup_storage();
+        let storage = Arc::new(storage);
 
         let barrier = Arc::new(Barrier::new(4));
 
@@ -2552,7 +2478,7 @@ mod tests {
         use std::fs;
         use std::process::Command;
 
-        fn setup_git_repo() -> (TempDir, PathBuf) {
+        fn setup_git_repo() -> (TempDir, PathBuf, JsonFileStorage) {
             let temp_dir = TempDir::new().unwrap();
             let repo_path = temp_dir.path().to_path_buf();
 
@@ -2575,7 +2501,19 @@ mod tests {
                 .output()
                 .unwrap();
 
-            (temp_dir, repo_path)
+            let data = repo_path.join(".jit");
+            let storage = JsonFileStorage::new(&data);
+            let layout = crate::storage::discover_repository_layout(&repo_path, &data).unwrap();
+            crate::commands::CommandExecutor::new(storage.clone())
+                .with_layout(layout)
+                .initialize_fresh_repository(
+                    &repo_path,
+                    &crate::hierarchy_templates::HierarchyTemplate::default(),
+                    None,
+                )
+                .unwrap();
+
+            (temp_dir, repo_path, storage)
         }
 
         fn add_secondary_worktree(repo_path: &Path) -> (TempDir, PathBuf) {
@@ -2606,7 +2544,6 @@ mod tests {
         fn test_load_issue_from_local_first() {
             // Setup: Create a local .jit directory
             let (_temp, storage) = setup_storage();
-            storage.init().unwrap();
 
             // Create and save an issue locally
             let issue = crate::domain::types::fixture_issue(
@@ -2624,10 +2561,8 @@ mod tests {
         #[test]
         fn test_load_issue_from_git_when_not_local() {
             // Setup: Create git repo with committed issue
-            let (_temp_dir, repo_path) = setup_git_repo();
+            let (_temp_dir, repo_path, storage) = setup_git_repo();
             let jit_dir = repo_path.join(".jit");
-            let storage = JsonFileStorage::new(&jit_dir);
-            storage.init().unwrap();
 
             // Create an issue and commit it
             let issue = crate::domain::types::fixture_issue(
@@ -2673,10 +2608,7 @@ mod tests {
         #[test]
         fn test_load_issue_from_main_worktree_when_not_in_git() {
             // Setup: Create git repo with main worktree
-            let (_temp_dir, repo_path) = setup_git_repo();
-            let main_jit = repo_path.join(".jit");
-            let main_storage = JsonFileStorage::new(&main_jit);
-            main_storage.init().unwrap();
+            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
 
             // Create an issue in main worktree (not committed)
             let issue = crate::domain::types::fixture_issue(
@@ -2708,7 +2640,6 @@ mod tests {
 
             // Initialize secondary storage
             let secondary_storage = JsonFileStorage::new(&secondary_jit);
-            secondary_storage.init().unwrap();
 
             // Should fall back to reading from main worktree
             let loaded = secondary_storage.load_issue(&issue_id).unwrap();
@@ -2719,10 +2650,8 @@ mod tests {
         #[test]
         fn test_load_aggregated_index_includes_git_issues() {
             // Setup: Create git repo with committed issue
-            let (_temp_dir, repo_path) = setup_git_repo();
+            let (_temp_dir, repo_path, storage) = setup_git_repo();
             let jit_dir = repo_path.join(".jit");
-            let storage = JsonFileStorage::new(&jit_dir);
-            storage.init().unwrap();
 
             // Create and commit issue
             let issue = crate::domain::types::fixture_issue(
@@ -2764,10 +2693,8 @@ mod tests {
 
         #[test]
         fn test_load_aggregated_index_rejects_invalid_git_index() {
-            let (_temp_dir, repo_path) = setup_git_repo();
+            let (_temp_dir, repo_path, storage) = setup_git_repo();
             let jit_dir = repo_path.join(".jit");
-            let storage = JsonFileStorage::new(&jit_dir);
-            storage.init().unwrap();
 
             fs::write(jit_dir.join(INDEX_FILE), b"{ invalid json").unwrap();
             Command::new("git")
@@ -2790,10 +2717,7 @@ mod tests {
 
         #[test]
         fn test_local_membership_overrides_git_membership_in_both_states() {
-            let (_temp_dir, repo_path) = setup_git_repo();
-            let jit_dir = repo_path.join(".jit");
-            let storage = JsonFileStorage::new(&jit_dir);
-            storage.init().unwrap();
+            let (_temp_dir, repo_path, storage) = setup_git_repo();
 
             storage
                 .save_index(&Index {
@@ -2831,10 +2755,7 @@ mod tests {
 
         #[test]
         fn test_git_membership_overrides_main_worktree_in_both_states() {
-            let (_temp_dir, repo_path) = setup_git_repo();
-            let main_jit = repo_path.join(".jit");
-            let main_storage = JsonFileStorage::new(&main_jit);
-            main_storage.init().unwrap();
+            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
             main_storage
                 .save_index(&Index {
                     schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
@@ -2875,10 +2796,7 @@ mod tests {
         #[test]
         fn test_load_aggregated_index_includes_main_worktree_issues() {
             // Setup: Create git repo with main worktree
-            let (_temp_dir, repo_path) = setup_git_repo();
-            let main_jit = repo_path.join(".jit");
-            let main_storage = JsonFileStorage::new(&main_jit);
-            main_storage.init().unwrap();
+            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
 
             // Create issue in main worktree (not committed)
             let issue = crate::domain::types::fixture_issue(
@@ -2909,7 +2827,7 @@ mod tests {
             fs::create_dir_all(secondary_jit.join("issues")).unwrap();
 
             let secondary_storage = JsonFileStorage::new(&secondary_jit);
-            secondary_storage.init().unwrap();
+            secondary_storage.save_index(&Index::default()).unwrap();
 
             // Aggregated index should include main worktree issue
             let aggregated = secondary_storage.load_aggregated_index().unwrap();
@@ -2918,10 +2836,8 @@ mod tests {
 
         #[test]
         fn test_aggregated_index_propagates_main_worktree_failures() {
-            let (_temp_dir, repo_path) = setup_git_repo();
+            let (_temp_dir, repo_path, _main_storage) = setup_git_repo();
             let main_jit = repo_path.join(".jit");
-            let main_storage = JsonFileStorage::new(&main_jit);
-            main_storage.init().unwrap();
             let add = Command::new("git")
                 .args(["add", ".jit/index.json"])
                 .current_dir(&repo_path)
@@ -2955,10 +2871,7 @@ mod tests {
         #[test]
         fn test_load_aggregated_index_deduplicates() {
             // Setup: Create git repo
-            let (_temp_dir, repo_path) = setup_git_repo();
-            let jit_dir = repo_path.join(".jit");
-            let storage = JsonFileStorage::new(&jit_dir);
-            storage.init().unwrap();
+            let (_temp_dir, repo_path, storage) = setup_git_repo();
 
             // Create and commit issue
             let issue = crate::domain::types::fixture_issue(
@@ -2994,10 +2907,7 @@ mod tests {
         #[test]
         fn test_load_issue_prefers_local_over_git() {
             // Setup: Create git repo with committed issue
-            let (_temp_dir, repo_path) = setup_git_repo();
-            let jit_dir = repo_path.join(".jit");
-            let storage = JsonFileStorage::new(&jit_dir);
-            storage.init().unwrap();
+            let (_temp_dir, repo_path, storage) = setup_git_repo();
 
             // Create and commit an issue
             let mut issue = crate::domain::types::fixture_issue(
@@ -3033,7 +2943,6 @@ mod tests {
         #[test]
         fn test_load_issue_fails_when_not_found_anywhere() {
             let (_temp, storage) = setup_storage();
-            storage.init().unwrap();
 
             let fake_id = "00000000-0000-0000-0000-000000000000";
             let result = storage.load_issue(fake_id);
@@ -3046,12 +2955,9 @@ mod tests {
         #[test]
         fn test_load_issue_from_git_handles_invalid_json() {
             // Setup: Create git repo with invalid JSON committed
-            let (_temp_dir, repo_path) = setup_git_repo();
+            let (_temp_dir, repo_path, _storage) = setup_git_repo();
             let jit_dir = repo_path.join(".jit");
-            fs::create_dir_all(jit_dir.join("issues")).unwrap();
-
             let storage = JsonFileStorage::new(&jit_dir);
-            storage.init().unwrap();
 
             // Create invalid JSON file
             let issue_id = "11111111-1111-1111-1111-111111111111";
@@ -3096,9 +3002,7 @@ mod tests {
 
         #[test]
         fn test_index_v2_save_and_load() {
-            let temp_dir = TempDir::new().unwrap();
-            let storage = JsonFileStorage::new(temp_dir.path());
-            storage.init().unwrap();
+            let (_temp_dir, storage) = setup_storage();
 
             // Create index with deleted IDs
             let index = Index {
@@ -3119,17 +3023,6 @@ mod tests {
             assert!(loaded.all_ids.contains(&"issue-2".to_string()));
             assert_eq!(loaded.deleted_ids.len(), 1);
             assert!(loaded.deleted_ids.contains(&"issue-3".to_string()));
-        }
-
-        #[test]
-        fn test_init_creates_v2_index() {
-            let temp_dir = TempDir::new().unwrap();
-            let storage = JsonFileStorage::new(temp_dir.path());
-            storage.init().unwrap();
-
-            let index = storage.load_index().unwrap();
-            assert_eq!(index.schema_version, 2);
-            assert!(index.deleted_ids.is_empty());
         }
     }
 
@@ -3158,8 +3051,6 @@ mod tests {
                 .current_dir(outer.path())
                 .output()
                 .unwrap();
-
-            main_storage.init().unwrap();
 
             // Should detect as main worktree
             assert!(!main_storage.is_secondary_worktree());
@@ -3367,7 +3258,6 @@ mod tests {
         /// freshly-created `.jit`, returning the storage handle.
         fn storage_with_index_version(temp: &TempDir, version: u32) -> JsonFileStorage {
             let storage = JsonFileStorage::new(temp.path());
-            storage.init().unwrap();
             let index_path = temp.path().join(INDEX_FILE);
             let raw = format!(
                 "{{\n  \"schema_version\": {version},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
@@ -3385,9 +3275,7 @@ mod tests {
                 SUPPORTED_INDEX_SCHEMA_VERSION
             );
 
-            let temp_dir = TempDir::new().unwrap();
-            let storage = JsonFileStorage::new(temp_dir.path());
-            storage.init().unwrap();
+            let (_temp_dir, storage) = setup_storage();
             assert_eq!(
                 storage.load_index().unwrap().schema_version,
                 SUPPORTED_INDEX_SCHEMA_VERSION

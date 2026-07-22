@@ -21,7 +21,6 @@ use jit::storage::{InMemoryStorage, IssueStore};
 fn store_with_rules(rules_toml: &str) -> InMemoryStorage {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
-    storage.init().unwrap();
     std::fs::create_dir_all(storage.root()).unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
     storage

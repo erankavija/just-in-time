@@ -92,7 +92,14 @@ mod recovery_startup_tests {
     fn test_server_startup_recovers_committed_fresh_root_before_validation() {
         let temp = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root().join("issues")).unwrap();
+        std::fs::write(
+            storage.root().join("index.json"),
+            "{\n  \"all_ids\": [],\n  \"deleted_ids\": [],\n  \"schema_version\": 2\n}",
+        )
+        .unwrap();
+        std::fs::write(storage.root().join("gates.toml"), "").unwrap();
+        std::fs::write(storage.root().join("events.jsonl"), "").unwrap();
         let transaction = temp
             .path()
             .join(".jit-bootstrap/transactions/server-committed");

@@ -123,7 +123,6 @@ fn executor_with_rules_and_templates(
 ) -> CommandExecutor<InMemoryStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
-    storage.init().unwrap();
     std::fs::create_dir_all(storage.root()).unwrap();
     std::fs::write(storage.root().join("templates.toml"), templates_toml).unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
@@ -862,6 +861,7 @@ mod file_backed_external_plan {
     use super::{COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL};
     use jit::commands::CommandExecutor;
     use jit::domain::State;
+    use jit::hierarchy_templates::HierarchyTemplate;
     use jit::storage::{IssueStore, JsonFileStorage};
     use tempfile::TempDir;
 
@@ -873,12 +873,21 @@ mod file_backed_external_plan {
         std::env::set_var("JIT_TEST_MODE", "1");
         let repo_root = TempDir::new().unwrap();
         let jit_dir = repo_root.path().join(".jit");
-        let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
+        std::fs::create_dir(&jit_dir).unwrap();
+        std::fs::write(
+            jit_dir.join("config.toml"),
+            "[type_hierarchy]\ntypes = { epic = 2, planning = 3, breakdown = 3, task = 4 }\n",
+        )
+        .unwrap();
         std::fs::write(jit_dir.join("templates.toml"), PLAN_TEMPLATE_EXTERNAL).unwrap();
         std::fs::write(jit_dir.join("rules.toml"), COVERAGE_ON_EPIC).unwrap();
-        // A layout so the file-backed validation paths can capture the closed
-        // image they project plan-document content from.
+        let storage = JsonFileStorage::new(&jit_dir);
+        let layout =
+            jit::storage::discover_repository_layout(repo_root.path(), storage.root()).unwrap();
+        CommandExecutor::new(storage.clone())
+            .with_layout(layout)
+            .initialize_fresh_repository(repo_root.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         let layout =
             jit::storage::discover_repository_layout(repo_root.path(), storage.root()).unwrap();
         (repo_root, CommandExecutor::new(storage).with_layout(layout))

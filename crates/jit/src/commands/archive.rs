@@ -898,6 +898,7 @@ impl CommandExecutor<JsonFileStorage> {
 mod tests {
     use super::*;
     use crate::domain::{DocumentReference, State};
+    use crate::hierarchy_templates::HierarchyTemplate;
     use crate::storage::JsonFileStorage;
     use std::collections::HashMap;
     use std::fs;
@@ -976,12 +977,15 @@ mod tests {
     ) -> (TempDir, CommandExecutor<JsonFileStorage>, Vec<String>) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
             "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
         )
         .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), content).unwrap();
         let ids = (0..owner_count)
@@ -1286,12 +1290,15 @@ mod tests {
     fn test_execution_preserves_positive_relative_and_root_relative_multi_edge_layout() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
             "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"shared\"]\narchive_root = \"archive\"\n",
         )
         .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::create_dir(repo.path().join("shared")).unwrap();
         fs::write(
@@ -1354,12 +1361,15 @@ mod tests {
     fn test_publication_only_execution_records_one_event() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
             "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"archive\"\n",
         )
         .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         fs::create_dir(repo.path().join("docs")).unwrap();
         fs::write(repo.path().join("docs/permanent.md"), b"permanent").unwrap();
         let executor = executor(&repo, storage);
@@ -1386,12 +1396,15 @@ mod tests {
     fn test_preexisting_identical_permanent_copy_is_adopted_once_without_deletion() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
             "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"archive\"\n",
         )
         .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         fs::create_dir_all(repo.path().join("archive/docs")).unwrap();
         fs::create_dir(repo.path().join("docs")).unwrap();
         fs::write(repo.path().join("docs/permanent.md"), b"permanent").unwrap();
@@ -1480,12 +1493,15 @@ mod tests {
 
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
             "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n\n[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n[type_hierarchy.label_associations]\nepic = \"epic\"\n",
         )
         .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), b"shared").unwrap();
         git(repo.path(), &["init", "-q"]);
@@ -1531,7 +1547,7 @@ mod tests {
         let repo = TempDir::new().unwrap();
         let jit = repo.path().join(".jit");
         let storage = JsonFileStorage::new(&jit);
-        storage.init().unwrap();
+        fs::create_dir_all(&jit).unwrap();
         fs::write(
             jit.join("config.toml"),
             r#"
@@ -1547,6 +1563,9 @@ epic = "epic"
 "#,
         )
         .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
 
         fs::create_dir_all(repo.path().join("fixtures/bundle/theme")).unwrap();
         fs::write(
@@ -1642,7 +1661,14 @@ epic = "epic"
     fn test_preview_policy_statuses_remain_distinct_and_ineligible() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir_all(storage.root().join("issues")).unwrap();
+        fs::write(
+            storage.root().join("index.json"),
+            crate::repository_state::RepositoryIndex::default()
+                .to_pretty_bytes()
+                .unwrap(),
+        )
+        .unwrap();
         fs::write(repo.path().join("root.csv"), "a,b").unwrap();
         let executor = CommandExecutor::new(storage.clone());
         let unconfigured = executor.preview_archive_document("root.csv").unwrap();
@@ -1679,7 +1705,14 @@ epic = "epic"
     fn test_preview_every_partial_policy_is_incomplete_and_explicit_empty_is_configured() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir_all(storage.root().join("issues")).unwrap();
+        fs::write(
+            storage.root().join("index.json"),
+            crate::repository_state::RepositoryIndex::default()
+                .to_pretty_bytes()
+                .unwrap(),
+        )
+        .unwrap();
         fs::write(repo.path().join("root.csv"), "a,b").unwrap();
         let fields = [
             "managed_paths = []",
@@ -1766,12 +1799,15 @@ epic = "epic"
 
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
             "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
         )
         .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("real.md"), "[referent](secret.html)").unwrap();
         fs::write(repo.path().join("fixtures/secret.html"), "referent-only").unwrap();
@@ -1802,12 +1838,15 @@ epic = "epic"
 
         let regular_repo = TempDir::new().unwrap();
         let regular_storage = JsonFileStorage::new(regular_repo.path().join(".jit"));
-        regular_storage.init().unwrap();
+        fs::create_dir_all(regular_storage.root()).unwrap();
         fs::write(
             regular_storage.root().join("config.toml"),
             "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
         )
         .unwrap();
+        executor(&regular_repo, regular_storage.clone())
+            .initialize_fresh_repository(regular_repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         fs::create_dir(regular_repo.path().join("fixtures")).unwrap();
         fs::create_dir(regular_repo.path().join("real-archive")).unwrap();
         fs::write(regular_repo.path().join("fixtures/root.md"), "root").unwrap();
@@ -1826,12 +1865,15 @@ epic = "epic"
 
         let owner_repo = TempDir::new().unwrap();
         let owner_storage = JsonFileStorage::new(owner_repo.path().join(".jit"));
-        owner_storage.init().unwrap();
+        fs::create_dir_all(owner_storage.root()).unwrap();
         fs::write(
             owner_storage.root().join("config.toml"),
             "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
         )
         .unwrap();
+        executor(&owner_repo, owner_storage.clone())
+            .initialize_fresh_repository(owner_repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         fs::create_dir_all(owner_repo.path().join("docs")).unwrap();
         fs::create_dir_all(owner_repo.path().join("fixtures")).unwrap();
         fs::create_dir_all(owner_repo.path().join("referents")).unwrap();
@@ -1877,12 +1919,15 @@ epic = "epic"
     ) -> (TempDir, CommandExecutor<JsonFileStorage>, String) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
             "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
         )
         .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), content).unwrap();
         let mut container = crate::domain::types::fixture_issue("Container".into(), String::new());

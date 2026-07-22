@@ -1,4 +1,5 @@
 use jit::config::JitConfig;
+use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit::CommandExecutor;
 use tempfile::TempDir;
@@ -86,13 +87,16 @@ fn test_orphan_warning_is_unconditional_in_default_ruleset() {
     // warns. A repo that wants them silenced edits rules.toml.
     let temp_dir = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp_dir.path().join(".jit"));
-    storage.init().unwrap();
+    let initial_layout =
+        jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(initial_layout)
+        .initialize_fresh_repository(temp_dir.path(), &HierarchyTemplate::default(), None)
+        .unwrap();
 
-    // Remove the scaffolded rules.toml so we exercise the in-memory defaults.
-    let rules_path = storage.root().join("rules.toml");
-    if rules_path.exists() {
-        std::fs::remove_file(&rules_path).unwrap();
-    }
+    // Remove only rules.toml so the command derives the in-memory defaults from
+    // an otherwise canonically initialized repository.
+    std::fs::remove_file(storage.root().join("rules.toml")).unwrap();
 
     let layout = jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
     let executor = CommandExecutor::new(storage).with_layout(layout);

@@ -44,6 +44,7 @@
 //!   file duplicates either `D-01` or `RISK-01`.
 
 use jit::commands::CommandExecutor;
+use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::{IssueStore, JsonFileStorage};
 use serde_json::Value;
 use std::path::Path;
@@ -109,8 +110,6 @@ fn default_executor_with(
 ) -> (CommandExecutor<JsonFileStorage>, Vec<String>) {
     let jit_dir = repo.join(".jit");
     std::fs::create_dir_all(&jit_dir).unwrap();
-    let storage = JsonFileStorage::new(&jit_dir);
-    storage.init().unwrap();
     std::fs::write(
         jit_dir.join("config.toml"),
         "[item_kinds.decision]\n\
@@ -129,14 +128,21 @@ fn default_executor_with(
          source-of-truth = \"markdown-first\"\n",
     )
     .unwrap();
+    let storage = JsonFileStorage::new(&jit_dir);
+    let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .initialize_fresh_repository(repo, &HierarchyTemplate::default(), None)
+        .unwrap();
+    let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
+    let executor = CommandExecutor::new(storage).with_layout(layout);
     let mut shorts = Vec::new();
     for (title, body) in issues {
         let issue = crate::fixture_issue(title.to_string(), body.to_string());
         shorts.push(issue.short_id());
-        storage.save_issue(issue).unwrap();
+        executor.storage().save_issue(issue).unwrap();
     }
-    let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
-    (CommandExecutor::new(storage).with_layout(layout), shorts)
+    (executor, shorts)
 }
 
 #[test]

@@ -13,7 +13,16 @@ use tempfile::TempDir;
 fn setup_test_repo() -> (TempDir, CommandExecutor<JsonFileStorage>) {
     let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path().join(".jit"));
-    storage.init().unwrap();
+    let initial_layout =
+        jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(initial_layout)
+        .initialize_fresh_repository(
+            temp.path(),
+            &jit::hierarchy_templates::HierarchyTemplate::default(),
+            None,
+        )
+        .unwrap();
     let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
     let executor = CommandExecutor::new(storage).with_layout(layout);
     (temp, executor)

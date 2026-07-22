@@ -1254,7 +1254,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// std::env::set_var("JIT_TEST_MODE", "1"); // skip the main-history guard
     /// let storage = InMemoryStorage::new();
-    /// storage.init().unwrap();
     /// storage.write_repo_file(".jit/config.toml", "").unwrap();
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
@@ -1555,7 +1554,6 @@ mod tests {
 
     fn setup() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         // Create config with enforcement off for test backward compatibility
         let config_toml = r#"
@@ -1907,7 +1905,6 @@ enforce_leases = "off"
             crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
         ))));
         let storage = InMemoryStorage::with_repository_state_failures(failures);
-        storage.init().unwrap();
         storage
             .write_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n")
             .unwrap();

@@ -521,12 +521,6 @@ impl Default for InMemoryStorage {
 }
 
 impl IssueStore for InMemoryStorage {
-    fn init(&self) -> Result<()> {
-        // In-memory storage is already initialized
-        // Configuration is managed by ConfigManager
-        Ok(())
-    }
-
     fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard> {
         self.repo_lock.acquire()
     }
@@ -852,13 +846,6 @@ mod tests {
     }
 
     #[test]
-    fn test_init_is_noop() {
-        let storage = InMemoryStorage::new();
-        storage.init().unwrap();
-        storage.init().unwrap(); // Should be idempotent
-    }
-
-    #[test]
     fn test_gate_run_readers_match_only_exact_result_shape_and_name_malformed_path() {
         let storage = InMemoryStorage::new();
         let nested = VirtualPath::data("gate-runs/outer/nested/result.json").unwrap();
@@ -1025,7 +1012,6 @@ mod tests {
     #[test]
     fn test_save_and_load_issue() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let issue =
             crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
@@ -1040,7 +1026,6 @@ mod tests {
     #[test]
     fn test_save_updates_existing_issue() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let mut issue =
             crate::domain::types::fixture_issue("Original".to_string(), "Desc".to_string());
@@ -1060,7 +1045,6 @@ mod tests {
     #[test]
     fn test_load_nonexistent_issue_fails() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let result = storage.load_issue("nonexistent");
         assert!(result.is_err());
@@ -1070,7 +1054,6 @@ mod tests {
     #[test]
     fn test_list_issues() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let issue1 =
             crate::domain::types::fixture_issue("Issue 1".to_string(), "First".to_string());
@@ -1091,7 +1074,6 @@ mod tests {
     #[test]
     fn test_list_issues_empty() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let issues = storage.list_issues().unwrap();
         assert_eq!(issues.len(), 0);
@@ -1100,7 +1082,6 @@ mod tests {
     #[test]
     fn test_gate_registry_operations() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let registry = storage.load_gate_registry().unwrap();
         assert_eq!(registry.gates.len(), 0);
@@ -1131,7 +1112,6 @@ mod tests {
     #[test]
     fn test_event_log_operations() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let issue =
             crate::domain::types::fixture_issue("Event test".to_string(), "Test".to_string());
@@ -1147,7 +1127,6 @@ mod tests {
     #[test]
     fn test_multiple_events() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), "Test".to_string());
         let issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), "Test".to_string());
@@ -1166,7 +1145,6 @@ mod tests {
     #[test]
     fn test_clone_shares_storage() {
         let storage1 = InMemoryStorage::new();
-        storage1.init().unwrap();
 
         let issue1 =
             crate::domain::types::fixture_issue("Issue 1".to_string(), "In storage 1".to_string());
@@ -1207,7 +1185,6 @@ mod tests {
     #[test]
     fn test_works_with_complex_issue_state() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let mut issue =
             crate::domain::types::fixture_issue("Complex".to_string(), "Test".to_string());
@@ -1234,7 +1211,6 @@ mod tests {
         use crate::storage::PathReadError;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         // Pass a repo-relative path that does not exist on disk.  The synthetic
         // root points at `/tmp/jit-test-{uuid}` which normally doesn't exist,
@@ -1255,7 +1231,6 @@ mod tests {
         use crate::storage::PathReadError;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let result = storage.read_path_bytes("/etc/passwd", None);
         assert!(
@@ -1269,7 +1244,6 @@ mod tests {
         use crate::storage::PathReadError;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let result = storage.read_path_bytes("../etc/passwd", None);
         assert!(
@@ -1283,7 +1257,6 @@ mod tests {
         use crate::storage::PathReadError;
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let result = storage.read_path_bytes("", None);
         assert!(

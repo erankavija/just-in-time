@@ -745,7 +745,6 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     std::env::set_var("JIT_TEST_MODE", "1");
     let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path());
-    storage.init().unwrap();
     std::fs::write(storage.root().join("config.toml"), "").unwrap();
     let layout =
         jit::storage::discover_repository_layout(temp.path().parent().unwrap(), storage.root())

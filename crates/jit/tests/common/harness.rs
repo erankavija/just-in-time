@@ -23,7 +23,6 @@ impl TestHarness {
         std::env::set_var("JIT_TEST_MODE", "1");
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         // Session-backed declaration mutations capture config from the same
         // aggregate image as gates/events; an empty file is the minimal valid
         // repository declaration set for generic harness tests.

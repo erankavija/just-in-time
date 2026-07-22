@@ -1057,6 +1057,19 @@ mod tests {
         Arc::new(CommandExecutor::new(storage).with_layout(layout))
     }
 
+    fn initialize_file_backed_test_repository(worktree_root: &std::path::Path) {
+        use jit::hierarchy_templates::HierarchyTemplate;
+        use jit::storage::JsonFileStorage;
+
+        let storage = JsonFileStorage::new(worktree_root.join(".jit"));
+        let layout =
+            jit::storage::discover_repository_layout(worktree_root, storage.root()).unwrap();
+        CommandExecutor::new(storage)
+            .with_layout(layout)
+            .initialize_fresh_repository(worktree_root, &HierarchyTemplate::default(), None)
+            .unwrap();
+    }
+
     fn create_test_app() -> TestServer {
         let storage = InMemoryStorage::new();
         let executor = test_executor(storage);
@@ -1155,6 +1168,7 @@ mod tests {
 enforce_leases = "off"
 "#;
         std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+        storage.add_repo_file(".jit/config.toml", config_toml);
 
         let executor = test_executor(storage);
 
@@ -1215,6 +1229,7 @@ enforce_leases = "off"
             "[worktree]\nenforce_leases = \"off\"\n",
         )
         .unwrap();
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
 
         let executor = test_executor(storage);
         let new = |title: &str| {
@@ -1264,6 +1279,7 @@ enforce_leases = "off"
             "[worktree]\nenforce_leases = \"off\"\n",
         )
         .unwrap();
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
 
         let executor = test_executor(storage);
         let new = |title: &str, labels: Vec<String>| {
@@ -1483,14 +1499,14 @@ enforce_leases = "off"
 
     #[tokio::test]
     async fn test_get_namespaces_exposes_taxonomy_only() {
-        use jit::storage::{IssueStore, JsonFileStorage};
+        use jit::storage::JsonFileStorage;
 
         // A file-backed storage with a config.toml carrying both the taxonomy
         // keys and (stale, ignored) constraint keys, so the response contract
         // (mirror of CLI config show --json) stays protected against drift.
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        std::fs::create_dir(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         std::fs::write(
             jit_dir.join("config.toml"),
             r#"
@@ -1508,7 +1524,6 @@ pattern = '^v\d+\.\d+$'
         )
         .unwrap();
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1560,7 +1575,7 @@ pattern = '^v\d+\.\d+$'
         // Set up a real tempdir acting as repo root with a .jit subdir.
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
 
         // Write a permissive config so the executor is happy.
         fs::write(
@@ -1579,7 +1594,6 @@ pattern = '^v\d+\.\d+$'
         fs::write(&doc_abs, doc_content).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
 
         let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
@@ -1659,7 +1673,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
 
         // Write a permissive config so the executor is happy.
         fs::write(
@@ -1669,7 +1683,6 @@ pattern = '^v\d+\.\d+$'
         .unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
 
         let executor = test_executor(storage);
 
@@ -1781,7 +1794,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -1789,7 +1802,6 @@ pattern = '^v\d+\.\d+$'
         .unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
 
         let (id, _) = executor
@@ -1851,7 +1863,7 @@ pattern = '^v\d+\.\d+$'
         // repo-relative path.
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -1863,7 +1875,6 @@ pattern = '^v\d+\.\d+$'
         fs::write(temp.path().join(doc_rel), html_body).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
         Box::leak(Box::new(temp));
 
@@ -2011,7 +2022,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2025,7 +2036,6 @@ pattern = '^v\d+\.\d+$'
         fs::create_dir_all(temp.path().join(dir_rel)).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
         // Keep tempdir alive.
         Box::leak(Box::new(temp));
@@ -2057,7 +2067,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2068,7 +2078,6 @@ pattern = '^v\d+\.\d+$'
         fs::create_dir_all(temp.path().join(dir_rel)).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
         Box::leak(Box::new(temp));
 
@@ -2108,7 +2117,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2124,7 +2133,6 @@ pattern = '^v\d+\.\d+$'
         let doc_rel = "broken-doc";
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
 
         let (id, _) = executor
@@ -2174,7 +2182,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2182,7 +2190,6 @@ pattern = '^v\d+\.\d+$'
         .unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
 
         let doc_rel = "bench/results.csv";
@@ -2242,7 +2249,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2255,7 +2262,6 @@ pattern = '^v\d+\.\d+$'
         let doc_rel = "broken-raw-doc";
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
 
         let (id, _) = executor
@@ -2301,7 +2307,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2309,7 +2315,6 @@ pattern = '^v\d+\.\d+$'
         .unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
 
         let doc_rel = "bench/results.csv";
@@ -2501,7 +2506,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2516,7 +2521,6 @@ pattern = '^v\d+\.\d+$'
         fs::write(&abs_path, content).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -2649,7 +2653,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2657,7 +2661,6 @@ pattern = '^v\d+\.\d+$'
         .unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
 
         let (id, _) = executor
@@ -2751,7 +2754,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2768,7 +2771,6 @@ pattern = '^v\d+\.\d+$'
         unix_fs::symlink(outside.path(), &link_path).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -2803,7 +2805,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2824,7 +2826,6 @@ pattern = '^v\d+\.\d+$'
         unix_fs::symlink(outside.path(), &link_path).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
         let (id, _) = executor
             .create_issue(
@@ -2873,7 +2874,7 @@ pattern = '^v\d+\.\d+$'
 
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
+        initialize_file_backed_test_repository(temp.path());
         fs::write(
             jit_dir.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2890,7 +2891,6 @@ pattern = '^v\d+\.\d+$'
         unix_fs::symlink(outside.path(), &link_path).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
-        storage.init().unwrap();
         let executor = test_executor(storage);
 
         let tracker = Arc::new(ChangeTracker::new(16));

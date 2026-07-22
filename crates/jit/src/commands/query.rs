@@ -211,10 +211,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ```
     /// use jit::commands::CommandExecutor;
     /// use jit::domain::{Priority, State};
-    /// use jit::storage::{InMemoryStorage, IssueStore};
+    /// use jit::storage::InMemoryStorage;
     ///
     /// let storage = InMemoryStorage::new();
-    /// storage.init().unwrap();
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let (done, _) = executor

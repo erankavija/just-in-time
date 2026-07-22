@@ -81,7 +81,6 @@ mod tests {
     #[test]
     fn test_add_label_recaptures_after_concurrent_issue_change() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         let executor = memory_executor(storage.clone());
         let id = create_issue(&executor, "Label race");
 
@@ -100,7 +99,6 @@ mod tests {
     #[test]
     fn test_add_label_preserves_unchecked_duplicate_append_behavior() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         let executor = memory_executor(storage.clone());
         let id = create_issue(&executor, "Duplicate label");
 

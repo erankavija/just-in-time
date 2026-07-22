@@ -1149,7 +1149,6 @@ mod captured_tests {
     #[test]
     fn test_dependency_add_rederives_and_preserves_concurrent_issue_change() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let dependency = crate::domain::types::fixture_issue("dependency".into(), String::new());
         let dependency_id = dependency.id.clone();
@@ -1303,7 +1302,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_single_removal_rejects_dependency_prefix_that_becomes_ambiguous() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut dependency = crate::domain::types::fixture_issue("dep".into(), String::new());
         dependency.id = "22221111111111111111111111111111".to_string();
@@ -1343,7 +1341,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_single_removal_rejects_dependency_deleted_between_phases() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut dependency = crate::domain::types::fixture_issue("dep".into(), String::new());
         dependency.id = "22221111111111111111111111111111".to_string();

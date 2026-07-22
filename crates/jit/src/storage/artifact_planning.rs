@@ -251,7 +251,7 @@ mod tests {
     ) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        fs::create_dir(storage.root()).unwrap();
         fs::create_dir_all(repo.path().join("archive/sub")).unwrap();
         fs::write(repo.path().join("archive/sub/nested.md"), "nested").unwrap();
         fs::create_dir(repo.path().join("outside")).unwrap();

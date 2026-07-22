@@ -101,12 +101,13 @@ applies_to  = ["epic"]
 "#;
 
 /// An executor over an isolated repository whose `.jit/templates.toml` holds
-/// `templates_toml`. No `config.toml`: the bindings and the bracket vocabulary
-/// come entirely from the template registry.
+/// `templates_toml`. The neutral `config.toml` makes the captured repository
+/// complete; the bindings and bracket vocabulary still come entirely from the
+/// template registry.
 fn executor_with_templates(templates_toml: &str) -> CommandExecutor<InMemoryStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
-    storage.init().unwrap();
+    crate::seed_memory_data_file(&storage, "config.toml", "");
     crate::seed_memory_data_file(&storage, "templates.toml", templates_toml);
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
@@ -280,7 +281,6 @@ fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
 fn test_container_anchor_defaults_without_a_templates_file() {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
-    storage.init().unwrap();
     let layout = storage.repository_layout();
     let executor = CommandExecutor::new(storage).with_layout(layout);
     assert_eq!(executor.container_anchor().unwrap(), "container");

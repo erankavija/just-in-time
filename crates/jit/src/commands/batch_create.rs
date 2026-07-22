@@ -486,7 +486,6 @@ mod tests {
 
     fn executor() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         crate::commands::test_helpers::memory_executor(storage)
     }

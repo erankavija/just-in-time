@@ -400,6 +400,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hierarchy_templates::HierarchyTemplate;
 
     #[test]
     fn test_resolve_dotted_key_scalar_leaf() {
@@ -601,11 +602,17 @@ schema = 1
         // A repo `config set` publishes through the recovered session and validates
         // the proposed repository, so it needs an initialized, layout-backed repo.
         let storage = crate::storage::JsonFileStorage::new(dir.path());
-        crate::storage::IssueStore::init(&storage).unwrap();
         let layout =
             crate::storage::discover_repository_layout(dir.path().parent().unwrap(), dir.path())
                 .unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
+        executor
+            .initialize_fresh_repository(
+                dir.path().parent().unwrap(),
+                &HierarchyTemplate::default(),
+                None,
+            )
+            .unwrap();
 
         // A recognized level is accepted and persisted.
         executor

@@ -405,10 +405,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ```
     /// use jit::commands::CommandExecutor;
     /// use jit::domain::Priority;
-    /// use jit::storage::{InMemoryStorage, IssueStore};
+    /// use jit::storage::InMemoryStorage;
     ///
     /// let storage = InMemoryStorage::new();
-    /// storage.init().unwrap();
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str| {
@@ -459,10 +458,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ```
     /// use jit::commands::CommandExecutor;
     /// use jit::domain::{Priority, State};
-    /// use jit::storage::{InMemoryStorage, IssueStore};
+    /// use jit::storage::InMemoryStorage;
     ///
     /// let storage = InMemoryStorage::new();
-    /// storage.init().unwrap();
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str| {
@@ -880,7 +878,6 @@ mod tests {
 
     fn setup() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         // Create config with enforcement off for test backward compatibility
         let config_toml = r#"
@@ -1233,7 +1230,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_claim_rechecks_ready_precheck_classification_after_preflight_race() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut registry = storage.load_gate_registry().unwrap();
         registry.gates.insert(
@@ -1979,7 +1975,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_delete_issue_retries_when_lease_mode_changes_after_preflight() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let issue = crate::domain::types::fixture_issue("Doomed".into(), String::new());
         let issue_id = issue.id.clone();
@@ -2014,7 +2009,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_delete_issue_rechecks_ambiguous_target_after_preflight() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut target = crate::domain::types::fixture_issue("Target".into(), String::new());
         target.id = "22221111111111111111111111111111".to_string();
@@ -2048,7 +2042,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
         ))));
         let storage = InMemoryStorage::with_repository_state_failures(failures);
-        storage.init().unwrap();
         storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let recovered = storage.without_repository_state_failures();
         let layout = storage.repository_layout();

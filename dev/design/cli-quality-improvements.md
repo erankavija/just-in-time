@@ -275,24 +275,23 @@ Extract to shared test utilities module.
 use anyhow::Result;
 use std::fs;
 use tempfile::TempDir;
-use crate::storage::{JsonFileStorage, WorktreePaths};
+use crate::commands::CommandExecutor;
+use crate::hierarchy_templates::HierarchyTemplate;
+use crate::storage::{discover_repository_layout, JsonFileStorage, WorktreePaths};
 
 /// Standard test repository setup
 pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     let temp = TempDir::new()?;
     
-    // Create .jit directory
+    // Initialize the repository through an explicit recovered layout
     let jit_root = temp.path().join(".jit");
-    fs::create_dir_all(&jit_root)?;
-    
-    // Create .git directory
-    let git_dir = temp.path().join(".git");
-    fs::create_dir_all(&git_dir)?;
-    
-    // Initialize storage
     let storage = JsonFileStorage::new(&jit_root);
-    storage.init()?;
-    
+    let layout = discover_repository_layout(temp.path(), &jit_root)?;
+    CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)?;
+
+    fs::create_dir(temp.path().join(".git"))?;
     Ok((temp, storage))
 }
 
@@ -306,16 +305,6 @@ pub fn create_test_paths(temp: &TempDir) -> WorktreePaths {
     }
 }
 
-/// Create a test issue
-pub fn create_test_issue(
-    storage: &JsonFileStorage,
-    title: &str
-) -> Result<String> {
-    let issue = Issue::new(title.to_string(), "Test description".to_string());
-    let issue_id = issue.id.clone();
-    storage.save_issue(&issue)?;
-    Ok(issue_id)
-}
 ```
 
 **Migration:**

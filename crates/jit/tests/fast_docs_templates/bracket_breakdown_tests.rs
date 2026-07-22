@@ -644,7 +644,6 @@ types = { epic = 1, planning = 2, breakdown = 2, task = 3 }
 fn executor_with_templates() -> CommandExecutor<InMemoryStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
-    storage.init().unwrap();
     crate::seed_memory_data_file(&storage, "config.toml", CONFIG_TOML);
     crate::seed_memory_data_file(&storage, "templates.toml", TEMPLATES_TOML);
     let layout = storage.repository_layout();

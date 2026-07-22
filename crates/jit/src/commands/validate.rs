@@ -2422,6 +2422,7 @@ fn validate_claims_index_with_paths(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hierarchy_templates::HierarchyTemplate;
     use crate::storage::JsonFileStorage;
     use chrono::Duration;
 
@@ -2433,8 +2434,17 @@ mod tests {
     fn test_validate_silent_file_backend_reports_missing_index_through_captured_image() {
         let repo = tempfile::tempdir().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
-        std::fs::remove_file(repo.path().join(".jit/index.json")).unwrap();
+        std::fs::create_dir_all(repo.path().join(".jit/issues")).unwrap();
+        std::fs::write(repo.path().join(".jit/config.toml"), "").unwrap();
+        std::fs::write(
+            repo.path().join(".jit/gates.toml"),
+            crate::declarations::serialize_gate_registry(
+                &crate::declarations::GateRegistry::default(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        std::fs::write(repo.path().join(".jit/events.jsonl"), "").unwrap();
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
@@ -2450,13 +2460,26 @@ mod tests {
     #[test]
     fn test_validate_fix_repairs_stale_derived_projection_through_the_session() {
         let repo = tempfile::tempdir().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
+        let jit_dir = repo.path().join(".jit");
+        std::fs::create_dir(&jit_dir).unwrap();
+        std::fs::write(
+            jit_dir.join("config.toml"),
+            "[type_hierarchy.types]\ntask = 4\n\
+             [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
         let config = "[type_hierarchy.types]\ntask = 4\n\
             [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n\
             [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = []\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
             [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n";
-        std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        CommandExecutor::new(storage.clone())
+            .with_layout(layout)
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
+        std::fs::write(jit_dir.join("config.toml"), config).unwrap();
         std::fs::write(
             repo.path().join(".jit/invariants.toml"),
             "[[invariants]]\nid = \"sample\"\nstatement = \"Stay acyclic.\"\nkind = \"advisory\"\n",
@@ -2493,7 +2516,6 @@ mod tests {
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         storage.add_repo_file(
             ".jit/config.toml",
             "[worktree]\nenforce_leases = \"off\"\n\
@@ -2531,7 +2553,6 @@ mod tests {
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         let executor = memory_executor(storage.clone());
         let id = executor
             .create_issue(
@@ -2664,7 +2685,6 @@ source-of-truth = \"registry-first\"
     /// canonical `[item_kinds]` table, seeded with `issues`.
     fn dangling_exec(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         storage.add_repo_file(".jit/config.toml", CANONICAL_ITEM_KINDS);
@@ -2684,7 +2704,6 @@ source-of-truth = \"registry-first\"
     /// isolating the dangling-item-link pass as the validation failure.
     fn dangling_exec_with_namespaces(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         // Invariant registry through the storage boundary (descriptor path); the
         // `config.toml` is parsed from the real `.jit` root by `cached_config`.
@@ -2766,7 +2785,6 @@ description = \"Full Rust CI pipeline must pass.\"
     /// pass for `enforces:@/rule/<name>` and `enforces:@/gate/<key>` labels.
     fn dangling_exec_with_rules_and_gates(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         let config = format!("{CANONICAL_ITEM_KINDS}\n{RULE_AND_GATE_ITEM_KINDS}");
         std::fs::write(storage.root().join("config.toml"), config).unwrap();

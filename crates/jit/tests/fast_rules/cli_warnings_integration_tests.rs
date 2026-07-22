@@ -7,6 +7,7 @@
 //! the rule engine.
 
 use jit::commands::CommandExecutor;
+use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit::validation::graph::GraphFinding;
 use tempfile::TempDir;
@@ -14,7 +15,12 @@ use tempfile::TempDir;
 fn setup_test_repo() -> (TempDir, CommandExecutor<JsonFileStorage>) {
     let temp_dir = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp_dir.path().join(".jit"));
-    storage.init().unwrap();
+    let initial_layout =
+        jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(initial_layout)
+        .initialize_fresh_repository(temp_dir.path(), &HierarchyTemplate::default(), None)
+        .unwrap();
     let layout = jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
     (temp_dir, CommandExecutor::new(storage).with_layout(layout))
 }

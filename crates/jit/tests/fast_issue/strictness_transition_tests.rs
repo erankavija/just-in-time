@@ -41,7 +41,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 fn executor(strictness: &str, rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
-    storage.init().unwrap();
     storage.add_repo_file(
         ".jit/config.toml",
         &format!("[validation]\nstrictness = \"{strictness}\"\n"),

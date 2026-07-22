@@ -81,11 +81,6 @@ pub use memory::InMemoryStorage;
 /// storage implementation. Implementations must be `Clone` to support shared
 /// access patterns.
 pub trait IssueStore: Clone {
-    /// Initialize the storage backend (idempotent).
-    ///
-    /// Creates necessary directories, files, or database tables.
-    fn init(&self) -> Result<()>;
-
     /// Acquire this backend's repository-wide write lock, held until the returned
     /// guard drops.
     ///
@@ -398,10 +393,7 @@ mod tests {
     /// Test that JsonFileStorage implements IssueStore correctly
     #[test]
     fn test_json_storage_implements_trait() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let storage = JsonFileStorage::new(temp_dir.path());
-
-        storage.init().unwrap();
+        let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
 
         let issue =
             crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
@@ -415,8 +407,6 @@ mod tests {
     #[test]
     fn test_trait_save_and_load() {
         fn test_with_storage<S: IssueStore>(storage: S) {
-            storage.init().unwrap();
-
             let mut issue =
                 crate::domain::types::fixture_issue("Trait test".to_string(), "Works".to_string());
             issue.priority = Priority::High;
@@ -431,16 +421,14 @@ mod tests {
         }
 
         // Test with both backends
-        let temp_dir = tempfile::tempdir().unwrap();
-        test_with_storage(JsonFileStorage::new(temp_dir.path()));
+        let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
+        test_with_storage(storage);
         test_with_storage(InMemoryStorage::new());
     }
 
     #[test]
     fn test_trait_restore_issue_verbatim_preserves_updated_at() {
         fn test_with_storage<S: IssueStore>(storage: S) {
-            storage.init().unwrap();
-
             let seed =
                 crate::domain::types::fixture_issue("Snapshot".to_string(), "Original".to_string());
             storage.save_issue(seed.clone()).unwrap();
@@ -465,16 +453,14 @@ mod tests {
 
         // Both backends must agree, or an in-memory atomicity test says nothing
         // about what a failed apply leaves in `.jit/issues/<id>.json`.
-        let temp_dir = tempfile::tempdir().unwrap();
-        test_with_storage(JsonFileStorage::new(temp_dir.path()));
+        let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
+        test_with_storage(storage);
         test_with_storage(InMemoryStorage::new());
     }
 
     #[test]
     fn test_trait_list_issues() {
         fn test_with_storage<S: IssueStore>(storage: S) {
-            storage.init().unwrap();
-
             let issue1 =
                 crate::domain::types::fixture_issue("Issue 1".to_string(), "First".to_string());
             let issue2 =
@@ -492,16 +478,14 @@ mod tests {
         }
 
         // Test with both backends
-        let temp_dir = tempfile::tempdir().unwrap();
-        test_with_storage(JsonFileStorage::new(temp_dir.path()));
+        let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
+        test_with_storage(storage);
         test_with_storage(InMemoryStorage::new());
     }
 
     #[test]
     fn test_trait_gate_registry() {
         fn test_with_storage<S: IssueStore>(storage: S) {
-            storage.init().unwrap();
-
             let registry = storage.load_gate_registry().unwrap();
             assert_eq!(registry.gates.len(), 0);
 
@@ -529,16 +513,14 @@ mod tests {
         }
 
         // Test with both backends
-        let temp_dir = tempfile::tempdir().unwrap();
-        test_with_storage(JsonFileStorage::new(temp_dir.path()));
+        let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
+        test_with_storage(storage);
         test_with_storage(InMemoryStorage::new());
     }
 
     #[test]
     fn test_trait_event_log() {
         fn test_with_storage<S: IssueStore>(storage: S) {
-            storage.init().unwrap();
-
             let issue =
                 crate::domain::types::fixture_issue("Event test".to_string(), "Test".to_string());
             let event = Event::draft_issue_created(&issue);
@@ -552,8 +534,8 @@ mod tests {
         }
 
         // Test with both backends
-        let temp_dir = tempfile::tempdir().unwrap();
-        test_with_storage(JsonFileStorage::new(temp_dir.path()));
+        let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
+        test_with_storage(storage);
         test_with_storage(InMemoryStorage::new());
     }
 }

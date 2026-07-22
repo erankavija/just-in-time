@@ -647,7 +647,6 @@ mod tests {
     #[test]
     fn test_resolution_refuses_a_prefix_below_the_projected_minimum() {
         let storage = InMemoryStorage::new();
-        storage.init().expect("in-memory storage initializes");
         let issue = crate::domain::types::fixture_issue("Probe".to_string(), String::new());
         let id = issue.id.clone();
         storage.save_issue(issue).expect("the issue saves");
@@ -686,7 +685,6 @@ mod tests {
     #[test]
     fn test_full_id_resolves_only_in_canonical_form() {
         let storage = InMemoryStorage::new();
-        storage.init().expect("in-memory storage initializes");
         let issue = crate::domain::types::fixture_issue("Probe".to_string(), String::new());
         let id = issue.id.clone();
         storage.save_issue(issue).expect("the issue saves");

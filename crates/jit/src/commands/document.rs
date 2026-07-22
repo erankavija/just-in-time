@@ -1518,7 +1518,6 @@ mod tests {
     #[test]
     fn test_document_rescan_uses_image_and_identical_inventory_is_noop() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         let mut issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
         issue.documents.push(DocumentReference {
             path: "docs/guide.md".into(),
@@ -1557,7 +1556,6 @@ mod tests {
     #[test]
     fn test_document_add_retry_rederives_assets_and_preserves_unrelated_issue_changes() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         let mut issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
         issue.documents.push(DocumentReference {
             path: "docs/other.md".into(),
@@ -1709,7 +1707,6 @@ mod tests {
     #[test]
     fn test_document_add_preserves_typed_invalid_path_error() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         let issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
         let id = issue.id.clone();
         storage.save_issue(issue).unwrap();

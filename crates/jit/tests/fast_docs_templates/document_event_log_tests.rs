@@ -233,6 +233,7 @@ fn test_add_document_reference_new_path_appends() {
 #[test]
 fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
     use jit::commands::CommandExecutor;
+    use jit::hierarchy_templates::HierarchyTemplate;
     use jit::storage::{discover_repository_layout, JsonFileStorage};
     use sha2::{Digest, Sha256};
 
@@ -264,12 +265,16 @@ fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
         .to_string();
 
     let storage = JsonFileStorage::new(temp.path().join(".jit"));
-    storage.init().unwrap();
+    let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .unwrap();
+    let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
+    let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
     let issue = crate::fixture_issue("Pinned docs".into(), String::new());
     let id = issue.id.clone();
     storage.save_issue(issue).unwrap();
-    let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
-    let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
 
     std::fs::write(
         temp.path().join("docs/guide.md"),
@@ -323,18 +328,23 @@ fn test_add_document_rejects_asset_closure_over_fixed_budget_without_writes() {
 #[test]
 fn test_add_document_rejects_malformed_utf8_without_writes() {
     use jit::commands::CommandExecutor;
+    use jit::hierarchy_templates::HierarchyTemplate;
     use jit::storage::{discover_repository_layout, JsonFileStorage};
 
     let temp = tempfile::tempdir().unwrap();
     let storage = JsonFileStorage::new(temp.path().join(".jit"));
-    storage.init().unwrap();
+    let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .unwrap();
+    let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
+    let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
     let issue = crate::fixture_issue("Malformed document".into(), String::new());
     let id = issue.id.clone();
     storage.save_issue(issue).unwrap();
     std::fs::create_dir_all(temp.path().join("docs")).unwrap();
     std::fs::write(temp.path().join("docs/guide.md"), [0xff, 0xfe]).unwrap();
-    let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
-    let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
     let issue_before = storage.load_issue(&id).unwrap();
     let events_before = storage.read_events().unwrap();
 

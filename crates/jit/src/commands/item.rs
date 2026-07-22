@@ -607,7 +607,6 @@ source-of-truth = \"registry-first\"
 
     fn executor_with(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         for issue in issues {
@@ -626,7 +625,6 @@ source-of-truth = \"registry-first\"
         source_md: Option<&str>,
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         let config = format!(
             "[project]\n\
@@ -727,7 +725,6 @@ source-of-truth = \"registry-first\"
         issues: Vec<Issue>,
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         let config = format!(
             "[item_kinds.glossary]\n\
@@ -825,7 +822,6 @@ source-of-truth = \"registry-first\"
         gates_md: Option<&str>,
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(
             storage.root().join("config.toml"),
@@ -1067,7 +1063,6 @@ source-of-truth = \"registry-first\"
         // boundary, so `@/<kind>/<id>` resolution surfaces a typed InvalidPath error
         // rather than reading a file outside the repository.
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(
             storage.root().join("config.toml"),
@@ -1096,7 +1091,6 @@ source-of-truth = \"registry-first\"
     fn test_project_items_rejects_absolute_source() {
         // Path-safety: an absolute source path is rejected by the storage boundary.
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(
             storage.root().join("config.toml"),
@@ -1128,7 +1122,6 @@ source-of-truth = \"registry-first\"
     /// same path a descriptor-backed `invariant` kind routes through.
     fn policy_exec(policies_toml: Option<&str>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         let config = "[item_kinds.policy]\n\
              section = \"success_criteria\"\n\
@@ -1217,7 +1210,6 @@ statement = \"Every dependency edge stays acyclic.\"
         issues: Vec<Issue>,
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         storage.add_repo_file(".jit/invariants.toml", invariants_toml);
@@ -1233,7 +1225,6 @@ statement = \"Every dependency edge stays acyclic.\"
     /// the same pattern [`registry_exec`] establishes for invariants.
     fn registry_exec_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         storage.add_repo_file(".jit/rules.toml", rules_toml);
@@ -1353,7 +1344,6 @@ source-of-truth = \"registry-first\"
     /// rules.
     fn registry_exec_with_gates(gates_toml: &str) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), GATE_ITEM_KIND).unwrap();
         storage.add_repo_file(".jit/gates.toml", gates_toml);
@@ -1441,7 +1431,6 @@ stage = \"postcheck\"
         gates_toml: &str,
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         let config = format!("{CANONICAL_ITEM_KINDS}\n{GATE_ITEM_KIND}");
         std::fs::write(storage.root().join("config.toml"), config).unwrap();
@@ -1551,7 +1540,6 @@ stage = \"postcheck\"
         issues: Vec<Issue>,
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), config).unwrap();
         if let Some(inv) = invariants_toml {

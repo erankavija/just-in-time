@@ -41,7 +41,6 @@ assert = { require-label = { label = "req:*", min = 1 } }
 /// Leases are disabled so the write path does not require a claim.
 fn executor(strictness: Option<&str>, rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     let storage = InMemoryStorage::new();
-    storage.init().unwrap();
     std::fs::create_dir_all(storage.root()).unwrap();
     let validation = match strictness {
         Some(level) => format!("[validation]\nstrictness = \"{level}\"\n"),

@@ -19,7 +19,6 @@ use jit::storage::{InMemoryStorage, IssueStore};
 /// Build an executor whose `.jit/rules.toml` contains `rules_toml`.
 fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     let storage = InMemoryStorage::new();
-    storage.init().unwrap();
     std::fs::create_dir_all(storage.root()).unwrap();
     // Disable lease enforcement so updates do not require a claim.
     let config = "[worktree]\nenforce_leases = \"off\"\n";
@@ -711,14 +710,12 @@ fn test_no_bypass_event_when_save_fails() {
     // enforce rule must NOT leave a LocalRuleBypassed entry when the write fails,
     // because the bypass event is now emitted only after a successful save.
     let inner = InMemoryStorage::new();
-    inner.init().unwrap();
     std::fs::create_dir_all(inner.root()).unwrap();
-    std::fs::write(
-        inner.root().join("config.toml"),
-        "[worktree]\nenforce_leases = \"off\"\n",
-    )
-    .unwrap();
+    let config = "[worktree]\nenforce_leases = \"off\"\n";
+    std::fs::write(inner.root().join("config.toml"), config).unwrap();
     std::fs::write(inner.root().join("rules.toml"), EPIC_NEEDS_REQ_ENFORCE).unwrap();
+    inner.add_repo_file(".jit/config.toml", config);
+    inner.add_repo_file(".jit/rules.toml", EPIC_NEEDS_REQ_ENFORCE);
 
     let storage = FailingSaveStorage::new(inner);
     let layout = jit::repository_state::RepositoryLayout::new(
@@ -841,10 +838,6 @@ impl jit::storage::RepositoryStateStore for FailingSaveStorage {
 }
 
 impl IssueStore for FailingSaveStorage {
-    fn init(&self) -> anyhow::Result<()> {
-        self.inner.init()
-    }
-
     fn acquire_repo_write_lock(&self) -> anyhow::Result<jit::storage::RepoWriteGuard> {
         self.inner.acquire_repo_write_lock()
     }

@@ -1588,6 +1588,7 @@ mod tests {
     use crate::domain::{
         GateFindings, GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION,
     };
+    use crate::hierarchy_templates::HierarchyTemplate;
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage};
     use chrono::{TimeZone, Utc};
     use std::collections::HashMap;
@@ -1628,8 +1629,6 @@ mod tests {
 
     fn setup() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
-
         // Create config with enforcement off for test backward compatibility
         std::fs::create_dir_all(storage.root()).unwrap();
         let config_toml = r#"
@@ -1914,13 +1913,18 @@ assert = { require-section = { heading = "Summary" } }
     fn setup_file_repository() -> (tempfile::TempDir, CommandExecutor<JsonFileStorage>, String) {
         let repo = tempfile::tempdir().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        storage.init().unwrap();
-        storage
-            .write_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n")
-            .unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
+        executor
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         let issue_id = add_builtin_gate(
             &executor,
             "not-a-reserved-repository-key",
@@ -4178,7 +4182,7 @@ assert = { require-section = { heading = "Summary" } }
         std::env::set_var("JIT_TEST_MODE", "1");
         let jit_root = repo_root.join(".jit");
         let storage = crate::storage::JsonFileStorage::new(&jit_root);
-        storage.init().unwrap();
+        std::fs::create_dir_all(&jit_root).unwrap();
         std::fs::write(
             jit_root.join("config.toml"),
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -4187,6 +4191,9 @@ assert = { require-section = { heading = "Summary" } }
 
         let layout = crate::storage::discover_repository_layout(repo_root, &jit_root).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
+        executor
+            .initialize_fresh_repository(repo_root, &HierarchyTemplate::default(), None)
+            .unwrap();
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry
             .gates

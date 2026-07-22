@@ -12,7 +12,6 @@ mod tests {
         std::env::set_var("JIT_TEST_MODE", "1");
 
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         // Create config with enforcement off for test backward compatibility
         let config_toml = r#"

@@ -81,7 +81,6 @@ source-of-truth = "registry-first"
 fn storage_with(config_toml: &str, registries: &[(&str, &str)]) -> InMemoryStorage {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
-    storage.init().unwrap();
     let root = storage.root().to_path_buf();
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(root.join("config.toml"), config_toml).unwrap();

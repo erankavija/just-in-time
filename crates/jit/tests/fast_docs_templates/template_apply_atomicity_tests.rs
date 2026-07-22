@@ -15,6 +15,7 @@ use anyhow::Result;
 use jit::declarations::{GateRegistry, GateStage};
 use jit::domain::{Event, Issue, Priority};
 use jit::gate_presets::{GatePresetDefinition, PresetInfo};
+use jit::hierarchy_templates::HierarchyTemplate;
 use jit::repository_state::{CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath};
 use jit::storage::{
     InMemoryStorage, IssueStore, JsonFileStorage, PathReadError, RepositoryStateStore,
@@ -127,9 +128,6 @@ impl<S: IssueStore> PublicationProbeStore<S> {
 impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn acquire_repo_write_lock(&self) -> Result<jit::storage::RepoWriteGuard> {
         self.inner.acquire_repo_write_lock()
-    }
-    fn init(&self) -> Result<()> {
-        self.inner.init()
     }
     fn save_issue(&self, issue: Issue) -> Result<()> {
         self.inner.save_issue(issue)
@@ -366,9 +364,8 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
     store: PublicationProbeStore<S>,
 ) -> (CommandExecutor<PublicationProbeStore<S>>, String, String) {
     std::env::set_var("JIT_TEST_MODE", "1");
-    store.init().unwrap();
     if store.is_file_backed() {
-        std::fs::write(store.root().join("config.toml"), "").unwrap();
+        assert!(store.root().join("config.toml").is_file());
     } else {
         store.write_repo_file(".jit/config.toml", "").unwrap();
     }
@@ -468,9 +465,13 @@ fn test_failed_publication_preserves_memory_preimage_and_retry_succeeds() {
 #[test]
 fn test_failed_publication_preserves_file_preimage_and_retry_succeeds() {
     let temp = TempDir::new().unwrap();
-    assert_publication_failure_is_atomic(PublicationProbeStore::new(JsonFileStorage::new(
-        temp.path().join(".jit"),
-    )));
+    let storage = JsonFileStorage::new(temp.path().join(".jit"));
+    let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .unwrap();
+    assert_publication_failure_is_atomic(PublicationProbeStore::new(storage));
 }
 
 #[test]
@@ -508,7 +509,13 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
     let temp = TempDir::new().unwrap();
     let jit_root = temp.path().join(".jit");
     let stall = Duration::from_millis(500);
-    let store = PublicationProbeStore::with_stall(JsonFileStorage::new(&jit_root), stall);
+    let storage = JsonFileStorage::new(&jit_root);
+    let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .unwrap();
+    let store = PublicationProbeStore::with_stall(storage, stall);
     let (executor, container, upstream) = fixture(store.clone());
     let original_container = executor.storage().load_issue(&container).unwrap();
     store.arm();
@@ -615,8 +622,14 @@ kind = "invariant"
 mode = "region"
 target = "docs/closure.md"
 "#;
+    let storage = JsonFileStorage::new(&jit_root);
+    let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .unwrap();
     let store = PublicationProbeStore::rewrite_config_once(
-        JsonFileStorage::new(&jit_root),
+        storage,
         jit_root.join("config.toml"),
         changed_config.to_string(),
     );

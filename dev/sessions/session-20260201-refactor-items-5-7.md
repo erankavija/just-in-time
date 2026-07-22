@@ -10,12 +10,14 @@
 - `src/commands/gate_cli_tests.rs:10`
 - `src/commands/issue.rs:545`
 
-All identical:
+At the time, all four helpers had the same shape. The equivalent current setup
+attaches the storage's explicit repository layout:
+
 ```rust
 fn setup() -> CommandExecutor<InMemoryStorage> {
     let storage = InMemoryStorage::new();
-    storage.init().unwrap();
-    CommandExecutor::new(storage)
+    let layout = storage.repository_layout();
+    CommandExecutor::new(storage).with_layout(layout)
 }
 ```
 

@@ -10,6 +10,7 @@
 
 use jit::commands::CommandExecutor;
 use jit::domain::{ContentFormat, Issue, Priority};
+use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit::validation::evaluate_local;
 use std::fs;
@@ -37,18 +38,12 @@ unique = true
 "#;
     fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
-    storage.init().unwrap();
-    let config: jit::config::JitConfig = toml::from_str(config_toml).unwrap();
-    let namespaces = jit::config_manager::namespaces_from_config(&config);
-    let serialized = jit::repository_state::serialize_ruleset(
-        &jit::repository_state::default_ruleset(&namespaces),
-    );
-    fs::write(jit_dir.join("rules.toml"), serialized.rules_toml).unwrap();
-    let schemas = jit_dir.join("schemas");
-    fs::create_dir(&schemas).unwrap();
-    for schema in serialized.schema_files {
-        fs::write(schemas.join(schema.name), schema.content).unwrap();
-    }
+    let initial_layout =
+        jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(initial_layout)
+        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .unwrap();
     (temp, jit_dir)
 }
 

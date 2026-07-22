@@ -819,7 +819,6 @@ mod tests {
     #[test]
     fn test_enumerate_issues_all() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         // Create a couple of issues
         let issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
@@ -836,7 +835,6 @@ mod tests {
     #[test]
     fn test_enumerate_issues_single() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let issue = crate::domain::types::fixture_issue("Test Issue".to_string(), String::new());
         let issue_id = issue.id.clone();
@@ -854,7 +852,6 @@ mod tests {
     #[test]
     fn test_enumerate_issues_label_epic() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         // Create issues with epic labels
         let mut issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
@@ -891,7 +888,6 @@ mod tests {
     #[test]
     fn test_enumerate_issues_label_milestone() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let mut issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
         issue1.labels.push("milestone:v1.0".to_string());
@@ -916,7 +912,6 @@ mod tests {
     #[test]
     fn test_enumerate_issues_label_no_matches() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let issue = crate::domain::types::fixture_issue("Issue".to_string(), String::new());
         storage.save_issue(issue).unwrap();
@@ -935,7 +930,6 @@ mod tests {
     #[test]
     fn test_extract_documents() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let mut issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
         issue1.documents.push(DocumentReference {
@@ -982,7 +976,6 @@ mod tests {
     #[test]
     fn test_extract_documents_empty() {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
 
         let exporter = exporter(&storage);
         let docs = exporter.extract_documents(&[]);

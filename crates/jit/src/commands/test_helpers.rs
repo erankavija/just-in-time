@@ -93,8 +93,6 @@ pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStor
 /// * `mode` - Enforcement mode: "strict", "warn", or "off"
 pub fn setup_with_enforcement(mode: &str) -> CommandExecutor<InMemoryStorage> {
     let storage = InMemoryStorage::new();
-    storage.init().unwrap();
-
     let config_toml = format!(
         r#"
 [worktree]

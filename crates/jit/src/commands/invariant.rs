@@ -79,7 +79,6 @@ mod tests {
         gate_keys: &[&str],
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("invariants.toml"), invariants_toml).unwrap();
         std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();

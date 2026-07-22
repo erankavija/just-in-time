@@ -400,7 +400,12 @@ fn test_backfill_rejects_missing_indexed_issue_without_writes() {
     let repo = tempfile::TempDir::new().unwrap();
     let data_root = repo.path().join(".jit");
     let storage = JsonFileStorage::new(&data_root);
-    storage.init().unwrap();
+    std::fs::create_dir_all(data_root.join("issues")).unwrap();
+    std::fs::write(
+        data_root.join("index.json"),
+        "{\n  \"all_ids\": [],\n  \"deleted_ids\": [],\n  \"schema_version\": 2\n}",
+    )
+    .unwrap();
     let mut issue = crate::fixture_issue("Legacy".into(), String::new());
     issue.first_ready_at = None;
     issue.claimed_at = None;

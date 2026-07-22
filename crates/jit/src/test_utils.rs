@@ -4,8 +4,10 @@
 
 #![cfg(test)]
 
+use crate::commands::CommandExecutor;
+use crate::hierarchy_templates::HierarchyTemplate;
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::{IssueStore, JsonFileStorage};
+use crate::storage::{discover_repository_layout, JsonFileStorage};
 use anyhow::Result;
 use std::fs;
 use tempfile::TempDir;
@@ -25,17 +27,15 @@ use tempfile::TempDir;
 pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     let temp = TempDir::new()?;
 
-    // Create .jit directory
     let jit_root = temp.path().join(".jit");
-    fs::create_dir_all(&jit_root)?;
-
-    // Create .git directory
-    let git_dir = temp.path().join(".git");
-    fs::create_dir_all(&git_dir)?;
-
-    // Initialize storage
     let storage = JsonFileStorage::new(&jit_root);
-    storage.init()?;
+    let layout = discover_repository_layout(temp.path(), &jit_root)?;
+    CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)?;
+
+    // Claim coordination tests use this as a synthetic Git control directory.
+    fs::create_dir(temp.path().join(".git"))?;
 
     Ok((temp, storage))
 }

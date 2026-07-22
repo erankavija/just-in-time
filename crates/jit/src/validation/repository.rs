@@ -975,23 +975,27 @@ fn validate_projections(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hierarchy_templates::HierarchyTemplate;
     use crate::storage::{IssueStore, JsonFileStorage};
 
     fn fixture() -> tempfile::TempDir {
         let repo = tempfile::tempdir().unwrap();
         let store = JsonFileStorage::new(repo.path().join(".jit"));
-        store.init().unwrap();
+        std::fs::create_dir_all(store.root()).unwrap();
+        std::fs::write(
+            repo.path().join(".jit/config.toml"),
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor(&repo)
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
         let mut issue = crate::domain::types::fixture_issue(
             "Root".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n".to_string(),
         );
         issue.labels = vec!["type:task".to_string()];
         store.save_issue(issue).unwrap();
-        std::fs::write(
-            repo.path().join(".jit/config.toml"),
-            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
-        )
-        .unwrap();
         repo
     }
 

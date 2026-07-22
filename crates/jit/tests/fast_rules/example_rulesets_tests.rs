@@ -673,7 +673,6 @@ mod sdd_lifecycle {
     fn executor_with_sdd_example() -> CommandExecutor<InMemoryStorage> {
         std::env::set_var("JIT_TEST_MODE", "1");
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), "").unwrap();
         storage.add_repo_file(".jit/config.toml", "");
@@ -1583,7 +1582,6 @@ mod research {
     fn research_coverage_executor() -> CommandExecutor<InMemoryStorage> {
         std::env::set_var("JIT_TEST_MODE", "1");
         let storage = InMemoryStorage::new();
-        storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), "").unwrap();
         storage.add_repo_file(".jit/config.toml", "");

@@ -225,13 +225,11 @@ fn test_cli_delete_with_short_hash() {
 
 // ========== Property-Based Tests ==========
 
-/// Build a fresh `InMemoryStorage` with `init()` already called.
+/// Build a fresh in-memory storage fixture.
 fn make_storage() -> InMemoryStorage {
     // Disable worktree divergence checks in tests
     std::env::set_var("JIT_TEST_MODE", "1");
-    let storage = InMemoryStorage::new();
-    storage.init().unwrap();
-    storage
+    InMemoryStorage::new()
 }
 
 /// Save an issue whose `id` field is set to `custom_id`.

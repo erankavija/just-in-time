@@ -164,7 +164,6 @@ fn test_project_defined_preset_save_list_show_apply_in_process() {
     std::env::set_var("JIT_TEST_MODE", "1");
     let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path());
-    storage.init().unwrap();
     std::fs::write(storage.root().join("config.toml"), "").unwrap();
     let layout =
         jit::storage::discover_repository_layout(temp.path().parent().unwrap(), storage.root())
