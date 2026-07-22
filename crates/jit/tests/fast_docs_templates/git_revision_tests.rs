@@ -1,4 +1,3 @@
-use jit::domain::artifact_inventory::PinnedRootResolver;
 use jit::storage::{GitRevisionError, GitRevisionResolver};
 use std::fs;
 use std::path::Path;
@@ -71,10 +70,10 @@ fn test_git_revision_resolver_canonicalizes_symbolic_abbreviated_and_full_revisi
     for revision in ["HEAD", abbreviated, oid.as_str()] {
         let resolved = resolver.resolve_commit(revision).unwrap();
         assert_eq!(resolved.as_str(), oid);
-        let version = resolver
-            .resolve_and_read(revision, "docs/history.bin")
+        let read = resolver
+            .read_pinned_path(revision, "docs/history.bin")
             .unwrap();
-        assert_eq!(version.as_str(), oid);
+        assert_eq!(read.version().as_str(), oid);
     }
 }
 
@@ -92,11 +91,11 @@ fn test_git_revision_resolver_never_falls_back_on_invalid_revision_or_failed_blo
     let resolver = GitRevisionResolver::new(&repo.root);
 
     assert!(matches!(
-        resolver.resolve_and_read("not-a-revision", "docs/working.md"),
+        resolver.read_pinned_path("not-a-revision", "docs/working.md"),
         Err(GitRevisionError::RevisionNotFound { .. })
     ));
     assert!(matches!(
-        resolver.resolve_and_read("HEAD", "docs/working.md"),
+        resolver.read_pinned_path("HEAD", "docs/working.md"),
         Err(GitRevisionError::PinnedReadFailed { .. })
     ));
 

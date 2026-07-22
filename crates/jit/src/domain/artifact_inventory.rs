@@ -3,9 +3,9 @@
 //! This module establishes explicit roots and their repository-wide direct
 //! owners before embedded-edge discovery or action classification. Container
 //! membership follows the resolved hierarchy's `children` relation, never a
-//! raw dependency closure. Git and filesystem access enter through
-//! [`PinnedRootResolver`], keeping hierarchy, grouping, and owner association
-//! deterministic and independently testable.
+//! raw dependency closure. Pinned Git reads enter as explicit evidence, keeping
+//! hierarchy, grouping, and owner association deterministic and independently
+//! testable.
 
 use crate::domain::artifact_plan::{
     normalize_artifact_path, ArtifactAction, ArtifactPlanEntry, ArtifactProvenance,
@@ -26,17 +26,38 @@ pub enum ExplicitRootTarget<'a> {
     Document(&'a str),
 }
 
-/// Storage boundary used to validate and canonicalize pinned document roots.
-///
-/// Implementations must resolve `revision` to a canonical full commit OID and
-/// successfully read `path` at that commit. Returning success without the read
-/// would weaken the inventory's `pinned-read-failed` guarantee.
-pub trait PinnedRootResolver {
-    type Error;
+/// Captured result of resolving and reading one pinned root.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PinnedRootEvidence {
+    /// The revision resolved to this immutable commit and the path was readable.
+    Resolved(ArtifactVersion),
+    /// Resolution or the historical read failed; no working-tree fallback exists.
+    Unavailable,
+}
 
-    /// Resolve the revision, read the historical root, and return its canonical
-    /// pinned version. No working-tree fallback is permitted.
-    fn resolve_and_read(&self, revision: &str, path: &str) -> Result<ArtifactVersion, Self::Error>;
+/// Pinned evidence keyed by authored `(revision, normalized path)`.
+pub type PinnedRootEvidenceMap = BTreeMap<(String, String), PinnedRootEvidence>;
+
+/// Canonical pinned reads relevant to one explicit-root target.
+pub fn pinned_root_requests(
+    issues: &[Issue],
+    hierarchy: &HierarchyConfig,
+    target: ExplicitRootTarget<'_>,
+) -> Result<BTreeSet<(String, String)>, InventoryError> {
+    let (_, _, explicit_paths, _) = inventory_scope(issues, hierarchy, target)?;
+    Ok(issues
+        .iter()
+        .flat_map(|issue| issue.documents.iter())
+        .filter_map(|document| {
+            let path = normalize_artifact_path(&document.path);
+            explicit_paths.contains(&path).then(|| {
+                document
+                    .commit
+                    .as_ref()
+                    .map(|revision| (revision.clone(), path))
+            })?
+        })
+        .collect())
 }
 
 /// Versioned explicit roots and target-level failures ready to feed a plan.
@@ -93,7 +114,7 @@ impl ExplicitRootInventory {
 pub enum InventoryError {
     /// The supplied full container id is absent from the repository-wide input.
     ContainerNotFound(String),
-    /// A resolver claimed success with a working-tree or malformed version.
+    /// Captured evidence claimed success with a working-tree or malformed version.
     NonPinnedResolution { revision: String, path: String },
     /// The produced entry violated the artifact-plan model.
     InvalidPlanEntry(PlanError),
@@ -105,7 +126,7 @@ impl fmt::Display for InventoryError {
             Self::ContainerNotFound(id) => write!(formatter, "container not found: {id}"),
             Self::NonPinnedResolution { revision, path } => write!(
                 formatter,
-                "pinned resolver returned a non-pinned version for {revision} at {path}"
+                "pinned evidence contains a non-pinned version for {revision} at {path}"
             ),
             Self::InvalidPlanEntry(error) => error.fmt(formatter),
         }
@@ -129,57 +150,22 @@ struct DirectOwner {
     inside_subtree: bool,
 }
 
-#[derive(Debug, Clone)]
-enum CachedResolution {
-    Resolved(ArtifactVersion),
-    Failed,
-}
-
 /// Inventory explicit roots for a container or arbitrary document target.
 ///
 /// `issues` must be the repository-wide issue set. That single universe is
 /// used both to resolve hierarchy membership and to associate every direct
 /// `DocumentReference` owner. Pinned references are included only after
-/// `resolver` both canonicalizes and reads them; failures add a
+/// evidence proves both canonical resolution and a successful read; failures add a
 /// `pinned-read-failed` blocker and never attach the owner to a working-tree
 /// entry.
-pub fn inventory_explicit_roots<R: PinnedRootResolver>(
+pub fn inventory_explicit_roots(
     issues: &[Issue],
     hierarchy: &HierarchyConfig,
     target: ExplicitRootTarget<'_>,
-    resolver: &R,
+    pinned: &PinnedRootEvidenceMap,
 ) -> Result<ExplicitRootInventory, InventoryError> {
-    let (plan_target, member_ids, explicit_paths, force_working_tree) = match target {
-        ExplicitRootTarget::Container(root) => {
-            if !issues.iter().any(|issue| issue.id == root) {
-                return Err(InventoryError::ContainerNotFound(root.to_string()));
-            }
-            let members = resolved_subtree_members(issues, hierarchy, root);
-            let paths = issues
-                .iter()
-                .filter(|issue| members.contains(&issue.id))
-                .flat_map(|issue| issue.documents.iter())
-                .map(|document| normalize_artifact_path(&document.path))
-                .collect();
-            (
-                PlanTarget::Container {
-                    id: root.to_string(),
-                },
-                members,
-                paths,
-                false,
-            )
-        }
-        ExplicitRootTarget::Document(path) => {
-            let path = normalize_artifact_path(path);
-            (
-                PlanTarget::Document { path: path.clone() },
-                BTreeSet::new(),
-                BTreeSet::from([path]),
-                true,
-            )
-        }
-    };
+    let (plan_target, member_ids, explicit_paths, force_working_tree) =
+        inventory_scope(issues, hierarchy, target)?;
 
     let mut owners_by_identity: BTreeMap<(String, ArtifactVersion), Vec<DirectOwner>> =
         BTreeMap::new();
@@ -189,7 +175,6 @@ pub fn inventory_explicit_roots<R: PinnedRootResolver>(
         .map(|path| (path, 0))
         .collect();
     let mut blockers = Vec::new();
-    let mut resolution_cache: BTreeMap<(String, String), CachedResolution> = BTreeMap::new();
 
     if force_working_tree {
         explicit_paths.iter().for_each(|path| {
@@ -221,31 +206,23 @@ pub fn inventory_explicit_roots<R: PinnedRootResolver>(
                     .entry((path, ArtifactVersion::WorkingTree))
                     .or_default()
                     .push(owner),
-                Some(revision) => {
-                    let cache_key = (revision.to_string(), path.clone());
-                    let resolved = resolution_cache.entry(cache_key).or_insert_with(|| {
-                        match resolver.resolve_and_read(revision, &path) {
-                            Ok(version) => CachedResolution::Resolved(version),
-                            Err(_) => CachedResolution::Failed,
-                        }
-                    });
-                    match resolved {
-                        CachedResolution::Resolved(version) if version.is_pinned() => {
-                            owners_by_identity
-                                .entry((path, version.clone()))
-                                .or_default()
-                                .push(owner);
-                        }
-                        CachedResolution::Resolved(_) => {
-                            return Err(InventoryError::NonPinnedResolution {
-                                revision: revision.to_string(),
-                                path,
-                            });
-                        }
-                        CachedResolution::Failed => blockers
-                            .push(PlanBlocker::new(BlockerCode::PinnedReadFailed, Some(path))),
+                Some(revision) => match pinned.get(&(revision.to_string(), path.clone())) {
+                    Some(PinnedRootEvidence::Resolved(version)) if version.is_pinned() => {
+                        owners_by_identity
+                            .entry((path, version.clone()))
+                            .or_default()
+                            .push(owner);
                     }
-                }
+                    Some(PinnedRootEvidence::Resolved(_)) => {
+                        return Err(InventoryError::NonPinnedResolution {
+                            revision: revision.to_string(),
+                            path,
+                        });
+                    }
+                    Some(PinnedRootEvidence::Unavailable) | None => {
+                        blockers.push(PlanBlocker::new(BlockerCode::PinnedReadFailed, Some(path)))
+                    }
+                },
             }
         }
     }
@@ -292,6 +269,44 @@ pub fn inventory_explicit_roots<R: PinnedRootResolver>(
         artifacts,
         blockers,
     })
+}
+
+fn inventory_scope(
+    issues: &[Issue],
+    hierarchy: &HierarchyConfig,
+    target: ExplicitRootTarget<'_>,
+) -> Result<(PlanTarget, BTreeSet<String>, BTreeSet<String>, bool), InventoryError> {
+    match target {
+        ExplicitRootTarget::Container(root) => {
+            if !issues.iter().any(|issue| issue.id == root) {
+                return Err(InventoryError::ContainerNotFound(root.to_string()));
+            }
+            let members = resolved_subtree_members(issues, hierarchy, root);
+            let paths = issues
+                .iter()
+                .filter(|issue| members.contains(&issue.id))
+                .flat_map(|issue| issue.documents.iter())
+                .map(|document| normalize_artifact_path(&document.path))
+                .collect();
+            Ok((
+                PlanTarget::Container {
+                    id: root.to_string(),
+                },
+                members,
+                paths,
+                false,
+            ))
+        }
+        ExplicitRootTarget::Document(path) => {
+            let path = normalize_artifact_path(path);
+            Ok((
+                PlanTarget::Document { path: path.clone() },
+                BTreeSet::new(),
+                BTreeSet::from([path]),
+                true,
+            ))
+        }
+    }
 }
 
 fn resolved_subtree_members(

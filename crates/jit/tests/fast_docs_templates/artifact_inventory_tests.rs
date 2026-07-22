@@ -1,44 +1,41 @@
 use jit::domain::artifact_inventory::{
-    inventory_explicit_roots, ExplicitRootTarget, PinnedRootResolver,
+    inventory_explicit_roots, pinned_root_requests, ExplicitRootTarget, PinnedRootEvidence,
+    PinnedRootEvidenceMap,
 };
 use jit::domain::artifact_plan::{ArtifactVersion, BlockerCode, EvidenceCode, WarningCode};
 use jit::domain::type_taxonomy::HierarchyConfig;
 use jit::domain::{DocumentReference, Issue, State};
-use std::collections::HashMap;
 
 const OID_A: &str = "0123456789abcdef0123456789abcdef01234567";
 const OID_B: &str = "fedcba9876543210fedcba9876543210fedcba98";
 
 #[derive(Default)]
 struct FakePinnedResolver {
-    resolutions: HashMap<(String, String), Result<String, ()>>,
+    resolutions: PinnedRootEvidenceMap,
 }
 
 impl FakePinnedResolver {
     fn resolves(mut self, revision: &str, path: &str, oid: &str) -> Self {
         self.resolutions.insert(
             (revision.to_string(), path.to_string()),
-            Ok(oid.to_string()),
+            PinnedRootEvidence::Resolved(ArtifactVersion::pinned(oid).unwrap()),
         );
         self
     }
 
     fn fails(mut self, revision: &str, path: &str) -> Self {
-        self.resolutions
-            .insert((revision.to_string(), path.to_string()), Err(()));
+        self.resolutions.insert(
+            (revision.to_string(), path.to_string()),
+            PinnedRootEvidence::Unavailable,
+        );
         self
     }
 }
 
-impl PinnedRootResolver for FakePinnedResolver {
-    type Error = ();
-
-    fn resolve_and_read(&self, revision: &str, path: &str) -> Result<ArtifactVersion, Self::Error> {
-        self.resolutions
-            .get(&(revision.to_string(), path.to_string()))
-            .cloned()
-            .unwrap_or(Err(()))
-            .and_then(|oid| ArtifactVersion::pinned(oid).map_err(|_| ()))
+impl std::ops::Deref for FakePinnedResolver {
+    type Target = PinnedRootEvidenceMap;
+    fn deref(&self) -> &Self::Target {
+        &self.resolutions
     }
 }
 
@@ -233,5 +230,33 @@ fn test_pinned_resolution_or_read_failure_blocks_without_working_tree_owner_fall
     assert_eq!(
         inventory.blockers()[0].path.as_deref(),
         Some("docs/history.md")
+    );
+}
+
+#[test]
+fn test_pinned_root_requests_are_target_relevant_and_deduplicated() {
+    let mut epic = issue("selected", "epic", State::Done);
+    let mut child = issue("child", "task", State::Done);
+    let mut outside = issue("outside", "task", State::Done);
+    epic.dependencies = vec![child.id.clone()];
+    child.documents = vec![
+        document("docs/shared.md", Some("release")),
+        document("./docs/shared.md", Some("release")),
+    ];
+    outside.documents = vec![document("docs/outside.md", Some("other"))];
+    let issues = [outside, child, epic];
+    let requests = |target| {
+        pinned_root_requests(&issues, &HierarchyConfig::default(), target)
+            .unwrap()
+            .into_iter()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        requests(ExplicitRootTarget::Container("selected")),
+        [("release".into(), "docs/shared.md".into())]
+    );
+    assert_eq!(
+        requests(ExplicitRootTarget::Document("docs/outside.md")),
+        [("other".into(), "docs/outside.md".into())]
     );
 }

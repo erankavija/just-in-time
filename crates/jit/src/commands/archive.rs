@@ -7,7 +7,10 @@ use crate::domain::artifact_classifier::{
     ArtifactClassificationPolicy, ArtifactLocation, ArtifactLocationFacts,
 };
 use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
-use crate::domain::artifact_inventory::{inventory_explicit_roots, ExplicitRootTarget};
+use crate::domain::artifact_inventory::{
+    inventory_explicit_roots, pinned_root_requests, ExplicitRootTarget, PinnedRootEvidence,
+    PinnedRootEvidenceMap,
+};
 use crate::domain::artifact_plan::{
     normalize_artifact_path, ArchiveCandidates, ArtifactAction, ArtifactPlan, BlockerCode,
     ContentIdentity, EdgeKind, EdgeResolutionMode, PendingDeletion, PlanBlocker, PlanTarget,
@@ -16,9 +19,9 @@ use crate::domain::artifact_plan::{
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Event, Issue};
 use crate::storage::{
-    collect_artifact_classification_facts, discover_artifact_dependencies,
-    discover_repository_embedded_owners, resolve_container_destination, GitRevisionResolver,
-    IssueStore, JsonFileStorage, VerifiedArtifact,
+    collect_artifact_classification_facts, discover_archive_artifacts,
+    resolve_container_destination, GitRevisionResolver, IssueStore, JsonFileStorage,
+    VerifiedArtifact,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
@@ -69,6 +72,23 @@ fn remap_archived_references(issues: &mut [Issue], destination_root: &str) {
                 }
             });
     });
+}
+
+fn inventory_issues_pinned_evidence(
+    requests: impl IntoIterator<Item = (String, String)>,
+    resolver: &GitRevisionResolver,
+) -> PinnedRootEvidenceMap {
+    requests
+        .into_iter()
+        .map(|(revision, path)| {
+            let key = (revision.clone(), path.clone());
+            let evidence = resolver
+                .read_pinned_path(&revision, &path)
+                .map(|read| PinnedRootEvidence::Resolved(read.version().clone()))
+                .unwrap_or(PinnedRootEvidence::Unavailable);
+            (key, evidence)
+        })
+        .collect()
 }
 
 fn apply_recorded_residue_identities(
@@ -195,17 +215,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             (ArchiveTarget::Container(_), Some(id)) => ExplicitRootTarget::Container(id),
             (ArchiveTarget::Container(_), None) => unreachable!("container id was resolved"),
         };
+        let pinned = inventory_issues_pinned_evidence(
+            pinned_root_requests(&inventory_issues, &hierarchy, explicit_target)?,
+            &resolver,
+        );
         let inventory =
-            inventory_explicit_roots(&inventory_issues, &hierarchy, explicit_target, &resolver)?;
-        let discovered = discover_artifact_dependencies(&self.storage, inventory)?;
-        let member_ids = discovered
-            .member_ids()
-            .iter()
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        let embedded_owners =
-            discover_repository_embedded_owners(&self.storage, &issues, &member_ids)?;
-        let (plan_target, artifacts, mut blockers) = discovered.into_plan_parts();
+            inventory_explicit_roots(&inventory_issues, &hierarchy, explicit_target, &pinned)?;
+        let (discovered, embedded_owners) =
+            discover_archive_artifacts(&self.storage, inventory, &issues)?;
+        let plan_target = discovered.target;
+        let artifacts = discovered.artifacts;
+        let mut blockers = discovered.blockers;
         blockers.extend(
             destination_conflicts
                 .into_iter()

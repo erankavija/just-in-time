@@ -5,12 +5,16 @@
 //! repository-component semantics. The storage layer owns the recursive read
 //! loop and feeds bytes through this pure core.
 
+use crate::domain::artifact_classifier::{ArtifactClassificationInventory, EmbeddedArtifactOwner};
+use crate::domain::artifact_inventory::ExplicitRootInventory;
 use crate::domain::artifact_plan::{
-    ArtifactEdge, BlockerCode, EdgeKind, EdgeResolutionMode, PlanBlocker,
+    ArtifactAction, ArtifactEdge, ArtifactPlanEntry, ArtifactProvenance, ArtifactVersion,
+    BlockerCode, EdgeKind, EdgeResolutionMode, PlanBlocker, PlanError, PlanWarning, WarningCode,
 };
+use crate::domain::Issue;
 use pulldown_cmark::{Event, Parser, Tag};
 use regex::Regex;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::LazyLock;
 
@@ -65,6 +69,336 @@ pub struct DiscoveryGraph {
     visited: BTreeSet<String>,
 }
 
+/// Incremental pure discovery state retained while callers acquire missing evidence.
+/// Evidence for paths already listed by [`Self::parsed_paths`] must remain immutable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactClosureState {
+    graph: DiscoveryGraph,
+    parsed: BTreeMap<String, ParsedArtifact>,
+}
+
+impl ArtifactClosureState {
+    /// Seed a closure expansion from normalized working-tree roots.
+    pub fn new(roots: impl IntoIterator<Item = String>) -> Self {
+        Self {
+            graph: DiscoveryGraph::new(roots),
+            parsed: BTreeMap::new(),
+        }
+    }
+
+    /// Paths parsed so far, exposed to verify incremental reuse without instrumentation.
+    pub fn parsed_paths(&self) -> impl Iterator<Item = &str> {
+        self.parsed.keys().map(String::as_str)
+    }
+}
+
+/// No-follow worktree evidence used by both selected-artifact and owner closure expansion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArtifactEvidence {
+    /// Captured ordinary file bytes.
+    File(Vec<u8>),
+    /// Captured absence.
+    Missing,
+    /// A symlink occurs at or above the path.
+    Symlink,
+    /// A non-file, non-directory filesystem object.
+    Unsupported,
+    /// The requested path escaped or violated repository-relative syntax.
+    InvalidPath,
+}
+
+/// Archive-specific captured evidence keyed by normalized worktree path.
+pub type ArtifactEvidenceMap = BTreeMap<String, ArtifactEvidence>;
+
+/// Pure closure result: callers acquire only the paths still needed and retry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArtifactClosure {
+    /// More exact path evidence is required; resume with the returned state.
+    Needs {
+        paths: BTreeSet<String>,
+        state: ArtifactClosureState,
+    },
+    /// Every reachable ordinary file was parsed exactly once into this map.
+    Complete(BTreeMap<String, ParsedArtifact>),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ArtifactDiscoveryError {
+    /// Discovery produced an invalid artifact-plan entry.
+    #[error(transparent)]
+    InvalidPlanEntry(#[from] PlanError),
+    /// Closed evidence or its parsed closure omitted a graph entry.
+    #[error("artifact discovery graph has no entry for {0}")]
+    MissingGraphEntry(String),
+}
+
+/// Expand all supported local edges from roots using one explicit evidence map.
+pub fn expand_artifact_closure(
+    mut state: ArtifactClosureState,
+    evidence: &ArtifactEvidenceMap,
+) -> ArtifactClosure {
+    let mut needs = BTreeSet::new();
+    while let Some(path) = state.graph.next_path() {
+        match evidence.get(&path) {
+            None => {
+                needs.insert(path);
+            }
+            Some(ArtifactEvidence::File(bytes)) => {
+                let artifact = parse_artifact(&path, bytes);
+                artifact.references().iter().for_each(|reference| {
+                    if let ReferenceResolution::Local { target, .. } =
+                        resolve_reference(&path, reference)
+                    {
+                        state.graph.enqueue(target);
+                    }
+                });
+                state.parsed.insert(path, artifact);
+            }
+            Some(
+                ArtifactEvidence::Missing
+                | ArtifactEvidence::Symlink
+                | ArtifactEvidence::Unsupported
+                | ArtifactEvidence::InvalidPath,
+            ) => {}
+        }
+    }
+    if needs.is_empty() {
+        ArtifactClosure::Complete(state.parsed)
+    } else {
+        needs
+            .iter()
+            .cloned()
+            .for_each(|path| state.graph.defer(path));
+        ArtifactClosure::Needs {
+            paths: needs,
+            state,
+        }
+    }
+}
+
+/// Derive selected inventory and repository-wide embedded owners from the same closed evidence.
+pub fn discover_archive_artifacts(
+    inventory: ExplicitRootInventory,
+    issues: &[Issue],
+    evidence: &ArtifactEvidenceMap,
+    parsed_by_path: &BTreeMap<String, ParsedArtifact>,
+) -> Result<(ArtifactClassificationInventory, Vec<EmbeddedArtifactOwner>), ArtifactDiscoveryError> {
+    let (target, member_ids, roots, blockers) = inventory.into_discovery_parts();
+    let working_roots = roots
+        .iter()
+        .filter(|entry| !entry.version().is_pinned())
+        .map(|entry| entry.source().to_string())
+        .collect::<BTreeSet<_>>();
+    let explicit_paths = working_roots;
+    let mut historical = roots
+        .iter()
+        .filter(|entry| entry.version().is_pinned())
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut working = roots
+        .into_iter()
+        .filter(|entry| !entry.version().is_pinned())
+        .map(|entry| (entry.source().to_string(), entry))
+        .collect::<BTreeMap<_, _>>();
+    let mut graph = DiscoveryGraph::new(explicit_paths.iter().cloned());
+    let mut referencing = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut missing = BTreeSet::new();
+    while let Some(path) = graph.next_path() {
+        match evidence.get(&path) {
+            Some(ArtifactEvidence::Missing) => {
+                if explicit_paths.contains(&path) {
+                    append_blocker(
+                        working.get_mut(&path).ok_or_else(|| {
+                            ArtifactDiscoveryError::MissingGraphEntry(path.clone())
+                        })?,
+                        PlanBlocker::new(BlockerCode::MissingSource, Some(&path)),
+                    )?;
+                } else {
+                    missing.insert(path.clone());
+                    for parent in referencing.get(&path).into_iter().flatten() {
+                        append_warning(
+                            working.get_mut(parent).ok_or_else(|| {
+                                ArtifactDiscoveryError::MissingGraphEntry(parent.clone())
+                            })?,
+                            PlanWarning::new(WarningCode::MissingEdgeTarget, Some(&path)),
+                        )?;
+                    }
+                }
+                continue;
+            }
+            Some(ArtifactEvidence::Unsupported) => {
+                for parent in referencing.get(&path).into_iter().flatten() {
+                    append_warning(
+                        working.get_mut(parent).ok_or_else(|| {
+                            ArtifactDiscoveryError::MissingGraphEntry(parent.clone())
+                        })?,
+                        PlanWarning::new(WarningCode::UnsupportedEdgeTarget, Some(&path)),
+                    )?;
+                }
+                continue;
+            }
+            Some(ArtifactEvidence::InvalidPath) => {
+                append_blocker(
+                    working
+                        .get_mut(&path)
+                        .ok_or_else(|| ArtifactDiscoveryError::MissingGraphEntry(path.clone()))?,
+                    PlanBlocker::new(BlockerCode::RepositoryEscape, Some(&path)),
+                )?;
+                continue;
+            }
+            Some(ArtifactEvidence::Symlink) => continue,
+            Some(ArtifactEvidence::File(_)) => {
+                let parsed = parsed_by_path
+                    .get(&path)
+                    .ok_or_else(|| ArtifactDiscoveryError::MissingGraphEntry(path.clone()))?;
+                let mut edges = Vec::new();
+                let mut entry_blockers = Vec::new();
+                let mut entry_warnings = Vec::new();
+                if parsed.dynamic_loading_suspected() {
+                    entry_warnings.push(PlanWarning::new(
+                        WarningCode::DynamicLoadingSuspected,
+                        Some(&path),
+                    ));
+                }
+                for reference in parsed.references() {
+                    match resolve_reference(&path, reference) {
+                        ReferenceResolution::Ignored => {}
+                        ReferenceResolution::External(edge) => {
+                            edges.push(edge);
+                            entry_warnings
+                                .push(PlanWarning::new(WarningCode::ExternalEdge, Some(&path)));
+                        }
+                        ReferenceResolution::RepositoryEscape { edge, blocker } => {
+                            edges.push(edge);
+                            entry_blockers.push(blocker);
+                        }
+                        ReferenceResolution::Local { edge, target } => {
+                            edges.push(edge);
+                            referencing
+                                .entry(target.clone())
+                                .or_default()
+                                .insert(path.clone());
+                            if missing.contains(&target) {
+                                entry_warnings.push(PlanWarning::new(
+                                    WarningCode::MissingEdgeTarget,
+                                    Some(&target),
+                                ));
+                            }
+                            working.entry(target.clone()).or_insert_with(|| {
+                                ArtifactPlanEntry::new(
+                                    &target,
+                                    ArtifactVersion::WorkingTree,
+                                    ArtifactAction::Retain,
+                                )
+                                .with_provenance(vec![ArtifactProvenance::Embedded])
+                            });
+                            graph.enqueue(target);
+                        }
+                    }
+                }
+                let entry = working
+                    .get_mut(&path)
+                    .ok_or_else(|| ArtifactDiscoveryError::MissingGraphEntry(path.clone()))?;
+                let mut updated = entry
+                    .clone()
+                    .with_edges(merge(entry.edges(), edges))
+                    .with_blockers(merge(entry.blockers(), entry_blockers))
+                    .with_warnings(merge(entry.warnings(), entry_warnings));
+                if let Some(format) = parsed.format() {
+                    updated = updated.with_format(format);
+                }
+                updated.normalize()?;
+                *entry = updated;
+            }
+            None => return Err(ArtifactDiscoveryError::MissingGraphEntry(path)),
+        }
+    }
+    historical.extend(working.into_values());
+    historical.sort_by_key(ArtifactPlanEntry::identity);
+    let members = member_ids.iter().cloned().collect::<BTreeSet<_>>();
+    let owners = discover_embedded_owners(issues, &members, parsed_by_path);
+    Ok((
+        ArtifactClassificationInventory::new(target, historical, blockers),
+        owners,
+    ))
+}
+
+/// Derive repository-wide embedded ownership from the same closed artifact evidence.
+fn discover_embedded_owners(
+    issues: &[Issue],
+    selected_member_ids: &BTreeSet<String>,
+    parsed_by_path: &BTreeMap<String, ParsedArtifact>,
+) -> Vec<EmbeddedArtifactOwner> {
+    let mut owners = Vec::new();
+    for issue in issues {
+        for document in issue
+            .documents
+            .iter()
+            .filter(|document| document.commit.is_none())
+        {
+            let root = crate::domain::artifact_plan::normalize_artifact_path(&document.path);
+            owners.extend(
+                reachable_parsed_paths(&root, parsed_by_path)
+                    .into_iter()
+                    .filter(|path| path != &root)
+                    .map(|path| EmbeddedArtifactOwner {
+                        artifact: path.clone(),
+                        root: root.clone(),
+                        issue: issue.id.clone(),
+                        state: issue.state,
+                        archived_from: issue.archived_from,
+                        inside_subtree: selected_member_ids.contains(&issue.id),
+                    }),
+            );
+        }
+    }
+    owners.sort_by(|left, right| {
+        (&left.artifact, &left.root, &left.issue).cmp(&(&right.artifact, &right.root, &right.issue))
+    });
+    owners.dedup();
+    owners
+}
+
+fn reachable_parsed_paths(
+    root: &str,
+    parsed_by_path: &BTreeMap<String, ParsedArtifact>,
+) -> BTreeSet<String> {
+    let mut graph = DiscoveryGraph::new([root.to_string()]);
+    let mut reachable = BTreeSet::new();
+    while let Some(path) = graph.next_path() {
+        let Some(parsed) = parsed_by_path.get(&path) else {
+            continue;
+        };
+        reachable.insert(path.clone());
+        parsed.references().iter().for_each(|reference| {
+            if let ReferenceResolution::Local { target, .. } = resolve_reference(&path, reference) {
+                graph.enqueue(target);
+            }
+        });
+    }
+    reachable
+}
+
+fn append_blocker(entry: &mut ArtifactPlanEntry, blocker: PlanBlocker) -> Result<(), PlanError> {
+    let mut updated = entry
+        .clone()
+        .with_blockers(merge(entry.blockers(), [blocker]));
+    updated.normalize()?;
+    *entry = updated;
+    Ok(())
+}
+fn append_warning(entry: &mut ArtifactPlanEntry, warning: PlanWarning) -> Result<(), PlanError> {
+    let mut updated = entry
+        .clone()
+        .with_warnings(merge(entry.warnings(), [warning]));
+    updated.normalize()?;
+    *entry = updated;
+    Ok(())
+}
+fn merge<T: Clone>(existing: &[T], additional: impl IntoIterator<Item = T>) -> Vec<T> {
+    existing.iter().cloned().chain(additional).collect()
+}
+
 impl DiscoveryGraph {
     /// Seed discovery with normalized working-tree roots.
     pub fn new(roots: impl IntoIterator<Item = String>) -> Self {
@@ -79,6 +413,11 @@ impl DiscoveryGraph {
         if !self.visited.contains(&target) {
             self.pending.insert(target);
         }
+    }
+
+    fn defer(&mut self, path: String) {
+        self.visited.remove(&path);
+        self.pending.insert(path);
     }
 
     /// Take and mark the lexicographically next unvisited path.

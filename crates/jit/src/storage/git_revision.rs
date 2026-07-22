@@ -5,7 +5,6 @@
 //! symbolic and abbreviated revision semantics while publishing only a full,
 //! hash-algorithm-agnostic OID to the domain layer.
 
-use crate::domain::artifact_inventory::PinnedRootResolver;
 use crate::domain::artifact_plan::ArtifactVersion;
 use crate::storage::validate_repo_relative_path;
 use std::path::PathBuf;
@@ -161,15 +160,6 @@ impl GitRevisionResolver {
                 program: self.git_program.clone(),
                 source,
             })
-    }
-}
-
-impl PinnedRootResolver for GitRevisionResolver {
-    type Error = GitRevisionError;
-
-    fn resolve_and_read(&self, revision: &str, path: &str) -> Result<ArtifactVersion, Self::Error> {
-        self.read_pinned_path(revision, path)
-            .map(|read| read.version)
     }
 }
 

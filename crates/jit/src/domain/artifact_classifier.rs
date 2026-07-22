@@ -175,6 +175,11 @@ impl ArtifactClassificationInventory {
         }
     }
 
+    /// Canonically ordered discovered artifact entries.
+    pub fn artifacts(&self) -> &[ArtifactPlanEntry] {
+        &self.artifacts
+    }
+
     /// Use the destination previously resolved by the storage boundary.
     pub fn with_destination_root(mut self, destination_root: impl Into<String>) -> Self {
         self.destination_root = Some(destination_root.into());

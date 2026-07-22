@@ -43,10 +43,7 @@ pub mod worktree_identity;
 pub mod worktree_paths;
 
 // Re-export for convenience
-pub use artifact_discovery::{
-    discover_artifact_dependencies, discover_repository_embedded_owners, ArtifactDiscoveryError,
-    DiscoveredArtifactInventory,
-};
+pub use artifact_discovery::{discover_archive_artifacts, ArtifactDiscoveryError};
 pub use artifact_mutation::{ArtifactMutationError, StagedArtifact, VerifiedArtifact};
 pub use artifact_planning::{
     collect_artifact_classification_facts, resolve_container_destination,

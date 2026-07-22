@@ -1,14 +1,35 @@
+use jit::domain::artifact_discovery::{
+    expand_artifact_closure, ArtifactClosure, ArtifactClosureState, ArtifactEvidence,
+    ArtifactEvidenceMap,
+};
 use jit::domain::artifact_inventory::{
-    inventory_explicit_roots, ExplicitRootTarget, PinnedRootResolver,
+    inventory_explicit_roots, ExplicitRootTarget, PinnedRootEvidence, PinnedRootEvidenceMap,
 };
 use jit::domain::artifact_plan::{ArtifactVersion, BlockerCode, EdgeResolutionMode, WarningCode};
 use jit::domain::type_taxonomy::HierarchyConfig;
 use jit::domain::{DocumentReference, Issue, State};
-use jit::storage::{discover_artifact_dependencies, JsonFileStorage};
+use jit::storage::{discover_archive_artifacts, JsonFileStorage};
 use std::fs;
 use tempfile::TempDir;
 
 const OID: &str = "0123456789abcdef0123456789abcdef01234567";
+
+#[test]
+fn test_terminal_evidence_closes_without_parsing_or_more_needs() {
+    for terminal in [
+        ArtifactEvidence::Missing,
+        ArtifactEvidence::Symlink,
+        ArtifactEvidence::Unsupported,
+        ArtifactEvidence::InvalidPath,
+    ] {
+        let evidence = ArtifactEvidenceMap::from([("root.md".to_string(), terminal)]);
+        let result = expand_artifact_closure(
+            ArtifactClosureState::new(["root.md".to_string()]),
+            &evidence,
+        );
+        assert!(matches!(result, ArtifactClosure::Complete(parsed) if parsed.is_empty()));
+    }
+}
 
 #[derive(Clone)]
 struct Repo {
@@ -35,25 +56,20 @@ impl Repo {
         fs::write(target, content).unwrap();
     }
 
-    fn discover(&self, root: &str) -> jit::storage::DiscoveredArtifactInventory {
+    fn discover(
+        &self,
+        root: &str,
+    ) -> jit::domain::artifact_classifier::ArtifactClassificationInventory {
         let inventory = inventory_explicit_roots(
             &[],
             &HierarchyConfig::default(),
             ExplicitRootTarget::Document(root),
-            &NeverPinned,
+            &PinnedRootEvidenceMap::new(),
         )
         .unwrap();
-        discover_artifact_dependencies(&self.storage, inventory).unwrap()
-    }
-}
-
-struct NeverPinned;
-
-impl PinnedRootResolver for NeverPinned {
-    type Error = ();
-
-    fn resolve_and_read(&self, _revision: &str, _path: &str) -> Result<ArtifactVersion, ()> {
-        Err(())
+        discover_archive_artifacts(&self.storage, inventory, &[])
+            .unwrap()
+            .0
     }
 }
 
@@ -155,30 +171,51 @@ fn test_markdown_links_preserve_relative_and_root_relative_edge_metadata() {
 }
 
 #[test]
-fn test_cycles_terminate_with_deterministic_artifact_and_edge_order() {
-    let repo = Repo::new();
-    repo.write("styles/a.css", "@import 'b.css'; @import 'c.css';");
-    repo.write("styles/b.css", "@import 'a.css';");
-    repo.write("styles/c.css", "@import 'b.css';");
-
-    let first = repo.discover("styles/a.css");
-    let second = repo.discover("./styles//a.css");
-    assert_eq!(first, second);
-    assert_eq!(
-        first
-            .artifacts()
-            .iter()
-            .map(|entry| entry.source())
-            .collect::<Vec<_>>(),
-        ["styles/a.css", "styles/b.css", "styles/c.css"]
+fn test_incremental_closure_reuses_parsed_state_for_shared_cyclic_reachability() {
+    let mut evidence = ArtifactEvidenceMap::new();
+    let state = ArtifactClosureState::new(["root.md".to_string()]);
+    let ArtifactClosure::Needs { paths, state } = expand_artifact_closure(state, &evidence) else {
+        panic!("an uncaptured root must be requested");
+    };
+    assert_eq!(paths, ["root.md".to_string()].into_iter().collect());
+    evidence.insert(
+        "root.md".into(),
+        ArtifactEvidence::File(b"[a](a.md) [b](b.md)".to_vec()),
     );
+    let ArtifactClosure::Needs { paths, state } = expand_artifact_closure(state, &evidence) else {
+        panic!("the shared branches must be requested");
+    };
     assert_eq!(
-        first.artifacts()[0]
-            .edges()
-            .iter()
-            .map(|edge| edge.target.as_deref().unwrap())
-            .collect::<Vec<_>>(),
-        ["styles/b.css", "styles/c.css"]
+        paths,
+        ["a.md".to_string(), "b.md".to_string()]
+            .into_iter()
+            .collect()
+    );
+    assert_eq!(state.parsed_paths().collect::<Vec<_>>(), ["root.md"]);
+    for path in ["a.md", "b.md"] {
+        evidence.insert(
+            path.into(),
+            ArtifactEvidence::File(b"[shared](shared.md)".to_vec()),
+        );
+    }
+    let ArtifactClosure::Needs { paths, state } = expand_artifact_closure(state, &evidence) else {
+        panic!("the shared descendant must be requested once");
+    };
+    assert_eq!(paths, ["shared.md".to_string()].into_iter().collect());
+    evidence.insert(
+        "root.md".into(),
+        ArtifactEvidence::File(b"[new](uncaptured.md)".to_vec()),
+    );
+    evidence.insert(
+        "shared.md".into(),
+        ArtifactEvidence::File(b"[cycle](a.md)".to_vec()),
+    );
+    let ArtifactClosure::Complete(parsed) = expand_artifact_closure(state, &evidence) else {
+        panic!("completed evidence must close without reparsing the changed root bytes");
+    };
+    assert_eq!(
+        parsed.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["a.md", "b.md", "root.md", "shared.md"]
     );
 }
 
@@ -405,7 +442,7 @@ fn assert_dynamic_loading_warning(path: &str, content: &str) {
     let repo = Repo::new();
     repo.write(path, content);
     let discovered = repo.discover(path);
-    let entry = &discovered.artifacts()[0];
+    let entry = &discovered.artifacts[0];
     assert!(
         entry
             .warnings()
@@ -415,7 +452,7 @@ fn assert_dynamic_loading_warning(path: &str, content: &str) {
     );
     assert!(entry.blockers().is_empty(), "pattern blocked {path}");
     assert_eq!(
-        discovered.artifacts().len(),
+        discovered.artifacts.len(),
         1,
         "guessed a target for {path}: {content}"
     );
@@ -425,7 +462,7 @@ fn assert_no_dynamic_loading_warning(path: &str, content: &str) {
     let repo = Repo::new();
     repo.write(path, content);
     let discovered = repo.discover(path);
-    let entry = &discovered.artifacts()[0];
+    let entry = &discovered.artifacts[0];
     assert!(
         !entry
             .warnings()
@@ -435,25 +472,23 @@ fn assert_no_dynamic_loading_warning(path: &str, content: &str) {
     );
     assert!(entry.blockers().is_empty(), "pattern blocked {path}");
     assert_eq!(
-        discovered.artifacts().len(),
+        discovered.artifacts.len(),
         1,
         "guessed a target for {path}: {content}"
     );
 }
 
-#[derive(Default)]
-struct PinResolver {
-    readable: bool,
-}
-
-impl PinnedRootResolver for PinResolver {
-    type Error = ();
-
-    fn resolve_and_read(&self, _revision: &str, _path: &str) -> Result<ArtifactVersion, ()> {
-        self.readable
-            .then(|| ArtifactVersion::pinned(OID).unwrap())
-            .ok_or(())
-    }
+fn pin_evidence(readable: bool) -> PinnedRootEvidenceMap {
+    [(
+        ("release-v1".to_string(), "docs/history.html".to_string()),
+        if readable {
+            PinnedRootEvidence::Resolved(ArtifactVersion::pinned(OID).unwrap())
+        } else {
+            PinnedRootEvidence::Unavailable
+        },
+    )]
+    .into_iter()
+    .collect()
 }
 
 fn pinned_issue() -> Issue {
@@ -472,39 +507,45 @@ fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_worki
     let repo = Repo::new();
     repo.write("docs/history.html", r#"<img src="working-tree-bait.png">"#);
     repo.write("docs/working-tree-bait.png", "bait");
+    let issues = [pinned_issue()];
     let inventory = inventory_explicit_roots(
-        &[pinned_issue()],
+        &issues,
         &HierarchyConfig::default(),
         ExplicitRootTarget::Container("history"),
-        &PinResolver { readable: true },
+        &pin_evidence(true),
     )
     .unwrap();
 
-    let discovered = discover_artifact_dependencies(&repo.storage, inventory).unwrap();
-    assert_eq!(discovered.artifacts().len(), 1);
-    let historical = &discovered.artifacts()[0];
+    let discovered = discover_archive_artifacts(&repo.storage, inventory, &issues)
+        .unwrap()
+        .0;
+    assert_eq!(discovered.artifacts.len(), 1);
+    let historical = &discovered.artifacts[0];
     assert!(historical.version().is_pinned());
     assert!(historical.edges().is_empty());
     assert!(historical.content_identity().is_none());
-    assert!(discovered.blockers().is_empty());
+    assert!(discovered.blockers.is_empty());
 }
 
 #[test]
 fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallback() {
     let repo = Repo::new();
     repo.write("docs/history.html", "working-tree fallback bait");
+    let issues = [pinned_issue()];
     let inventory = inventory_explicit_roots(
-        &[pinned_issue()],
+        &issues,
         &HierarchyConfig::default(),
         ExplicitRootTarget::Container("history"),
-        &PinResolver { readable: false },
+        &pin_evidence(false),
     )
     .unwrap();
 
-    let discovered = discover_artifact_dependencies(&repo.storage, inventory).unwrap();
-    assert!(discovered.artifacts().is_empty());
-    assert_eq!(discovered.blockers().len(), 1);
-    assert_eq!(discovered.blockers()[0].code, BlockerCode::PinnedReadFailed);
+    let discovered = discover_archive_artifacts(&repo.storage, inventory, &issues)
+        .unwrap()
+        .0;
+    assert!(discovered.artifacts.is_empty());
+    assert_eq!(discovered.blockers.len(), 1);
+    assert_eq!(discovered.blockers[0].code, BlockerCode::PinnedReadFailed);
 }
 
 #[cfg(unix)]
@@ -538,7 +579,7 @@ fn test_symlinked_source_root_is_retained_without_parsing_referent_edges() {
             .collect::<Vec<_>>(),
         ["docs/root.md"]
     );
-    assert!(discovered.artifacts()[0].edges().is_empty());
+    assert!(discovered.artifacts[0].edges().is_empty());
 }
 
 #[cfg(unix)]
@@ -572,7 +613,7 @@ fn test_source_beneath_symlinked_directory_is_not_parsed_or_traversed() {
             .collect::<Vec<_>>(),
         ["docs/bundle/root.md"]
     );
-    assert!(discovered.artifacts()[0].edges().is_empty());
+    assert!(discovered.artifacts[0].edges().is_empty());
 }
 
 #[cfg(unix)]
