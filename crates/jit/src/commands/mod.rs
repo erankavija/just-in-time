@@ -1592,11 +1592,20 @@ pub(crate) fn validation_overlay(
         .collect()
 }
 
-/// Map a repository-relative path to its canonical virtual path (`.jit/...` is
-/// `Data`, everything else `Worktree`).
+/// Map a configured repository-relative path to its canonical virtual path
+/// (`.jit/...` is `Data`, everything else `Worktree`).
+///
+/// Configuration accepts leading `./` components as repository-relative
+/// spelling. The typed path remains canonical and rejects every other lexical
+/// normalization, including an empty path after removing those components.
 pub(crate) fn repo_rel_virtual_path(path: &str) -> Result<crate::repository_state::VirtualPath> {
     use crate::repository_state::VirtualPath;
+    let path = path.trim_start_matches("./");
+    if path.is_empty() {
+        anyhow::bail!("repository-relative path must name a descendant");
+    }
     match path.strip_prefix(".jit/") {
+        Some("") => anyhow::bail!("repository-relative path must name a descendant"),
         Some(rest) => Ok(VirtualPath::data(rest)?),
         None => Ok(VirtualPath::worktree(path)?),
     }
@@ -3250,6 +3259,40 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_repo_rel_virtual_path_normalizes_only_leading_current_directory_components() {
+        use crate::repository_state::VirtualPath;
+
+        assert_eq!(
+            repo_rel_virtual_path("./scripts/code-review-prompt.md").unwrap(),
+            VirtualPath::worktree("scripts/code-review-prompt.md").unwrap()
+        );
+        assert_eq!(
+            repo_rel_virtual_path("././.jit/gates.toml").unwrap(),
+            VirtualPath::data("gates.toml").unwrap()
+        );
+
+        let control = format!("./scripts/{}prompt", '\u{0007}');
+        for path in [
+            "",
+            "./",
+            "././",
+            ".jit/",
+            "./.jit/",
+            "../outside",
+            "./../outside",
+            "/absolute",
+            "./scripts/./prompt",
+            "./scripts//prompt",
+            "./scripts\\prompt",
+            "./C:/prompt",
+            control.as_str(),
+        ] {
+            assert!(repo_rel_virtual_path(path).is_err(), "{path:?}");
+        }
+        assert!(VirtualPath::worktree("./scripts/code-review-prompt.md").is_err());
+    }
 
     #[test]
     fn test_publish_repository_export_retries_apply_conflict() {

@@ -287,7 +287,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         let effective = |image: &crate::repository_state::RepositoryImage,
                          repo_rel: &str|
          -> Result<Option<Vec<u8>>> {
-            let vpath = repo_rel_virtual_path(repo_rel)?;
+            let vpath = super::repo_rel_virtual_path(repo_rel)?;
             match overrides.get(&vpath) {
                 Some(value) => Ok(value.clone()),
                 None => super::image_repo_bytes(image, repo_rel),
@@ -534,16 +534,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             "derived-state repair did not converge after repeated capture conflicts"
         ))
     }
-}
-
-/// The canonical [`VirtualPath`](crate::repository_state::VirtualPath) for a
-/// repo-relative path (`.jit/...` is `Data`, everything else `Worktree`).
-fn repo_rel_virtual_path(repo_rel: &str) -> Result<crate::repository_state::VirtualPath> {
-    use crate::repository_state::VirtualPath;
-    Ok(match repo_rel.strip_prefix(".jit/") {
-        Some(rest) => VirtualPath::data(rest),
-        None => VirtualPath::worktree(repo_rel),
-    }?)
 }
 
 /// Effective-bytes byte source over a captured image and a proposed overlay.
