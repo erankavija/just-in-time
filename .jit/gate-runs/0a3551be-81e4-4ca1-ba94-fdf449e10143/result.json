@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "c5b350927d2962ee6a144a2e25d33ded2c09ec93",
+  "completed_at": "2026-07-22T22:55:58.350643452Z",
+  "duration_ms": 304324,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "661d6be2-e28b-463d-be93-58ee3e20e663",
+  "message": null,
+  "run_id": "0a3551be-81e4-4ca1-ba94-fdf449e10143",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-22T22:50:54.026443806Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest repo_discovery_tests::test_status_discovers_repo_from_inside_dot_jit ... FAILED\ntest result: FAILED. 283 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 50.09s\n---- repo_discovery_tests::test_status_discovers_repo_from_inside_dot_jit stdout ----\n\nthread 'repo_discovery_tests::test_status_discovers_repo_from_inside_dot_jit' (2137175) panicked at crates/jit/tests/cli_repo_workflow/repo_discovery_tests.rs:74:5:\nstatus from inside .jit/issues failed: stderr=Error: worktree root '/home/vkaskivuo/.cache/jit-cargo-ci-tmp/.tmpdYdN4F/.jit/issues' and data root '/home/vkaskivuo/.cache/jit-cargo-ci-tmp/.tmpdYdN4F/.jit' overlap ambiguously\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1169 bytes=20377152)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1255664096/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}
