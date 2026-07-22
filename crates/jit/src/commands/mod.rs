@@ -514,6 +514,7 @@ struct CapturedFieldUpdate {
     state: Option<State>,
     add_labels: Vec<String>,
     remove_labels: Vec<String>,
+    label_edit: Option<CapturedLabelEdit>,
     content_format: Option<Option<crate::domain::ContentFormat>>,
     issue_type: Option<String>,
     add_gates: Vec<String>,
@@ -523,6 +524,36 @@ struct CapturedFieldUpdate {
     bulk: bool,
     force: bool,
     enforce_lease: bool,
+}
+
+#[derive(Clone)]
+enum CapturedLabelEdit {
+    AppendUnchecked(String),
+    ReplaceExact { old: String, new: String },
+}
+
+impl CapturedFieldUpdate {
+    fn label_edit(issue_id: String, label_edit: CapturedLabelEdit) -> Self {
+        Self {
+            issue_id,
+            title: None,
+            description: None,
+            priority: None,
+            state: None,
+            add_labels: Vec::new(),
+            remove_labels: Vec::new(),
+            label_edit: Some(label_edit),
+            content_format: None,
+            issue_type: None,
+            add_gates: Vec::new(),
+            remove_gates: Vec::new(),
+            assignee: None,
+            unassign: false,
+            bulk: false,
+            force: false,
+            enforce_lease: false,
+        }
+    }
 }
 
 struct DerivedFieldUpdate {
@@ -825,6 +856,17 @@ fn derive_field_update(
     for label in &request.remove_labels {
         issue.labels.retain(|candidate| candidate != label);
     }
+    match &request.label_edit {
+        Some(CapturedLabelEdit::AppendUnchecked(label)) => issue.labels.push(label.clone()),
+        Some(CapturedLabelEdit::ReplaceExact { old, new })
+            if issue.labels.iter().any(|label| label == old) =>
+        {
+            issue.labels.retain(|label| label != old);
+            issue.labels.push(new.clone());
+        }
+        Some(CapturedLabelEdit::ReplaceExact { .. }) => {}
+        None => {}
+    }
     let missing_gates = request
         .add_gates
         .iter()
@@ -909,12 +951,42 @@ fn derive_field_update(
     if let Some(target) = target {
         projected.state = target;
     }
-    let validation = derive_write_validation(
-        &projected,
-        evidence.declarations,
-        evidence.config,
-        request.force,
-    )?;
+    let validation = match &request.label_edit {
+        Some(CapturedLabelEdit::AppendUnchecked(_)) => {
+            let repo_format = evidence
+                .config
+                .validation
+                .as_ref()
+                .map(crate::config::ValidationConfig::content_format)
+                .transpose()?
+                .unwrap_or(crate::domain::ContentFormat::Markdown);
+            let evaluation = crate::validation::evaluate_local(
+                &projected,
+                &evidence.declarations.rules,
+                repo_format,
+            )
+            .map_err(|error| anyhow!("rule evaluation failed: {error}"))?;
+            WriteValidation {
+                warnings: evaluation
+                    .findings()
+                    .into_iter()
+                    .filter(|finding| finding.severity != crate::declarations::rules::Severity::Off)
+                    .map(|finding| format!("[{}] {}", finding.rule, finding.message))
+                    .collect(),
+                bypassed_rules: Vec::new(),
+            }
+        }
+        Some(CapturedLabelEdit::ReplaceExact { .. }) => WriteValidation {
+            warnings: Vec::new(),
+            bypassed_rules: Vec::new(),
+        },
+        None => derive_write_validation(
+            &projected,
+            evidence.declarations,
+            evidence.config,
+            request.force,
+        )?,
+    };
     if request.issue_type.is_some() {
         let repo_format = evidence
             .config
@@ -983,7 +1055,7 @@ fn derive_field_update(
             events.push((4, Event::draft_issue_claimed(issue.id.clone(), assignee)));
         }
     }
-    if !changed_fields.is_empty() {
+    if !changed_fields.is_empty() && request.label_edit.is_none() {
         events.push((
             5,
             Event::draft_issue_updated(
@@ -1948,34 +2020,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         ))
     }
 
-    /// Transitional boundary for callers that still publish records loaded before
-    /// session capture. New callers must use a closed semantic request instead.
-    fn publish_ambient_issue_mutation(
-        &self,
-        updates: Vec<Issue>,
-        events: Vec<(u8, Event)>,
-    ) -> Result<()>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::repository_state::MutationIntent;
-        let intents = updates
-            .into_iter()
-            .map(|issue| MutationIntent::UpdateIssue {
-                issue: Box::new(issue),
-            })
-            .chain(
-                events
-                    .into_iter()
-                    .map(|(phase, event)| MutationIntent::RecordEvent {
-                        phase,
-                        event: Box::new(event),
-                    }),
-            )
-            .collect();
-        self.publish_repository_mutation(intents).map(|_| ())
-    }
-
     fn publish_issue_creation(&self, draft: Issue, bypassed_rules: &[String]) -> Result<String>
     where
         S: crate::storage::RepositoryStateStore,
@@ -2388,6 +2432,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             state: operations.state,
             add_labels: operations.add_labels.clone(),
             remove_labels: operations.remove_labels.clone(),
+            label_edit: None,
             content_format: None,
             issue_type: None,
             add_gates: operations.add_gates.clone(),

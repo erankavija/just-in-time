@@ -21,33 +21,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let mut issue = self.storage.load_issue(&full_id)?;
-
         // This path is only reached internally from `jit issue reject --reason`
         // (adding a `resolution:` label); reject deliberately BYPASSES rule
         // ENFORCEMENT, so label format / uniqueness / registry checks are NOT
         // applied as blockers here — they live solely in the default rule set and
         // are surfaced below only as non-blocking WARNINGS (a0f0f342 migration: no
         // inline `validate_label` / uniqueness reject remains).
-        issue.labels.push(label.to_string());
-
-        // Surface non-blocking warnings from the effective rule set (built-in
-        // defaults + user rules). This path never blocks, so enforce findings are
-        // reported as warnings too.
-        let rules = self.effective_rules()?;
-        let repo_format = self.repo_content_format()?;
-        let evaluation = crate::validation::evaluate_local(&issue, rules, repo_format)
-            .map_err(|err| anyhow!("rule evaluation failed: {err}"))?;
-        let warnings: Vec<String> = evaluation
-            .findings()
-            .into_iter()
-            .filter(|f| f.severity != crate::declarations::rules::Severity::Off)
-            .map(|f| format!("[{}] {}", f.rule, f.message))
-            .collect();
-
-        self.publish_ambient_issue_mutation(vec![issue], Vec::new())?;
-        Ok(warnings)
+        Ok(self
+            .publish_captured_field_update(CapturedFieldUpdate::label_edit(
+                issue_id.to_string(),
+                CapturedLabelEdit::AppendUnchecked(label.to_string()),
+            ))?
+            .warnings)
     }
 
     pub fn list_label_values(&self, namespace: &str) -> Result<Vec<String>> {
@@ -67,5 +52,70 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut result: Vec<String> = values.into_iter().collect();
         result.sort();
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::commands::test_helpers::{memory_executor, with_open_race, OpenRaceAction};
+    use crate::commands::CommandExecutor;
+    use crate::domain::Priority;
+    use crate::storage::{InMemoryStorage, IssueStore};
+
+    fn create_issue(executor: &CommandExecutor<InMemoryStorage>, title: &str) -> String {
+        executor
+            .create_issue(
+                title.to_string(),
+                String::new(),
+                Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )
+            .unwrap()
+            .0
+    }
+
+    #[test]
+    fn test_add_label_recaptures_after_concurrent_issue_change() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        let executor = memory_executor(storage.clone());
+        let id = create_issue(&executor, "Label race");
+
+        let mut concurrent = storage.load_issue(&id).unwrap();
+        concurrent.labels.push("owner:concurrent".to_string());
+        let raced = with_open_race(storage, 2, OpenRaceAction::Save(Box::new(concurrent)));
+        let executor = memory_executor(raced.clone());
+
+        executor.add_label(&id, "resolution:done").unwrap();
+
+        let labels = raced.load_issue(&id).unwrap().labels;
+        assert!(labels.iter().any(|label| label == "owner:concurrent"));
+        assert!(labels.iter().any(|label| label == "resolution:done"));
+    }
+
+    #[test]
+    fn test_add_label_preserves_unchecked_duplicate_append_behavior() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        let executor = memory_executor(storage.clone());
+        let id = create_issue(&executor, "Duplicate label");
+
+        executor.add_label(&id, "resolution:done").unwrap();
+        executor.add_label(&id, "resolution:done").unwrap();
+
+        assert_eq!(
+            storage
+                .load_issue(&id)
+                .unwrap()
+                .labels
+                .iter()
+                .filter(|label| label.as_str() == "resolution:done")
+                .count(),
+            2
+        );
     }
 }

@@ -431,6 +431,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 state,
                 add_labels,
                 remove_labels,
+                label_edit: None,
                 content_format,
                 issue_type,
                 add_gates: Vec::new(),

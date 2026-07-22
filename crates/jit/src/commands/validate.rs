@@ -810,19 +810,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let mut issue = self.storage.load_issue(issue_id)?;
-
         // Replace the type label
         let old_label = label_utils::type_label(old_type);
         let new_label = label_utils::type_label(new_type);
 
-        issue.labels.retain(|l| l != &old_label);
-        issue.labels.push(new_label);
-
-        // Publish the relabel as a semantic full-issue update through the recovered
-        // session; the finalizer stamps `updated_at` and reconciles the lifecycle
-        // timestamps from the captured preimage.
-        self.publish_ambient_issue_mutation(vec![issue], Vec::new())
+        self.publish_captured_field_update(CapturedFieldUpdate::label_edit(
+            issue_id.to_string(),
+            CapturedLabelEdit::ReplaceExact {
+                old: old_label,
+                new: new_label,
+            },
+        ))
+        .map(|_| ())
     }
 
     // Note: apply_dependency_reversal is removed - we don't reverse dependencies
@@ -2448,6 +2447,76 @@ mod tests {
         // A second --fix run is a no-op: the derived state is already coherent.
         let (again, _) = executor.validate_with_fix(true, false).unwrap();
         assert_eq!(again, 0, "repair must be idempotent");
+    }
+
+    #[test]
+    fn test_validate_type_fix_is_noop_after_captured_repair() {
+        use crate::commands::test_helpers::memory_executor;
+        use crate::storage::{InMemoryStorage, IssueStore};
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        storage.add_repo_file(
+            ".jit/config.toml",
+            "[worktree]\nenforce_leases = \"off\"\n\
+             [type_hierarchy.types]\ntask = 4\n\
+             [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        );
+        let mut executor = memory_executor(storage.clone());
+        let id = executor
+            .create_issue(
+                "Type fix no-op".to_string(),
+                String::new(),
+                Priority::Normal,
+                Vec::new(),
+                vec!["type:taks".to_string()],
+                None,
+                None,
+                true,
+            )
+            .unwrap()
+            .0;
+
+        let (first, _) = executor.validate_with_fix(true, false).unwrap();
+        assert!(first > 0);
+        let repaired = storage.load_issue(&id).unwrap();
+        assert!(repaired.labels.iter().any(|label| label == "type:task"));
+        assert!(!repaired.labels.iter().any(|label| label == "type:taks"));
+
+        let (second, _) = executor.validate_with_fix(true, false).unwrap();
+        assert_eq!(second, 0, "a captured type repair must not repeat");
+    }
+
+    #[test]
+    fn test_apply_type_fix_preserves_concurrent_type_correction() {
+        use crate::commands::test_helpers::{memory_executor, with_open_race, OpenRaceAction};
+        use crate::storage::{InMemoryStorage, IssueStore};
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        let executor = memory_executor(storage.clone());
+        let id = executor
+            .create_issue(
+                "Type fix race".to_string(),
+                String::new(),
+                Priority::Normal,
+                Vec::new(),
+                vec!["type:taks".to_string()],
+                None,
+                None,
+                true,
+            )
+            .unwrap()
+            .0;
+
+        let mut issue = storage.load_issue(&id).unwrap();
+        issue.labels = vec!["type:story".to_string()];
+        let raced = with_open_race(storage, 2, OpenRaceAction::Save(Box::new(issue)));
+        let executor = memory_executor(raced.clone());
+
+        executor.apply_type_fix(&id, "taks", "task").unwrap();
+
+        assert_eq!(raced.load_issue(&id).unwrap().labels, ["type:story"]);
     }
 
     #[test]
