@@ -374,8 +374,10 @@
     {
       "category": "rework-exceeded",
       "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-22T18:38:53+03:00",
+      "resolved_at": "2026-07-22T18:50:56+03:00",
+      "resolution": "Invoker selected option 1 and authorized one final tightly bounded correction with a counter reset, limited to the four independently reviewed defect classes and one independent final review.",
       "situation": "The invoker-authorized fixture correction reached rework attempt two. Final semantic and architectural reviews agree that equivalent relative and absolute JIT_DATA_DIR spellings choose different profile worktree roots because the explicit path is compared before lexical normalization. Architectural review additionally found that coordinates_claims_first groups nested enums instead of exhaustively classifying leaves, incorrectly marks dep rm claim-first despite RemoveBatch disabling lease enforcement, exposes RepositoryIndex publicly only for fixture seeding without validating invariants on serialization, and leaves two profile-finalizer comments inconsistent with finalizer ownership. The package is net-negative (1506 additions, 2239 deletions), formatting/Clippy/MCP pass, and the full Rust workspace reaches only one pre-existing exact-policy-text failure, but acceptance remains blocked.",
       "recommendation": "Authorize one final tightly bounded correction with a counter reset: normalize the selected explicit data root before root-authority comparison and add equivalent-path coverage; replace the claim-lock grouping with exhaustive per-leaf classification and a complete inventory test, excluding dep rm; keep RepositoryIndex internal behind an explicit aggregate fixture boundary or make a complete invariant-validating public codec; correct the two comments; then rerun focused/full gates and one independent final review. Do not restore any deleted publisher, add a compatibility fallback, or broaden production behavior."
     }
@@ -385,7 +387,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 2
+    "49adf23b": 0
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
