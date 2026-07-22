@@ -8617,3 +8617,11 @@
 {"fields":["description"],"id":"62a74f4e-fe43-4675-8e1f-983b60dfa6c9","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:47:26.627068337Z","type":"issue_updated","updated_by":"issue-update"}
 {"from":"ready","id":"7d2b105e-a021-428c-be14-d509bdeb4a35","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:47:34.262037434Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"d8c22514-1fce-495b-b960-71d4a22248fe","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:47:34.262037434Z","type":"issue_claimed"}
+{"gate_key":"jit-validate","id":"a1ca81d5-ac6d-47a9-8ead-af63036c81ec","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:49:53.341067217Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"npm-ci","id":"6518b482-f3e8-4a5b-a272-90d287966644","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:50:23.151879482Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"3e530d12-1bef-4766-8af9-50f8bfdd79df","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:50:37.787723076Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci-features","id":"887cf8b7-3076-49de-91a2-5d200ded19c0","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:53:08.076500739Z","type":"gate_added"}
+{"gate_key":"dependency-audit","id":"8959978d-06d9-4112-97d3-bf2c55777cc1","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:53:08.076500739Z","type":"gate_added"}
+{"gate_key":"repo-validate","id":"de1fa17b-69fa-48aa-b537-514df22182a1","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:53:08.076500739Z","type":"gate_added"}
+{"gate_key":"secret-detection","id":"d9f2dd80-686d-464a-ab51-e2821778e215","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:53:08.076500739Z","type":"gate_added"}
+{"gate_key":"security-review","id":"e1ee1424-9807-4b53-a34c-b07c03bef227","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:53:08.076500739Z","type":"gate_added"}
