@@ -57,7 +57,7 @@ fn seed_epic(executor: &CommandExecutor<InMemoryStorage>) -> String {
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
     let id = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
     id
 }
 

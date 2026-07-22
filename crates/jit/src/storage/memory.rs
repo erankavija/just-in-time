@@ -3,11 +3,11 @@
 //! This backend stores all data in RAM using HashMaps, providing 10-100x faster
 //! test execution compared to JSON file I/O. Thread-safe for concurrent access.
 
-use crate::declarations::{parse_gate_registry, serialize_gate_registry, GateRegistry};
+use crate::declarations::{parse_gate_registry, GateRegistry};
 use crate::domain::{Event, GateRunResult, Issue};
 use crate::repository_state::{
-    gate_run_result_relative_path, serialize_event, serialize_issue, EntryIdentity, FileMode,
-    RepositoryEntry, RepositoryRootClass, RootRelativePath, VirtualPath,
+    gate_run_result_relative_path, EntryIdentity, FileMode, RepositoryEntry, RepositoryRootClass,
+    RootRelativePath, VirtualPath,
 };
 use crate::storage::{
     AmbiguousIdError, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError, IssueStore,
@@ -223,7 +223,7 @@ impl InMemoryStorage {
     /// aggregate repository image: a `.jit/`-prefixed path is a `Data(...)` entry,
     /// every other repo-relative path a `Worktree(...)` entry. This is the SAME
     /// mapping the materialization producers and command capture specs use, so a
-    /// file written through [`IssueStore::write_repo_file`] is captured by a
+    /// file seeded through [`InMemoryStorage::add_repo_file`] is captured by a
     /// mutation session under the identical key.
     fn repo_file_vpath(
         rel_path: &str,
@@ -303,10 +303,6 @@ impl InMemoryStorage {
         VirtualPath::data(format!("issues/{id}.json")).expect("issue record path is canonical")
     }
 
-    fn index_vpath() -> VirtualPath {
-        VirtualPath::data("index.json").expect("issue index path is canonical")
-    }
-
     /// Canonical `Data(...)` identity for one gate-run result.
     fn gate_run_vpath(run_id: &str) -> Result<VirtualPath> {
         Ok(VirtualPath::data(
@@ -364,10 +360,8 @@ impl InMemoryStorage {
         VirtualPath::data("events.jsonl").expect("audit log path is canonical")
     }
 
-    /// Publish `bytes` as the captured `File` entry for `vpath` in the aggregate
-    /// image, marking the data root existing. This is the single byte-writing
-    /// path behind every repository-owned typed record so that seeded state,
-    /// per-method writes, and session-published deltas share one store.
+    /// Publish a malformed fixture as a captured `File` entry.
+    #[cfg(test)]
     fn put_data_entry(state: &mut MemoryRepositoryState, vpath: VirtualPath, bytes: Vec<u8>) {
         let object = vpath.relative().as_str().to_owned();
         let identity =
@@ -483,31 +477,6 @@ impl InMemoryStorage {
             })
             .collect()
     }
-
-    /// Insert `issue` under the repository write lock.
-    ///
-    /// The write path behind [`IssueStore::save_issue`]. The issue is persisted
-    /// as its canonical bytes in the aggregate image, exactly as a mutation
-    /// session publishes it.
-    fn persist_issue(&self, issue: Issue) -> Result<()> {
-        let _repo_lock = self.repo_lock.acquire()?;
-        let bytes = serialize_issue(&issue).map_err(|e| anyhow!("{e}"))?;
-        let mut state = self.repository_state();
-        let mut index = Self::data_entry_bytes(&state, &Self::index_vpath())
-            .map(|bytes| crate::repository_state::RepositoryIndex::parse(&bytes))
-            .transpose()
-            .map_err(|error| anyhow!(error))?
-            .unwrap_or_default();
-        if !index.all_ids.contains(&issue.id) {
-            index.all_ids.push(issue.id.clone());
-            index.all_ids.sort();
-        }
-        index.deleted_ids.retain(|id| id != &issue.id);
-        let index_bytes = index.to_pretty_bytes()?;
-        Self::put_data_entry(&mut state, Self::issue_vpath(&issue.id), bytes);
-        Self::put_data_entry(&mut state, Self::index_vpath(), index_bytes);
-        Ok(())
-    }
 }
 
 impl Default for InMemoryStorage {
@@ -519,12 +488,6 @@ impl Default for InMemoryStorage {
 impl IssueStore for InMemoryStorage {
     fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard> {
         self.repo_lock.acquire()
-    }
-
-    fn save_issue(&self, mut issue: Issue) -> Result<()> {
-        // Update the updated_at timestamp (storage responsibility)
-        issue.updated_at = chrono::Utc::now();
-        self.persist_issue(issue)
     }
 
     fn load_issue(&self, id: &str) -> Result<Issue> {
@@ -596,30 +559,6 @@ impl IssueStore for InMemoryStorage {
                 .context("Failed to deserialize gate registry from repository image"),
             None => Ok(GateRegistry::default()),
         }
-    }
-
-    fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
-        let _repo_lock = self.repo_lock.acquire()?;
-        let bytes = serialize_gate_registry(registry).map_err(|e| anyhow!("{e}"))?;
-        Self::put_data_entry(
-            &mut self.repository_state(),
-            Self::gate_registry_vpath(),
-            bytes,
-        );
-        Ok(())
-    }
-
-    fn append_event(&self, event: &Event) -> Result<()> {
-        let _repo_lock = self.repo_lock.acquire()?;
-        let mut line = serialize_event(event).map_err(|e| anyhow!("{e}"))?;
-        line.push(b'\n');
-        let mut state = self.repository_state();
-        // Append to the exact captured audit-log bytes, preserving every prior
-        // byte, exactly as the canonical finalizer appends one JSONL record.
-        let mut bytes = Self::data_entry_bytes(&state, &Self::events_vpath()).unwrap_or_default();
-        bytes.extend_from_slice(&line);
-        Self::put_data_entry(&mut state, Self::events_vpath(), bytes);
-        Ok(())
     }
 
     fn read_events(&self) -> Result<Vec<Event>> {
@@ -744,18 +683,6 @@ impl IssueStore for InMemoryStorage {
         })
     }
 
-    fn write_repo_file(
-        &self,
-        rel_path: &str,
-        content: &str,
-    ) -> Result<(), crate::storage::PathReadError> {
-        // Enforce the SAME repo-relative path contract as JsonFileStorage (reject
-        // empty, absolute, or `..`-bearing paths), then store into the aggregate
-        // repository image. A subsequent `read_repo_file` for the same path returns
-        // the written content, and a mutation session captures the same bytes.
-        self.insert_repo_file(rel_path, content)
-    }
-
     fn read_path_bytes(
         &self,
         path: &str,
@@ -806,8 +733,6 @@ impl IssueStore for InMemoryStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::declarations::GateDefinition;
-    use crate::domain::{Priority, State};
 
     fn gate_run_parent_entry(kind: &str) -> RepositoryEntry {
         let identity =
@@ -1002,39 +927,6 @@ mod tests {
     }
 
     #[test]
-    fn test_save_and_load_issue() {
-        let storage = InMemoryStorage::new();
-
-        let issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
-        storage.save_issue(issue.clone()).unwrap();
-
-        let loaded = storage.load_issue(&issue.id).unwrap();
-        assert_eq!(loaded.id, issue.id);
-        assert_eq!(loaded.title, "Test");
-        assert_eq!(loaded.description, "Description");
-    }
-
-    #[test]
-    fn test_save_updates_existing_issue() {
-        let storage = InMemoryStorage::new();
-
-        let mut issue =
-            crate::domain::types::fixture_issue("Original".to_string(), "Desc".to_string());
-        storage.save_issue(issue.clone()).unwrap();
-
-        issue.title = "Updated".to_string();
-        storage.save_issue(issue.clone()).unwrap();
-
-        let loaded = storage.load_issue(&issue.id).unwrap();
-        assert_eq!(loaded.title, "Updated");
-
-        // Should only have one issue
-        let issues = storage.list_issues().unwrap();
-        assert_eq!(issues.len(), 1);
-    }
-
-    #[test]
     fn test_load_nonexistent_issue_fails() {
         let storage = InMemoryStorage::new();
 
@@ -1044,158 +936,11 @@ mod tests {
     }
 
     #[test]
-    fn test_list_issues() {
-        let storage = InMemoryStorage::new();
-
-        let issue1 =
-            crate::domain::types::fixture_issue("Issue 1".to_string(), "First".to_string());
-        let issue2 =
-            crate::domain::types::fixture_issue("Issue 2".to_string(), "Second".to_string());
-
-        storage.save_issue(issue1.clone()).unwrap();
-        storage.save_issue(issue2.clone()).unwrap();
-
-        let issues = storage.list_issues().unwrap();
-        assert_eq!(issues.len(), 2);
-
-        let titles: Vec<_> = issues.iter().map(|i| i.title.as_str()).collect();
-        assert!(titles.contains(&"Issue 1"));
-        assert!(titles.contains(&"Issue 2"));
-    }
-
-    #[test]
     fn test_list_issues_empty() {
         let storage = InMemoryStorage::new();
 
         let issues = storage.list_issues().unwrap();
         assert_eq!(issues.len(), 0);
-    }
-
-    #[test]
-    fn test_gate_registry_operations() {
-        let storage = InMemoryStorage::new();
-
-        let registry = storage.load_gate_registry().unwrap();
-        assert_eq!(registry.gates.len(), 0);
-
-        let mut new_registry = GateRegistry::default();
-        let gate = GateDefinition {
-            version: 1,
-            key: "test-gate".to_string(),
-            title: "Test Gate".to_string(),
-            description: "A test gate".to_string(),
-            stage: crate::declarations::GateStage::Postcheck,
-            mode: crate::declarations::GateMode::Manual,
-            checker: None,
-            priority: 100,
-            reserved: std::collections::HashMap::new(),
-            auto: false,
-            example_integration: None,
-        };
-        new_registry.gates.insert("test-gate".to_string(), gate);
-
-        storage.save_gate_registry(&new_registry).unwrap();
-
-        let loaded = storage.load_gate_registry().unwrap();
-        assert_eq!(loaded.gates.len(), 1);
-        assert!(loaded.gates.contains_key("test-gate"));
-    }
-
-    #[test]
-    fn test_event_log_operations() {
-        let storage = InMemoryStorage::new();
-
-        let issue =
-            crate::domain::types::fixture_issue("Event test".to_string(), "Test".to_string());
-        let event = Event::draft_issue_created(&issue);
-
-        storage.append_event(&event).unwrap();
-
-        let events = storage.read_events().unwrap();
-        assert_eq!(events.len(), 1);
-        matches!(events[0], Event::IssueCreated { .. });
-    }
-
-    #[test]
-    fn test_multiple_events() {
-        let storage = InMemoryStorage::new();
-
-        let issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), "Test".to_string());
-        let issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), "Test".to_string());
-
-        storage
-            .append_event(&Event::draft_issue_created(&issue1))
-            .unwrap();
-        storage
-            .append_event(&Event::draft_issue_created(&issue2))
-            .unwrap();
-
-        let events = storage.read_events().unwrap();
-        assert_eq!(events.len(), 2);
-    }
-
-    #[test]
-    fn test_clone_shares_storage() {
-        let storage1 = InMemoryStorage::new();
-
-        let issue1 =
-            crate::domain::types::fixture_issue("Issue 1".to_string(), "In storage 1".to_string());
-        storage1.save_issue(issue1.clone()).unwrap();
-
-        // Clone shares the same underlying storage (via RefCell)
-        let storage2 = storage1.clone();
-        let loaded = storage2.load_issue(&issue1.id).unwrap();
-        assert_eq!(loaded.title, "Issue 1");
-
-        // Verify they share the same underlying storage
-        let issue2 =
-            crate::domain::types::fixture_issue("Issue 2".to_string(), "In storage 2".to_string());
-        storage2.save_issue(issue2.clone()).unwrap();
-
-        // Both see the same data because they share the RefCell
-        let issues1 = storage1.list_issues().unwrap();
-        let issues2 = storage2.list_issues().unwrap();
-        assert_eq!(issues1.len(), 2);
-        assert_eq!(issues2.len(), 2);
-    }
-
-    #[test]
-    fn test_save_issue_updates_canonical_index_membership() {
-        let storage = InMemoryStorage::new();
-        let issue = crate::domain::types::fixture_issue("Indexed".to_string(), String::new());
-
-        storage.save_issue(issue.clone()).unwrap();
-
-        let state = storage.repository_state();
-        let bytes = InMemoryStorage::data_entry_bytes(&state, &InMemoryStorage::index_vpath())
-            .expect("legacy save publishes index bytes");
-        let index = crate::repository_state::RepositoryIndex::parse(&bytes).unwrap();
-        assert_eq!(index.all_ids, vec![issue.id]);
-        assert!(index.deleted_ids.is_empty());
-    }
-
-    #[test]
-    fn test_works_with_complex_issue_state() {
-        let storage = InMemoryStorage::new();
-
-        let mut issue =
-            crate::domain::types::fixture_issue("Complex".to_string(), "Test".to_string());
-        issue.priority = Priority::Critical;
-        issue.state = State::InProgress;
-        issue.assignee = Some("agent:test".parse().unwrap());
-        issue.dependencies = vec!["dep1".to_string(), "dep2".to_string()];
-        issue.gates_required = vec!["gate1".to_string()];
-        issue.context.insert("key".to_string(), "value".to_string());
-
-        storage.save_issue(issue.clone()).unwrap();
-
-        let loaded = storage.load_issue(&issue.id).unwrap();
-        assert_eq!(loaded.priority, Priority::Critical);
-        assert_eq!(loaded.state, State::InProgress);
-        assert_eq!(loaded.assignee, Some("agent:test".parse().unwrap()));
-        assert_eq!(loaded.dependencies.len(), 2);
-        assert_eq!(loaded.gates_required.len(), 1);
-        assert_eq!(loaded.context.get("key").unwrap(), "value");
     }
 
     #[test]

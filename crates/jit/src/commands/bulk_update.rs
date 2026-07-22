@@ -559,9 +559,10 @@ mod tests {
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
-        storage
-            .save_issue(create_test_issue("test-1", State::Ready, vec!["type:task"]))
-            .unwrap();
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("test-1", State::Ready, vec!["type:task"]),
+        );
         // A clone shares the in-memory state, so we can read events after the
         // executor takes ownership of `storage`.
         let reader = storage.clone();
@@ -606,7 +607,7 @@ mod tests {
 
         // Create test issue
         let issue = create_test_issue("test-1", State::Ready, vec!["type:task"]);
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -636,15 +637,13 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Create test issues
-        storage
-            .save_issue(create_test_issue("1", State::Ready, vec![]))
-            .unwrap();
-        storage
-            .save_issue(create_test_issue("2", State::Ready, vec![]))
-            .unwrap();
-        storage
-            .save_issue(create_test_issue("3", State::InProgress, vec![]))
-            .unwrap();
+        for issue in [
+            create_test_issue("1", State::Ready, vec![]),
+            create_test_issue("2", State::Ready, vec![]),
+            create_test_issue("3", State::InProgress, vec![]),
+        ] {
+            crate::commands::test_helpers::seed_issue(&storage, issue);
+        }
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -674,9 +673,10 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage
-            .save_issue(create_test_issue("1", State::Done, vec![]))
-            .unwrap();
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("1", State::Done, vec![]),
+        );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -704,7 +704,7 @@ mod tests {
         // Create issue with unpassed gates
         let mut issue = create_test_issue("1", State::Gated, vec![]);
         issue.gates_required = vec!["tests".to_string()];
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -733,17 +733,19 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Create mix of valid and invalid issues
-        storage
-            .save_issue(create_test_issue("1", State::Ready, vec![]))
-            .unwrap();
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("1", State::Ready, vec![]),
+        );
 
         let mut blocked = create_test_issue("2", State::Ready, vec![]);
         blocked.gates_required = vec!["tests".to_string()];
-        storage.save_issue(blocked).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, blocked);
 
-        storage
-            .save_issue(create_test_issue("3", State::Ready, vec![]))
-            .unwrap();
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("3", State::Ready, vec![]),
+        );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -773,9 +775,10 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage
-            .save_issue(create_test_issue("1", State::Ready, vec!["type:task"]))
-            .unwrap();
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("1", State::Ready, vec!["type:task"]),
+        );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -806,9 +809,10 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Issue already has type:task label
-        storage
-            .save_issue(create_test_issue("1", State::Ready, vec!["type:task"]))
-            .unwrap();
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("1", State::Ready, vec!["type:task"]),
+        );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -836,9 +840,10 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage
-            .save_issue(create_test_issue("1", State::Ready, vec![]))
-            .unwrap();
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("1", State::Ready, vec![]),
+        );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -864,9 +869,10 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage
-            .save_issue(create_test_issue("1", State::Ready, vec![]))
-            .unwrap();
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("1", State::Ready, vec![]),
+        );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -921,13 +927,14 @@ mod tests {
     #[test]
     fn test_bulk_transition_emits_same_events_as_single_transitions() {
         use crate::query_engine::QueryFilter;
-        use crate::storage::{InMemoryStorage, IssueStore};
+        use crate::storage::InMemoryStorage;
 
         let seed = |storage: &InMemoryStorage| {
             for id in ["aaaa1111", "bbbb2222"] {
-                storage
-                    .save_issue(create_test_issue(id, State::Ready, vec!["type:task"]))
-                    .unwrap();
+                crate::commands::test_helpers::seed_issue(
+                    storage,
+                    create_test_issue(id, State::Ready, vec!["type:task"]),
+                );
             }
         };
 
@@ -978,19 +985,16 @@ mod tests {
     #[test]
     fn test_apply_operations_dependency_blocked_reports_same_typed_blockers() {
         use crate::errors::TransitionBlockedError;
-        use crate::storage::{InMemoryStorage, IssueStore};
+        use crate::storage::InMemoryStorage;
 
         let seed = |storage: &InMemoryStorage| {
-            storage
-                .save_issue(create_test_issue(
-                    "aaaa1111",
-                    State::Backlog,
-                    vec!["type:task"],
-                ))
-                .unwrap();
+            crate::commands::test_helpers::seed_issue(
+                storage,
+                create_test_issue("aaaa1111", State::Backlog, vec!["type:task"]),
+            );
             let mut blocked = create_test_issue("bbbb2222", State::Ready, vec!["type:task"]);
             blocked.dependencies = vec!["aaaa1111".to_string()];
-            storage.save_issue(blocked).unwrap();
+            crate::commands::test_helpers::seed_issue(storage, blocked);
         };
 
         let bulk_storage = InMemoryStorage::new();
@@ -1036,12 +1040,12 @@ mod tests {
     #[test]
     fn test_apply_operations_gate_blocked_reports_same_typed_blockers() {
         use crate::errors::TransitionBlockedError;
-        use crate::storage::{InMemoryStorage, IssueStore};
+        use crate::storage::InMemoryStorage;
 
         let seed = |storage: &InMemoryStorage| {
             let mut gated = create_test_issue("aaaa1111", State::Ready, vec!["type:task"]);
             gated.gates_required = vec!["tests".to_string()];
-            storage.save_issue(gated).unwrap();
+            crate::commands::test_helpers::seed_issue(storage, gated);
         };
 
         let bulk_storage = InMemoryStorage::new();
@@ -1088,9 +1092,10 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        storage
-            .save_issue(create_test_issue("1", State::Ready, vec!["type:task"]))
-            .unwrap();
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("1", State::Ready, vec!["type:task"]),
+        );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
 

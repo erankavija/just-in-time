@@ -31,7 +31,7 @@ fn save_legacy_archived(h: &TestHarness, id: &str) {
     let mut issue = h.get_issue(id);
     issue.state = State::Archived;
     issue.archived_from = None;
-    h.storage.save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue);
 }
 
 fn count_state_changes(h: &TestHarness, id: &str) -> usize {

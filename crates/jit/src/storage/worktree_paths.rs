@@ -27,12 +27,27 @@ impl WorktreePaths {
         Self::detect_from(&env::current_dir()?)
     }
 
+    /// Detect worktree context while using `non_git_root` as the worktree
+    /// authority when Git is unavailable.
+    ///
+    /// The caller has already selected a JIT data root and therefore knows
+    /// whether that selection came from ancestor discovery or from an explicit
+    /// init/override target. Git remains authoritative whenever `current` is in
+    /// a worktree.
+    pub fn detect_with_non_git_root(non_git_root: &Path) -> Result<Self> {
+        Self::detect_from_with_non_git_root(&env::current_dir()?, non_git_root)
+    }
+
     /// Detect worktree context from an explicitly selected repository root.
     ///
     /// This is the non-global counterpart to [`Self::detect`]. Validation views
     /// use it so machine-local claims coordination is checked for the repository
     /// being validated, even when that repository is not the process cwd.
     pub(crate) fn detect_from(current: &Path) -> Result<Self> {
+        Self::detect_from_with_non_git_root(current, current)
+    }
+
+    fn detect_from_with_non_git_root(current: &Path, non_git_root: &Path) -> Result<Self> {
         // Check if in git repo
         let is_repo = Command::new("git")
             .arg("-C")
@@ -43,11 +58,12 @@ impl WorktreePaths {
             .unwrap_or(false);
 
         if !is_repo {
-            let dot_git = current.join(".git");
+            let worktree_root = non_git_root.to_path_buf();
+            let dot_git = worktree_root.join(".git");
             return Ok(Self {
                 common_dir: dot_git.clone(),
-                worktree_root: current.to_path_buf(),
-                local_jit: current.join(".jit"),
+                local_jit: worktree_root.join(".jit"),
+                worktree_root,
                 shared_jit: dot_git.join("jit"),
             });
         }
@@ -127,10 +143,15 @@ mod tests {
 
     #[test]
     fn test_detect_in_non_git_directory() {
-        // REMOVED: This test changes global cwd which causes race conditions with other tests.
-        // The non-git-repo case is covered by WorktreePaths::detect() implementation
-        // when git commands fail (lines 38-54).
-        // Integration tests verify this behavior without changing global state.
+        let current = tempfile::tempdir().unwrap();
+        let selected_root = tempfile::tempdir().unwrap();
+
+        let paths =
+            WorktreePaths::detect_from_with_non_git_root(current.path(), selected_root.path())
+                .unwrap();
+
+        assert_eq!(paths.worktree_root, selected_root.path());
+        assert_eq!(paths.local_jit, selected_root.path().join(".jit"));
     }
 
     #[test]

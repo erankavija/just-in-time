@@ -48,7 +48,7 @@ fn test_validation_detects_broken_dependency() {
     // this shape before publication.
     let mut issue2 = storage.load_issue(&issue2_id).unwrap();
     issue2.dependencies = vec!["00000000-0000-0000-0000-000000000000".to_string()];
-    storage.save_issue(issue2).unwrap();
+    crate::harness::seed_memory_issue(&storage, &issue2);
 
     // Validation should fail
     let result = executor.validate_silent();
@@ -95,7 +95,7 @@ fn test_validation_detects_cycle() {
     // Manually create cycle by adding B -> A directly in storage
     let mut issue2_updated = storage.load_issue(&issue2_id).unwrap();
     issue2_updated.dependencies.push(issue1_id.clone());
-    storage.save_issue(issue2_updated.clone()).unwrap();
+    crate::harness::seed_memory_issue(&storage, &issue2_updated);
 
     // Validation should detect the cycle
     let result = executor.validate_silent();
@@ -177,7 +177,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
     let mut issue = storage.load_issue(&issue1_id).unwrap();
     issue.dependencies.push("nonexistent1".to_string());
     issue.dependencies.push("nonexistent2".to_string());
-    storage.save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(&storage, &issue);
 
     // Validation should fail
     let result = executor.validate_silent();

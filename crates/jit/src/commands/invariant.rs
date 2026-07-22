@@ -101,7 +101,7 @@ mod tests {
                 },
             );
         }
-        storage.save_gate_registry(&registry).unwrap();
+        crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
         CommandExecutor::new(storage)
     }
 

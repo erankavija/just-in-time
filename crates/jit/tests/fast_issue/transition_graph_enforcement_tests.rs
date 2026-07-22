@@ -62,7 +62,7 @@ fn seed_issue(
     let mut issue = executor.storage().load_issue(&id).unwrap();
     issue.labels = labels.iter().map(|s| s.to_string()).collect();
     issue.state = state;
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
     id
 }
 
@@ -332,7 +332,7 @@ fn test_gated_diversion_runs_before_graph_enforcement() {
     issue.state = State::InProgress;
     issue.gates_required = vec!["tests".to_string()];
     let epic = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
 
     // Register the gate so it is a valid reference, leaving it unpassed.
     executor.add_gate(&epic, "tests".to_string()).unwrap();
@@ -387,7 +387,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     issue.state = State::InProgress;
     issue.gates_required = vec!["tests".to_string()];
     let epic = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
     executor.add_gate(&epic, "tests".to_string()).unwrap();
 
     let result = executor.update_issue(
@@ -437,7 +437,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     issue.state = State::InProgress;
     issue.gates_required = vec!["tests".to_string()];
     let epic = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
     executor.add_gate(&epic, "tests".to_string()).unwrap();
 
     let result = executor.update_issue(
@@ -486,7 +486,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     issue.state = State::InProgress;
     issue.gates_required = vec!["tests".to_string()];
     let epic = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
     executor.add_gate(&epic, "tests".to_string()).unwrap();
 
     let result = executor.update_issue(
@@ -660,7 +660,7 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
         },
     );
     let epic = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
 
     // Drive the Gated arm: it runs postchecks, which try to auto-transition to
     // done. The enforce-at-done graph rule must block that auto-done.

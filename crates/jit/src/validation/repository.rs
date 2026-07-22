@@ -990,12 +990,18 @@ mod tests {
         executor(&repo)
             .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
-        let mut issue = crate::domain::types::fixture_issue(
-            "Root".to_string(),
-            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n".to_string(),
-        );
-        issue.labels = vec!["type:task".to_string()];
-        store.save_issue(issue).unwrap();
+        executor(&repo)
+            .create_issue(
+                "Root".to_string(),
+                "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                vec!["type:task".to_string()],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
         repo
     }
 

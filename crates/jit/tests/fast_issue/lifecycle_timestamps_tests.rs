@@ -14,10 +14,6 @@ use jit::storage::{discover_repository_layout, IssueStore, JsonFileStorage};
 
 /// Append a synthetic `issue_state_changed` event with a fixed timestamp.
 fn append_state_changed(h: &TestHarness, issue_id: &str, to: State, day: u32) {
-    append_state_changed_to(&h.storage, issue_id, to, day);
-}
-
-fn append_state_changed_to<S: IssueStore>(storage: &S, issue_id: &str, to: State, day: u32) {
     let event = Event::IssueStateChanged {
         id: uuid::Uuid::new_v4().to_string(),
         issue_id: issue_id.to_string(),
@@ -25,7 +21,7 @@ fn append_state_changed_to<S: IssueStore>(storage: &S, issue_id: &str, to: State
         from: State::Backlog,
         to,
     };
-    storage.append_event(&event).unwrap();
+    crate::harness::seed_memory_event(&h.storage, &event);
 }
 
 /// Strip the lifecycle timestamps off an issue to simulate a record written
@@ -35,7 +31,7 @@ fn clear_lifecycle_fields(h: &TestHarness, id: &str) {
     issue.first_ready_at = None;
     issue.claimed_at = None;
     issue.done_at = None;
-    h.storage.save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue);
 }
 
 fn backfill_candidate() -> (TestHarness, String) {
@@ -57,12 +53,10 @@ fn repository_bytes(h: &TestHarness, id: &str) -> (Option<String>, Option<String
 }
 
 fn replace_index(h: &TestHarness, value: serde_json::Value) {
-    h.storage
-        .write_repo_file(
-            ".jit/index.json",
-            &serde_json::to_string_pretty(&value).unwrap(),
-        )
-        .unwrap();
+    h.storage.add_repo_file(
+        ".jit/index.json",
+        &serde_json::to_string_pretty(&value).unwrap(),
+    );
 }
 
 fn assert_backfill_rejected_without_writes(h: &TestHarness, id: &str) {
@@ -138,7 +132,7 @@ fn test_backlog_to_ready_transition_stamps_first_ready() {
     let mut issue = h.get_issue(&id);
     issue.state = State::Backlog;
     issue.first_ready_at = None;
-    h.storage.save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue);
 
     h.executor.update_issue_state(&id, State::Ready).unwrap();
 
@@ -232,14 +226,15 @@ fn test_backfill_derives_timestamps_from_events() {
 
     append_state_changed(&h, &id, State::Ready, 1);
     let claimed = Utc.with_ymd_and_hms(2026, 1, 2, 0, 0, 0).unwrap();
-    h.storage
-        .append_event(&Event::IssueClaimed {
+    crate::harness::seed_memory_event(
+        &h.storage,
+        &Event::IssueClaimed {
             id: uuid::Uuid::new_v4().to_string(),
             issue_id: id.clone(),
             timestamp: claimed,
             assignee: "agent:worker-1".parse().unwrap(),
-        })
-        .unwrap();
+        },
+    );
     append_state_changed(&h, &id, State::Done, 3);
 
     let result = h.executor.backfill_lifecycle_timestamps().unwrap();
@@ -411,8 +406,33 @@ fn test_backfill_rejects_missing_indexed_issue_without_writes() {
     issue.claimed_at = None;
     issue.done_at = None;
     let id = issue.id.clone();
-    storage.save_issue(issue).unwrap();
-    append_state_changed_to(&storage, &id, State::Done, 3);
+    std::fs::write(
+        data_root.join("issues").join(format!("{id}.json")),
+        serde_json::to_vec_pretty(&issue).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        data_root.join("index.json"),
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "schema_version": 2,
+            "all_ids": [id],
+            "deleted_ids": []
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let event = Event::IssueStateChanged {
+        id: uuid::Uuid::new_v4().to_string(),
+        issue_id: id.clone(),
+        timestamp: Utc.with_ymd_and_hms(2026, 1, 3, 0, 0, 0).unwrap(),
+        from: State::Backlog,
+        to: State::Done,
+    };
+    std::fs::write(
+        data_root.join("events.jsonl"),
+        format!("{}\n", serde_json::to_string(&event).unwrap()),
+    )
+    .unwrap();
     let layout = discover_repository_layout(repo.path(), &data_root).unwrap();
     let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
     let index_before = storage.read_repo_file(".jit/index.json").unwrap();
@@ -452,12 +472,10 @@ fn test_backfill_rejects_mismatched_embedded_issue_id_without_writes() {
     let (h, id) = backfill_candidate();
     let mut issue = h.get_issue(&id);
     issue.id = "44444444-4444-4444-8444-444444444444".into();
-    h.storage
-        .write_repo_file(
-            &format!(".jit/issues/{id}.json"),
-            &serde_json::to_string_pretty(&issue).unwrap(),
-        )
-        .unwrap();
+    h.storage.add_repo_file(
+        &format!(".jit/issues/{id}.json"),
+        &serde_json::to_string_pretty(&issue).unwrap(),
+    );
 
     assert_backfill_rejected_without_writes(&h, &id);
 }

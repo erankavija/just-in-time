@@ -3,8 +3,33 @@
 //! Provides reusable setup functions to eliminate duplication across test modules.
 
 use crate::commands::CommandExecutor;
+use crate::declarations::GateRegistry;
+use crate::domain::Issue;
+use crate::repository_state::RepositoryIndex;
 use crate::storage::{InMemoryStorage, IssueStore};
 use std::sync::{Arc, Mutex};
+
+/// Seed one exact repository-file precondition in the aggregate memory image.
+pub(crate) fn seed_repo_file(storage: &InMemoryStorage, path: &str, content: &str) {
+    storage.add_repo_file(path, content);
+}
+
+/// Seed one issue record and its active index membership without invoking a
+/// product mutation path. Lifecycle timestamps are preserved verbatim.
+pub(crate) fn seed_issue(storage: &InMemoryStorage, issue: Issue) {
+    storage.seed_issue_fixture(&issue);
+}
+
+/// Seed one exact authored gate-registry precondition.
+pub(crate) fn seed_gate_registry(storage: &InMemoryStorage, registry: &GateRegistry) {
+    let bytes = crate::declarations::serialize_gate_registry(registry)
+        .expect("fixture gate registry serializes");
+    seed_repo_file(
+        storage,
+        ".jit/gates.toml",
+        std::str::from_utf8(&bytes).expect("gate registry TOML is UTF-8"),
+    );
+}
 
 pub(crate) enum OpenRaceAction {
     Save(Box<crate::domain::Issue>),
@@ -26,30 +51,23 @@ impl crate::storage::TransactionFailureInjector for OpenRace {
         {
             let storage = self.storage.lock().unwrap().clone().unwrap();
             match self.action.lock().unwrap().take().unwrap() {
-                OpenRaceAction::Save(issue) => storage.save_issue(*issue).unwrap(),
+                OpenRaceAction::Save(issue) => seed_issue(&storage, *issue),
                 OpenRaceAction::Delete(id) => {
                     let bytes = storage
                         .read_repo_file(".jit/index.json")
                         .unwrap()
                         .expect("race fixture index exists");
-                    let mut index: serde_json::Value = serde_json::from_str(&bytes).unwrap();
-                    index["all_ids"]
-                        .as_array_mut()
-                        .unwrap()
-                        .retain(|active| active.as_str() != Some(id.as_str()));
-                    index["deleted_ids"]
-                        .as_array_mut()
-                        .unwrap()
-                        .push(serde_json::Value::String(id));
-                    storage
-                        .write_repo_file(
-                            ".jit/index.json",
-                            &serde_json::to_string_pretty(&index).unwrap(),
-                        )
-                        .unwrap();
+                    let mut index = RepositoryIndex::parse(bytes.as_bytes()).unwrap();
+                    index.mark_deleted(id);
+                    let index = index.to_pretty_bytes().unwrap();
+                    seed_repo_file(
+                        &storage,
+                        ".jit/index.json",
+                        std::str::from_utf8(&index).unwrap(),
+                    );
                 }
                 OpenRaceAction::WriteRepoFile { path, content } => {
-                    storage.write_repo_file(&path, &content).unwrap();
+                    seed_repo_file(&storage, &path, &content);
                 }
             }
         }

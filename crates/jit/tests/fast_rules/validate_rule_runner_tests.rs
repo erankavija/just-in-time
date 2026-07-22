@@ -58,7 +58,7 @@ fn test_per_issue_local_rule_fails() {
     let storage = store_with_rules(EPIC_NEEDS_REQ);
     let bad = epic(false);
     let id = bad.id.clone();
-    storage.save_issue(bad).unwrap();
+    crate::harness::seed_memory_issue(&storage, &bad);
 
     let executor = crate::memory_executor(storage);
     let report = executor.run_rules(Some(&id)).unwrap();
@@ -77,7 +77,7 @@ fn test_per_issue_local_rule_passes() {
     let storage = store_with_rules(EPIC_NEEDS_REQ);
     let good = epic(true);
     let id = good.id.clone();
-    storage.save_issue(good).unwrap();
+    crate::harness::seed_memory_issue(&storage, &good);
 
     let executor = crate::memory_executor(storage);
     let report = executor.run_rules(Some(&id)).unwrap();
@@ -94,8 +94,8 @@ fn test_per_issue_local_rule_passes() {
 fn test_whole_repo_collects_local_findings_for_all_issues() {
     let storage = store_with_rules(EPIC_NEEDS_REQ);
     // Two bad epics; both must surface.
-    storage.save_issue(epic(false)).unwrap();
-    storage.save_issue(epic(false)).unwrap();
+    crate::harness::seed_memory_issue(&storage, &epic(false));
+    crate::harness::seed_memory_issue(&storage, &epic(false));
 
     let executor = crate::memory_executor(storage);
     let report = executor.run_rules(None).unwrap();
@@ -120,8 +120,8 @@ assert = { dependency-shape = { target = { type = "story" }, mode = "must" } }
     let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()]; // no story dependency -> violation
     let task_id = task.id.clone();
-    storage.save_issue(story).unwrap();
-    storage.save_issue(task).unwrap();
+    crate::harness::seed_memory_issue(&storage, &story);
+    crate::harness::seed_memory_issue(&storage, &task);
 
     let executor = crate::memory_executor(storage);
     let report = executor.run_rules(Some(&task_id)).unwrap();
@@ -138,7 +138,7 @@ fn test_explain_lists_matched_rules_and_outcomes() {
     let storage = store_with_rules(EPIC_NEEDS_REQ);
     let bad = epic(false);
     let id = bad.id.clone();
-    storage.save_issue(bad).unwrap();
+    crate::harness::seed_memory_issue(&storage, &bad);
 
     let executor = crate::memory_executor(storage);
     let report = executor.explain_rules(&id).unwrap();
@@ -165,7 +165,7 @@ fn test_explain_passing_rule_marks_pass() {
     let storage = store_with_rules(EPIC_NEEDS_REQ);
     let good = epic(true);
     let id = good.id.clone();
-    storage.save_issue(good).unwrap();
+    crate::harness::seed_memory_issue(&storage, &good);
 
     let executor = crate::memory_executor(storage);
     let report = executor.explain_rules(&id).unwrap();
@@ -188,7 +188,7 @@ fn test_explain_non_matching_rule_is_reported_as_skipped() {
     let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     let id = task.id.clone();
-    storage.save_issue(task).unwrap();
+    crate::harness::seed_memory_issue(&storage, &task);
 
     let executor = crate::memory_executor(storage);
     let report = executor.explain_rules(&id).unwrap();
@@ -230,7 +230,7 @@ assert = { require-section = { heading = "Plan" } }
     let mut issue = crate::fixture_issue("a task".to_string(), String::new());
     issue.state = jit::domain::State::InProgress;
     let id = issue.id.clone();
-    storage.save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(&storage, &issue);
 
     let executor = crate::memory_executor(storage);
     let report = executor.explain_rules(&id).unwrap();
@@ -267,7 +267,7 @@ assert = { require-section = { heading = "Summary" } }
     let mut issue = crate::fixture_issue("a task".to_string(), String::new());
     issue.state = jit::domain::State::InProgress;
     let id = issue.id.clone();
-    storage.save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(&storage, &issue);
 
     let executor = crate::memory_executor(storage);
     let report = executor.explain_rules(&id).unwrap();
@@ -308,7 +308,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
     let storage = store_with_rules(rules);
     let bad = epic(false);
     let id = bad.id.clone();
-    storage.save_issue(bad).unwrap();
+    crate::harness::seed_memory_issue(&storage, &bad);
 
     let executor = crate::memory_executor(storage);
     let report = executor.run_rules(Some(&id)).unwrap();

@@ -24,8 +24,7 @@
 //! and the atomic write itself are orchestrated by the two-phase
 //! [`project_render`](crate::commands) command, which renders and materializes
 //! EVERY projection before writing ANY target so a failing render leaves the tree
-//! untouched; the write lands through the storage boundary
-//! ([`IssueStore::write_repo_file`](crate::storage::IssueStore::write_repo_file)).
+//! untouched; publication lands through the repository-state transaction.
 //!
 //! Target path, mode, style, and delimiters come ONLY from
 //! [`ProjectionConfig`](crate::config::ProjectionConfig); this module hardcodes no

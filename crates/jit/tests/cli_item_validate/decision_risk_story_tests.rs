@@ -138,9 +138,7 @@ fn default_executor_with(
     let executor = CommandExecutor::new(storage).with_layout(layout);
     let mut shorts = Vec::new();
     for (title, body) in issues {
-        let issue = crate::fixture_issue(title.to_string(), body.to_string());
-        shorts.push(issue.short_id());
-        executor.storage().save_issue(issue).unwrap();
+        shorts.push(crate::create_issue(&executor, title, body));
     }
     (executor, shorts)
 }

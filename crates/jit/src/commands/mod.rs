@@ -3293,7 +3293,6 @@ mod tests {
         String,
     ) {
         use crate::declarations::{GateChecker, GateDefinition, GateRegistry, GateStage};
-        use crate::storage::IssueStore;
         use std::collections::HashMap;
 
         let storage = crate::storage::InMemoryStorage::new();
@@ -3340,7 +3339,7 @@ mod tests {
                 example_integration: None,
             },
         );
-        storage.save_gate_registry(&registry).unwrap();
+        crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
         let mut issue = crate::domain::types::fixture_issue("checked".to_string(), String::new());
         issue.state = State::Ready;
         issue.gates_required = vec!["auto-start".to_string(), "manual-start".to_string()];
@@ -3353,7 +3352,7 @@ mod tests {
             },
         );
         let issue_id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
         let executor =
             CommandExecutor::new(storage.clone()).with_layout(storage.repository_layout());
         (storage, executor, issue_id)
@@ -3506,7 +3505,7 @@ mod tests {
             "Captured retry".to_string(),
         );
         let id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
         let layout = storage.repository_layout();
         let request = CapturedIssueMutation::Assign {
             issue_id: id.clone(),
@@ -3533,7 +3532,7 @@ mod tests {
         // conflicts instead of replacing that writer's label.
         let mut concurrent = storage.load_issue(&id).unwrap();
         concurrent.labels.push("owner:concurrent".to_string());
-        storage.save_issue(concurrent).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, concurrent);
         assert!(matches!(
             first_session.apply(&first_plan),
             Err(RepositoryStateStoreError::RetryableConflict { .. })
@@ -3598,9 +3597,10 @@ mod tests {
 
         for status in [GateStatus::Passed, GateStatus::Failed] {
             let storage = InMemoryStorage::new();
-            storage
-                .save_gate_registry(&manual_gate_registry("review"))
-                .unwrap();
+            crate::commands::test_helpers::seed_gate_registry(
+                &storage,
+                &manual_gate_registry("review"),
+            );
             let mut issue = crate::domain::types::fixture_issue(
                 format!("repeat-{status:?}"),
                 "Repeated evidence".to_string(),
@@ -3616,7 +3616,7 @@ mod tests {
                     updated_at: chrono::DateTime::UNIX_EPOCH,
                 },
             );
-            storage.save_issue(issue).unwrap();
+            crate::commands::test_helpers::seed_issue(&storage, issue);
             let layout = storage.repository_layout();
             let request = CapturedIssueMutation::SetManualGateStatus {
                 issue_id: id.clone(),
@@ -3646,7 +3646,7 @@ mod tests {
             // changes between attempts.
             let mut concurrent = storage.load_issue(&id).unwrap();
             concurrent.labels.push("owner:concurrent".to_string());
-            storage.save_issue(concurrent).unwrap();
+            crate::commands::test_helpers::seed_issue(&storage, concurrent);
             assert!(matches!(
                 first_session.apply(&first_plan),
                 Err(RepositoryStateStoreError::RetryableConflict { .. })
@@ -3767,15 +3767,16 @@ mod tests {
         };
 
         let storage = InMemoryStorage::new();
-        storage
-            .save_gate_registry(&manual_gate_registry("review"))
-            .unwrap();
+        crate::commands::test_helpers::seed_gate_registry(
+            &storage,
+            &manual_gate_registry("review"),
+        );
         let issue = crate::domain::types::fixture_issue(
             "registry-race".to_string(),
             "Registry race".to_string(),
         );
         let id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
         let layout = storage.repository_layout();
         let request = CapturedIssueMutation::AddGates {
             issue_id: id.clone(),
@@ -3800,9 +3801,10 @@ mod tests {
         .unwrap();
         let stale_plan = finalize(&layout, &first_image, &context, &first.intents).unwrap();
 
-        storage
-            .save_gate_registry(&crate::declarations::GateRegistry::default())
-            .unwrap();
+        crate::commands::test_helpers::seed_gate_registry(
+            &storage,
+            &crate::declarations::GateRegistry::default(),
+        );
         assert!(matches!(
             first_session.apply(&stale_plan),
             Err(RepositoryStateStoreError::RetryableConflict { .. })
@@ -3983,7 +3985,7 @@ assert = {}
         let issue =
             crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
 
         // Create the root directory and config with enforcement off
         std::fs::create_dir_all(storage.root()).unwrap();
@@ -4011,7 +4013,7 @@ enforce_leases = "off"
         let issue =
             crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
 
         let executor = CommandExecutor::new(storage);
 
@@ -4031,7 +4033,7 @@ enforce_leases = "off"
         let issue =
             crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
 
         // Create the root directory and config with enforcement strict
         std::fs::create_dir_all(storage.root()).unwrap();
@@ -4061,7 +4063,7 @@ enforce_leases = "strict"
         let issue =
             crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
 
         // No config file - should default to off mode (single-agent development)
         let executor = CommandExecutor::new(storage);
@@ -4079,7 +4081,7 @@ enforce_leases = "strict"
 
         let mut issue = storage.load_issue(&issue_id).unwrap();
         issue.gates_status.get_mut("manual-start").unwrap().status = GateStatus::Failed;
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
 
         assert_ne!(capture_precheck_plan(&executor, &issue_id).evidence, before);
     }

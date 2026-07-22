@@ -905,31 +905,9 @@ enforce_leases = "off"
                 },
             );
         }
-        storage.save_gate_registry(&registry).unwrap();
+        crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
 
         crate::commands::test_helpers::memory_executor(storage)
-    }
-
-    fn remove_active_index_membership(storage: &InMemoryStorage, id: &str) {
-        let bytes = storage
-            .read_repo_file(".jit/index.json")
-            .unwrap()
-            .expect("fixture index exists");
-        let mut index: serde_json::Value = serde_json::from_str(&bytes).unwrap();
-        index["all_ids"]
-            .as_array_mut()
-            .unwrap()
-            .retain(|active| active.as_str() != Some(id));
-        index["deleted_ids"]
-            .as_array_mut()
-            .unwrap()
-            .push(serde_json::Value::String(id.to_string()));
-        storage
-            .write_repo_file(
-                ".jit/index.json",
-                &serde_json::to_string_pretty(&index).unwrap(),
-            )
-            .unwrap();
     }
 
     #[test]
@@ -954,14 +932,14 @@ enforce_leases = "off"
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        crate::commands::test_helpers::seed_gate_registry(&executor.storage, &registry);
 
         // Create issue with precheck gate
         let mut issue =
             crate::domain::types::fixture_issue("Test task".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
             .add_gate(&issue_id, "tdd-reminder".to_string())
             .unwrap();
@@ -1012,14 +990,14 @@ enforce_leases = "off"
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        crate::commands::test_helpers::seed_gate_registry(&executor.storage, &registry);
 
         // Create issue with precheck gate
         let mut issue =
             crate::domain::types::fixture_issue("Test task".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
             .add_gate(&issue_id, "tdd-reminder".to_string())
             .unwrap();
@@ -1059,13 +1037,13 @@ enforce_leases = "off"
         let dependency =
             crate::domain::types::fixture_issue("Dependency".to_string(), "".to_string());
         let dependency_id = dependency.id.clone();
-        executor.storage.save_issue(dependency).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, dependency);
 
         let mut dependent =
             crate::domain::types::fixture_issue("Dependent".to_string(), "".to_string());
         dependent.dependencies.push(dependency_id.clone());
         let dependent_id = dependent.id.clone();
-        executor.storage.save_issue(dependent).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
 
         // Assign while the dependency is still open. The issue remains Backlog
         // (a full claim here would exit 4 on the blocked in_progress transition).
@@ -1126,7 +1104,7 @@ enforce_leases = "off"
         let mut issue = crate::domain::types::fixture_issue("Task".to_string(), "".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         executor
             .claim_issue(&issue_id, "agent:first".to_string())
@@ -1181,7 +1159,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         issue.state = State::Ready;
         issue.labels = vec!["type:epic".to_string()];
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         let error = executor
             .publish_captured_claim(issue_id.clone(), "agent:test".parse().unwrap())
@@ -1212,7 +1190,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         issue.state = State::InProgress;
         issue.assignee = Some("agent:test".parse().unwrap());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         let before = executor.storage.load_issue(&issue_id).unwrap();
         let events_before = executor.storage.read_events().unwrap();
 
@@ -1248,11 +1226,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 example_integration: None,
             },
         );
-        storage.save_gate_registry(&registry).unwrap();
+        crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
         let mut issue = crate::domain::types::fixture_issue("Race".to_string(), String::new());
         issue.gates_required.push("manual-start".to_string());
         let issue_id = issue.id.clone();
-        storage.save_issue(issue.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue.clone());
         issue.state = State::Ready;
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
@@ -1280,7 +1258,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mut issue = crate::domain::types::fixture_issue("Target".to_string(), String::new());
         issue.id = "abcd1111111111111111111111111111".to_string();
         issue.state = State::InProgress;
-        executor.storage.save_issue(issue.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue.clone());
 
         let outcome = executor
             .publish_captured_state_transition("abcd", State::Gated, false, false, true)
@@ -1288,7 +1266,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mut collision =
             crate::domain::types::fixture_issue("Collision".to_string(), String::new());
         collision.id = "abcd2222222222222222222222222222".to_string();
-        executor.storage.save_issue(collision).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, collision);
 
         assert!(executor.storage.resolve_issue_id("abcd").is_err());
         executor.run_postchecks(&outcome.target_id).unwrap();
@@ -1307,7 +1285,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         // Add gates that haven't been passed
         executor.add_gate(&issue_id, "tests".to_string()).unwrap();
@@ -1336,14 +1314,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::domain::types::fixture_issue("Dependency".to_string(), "Dep".to_string());
         dep.state = State::InProgress; // Not done
         let dep_id = dep.id.clone();
-        executor.storage.save_issue(dep).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, dep);
 
         // Create issue that depends on it
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.dependencies.push(dep_id.clone());
         issue.state = State::Backlog; // Blocked
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         // Transition to Rejected should succeed even with unmet dependencies
         let result = executor.update_issue_state(&issue_id, State::Rejected);
@@ -1365,7 +1343,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor.add_gate(&issue_id, "tests".to_string()).unwrap();
 
         // Transition to Done should fail (gates not passed)
@@ -1388,7 +1366,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor.add_gate(&issue_id, "tests".to_string()).unwrap();
 
         // First `--state done`: a genuine InProgress -> Gated transition, which
@@ -1430,7 +1408,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor.add_gate(&issue_id, "tests".to_string()).unwrap();
 
         // First done attempt: genuine transition to Gated.
@@ -1493,7 +1471,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Body".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         // Set the override to Html.
         executor
@@ -1581,7 +1559,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::domain::types::fixture_issue("Old Title".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor.add_gate(&issue_id, "tests".to_string()).unwrap();
 
         // Move to Gated via a first blocked done attempt.
@@ -1654,7 +1632,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::domain::types::fixture_issue("Same Title".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor.add_gate(&issue_id, "tests".to_string()).unwrap();
 
         // First blocked done attempt: transition to Gated.
@@ -1709,7 +1687,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         executor
             .assign_issue(&issue_id, "agent:a".to_string())
@@ -1733,7 +1711,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
 
         // Unassigning an issue that has no assignee is a no-op.
@@ -1752,7 +1730,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
         let events_before = executor.storage.read_events().unwrap().len();
 
@@ -1789,7 +1767,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "old".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         let events_before = executor.storage.read_events().unwrap().len();
 
         // A real description edit must be captured in the event log, not only
@@ -1852,7 +1830,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let issue = crate::domain::types::fixture_issue("Doomed".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         let events_before = executor.storage.read_events().unwrap().len();
 
         // Deletion is a state change and must be captured in the event log.
@@ -1878,13 +1856,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::domain::types::fixture_issue("Dependency".to_string(), String::new());
         dependency.state = State::Ready;
         let dependency_id = dependency.id.clone();
-        executor.storage.save_issue(dependency).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, dependency);
         let mut dependent =
             crate::domain::types::fixture_issue("Dependent".to_string(), String::new());
         dependent.state = State::Backlog;
         dependent.dependencies = vec![dependency_id.clone()];
         let dependent_id = dependent.id.clone();
-        executor.storage.save_issue(dependent).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
 
         executor.delete_issue(&dependency_id).unwrap();
 
@@ -1953,7 +1931,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = setup();
         let issue = crate::domain::types::fixture_issue("Doomed".into(), String::new());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
             .storage
             .add_repo_file(".jit/index.json", "not valid JSON");
@@ -1978,7 +1956,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let issue = crate::domain::types::fixture_issue("Doomed".into(), String::new());
         let issue_id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
             2,
@@ -2012,7 +1990,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut target = crate::domain::types::fixture_issue("Target".into(), String::new());
         target.id = "22221111111111111111111111111111".to_string();
-        storage.save_issue(target.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, target.clone());
         let mut collision = crate::domain::types::fixture_issue("Collision".into(), String::new());
         collision.id = "22222222222222222222222222222222".to_string();
         let storage = crate::commands::test_helpers::with_open_race(
@@ -2048,13 +2026,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let dependency =
             crate::domain::types::fixture_issue("Dependency".to_string(), String::new());
         let dependency_id = dependency.id.clone();
-        storage.save_issue(dependency).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, dependency);
         let mut dependent =
             crate::domain::types::fixture_issue("Dependent".to_string(), String::new());
         dependent.state = State::Backlog;
         dependent.dependencies = vec![dependency_id.clone()];
         let dependent_id = dependent.id.clone();
-        storage.save_issue(dependent).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, dependent);
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
 
         assert!(executor.delete_issue(&dependency_id).is_err());
@@ -2172,10 +2150,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
-        executor.storage.save_issue(a).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, a);
         let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
-        executor.storage.save_issue(b).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, b);
         executor.add_dependency(&a_id, &b_id).unwrap();
 
         let events_before = executor.storage.read_events().unwrap().len();
@@ -2208,11 +2186,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
-        executor.storage.save_issue(a).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, a);
         // B exists but A does NOT depend on it, so removing B from A is a no-op.
         let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
-        executor.storage.save_issue(b).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, b);
 
         let updated_before = executor.storage.load_issue(&a_id).unwrap().updated_at;
         let events_before = executor.storage.read_events().unwrap().len();
@@ -2245,10 +2223,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
-        executor.storage.save_issue(a).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, a);
         let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
-        executor.storage.save_issue(b).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, b);
         executor.add_dependency(&a_id, &b_id).unwrap();
         assert!(executor.storage.load_issue(&a_id).unwrap().dependencies == vec![b_id.clone()]);
 
@@ -2346,19 +2324,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         // (jit:f847df3f).
         let executor = setup();
 
-        let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
+        let b_id = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string()).id;
+        let mut a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
+        a.dependencies.push(b_id.clone());
         let a_id = a.id.clone();
-        executor.storage.save_issue(a).unwrap();
-        let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
-        let b_id = b.id.clone();
-        executor.storage.save_issue(b).unwrap();
-        executor.add_dependency(&a_id, &b_id).unwrap();
-
-        // Corrupt canonical membership directly to reproduce a dangling edge.
-        remove_active_index_membership(&executor.storage, &b_id);
+        crate::commands::test_helpers::seed_issue(&executor.storage, a);
         assert!(
             executor.storage.resolve_issue_id(&b_id).is_err(),
-            "the deleted id must no longer resolve, matching the reported bug"
+            "the missing dependency must not resolve, matching the reported bug"
         );
 
         let result = executor
@@ -2385,14 +2358,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         // work against the raw stored id, not via global resolution.
         let executor = setup();
 
-        let a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
+        let b_id = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string()).id;
+        let mut a = crate::domain::types::fixture_issue("A".to_string(), "Test".to_string());
+        a.dependencies.push(b_id.clone());
         let a_id = a.id.clone();
-        executor.storage.save_issue(a).unwrap();
-        let b = crate::domain::types::fixture_issue("B".to_string(), "Test".to_string());
-        let b_id = b.id.clone();
-        executor.storage.save_issue(b).unwrap();
-        executor.add_dependency(&a_id, &b_id).unwrap();
-        remove_active_index_membership(&executor.storage, &b_id);
+        crate::commands::test_helpers::seed_issue(&executor.storage, a);
 
         let prefix = b_id[..8].to_string();
         let result = executor
@@ -2417,7 +2387,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let dep2 = "abcd1234-0000-0000-0000-000000000002".to_string();
         a.dependencies = vec![dep1.clone(), dep2.clone()];
         let a_id = a.id.clone();
-        executor.storage.save_issue(a).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, a);
 
         let prefix = "abcd1234".to_string();
         let err = executor
@@ -2445,7 +2415,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let dep = crate::domain::types::fixture_issue("Dep".to_string(), "Test".to_string());
         let dep_id = dep.id.clone();
-        executor.storage.save_issue(dep).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, dep);
 
         let mut issue =
             crate::domain::types::fixture_issue("Parent".to_string(), "Test".to_string());
@@ -2523,7 +2493,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = setup();
         let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         executor
             .update_issue(
@@ -2560,7 +2530,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = setup();
         let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         let err = executor
             .update_issue(
@@ -2592,14 +2562,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::domain::types::fixture_issue("Dependency".to_string(), "Dep".to_string());
         dep.state = State::Done;
         let dep_id = dep.id.clone();
-        executor.storage.save_issue(dep).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, dep);
 
         // Create issue in Backlog that depends on the Done dependency
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::Backlog;
         issue.dependencies.push(dep_id.clone());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         // Manually transition to Ready should succeed (dependency is done)
         let result = executor.update_issue(

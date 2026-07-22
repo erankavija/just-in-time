@@ -2,19 +2,20 @@
 //!
 //! `repository_state` owns fresh-config rendering and the complete init/profile
 //! delta. A command submits semantic choices — the template config skeleton, the
-//! project name, and (for a profile) the embedded package's asset bytes,
-//! provenance record, and audit-log bytes — and this module renders every neutral
-//! byte and composes one exact [`RepositoryDelta`] over the captured base image.
+//! project name, and (for a profile) its derived contribution and provenance
+//! metadata — and this module renders every neutral byte and composes one exact
+//! [`RepositoryDelta`] over the captured base image, including the audit append.
 //! The command opens the recovered session, captures the base under its guard,
 //! and applies the returned plan; it never hand-builds a transaction or a
 //! command-local final-byte inventory.
 //!
 //! The profile's asset/region/registry bytes arrive as a [`ProfileContribution`]
 //! the command derives through
-//! [`derive_profile_materializations`](super::derive_profile_materializations); the
-//! `ProfileApplied` audit line is composed here by the finalizer from the captured
-//! `events.jsonl` prefix (id/timestamp/torn-tail owned by the mutation finalizer,
-//! never command code). Every byte flows through `session.apply` here.
+//! [`derive_profile_materializations`](super::derive_profile_materializations).
+//! Finalization derives the coupled default-rule/schema closure and composes the
+//! `ProfileApplied` line from the captured `events.jsonl` prefix (id, timestamp,
+//! and torn-tail handling are never command-owned). Every byte flows through
+//! `session.apply` here.
 
 use std::collections::BTreeMap;
 
@@ -82,7 +83,9 @@ pub struct ProfileContribution {
     pub package_hash: String,
     /// Non-noop asset targets (the command's derivation pre-filters unchanged ones).
     pub targets: Vec<ProfileTargetContribution>,
-    /// Package contribution hashes keyed by repository target, for the audit event.
+    /// Package contribution hashes keyed by repository target. Besides identifying
+    /// the audit payload, these prove package ownership of config/rules authority
+    /// when finalization derives the coupled default-rule/schema closure.
     pub target_hashes: BTreeMap<String, String>,
     /// Canonical applied-provenance record path (`.jit/profiles/<id>.json`).
     pub record_path: VirtualPath,
@@ -90,19 +93,21 @@ pub struct ProfileContribution {
     pub record_bytes: Vec<u8>,
     /// Whether the captured provenance record differs from `record_bytes`.
     pub record_changed: bool,
-    /// Whether the application appends a `ProfileApplied` audit event (the profile
-    /// changed). The finalizer composes the event from the captured `events.jsonl`
-    /// prefix, assigning its id/timestamp and torn-tail evidence — command code no
-    /// longer computes audit-log bytes.
+    /// Whether direct package-target or provenance changes require profiled init
+    /// to append `ProfileApplied`. Standalone profile finalization instead audits
+    /// every non-empty complete delta, including a schema-only repair. In both
+    /// paths the finalizer owns the event id, timestamp, and torn-tail handling.
     pub emit_event: bool,
     /// Whether the `.jit/profiles` directory must be created.
     pub ensure_profiles_dir: bool,
 }
 
 impl ProfileContribution {
-    /// Every path a standalone profile-application delta may touch — asset targets,
-    /// the provenance record, the audit log, the profiles directory, and every
-    /// ancestor directory — so the command discovers them into its capture spec.
+    /// Every explicit profile path a standalone application may touch — asset
+    /// targets, provenance, audit log, profiles directory, and their ancestors.
+    /// The declaration-driven capture closure separately discovers any default
+    /// rule/schema file actions coupled to a profile-owned config or rules
+    /// registry; this method includes their shared schema-directory preimage.
     pub fn delta_paths(&self) -> Result<Vec<VirtualPath>, InitializationError> {
         let mut paths: Vec<VirtualPath> = self
             .targets
@@ -111,6 +116,9 @@ impl ProfileContribution {
             .collect();
         paths.push(self.record_path.clone());
         paths.push(VirtualPath::data("events.jsonl")?);
+        if profile_owns_default_rule_authority(self) {
+            paths.push(VirtualPath::data("schemas")?);
+        }
         if self.ensure_profiles_dir {
             paths.push(VirtualPath::data("profiles")?);
         }
@@ -487,12 +495,10 @@ pub fn finalize_initialization(
     let config_path = VirtualPath::data("config.toml")?;
     let rules_path = VirtualPath::data("rules.toml")?;
     let existing_rules = matches!(base.entry(&rules_path)?, RepositoryEntry::File { .. });
-    let profile_changes_rules_authority = scaffold.profile.as_ref().is_some_and(|profile| {
-        profile
-            .targets
-            .iter()
-            .any(|target| target.path == config_path || target.path == rules_path)
-    });
+    let profile_changes_rules_authority = scaffold
+        .profile
+        .as_ref()
+        .is_some_and(profile_owns_default_rule_authority);
     let compose_rules = existing_rules || profile_changes_rules_authority;
     let generated_paths: std::collections::BTreeSet<VirtualPath> = scaffold
         .schemas
@@ -633,14 +639,7 @@ fn events_action(
 ) -> Result<Option<RepositoryAction>, InitializationError> {
     if let Some(profile) = profile {
         if profile.emit_event {
-            let event = profile_applied_event(
-                profile.id.clone(),
-                profile.version.clone(),
-                ProfileOrigin::Embedded,
-                profile.package_hash.clone(),
-                profile.target_hashes.clone(),
-            );
-            return Ok(finalize_audit_append(base, context, vec![(2, event)])?);
+            return profile_event_action(base, profile, context);
         }
     }
     let path = VirtualPath::data("events.jsonl")?;
@@ -657,6 +656,22 @@ fn events_action(
             path: format!("{path:?}"),
         }),
     }
+}
+
+/// Compose one profile-applied audit append over the captured event prefix.
+fn profile_event_action(
+    base: &RepositoryImage,
+    profile: &ProfileContribution,
+    context: &MutationContext,
+) -> Result<Option<RepositoryAction>, InitializationError> {
+    let event = profile_applied_event(
+        profile.id.clone(),
+        profile.version.clone(),
+        ProfileOrigin::Embedded,
+        profile.package_hash.clone(),
+        profile.target_hashes.clone(),
+    );
+    Ok(finalize_audit_append(base, context, vec![(2, event)])?)
 }
 
 /// Emit the worktree `.gitattributes` write when the claim is eligible and the
@@ -737,9 +752,17 @@ pub fn finalize_profile_application(
     let files = profile_asset_files(profile);
     let mut actions = Vec::new();
     push_file_actions(base, &files, &mut actions)?;
+    let config_path = VirtualPath::data("config.toml")?;
+    let rules_path = VirtualPath::data("rules.toml")?;
+    if profile_owns_default_rule_authority(profile) {
+        let authority = authored_rule_overrides(base, &files, &config_path, &rules_path)?;
+        compose_existing_default_rules(base, authority, &mut actions)?;
+    }
     push_record_action(base, profile, &mut actions)?;
-    if let Some(action) = events_action(base, Some(profile), context)? {
-        actions.push(action);
+    if !actions.is_empty() {
+        if let Some(action) = profile_event_action(base, profile, context)? {
+            actions.push(action);
+        }
     }
     let explicit = if profile.ensure_profiles_dir {
         vec![VirtualPath::data("profiles")?]
@@ -794,6 +817,13 @@ fn profile_asset_files(profile: &ProfileContribution) -> Vec<DesiredFile> {
             owner: PROFILE_OWNER,
         })
         .collect()
+}
+
+/// Whether the profile package contributes either authored input of the coupled
+/// default-rule/schema materialization.
+fn profile_owns_default_rule_authority(profile: &ProfileContribution) -> bool {
+    profile.target_hashes.contains_key(".jit/config.toml")
+        || profile.target_hashes.contains_key(".jit/rules.toml")
 }
 
 /// Emit the provenance-record write only when the command proved it changed.

@@ -17,7 +17,7 @@
 //! - A row's `carries_issue_id` follows from its [`EventScope`]: only
 //!   issue-scoped records name an issue. Tests hold that against reality from
 //!   both sides — against the serialized sample (the same `serde_json` encoding
-//!   `append_event` writes to `events.jsonl`) and against [`Event::get_issue_id`],
+//!   the repository-state finalizer publishes to `events.jsonl`) and against [`Event::get_issue_id`],
 //!   the accessor every consumer reads an event's issue through.
 //! - Conformance tests compare the catalog against the variant lists schemars
 //!   derives from the enums: every serde `type` tag of [`Event`] must be
@@ -702,7 +702,8 @@ mod tests {
     }
 
     /// REQ-01/REQ-03: the `issue_id` column agrees with the on-disk record — the
-    /// same `serde_json` encoding `append_event` writes to `events.jsonl`. The
+    /// same `serde_json` encoding the repository-state finalizer publishes to
+    /// `events.jsonl`. The
     /// column follows from the tag's scope, so this is what holds that scope
     /// against the record it claims to describe.
     #[test]

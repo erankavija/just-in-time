@@ -910,6 +910,32 @@ mod tests {
         CommandExecutor::new(storage).with_layout(layout)
     }
 
+    /// Seed an exact file-backed issue precondition without exercising command mutation behavior.
+    fn seed_archive_issue_precondition(storage: &JsonFileStorage, issue: Issue) {
+        let index_path = storage.root().join("index.json");
+        let mut index = crate::repository_state::RepositoryIndex::parse(
+            &fs::read(&index_path).expect("initialized repository index"),
+        )
+        .expect("valid repository index");
+        index.all_ids.push(issue.id.clone());
+        index.all_ids.sort();
+        index.all_ids.dedup();
+        index.deleted_ids.retain(|id| id != &issue.id);
+        fs::write(
+            storage
+                .root()
+                .join("issues")
+                .join(format!("{}.json", issue.id)),
+            crate::repository_state::serialize_issue(&issue).expect("serialize fixture issue"),
+        )
+        .unwrap();
+        fs::write(
+            index_path,
+            index.to_pretty_bytes().expect("serialize fixture index"),
+        )
+        .unwrap();
+    }
+
     #[test]
     fn test_effectively_terminal_container_ids_use_live_non_leaf_levels_and_effective_terminality()
     {
@@ -1004,7 +1030,7 @@ mod tests {
                 });
                 issue.documents = vec![document];
                 let id = issue.id.clone();
-                storage.save_issue(issue).unwrap();
+                seed_archive_issue_precondition(&storage, issue);
                 id
             })
             .collect();
@@ -1194,7 +1220,7 @@ mod tests {
         let (active_repo, active_executor, ids) = executable_document_repo(1, "active");
         let mut issue = active_executor.storage.load_issue(&ids[0]).unwrap();
         issue.state = State::InProgress;
-        active_executor.storage.save_issue(issue).unwrap();
+        seed_archive_issue_precondition(&active_executor.storage, issue);
         assert!(active_executor
             .execute_archive_document("fixtures/root.md")
             .is_err());
@@ -1227,7 +1253,8 @@ mod tests {
             Vec::new(),
             true,
         );
-        executor.storage.append_event(&valid).unwrap();
+        let valid_json = serde_json::to_string(&valid).unwrap();
+        fs::write(&events_path, format!("{nested_torn}\n{valid_json}\n")).unwrap();
         assert_eq!(
             executor
                 .storage
@@ -1236,7 +1263,6 @@ mod tests {
                 .len(),
             1
         );
-        let valid_json = serde_json::to_string(&valid).unwrap();
         fs::write(
             &events_path,
             format!("{nested_torn}\n{{\"type\":\"issue_created\"\n{nested_torn}\n{valid_json}\n"),
@@ -1519,14 +1545,14 @@ mod tests {
             DocumentReference::at_commit("fixtures/root.md".into(), commit),
         ];
         let container_id = container.id.clone();
-        storage.save_issue(container).unwrap();
+        seed_archive_issue_precondition(&storage, container);
         let mut outside =
             crate::domain::types::fixture_issue("Outside active".into(), String::new());
         outside.state = State::InProgress;
         outside.labels = vec!["type:task".into()];
         outside.documents = vec![DocumentReference::new("fixtures/root.md".into())];
         let outside_id = outside.id.clone();
-        storage.save_issue(outside).unwrap();
+        seed_archive_issue_precondition(&storage, outside);
 
         let executor = executor(&repo, storage);
         let result = executor.execute_archive_container(&container_id).unwrap();
@@ -1603,7 +1629,7 @@ epic = "epic"
         .map(|path| DocumentReference::new(path.into()))
         .collect();
         let id = epic.id.clone();
-        storage.save_issue(epic).unwrap();
+        seed_archive_issue_precondition(&storage, epic);
         let executor = executor(&repo, storage);
         (repo, executor, id)
     }
@@ -1767,7 +1793,7 @@ epic = "epic"
         let (repo, executor, id) = configured_repo();
         let mut issue = executor.storage.load_issue(&id).unwrap();
         issue.state = State::InProgress;
-        executor.storage.save_issue(issue).unwrap();
+        seed_archive_issue_precondition(&executor.storage, issue);
         let destination = repo.path().join("archive").join(&id[..8]);
         fs::create_dir_all(&destination).unwrap();
         fs::write(destination.join(".jit-container"), "foreign-container-id\n").unwrap();
@@ -1892,7 +1918,7 @@ epic = "epic"
             crate::domain::types::fixture_issue("Active outside owner".into(), String::new());
         outside.state = State::InProgress;
         outside.documents = vec![DocumentReference::new("docs/outside.md".into())];
-        owner_storage.save_issue(outside).unwrap();
+        seed_archive_issue_precondition(&owner_storage, outside);
 
         let owner_plan = CommandExecutor::new(owner_storage)
             .preview_archive_document("fixtures/selected.md")
@@ -1935,7 +1961,7 @@ epic = "epic"
         container.labels = vec!["type:epic".to_string()];
         container.documents = vec![DocumentReference::new("fixtures/root.md".into())];
         let id = container.id.clone();
-        storage.save_issue(container).unwrap();
+        seed_archive_issue_precondition(&storage, container);
         let executor = executor(&repo, storage);
         (repo, executor, id)
     }
@@ -2021,7 +2047,7 @@ epic = "epic"
         archived_owner.state = State::Archived;
         archived_owner.archived_from = Some(State::Done);
         archived_owner.documents = vec![DocumentReference::new("fixtures/root.md".into())];
-        executor.storage.save_issue(archived_owner.clone()).unwrap();
+        seed_archive_issue_precondition(&executor.storage, archived_owner.clone());
 
         let plan = executor
             .preview_archive_document("fixtures/root.md")
@@ -2036,7 +2062,7 @@ epic = "epic"
         // active owner, so the shared source is retained instead of moved.
         let mut parked = executor.storage.load_issue(&archived_owner.id).unwrap();
         parked.archived_from = Some(State::InProgress);
-        executor.storage.save_issue(parked).unwrap();
+        seed_archive_issue_precondition(&executor.storage, parked);
         let plan = executor
             .preview_archive_document("fixtures/root.md")
             .unwrap();

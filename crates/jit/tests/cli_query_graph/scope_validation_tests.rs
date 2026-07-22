@@ -14,7 +14,72 @@
 
 use jit::commands::CommandExecutor;
 use jit::domain::{DocumentReference, State};
-use jit::storage::{InMemoryStorage, IssueStore};
+use jit::storage::{InMemoryStorage, IssueStore, RepositoryStateStore};
+
+trait ScopeFixtureStore: IssueStore + RepositoryStateStore {
+    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> String;
+}
+
+impl ScopeFixtureStore for InMemoryStorage {
+    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> String {
+        let id = issue.id.clone();
+        crate::harness::seed_memory_issue(executor.storage(), &issue);
+        id
+    }
+}
+
+impl ScopeFixtureStore for jit::storage::JsonFileStorage {
+    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> String {
+        let dependencies = issue.dependencies.clone();
+        let documents = issue.documents.clone();
+        let target_state = issue.state;
+        let id = executor
+            .create_issue(
+                issue.title,
+                issue.description,
+                issue.priority,
+                issue.gates_required,
+                issue.labels,
+                issue.content_format,
+                None,
+                false,
+            )
+            .unwrap()
+            .0;
+        for dependency in dependencies {
+            executor.add_dependency(&id, &dependency).unwrap();
+        }
+        if executor.storage().load_issue(&id).unwrap().state != target_state {
+            executor
+                .update_issue(
+                    &id,
+                    None,
+                    None,
+                    None,
+                    Some(target_state),
+                    vec![],
+                    vec![],
+                    None,
+                    None,
+                    true,
+                )
+                .unwrap();
+        }
+        for document in documents {
+            executor
+                .add_document_reference(
+                    &id,
+                    &document.path,
+                    document.commit.as_deref(),
+                    document.label.as_deref(),
+                    document.doc_type.as_deref(),
+                    false,
+                )
+                .unwrap();
+        }
+        id
+    }
+}
 
 /// Wire a `plan` bracket onto container `container_id`: a planning node `P`
 /// (`type:planning`, in `planning_state`) carrying a `plan`-labeled doc reference
@@ -25,7 +90,7 @@ use jit::storage::{InMemoryStorage, IssueStore};
 /// This is the bracket shape plan-doc resolution walks: the plan-doc location is
 /// read from `P`'s `plan` reference (the validation-time source of truth), NOT
 /// the template path. The container itself is not modified.
-fn wire_plan_bracket<S: IssueStore>(
+fn wire_plan_bracket<S: ScopeFixtureStore>(
     executor: &CommandExecutor<S>,
     container_id: &str,
     plan_path: &str,
@@ -49,37 +114,14 @@ fn wire_plan_bracket<S: IssueStore>(
         format: None,
         assets: Vec::new(),
     });
-    let p_id = p.id.clone();
-    executor.storage().save_issue(p).unwrap();
+    let p_id = S::publish_scope_issue(executor, p);
 
     let mut b = crate::fixture_issue("breakdown".to_string(), String::new());
     b.id = format!("break-{container_id}");
     b.labels = vec!["type:breakdown".to_string(), format!("brackets:{c_short}")];
     b.dependencies = vec![p_id.clone()];
     b.state = State::Backlog;
-    executor.storage().save_issue(b).unwrap();
-    if !executor.storage().is_file_backed() {
-        let mut ids = executor
-            .storage()
-            .list_issues()
-            .unwrap()
-            .into_iter()
-            .map(|issue| issue.id)
-            .collect::<Vec<_>>();
-        ids.sort();
-        executor
-            .storage()
-            .write_repo_file(
-                ".jit/index.json",
-                &serde_json::json!({
-                    "schema_version": 2,
-                    "all_ids": ids,
-                    "deleted_ids": []
-                })
-                .to_string(),
-            )
-            .unwrap();
-    }
+    S::publish_scope_issue(executor, b);
 
     p_id
 }
@@ -134,7 +176,7 @@ fn executor_with_rules_and_templates(
     CommandExecutor::new(storage).with_layout(layout)
 }
 
-/// Save an issue directly into storage, returning its id.
+/// Seed an exact issue preimage into the in-memory aggregate, returning its id.
 fn seed(
     executor: &CommandExecutor<InMemoryStorage>,
     title: &str,
@@ -153,9 +195,7 @@ fn seed(
     issue.labels = labels.iter().map(|s| s.to_string()).collect();
     issue.dependencies = deps.to_vec();
     issue.state = State::Backlog;
-    let id = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
-    id
+    InMemoryStorage::publish_scope_issue(executor, issue)
 }
 
 /// A `label-coverage` rule keyed on the breakdown node `B`. It checks that the
@@ -479,9 +519,7 @@ fn seed_breakdown_bracketing(
     b.labels = vec!["type:breakdown".to_string(), format!("brackets:{pointer}")];
     b.dependencies = deps.to_vec();
     b.state = state;
-    let id = b.id.clone();
-    executor.storage().save_issue(b).unwrap();
-    id
+    InMemoryStorage::publish_scope_issue(executor, b)
 }
 
 #[test]
@@ -911,9 +949,7 @@ mod file_backed_external_plan {
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue.dependencies = deps.to_vec();
         issue.state = State::Backlog;
-        let id = issue.id.clone();
-        executor.storage().save_issue(issue).unwrap();
-        id
+        <JsonFileStorage as super::ScopeFixtureStore>::publish_scope_issue(executor, issue)
     }
 
     /// Wire `C -> impl`, with C a breakable container whose criteria live ONLY in

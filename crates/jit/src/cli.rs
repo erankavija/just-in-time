@@ -2887,6 +2887,52 @@ impl Commands {
             | Self::Status { .. } => false,
         }
     }
+
+    /// Whether dispatch may enter claims coordination before opening its
+    /// repository mutation session.
+    ///
+    /// These matches are exhaustive for the same reason as
+    /// [`Self::requires_recovery_dispatch`]: adding a command leaf must classify
+    /// its lock ordering explicitly.
+    pub fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Profile(command) => command.coordinates_claims_first(),
+            Self::Issue(command) => command.coordinates_claims_first(),
+            Self::Dep(command) => command.coordinates_claims_first(),
+            Self::Gate(command) => command.coordinates_claims_first(),
+            Self::Events(command) => command.coordinates_claims_first(),
+            Self::Doc(command) => command.coordinates_claims_first(),
+            Self::Archive(command) => command.coordinates_claims_first(),
+            Self::Graph(command) => command.coordinates_claims_first(),
+            Self::Query {
+                subcommand: Some(command),
+                ..
+            } => command.coordinates_claims_first(),
+            Self::Label(command) => command.coordinates_claims_first(),
+            Self::Config(command) => command.coordinates_claims_first(),
+            Self::Snapshot(command) => command.coordinates_claims_first(),
+            Self::Claim(command) => command.coordinates_claims_first(),
+            Self::Worktree(command) => command.coordinates_claims_first(),
+            Self::Hooks(command) => command.coordinates_claims_first(),
+            Self::Item(command) => command.coordinates_claims_first(),
+            Self::Invariant(command) => command.coordinates_claims_first(),
+            Self::Project(command) => command.coordinates_claims_first(),
+            Self::Migrate(command) => command.coordinates_claims_first(),
+            Self::Init { .. }
+            | Self::List { .. }
+            | Self::Apply { .. }
+            | Self::Rdeps { .. }
+            | Self::Query {
+                subcommand: None, ..
+            }
+            | Self::Search { .. }
+            | Self::Validate { .. }
+            | Self::Recover { .. }
+            | Self::Serve { .. }
+            | Self::Version { .. }
+            | Self::Status { .. } => false,
+        }
+    }
 }
 
 impl ProfileCommands {
@@ -3057,10 +3103,248 @@ impl SnapshotCommands {
     }
 }
 
+impl ProfileCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::List { .. } | Self::Show { .. } | Self::Apply { .. } => false,
+        }
+    }
+}
+
+impl IssueCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Update { .. }
+            | Self::Delete { .. }
+            | Self::Claim { .. }
+            | Self::Reject { .. }
+            | Self::ClaimNext { .. } => true,
+            Self::Create { .. }
+            | Self::BatchCreate { .. }
+            | Self::Search { .. }
+            | Self::Show { .. }
+            | Self::Status { .. }
+            | Self::Children { .. }
+            | Self::Progress { .. }
+            | Self::Rm { .. }
+            | Self::Remove { .. }
+            | Self::Complete { .. }
+            | Self::Edit { .. }
+            | Self::Assign { .. }
+            | Self::Unassign { .. }
+            | Self::Release { .. }
+            | Self::List { .. } => false,
+        }
+    }
+}
+
+impl DepCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            // Both CLI verbs use the batch mutation variants, whose current
+            // contract does not enter claims coordination.
+            Self::Add { .. } | Self::Rm { .. } | Self::Remove { .. } | Self::Delete { .. } => false,
+        }
+    }
+}
+
+impl GateCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Preset(command) => command.coordinates_claims_first(),
+            Self::Define { .. }
+            | Self::Update { .. }
+            | Self::Remove { .. }
+            | Self::Rm { .. }
+            | Self::Delete { .. }
+            | Self::Add { .. }
+            | Self::Evaluate { .. }
+            | Self::EvaluateAll { .. }
+            | Self::Fail { .. }
+            | Self::List { .. }
+            | Self::Show { .. }
+            | Self::Status { .. }
+            | Self::StatusAll { .. } => false,
+        }
+    }
+}
+
+impl PresetCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Apply { .. } => true,
+            Self::List { .. } | Self::Show { .. } | Self::Create { .. } => false,
+        }
+    }
+}
+
+impl EventCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Tail { .. } | Self::Query { .. } => false,
+        }
+    }
+}
+
+impl DocCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Assets { command } => command.coordinates_claims_first(),
+            Self::Add { .. }
+            | Self::List { .. }
+            | Self::Remove { .. }
+            | Self::Rm { .. }
+            | Self::Delete { .. }
+            | Self::Show { .. }
+            | Self::History { .. }
+            | Self::Diff { .. }
+            | Self::CheckLinks { .. } => false,
+        }
+    }
+}
+
+impl AssetCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::List { .. } => false,
+        }
+    }
+}
+
+impl ArchiveCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Candidates { .. } | Self::Document { .. } | Self::Container { .. } => false,
+        }
+    }
+}
+
+impl GraphCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Deps { .. }
+            | Self::Rdeps { .. }
+            | Self::Roots { .. }
+            | Self::Tree { .. }
+            | Self::Export { .. } => false,
+        }
+    }
+}
+
+impl QueryCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::All { .. }
+            | Self::Available { .. }
+            | Self::Blocked { .. }
+            | Self::Strategic { .. }
+            | Self::Closed { .. }
+            | Self::Count { .. }
+            | Self::Divergence { .. } => false,
+        }
+    }
+}
+
+impl LabelCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Namespaces { .. }
+            | Self::Values { .. }
+            | Self::Add { .. }
+            | Self::Rm { .. }
+            | Self::Remove { .. } => false,
+        }
+    }
+}
+
+impl ConfigCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Show { .. }
+            | Self::Get { .. }
+            | Self::Set { .. }
+            | Self::Validate { .. }
+            | Self::ShowHierarchy { .. }
+            | Self::ListTemplates { .. } => false,
+        }
+    }
+}
+
+impl SnapshotCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Export { .. } => false,
+        }
+    }
+}
+
+impl ClaimCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Acquire { .. }
+            | Self::Release { .. }
+            | Self::Renew { .. }
+            | Self::Heartbeat { .. }
+            | Self::ForceEvict { .. } => true,
+            Self::Status { .. } | Self::List { .. } => false,
+        }
+    }
+}
+
+impl WorktreeCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Info { .. } | Self::List { .. } => false,
+        }
+    }
+}
+
+impl HooksCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Install { .. } => false,
+        }
+    }
+}
+
+impl ItemCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::List { .. } | Self::Show { .. } | Self::Resolve { .. } | Self::Search { .. } => {
+                false
+            }
+        }
+    }
+}
+
+impl InvariantCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Check { .. } => false,
+        }
+    }
+}
+
+impl ProjectCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::Render { .. } => false,
+        }
+    }
+}
+
+impl MigrateCommands {
+    fn coordinates_claims_first(&self) -> bool {
+        match self {
+            Self::LifecycleTimestamps { .. } => false,
+        }
+    }
+}
+
 #[cfg(test)]
 mod recovery_dispatch_tests {
     use super::*;
-    use clap::CommandFactory;
+    use clap::{CommandFactory, Parser};
     use std::collections::BTreeSet;
 
     const CLI_LEAF_COMMANDS: &[&str] = &[
@@ -3176,6 +3460,20 @@ mod recovery_dispatch_tests {
         "worktree list",
     ];
 
+    const CLAIM_FIRST_LEAF_COMMANDS: &[&str] = &[
+        "claim acquire",
+        "claim force-evict",
+        "claim heartbeat",
+        "claim release",
+        "claim renew",
+        "gate preset apply",
+        "issue claim",
+        "issue claim-next",
+        "issue delete",
+        "issue reject",
+        "issue update",
+    ];
+
     fn collect_leaf_commands(
         command: &clap::Command,
         path: Vec<String>,
@@ -3194,6 +3492,10 @@ mod recovery_dispatch_tests {
             subcommand_path.push(subcommand.get_name().to_string());
             collect_leaf_commands(subcommand, subcommand_path, leaves);
         }
+    }
+
+    fn parsed_command(args: &[&str]) -> Commands {
+        Cli::try_parse_from(args).unwrap().command.unwrap()
     }
 
     #[test]
@@ -3246,6 +3548,126 @@ mod recovery_dispatch_tests {
             json: false,
         }
         .requires_recovery_dispatch());
+    }
+
+    #[test]
+    fn test_claim_first_classification_covers_exact_cli_callers() {
+        let claim_first: &[(&str, &[&str])] = &[
+            (
+                "issue update",
+                &["jit", "issue", "update", "deadbeef", "--title", "updated"],
+            ),
+            ("issue delete", &["jit", "issue", "delete", "deadbeef"]),
+            (
+                "issue claim",
+                &["jit", "issue", "claim", "deadbeef", "agent:test"],
+            ),
+            ("issue reject", &["jit", "issue", "reject", "deadbeef"]),
+            (
+                "issue claim-next",
+                &["jit", "issue", "claim-next", "agent:test"],
+            ),
+            (
+                "gate preset apply",
+                &["jit", "gate", "preset", "apply", "plan-review", "deadbeef"],
+            ),
+            ("claim acquire", &["jit", "claim", "acquire", "deadbeef"]),
+            ("claim release", &["jit", "claim", "release", "deadbeef"]),
+            ("claim renew", &["jit", "claim", "renew", "lease-id"]),
+            (
+                "claim heartbeat",
+                &["jit", "claim", "heartbeat", "lease-id"],
+            ),
+            (
+                "claim force-evict",
+                &[
+                    "jit",
+                    "claim",
+                    "force-evict",
+                    "lease-id",
+                    "--reason",
+                    "stale",
+                ],
+            ),
+        ];
+        let classified = claim_first
+            .iter()
+            .map(|(leaf, _)| (*leaf).to_string())
+            .collect::<BTreeSet<_>>();
+        let expected = CLAIM_FIRST_LEAF_COMMANDS
+            .iter()
+            .map(|leaf| (*leaf).to_string())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(classified, expected, "claim-first cases must be exhaustive");
+        assert!(expected
+            .iter()
+            .all(|leaf| CLI_LEAF_COMMANDS.iter().any(|candidate| candidate == leaf)));
+
+        for (leaf, args) in claim_first {
+            let command = parsed_command(args);
+            assert!(
+                command.coordinates_claims_first(),
+                "{leaf} must coordinate claims before opening its repository session"
+            );
+            assert!(command.requires_recovery_dispatch());
+        }
+
+        let repository_first: &[(&str, &[&str])] = &[
+            (
+                "issue assign",
+                &["jit", "issue", "assign", "deadbeef", "agent:test"],
+            ),
+            ("issue unassign", &["jit", "issue", "unassign", "deadbeef"]),
+            (
+                "issue release",
+                &["jit", "issue", "release", "deadbeef", "timeout"],
+            ),
+            ("dep add", &["jit", "dep", "add", "deadbeef", "feedface"]),
+            ("dep rm", &["jit", "dep", "rm", "deadbeef", "feedface"]),
+            ("gate add", &["jit", "gate", "add", "deadbeef", "tests"]),
+            (
+                "gate evaluate",
+                &["jit", "gate", "evaluate", "deadbeef", "tests"],
+            ),
+            (
+                "gate preset create",
+                &["jit", "gate", "preset", "create", "deadbeef", "custom"],
+            ),
+        ];
+        let claim_readers: &[(&str, &[&str])] = &[
+            ("claim status", &["jit", "claim", "status"]),
+            ("claim list", &["jit", "claim", "list"]),
+        ];
+        let claim_leaves = claim_first
+            .iter()
+            .chain(repository_first.iter())
+            .chain(claim_readers.iter())
+            .map(|(leaf, _)| *leaf)
+            .filter(|leaf| leaf.starts_with("claim "))
+            .collect::<BTreeSet<_>>();
+        let expected_claim_leaves = CLI_LEAF_COMMANDS
+            .iter()
+            .copied()
+            .filter(|leaf| leaf.starts_with("claim "))
+            .collect::<BTreeSet<_>>();
+        assert_eq!(claim_leaves, expected_claim_leaves);
+
+        for (leaf, args) in repository_first {
+            let command = parsed_command(args);
+            assert!(
+                !command.coordinates_claims_first(),
+                "{leaf} does not reach claims_mutation_guard"
+            );
+            assert!(
+                command.requires_recovery_dispatch(),
+                "{leaf} must retain its startup recovery session"
+            );
+        }
+        for (leaf, args) in claim_readers {
+            let command = parsed_command(args);
+            assert!(!command.coordinates_claims_first(), "{leaf} is read-only");
+            assert!(!command.requires_recovery_dispatch(), "{leaf} is read-only");
+        }
     }
 
     #[test]

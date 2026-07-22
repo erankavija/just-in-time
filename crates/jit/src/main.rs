@@ -28,7 +28,22 @@ use jit::domain::{GateRunResult, Priority, State};
 use jit::output::{ExitCode, JsonOutput, OutputContext};
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
+use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
+
+fn normalize_absolute_path(path: &Path) -> PathBuf {
+    path.components()
+        .fold(PathBuf::new(), |mut normalized, component| {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    normalized.pop();
+                }
+                other => normalized.push(other.as_os_str()),
+            }
+            normalized
+        })
+}
 
 /// Helper to determine exit code from error message
 fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
@@ -1835,16 +1850,39 @@ fn run() -> Result<()> {
     // boundary, fall back to `<cwd>/.jit` so the "repository not found" error
     // from `storage.validate()` below names a sensible path and still
     // suggests `jit init`.
-    let jit_dir = if let Ok(custom_dir) = env::var("JIT_DATA_DIR") {
-        current_dir.join(custom_dir)
-    } else if matches!(command, Commands::Init { .. }) {
-        current_dir.join(".jit")
+    let is_init = matches!(&command, Commands::Init { .. });
+    let (jit_dir, non_git_worktree_root) = if let Ok(custom_dir) = env::var("JIT_DATA_DIR") {
+        let target = normalize_absolute_path(&current_dir.join(custom_dir));
+        let discovered = jit::storage::discovery::discover_jit_dir(&current_dir);
+        let worktree_root = discovered
+            .filter(|candidate| candidate == &target)
+            .and_then(|candidate| candidate.parent().map(|parent| parent.to_path_buf()))
+            .unwrap_or_else(|| current_dir.clone());
+        (target, worktree_root)
+    } else if is_init {
+        (current_dir.join(".jit"), current_dir.clone())
     } else if requires_recovery_dispatch {
-        jit::storage::discovery::discover_recovery_jit_dir(&current_dir)
-            .unwrap_or_else(|| current_dir.join(".jit"))
+        match jit::storage::discovery::discover_recovery_jit_dir(&current_dir) {
+            Some(discovered) => {
+                let worktree_root = discovered
+                    .parent()
+                    .map(|parent| parent.to_path_buf())
+                    .unwrap_or_else(|| current_dir.clone());
+                (discovered, worktree_root)
+            }
+            None => (current_dir.join(".jit"), current_dir.clone()),
+        }
     } else {
-        jit::storage::discovery::discover_jit_dir(&current_dir)
-            .unwrap_or_else(|| current_dir.join(".jit"))
+        match jit::storage::discovery::discover_jit_dir(&current_dir) {
+            Some(discovered) => {
+                let worktree_root = discovered
+                    .parent()
+                    .map(|parent| parent.to_path_buf())
+                    .unwrap_or_else(|| current_dir.clone());
+                (discovered, worktree_root)
+            }
+            None => (current_dir.join(".jit"), current_dir.clone()),
+        }
     };
 
     let storage = JsonFileStorage::new(&jit_dir);
@@ -1855,19 +1893,22 @@ fn run() -> Result<()> {
     // layout; the worktree root always comes from this boundary, never inferred
     // from the storage parent (`@/charter/D-4`, plan layout authority). Discovery
     // is mandatory: startup reports discovery/wiring failures before dispatch.
-    let worktree_paths = jit::storage::worktree_paths::WorktreePaths::detect()
-        .context("failed to discover repository worktree layout")?;
+    let worktree_paths = jit::storage::worktree_paths::WorktreePaths::detect_with_non_git_root(
+        &non_git_worktree_root,
+    )
+    .context("failed to discover repository worktree layout")?;
     let executor_layout =
         jit::storage::discover_repository_layout(worktree_paths.worktree_root, &jit_dir)
             .context("failed to construct repository layout")?;
     // Session opening is the one recovery boundary. Ordinary mutation dispatch
     // asks storage to open and retain its own exact session, so no caller can
-    // inject a foreign session. Claim mutation is the deliberate exception:
-    // its command opens the retained operation session only after coordination.
+    // inject a foreign session. Commands that coordinate claims are the deliberate
+    // exception: their operation session opens only after coordination.
+    let coordinates_claims_first = command.coordinates_claims_first();
     let mut retained_mutation_session = None;
     let transactions_recovered = if requires_recovery_dispatch {
-        if matches!(&command, Commands::Claim(_)) {
-            // Claim mutation enters coordination first, then opens its own
+        if coordinates_claims_first {
+            // Claim-aware mutation enters coordination first, then opens its own
             // recovered repository session. This unretained startup open repairs
             // residue before validation without inverting coordinator -> repository.
             let session = jit::storage::RepositoryStateStore::open_mutation_session(

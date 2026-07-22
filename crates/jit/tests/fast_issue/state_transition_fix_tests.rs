@@ -23,7 +23,7 @@ fn test_validate_fix_transitions_backlog_to_ready() {
     // Complete the task (simulating worktree merge - state changes without transition)
     let mut task_issue = h.storage.load_issue(&task).unwrap();
     task_issue.state = State::Done;
-    h.storage.save_issue(task_issue).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &task_issue);
 
     // Story is still in backlog (auto-transition didn't run)
     let story_issue = h.storage.load_issue(&story).unwrap();
@@ -56,7 +56,7 @@ fn test_validate_fix_ignores_unmet_dependencies() {
     // Complete only one task
     let mut task1_issue = h.storage.load_issue(&task1).unwrap();
     task1_issue.state = State::Done;
-    h.storage.save_issue(task1_issue.clone()).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &task1_issue);
 
     // Run validate --fix
     let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
@@ -83,11 +83,11 @@ fn test_validate_fix_transitions_multiple_issues() {
     // Complete both tasks
     let mut task1_issue = h.storage.load_issue(&task1).unwrap();
     task1_issue.state = State::Done;
-    h.storage.save_issue(task1_issue.clone()).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &task1_issue);
 
     let mut task2_issue = h.storage.load_issue(&task2).unwrap();
     task2_issue.state = State::Done;
-    h.storage.save_issue(task2_issue.clone()).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &task2_issue);
 
     // Run validate --fix
     let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
@@ -112,7 +112,7 @@ fn test_validate_fix_dry_run_no_changes() {
 
     let mut task_issue = h.storage.load_issue(&task).unwrap();
     task_issue.state = State::Done;
-    h.storage.save_issue(task_issue).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &task_issue);
 
     // Run validate --fix with dry-run
     let (fixes, _messages) = h.executor.validate_with_fix(true, true).unwrap();
@@ -138,11 +138,11 @@ fn test_validate_fix_ignores_ready_issues() {
     // Manually set to ready
     let mut issue1_loaded = h.storage.load_issue(&issue1).unwrap();
     issue1_loaded.state = State::Ready;
-    h.storage.save_issue(issue1_loaded.clone()).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue1_loaded);
 
     let mut issue2_loaded = h.storage.load_issue(&issue2).unwrap();
     issue2_loaded.state = State::Ready;
-    h.storage.save_issue(issue2_loaded.clone()).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue2_loaded);
 
     // Run validate --fix
     let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
@@ -161,11 +161,11 @@ fn test_validate_fix_ignores_done_issues() {
     // Both done
     let mut task_issue = h.storage.load_issue(&task).unwrap();
     task_issue.state = State::Done;
-    h.storage.save_issue(task_issue).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &task_issue);
 
     let mut story_issue = h.storage.load_issue(&story).unwrap();
     story_issue.state = State::Done;
-    h.storage.save_issue(story_issue).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &story_issue);
 
     // Run validate --fix
     let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
@@ -194,7 +194,7 @@ fn test_validate_fix_complex_dependency_chain() {
     for task_id in [&task1, &task2, &task3] {
         let mut task = h.storage.load_issue(task_id).unwrap();
         task.state = State::Done;
-        h.storage.save_issue(task).unwrap();
+        crate::harness::seed_memory_issue(&h.storage, &task);
     }
 
     // Run validate --fix
@@ -215,11 +215,11 @@ fn test_validate_fix_complex_dependency_chain() {
     // Now mark stories as done
     let mut story1_loaded = h.storage.load_issue(&story1).unwrap();
     story1_loaded.state = State::Done;
-    h.storage.save_issue(story1_loaded.clone()).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &story1_loaded);
 
     let mut story2_loaded = h.storage.load_issue(&story2).unwrap();
     story2_loaded.state = State::Done;
-    h.storage.save_issue(story2_loaded.clone()).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &story2_loaded);
 
     // Run validate --fix again
     let (more_fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();

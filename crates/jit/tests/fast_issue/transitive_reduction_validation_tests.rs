@@ -20,7 +20,7 @@ fn test_fix_transitive_reduction_logs_event() {
     // Manually inject redundant edge
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
-    h.storage.save_issue(issue_a).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue_a);
 
     let events_before = h.storage.read_events().unwrap().len();
 
@@ -69,7 +69,7 @@ fn test_detect_transitive_redundancy() {
     // Manually add redundant edge (bypassing reduction logic)
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
-    h.storage.save_issue(issue_a).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Validate should detect it
     let result = h.executor.validate_silent();
@@ -97,7 +97,7 @@ fn test_fix_transitive_redundancy() {
     // Add redundant edge
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
-    h.storage.save_issue(issue_a).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Fix with validate --fix
     let mut executor = h.executor;
@@ -135,7 +135,7 @@ fn test_validate_reports_all_redundancies() {
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
     issue_a.dependencies.push(d.clone());
-    h.storage.save_issue(issue_a).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Validate should detect both
     let result = h.executor.validate_silent();
@@ -203,7 +203,7 @@ fn test_dry_run_does_not_modify() {
 
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
-    h.storage.save_issue(issue_a).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Dry run
     let mut executor = h.executor;
@@ -236,7 +236,7 @@ fn test_complex_chain_reduction() {
     // Add redundant edge (A can reach D via B→C→D)
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(d.clone());
-    h.storage.save_issue(issue_a).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Fix
     let mut executor = h.executor;
@@ -271,11 +271,11 @@ fn test_multiple_issues_with_redundancies() {
     // Add redundant edges
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
-    h.storage.save_issue(issue_a).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue_a);
 
     let mut issue_d = h.storage.load_issue(&d).unwrap();
     issue_d.dependencies.push(f.clone());
-    h.storage.save_issue(issue_d).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &issue_d);
 
     // Fix both
     let mut executor = h.executor;

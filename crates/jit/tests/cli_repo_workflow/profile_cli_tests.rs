@@ -121,6 +121,57 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
 }
 
 #[test]
+fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op() {
+    let repo = TempDir::new().unwrap();
+    let initialized = jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
+    assert!(initialized.status.success(), "{initialized:?}");
+
+    let namespace_schema = repo
+        .path()
+        .join(".jit/schemas/default-namespace-registry.json");
+    let type_schema = repo
+        .path()
+        .join(".jit/schemas/default-type-hierarchy-known.json");
+    let expected_namespace = fs::read(&namespace_schema).unwrap();
+    let expected_types = fs::read(&type_schema).unwrap();
+    let events_path = repo.path().join(".jit/events.jsonl");
+    let event_count_before = fs::read_to_string(&events_path).unwrap().lines().count();
+
+    fs::remove_file(&namespace_schema).unwrap();
+    let preview = jit(
+        repo.path(),
+        &["profile", "apply", "jit-dogfood", "--dry-run", "--json"],
+    );
+    assert!(preview.status.success(), "{preview:?}");
+    assert_eq!(json(&preview)["status"], "would_apply");
+    assert!(!namespace_schema.exists(), "dry-run must remain read-only");
+
+    let repaired_missing = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
+    assert!(repaired_missing.status.success(), "{repaired_missing:?}");
+    assert_eq!(json(&repaired_missing)["status"], "applied");
+    assert_eq!(fs::read(&namespace_schema).unwrap(), expected_namespace);
+
+    fs::write(&type_schema, b"stale\n").unwrap();
+    let repaired_stale = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
+    assert!(repaired_stale.status.success(), "{repaired_stale:?}");
+    assert_eq!(json(&repaired_stale)["status"], "applied");
+    assert_eq!(fs::read(&type_schema).unwrap(), expected_types);
+
+    let events_after_repairs = fs::read(&events_path).unwrap();
+    assert_eq!(
+        std::str::from_utf8(&events_after_repairs)
+            .unwrap()
+            .lines()
+            .count(),
+        event_count_before + 2
+    );
+    let unchanged = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
+    assert!(unchanged.status.success(), "{unchanged:?}");
+    assert_eq!(json(&unchanged)["status"], "unchanged");
+    assert_eq!(fs::read(events_path).unwrap(), events_after_repairs);
+}
+
+#[test]
 fn test_profiled_init_conflict_leaves_no_jit_and_preserves_occupant() {
     let repo = TempDir::new().unwrap();
     fs::create_dir_all(repo.path().join("scripts")).unwrap();

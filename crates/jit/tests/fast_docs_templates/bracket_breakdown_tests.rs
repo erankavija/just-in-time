@@ -98,7 +98,7 @@ fn approve_plan(h: &TestHarness, planning_id: &str) {
         .get_mut("plan-review")
         .expect("planning node carries the plan gate");
     gate.status = jit::domain::GateStatus::Passed;
-    h.storage.save_issue(p).unwrap();
+    crate::harness::seed_memory_issue(&h.storage, &p);
 }
 
 /// Scaffold a breakable container `C` via the apply engine into `C → B → P`, with
@@ -674,7 +674,7 @@ fn test_bracket_breakdown_reads_template_from_disk() {
     // Approve P's plan-review gate: breakdown consumes an approved plan.
     let mut p = executor.storage().load_issue(&planning_id).unwrap();
     p.gates_status.get_mut("plan-review").unwrap().status = jit::domain::GateStatus::Passed;
-    executor.storage().save_issue(p).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &p);
 
     // The public wrapper resolves the template from templates.toml; none injected.
     let result = executor.bracket_breakdown(&c, vec![child("only")]).unwrap();

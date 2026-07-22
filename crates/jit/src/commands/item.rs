@@ -610,7 +610,7 @@ source-of-truth = \"registry-first\"
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         for issue in issues {
-            storage.save_issue(issue).unwrap();
+            crate::commands::test_helpers::seed_issue(&storage, issue);
         }
         CommandExecutor::new(storage)
     }
@@ -741,7 +741,7 @@ source-of-truth = \"registry-first\"
             storage.add_repo_file("project-items.md", md);
         }
         for issue in issues {
-            storage.save_issue(issue).unwrap();
+            crate::commands::test_helpers::seed_issue(&storage, issue);
         }
         CommandExecutor::new(storage)
     }
@@ -1214,7 +1214,7 @@ statement = \"Every dependency edge stays acyclic.\"
         std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         storage.add_repo_file(".jit/invariants.toml", invariants_toml);
         for issue in issues {
-            storage.save_issue(issue).unwrap();
+            crate::commands::test_helpers::seed_issue(&storage, issue);
         }
         CommandExecutor::new(storage)
     }
@@ -1546,7 +1546,7 @@ stage = \"postcheck\"
             storage.add_repo_file(".jit/invariants.toml", inv);
         }
         for issue in issues {
-            storage.save_issue(issue).unwrap();
+            crate::commands::test_helpers::seed_issue(&storage, issue);
         }
         CommandExecutor::new(storage)
     }

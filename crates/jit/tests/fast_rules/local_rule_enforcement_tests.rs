@@ -237,7 +237,7 @@ fn test_update_enforce_rule_blocks_and_force_logs() {
     issue.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
     issue.state = State::Ready;
     let id = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
 
     // Removing the only req: label would violate the enforce rule -> blocked.
     let blocked = executor.update_issue(
@@ -320,7 +320,7 @@ assert = { require-label = { label = "owner:*", min = 1 } }
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::Ready;
     let id = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
 
     let updated_at_before = executor.storage().load_issue(&id).unwrap().updated_at;
     let events_before = executor.storage().read_events().unwrap().len();
@@ -405,7 +405,7 @@ assert = { json-schema = "schemas/no-bad.json" }
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::Ready;
     let id = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
 
     // Adding a `bad:*` label via bulk update violates the schema -> error, no force.
     let filter = QueryFilter::parse("state:ready").unwrap();
@@ -463,7 +463,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
     issue.state = State::InProgress;
     issue.gates_required = vec!["manual-gate".to_string()]; // unpassed
     let id = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
 
     let result = executor.update_issue(
         &id,
@@ -530,7 +530,7 @@ assert = { json-schema = "schemas/no-bad.json" }
     let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string(), "bad:value".to_string()];
     issue.state = State::Ready;
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
 
     // Adding a label the issue already has is a no-op (no field change), but the
     // issue still violates the enforce rule, so a forced write must log a bypass.
@@ -620,7 +620,7 @@ fn test_update_evaluates_rules_against_post_transition_shape() {
     issue.labels = vec!["type:task".to_string()];
     issue.state = State::Backlog;
     let id = issue.id.clone();
-    executor.storage().save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &issue);
 
     let blocked = executor.update_issue(
         &id,
@@ -668,9 +668,9 @@ fn test_update_evaluates_rules_against_post_transition_shape() {
 }
 
 #[test]
-fn test_force_bypass_event_emitted_after_successful_create_save() {
+fn test_force_bypass_event_emitted_after_successful_create_publication() {
     // The bypass event must be deferred until after the write commits. On a
-    // forced create, IssueCreated is appended only after save_issue succeeds, so
+    // forced create, IssueCreated is appended only after publication succeeds, so
     // the LocalRuleBypassed event (now logged after the save) must come AFTER
     // the IssueCreated event in the log — proving it is not emitted pre-write.
     let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
@@ -705,8 +705,8 @@ fn test_force_bypass_event_emitted_after_successful_create_save() {
 }
 
 #[test]
-fn test_no_bypass_event_when_save_fails() {
-    // A storage whose save_issue always fails. A forced create that bypasses an
+fn test_no_bypass_event_when_publication_fails() {
+    // A storage whose mutation publication always fails. A forced create that bypasses an
     // enforce rule must NOT leave a LocalRuleBypassed entry when the write fails,
     // because the bypass event is now emitted only after a successful save.
     let inner = InMemoryStorage::new();
@@ -717,7 +717,7 @@ fn test_no_bypass_event_when_save_fails() {
     inner.add_repo_file(".jit/config.toml", config);
     inner.add_repo_file(".jit/rules.toml", EPIC_NEEDS_REQ_ENFORCE);
 
-    let storage = FailingSaveStorage::new(inner);
+    let storage = FailingMutationStorage::new(inner);
     let layout = jit::repository_state::RepositoryLayout::new(
         jit::repository_state::RepositoryRootEvidence::new(
             "/jit-failing-memory-worktree",
@@ -778,15 +778,15 @@ fn test_ordinary_rejection_is_not_logged() {
     assert_eq!(before, after, "an ordinary rejection must not log events");
 }
 
-/// A storage backend that delegates every operation to an inner
-/// [`InMemoryStorage`] EXCEPT `save_issue`, which always fails. Used to prove
-/// that a `--force` bypass event is never written when the issue write fails.
+/// A storage backend whose repository mutation session rejects publication.
+/// Used to prove that a `--force` bypass event is never written when the issue
+/// mutation fails.
 #[derive(Clone)]
-struct FailingSaveStorage {
+struct FailingMutationStorage {
     inner: InMemoryStorage,
 }
 
-impl FailingSaveStorage {
+impl FailingMutationStorage {
     fn new(inner: InMemoryStorage) -> Self {
         Self { inner }
     }
@@ -823,7 +823,7 @@ impl jit::storage::RepositoryMutationSession for FailingMutationSession {
     }
 }
 
-impl jit::storage::RepositoryStateStore for FailingSaveStorage {
+impl jit::storage::RepositoryStateStore for FailingMutationStorage {
     fn open_mutation_session(
         &self,
         layout: jit::repository_state::RepositoryLayout,
@@ -837,13 +837,9 @@ impl jit::storage::RepositoryStateStore for FailingSaveStorage {
     }
 }
 
-impl IssueStore for FailingSaveStorage {
+impl IssueStore for FailingMutationStorage {
     fn acquire_repo_write_lock(&self) -> anyhow::Result<jit::storage::RepoWriteGuard> {
         self.inner.acquire_repo_write_lock()
-    }
-
-    fn save_issue(&self, _issue: Issue) -> anyhow::Result<()> {
-        Err(anyhow::anyhow!("simulated save failure"))
     }
 
     fn load_issue(&self, id: &str) -> anyhow::Result<Issue> {
@@ -860,14 +856,6 @@ impl IssueStore for FailingSaveStorage {
 
     fn load_gate_registry(&self) -> anyhow::Result<jit::declarations::GateRegistry> {
         self.inner.load_gate_registry()
-    }
-
-    fn save_gate_registry(&self, registry: &jit::declarations::GateRegistry) -> anyhow::Result<()> {
-        self.inner.save_gate_registry(registry)
-    }
-
-    fn append_event(&self, event: &Event) -> anyhow::Result<()> {
-        self.inner.append_event(event)
     }
 
     fn read_events(&self) -> anyhow::Result<Vec<Event>> {
@@ -894,14 +882,6 @@ impl IssueStore for FailingSaveStorage {
         rel_path: &str,
     ) -> Result<Option<String>, jit::storage::PathReadError> {
         self.inner.read_repo_file(rel_path)
-    }
-
-    fn write_repo_file(
-        &self,
-        rel_path: &str,
-        content: &str,
-    ) -> Result<(), jit::storage::PathReadError> {
-        self.inner.write_repo_file(rel_path, content)
     }
 
     fn list_gate_presets(&self) -> anyhow::Result<Vec<jit::gate_presets::PresetInfo>> {

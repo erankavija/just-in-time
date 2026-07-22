@@ -1250,11 +1250,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ```
     /// use jit::commands::{CommandExecutor, GateUpdate};
     /// use jit::declarations::{GateMode, GateStage};
-    /// use jit::{InMemoryStorage, IssueStore};
+    /// use jit::InMemoryStorage;
     ///
     /// std::env::set_var("JIT_TEST_MODE", "1"); // skip the main-history guard
     /// let storage = InMemoryStorage::new();
-    /// storage.write_repo_file(".jit/config.toml", "").unwrap();
+    /// storage.add_repo_file(".jit/config.toml", "");
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// executor
@@ -1547,6 +1547,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file};
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::storage::InMemoryStorage;
@@ -1560,9 +1561,7 @@ mod tests {
 [worktree]
 enforce_leases = "off"
 "#;
-        storage
-            .write_repo_file(".jit/config.toml", config_toml)
-            .unwrap();
+        seed_repo_file(&storage, ".jit/config.toml", config_toml);
 
         crate::commands::test_helpers::memory_executor(storage)
     }
@@ -1597,12 +1596,12 @@ enforce_leases = "off"
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with the gate
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "auto-gate".to_string())
             .unwrap();
@@ -1647,7 +1646,7 @@ enforce_leases = "off"
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
     }
 
     #[test]
@@ -1657,7 +1656,7 @@ enforce_leases = "off"
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
 
         // Add the gate for real, then snapshot updated_at.
         let (res1, _) = executor.add_gates(&issue_id, &["g1".to_string()]).unwrap();
@@ -1682,7 +1681,7 @@ enforce_leases = "off"
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
 
         // Removing a gate the issue does not have is a no-op.
@@ -1728,12 +1727,12 @@ enforce_leases = "off"
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with the gate
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "auto-gate".to_string())
             .unwrap();
@@ -1781,12 +1780,12 @@ enforce_leases = "off"
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with the gate
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "manual-gate".to_string())
             .unwrap();
@@ -1819,7 +1818,7 @@ enforce_leases = "off"
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "manual-gate".to_string())
             .unwrap();
@@ -1868,7 +1867,7 @@ enforce_leases = "off"
             crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
         ))));
         let storage = InMemoryStorage::with_repository_state_failures(failures);
-        storage.write_repo_file(".jit/config.toml", "").unwrap();
+        seed_repo_file(&storage, ".jit/config.toml", "");
         let recovered = storage.without_repository_state_failures();
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
@@ -1905,12 +1904,14 @@ enforce_leases = "off"
             crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
         ))));
         let storage = InMemoryStorage::with_repository_state_failures(failures);
-        storage
-            .write_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n")
-            .unwrap();
+        seed_repo_file(
+            &storage,
+            ".jit/config.toml",
+            "[worktree]\nenforce_leases = \"off\"\n",
+        );
         let issue = crate::domain::types::fixture_issue("Preset target".into(), String::new());
         let issue_id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        seed_issue(&storage, issue);
         let recovered = storage.without_repository_state_failures();
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
@@ -1943,7 +1944,7 @@ enforce_leases = "off"
         let mut issue = crate::domain::types::fixture_issue("Preset source".into(), String::new());
         issue.gates_required.push("review".into());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         let layout = executor.storage.repository_layout();
 
         let mut stale_session = executor
@@ -2002,7 +2003,7 @@ enforce_leases = "off"
         let mut issue = crate::domain::types::fixture_issue("Preset source".into(), String::new());
         issue.gates_required.push("review".into());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
 
         let path = executor
             .create_gate_preset("team-review", &issue_id)
@@ -2058,11 +2059,12 @@ enforce_leases = "off"
         let mut issue = crate::domain::types::fixture_issue("Preset source".into(), String::new());
         issue.gates_required.push("review".into());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
-        executor
-            .storage
-            .write_repo_file(".jit/config/gate-presets/occupied.json", "{ malformed")
-            .unwrap();
+        seed_issue(executor.storage(), issue);
+        seed_repo_file(
+            executor.storage(),
+            ".jit/config/gate-presets/occupied.json",
+            "{ malformed",
+        );
 
         let error = executor
             .create_gate_preset("occupied", &issue_id)
@@ -2075,10 +2077,10 @@ enforce_leases = "off"
     #[test]
     fn test_gate_definition_updates_configured_projection_in_same_mutation() {
         let storage = InMemoryStorage::new();
-        storage
-            .write_repo_file(
-                ".jit/config.toml",
-                r#"
+        seed_repo_file(
+            &storage,
+            ".jit/config.toml",
+            r#"
 [item_kinds.gate]
 section = "success_criteria"
 id-pattern = "[a-z][a-z0-9-]*"
@@ -2103,9 +2105,8 @@ mode = "separate-file"
 target = "gates.md"
 style = "full"
 "#,
-            )
-            .unwrap();
-        storage.write_repo_file(".jit/rules.toml", "").unwrap();
+        );
+        seed_repo_file(&storage, ".jit/rules.toml", "");
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage).with_layout(layout);
 
@@ -2147,7 +2148,7 @@ style = "full"
         use crate::storage::{RepositoryStateStore, RepositoryStateStoreError};
 
         let storage = InMemoryStorage::new();
-        storage.write_repo_file(".jit/config.toml", "").unwrap();
+        seed_repo_file(&storage, ".jit/config.toml", "");
         let layout = storage.repository_layout();
         let spec = || {
             CaptureSpec::phase_one(
@@ -2246,7 +2247,7 @@ style = "full"
                 example_integration: None,
             },
         );
-        storage.save_gate_registry(&concurrent).unwrap();
+        seed_gate_registry(&storage, &concurrent);
         assert!(matches!(
             first_session.apply(&first_plan),
             Err(RepositoryStateStoreError::RetryableConflict { .. })

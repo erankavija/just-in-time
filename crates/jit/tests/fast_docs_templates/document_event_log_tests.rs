@@ -7,6 +7,25 @@ use crate::harness::TestHarness;
 use jit::domain::Event;
 use jit::storage::IssueStore;
 
+fn create_issue<S>(executor: &jit::commands::CommandExecutor<S>, title: &str) -> String
+where
+    S: IssueStore + jit::storage::RepositoryStateStore,
+{
+    executor
+        .create_issue(
+            title.into(),
+            String::new(),
+            jit::domain::Priority::Normal,
+            vec![],
+            vec![],
+            None,
+            None,
+            false,
+        )
+        .unwrap()
+        .0
+}
+
 /// Assert the last event is `issue_updated` for `issue_id` with the expected
 /// actor and `fields` containing `documents`.
 fn assert_last_event_is_documents_update(h: &TestHarness, issue_id: &str, expected_actor: &str) {
@@ -272,9 +291,7 @@ fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
         .unwrap();
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
-    let issue = crate::fixture_issue("Pinned docs".into(), String::new());
-    let id = issue.id.clone();
-    storage.save_issue(issue).unwrap();
+    let id = create_issue(&executor, "Pinned docs");
 
     std::fs::write(
         temp.path().join("docs/guide.md"),
@@ -340,9 +357,7 @@ fn test_add_document_rejects_malformed_utf8_without_writes() {
         .unwrap();
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
-    let issue = crate::fixture_issue("Malformed document".into(), String::new());
-    let id = issue.id.clone();
-    storage.save_issue(issue).unwrap();
+    let id = create_issue(&executor, "Malformed document");
     std::fs::create_dir_all(temp.path().join("docs")).unwrap();
     std::fs::write(temp.path().join("docs/guide.md"), [0xff, 0xfe]).unwrap();
     let issue_before = storage.load_issue(&id).unwrap();

@@ -1583,7 +1583,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::{compact_run_history_for_context, omit_current_gate_projection};
-    use crate::commands::CommandExecutor;
+    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file};
+    use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::domain::{
         GateFindings, GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION,
@@ -1594,8 +1595,8 @@ mod tests {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    fn add_builtin_gate<S: IssueStore>(
-        executor: &CommandExecutor<S>,
+    fn add_builtin_gate(
+        executor: &CommandExecutor<InMemoryStorage>,
         gate_key: &str,
         checker: GateChecker,
         labels: Vec<String>,
@@ -1617,13 +1618,13 @@ mod tests {
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.labels = labels;
         issue.gates_required.push(gate_key.to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         issue_id
     }
 
@@ -1787,12 +1788,12 @@ enforce_leases = "off"
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with gate
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "test-gate".to_string())
             .unwrap();
@@ -1925,22 +1926,45 @@ assert = { require-section = { heading = "Summary" } }
         executor
             .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
-        let issue_id = add_builtin_gate(
-            &executor,
-            "not-a-reserved-repository-key",
-            GateChecker::RepositoryValidation,
-            vec!["type:task".to_string()],
-        );
-        let mut registry = executor.storage.load_gate_registry().unwrap();
-        let mut placeholder = registry
-            .gates
-            .get("not-a-reserved-repository-key")
-            .unwrap()
-            .clone();
-        placeholder.key = "editable-review".to_string();
-        placeholder.checker = Some(GateChecker::ReviewPlaceholder);
-        registry.gates.insert(placeholder.key.clone(), placeholder);
-        executor.storage.save_gate_registry(&registry).unwrap();
+        executor
+            .define_gate(
+                "not-a-reserved-repository-key".to_string(),
+                "Portable check".to_string(),
+                "Portable check".to_string(),
+                GateStage::Postcheck,
+                GateMode::Auto,
+                Some(GateChecker::RepositoryValidation),
+                100,
+                None,
+            )
+            .unwrap();
+        executor
+            .define_gate(
+                "editable-review".to_string(),
+                "Portable check".to_string(),
+                "Portable check".to_string(),
+                GateStage::Postcheck,
+                GateMode::Auto,
+                Some(GateChecker::ReviewPlaceholder),
+                100,
+                None,
+            )
+            .unwrap();
+        let (issue_id, _) = executor
+            .create_issue(
+                "Test".to_string(),
+                "Test".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                vec!["type:task".to_string()],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+        executor
+            .add_gate(&issue_id, "not-a-reserved-repository-key".to_string())
+            .unwrap();
         (repo, executor, issue_id)
     }
 
@@ -1952,17 +1976,14 @@ assert = { require-section = { heading = "Summary" } }
         command: String,
         prompt_file: Option<String>,
     ) {
-        let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry.gates.insert(
-            gate_key.to_string(),
-            crate::declarations::GateDefinition {
-                version: 1,
-                key: gate_key.to_string(),
-                title: title.to_string(),
-                description: "Race fixture".to_string(),
-                stage: GateStage::Postcheck,
-                mode: GateMode::Auto,
-                checker: Some(GateChecker::Exec {
+        executor
+            .define_gate(
+                gate_key.to_string(),
+                title.to_string(),
+                "Race fixture".to_string(),
+                GateStage::Postcheck,
+                GateMode::Auto,
+                Some(GateChecker::Exec {
                     command,
                     timeout_seconds: 10,
                     working_dir: None,
@@ -1971,13 +1992,10 @@ assert = { require-section = { heading = "Summary" } }
                     prompt: Some("inline prompt".to_string()),
                     prompt_file,
                 }),
-                priority: 100,
-                reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
-            },
-        );
-        executor.storage.save_gate_registry(&registry).unwrap();
+                100,
+                None,
+            )
+            .unwrap();
         executor.add_gate(issue_id, gate_key.to_string()).unwrap();
     }
 
@@ -2076,16 +2094,15 @@ assert = { require-section = { heading = "Summary" } }
             "true".to_string(),
             None,
         );
-        let mut registry = executor.storage.load_gate_registry().unwrap();
-        let Some(GateChecker::Exec { pass_context, .. }) = registry
-            .gates
-            .get_mut("no-context")
-            .and_then(|gate| gate.checker.as_mut())
-        else {
-            panic!("test gate must use the exec checker")
-        };
-        *pass_context = false;
-        executor.storage.save_gate_registry(&registry).unwrap();
+        executor
+            .update_gate(
+                "no-context",
+                GateUpdate {
+                    pass_context: Some(false),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
         write_corrupt_gate_run(repo.path());
 
         let result = executor.check_gate(&issue_id, "no-context").unwrap();
@@ -2113,7 +2130,7 @@ assert = { require-section = { heading = "Summary" } }
 
     #[test]
     fn test_review_placeholder_ignores_unsupported_target_documents() {
-        let (_repo, executor, issue_id) = setup_file_repository();
+        let (repo, executor, issue_id) = setup_file_repository();
         executor
             .add_gate(&issue_id, "editable-review".to_string())
             .unwrap();
@@ -2121,7 +2138,12 @@ assert = { require-section = { heading = "Summary" } }
         issue.documents.push(crate::domain::DocumentReference::new(
             "../../outside".to_string(),
         ));
-        executor.storage.save_issue(issue).unwrap();
+        let bytes = crate::repository_state::serialize_issue(&issue).unwrap();
+        std::fs::write(
+            repo.path().join(format!(".jit/issues/{issue_id}.json")),
+            bytes,
+        )
+        .unwrap();
 
         let result = executor.check_gate(&issue_id, "editable-review").unwrap();
 
@@ -2322,7 +2344,7 @@ assert = { require-section = { heading = "Summary" } }
             crate::domain::types::fixture_issue("Container".to_string(), "Container".to_string());
         target.labels = vec!["type:task".to_string()];
         let target_id = target.id.clone();
-        executor.storage.save_issue(target).unwrap();
+        seed_issue(executor.storage(), target);
 
         let issue_id = add_builtin_gate(
             &executor,
@@ -2375,12 +2397,12 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with gate
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "failing-gate".to_string())
             .unwrap();
@@ -2419,12 +2441,12 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with gate
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "manual-gate".to_string())
             .unwrap();
@@ -2482,11 +2504,11 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "auto-gate".to_string())
             .unwrap();
@@ -2566,12 +2588,12 @@ assert = { require-section = { heading = "Summary" } }
                 },
             );
         }
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with both gates
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "gate-1".to_string()).unwrap();
         executor.add_gate(&issue_id, "gate-2".to_string()).unwrap();
 
@@ -2595,11 +2617,11 @@ assert = { require-section = { heading = "Summary" } }
                 .gates
                 .insert(key.to_string(), make_auto_gate(key, "exit 0"));
         }
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "gate-1".to_string()).unwrap();
         executor.add_gate(&issue_id, "gate-2".to_string()).unwrap();
 
@@ -2666,13 +2688,13 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with precheck
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "precheck".to_string())
             .unwrap();
@@ -2705,12 +2727,18 @@ assert = { require-section = { heading = "Summary" } }
             "true".to_string(),
             None,
         );
-        let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry.gates.get_mut("precheck").unwrap().stage = GateStage::Precheck;
-        executor.storage.save_gate_registry(&registry).unwrap();
-        let mut issue = executor.storage.load_issue(&issue_id).unwrap();
-        issue.state = State::Ready;
-        executor.storage.save_issue(issue).unwrap();
+        executor
+            .update_gate(
+                "precheck",
+                GateUpdate {
+                    stage: Some(GateStage::Precheck),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        executor
+            .update_issue_state(&issue_id, State::Ready)
+            .unwrap();
 
         let root = repo.path().join(".jit/gate-runs");
         for index in 0..257 {
@@ -2756,17 +2784,19 @@ assert = { require-section = { heading = "Summary" } }
             "true".to_string(),
             None,
         );
-        let mut registry = executor.storage.load_gate_registry().unwrap();
-        let gate = registry.gates.get_mut("precheck-no-context").unwrap();
-        gate.stage = GateStage::Precheck;
-        let Some(GateChecker::Exec { pass_context, .. }) = gate.checker.as_mut() else {
-            panic!("test gate must use the exec checker")
-        };
-        *pass_context = false;
-        executor.storage.save_gate_registry(&registry).unwrap();
-        let mut issue = executor.storage.load_issue(&issue_id).unwrap();
-        issue.state = State::Ready;
-        executor.storage.save_issue(issue).unwrap();
+        executor
+            .update_gate(
+                "precheck-no-context",
+                GateUpdate {
+                    stage: Some(GateStage::Precheck),
+                    pass_context: Some(false),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        executor
+            .update_issue_state(&issue_id, State::Ready)
+            .unwrap();
         write_corrupt_gate_run(repo.path());
 
         executor
@@ -2815,12 +2845,12 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
         let mut issue = crate::domain::types::fixture_issue("Test".into(), String::new());
         issue.state = State::Ready;
         issue.gates_required.push("precheck".to_string());
         let id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
 
         let error = executor
             .update_issue_state(&id, State::InProgress)
@@ -2860,13 +2890,13 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with failing precheck
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "precheck-fail".to_string())
             .unwrap();
@@ -2911,13 +2941,13 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue in progress with postcheck
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "postcheck".to_string())
             .unwrap();
@@ -2965,13 +2995,13 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue in progress with failing postcheck
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "postcheck-fail".to_string())
             .unwrap();
@@ -3019,7 +3049,7 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create an issue with the gate
         let mut issue = crate::domain::types::fixture_issue(
@@ -3028,7 +3058,7 @@ assert = { require-section = { heading = "Summary" } }
         );
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "review".to_string()).unwrap();
 
         // Check the gate - should build context and pass it
@@ -3063,13 +3093,11 @@ assert = { require-section = { heading = "Summary" } }
         let executor = setup();
 
         // Write a prompt file relative to repo root
-        executor
-            .storage
-            .write_repo_file(
-                "review-prompt.md",
-                "You are a senior engineer. Review for security issues.",
-            )
-            .unwrap();
+        seed_repo_file(
+            executor.storage(),
+            "review-prompt.md",
+            "You are a senior engineer. Review for security issues.",
+        );
 
         // Define a gate with prompt_file
         let mut registry = executor.storage.load_gate_registry().unwrap();
@@ -3097,12 +3125,12 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "review".to_string()).unwrap();
 
         let result = executor.check_gate(&issue_id, "review").unwrap();
@@ -3184,9 +3212,18 @@ assert = { require-section = { heading = "Summary" } }
     #[test]
     fn test_check_gate_reexecutes_when_direct_dependency_changes() {
         let (repo, executor, issue_id) = setup_file_repository();
-        let dependency = crate::domain::types::fixture_issue("Dependency".into(), "Test".into());
-        let dependency_id = dependency.id.clone();
-        executor.storage.save_issue(dependency).unwrap();
+        let (dependency_id, _) = executor
+            .create_issue(
+                "Dependency".into(),
+                "Test".into(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )
+            .unwrap();
         executor.add_dependency(&issue_id, &dependency_id).unwrap();
         let dependency_path = format!(".jit/issues/{dependency_id}.json");
         add_exec_gate(
@@ -3389,7 +3426,7 @@ assert = { require-section = { heading = "Summary" } }
         let executor = setup();
         let issue = crate::domain::types::fixture_issue("Apply race".into(), "Test".into());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         let temp = tempfile::tempdir().unwrap();
         let count = temp.path().join("checker-count");
         add_exec_gate(
@@ -3472,13 +3509,13 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "review".to_string()).unwrap();
 
         // First run - should have empty history
@@ -3545,11 +3582,11 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "review".to_string()).unwrap();
 
         let result = executor.check_gate(&issue_id, "review");
@@ -3592,12 +3629,12 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "review".to_string()).unwrap();
 
         // Run the gate repeatedly to exercise history compaction.
@@ -3621,10 +3658,7 @@ assert = { require-section = { heading = "Summary" } }
             .map(|_| "x".repeat(100))
             .collect::<Vec<_>>()
             .join("\n"); // 1100 lines of 100 chars = ~110KB
-        executor
-            .storage
-            .write_repo_file("huge-prompt.md", &big_content)
-            .unwrap();
+        seed_repo_file(executor.storage(), "huge-prompt.md", &big_content);
 
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
@@ -3651,11 +3685,11 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "review".to_string()).unwrap();
 
         let result = executor.check_gate(&issue_id, "review");
@@ -3698,11 +3732,11 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "test-gate".to_string())
             .unwrap();
@@ -3745,11 +3779,11 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "test-gate".to_string())
             .unwrap();
@@ -3809,11 +3843,11 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "test-gate".to_string())
             .unwrap();
@@ -3833,14 +3867,14 @@ assert = { require-section = { heading = "Summary" } }
             "Create tables".to_string(),
         );
         let dep1_id = dep1.id.clone();
-        executor.storage.save_issue(dep1).unwrap();
+        seed_issue(executor.storage(), dep1);
 
         let dep2 = crate::domain::types::fixture_issue(
             "Implement auth module".to_string(),
             "OAuth2 flow".to_string(),
         );
         let dep2_id = dep2.id.clone();
-        executor.storage.save_issue(dep2).unwrap();
+        seed_issue(executor.storage(), dep2);
 
         // Create main issue that depends on both
         let mut main_issue = crate::domain::types::fixture_issue(
@@ -3851,7 +3885,7 @@ assert = { require-section = { heading = "Summary" } }
         main_issue.dependencies.push(dep1_id.clone());
         main_issue.dependencies.push(dep2_id.clone());
         let main_id = main_issue.id.clone();
-        executor.storage.save_issue(main_issue).unwrap();
+        seed_issue(executor.storage(), main_issue);
 
         // Define a context-aware gate
         let mut registry = executor.storage.load_gate_registry().unwrap();
@@ -3879,7 +3913,7 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         executor.add_gate(&main_id, "review".to_string()).unwrap();
 
@@ -3929,12 +3963,12 @@ assert = { require-section = { heading = "Summary" } }
                 },
             );
         }
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with gates added in priority 30, 10, 20 order
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "gate-p30".to_string())
             .unwrap();
@@ -3990,12 +4024,12 @@ assert = { require-section = { heading = "Summary" } }
                 },
             );
         }
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         // Add gates in specific insertion order
         let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "alpha".to_string()).unwrap();
         executor.add_gate(&issue_id, "beta".to_string()).unwrap();
         executor.add_gate(&issue_id, "gamma".to_string()).unwrap();
@@ -4062,11 +4096,11 @@ assert = { require-section = { heading = "Summary" } }
         registry
             .gates
             .insert("g".to_string(), make_auto_gate("g", "exit 0"));
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "g".to_string()).unwrap();
 
         let result = executor.get_last_gate_run(&issue_id, "g").unwrap();
@@ -4080,11 +4114,11 @@ assert = { require-section = { heading = "Summary" } }
         registry
             .gates
             .insert("g".to_string(), make_auto_gate("g", "exit 0"));
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "g".to_string()).unwrap();
 
         let first = executor.check_gate(&issue_id, "g").unwrap();
@@ -4107,11 +4141,11 @@ assert = { require-section = { heading = "Summary" } }
         registry
             .gates
             .insert("gate-b".to_string(), make_auto_gate("gate-b", "exit 0"));
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "gate-a".to_string()).unwrap();
         executor.add_gate(&issue_id, "gate-b".to_string()).unwrap();
 
@@ -4141,11 +4175,11 @@ assert = { require-section = { heading = "Summary" } }
             "fail-gate".to_string(),
             make_auto_gate("fail-gate", "echo 'oops' && exit 1"),
         );
-        executor.storage.save_gate_registry(&registry).unwrap();
+        seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        seed_issue(executor.storage(), issue);
         executor
             .add_gate(&issue_id, "fail-gate".to_string())
             .unwrap();
@@ -4194,19 +4228,43 @@ assert = { require-section = { heading = "Summary" } }
         executor
             .initialize_fresh_repository(repo_root, &HierarchyTemplate::default(), None)
             .unwrap();
-        let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry
-            .gates
-            .insert("g".to_string(), make_auto_gate("g", "echo ran"));
-        executor.storage.save_gate_registry(&registry).unwrap();
+        executor
+            .define_gate(
+                "g".to_string(),
+                "g".to_string(),
+                String::new(),
+                GateStage::Postcheck,
+                GateMode::Auto,
+                Some(GateChecker::Exec {
+                    command: "echo ran".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
+                }),
+                100,
+                None,
+            )
+            .unwrap();
         executor
     }
 
     /// Create an issue requiring gate `"g"` on `executor`.
     fn add_gated_issue(executor: &CommandExecutor<crate::storage::JsonFileStorage>) -> String {
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
-        let issue_id = issue.id.clone();
-        executor.storage.save_issue(issue).unwrap();
+        let (issue_id, _) = executor
+            .create_issue(
+                "Test".to_string(),
+                "Test".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )
+            .unwrap();
         executor.add_gate(&issue_id, "g".to_string()).unwrap();
         issue_id
     }

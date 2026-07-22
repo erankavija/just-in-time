@@ -823,8 +823,8 @@ mod tests {
         // Create a couple of issues
         let issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
         let issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), String::new());
-        storage.save_issue(issue1.clone()).unwrap();
-        storage.save_issue(issue2.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
+        crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
         let exporter = exporter(&storage);
         let issues = exporter.enumerate_issues(&SnapshotScope::All).unwrap();
@@ -838,7 +838,7 @@ mod tests {
 
         let issue = crate::domain::types::fixture_issue("Test Issue".to_string(), String::new());
         let issue_id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
 
         let exporter = exporter(&storage);
         let issues = exporter
@@ -856,20 +856,20 @@ mod tests {
         // Create issues with epic labels
         let mut issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
         issue1.labels.push("epic:auth".to_string());
-        storage.save_issue(issue1.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
         let mut issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), String::new());
         issue2.labels.push("epic:auth".to_string());
-        storage.save_issue(issue2.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
         // Create issue with different epic
         let mut issue3 = crate::domain::types::fixture_issue("Issue 3".to_string(), String::new());
         issue3.labels.push("epic:billing".to_string());
-        storage.save_issue(issue3.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue3.clone());
 
         // Create unrelated issue
         let issue4 = crate::domain::types::fixture_issue("Issue 4".to_string(), String::new());
-        storage.save_issue(issue4.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue4.clone());
 
         let exporter = exporter(&storage);
         let issues = exporter
@@ -891,11 +891,11 @@ mod tests {
 
         let mut issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
         issue1.labels.push("milestone:v1.0".to_string());
-        storage.save_issue(issue1.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
         let mut issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), String::new());
         issue2.labels.push("milestone:v2.0".to_string());
-        storage.save_issue(issue2.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
         let exporter = exporter(&storage);
         let issues = exporter
@@ -914,7 +914,7 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         let issue = crate::domain::types::fixture_issue("Issue".to_string(), String::new());
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
 
         let exporter = exporter(&storage);
         let issues = exporter
@@ -940,7 +940,7 @@ mod tests {
             format: None,
             assets: vec![],
         });
-        storage.save_issue(issue1.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
         let mut issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), String::new());
         issue2.documents.push(DocumentReference {
@@ -960,7 +960,7 @@ mod tests {
             format: None,
             assets: vec![],
         });
-        storage.save_issue(issue2.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
         let exporter = exporter(&storage);
         let issues = vec![issue1, issue2];

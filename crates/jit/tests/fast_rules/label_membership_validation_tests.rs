@@ -28,6 +28,23 @@ fn setup_test_repo() -> (TempDir, CommandExecutor<JsonFileStorage>) {
     (temp, executor)
 }
 
+fn publish_issue(executor: &CommandExecutor<JsonFileStorage>, issue: &mut jit::domain::Issue) {
+    let id = executor
+        .create_issue(
+            issue.title.clone(),
+            issue.description.clone(),
+            issue.priority,
+            issue.gates_required.clone(),
+            issue.labels.clone(),
+            None,
+            None,
+            false,
+        )
+        .unwrap()
+        .0;
+    *issue = executor.storage().load_issue(&id).unwrap();
+}
+
 #[test]
 fn test_valid_epic_membership() {
     let (_temp, executor) = setup_test_repo();
@@ -36,12 +53,12 @@ fn test_valid_epic_membership() {
     // Create an epic
     let mut epic = crate::fixture_issue("Authentication System".to_string(), String::new());
     epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
-    executor.storage().save_issue(epic.clone()).unwrap();
+    publish_issue(&executor, &mut epic);
 
     // Create a task that references the epic
     let mut task = crate::fixture_issue("Implement login".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "epic:auth".to_string()];
-    executor.storage().save_issue(task.clone()).unwrap();
+    publish_issue(&executor, &mut task);
 
     // Load all issues for validation
     let all_issues = executor.storage().list_issues().unwrap();
@@ -62,7 +79,7 @@ fn test_invalid_epic_reference_not_found() {
     // Create a task that references a non-existent epic
     let mut task = crate::fixture_issue("Implement login".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "epic:nonexistent".to_string()];
-    executor.storage().save_issue(task.clone()).unwrap();
+    publish_issue(&executor, &mut task);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -101,12 +118,12 @@ fn test_invalid_epic_reference_wrong_type() {
     // Create an issue with type:task but epic:backend label
     let mut backend = crate::fixture_issue("Backend Service".to_string(), String::new());
     backend.labels = vec!["type:task".to_string(), "epic:backend".to_string()];
-    executor.storage().save_issue(backend.clone()).unwrap();
+    publish_issue(&executor, &mut backend);
 
     // Create a task that references it as an epic (wrong!)
     let mut task = crate::fixture_issue("Add endpoint".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "epic:backend".to_string()];
-    executor.storage().save_issue(task.clone()).unwrap();
+    publish_issue(&executor, &mut task);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -133,12 +150,12 @@ fn test_valid_milestone_membership() {
     // Create milestone
     let mut milestone = crate::fixture_issue("v1.0 Release".to_string(), String::new());
     milestone.labels = vec!["type:milestone".to_string(), "milestone:v1.0".to_string()];
-    executor.storage().save_issue(milestone.clone()).unwrap();
+    publish_issue(&executor, &mut milestone);
 
     // Create task under milestone
     let mut task = crate::fixture_issue("Fix critical bug".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "milestone:v1.0".to_string()];
-    executor.storage().save_issue(task.clone()).unwrap();
+    publish_issue(&executor, &mut task);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -154,7 +171,7 @@ fn test_multiple_membership_labels() {
     // Create milestone and epic
     let mut milestone = crate::fixture_issue("v1.0".to_string(), String::new());
     milestone.labels = vec!["type:milestone".to_string(), "milestone:v1.0".to_string()];
-    executor.storage().save_issue(milestone.clone()).unwrap();
+    publish_issue(&executor, &mut milestone);
 
     let mut epic = crate::fixture_issue("Auth".to_string(), String::new());
     epic.labels = vec![
@@ -162,7 +179,7 @@ fn test_multiple_membership_labels() {
         "epic:auth".to_string(),
         "milestone:v1.0".to_string(), // Epic belongs to milestone
     ];
-    executor.storage().save_issue(epic.clone()).unwrap();
+    publish_issue(&executor, &mut epic);
 
     // Task belongs to both
     let mut task = crate::fixture_issue("Login".to_string(), String::new());
@@ -171,7 +188,7 @@ fn test_multiple_membership_labels() {
         "epic:auth".to_string(),
         "milestone:v1.0".to_string(),
     ];
-    executor.storage().save_issue(task.clone()).unwrap();
+    publish_issue(&executor, &mut task);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -190,7 +207,7 @@ fn test_no_membership_labels_is_ok() {
     // Task with no membership labels (orphan)
     let mut task = crate::fixture_issue("Standalone task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
-    executor.storage().save_issue(task.clone()).unwrap();
+    publish_issue(&executor, &mut task);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -209,7 +226,7 @@ fn test_epic_referencing_itself() {
     // Epic that references itself (valid but maybe weird)
     let mut epic = crate::fixture_issue("Auth".to_string(), String::new());
     epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
-    executor.storage().save_issue(epic.clone()).unwrap();
+    publish_issue(&executor, &mut epic);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -229,7 +246,7 @@ fn test_mixed_valid_and_invalid_references() {
     // Create one valid epic
     let mut epic = crate::fixture_issue("Auth".to_string(), String::new());
     epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
-    executor.storage().save_issue(epic.clone()).unwrap();
+    publish_issue(&executor, &mut epic);
 
     // Task references one valid, one invalid
     let mut task = crate::fixture_issue("Login".to_string(), String::new());
@@ -238,7 +255,7 @@ fn test_mixed_valid_and_invalid_references() {
         "epic:auth".to_string(),      // Valid
         "milestone:v2.0".to_string(), // Invalid - doesn't exist
     ];
-    executor.storage().save_issue(task.clone()).unwrap();
+    publish_issue(&executor, &mut task);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -271,12 +288,12 @@ fn test_custom_type_names_and_namespaces() {
     // Create a theme
     let mut theme = crate::fixture_issue("Dark Mode".to_string(), String::new());
     theme.labels = vec!["type:theme".to_string(), "theme:ui".to_string()];
-    executor.storage().save_issue(theme.clone()).unwrap();
+    publish_issue(&executor, &mut theme);
 
     // Create a feature that references the theme
     let mut feature = crate::fixture_issue("Dark sidebar".to_string(), String::new());
     feature.labels = vec!["type:feature".to_string(), "theme:ui".to_string()];
-    executor.storage().save_issue(feature.clone()).unwrap();
+    publish_issue(&executor, &mut feature);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
@@ -307,12 +324,12 @@ fn test_type_alias_same_namespace() {
     // Create a release (uses milestone namespace)
     let mut release = crate::fixture_issue("v2.0".to_string(), String::new());
     release.labels = vec!["type:release".to_string(), "milestone:v2.0".to_string()];
-    executor.storage().save_issue(release.clone()).unwrap();
+    publish_issue(&executor, &mut release);
 
     // Task references it via milestone:v2.0 label
     let mut task = crate::fixture_issue("Prepare release notes".to_string(), String::new());
     task.labels = vec!["type:task".to_string(), "milestone:v2.0".to_string()];
-    executor.storage().save_issue(task.clone()).unwrap();
+    publish_issue(&executor, &mut task);
 
     let all_issues = executor.storage().list_issues().unwrap();
 

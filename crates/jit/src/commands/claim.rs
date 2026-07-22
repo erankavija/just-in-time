@@ -833,6 +833,7 @@ pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::CommandExecutor;
     use crate::storage::claim_coordinator::Lease;
     // Test helpers below load identity with explicit paths and don't surface
     // warnings; the production paths use the `_with_warnings` variant instead.
@@ -1107,33 +1108,49 @@ mod tests {
         Ok(leases)
     }
 
-    /// Seed one persisted issue for claim tests.
-    fn create_test_issue_inner(
-        storage: &JsonFileStorage,
-        title: &str,
-        id: Option<&str>,
-    ) -> Result<String> {
-        let mut issue =
-            crate::domain::types::fixture_issue(title.to_string(), "Test description".to_string());
-        if let Some(id) = id {
-            issue.id = id.to_string();
-        }
-        let issue_id = issue.id.clone();
-        storage.save_issue(issue)?;
-        Ok(issue_id)
-    }
-
     /// Helper to create a test issue
     fn create_test_issue(storage: &JsonFileStorage, title: &str) -> Result<String> {
-        create_test_issue_inner(storage, title, None)
+        let worktree = storage.root().parent().unwrap();
+        let layout = crate::storage::discover_repository_layout(worktree, storage.root())?;
+        CommandExecutor::new(storage.clone())
+            .with_layout(layout)
+            .create_issue(
+                title.to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )
+            .map(|(id, _)| id)
     }
 
+    /// Seed an exact identifier precondition for short-id collision tests.
     fn create_test_issue_with_id(
         storage: &JsonFileStorage,
         id: &str,
         title: &str,
     ) -> Result<String> {
-        create_test_issue_inner(storage, title, Some(id))
+        let mut issue =
+            crate::domain::types::fixture_issue(title.to_string(), "Test description".to_string());
+        issue.id = id.to_string();
+        let issue_bytes = crate::repository_state::serialize_issue(&issue)?;
+        std::fs::write(
+            storage.root().join("issues").join(format!("{id}.json")),
+            issue_bytes,
+        )?;
+
+        let index_path = storage.root().join("index.json");
+        let mut index =
+            crate::repository_state::RepositoryIndex::parse(&std::fs::read(&index_path)?)?;
+        index.all_ids.push(id.to_string());
+        index.all_ids.sort();
+        index.all_ids.dedup();
+        index.deleted_ids.retain(|deleted| deleted != id);
+        std::fs::write(index_path, index.to_pretty_bytes()?)?;
+        Ok(id.to_string())
     }
 
     #[test]

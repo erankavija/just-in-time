@@ -232,11 +232,11 @@ fn make_storage() -> InMemoryStorage {
     InMemoryStorage::new()
 }
 
-/// Save an issue whose `id` field is set to `custom_id`.
-fn save_issue_with_id(storage: &InMemoryStorage, custom_id: &str, title: &str) {
+/// Seed an issue whose `id` field is set to `custom_id`.
+fn seed_issue_with_id(storage: &InMemoryStorage, custom_id: &str, title: &str) {
     let mut issue = crate::fixture_issue(title.to_string(), String::new());
     issue.id = custom_id.to_string();
-    storage.save_issue(issue).unwrap();
+    crate::harness::seed_memory_issue(storage, &issue);
 }
 
 /// Return the normalized (lowercase, no hyphens) form of a UUID string.
@@ -301,7 +301,7 @@ proptest! {
         prefix_len in 4usize..=16usize,
     ) {
         let storage = make_storage();
-        save_issue_with_id(&storage, &uuid, "proptest issue");
+        seed_issue_with_id(&storage, &uuid, "proptest issue");
 
         let normalized = normalize_uuid(&uuid);
         // Guard: normalized UUID must be at least prefix_len chars
@@ -356,8 +356,8 @@ proptest! {
         );
 
         let storage = make_storage();
-        save_issue_with_id(&storage, &uuid_a, "issue A");
-        save_issue_with_id(&storage, &uuid_b, "issue B");
+        seed_issue_with_id(&storage, &uuid_a, "issue A");
+        seed_issue_with_id(&storage, &uuid_b, "issue B");
 
         // Resolve using the shared prefix: must fail with an ambiguity error
         let result = storage.resolve_issue_id(&prefix_str);
@@ -385,7 +385,7 @@ proptest! {
         uuid in uuid_like_strategy(),
     ) {
         let storage = make_storage();
-        save_issue_with_id(&storage, &uuid, "stored issue");
+        seed_issue_with_id(&storage, &uuid, "stored issue");
 
         let prefix_str: String = short_prefix.iter().collect();
         let result = storage.resolve_issue_id(&prefix_str);

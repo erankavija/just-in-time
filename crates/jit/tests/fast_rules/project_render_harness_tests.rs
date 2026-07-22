@@ -227,7 +227,7 @@ fn test_rules_and_gates_projection_parity_with_typed_render() {
     // Full style guards its declared registry sources (`.jit/rules.toml`,
     // `.jit/gates.toml`) for existence over the `read_repo_file` boundary before
     // rendering, so seed both there (the bytes are probed for presence; the render
-    // itself reads the effective rules and the saved gate registry).
+    // itself reads the effective rules and the seeded gate registry).
     storage.add_repo_file(".jit/rules.toml", RULES_TOML);
     storage.add_repo_file(
         ".jit/gates.toml",
@@ -238,7 +238,7 @@ fn test_rules_and_gates_projection_parity_with_typed_render() {
         "cargo-ci".to_string(),
         manual_gate("cargo-ci", "Cargo CI", "fmt + clippy"),
     );
-    storage.save_gate_registry(&registry).unwrap();
+    crate::harness::seed_memory_gate_registry(&storage, &registry);
 
     let executor = render_executor(&storage);
     // The command renders the EFFECTIVE rules (defaults merged with local

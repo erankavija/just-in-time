@@ -1,10 +1,10 @@
 //! JSON file-based storage implementation.
 //!
-//! Issues, the index, and events are stored as JSON files in a `.jit/` directory
-//! with atomic writes; the gate registry is `.jit/gates.toml`, persisted through
-//! [`crate::storage::gate_store`] (see that module for the TOML-specific
-//! layout). The directory location can be overridden with the `JIT_DATA_DIR`
-//! environment variable.
+//! Issues, the index, and events are read from a `.jit/` directory; the gate
+//! registry is parsed from `.jit/gates.toml` through
+//! [`crate::storage::gate_store`]. Repository-owned changes are published as
+//! file-set transactions through [`RepositoryStateStore`]. The directory
+//! location can be overridden with the `JIT_DATA_DIR` environment variable.
 
 use crate::declarations::GateRegistry;
 use crate::domain::{parse_known_events, Event, Issue};
@@ -19,11 +19,11 @@ use crate::storage::{
     RepositoryStateStoreError, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, HashMap};
-use std::fs::{self, OpenOptions};
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
+use std::fs;
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::rc::Rc;
@@ -219,23 +219,19 @@ pub(crate) fn parse_repository_index(bytes: &[u8]) -> Result<Index> {
     }
 }
 
-/// JSON file-based storage for issues, gates, and events.
+/// File-backed repository reader and transaction-session provider.
 ///
 /// This implementation stores each issue as a separate JSON file in `.jit/issues/`,
 /// events in `.jit/events.jsonl`, and gate definitions in `.jit/gates.toml` — a
-/// `[[gates]]` array-of-tables persisted through [`crate::storage::gate_store`]
-/// (the sole source of truth for the gate registry; TOML, not JSON, despite the
-/// module name, which reflects the issue/event storage this type otherwise owns).
-/// All file writes are atomic (write to temp file, then rename).
+/// `[[gates]]` array-of-tables parsed through [`crate::storage::gate_store`].
+/// Publication is owned by its [`RepositoryStateStore`] implementation, which
+/// applies complete repository deltas through the file transaction kernel.
 ///
-/// File locking is used to prevent race conditions in concurrent access:
-/// - Every mutating path takes the repository-sibling bootstrap lock before the
-///   repository write lock ([`RepoWriteLock`], `.repo-write.lock`), so a caller
-///   holding the chain across a multi-write sequence excludes all other writers
-///   for the whole sequence
-/// - Index updates are protected with exclusive locks
-/// - Individual issue updates use per-file locks
-/// - Gate registry and event log use exclusive locks for writes
+/// A mutation session retains the repository-sibling bootstrap lock followed by
+/// the repository write lock ([`RepoWriteLock`], `.repo-write.lock`) across
+/// recovery, capture, and apply. Typed readers retain their narrower shared
+/// locks; event-log publication takes the matching exclusive event lock only
+/// around recovery or transactional apply.
 #[derive(Clone)]
 pub struct JsonFileStorage {
     root: PathBuf,
@@ -408,9 +404,9 @@ impl JsonFileStorage {
 
     /// Acquire the event-log lock after the repository write lock.
     ///
-    /// Profile application replaces the complete next event-log image inside a
-    /// file-set transaction, so readers must be excluded for that publication
-    /// just as they are for the ordinary append path.
+    /// Repository-state publication replaces the complete next event-log image
+    /// inside a file-set transaction, so typed event readers are excluded while
+    /// those bytes are recovered or applied.
     pub(crate) fn acquire_events_write_lock(&self) -> Result<crate::storage::lock::LockGuard> {
         self.locker.lock_exclusive(&self.root.join(".events.lock"))
     }
@@ -498,48 +494,6 @@ impl JsonFileStorage {
         self.root.join(ISSUES_DIR).join(format!("{}.json", id))
     }
 
-    /// Write `issue` to its file and register it in the index, taking the
-    /// repository, index and issue locks in that order.
-    ///
-    /// The write path behind [`IssueStore::save_issue`].
-    fn persist_issue(&self, issue: &Issue) -> Result<()> {
-        let issue_path = self.issue_path(&issue.id);
-        let index_lock_path = self.root.join(".index.lock");
-        let issue_lock_path = issue_path.with_extension("lock");
-
-        // Lock order: repository write lock first, then index, then issue.
-        // Use separate .lock files to avoid conflicts with atomic writes
-        let _repo_lock = self.repo_lock.acquire()?;
-        let _index_lock = self.locker.lock_exclusive(&index_lock_path)?;
-        let mut index = self.load_index()?;
-        let needs_index_update = !index.all_ids.contains(&issue.id);
-
-        // Lock the issue (exclusive) and write
-        let _issue_lock = self.locker.lock_exclusive(&issue_lock_path)?;
-        self.write_json(&issue_path, issue)?;
-
-        // Update index if this is a new issue
-        if needs_index_update {
-            index.all_ids.push(issue.id.clone());
-            self.save_index(&index)?;
-        }
-
-        Ok(())
-    }
-
-    fn write_json<T: Serialize>(&self, path: &Path, data: &T) -> Result<()> {
-        let json = serde_json::to_string_pretty(data).context("Failed to serialize data")?;
-
-        // Ensure parent directory exists
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).context("Failed to create parent directory")?;
-        }
-
-        // Route through the canonical atomic-write primitive (temp file + rename
-        // with a UNIQUE per-process temp name, safe under concurrent writers).
-        crate::storage::atomic_write::write_file_atomic(path, &json)
-    }
-
     fn read_json<T: for<'de> Deserialize<'de>>(&self, path: &Path) -> Result<T> {
         let contents = fs::read_to_string(path)
             .with_context(|| format!("Failed to read file: {}", path.display()))?;
@@ -551,14 +505,6 @@ impl JsonFileStorage {
         let bytes = fs::read(&index_path)
             .with_context(|| format!("Failed to read file: {}", index_path.display()))?;
         parse_repository_index(&bytes)
-    }
-
-    fn save_index(&self, index: &Index) -> Result<()> {
-        let index_path = self.root.join(INDEX_FILE);
-        let bytes = index
-            .to_pretty_bytes()
-            .context("Failed to serialize index")?;
-        crate::storage::atomic_write::write_file_atomic(&index_path, std::str::from_utf8(&bytes)?)
     }
 
     /// Load aggregated index from all sources (local + git + main worktree).
@@ -931,12 +877,6 @@ impl IssueStore for JsonFileStorage {
         }
     }
 
-    fn save_issue(&self, mut issue: Issue) -> Result<()> {
-        // Update the updated_at timestamp (storage responsibility)
-        issue.updated_at = chrono::Utc::now();
-        self.persist_issue(&issue)
-    }
-
     fn load_issue(&self, id: &str) -> Result<Issue> {
         // Try local .jit/issues/ first (current behavior)
         let issue_path = self.issue_path(id);
@@ -1075,46 +1015,6 @@ impl IssueStore for JsonFileStorage {
         let gates_lock_path = self.root.join(".gates.lock");
         let _lock = self.locker.lock_shared(&gates_lock_path)?;
         crate::storage::gate_store::load_gate_registry(&self.root)
-    }
-
-    fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
-        let gates_lock_path = self.root.join(".gates.lock");
-        let _repo_lock = self.repo_lock.acquire()?;
-        let _lock = self.locker.lock_exclusive(&gates_lock_path)?;
-        crate::storage::gate_store::save_gate_registry(&self.root, registry)
-    }
-
-    fn append_event(&self, event: &Event) -> Result<()> {
-        let events_lock_path = self.root.join(".events.lock");
-        let _repo_lock = self.repo_lock.acquire()?;
-        let _lock = self.locker.lock_exclusive(&events_lock_path)?;
-
-        let events_path = self.root.join(EVENTS_FILE);
-        let mut file = OpenOptions::new()
-            .create(true)
-            .read(true)
-            .append(true)
-            .open(&events_path)
-            .context("Failed to open events file")?;
-
-        let json = serde_json::to_string(event).context("Failed to serialize event")?;
-        let length = file
-            .metadata()
-            .context("Failed to inspect events file")?
-            .len();
-        if length > 0 {
-            file.seek(SeekFrom::End(-1))
-                .context("Failed to inspect events tail")?;
-            let mut tail = [0_u8; 1];
-            file.read_exact(&mut tail)
-                .context("Failed to read events tail")?;
-            if tail[0] != b'\n' {
-                file.write_all(b"\n")
-                    .context("Failed to isolate torn event tail")?;
-            }
-        }
-        writeln!(file, "{}", json).context("Failed to write event")?;
-        Ok(())
     }
 
     fn read_events(&self) -> Result<Vec<Event>> {
@@ -1358,61 +1258,6 @@ impl IssueStore for JsonFileStorage {
         }
     }
 
-    fn write_repo_file(
-        &self,
-        rel_path: &str,
-        content: &str,
-    ) -> Result<(), crate::storage::PathReadError> {
-        use crate::storage::PathReadError;
-        // Reuse the ONE shared path validator so the write path rejects exactly
-        // the same shape-level inputs as the read path (empty, absolute,
-        // `..`-escaping) before any I/O.
-        validate_repo_relative_input(rel_path)?;
-        let _repo_lock = self.repo_lock.acquire().map_err(PathReadError::Other)?;
-
-        // Resolve repo root (parent of `.jit`) and join the validated relative
-        // path. Shape validation alone is not enough: a symlinked directory
-        // segment could still resolve OUTSIDE the repo, so mirror the read path's
-        // canonicalize+containment check below before creating dirs or writing.
-        let repo_root = self.root.parent().ok_or_else(|| {
-            PathReadError::Other(
-                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
-            )
-        })?;
-        let target = repo_root.join(rel_path);
-        let parent = target
-            .parent()
-            .ok_or_else(|| PathReadError::Other(anyhow!("target has no parent: {rel_path}")))?;
-
-        // The target file (and possibly some parent dirs) may not exist yet, so
-        // canonicalization must walk up to the DEEPEST EXISTING ancestor of the
-        // parent and verify IT is contained in the repo. This rejects a symlink
-        // anywhere along the existing prefix (e.g. `docs -> /external`) WITHOUT
-        // first creating directories outside the repo.
-        let mut existing_ancestor = parent;
-        while !existing_ancestor.exists() {
-            existing_ancestor = existing_ancestor.parent().ok_or_else(|| {
-                PathReadError::Other(anyhow!("no existing ancestor for {rel_path}"))
-            })?;
-        }
-        assert_canonical_contained(existing_ancestor, repo_root, rel_path)?;
-
-        // Create intermediate directories — now known to be rooted within the
-        // repo — so a config-declared nested target (e.g. `docs/reference/x.md`)
-        // materializes.
-        fs::create_dir_all(parent)
-            .map_err(|e| PathReadError::Other(anyhow!("creating {}: {}", parent.display(), e)))?;
-
-        // Re-verify containment of the now-existing parent: this catches the case
-        // where the deepest missing segment was itself a symlink escaping the repo.
-        assert_canonical_contained(parent, repo_root, rel_path)?;
-
-        // Write through the SHARED atomic writer (temp file in the target's
-        // directory + rename), preserving the atomic-write invariant (REQ-05).
-        crate::storage::atomic_write::write_file_atomic(&target, content)
-            .map_err(PathReadError::Other)
-    }
-
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
         let manager = crate::gate_presets::PresetManager::new(self.root.clone())?;
         Ok(manager.list_presets())
@@ -1503,8 +1348,8 @@ impl IssueStore for JsonFileStorage {
 }
 
 fn is_torn_event_prefix(line: &str, error: &serde_json::Error) -> bool {
-    // `append_event` repairs a non-newline tail by terminating it before the
-    // next append. Before that retry it is still the final line. Such a record
+    // The canonical transaction finalizer isolates a non-newline tail before
+    // publishing the next event. Before that retry it is still the final line. Such a record
     // is therefore recognizable as an object-shaped JSON prefix that fails
     // only because input ended. This admits a final torn append and every
     // number of independently isolated predecessors (including prefixes ending
@@ -1561,7 +1406,6 @@ fn assert_canonical_contained(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::declarations::GateDefinition;
     use crate::storage::IssueStore;
     use tempfile::TempDir;
 
@@ -1640,23 +1484,6 @@ mod tests {
     }
 
     #[test]
-    fn test_retained_startup_session_allows_event_publication() {
-        let (_temp, _, storage, retained) = retained_storage();
-
-        let event = Event::IssueCreated {
-            id: "startup-event".to_string(),
-            issue_id: "issue-id".to_string(),
-            timestamp: chrono::Utc::now(),
-            title: "Created after startup recovery".to_string(),
-            priority: crate::domain::Priority::Normal,
-        };
-        storage.append_event(&event).unwrap();
-
-        assert_eq!(storage.read_events().unwrap(), vec![event]);
-        drop(retained);
-    }
-
-    #[test]
     fn test_retained_guard_error_unwind_clears_session_and_order_state() {
         fn fail_after_retaining(storage: JsonFileStorage, layout: RepositoryLayout) -> Result<()> {
             let _retained = storage.open_and_retain_mutation_session(layout)?;
@@ -1706,34 +1533,6 @@ mod tests {
         let session = storage.open_mutation_session(layout).unwrap();
         drop(session);
         assert!(crate::storage::guard_order::CoordinationOrderGuard::enter().is_ok());
-    }
-
-    fn assert_direct_writer_waits_for_repository_guard(
-        storage: &JsonFileStorage,
-        writer: impl FnOnce(JsonFileStorage) -> Result<()> + Send + 'static,
-    ) {
-        let guard = storage.repo_lock.acquire().unwrap();
-        let writer_storage = storage.clone();
-        let (started_tx, started_rx) = std::sync::mpsc::channel();
-        let (done_tx, done_rx) = std::sync::mpsc::channel();
-        let handle = std::thread::spawn(move || {
-            started_tx.send(()).unwrap();
-            done_tx.send(writer(writer_storage)).unwrap();
-        });
-
-        started_rx.recv().unwrap();
-        assert!(
-            done_rx
-                .recv_timeout(std::time::Duration::from_millis(100))
-                .is_err(),
-            "direct storage writer bypassed the held repository guard"
-        );
-        drop(guard);
-        done_rx
-            .recv_timeout(std::time::Duration::from_secs(2))
-            .expect("writer did not resume after repository guard release")
-            .unwrap();
-        handle.join().unwrap();
     }
 
     fn setup_storage() -> (TempDir, JsonFileStorage) {
@@ -1807,91 +1606,6 @@ mod tests {
             storage.read_repo_file("../escape.md"),
             Err(crate::storage::PathReadError::InvalidPath(_))
         ));
-    }
-
-    #[test]
-    fn test_write_repo_file_atomic_creates_dirs_and_rejects_escaping() {
-        use crate::storage::PathReadError;
-        let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        fs::create_dir(storage.root()).unwrap();
-
-        // A nested target is written atomically, creating intermediate dirs; a
-        // round-trip read returns the same content.
-        storage
-            .write_repo_file("docs/reference/inv.md", "## Invariants\n")
-            .unwrap();
-        assert_eq!(
-            std::fs::read_to_string(temp.path().join("docs/reference/inv.md")).unwrap(),
-            "## Invariants\n"
-        );
-        assert_eq!(
-            storage.read_repo_file("docs/reference/inv.md").unwrap(),
-            Some("## Invariants\n".to_string())
-        );
-        // No leftover temp file in the target directory (atomic temp+rename).
-        let leftovers: Vec<_> = std::fs::read_dir(temp.path().join("docs/reference"))
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("tmp"))
-            .collect();
-        assert!(leftovers.is_empty(), "no .tmp temp file should remain");
-
-        // Path-safety: an absolute or `..`-escaping target is rejected with the
-        // typed error BEFORE any write — nothing leaks outside the repo.
-        assert!(matches!(
-            storage.write_repo_file("/tmp/jit-escape.md", "x"),
-            Err(PathReadError::InvalidPath(_))
-        ));
-        assert!(matches!(
-            storage.write_repo_file("../escape.md", "x"),
-            Err(PathReadError::InvalidPath(_))
-        ));
-        assert!(!temp.path().join("../escape.md").exists());
-    }
-
-    #[test]
-    fn test_write_repo_file_waits_for_repository_guard() {
-        let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        fs::create_dir(storage.root()).unwrap();
-
-        assert_direct_writer_waits_for_repository_guard(&storage, |storage| {
-            storage
-                .write_repo_file("docs/serialized.md", "serialized")
-                .map_err(anyhow::Error::from)
-        });
-
-        assert_eq!(
-            fs::read_to_string(temp.path().join("docs/serialized.md")).unwrap(),
-            "serialized"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn test_write_repo_file_rejects_symlinked_parent_escape() {
-        use crate::storage::PathReadError;
-        // A shape-valid relative target whose PARENT directory is a symlink
-        // pointing OUTSIDE the repo must be rejected (mirrors the read path's
-        // containment check) — nothing is written into the external directory.
-        let repo = TempDir::new().unwrap();
-        let outside = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        fs::create_dir(storage.root()).unwrap();
-
-        // `repo/docs -> outside/` (an existing symlinked directory segment).
-        std::os::unix::fs::symlink(outside.path(), repo.path().join("docs")).unwrap();
-
-        let err = storage
-            .write_repo_file("docs/invariants.md", "leak")
-            .unwrap_err();
-        assert!(
-            matches!(err, PathReadError::OutsideRepoRoot(_)),
-            "symlink-escaping parent must be OutsideRepoRoot, got {err:?}"
-        );
-        // Nothing was written through the symlink into the external directory.
-        assert!(!outside.path().join("invariants.md").exists());
     }
 
     #[test]
@@ -2078,394 +1792,6 @@ mod tests {
         assert_eq!(held_bytes, b"inside");
     }
 
-    #[test]
-    fn test_save_and_load_issue() {
-        let (_temp, storage) = setup_storage();
-
-        let issue = crate::domain::types::fixture_issue(
-            "Test Issue".to_string(),
-            "Description".to_string(),
-        );
-        let issue_id = issue.id.clone();
-
-        storage.save_issue(issue.clone()).unwrap();
-        let loaded = storage.load_issue(&issue_id).unwrap();
-
-        assert_eq!(loaded.id, issue.id);
-        assert_eq!(loaded.title, issue.title);
-        assert_eq!(loaded.description, issue.description);
-    }
-
-    #[test]
-    fn test_save_issue_updates_index() {
-        let (_temp, storage) = setup_storage();
-
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
-        storage.save_issue(issue.clone()).unwrap();
-
-        let index = storage.load_index().unwrap();
-        assert!(index.all_ids.contains(&issue.id));
-    }
-
-    #[test]
-    fn test_save_issue_twice_doesnt_duplicate_in_index() {
-        let (_temp, storage) = setup_storage();
-
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
-        storage.save_issue(issue.clone()).unwrap();
-
-        issue.title = "Updated".to_string();
-        storage.save_issue(issue.clone()).unwrap();
-
-        let index = storage.load_index().unwrap();
-        assert_eq!(
-            index.all_ids.iter().filter(|id| *id == &issue.id).count(),
-            1
-        );
-    }
-
-    #[test]
-    fn test_list_issues_returns_all_issues() {
-        let (_temp, storage) = setup_storage();
-
-        let issue1 =
-            crate::domain::types::fixture_issue("Issue 1".to_string(), "Desc 1".to_string());
-        let issue2 =
-            crate::domain::types::fixture_issue("Issue 2".to_string(), "Desc 2".to_string());
-
-        storage.save_issue(issue1.clone()).unwrap();
-        storage.save_issue(issue2.clone()).unwrap();
-
-        let issues = storage.list_issues().unwrap();
-        assert_eq!(issues.len(), 2);
-        assert!(issues.iter().any(|i| i.id == issue1.id));
-        assert!(issues.iter().any(|i| i.id == issue2.id));
-    }
-
-    #[test]
-    fn test_load_nonexistent_issue_returns_error() {
-        let (_temp, storage) = setup_storage();
-
-        let result = storage.load_issue("nonexistent");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_gate_registry_operations() {
-        let (_temp, storage) = setup_storage();
-
-        let mut registry = storage.load_gate_registry().unwrap();
-        assert!(registry.gates.is_empty());
-
-        let gate = GateDefinition {
-            version: 1,
-            key: "review".to_string(),
-            title: "Code Review".to_string(),
-            description: "Manual code review".to_string(),
-            stage: crate::declarations::GateStage::Postcheck,
-            mode: crate::declarations::GateMode::Manual,
-            checker: None,
-            priority: 100,
-            reserved: std::collections::HashMap::new(),
-            auto: false,
-            example_integration: None,
-        };
-
-        registry.gates.insert(gate.key.clone(), gate.clone());
-        storage.save_gate_registry(&registry).unwrap();
-
-        let loaded = storage.load_gate_registry().unwrap();
-        assert_eq!(loaded.gates.len(), 1);
-        assert_eq!(loaded.gates.get("review").unwrap().title, "Code Review");
-    }
-
-    // Concurrent access tests
-
-    #[test]
-    fn test_concurrent_issue_creates_no_corruption() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let (_temp_dir, storage) = setup_storage();
-        let storage = Arc::new(storage);
-
-        let num_threads = 10;
-        let issues_per_thread = 5;
-
-        let handles: Vec<_> = (0..num_threads)
-            .map(|thread_id| {
-                let storage = Arc::clone(&storage);
-                thread::spawn(move || {
-                    for i in 0..issues_per_thread {
-                        let issue = crate::domain::types::fixture_issue(
-                            format!("Thread {} Issue {}", thread_id, i),
-                            format!("Description {}-{}", thread_id, i),
-                        );
-                        storage.save_issue(issue.clone()).unwrap();
-                    }
-                })
-            })
-            .collect();
-
-        for handle in handles {
-            handle.join().unwrap();
-        }
-
-        // Verify: exactly 50 issues, no duplicates in index
-        let issues = storage.list_issues().unwrap();
-        assert_eq!(issues.len(), num_threads * issues_per_thread);
-
-        let index = storage.load_index().unwrap();
-        assert_eq!(index.all_ids.len(), num_threads * issues_per_thread);
-
-        // Check for duplicates
-        let mut ids = index.all_ids.clone();
-        ids.sort();
-        ids.dedup();
-        assert_eq!(ids.len(), num_threads * issues_per_thread);
-    }
-
-    #[test]
-    fn test_concurrent_updates_to_different_issues() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let (_temp_dir, storage) = setup_storage();
-        let storage = Arc::new(storage);
-
-        // Create two issues
-        let issue1 =
-            crate::domain::types::fixture_issue("Issue 1".to_string(), "Desc 1".to_string());
-        let issue2 =
-            crate::domain::types::fixture_issue("Issue 2".to_string(), "Desc 2".to_string());
-        let id1 = issue1.id.clone();
-        let id2 = issue2.id.clone();
-
-        storage.save_issue(issue1.clone()).unwrap();
-        storage.save_issue(issue2.clone()).unwrap();
-
-        // Update them concurrently
-        let storage1 = Arc::clone(&storage);
-        let storage2 = Arc::clone(&storage);
-        let id1_clone = id1.clone();
-        let id2_clone = id2.clone();
-
-        let handle1 = thread::spawn(move || {
-            for i in 0..10 {
-                let mut issue = storage1.load_issue(&id1_clone).unwrap();
-                issue.title = format!("Updated 1 - {}", i);
-                storage1.save_issue(issue.clone()).unwrap();
-            }
-        });
-
-        let handle2 = thread::spawn(move || {
-            for i in 0..10 {
-                let mut issue = storage2.load_issue(&id2_clone).unwrap();
-                issue.title = format!("Updated 2 - {}", i);
-                storage2.save_issue(issue.clone()).unwrap();
-            }
-        });
-
-        handle1.join().unwrap();
-        handle2.join().unwrap();
-
-        // Both issues should exist and be loadable
-        let loaded1 = storage.load_issue(&id1).unwrap();
-        let loaded2 = storage.load_issue(&id2).unwrap();
-        assert!(loaded1.title.starts_with("Updated 1"));
-        assert!(loaded2.title.starts_with("Updated 2"));
-    }
-
-    #[test]
-    fn test_concurrent_updates_to_same_issue() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let (_temp_dir, storage) = setup_storage();
-        let storage = Arc::new(storage);
-
-        let issue = crate::domain::types::fixture_issue(
-            "Test Issue".to_string(),
-            "Description".to_string(),
-        );
-        let issue_id = issue.id.clone();
-        storage.save_issue(issue.clone()).unwrap();
-
-        let num_threads = 5;
-        let updates_per_thread = 3;
-
-        let handles: Vec<_> = (0..num_threads)
-            .map(|thread_id| {
-                let storage = Arc::clone(&storage);
-                let id = issue_id.clone();
-                thread::spawn(move || {
-                    for i in 0..updates_per_thread {
-                        let mut issue = storage.load_issue(&id).unwrap();
-                        issue.title = format!("Thread {} Update {}", thread_id, i);
-                        storage.save_issue(issue.clone()).unwrap();
-                    }
-                })
-            })
-            .collect();
-
-        for handle in handles {
-            handle.join().unwrap();
-        }
-
-        // Issue should still be loadable and valid
-        let final_issue = storage.load_issue(&issue_id).unwrap();
-        assert!(final_issue.title.starts_with("Thread"));
-        assert_eq!(final_issue.id, issue_id);
-    }
-
-    #[test]
-    fn test_concurrent_read_write_issue() {
-        use std::sync::{Arc, Barrier};
-        use std::thread;
-
-        let (_temp_dir, storage) = setup_storage();
-        let storage = Arc::new(storage);
-
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
-        let issue_id = issue.id.clone();
-        storage.save_issue(issue.clone()).unwrap();
-
-        let barrier = Arc::new(Barrier::new(6)); // 1 writer + 5 readers
-
-        // Writer thread
-        let storage_writer = Arc::clone(&storage);
-        let id_writer = issue_id.clone();
-        let barrier_writer = Arc::clone(&barrier);
-        let writer = thread::spawn(move || {
-            barrier_writer.wait();
-            for i in 0..5 {
-                let mut issue = storage_writer.load_issue(&id_writer).unwrap();
-                issue.title = format!("Updated {}", i);
-                storage_writer.save_issue(issue.clone()).unwrap();
-                thread::sleep(std::time::Duration::from_millis(10));
-            }
-        });
-
-        // Reader threads
-        let mut readers = vec![];
-        for _ in 0..5 {
-            let storage_reader = Arc::clone(&storage);
-            let id_reader = issue_id.clone();
-            let barrier_reader = Arc::clone(&barrier);
-            readers.push(thread::spawn(move || {
-                barrier_reader.wait();
-                for _ in 0..10 {
-                    let issue = storage_reader.load_issue(&id_reader).unwrap();
-                    // Should always get valid data (not corrupted)
-                    assert!(!issue.title.is_empty());
-                    assert_eq!(issue.id, id_reader);
-                }
-            }));
-        }
-
-        writer.join().unwrap();
-        for reader in readers {
-            reader.join().unwrap();
-        }
-    }
-
-    #[test]
-    fn test_concurrent_dependency_operations() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let (_temp_dir, storage) = setup_storage();
-        let storage = Arc::new(storage);
-
-        // Create base issue
-        let base = crate::domain::types::fixture_issue("Base".to_string(), "Desc".to_string());
-        let base_id = base.id.clone();
-        storage.save_issue(base.clone()).unwrap();
-
-        // Add dependencies concurrently
-        let handles: Vec<_> = (0..5)
-            .map(|i| {
-                let storage = Arc::clone(&storage);
-                let base_id = base_id.clone();
-                thread::spawn(move || {
-                    let dep = crate::domain::types::fixture_issue(
-                        format!("Dep {}", i),
-                        "Desc".to_string(),
-                    );
-                    let dep_id = dep.id.clone();
-                    storage.save_issue(dep.clone()).unwrap();
-
-                    let mut base = storage.load_issue(&base_id).unwrap();
-                    base.dependencies.push(dep_id);
-                    storage.save_issue(base.clone()).unwrap();
-                })
-            })
-            .collect();
-
-        for handle in handles {
-            handle.join().unwrap();
-        }
-
-        // Load and verify
-        let final_base = storage.load_issue(&base_id).unwrap();
-        // Note: Due to concurrent updates, we may lose some dependencies
-        // (last write wins), but the data should not be corrupted
-        assert!(!final_base.dependencies.is_empty());
-        assert!(final_base.dependencies.len() <= 5);
-    }
-
-    #[test]
-    fn test_concurrent_list_and_create() {
-        use std::sync::{Arc, Barrier};
-        use std::thread;
-
-        let (_temp_dir, storage) = setup_storage();
-        let storage = Arc::new(storage);
-
-        let barrier = Arc::new(Barrier::new(4));
-
-        // Create some initial issues
-        for i in 0..3 {
-            let issue =
-                crate::domain::types::fixture_issue(format!("Initial {}", i), "Desc".to_string());
-            storage.save_issue(issue.clone()).unwrap();
-        }
-
-        // Concurrent readers
-        let mut handles = vec![];
-        for _ in 0..3 {
-            let storage = Arc::clone(&storage);
-            let barrier = Arc::clone(&barrier);
-            handles.push(thread::spawn(move || {
-                barrier.wait();
-                for _ in 0..5 {
-                    let issues = storage.list_issues().unwrap();
-                    assert!(issues.len() >= 3); // At least initial issues
-                }
-            }));
-        }
-
-        // Concurrent writer
-        let storage_writer = Arc::clone(&storage);
-        let barrier_writer = Arc::clone(&barrier);
-        handles.push(thread::spawn(move || {
-            barrier_writer.wait();
-            for i in 0..5 {
-                let issue =
-                    crate::domain::types::fixture_issue(format!("New {}", i), "Desc".to_string());
-                storage_writer.save_issue(issue.clone()).unwrap();
-            }
-        }));
-
-        for handle in handles {
-            handle.join().unwrap();
-        }
-
-        // Final check
-        let final_issues = storage.list_issues().unwrap();
-        assert_eq!(final_issues.len(), 8); // 3 initial + 5 new
-    }
-
     // Tests for cross-worktree issue visibility (TDD)
     mod cross_worktree_tests {
         use super::*;
@@ -2534,6 +1860,30 @@ mod tests {
             (container, worktree_path)
         }
 
+        fn seed_index_preimage(storage: &JsonFileStorage, index: &Index) {
+            fs::write(
+                storage.root.join(INDEX_FILE),
+                index.to_pretty_bytes().unwrap(),
+            )
+            .unwrap();
+        }
+
+        fn seed_issue_preimage(storage: &JsonFileStorage, issue: &Issue) {
+            let issue_dir = storage.root.join(ISSUES_DIR);
+            fs::create_dir_all(&issue_dir).unwrap();
+            fs::write(
+                issue_dir.join(format!("{}.json", issue.id)),
+                crate::repository_state::serialize_issue(issue).unwrap(),
+            )
+            .unwrap();
+            let mut index = storage.load_index().unwrap_or_default();
+            if !index.all_ids.contains(&issue.id) {
+                index.all_ids.push(issue.id.clone());
+            }
+            index.deleted_ids.retain(|id| id != &issue.id);
+            seed_index_preimage(storage, &index);
+        }
+
         #[test]
         fn test_load_issue_from_local_first() {
             // Setup: Create a local .jit directory
@@ -2545,7 +1895,7 @@ mod tests {
                 "Description".to_string(),
             );
             let issue_id = issue.id.clone();
-            storage.save_issue(issue.clone()).unwrap();
+            seed_issue_preimage(&storage, &issue);
 
             // Should read from local storage
             let loaded = storage.load_issue(&issue_id).unwrap();
@@ -2564,7 +1914,7 @@ mod tests {
                 "From git".to_string(),
             );
             let issue_id = issue.id.clone();
-            storage.save_issue(issue.clone()).unwrap();
+            seed_issue_preimage(&storage, &issue);
 
             // Commit to git
             Command::new("git")
@@ -2589,9 +1939,7 @@ mod tests {
                 all_ids: vec![],
                 deleted_ids: vec![],
             };
-            storage
-                .write_json(&jit_dir.join(INDEX_FILE), &index)
-                .unwrap();
+            seed_index_preimage(&storage, &index);
 
             // Should fall back to reading from git
             let loaded = storage.load_issue(&issue_id).unwrap();
@@ -2610,7 +1958,7 @@ mod tests {
                 "Uncommitted".to_string(),
             );
             let issue_id = issue.id.clone();
-            main_storage.save_issue(issue.clone()).unwrap();
+            seed_issue_preimage(&main_storage, &issue);
 
             // Create secondary worktree with unique name
             use std::time::SystemTime;
@@ -2653,7 +2001,7 @@ mod tests {
                 "In git".to_string(),
             );
             let issue_id = issue.id.clone();
-            storage.save_issue(issue.clone()).unwrap();
+            seed_issue_preimage(&storage, &issue);
 
             Command::new("git")
                 .args(["add", ".jit"])
@@ -2676,9 +2024,7 @@ mod tests {
                 all_ids: vec![],
                 deleted_ids: vec![],
             };
-            storage
-                .write_json(&jit_dir.join(INDEX_FILE), &index)
-                .unwrap();
+            seed_index_preimage(&storage, &index);
 
             // load_aggregated_index should find it in git
             let aggregated = storage.load_aggregated_index().unwrap();
@@ -2702,7 +2048,7 @@ mod tests {
                 .output()
                 .unwrap();
 
-            storage.save_index(&Index::default()).unwrap();
+            seed_index_preimage(&storage, &Index::default());
             let error = storage
                 .load_aggregated_index()
                 .expect_err("a malformed fallback index must not be skipped");
@@ -2713,13 +2059,14 @@ mod tests {
         fn test_local_membership_overrides_git_membership_in_both_states() {
             let (_temp_dir, repo_path, storage) = setup_git_repo();
 
-            storage
-                .save_index(&Index {
+            seed_index_preimage(
+                &storage,
+                &Index {
                     schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
                     all_ids: vec!["deleted-locally".to_string()],
                     deleted_ids: vec!["restored-locally".to_string()],
-                })
-                .unwrap();
+                },
+            );
             let add = Command::new("git")
                 .args(["add", ".jit/index.json"])
                 .current_dir(&repo_path)
@@ -2733,13 +2080,14 @@ mod tests {
                 .unwrap();
             assert!(commit.status.success());
 
-            storage
-                .save_index(&Index {
+            seed_index_preimage(
+                &storage,
+                &Index {
                     schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
                     all_ids: vec!["restored-locally".to_string()],
                     deleted_ids: vec!["deleted-locally".to_string()],
-                })
-                .unwrap();
+                },
+            );
 
             assert_eq!(
                 storage.load_aggregated_index().unwrap().all_ids,
@@ -2750,13 +2098,14 @@ mod tests {
         #[test]
         fn test_git_membership_overrides_main_worktree_in_both_states() {
             let (_temp_dir, repo_path, main_storage) = setup_git_repo();
-            main_storage
-                .save_index(&Index {
+            seed_index_preimage(
+                &main_storage,
+                &Index {
                     schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
                     all_ids: vec!["active-in-head".to_string()],
                     deleted_ids: vec!["deleted-in-head".to_string()],
-                })
-                .unwrap();
+                },
+            );
             let add = Command::new("git")
                 .args(["add", ".jit/index.json"])
                 .current_dir(&repo_path)
@@ -2772,13 +2121,14 @@ mod tests {
 
             let (_secondary_container, secondary_path) = add_secondary_worktree(&repo_path);
             fs::remove_file(secondary_path.join(".jit/index.json")).unwrap();
-            main_storage
-                .save_index(&Index {
+            seed_index_preimage(
+                &main_storage,
+                &Index {
                     schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
                     all_ids: vec!["deleted-in-head".to_string()],
                     deleted_ids: vec!["active-in-head".to_string()],
-                })
-                .unwrap();
+                },
+            );
 
             let secondary_storage = JsonFileStorage::new(secondary_path.join(".jit"));
             assert_eq!(
@@ -2798,7 +2148,7 @@ mod tests {
                 "Uncommitted".to_string(),
             );
             let issue_id = issue.id.clone();
-            main_storage.save_issue(issue.clone()).unwrap();
+            seed_issue_preimage(&main_storage, &issue);
 
             // Create secondary worktree
             use std::time::SystemTime;
@@ -2821,7 +2171,7 @@ mod tests {
             fs::create_dir_all(secondary_jit.join("issues")).unwrap();
 
             let secondary_storage = JsonFileStorage::new(&secondary_jit);
-            secondary_storage.save_index(&Index::default()).unwrap();
+            seed_index_preimage(&secondary_storage, &Index::default());
 
             // Aggregated index should include main worktree issue
             let aggregated = secondary_storage.load_aggregated_index().unwrap();
@@ -2873,7 +2223,7 @@ mod tests {
                 "Test".to_string(),
             );
             let issue_id = issue.id.clone();
-            storage.save_issue(issue.clone()).unwrap();
+            seed_issue_preimage(&storage, &issue);
 
             Command::new("git")
                 .args(["add", ".jit"])
@@ -2909,7 +2259,7 @@ mod tests {
                 "Old version".to_string(),
             );
             let issue_id = issue.id.clone();
-            storage.save_issue(issue.clone()).unwrap();
+            seed_issue_preimage(&storage, &issue);
 
             Command::new("git")
                 .args(["add", ".jit"])
@@ -2926,7 +2276,7 @@ mod tests {
             // Update issue locally (not committed)
             issue.title = "Updated Locally".to_string();
             issue.description = "New version".to_string();
-            storage.save_issue(issue.clone()).unwrap();
+            seed_issue_preimage(&storage, &issue);
 
             // Should prefer local version over git version
             let loaded = storage.load_issue(&issue_id).unwrap();
@@ -3005,8 +2355,11 @@ mod tests {
                 deleted_ids: vec!["issue-3".to_string()],
             };
 
-            // Save index
-            storage.save_index(&index).unwrap();
+            fs::write(
+                storage.root.join(INDEX_FILE),
+                index.to_pretty_bytes().unwrap(),
+            )
+            .unwrap();
 
             // Load it back
             let loaded = storage.load_index().unwrap();

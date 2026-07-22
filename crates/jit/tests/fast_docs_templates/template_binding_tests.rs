@@ -137,7 +137,7 @@ fn approve_plan(executor: &CommandExecutor<InMemoryStorage>, planning_id: &str) 
         .get_mut("plan-review")
         .expect("the planning node carries the plan gate")
         .status = GateStatus::Passed;
-    executor.storage().save_issue(p).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &p);
 }
 
 /// The issue's `type:` label value, if any.
@@ -218,7 +218,7 @@ fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
     // --- forced refresh ---
     let mut c = executor.storage().load_issue(&container).unwrap();
     c.title = "Auth epic (revised)".to_string();
-    executor.storage().save_issue(c).unwrap();
+    crate::harness::seed_memory_issue(executor.storage(), &c);
 
     let (refreshed, _) = executor
         .apply_template("plan", &container, &bindings, true)

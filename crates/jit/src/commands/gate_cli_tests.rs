@@ -2,9 +2,10 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::commands::test_helpers::seed_repo_file;
     use crate::commands::CommandExecutor;
     use crate::declarations::{GateChecker, GateMode, GateStage};
-    use crate::storage::{InMemoryStorage, IssueStore};
+    use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
 
     fn setup() -> CommandExecutor<InMemoryStorage> {
@@ -18,9 +19,7 @@ mod tests {
 [worktree]
 enforce_leases = "off"
 "#;
-        storage
-            .write_repo_file(".jit/config.toml", config_toml)
-            .unwrap();
+        seed_repo_file(&storage, ".jit/config.toml", config_toml);
 
         let layout = storage.repository_layout();
         CommandExecutor::new(storage).with_layout(layout)

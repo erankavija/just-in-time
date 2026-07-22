@@ -28,16 +28,21 @@ impl Default for RepositoryIndex {
 /// Failure to decode or validate one captured membership index.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum RepositoryIndexError {
+    /// The index is not valid JSON or does not match the index schema.
     #[error("failed to parse index: {0}")]
     Parse(#[from] serde_json::Error),
+    /// The index was written by a repository format newer than this binary.
     #[error(
         "repository format version {found} is newer than this binary supports (max {supported})"
     )]
     UnsupportedVersion { found: u32, supported: u32 },
+    /// The active membership contains the same issue more than once.
     #[error("index.json contains duplicate active issue id '{0}'")]
     DuplicateActive(String),
+    /// The deleted membership contains the same issue more than once.
     #[error("index.json contains duplicate deleted issue id '{0}'")]
     DuplicateDeleted(String),
+    /// One issue is simultaneously classified as active and deleted.
     #[error("index.json issue id '{0}' is both active and deleted")]
     ActiveDeletedOverlap(String),
 }
@@ -78,11 +83,55 @@ impl RepositoryIndex {
 
     /// Encode the canonical pretty-printed index used by every publisher.
     pub(crate) fn to_pretty_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
+        self.clone().validate().map_err(|error| {
+            serde_json::Error::io(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
+        })?;
         let fields = BTreeMap::from([
             ("all_ids", serde_json::to_value(&self.all_ids)?),
             ("deleted_ids", serde_json::to_value(&self.deleted_ids)?),
             ("schema_version", serde_json::to_value(self.schema_version)?),
         ]);
         serde_json::to_vec_pretty(&fields)
+    }
+
+    /// Add one issue to active membership and remove it from deleted membership.
+    ///
+    /// The canonical active order is lexical and repeated insertion is a no-op.
+    pub(crate) fn upsert_active(&mut self, id: String) {
+        if !self.all_ids.contains(&id) {
+            self.all_ids.push(id.clone());
+            self.all_ids.sort();
+        }
+        self.deleted_ids.retain(|deleted| deleted != &id);
+    }
+
+    /// Move one issue from active to deleted membership idempotently.
+    #[cfg(test)]
+    pub(crate) fn mark_deleted(&mut self, id: String) {
+        self.all_ids.retain(|active| active != &id);
+        if !self.deleted_ids.contains(&id) {
+            self.deleted_ids.push(id);
+            self.deleted_ids.sort();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_to_pretty_bytes_rejects_invalid_membership() {
+        let index = RepositoryIndex {
+            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+            all_ids: vec!["duplicate".into(), "duplicate".into()],
+            deleted_ids: Vec::new(),
+        };
+
+        assert!(index
+            .to_pretty_bytes()
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate active issue id 'duplicate'"));
     }
 }

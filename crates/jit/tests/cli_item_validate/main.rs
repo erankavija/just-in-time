@@ -17,8 +17,25 @@ mod validate_document_tests;
 mod validate_drift_builtin_tests;
 mod validation_lease_tests;
 
-fn fixture_issue(title: String, description: String) -> jit::domain::Issue {
-    let mut issue = jit::domain::Issue::draft(title, description);
-    issue.id = uuid::Uuid::new_v4().to_string();
-    issue
+fn create_issue(
+    executor: &jit::commands::CommandExecutor<jit::storage::JsonFileStorage>,
+    title: &str,
+    body: &str,
+) -> String {
+    use jit::storage::IssueStore;
+
+    let id = executor
+        .create_issue(
+            title.to_string(),
+            body.to_string(),
+            jit::domain::Priority::Normal,
+            vec![],
+            vec![],
+            None,
+            None,
+            false,
+        )
+        .unwrap()
+        .0;
+    executor.storage().load_issue(&id).unwrap().short_id()
 }

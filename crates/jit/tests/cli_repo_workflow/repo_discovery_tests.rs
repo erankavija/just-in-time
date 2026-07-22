@@ -78,6 +78,106 @@ fn test_status_discovers_repo_from_inside_dot_jit() {
     );
 }
 
+#[test]
+fn test_nested_profile_init_keeps_data_and_assets_in_child() {
+    let parent = TempDir::new().unwrap();
+    let parent_init = jit_init(parent.path());
+    assert!(
+        parent_init.status.success(),
+        "parent init failed: {parent_init:?}"
+    );
+    let parent_index = fs::read(parent.path().join(".jit/index.json")).unwrap();
+    let parent_events = fs::read(parent.path().join(".jit/events.jsonl")).unwrap();
+
+    let child = parent.path().join("child");
+    fs::create_dir(&child).unwrap();
+    let child_init = jit_cmd(&child)
+        .args(["init", "--profile", "jit-dogfood", "--json"])
+        .output()
+        .expect("nested init failed to spawn");
+
+    assert!(
+        child_init.status.success(),
+        "nested init failed: stderr={}",
+        String::from_utf8_lossy(&child_init.stderr)
+    );
+    assert!(child.join(".jit/index.json").is_file());
+    assert!(child.join(".jit/profiles/jit-dogfood.json").is_file());
+    assert!(child.join(".agents/skills/jit-manage/SKILL.md").is_file());
+    assert_eq!(
+        fs::read(parent.path().join(".jit/index.json")).unwrap(),
+        parent_index
+    );
+    assert_eq!(
+        fs::read(parent.path().join(".jit/events.jsonl")).unwrap(),
+        parent_events
+    );
+    assert!(!parent
+        .path()
+        .join(".jit/profiles/jit-dogfood.json")
+        .exists());
+    assert!(!parent.path().join(".agents").exists());
+}
+
+#[test]
+fn test_explicit_non_ancestor_data_root_keeps_worktree_assets_at_cwd() {
+    let parent = TempDir::new().unwrap();
+    assert!(jit_init(parent.path()).status.success());
+    let parent_events = fs::read(parent.path().join(".jit/events.jsonl")).unwrap();
+    let child = parent.path().join("child");
+    fs::create_dir(&child).unwrap();
+    let external = TempDir::new().unwrap();
+    let data_root = external.path().join("jit-data");
+
+    let output = Command::new(jit_binary())
+        .current_dir(&child)
+        .env("JIT_DATA_DIR", &data_root)
+        .args(["init", "--profile", "jit-dogfood", "--json"])
+        .output()
+        .expect("explicit-root init failed to spawn");
+
+    assert!(
+        output.status.success(),
+        "explicit-root init failed: stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(data_root.join("index.json").is_file());
+    assert!(data_root.join("profiles/jit-dogfood.json").is_file());
+    assert!(child.join(".agents/skills/jit-manage/SKILL.md").is_file());
+    assert_eq!(
+        fs::read(parent.path().join(".jit/events.jsonl")).unwrap(),
+        parent_events
+    );
+    assert!(!parent.path().join(".agents").exists());
+}
+
+#[test]
+fn test_relative_data_root_override_keeps_worktree_assets_at_discovered_root() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit_init(repo.path()).status.success());
+    let child = repo.path().join("child");
+    fs::create_dir(&child).unwrap();
+
+    let output = Command::new(jit_binary())
+        .current_dir(&child)
+        .env("JIT_DATA_DIR", "../.jit")
+        .args(["profile", "apply", "jit-dogfood", "--json"])
+        .output()
+        .expect("relative-root profile apply failed to spawn");
+
+    assert!(
+        output.status.success(),
+        "relative-root profile apply failed: stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(repo.path().join(".jit/profiles/jit-dogfood.json").is_file());
+    assert!(repo
+        .path()
+        .join(".agents/skills/jit-manage/SKILL.md")
+        .is_file());
+    assert!(!child.join(".agents").exists());
+}
+
 // ---------------------------------------------------------------------------
 // REQ-02: discovery halts at a `.git` boundary rather than escaping into an
 // unrelated ancestor's `.jit/`.

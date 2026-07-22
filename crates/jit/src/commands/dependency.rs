@@ -1152,11 +1152,11 @@ mod captured_tests {
         storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let dependency = crate::domain::types::fixture_issue("dependency".into(), String::new());
         let dependency_id = dependency.id.clone();
-        storage.save_issue(dependency).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, dependency);
         let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
         source.state = State::Ready;
         let source_id = source.id.clone();
-        storage.save_issue(source.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, source.clone());
         source.title = "concurrent title".to_string();
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
@@ -1194,12 +1194,12 @@ mod captured_tests {
             crate::domain::types::fixture_issue("dependency".into(), String::new());
         dependency.state = State::Done;
         let dependency_id = dependency.id.clone();
-        storage.save_issue(dependency).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, dependency);
         let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
         source.state = State::Backlog;
         source.dependencies = vec![dependency_id.clone()];
         let source_id = source.id.clone();
-        storage.save_issue(source).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, source);
 
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
         assert!(executor
@@ -1249,13 +1249,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::domain::types::fixture_issue("dependency".into(), String::new());
         dependency.state = State::Done;
         let dependency_id = dependency.id.clone();
-        storage.save_issue(dependency).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, dependency);
         let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
         source.state = State::Backlog;
         source.labels = vec!["type:epic".into()];
         source.dependencies = vec![dependency_id.clone()];
         let source_id = source.id.clone();
-        storage.save_issue(source).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, source);
 
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
         let error = executor
@@ -1284,11 +1284,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let layout = storage.repository_layout();
         let dependency = crate::domain::types::fixture_issue("dependency".into(), String::new());
         let dependency_id = dependency.id.clone();
-        storage.save_issue(dependency).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, dependency);
         let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
         source.dependencies = vec![dependency_id.clone()];
         let source_id = source.id.clone();
-        storage.save_issue(source).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, source);
         let prefix = dependency_id[..8].to_string();
 
         let executor = CommandExecutor::new(storage).with_layout(layout);
@@ -1308,8 +1308,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
         source.id = "11111111111111111111111111111111".to_string();
         source.dependencies = vec![dependency.id.clone()];
-        storage.save_issue(source.clone()).unwrap();
-        storage.save_issue(dependency).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, source.clone());
+        crate::commands::test_helpers::seed_issue(&storage, dependency);
         let mut collision = crate::domain::types::fixture_issue("collision".into(), String::new());
         collision.id = "22222222222222222222222222222222".to_string();
         let storage = crate::commands::test_helpers::with_open_race(
@@ -1347,8 +1347,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
         source.id = "11111111111111111111111111111111".to_string();
         source.dependencies = vec![dependency.id.clone()];
-        storage.save_issue(source.clone()).unwrap();
-        storage.save_issue(dependency.clone()).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, source.clone());
+        crate::commands::test_helpers::seed_issue(&storage, dependency.clone());
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
             2,

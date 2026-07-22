@@ -490,7 +490,7 @@ fn test_harness_archive_candidates_are_complete_and_non_mutating() {
         issue.state = state;
         issue.labels = vec![format!("type:{kind}")];
         let id = issue.id.clone();
-        h.storage.save_issue(issue).unwrap();
+        crate::harness::seed_memory_issue(&h.storage, &issue);
         id
     };
     let rejected = save("Rejected portfolio", State::Rejected, "portfolio");

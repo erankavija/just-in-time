@@ -22,6 +22,7 @@ use std::collections::BTreeMap;
 /// complete no-op, and the per-target changes for the dry-run preview.
 struct PreparedProfileApplication {
     contribution: ProfileContribution,
+    delta_overlay: BTreeMap<VirtualPath, Option<Vec<u8>>>,
     plan_hash: String,
     is_no_op: bool,
     changes: Vec<ProfileTargetChange>,
@@ -104,8 +105,11 @@ impl CommandExecutor<JsonFileStorage> {
         let metadata = &package.manifest().profile;
         let layout = self.require_layout()?;
         let mut session = self.storage().open_mutation_session(layout)?;
+        let context = MutationContext::production();
         for _ in 0..8 {
-            let Some(prepared) = self.prepare_embedded_profile(session.as_mut(), &package)? else {
+            let Some(prepared) =
+                self.prepare_embedded_profile(session.as_mut(), &package, &context)?
+            else {
                 continue;
             };
             return Ok(ProfilePlanResult {
@@ -144,8 +148,8 @@ impl CommandExecutor<JsonFileStorage> {
     /// [`repository_state::derive_profile_materializations`](crate::repository_state::derive_profile_materializations),
     /// finalizes one exact profile-application delta, validates that delta's proposed
     /// overlay, and publishes through `session.apply` with pre-journal revalidation.
-    /// A no-op profile (every target unchanged and provenance already recorded)
-    /// publishes nothing.
+    /// A no-op profile has an empty complete finalized delta: package targets and
+    /// provenance are unchanged, and coupled default-rule/schema state is current.
     pub fn apply_embedded_profile(
         &self,
         package: &EmbeddedProfilePackage<'_>,
@@ -157,7 +161,9 @@ impl CommandExecutor<JsonFileStorage> {
         // every retry so the appended ProfileApplied event's id/timestamp stay stable.
         let context = MutationContext::production();
         for _ in 0..8 {
-            let Some(prepared) = self.prepare_embedded_profile(session.as_mut(), package)? else {
+            let Some(prepared) =
+                self.prepare_embedded_profile(session.as_mut(), package, &context)?
+            else {
                 continue;
             };
             if prepared.is_no_op {
@@ -172,27 +178,10 @@ impl CommandExecutor<JsonFileStorage> {
             }
             let contribution = &prepared.contribution;
 
-            // Probe capture yields a base good enough to finalize the exact delta;
-            // that delta's overlay is the authoritative proposed state for both the
-            // capture closure and validation, so a preserved file is never shadowed.
             let extra_paths = contribution.delta_paths()?;
-            let probe_overrides = contribution.overlay_overrides()?;
-            let probe = match self.capture_proposed_base(
-                session.as_mut(),
-                &probe_overrides,
-                &extra_paths,
-                None,
-            )? {
-                None => continue,
-                Some(base) => base,
-            };
-            let delta_overlay = super::validation_overlay(
-                finalize_profile_application(&probe, contribution, &context)?.delta(),
-            );
-
             let base = match self.capture_proposed_base(
                 session.as_mut(),
-                &delta_overlay,
+                &prepared.delta_overlay,
                 &extra_paths,
                 None,
             )? {
@@ -200,7 +189,8 @@ impl CommandExecutor<JsonFileStorage> {
                 Some(base) => base,
             };
             let plan = finalize_profile_application(&base, contribution, &context)?;
-            let proposed = apply_overlay(&base, delta_overlay).map_err(anyhow::Error::from)?;
+            let proposed = apply_overlay(&base, prepared.delta_overlay.clone())
+                .map_err(anyhow::Error::from)?;
             let validation = crate::validation::repository::validate_repository(&proposed)
                 .map_err(ProfileApplyError::from)?;
             if validation.rule_report.has_errors() {
@@ -236,13 +226,14 @@ impl CommandExecutor<JsonFileStorage> {
     /// Returns `Ok(None)` on a retryable capture conflict so the caller re-attempts.
     /// The profile package is parsed into canonical claims
     /// ([`build_profile_claims`](crate::profile::build_profile_claims)) and composed
-    /// into exact target bytes by `repository_state`; the provenance record and the
-    /// appended `ProfileApplied` audit line are carried here (their finalizer-routed
-    /// replacement is a later increment).
+    /// into exact target bytes by `repository_state`; finalizing the complete probe
+    /// delta decides whether the operation is a no-op and supplies the validation
+    /// overlay reused by application.
     fn prepare_embedded_profile(
         &self,
         session: &mut (dyn RepositoryMutationSession + '_),
         package: &EmbeddedProfilePackage<'_>,
+        context: &MutationContext,
     ) -> Result<Option<PreparedProfileApplication>> {
         let metadata = &package.manifest().profile;
         reject_reserved_application_targets(package.hashes().targets.keys().map(String::as_str))?;
@@ -288,12 +279,11 @@ impl CommandExecutor<JsonFileStorage> {
             }
             changes.push(ProfileTargetChange::new(repo_string(path), action, *mode));
         }
-        let is_no_op = all_unchanged && record_matches;
-        let profile_changed = !is_no_op;
+        let direct_profile_changed = !all_unchanged || !record_matches;
 
-        // The finalizer composes the ProfileApplied audit append from the captured
-        // events prefix (owning its id, timestamp, and torn-tail evidence); the
-        // command only signals whether the profile changed.
+        // This signal covers direct package/provenance changes for profiled init.
+        // Standalone finalization audits any non-empty complete delta, including
+        // coupled default-rule/schema repair discovered after this preparation.
         let contribution = ProfileContribution {
             id: metadata.id.clone(),
             version: metadata.version.clone(),
@@ -303,11 +293,21 @@ impl CommandExecutor<JsonFileStorage> {
             record_path,
             record_bytes: record.to_bytes()?,
             record_changed: !record_matches,
-            emit_event: profile_changed,
+            emit_event: direct_profile_changed,
             ensure_profiles_dir,
         };
+        let extra_paths = contribution.delta_paths()?;
+        let overrides = contribution.overlay_overrides()?;
+        let probe = match self.capture_proposed_base(session, &overrides, &extra_paths, None)? {
+            None => return Ok(None),
+            Some(base) => base,
+        };
+        let preview = finalize_profile_application(&probe, &contribution, context)?;
+        let is_no_op = preview.delta().actions().is_empty();
+        let delta_overlay = super::validation_overlay(preview.delta());
         Ok(Some(PreparedProfileApplication {
             contribution,
+            delta_overlay,
             plan_hash: profile_plan_hash(&derived),
             is_no_op,
             changes,

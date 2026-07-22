@@ -1554,8 +1554,8 @@ fn first_image_difference(expected: &RepositoryImage, actual: &RepositoryImage) 
 mod tests {
     use super::*;
     use crate::repository_state::{
-        plan_hash, serialize_event, CaptureBudget, MaterializationIntent, RepositoryAction,
-        RepositorySeed, RepositorySeedKind,
+        plan_hash, CaptureBudget, MaterializationIntent, RepositoryAction, RepositorySeed,
+        RepositorySeedKind,
     };
     use std::collections::{BTreeMap, HashMap, HashSet};
     use std::sync::Mutex;
@@ -1734,44 +1734,6 @@ mod tests {
             .unwrap();
         assert_eq!(json.load_issue(&issue.id).unwrap(), issue);
         assert_eq!(json.list_issues().unwrap(), vec![issue]);
-    }
-
-    /// Reverse crossing for the audit tail: bytes written through the
-    /// `IssueStore::append_event` path are exactly what a subsequently opened
-    /// mutation session captures for `events.jsonl`, so the claim-sync
-    /// convergence check (which reads that captured tail) and the session agree
-    /// on one representation.
-    #[test]
-    fn test_appended_event_bytes_capture_into_session_image() {
-        let issue = crate::domain::types::fixture_issue("Evt".to_string(), "b".to_string());
-        let event = Event::draft_issue_created(&issue);
-        let mut expected = serialize_event(&event).unwrap();
-        expected.push(b'\n');
-
-        let memory = InMemoryStorage::new();
-        memory.append_event(&event).unwrap();
-        // Round-trips back through the typed reader as the same event.
-        assert_eq!(memory.read_events().unwrap(), vec![event.clone()]);
-
-        let temp = TempDir::new().unwrap();
-        let layout = discover_repository_layout(temp.path(), temp.path().join(".jit")).unwrap();
-        let mut session = memory.open_mutation_session(layout).unwrap();
-        let spec = CaptureSpec::phase_one(
-            [
-                VirtualPath::data("").unwrap(),
-                VirtualPath::data("events.jsonl").unwrap(),
-            ],
-            budget(),
-        )
-        .unwrap();
-        let image = session.capture(spec).unwrap();
-        match image
-            .entries()
-            .get(&VirtualPath::data("events.jsonl").unwrap())
-        {
-            Some(RepositoryEntry::File { bytes, .. }) => assert_eq!(bytes, &expected),
-            other => panic!("expected captured events.jsonl file, got {other:?}"),
-        }
     }
 
     #[derive(Default)]

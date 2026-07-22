@@ -1,21 +1,20 @@
 //! The repository-wide write lock, acquired behind the bootstrap lock on every
-//! mutating file-backed storage path.
+//! file-backed repository-state mutation session.
 //!
 //! The repository lock lives next to the data it guards at
 //! `.jit/.repo-write.lock`, while its repository-sibling bootstrap predecessor
 //! remains available when `.jit/` does not yet exist. Neither requires git
-//! (`@/charter/D-4`). Every write path in
-//! [`IssueStore`](crate::storage::IssueStore) takes this chain before any finer
-//! lock (`.index.lock`, the per-issue lock, `.gates.lock`, `.events.lock`), and
-//! a multi-write sequence such as `jit apply` holds ONE guard across its whole
-//! read-validate-write-rollback window. A concurrent writer therefore observes
-//! the sequence's start or its end, never a midpoint, and a compensating
-//! rollback can only undo writes the sequence itself made.
+//! (`@/charter/D-4`). A
+//! [`RepositoryStateStore`](crate::storage::RepositoryStateStore) session holds
+//! this chain across recovery, capture, read-set revalidation, and transactional
+//! apply. A concurrent publisher therefore observes the session's start or its
+//! end, never a midpoint, and recovery can only roll back its transaction's own
+//! actions.
 //!
 //! # Reentrancy
 //!
-//! A sequence holding the guard calls straight into the storage writes, which
-//! take the same lock again. `flock(2)` is per-open-file-description, so a second
+//! A retained startup session can reenter the same storage boundary. `flock(2)`
+//! is per-open-file-description, so a second
 //! exclusive acquisition from the same process on a fresh descriptor would block
 //! forever. The lock therefore tracks its owning thread and nests: the outermost
 //! acquisition takes the file lock, inner ones bump a depth counter, and the file
@@ -26,9 +25,9 @@
 //!
 //! # Lock order
 //!
-//! `bootstrap` → `repo-write` → (`.index.lock` → per-issue `.lock`) |
-//! `.gates.lock` | `.events.lock`. No path acquires an outer lock while holding
-//! an inner lock, and read paths never take this chain, so no cycle exists.
+//! `bootstrap` → `repo-write` → `.events.lock`. Typed readers may independently
+//! take shared index, issue, gate, or event locks; no reader acquires the outer
+//! mutation chain, so no cycle exists.
 
 use super::lock::{FileLocker, LockGuard};
 use anyhow::{Context, Result};
@@ -207,8 +206,8 @@ impl RepoWriteLock {
     /// guard drops.
     ///
     /// Reentrant: a thread already inside an acquisition takes the lock again
-    /// without touching the file lock, so a storage write nested inside a
-    /// multi-write sequence cannot self-deadlock.
+    /// without touching the file lock, so retained session control paths can
+    /// reenter without self-deadlocking.
     ///
     /// # Errors
     ///

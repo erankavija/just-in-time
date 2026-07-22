@@ -1528,7 +1528,7 @@ mod tests {
             assets: Vec::new(),
         });
         let id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
         storage.add_repo_file("docs/guide.md", "![logo](./logo.png)\n");
         storage.add_repo_file("docs/logo.png", "png bytes");
         let layout = storage.repository_layout();
@@ -1566,7 +1566,7 @@ mod tests {
             assets: Vec::new(),
         });
         let id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
         storage.add_repo_file("docs/guide.md", "![old](./old.png)\n");
         storage.add_repo_file("docs/old.png", "old bytes");
         storage.add_repo_file("docs/new.png", "new bytes");
@@ -1611,7 +1611,7 @@ mod tests {
 
         let mut concurrent = storage.load_issue(&id).unwrap();
         concurrent.labels.push("owner:concurrent".into());
-        storage.save_issue(concurrent).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, concurrent);
         storage.add_repo_file("docs/guide.md", "![new](./new.png)\n");
         assert!(matches!(
             first_session.apply(&first_plan),
@@ -1709,7 +1709,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         let issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
         let id = issue.id.clone();
-        storage.save_issue(issue).unwrap();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
         let executor =
             CommandExecutor::new(storage.clone()).with_layout(storage.repository_layout());
 

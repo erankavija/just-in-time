@@ -129,9 +129,6 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn acquire_repo_write_lock(&self) -> Result<jit::storage::RepoWriteGuard> {
         self.inner.acquire_repo_write_lock()
     }
-    fn save_issue(&self, issue: Issue) -> Result<()> {
-        self.inner.save_issue(issue)
-    }
     fn load_issue(&self, id: &str) -> Result<Issue> {
         self.inner.load_issue(id)
     }
@@ -153,12 +150,6 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn load_gate_registry(&self) -> Result<GateRegistry> {
         self.inner.load_gate_registry()
     }
-    fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
-        self.inner.save_gate_registry(registry)
-    }
-    fn append_event(&self, event: &Event) -> Result<()> {
-        self.inner.append_event(event)
-    }
     fn read_events(&self) -> Result<Vec<Event>> {
         self.inner.read_events()
     }
@@ -176,9 +167,6 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     }
     fn read_repo_file(&self, rel_path: &str) -> Result<Option<String>, PathReadError> {
         self.inner.read_repo_file(rel_path)
-    }
-    fn write_repo_file(&self, rel_path: &str, content: &str) -> Result<(), PathReadError> {
-        self.inner.write_repo_file(rel_path, content)
     }
     fn list_gate_presets(&self) -> Result<Vec<PresetInfo>> {
         self.inner.list_gate_presets()
@@ -357,15 +345,17 @@ fn bindings(container: &str) -> BTreeMap<String, String> {
     BTreeMap::from([("container".to_string(), container.to_string())])
 }
 
+fn memory_storage() -> InMemoryStorage {
+    let storage = InMemoryStorage::new();
+    storage.add_repo_file(".jit/config.toml", "");
+    storage
+}
+
 fn fixture<S: IssueStore + RepositoryStateStore>(
     store: PublicationProbeStore<S>,
 ) -> (CommandExecutor<PublicationProbeStore<S>>, String, String) {
     std::env::set_var("JIT_TEST_MODE", "1");
-    if store.is_file_backed() {
-        assert!(store.root().join("config.toml").is_file());
-    } else {
-        store.write_repo_file(".jit/config.toml", "").unwrap();
-    }
+    assert!(store.read_repo_file(".jit/config.toml").unwrap().is_some());
     let layout =
         jit::storage::discover_repository_layout(store.root().parent().unwrap(), store.root())
             .unwrap();
@@ -456,7 +446,7 @@ fn assert_publication_failure_is_atomic<S: IssueStore + RepositoryStateStore>(
 
 #[test]
 fn test_failed_publication_preserves_memory_preimage_and_retry_succeeds() {
-    assert_publication_failure_is_atomic(PublicationProbeStore::new(InMemoryStorage::new()));
+    assert_publication_failure_is_atomic(PublicationProbeStore::new(memory_storage()));
 }
 
 #[test]
@@ -473,7 +463,7 @@ fn test_failed_publication_preserves_file_preimage_and_retry_succeeds() {
 
 #[test]
 fn test_retryable_conflict_reuses_created_ids_and_timestamp() {
-    let store = PublicationProbeStore::retry_once(InMemoryStorage::new());
+    let store = PublicationProbeStore::retry_once(memory_storage());
     let (executor, container, _) = fixture(store.clone());
     store.arm();
     let result = executor
@@ -584,7 +574,7 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
 
 #[test]
 fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
-    let store = PublicationProbeStore::new(InMemoryStorage::new());
+    let store = PublicationProbeStore::new(memory_storage());
     let (executor, container, _) = fixture(store.clone());
     store.inner.add_repo_file(
         ".jit/config.toml",
@@ -657,7 +647,7 @@ target = "docs/closure.md"
 }
 
 fn assert_planning_document_capture(existing: bool) {
-    let store = PublicationProbeStore::new(InMemoryStorage::new());
+    let store = PublicationProbeStore::new(memory_storage());
     let (executor, container, _) = fixture(store.clone());
     let target = format!("dev/active/{container}-plan.md");
     if existing {
@@ -700,7 +690,7 @@ fn test_existing_planning_document_and_parents_are_captured_without_borrowing() 
 
 #[test]
 fn test_unchanged_force_is_exact_noop_without_publication_or_created_id_paths() {
-    let store = PublicationProbeStore::new(InMemoryStorage::new());
+    let store = PublicationProbeStore::new(memory_storage());
     let (executor, container, _) = fixture(store.clone());
     let template = plan_template();
     let applied = executor

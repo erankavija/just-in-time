@@ -150,15 +150,21 @@ fn test_hand_declared_namespace_validates_without_regeneration() {
     // Store a real issue carrying the label and run it through the same rule
     // path `jit validate <id>` uses (`run_rules`), on a FRESH executor so the
     // config cache reflects the hand edit — REQ-04's literal scenario.
-    let storage = JsonFileStorage::new(&jit_dir);
     let issue = issue_with_label("enforces:gate-semantics");
-    let id = issue.id.clone();
-    storage.save_issue(issue).unwrap();
-
-    let layout =
-        jit::storage::discover_repository_layout(jit_dir.parent().unwrap(), storage.root())
-            .unwrap();
-    let exec = CommandExecutor::new(storage).with_layout(layout);
+    let exec = executor(&jit_dir);
+    let id = exec
+        .create_issue(
+            issue.title,
+            issue.description,
+            issue.priority,
+            issue.gates_required,
+            issue.labels,
+            None,
+            None,
+            false,
+        )
+        .unwrap()
+        .0;
     let report = exec.run_rules(Some(&id)).unwrap();
     assert!(
         !report.has_errors(),

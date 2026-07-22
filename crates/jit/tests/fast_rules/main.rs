@@ -2,6 +2,9 @@
 //! integration targets as modules under one Cargo test target so Cargo links
 //! and runs them as a single executable (jit:8d4f7084).
 
+#[path = "../common/harness.rs"]
+mod harness;
+
 mod cli_warnings_integration_tests;
 mod config_loading_tests;
 mod default_rules_registry_derivation_tests;

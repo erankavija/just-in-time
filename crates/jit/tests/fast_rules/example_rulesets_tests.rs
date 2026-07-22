@@ -758,7 +758,7 @@ mod sdd_lifecycle {
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
         let epic_id = epic.id.clone();
-        executor.storage().save_issue(epic).unwrap();
+        crate::harness::seed_memory_issue(executor.storage(), &epic);
 
         // Attempt to transition to done: must be blocked.
         let result = executor.update_issue(
@@ -861,14 +861,14 @@ mod sdd_lifecycle {
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
         let epic_id = epic.id.clone();
-        executor.storage().save_issue(epic).unwrap();
+        crate::harness::seed_memory_issue(executor.storage(), &epic);
 
         // Seed a done child the epic depends on (containment) satisfying REQ-01.
         let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
         child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
         child.state = State::Done;
         let child_id = child.id.clone();
-        executor.storage().save_issue(child).unwrap();
+        crate::harness::seed_memory_issue(executor.storage(), &child);
         // Wire containment: the epic depends on its child.
         executor.add_dependency(&epic_id, &child_id).unwrap();
 
@@ -1600,7 +1600,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
         crate::memory_executor(storage)
     }
 
-    /// Save an issue directly into storage at a given state, bypassing validation.
+    /// Seed an exact issue preimage at a given state, bypassing validation.
     fn seed(
         executor: &CommandExecutor<InMemoryStorage>,
         title: &str,
@@ -1612,7 +1612,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue.state = state;
         let id = issue.id.clone();
-        executor.storage().save_issue(issue).unwrap();
+        crate::harness::seed_memory_issue(executor.storage(), &issue);
         id
     }
 

@@ -2693,7 +2693,7 @@ source-of-truth = \"registry-first\"
         // the real fs) at `.jit/invariants.toml`.
         storage.add_repo_file(".jit/invariants.toml", REGISTRY_TOML);
         for issue in issues {
-            storage.save_issue(issue).unwrap();
+            crate::commands::test_helpers::seed_issue(&storage, issue);
         }
         finish_dangling_executor(storage)
     }
@@ -2717,7 +2717,7 @@ source-of-truth = \"registry-first\"
         std::fs::write(storage.root().join("config.toml"), &config).unwrap();
         storage.add_repo_file(".jit/config.toml", &config);
         for issue in issues {
-            storage.save_issue(issue).unwrap();
+            crate::commands::test_helpers::seed_issue(&storage, issue);
         }
         finish_dangling_executor(storage)
     }
@@ -2792,7 +2792,7 @@ description = \"Full Rust CI pipeline must pass.\"
         storage.add_repo_file(".jit/rules.toml", ONE_RULE);
         storage.add_repo_file(".jit/gates.toml", ONE_GATE);
         for issue in issues {
-            storage.save_issue(issue).unwrap();
+            crate::commands::test_helpers::seed_issue(&storage, issue);
         }
         CommandExecutor::new(storage)
     }

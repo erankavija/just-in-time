@@ -1,8 +1,8 @@
-//! Storage abstraction layer for persisting issues, gates, and events.
+//! Storage read interfaces and repository transaction boundary.
 //!
-//! This module defines the `IssueStore` trait that abstracts storage operations,
-//! allowing different backends (JSON files, SQLite, in-memory, etc.) to be used
-//! interchangeably.
+//! [`IssueStore`] exposes typed reads plus lock/session lifecycle controls shared
+//! by file-backed and in-memory backends. Repository-owned publication goes only
+//! through [`RepositoryStateStore`] capture/apply sessions.
 
 use crate::declarations::GateRegistry;
 use crate::domain::{Event, Issue};
@@ -32,6 +32,7 @@ pub mod repo_lock;
 pub mod repository_state_store;
 pub mod ruleset_store;
 pub mod temp_cleanup;
+mod test_support;
 mod transaction_action;
 mod transaction_journal;
 mod transaction_recovery;
@@ -75,23 +76,20 @@ pub use warnings::StorageWarning;
 #[allow(unused_imports)] // Public API used only in tests, not in binary
 pub use memory::InMemoryStorage;
 
-/// Trait for storage backends that persist issues, gates, and events.
+/// Typed repository readers and session lifecycle controls.
 ///
-/// This trait allows the core business logic to be decoupled from the specific
-/// storage implementation. Implementations must be `Clone` to support shared
-/// access patterns.
+/// Publication is deliberately absent: commands publish complete semantic
+/// changes through [`RepositoryStateStore`]. Implementations must be `Clone` to
+/// support shared access patterns.
 pub trait IssueStore: Clone {
     /// Acquire this backend's repository-wide write lock, held until the returned
     /// guard drops.
     ///
-    /// Every mutating method of this trait takes it as its outer serialization
-    /// guard, so a caller that holds one guard across a multi-write sequence
-    /// (`jit apply`)
-    /// excludes every ordinary writer for the whole sequence: the reads its
-    /// validation depends on, its writes, and its compensating rollback all see
-    /// one store nobody else is touching. The lock is
-    /// [reentrant](repo_lock::RepoWriteLock#reentrancy), so the nested writes of
-    /// such a sequence do not self-deadlock.
+    /// [`RepositoryStateStore`] sessions retain this as their outer
+    /// serialization guard across recovery, capture, read-set revalidation, and
+    /// transactional apply. The lock is
+    /// [reentrant](repo_lock::RepoWriteLock#reentrancy) so a retained startup
+    /// session can reenter the same backend boundary.
     ///
     /// File storage acquires a repository-sibling bootstrap lock followed by
     /// `.jit/.repo-write.lock`; neither lives in the git control plane, so the
@@ -109,7 +107,7 @@ pub trait IssueStore: Clone {
     /// File-backed CLI storage overrides this to release the bootstrap and
     /// repository locks while a checker subprocess runs. The locks are
     /// reacquired and pending journals are recovered before the caller can
-    /// persist the subprocess result. Backends without a retained startup
+    /// publish the subprocess result through its session. Backends without a retained startup
     /// session execute `operation` directly.
     ///
     /// # Errors
@@ -119,17 +117,6 @@ pub trait IssueStore: Clone {
     fn run_external_process<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
         operation()
     }
-
-    /// Save an issue (create or update).
-    ///
-    /// Takes ownership of the issue and automatically updates the `updated_at`
-    /// timestamp before persisting. This ensures timestamps are always current
-    /// without requiring callers to remember to update them.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the issue cannot be serialized or persisted.
-    fn save_issue(&self, issue: Issue) -> Result<()>;
 
     /// Load an issue by ID.
     ///
@@ -187,20 +174,6 @@ pub trait IssueStore: Clone {
     ///
     /// Returns an error if the registry cannot be loaded.
     fn load_gate_registry(&self) -> Result<GateRegistry>;
-
-    /// Save the gate registry.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the registry cannot be persisted.
-    fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()>;
-
-    /// Append an event to the event log.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the event cannot be appended.
-    fn append_event(&self, event: &Event) -> Result<()>;
 
     /// Read all events whose tag is in the current event vocabulary.
     ///
@@ -260,10 +233,10 @@ pub trait IssueStore: Clone {
     /// Read a repository-local text file by its path relative to the repository
     /// root (the parent of the `.jit` directory).
     ///
-    /// This is the storage-owned entry point for command/domain code that needs to
+    /// This is the storage-owned read entry point for command/domain code that needs to
     /// read a config-declared file (e.g. a project-scope item source) WITHOUT
-    /// reaching into the filesystem directly — the layer boundary in AGENTS.md
-    /// ("storage owns ALL persistence"). The path is enforced repository-local:
+    /// reaching into the filesystem directly. Writes use [`RepositoryStateStore`]
+    /// instead. The path is enforced repository-local:
     /// an absolute path or any `..` traversal is rejected with the typed
     /// [`PathReadError::InvalidPath`] before any I/O.
     ///
@@ -282,34 +255,6 @@ pub trait IssueStore: Clone {
     ///   root (e.g. via a symlink).
     /// - [`PathReadError::Other`] for any other read failure.
     fn read_repo_file(&self, rel_path: &str) -> Result<Option<String>, PathReadError>;
-
-    /// Write a repository-local text file by its path relative to the repository
-    /// root (the parent of the `.jit` directory), atomically.
-    ///
-    /// The storage-owned write counterpart of [`read_repo_file`](Self::read_repo_file):
-    /// command/domain code that needs to materialize a config-declared file (e.g.
-    /// the invariant projection target) goes through this boundary rather than
-    /// touching the filesystem directly (the AGENTS.md "storage owns ALL
-    /// persistence" boundary). The path is enforced repository-local so a
-    /// configured target can never escape the repo, with the SAME two-layer check
-    /// as [`read_repo_file`](Self::read_repo_file): a shape check (an absolute path
-    /// or any `..` traversal is rejected with [`PathReadError::InvalidPath`] BEFORE
-    /// any I/O) AND, for file-backed storage, a canonicalize+containment check that
-    /// rejects a symlinked directory segment resolving outside the repo with
-    /// [`PathReadError::OutsideRepoRoot`] — directories are created only after the
-    /// target is confirmed within the repo. The write is atomic (temp file in the
-    /// target's directory + rename) so a reader never observes a partial file.
-    /// Intermediate directories under the repo root are created as needed.
-    ///
-    /// # Errors
-    ///
-    /// - [`PathReadError::InvalidPath`] for an empty, absolute, or `..`-bearing
-    ///   path.
-    /// - [`PathReadError::OutsideRepoRoot`] when a directory segment is a symlink
-    ///   resolving outside the repository root.
-    /// - [`PathReadError::Other`] for any I/O failure while creating directories or
-    ///   writing the file.
-    fn write_repo_file(&self, rel_path: &str, content: &str) -> Result<(), PathReadError>;
 
     /// List all available gate presets (builtin and custom).
     ///
@@ -361,128 +306,5 @@ pub trait IssueStore: Clone {
     ) -> Result<(String, String), PathReadError> {
         let (bytes, label) = self.read_path_bytes(path, at_commit)?;
         Ok((String::from_utf8_lossy(&bytes).into_owned(), label))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::domain::{Priority, State};
-
-    /// Test that JsonFileStorage implements IssueStore correctly
-    #[test]
-    fn test_json_storage_implements_trait() {
-        let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
-
-        let issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
-        storage.save_issue(issue.clone()).unwrap();
-
-        let loaded = storage.load_issue(&issue.id).unwrap();
-        assert_eq!(loaded.title, "Test");
-        assert_eq!(loaded.description, "Description");
-    }
-
-    #[test]
-    fn test_trait_save_and_load() {
-        fn test_with_storage<S: IssueStore>(storage: S) {
-            let mut issue =
-                crate::domain::types::fixture_issue("Trait test".to_string(), "Works".to_string());
-            issue.priority = Priority::High;
-            issue.state = State::Ready;
-
-            storage.save_issue(issue.clone()).unwrap();
-            let loaded = storage.load_issue(&issue.id).unwrap();
-
-            assert_eq!(loaded.title, issue.title);
-            assert_eq!(loaded.priority, Priority::High);
-            assert_eq!(loaded.state, State::Ready);
-        }
-
-        // Test with both backends
-        let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
-        test_with_storage(storage);
-        test_with_storage(InMemoryStorage::new());
-    }
-
-    #[test]
-    fn test_trait_list_issues() {
-        fn test_with_storage<S: IssueStore>(storage: S) {
-            let issue1 =
-                crate::domain::types::fixture_issue("Issue 1".to_string(), "First".to_string());
-            let issue2 =
-                crate::domain::types::fixture_issue("Issue 2".to_string(), "Second".to_string());
-
-            storage.save_issue(issue1.clone()).unwrap();
-            storage.save_issue(issue2.clone()).unwrap();
-
-            let issues = storage.list_issues().unwrap();
-            assert_eq!(issues.len(), 2);
-
-            let titles: Vec<_> = issues.iter().map(|i| i.title.as_str()).collect();
-            assert!(titles.contains(&"Issue 1"));
-            assert!(titles.contains(&"Issue 2"));
-        }
-
-        // Test with both backends
-        let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
-        test_with_storage(storage);
-        test_with_storage(InMemoryStorage::new());
-    }
-
-    #[test]
-    fn test_trait_gate_registry() {
-        fn test_with_storage<S: IssueStore>(storage: S) {
-            let registry = storage.load_gate_registry().unwrap();
-            assert_eq!(registry.gates.len(), 0);
-
-            let mut new_registry = GateRegistry::default();
-            let gate = crate::declarations::GateDefinition {
-                version: 1,
-                key: "test-gate".to_string(),
-                title: "Test Gate".to_string(),
-                description: "A test gate".to_string(),
-                stage: crate::declarations::GateStage::Postcheck,
-                mode: crate::declarations::GateMode::Manual,
-                checker: None,
-                priority: 100,
-                reserved: std::collections::HashMap::new(),
-                auto: false,
-                example_integration: None,
-            };
-            new_registry.gates.insert("test-gate".to_string(), gate);
-
-            storage.save_gate_registry(&new_registry).unwrap();
-
-            let loaded = storage.load_gate_registry().unwrap();
-            assert_eq!(loaded.gates.len(), 1);
-            assert!(loaded.gates.contains_key("test-gate"));
-        }
-
-        // Test with both backends
-        let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
-        test_with_storage(storage);
-        test_with_storage(InMemoryStorage::new());
-    }
-
-    #[test]
-    fn test_trait_event_log() {
-        fn test_with_storage<S: IssueStore>(storage: S) {
-            let issue =
-                crate::domain::types::fixture_issue("Event test".to_string(), "Test".to_string());
-            let event = Event::draft_issue_created(&issue);
-
-            storage.append_event(&event).unwrap();
-
-            let events = storage.read_events().unwrap();
-            assert_eq!(events.len(), 1);
-            // Event is an enum, check the variant
-            matches!(events[0], crate::domain::Event::IssueCreated { .. });
-        }
-
-        // Test with both backends
-        let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
-        test_with_storage(storage);
-        test_with_storage(InMemoryStorage::new());
     }
 }

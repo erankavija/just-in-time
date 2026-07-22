@@ -13,9 +13,8 @@
 //!   truncates to, and [`MIN_ID_PREFIX_LENGTH`], the minimum
 //!   [`resolve_issue_id`](crate::storage::IssueStore::resolve_issue_id) accepts.
 //! - The event-log sample lines are [`EventTag::sample`] records encoded with
-//!   `serde_json::to_string` — the encoding
-//!   [`append_event`](crate::storage::IssueStore::append_event) writes to
-//!   `events.jsonl`. The tag vocabulary is NOT restated here: it is the event
+//!   `serde_json::to_string` — the encoding the repository-state finalizer
+//!   publishes to `events.jsonl`. The tag vocabulary is NOT restated here: it is the event
 //!   catalog's own projection ([`crate::domain::event_catalog`]), which this page
 //!   links to.
 //! - The gate-run path comes from
@@ -509,6 +508,7 @@ pub fn render_reference_markdown() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::Issue;
     use crate::storage::{InMemoryStorage, InvalidIdPrefixError, IssueStore};
     use schemars::schema_for;
     use std::collections::BTreeSet;
@@ -521,6 +521,22 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
             .join(REFERENCE_PATH)
+    }
+
+    fn seed_issue_preimage(storage: &InMemoryStorage, issue: &Issue) {
+        storage.add_repo_file(
+            &format!(".jit/issues/{}.json", issue.id),
+            std::str::from_utf8(&crate::repository_state::serialize_issue(issue).unwrap()).unwrap(),
+        );
+        let index = crate::repository_state::RepositoryIndex {
+            schema_version: crate::repository_state::SUPPORTED_INDEX_SCHEMA_VERSION,
+            all_ids: vec![issue.id.clone()],
+            deleted_ids: Vec::new(),
+        };
+        storage.add_repo_file(
+            ".jit/index.json",
+            std::str::from_utf8(&index.to_pretty_bytes().unwrap()).unwrap(),
+        );
     }
 
     /// REQ-04 (field completeness): the projected field list must be exactly the
@@ -649,7 +665,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         let issue = crate::domain::types::fixture_issue("Probe".to_string(), String::new());
         let id = issue.id.clone();
-        storage.save_issue(issue).expect("the issue saves");
+        seed_issue_preimage(&storage, &issue);
 
         let too_short: String = id
             .replace('-', "")
@@ -687,7 +703,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         let issue = crate::domain::types::fixture_issue("Probe".to_string(), String::new());
         let id = issue.id.clone();
-        storage.save_issue(issue).expect("the issue saves");
+        seed_issue_preimage(&storage, &issue);
 
         assert_eq!(
             storage
