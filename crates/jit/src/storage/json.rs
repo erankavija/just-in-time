@@ -9,12 +9,14 @@
 use crate::declarations::GateRegistry;
 use crate::domain::{parse_known_events, Event, Issue};
 use crate::repository_state::{
-    RepositoryIndex, RepositoryIndexError, RepositoryLayout, SUPPORTED_INDEX_SCHEMA_VERSION,
+    gate_run_result_relative_path, RepositoryIndex, RepositoryIndexError, RepositoryLayout,
+    SUPPORTED_INDEX_SCHEMA_VERSION,
 };
 use crate::storage::{
     AmbiguousIdError, FileLocker, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
     IssueStore, RecoveryDispatchReport, RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError,
-    RepositoryMutationSession, RepositoryNotFoundError, RepositoryStateStore, MIN_ID_PREFIX_LENGTH,
+    RepositoryMutationSession, RepositoryNotFoundError, RepositoryStateStore,
+    RepositoryStateStoreError, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -35,7 +37,6 @@ const INDEX_FILE: &str = "index.json";
 const GATES_FILE: &str = "gates.toml";
 const EVENTS_FILE: &str = "events.jsonl";
 const GATE_RUNS_DIR: &str = "gate-runs";
-const GATE_RUN_RESULT_FILE: &str = "result.json";
 
 static NEXT_RETENTION_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -496,21 +497,6 @@ impl JsonFileStorage {
 
     fn issue_path(&self, id: &str) -> PathBuf {
         self.root.join(ISSUES_DIR).join(format!("{}.json", id))
-    }
-
-    /// Filesystem path of the persisted result for gate run `run_id`
-    /// (`<root>/gate-runs/<run_id>/result.json`).
-    ///
-    /// This is the single source for a gate run's on-disk location: the storage
-    /// methods that save and load a run derive their path from it, and the CLI
-    /// uses it to tell the user where a run's full output lives, so the
-    /// `gate-runs/<run_id>/result.json` layout is never reconstructed outside the
-    /// storage layer.
-    pub fn result_path(&self, run_id: &str) -> PathBuf {
-        self.root
-            .join(GATE_RUNS_DIR)
-            .join(run_id)
-            .join(GATE_RUN_RESULT_FILE)
     }
 
     /// Write `issue` to its file and register it in the index, taking the
@@ -1231,40 +1217,82 @@ impl IssueStore for JsonFileStorage {
         Ok(events)
     }
 
-    fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()> {
-        let _repo_lock = self.repo_lock.acquire()?;
-
-        // Single source for the run's location; create its parent directory.
-        let result_path = self.result_path(&result.run_id);
-        let run_dir = result_path
-            .parent()
-            .context("gate run result path has no parent directory")?;
-        fs::create_dir_all(run_dir).context("Failed to create run directory")?;
-
-        // Save result.json
-        let json =
-            serde_json::to_string_pretty(result).context("Failed to serialize gate run result")?;
-
-        // Atomic write: write to temp file, then rename
-        let temp_path = result_path.with_extension("json.tmp");
-        fs::write(&temp_path, json).context("Failed to write temporary gate run result")?;
-        fs::rename(&temp_path, &result_path)
-            .context("Failed to rename temporary gate run result")?;
-
-        Ok(())
-    }
-
     fn load_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult> {
-        let result_path = self.result_path(run_id);
-
-        if !result_path.exists() {
-            return Err(GateRunNotFoundError::new(run_id).into());
+        let relative = gate_run_result_relative_path(run_id)?;
+        let result_path = self.root.join(relative.as_path());
+        let result_leaf = relative
+            .as_path()
+            .file_name()
+            .and_then(|name| name.to_str())
+            .context("canonical gate run result path has no file name")?;
+        let data = match super::repository_state_store::open_absolute_dir_nofollow(&self.root) {
+            Ok(data) => data,
+            Err(RepositoryStateStoreError::Io(error))
+                if error.kind() == std::io::ErrorKind::NotFound =>
+            {
+                return Err(GateRunNotFoundError::new(run_id).into())
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let gate_runs = match data.symlink_metadata(GATE_RUNS_DIR) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Err(GateRunNotFoundError::new(run_id).into())
+            }
+            Err(error) => return Err(error.into()),
+            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
+                anyhow::bail!(
+                    "Gate run directory at {} must be an ordinary directory",
+                    self.root.join(GATE_RUNS_DIR).display()
+                )
+            }
+            Ok(_) => super::repository_state_store::open_child_dir_nofollow(&data, GATE_RUNS_DIR)?,
+        };
+        let run_dir = match gate_runs.symlink_metadata(run_id) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Err(GateRunNotFoundError::new(run_id).into())
+            }
+            Err(error) => return Err(error.into()),
+            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
+                anyhow::bail!(
+                    "Gate run directory at {} must be an ordinary directory",
+                    self.root.join(GATE_RUNS_DIR).join(run_id).display()
+                )
+            }
+            Ok(_) => super::repository_state_store::open_child_dir_nofollow(&gate_runs, run_id)?,
+        };
+        match run_dir.symlink_metadata(result_leaf) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Err(GateRunNotFoundError::new(run_id).into())
+            }
+            Err(error) => return Err(error.into()),
+            Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
+                anyhow::bail!(
+                    "Gate run result at {} must be an ordinary file",
+                    result_path.display()
+                )
+            }
+            Ok(_) => {}
         }
-
-        let contents =
-            fs::read_to_string(&result_path).context("Failed to read gate run result")?;
-        let result =
-            serde_json::from_str(&contents).context("Failed to deserialize gate run result")?;
+        let mut file = super::file_transaction::open_regular_file_nofollow(&run_dir, result_leaf)
+            .with_context(|| {
+            format!(
+                "Failed to open gate run result at {}",
+                result_path.display()
+            )
+        })?;
+        let mut contents = Vec::new();
+        file.read_to_end(&mut contents).with_context(|| {
+            format!(
+                "Failed to read gate run result at {}",
+                result_path.display()
+            )
+        })?;
+        let result = serde_json::from_slice(&contents).with_context(|| {
+            format!(
+                "Failed to deserialize gate run result at {}",
+                result_path.display()
+            )
+        })?;
 
         Ok(result)
     }
@@ -1273,36 +1301,83 @@ impl IssueStore for JsonFileStorage {
         &self,
         issue_id: &str,
     ) -> Result<Vec<crate::domain::GateRunResult>> {
-        let gate_runs_dir = self.root.join(GATE_RUNS_DIR);
-
-        if !gate_runs_dir.exists() {
-            return Ok(Vec::new());
-        }
+        let data = match super::repository_state_store::open_absolute_dir_nofollow(&self.root) {
+            Ok(data) => data,
+            Err(RepositoryStateStoreError::Io(error))
+                if error.kind() == std::io::ErrorKind::NotFound =>
+            {
+                return Ok(Vec::new())
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let gate_runs = match data.symlink_metadata(GATE_RUNS_DIR) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(error.into()),
+            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
+                anyhow::bail!(
+                    "Gate run root at {} must be an ordinary directory",
+                    self.root.join(GATE_RUNS_DIR).display()
+                )
+            }
+            Ok(_) => super::repository_state_store::open_child_dir_nofollow(&data, GATE_RUNS_DIR)?,
+        };
 
         let mut results = Vec::new();
-
-        for entry in fs::read_dir(&gate_runs_dir)? {
+        for entry in gate_runs.entries()? {
             let entry = entry?;
-            if entry.file_type()?.is_dir() {
-                let result_path = entry.path().join(GATE_RUN_RESULT_FILE);
-                if result_path.exists() {
-                    let contents = fs::read_to_string(&result_path).with_context(|| {
+            let Ok(run_id) = entry.file_name().into_string() else {
+                continue;
+            };
+            let Ok(relative) = gate_run_result_relative_path(&run_id) else {
+                continue;
+            };
+            let metadata = gate_runs.symlink_metadata(&run_id)?;
+            if metadata.is_symlink() || !metadata.is_dir() {
+                continue;
+            }
+            let run_dir =
+                super::repository_state_store::open_child_dir_nofollow(&gate_runs, &run_id)?;
+            let result_path = self.root.join(relative.as_path());
+            let result_leaf = relative
+                .as_path()
+                .file_name()
+                .and_then(|name| name.to_str())
+                .context("canonical gate run result path has no file name")?;
+            match run_dir.symlink_metadata(result_leaf) {
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => return Err(error.into()),
+                Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
+                    anyhow::bail!(
+                        "Gate run result at {} must be an ordinary file",
+                        result_path.display()
+                    )
+                }
+                Ok(_) => {}
+            }
+            let mut file =
+                super::file_transaction::open_regular_file_nofollow(&run_dir, result_leaf)
+                    .with_context(|| {
                         format!(
-                            "Failed to read gate run result at {}",
+                            "Failed to open gate run result at {}",
                             result_path.display()
                         )
                     })?;
-                    let result: crate::domain::GateRunResult = serde_json::from_str(&contents)
-                        .with_context(|| {
-                            format!(
-                                "Failed to deserialize gate run result at {}",
-                                result_path.display()
-                            )
-                        })?;
-                    if result.issue_id == issue_id {
-                        results.push(result);
-                    }
-                }
+            let mut contents = Vec::new();
+            file.read_to_end(&mut contents).with_context(|| {
+                format!(
+                    "Failed to read gate run result at {}",
+                    result_path.display()
+                )
+            })?;
+            let result: crate::domain::GateRunResult = serde_json::from_slice(&contents)
+                .with_context(|| {
+                    format!(
+                        "Failed to deserialize gate run result at {}",
+                        result_path.display()
+                    )
+                })?;
+            if result.issue_id == issue_id {
+                results.push(result);
             }
         }
 
@@ -1895,6 +1970,14 @@ mod tests {
         let result_path = run_dir.join("result.json");
         fs::write(&result_path, "{ not valid json").unwrap();
 
+        let load_err = storage
+            .load_gate_run_result("corrupt-run")
+            .expect_err("loading corrupt gate-run JSON must fail");
+        assert!(
+            format!("{load_err:#}").contains(&result_path.display().to_string()),
+            "load errors must name the malformed record path"
+        );
+
         let err = storage
             .list_gate_runs_for_issue("any-issue")
             .expect_err("corrupt gate-run record must produce an error, not a silent drop");
@@ -1912,96 +1995,155 @@ mod tests {
     }
 
     #[test]
-    fn test_save_gate_run_result_is_atomic_no_tmp_left() {
-        // The atomic write must leave only result.json (no .json.tmp residue).
-        use crate::declarations::GateStage;
-        use crate::domain::{GateRunResult, GateRunStatus};
-        use chrono::Utc;
-
+    fn test_list_gate_runs_ignores_noncanonical_nested_result_shape() {
         let (_temp, storage) = setup_storage();
         storage.init().unwrap();
+        let nested = storage.root.join("gate-runs/outer/nested/result.json");
+        fs::create_dir_all(nested.parent().unwrap()).unwrap();
+        fs::write(nested, "{ not valid json").unwrap();
+        fs::write(storage.root.join("gate-runs/direct-file"), "root clutter").unwrap();
 
-        let now = Utc::now();
-        let result = GateRunResult {
-            schema_version: 1,
-            run_id: "run-atomic".to_string(),
-            gate_key: "tests".to_string(),
-            stage: GateStage::Postcheck,
-            issue_id: "issue-1".to_string(),
-            commit: None,
-            branch: None,
-            tree_dirty: None,
-            status: GateRunStatus::Passed,
-            started_at: now,
-            completed_at: Some(now),
-            duration_ms: Some(1),
-            exit_code: Some(0),
-            stdout: String::new(),
-            stderr: String::new(),
-            command: "true".to_string(),
-            by: None,
-            message: None,
-            findings: None,
-        };
-
-        storage.save_gate_run_result(&result).unwrap();
-
-        let run_dir = storage.root.join("gate-runs").join("run-atomic");
-        assert!(
-            run_dir.join("result.json").exists(),
-            "result.json must exist"
-        );
-        assert!(
-            !run_dir.join("result.json.tmp").exists(),
-            "temp file must be renamed away, not left behind"
-        );
-
-        // And it round-trips.
-        let loaded = storage.list_gate_runs_for_issue("issue-1").unwrap();
-        assert_eq!(loaded.len(), 1);
-        assert_eq!(loaded[0].run_id, "run-atomic");
+        assert!(storage
+            .list_gate_runs_for_issue("any-issue")
+            .unwrap()
+            .is_empty());
+        assert!(format!(
+            "{:#}",
+            storage.load_gate_run_result("direct-file").unwrap_err()
+        )
+        .contains("ordinary directory"));
     }
 
     #[test]
-    fn test_save_gate_run_result_waits_for_repository_guard() {
-        use crate::declarations::GateStage;
-        use crate::domain::{GateRunResult, GateRunStatus};
-        use chrono::Utc;
-
+    fn test_gate_run_readers_reject_non_directory_gate_runs_root() {
         let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path().join(".jit"));
+        let data = temp.path().join(".jit");
+        fs::create_dir(&data).unwrap();
+        fs::write(data.join("gate-runs"), "not a directory").unwrap();
+        let storage = JsonFileStorage::new(data);
+
+        for error in [
+            storage.load_gate_run_result("run-one").unwrap_err(),
+            storage.list_gate_runs_for_issue("issue-one").unwrap_err(),
+        ] {
+            assert!(format!("{error:#}").contains("ordinary directory"));
+        }
+    }
+
+    #[test]
+    fn test_gate_run_readers_reject_non_file_result_object() {
+        let (_temp, storage) = setup_storage();
         storage.init().unwrap();
-        let now = Utc::now();
-        let result = GateRunResult {
-            schema_version: 1,
-            run_id: "run-serialized".to_string(),
-            gate_key: "tests".to_string(),
-            stage: GateStage::Postcheck,
-            issue_id: "issue-serialized".to_string(),
-            commit: None,
-            branch: None,
-            tree_dirty: None,
-            status: GateRunStatus::Passed,
-            started_at: now,
-            completed_at: Some(now),
-            duration_ms: Some(1),
-            exit_code: Some(0),
-            stdout: String::new(),
-            stderr: String::new(),
-            command: "true".to_string(),
-            by: None,
-            message: None,
-            findings: None,
-        };
+        fs::create_dir_all(storage.root.join("gate-runs/directory-run/result.json")).unwrap();
 
-        assert_direct_writer_waits_for_repository_guard(&storage, move |storage| {
-            storage.save_gate_run_result(&result)
-        });
+        for error in [
+            storage.load_gate_run_result("directory-run").unwrap_err(),
+            storage.list_gate_runs_for_issue("any-issue").unwrap_err(),
+        ] {
+            let message = format!("{error:#}");
+            assert!(message.contains("directory-run/result.json"));
+            assert!(message.contains("ordinary file"));
+        }
+    }
 
-        assert!(temp
-            .path()
-            .join(".jit/gate-runs/run-serialized/result.json")
-            .exists());
+    #[cfg(unix)]
+    #[test]
+    fn test_gate_run_readers_reject_symlinked_result_object() {
+        let (_temp, storage) = setup_storage();
+        storage.init().unwrap();
+        let run_dir = storage.root.join("gate-runs/symlink-run");
+        fs::create_dir_all(&run_dir).unwrap();
+        let target = storage.root.join("target.json");
+        fs::write(&target, "{}").unwrap();
+        std::os::unix::fs::symlink(target, run_dir.join("result.json")).unwrap();
+
+        let error = storage.load_gate_run_result("symlink-run").unwrap_err();
+        assert!(format!("{error:#}").contains("ordinary file"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_load_gate_run_rejects_symlinked_gate_runs_root() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        let outside = TempDir::new().unwrap();
+        fs::create_dir(&data).unwrap();
+        fs::create_dir_all(outside.path().join("escaped-run")).unwrap();
+        fs::write(outside.path().join("escaped-run/result.json"), "{}").unwrap();
+        std::os::unix::fs::symlink(outside.path(), data.join("gate-runs")).unwrap();
+        let storage = JsonFileStorage::new(data);
+
+        let error = storage.load_gate_run_result("escaped-run").unwrap_err();
+        assert!(format!("{error:#}").contains("ordinary directory"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_gate_run_readers_reject_targeted_symlinked_run_directory_but_list_ignores_it() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        let outside = TempDir::new().unwrap();
+        fs::create_dir_all(data.join("gate-runs")).unwrap();
+        fs::write(outside.path().join("result.json"), "{}").unwrap();
+        std::os::unix::fs::symlink(outside.path(), data.join("gate-runs/escaped-run")).unwrap();
+        let storage = JsonFileStorage::new(data);
+
+        let error = storage.load_gate_run_result("escaped-run").unwrap_err();
+        assert!(format!("{error:#}").contains("ordinary directory"));
+        assert!(storage
+            .list_gate_runs_for_issue("any-issue")
+            .unwrap()
+            .is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_held_gate_run_directory_capability_cannot_escape_after_parent_symlink_swaps() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        let original_run = data.join("gate-runs/run-one");
+        fs::create_dir_all(&original_run).unwrap();
+        fs::write(original_run.join("result.json"), b"inside").unwrap();
+
+        let outside_run = TempDir::new().unwrap();
+        fs::write(outside_run.path().join("result.json"), b"outside-run").unwrap();
+        let outside_root = TempDir::new().unwrap();
+        fs::create_dir(outside_root.path().join("run-one")).unwrap();
+        fs::write(
+            outside_root.path().join("run-one/result.json"),
+            b"outside-root",
+        )
+        .unwrap();
+
+        let data_handle =
+            super::super::repository_state_store::open_absolute_dir_nofollow(&data).unwrap();
+        let gate_runs_handle = super::super::repository_state_store::open_child_dir_nofollow(
+            &data_handle,
+            "gate-runs",
+        )
+        .unwrap();
+        let run_handle = super::super::repository_state_store::open_child_dir_nofollow(
+            &gate_runs_handle,
+            "run-one",
+        )
+        .unwrap();
+
+        fs::rename(&original_run, data.join("gate-runs/run-held")).unwrap();
+        std::os::unix::fs::symlink(outside_run.path(), &original_run).unwrap();
+        fs::rename(data.join("gate-runs"), data.join("gate-runs-held")).unwrap();
+        std::os::unix::fs::symlink(outside_root.path(), data.join("gate-runs")).unwrap();
+
+        assert_eq!(
+            fs::read(data.join("gate-runs/run-one/result.json")).unwrap(),
+            b"outside-root",
+            "the ambient path must demonstrate that the parent swap took effect"
+        );
+        let mut held_file =
+            super::super::file_transaction::open_regular_file_nofollow(&run_handle, "result.json")
+                .unwrap();
+        let mut held_bytes = Vec::new();
+        held_file.read_to_end(&mut held_bytes).unwrap();
+        assert_eq!(held_bytes, b"inside");
     }
 
     #[test]

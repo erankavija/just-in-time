@@ -59,8 +59,8 @@ Running a gate records its result at `.jit/gate-runs/<run-id>/result.json`.
 The `<run-id>` is a UUID v4 minted per execution, so runs accumulate: a rerun
 writes a new directory beside the old one, and the history of a gate on an issue
 is the set of run directories whose record names that issue. The record is
-written as pretty-printed JSON, through the temp-file-and-rename pattern every
-other `.jit/` write uses.
+written as pretty-printed JSON in the same recoverable repository transaction as
+its coupled issue and event updates.
 
 ```json
 {

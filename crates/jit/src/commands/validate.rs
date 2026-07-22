@@ -304,6 +304,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         full_config.templates = effective_templates(&image_two, &config, &effective)?;
         let (worktree_docs, pinned) = document_capture_closure(&issues, &full_config)?;
         phase_three.discover_paths(worktree_docs)?;
+        let mut capture_precheck_history = false;
         if let Some(raw_target) = precheck_target {
             let target = super::resolve_issue_from_capture(&issues, raw_target)?;
             let issue = issues
@@ -314,6 +315,18 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
                 None => crate::declarations::GateRegistry::default(),
             };
+            capture_precheck_history = issue
+                .gates_required
+                .iter()
+                .filter_map(|key| gates.gates.get(key))
+                .any(|gate| {
+                    gate.stage == crate::declarations::GateStage::Precheck
+                        && gate.mode == crate::declarations::GateMode::Auto
+                        && gate
+                            .checker
+                            .as_ref()
+                            .is_some_and(super::checker_consumes_run_history)
+                });
             let prompt_paths = issue
                 .gates_required
                 .iter()
@@ -333,12 +346,18 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 });
             phase_three.discover_paths(
                 prompt_paths
-                    .map(|path| super::repo_rel_virtual_path(path))
+                    .map(|path| {
+                        super::repo_rel_virtual_path(path).map_err(|_| {
+                            anyhow!("prompt_file '{}' resolves outside the repository", path)
+                        })
+                    })
                     .collect::<Result<Vec<_>>>()?,
             )?;
-            let gate_runs = VirtualPath::data("gate-runs")?;
-            phase_three.discover_paths([gate_runs.clone()])?;
-            phase_three.discover_listing(gate_runs)?;
+            if capture_precheck_history {
+                let gate_runs = VirtualPath::data("gate-runs")?;
+                phase_three.discover_paths([gate_runs.clone()])?;
+                phase_three.discover_listing(gate_runs)?;
+            }
         }
         phase_three.discover_paths(extra_paths.iter().cloned())?;
         for (revision, path) in pinned {
@@ -349,24 +368,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
             Err(error) => return Err(error.into()),
         };
-        if precheck_target.is_none() {
+        if !capture_precheck_history {
             return Ok(Some(image_three));
         }
-
-        let gate_runs = VirtualPath::data("gate-runs")?;
-        let run_paths = image_three
-            .listing_fingerprints()
-            .get(&gate_runs)
-            .into_iter()
-            .flat_map(|listing| listing.children().keys())
-            .map(|run_id| VirtualPath::data(format!("gate-runs/{run_id}/result.json")))
-            .collect::<Result<Vec<_>, _>>()?;
-        phase_three.discover_paths(run_paths)?;
-        match session.capture(phase_three) {
-            Ok(base) => Ok(Some(base)),
-            Err(RepositoryStateStoreError::RetryableConflict { .. }) => Ok(None),
-            Err(error) => Err(error.into()),
-        }
+        super::capture_gate_run_results(session, image_three)
     }
 
     /// Capture the validation image and return the full whole-repository report.

@@ -2904,7 +2904,7 @@ fn inspect_open_file(file: &mut cap_std::fs::File, path: &str) -> Result<FileIde
     })
 }
 
-fn open_regular_file_nofollow(parent: &Dir, leaf: &str) -> Result<cap_std::fs::File> {
+pub(crate) fn open_regular_file_nofollow(parent: &Dir, leaf: &str) -> Result<cap_std::fs::File> {
     let mut options = OpenOptions::new();
     options.read(true);
     options._cap_fs_ext_follow(FollowSymlinks::No);

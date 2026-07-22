@@ -498,6 +498,12 @@ impl RepositoryMutationSession for MemoryMutationSession {
         let delta = plan.delta();
         ensure_session_image(&self.layout, self.captured.as_ref(), image)?;
         ensure_delta_is_captured(image, delta)?;
+        #[cfg(test)]
+        if self.storage.consume_repository_state_apply_conflict() {
+            return Err(RepositoryStateStoreError::RetryableConflict {
+                path: "injected memory read-set conflict".into(),
+            });
+        }
         let mut state = self.storage.repository_state();
         let current = capture_memory_image(&self.layout, &state, image.capture_spec().clone())?;
         if &current != image {
@@ -1258,7 +1264,10 @@ fn open_descendant_dir_nofollow(root: &Dir, path: &Path) -> Result<Dir, Reposito
     Ok(current)
 }
 
-fn open_child_dir_nofollow(parent: &Dir, name: &str) -> Result<Dir, RepositoryStateStoreError> {
+pub(crate) fn open_child_dir_nofollow(
+    parent: &Dir,
+    name: &str,
+) -> Result<Dir, RepositoryStateStoreError> {
     let metadata = parent.symlink_metadata(name)?;
     if metadata.is_symlink() || !metadata.is_dir() {
         return Err(RepositoryStateStoreError::UnsafeTarget(name.to_string()));
@@ -1273,7 +1282,7 @@ fn open_child_dir_nofollow(parent: &Dir, name: &str) -> Result<Dir, RepositorySt
     Ok(Dir::from_std_file(file.into_std()))
 }
 
-fn open_absolute_dir_nofollow(path: &Path) -> Result<Dir, RepositoryStateStoreError> {
+pub(crate) fn open_absolute_dir_nofollow(path: &Path) -> Result<Dir, RepositoryStateStoreError> {
     if path.parent().is_none() {
         return Dir::open_ambient_dir(path, ambient_authority()).map_err(Into::into);
     }

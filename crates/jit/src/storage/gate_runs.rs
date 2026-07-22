@@ -4,20 +4,64 @@
 mod tests {
     use crate::declarations::GateStage;
     use crate::domain::{GateFinding, GateFindings, GateRunResult, GateRunStatus};
-    use crate::storage::{IssueStore, JsonFileStorage};
+    use crate::repository_state::{
+        finalize, gate_run_result_relative_path, CaptureBudget, CaptureSpec, MutationContext,
+        MutationIntent, VirtualPath,
+    };
+    use crate::storage::{
+        discover_repository_layout, IssueStore, JsonFileStorage, RepositoryStateStore,
+    };
     use chrono::Utc;
     use tempfile::TempDir;
 
     fn setup_storage() -> (TempDir, JsonFileStorage) {
         let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path());
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let storage = JsonFileStorage::new(data);
         (temp, storage)
     }
 
+    fn record_gate_run(
+        temp: &TempDir,
+        storage: &JsonFileStorage,
+        draft: GateRunResult,
+        seed: u8,
+    ) -> String {
+        let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
+        let context = MutationContext::deterministic([seed; 32], draft.started_at);
+        let run_id = context.identifier_at(0);
+        let run_dir = VirtualPath::data(format!("gate-runs/{run_id}")).unwrap();
+        let run_file =
+            VirtualPath::data(gate_run_result_relative_path(&run_id).unwrap().as_path()).unwrap();
+        let spec = CaptureSpec::phase_one(
+            [VirtualPath::data("gate-runs").unwrap(), run_dir, run_file],
+            CaptureBudget {
+                max_paths: 3,
+                max_listings: 0,
+                max_bytes: 1024 * 1024,
+                max_depth: 3,
+            },
+        )
+        .unwrap();
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let image = session.capture(spec).unwrap();
+        let plan = finalize(
+            &layout,
+            &image,
+            &context,
+            &[MutationIntent::RecordGateRun {
+                draft: Box::new(draft),
+            }],
+        )
+        .unwrap();
+        session.apply(&plan).unwrap();
+        run_id
+    }
+
     #[test]
-    fn test_save_and_load_gate_run_result() {
-        let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
+    fn test_record_and_load_gate_run_result() {
+        let (temp, storage) = setup_storage();
 
         let result = GateRunResult {
             schema_version: 1,
@@ -57,12 +101,11 @@ mod tests {
             }),
         };
 
-        // Save result
-        storage.save_gate_run_result(&result).unwrap();
+        let run_id = record_gate_run(&temp, &storage, result, 1);
 
         // Load result
-        let loaded = storage.load_gate_run_result("test-run-1").unwrap();
-        assert_eq!(loaded.run_id, "test-run-1");
+        let loaded = storage.load_gate_run_result(&run_id).unwrap();
+        assert_eq!(loaded.run_id, run_id);
         assert_eq!(loaded.gate_key, "unit-tests");
         assert_eq!(loaded.status, GateRunStatus::Passed);
         assert_eq!(loaded.exit_code, Some(0));
@@ -87,9 +130,6 @@ mod tests {
     fn test_load_gate_run_without_findings_field_defaults_to_none() {
         // A run recorded before the findings field existed must still load: the
         // serde default fills `findings` with None rather than erroring.
-        let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
-
         let legacy = serde_json::json!({
             "schema_version": 1,
             "run_id": "legacy-run",
@@ -183,54 +223,53 @@ mod tests {
 
     #[test]
     fn test_list_gate_runs_for_issue() {
-        let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
+        let (temp, storage) = setup_storage();
 
         // Create multiple runs for the same issue
-        for i in 0..3 {
-            let result = GateRunResult {
-                schema_version: 1,
-                run_id: format!("run-{}", i),
-                gate_key: "unit-tests".to_string(),
-                stage: GateStage::Postcheck,
-                issue_id: "issue-123".to_string(),
-                commit: None,
-                branch: None,
-                tree_dirty: None,
-                status: if i == 2 {
-                    GateRunStatus::Passed
-                } else {
-                    GateRunStatus::Failed
-                },
-                started_at: Utc::now(),
-                completed_at: Some(Utc::now()),
-                duration_ms: Some(1000),
-                exit_code: Some(if i == 2 { 0 } else { 1 }),
-                stdout: format!("Output {}", i),
-                stderr: "".to_string(),
-                command: "cargo test".to_string(),
-                by: Some(crate::gate_execution::AUTO_EXECUTOR.to_string()),
-                message: None,
-                findings: None,
-            };
-            storage.save_gate_run_result(&result).unwrap();
-        }
+        let run_ids = (0..3)
+            .map(|i| {
+                let result = GateRunResult {
+                    schema_version: 1,
+                    run_id: format!("run-{}", i),
+                    gate_key: "unit-tests".to_string(),
+                    stage: GateStage::Postcheck,
+                    issue_id: "issue-123".to_string(),
+                    commit: None,
+                    branch: None,
+                    tree_dirty: None,
+                    status: if i == 2 {
+                        GateRunStatus::Passed
+                    } else {
+                        GateRunStatus::Failed
+                    },
+                    started_at: Utc::now(),
+                    completed_at: Some(Utc::now()),
+                    duration_ms: Some(1000),
+                    exit_code: Some(if i == 2 { 0 } else { 1 }),
+                    stdout: format!("Output {}", i),
+                    stderr: "".to_string(),
+                    command: "cargo test".to_string(),
+                    by: Some(crate::gate_execution::AUTO_EXECUTOR.to_string()),
+                    message: None,
+                    findings: None,
+                };
+                record_gate_run(&temp, &storage, result, i + 1)
+            })
+            .collect::<Vec<_>>();
 
         // List runs for issue
         let runs = storage.list_gate_runs_for_issue("issue-123").unwrap();
         assert_eq!(runs.len(), 3);
 
         // Verify we got all runs
-        let run_ids: Vec<_> = runs.iter().map(|r| r.run_id.as_str()).collect();
-        assert!(run_ids.contains(&"run-0"));
-        assert!(run_ids.contains(&"run-1"));
-        assert!(run_ids.contains(&"run-2"));
+        assert!(run_ids
+            .iter()
+            .all(|run_id| runs.iter().any(|run| &run.run_id == run_id)));
     }
 
     #[test]
     fn test_list_gate_runs_for_nonexistent_issue() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
 
         let runs = storage.list_gate_runs_for_issue("nonexistent").unwrap();
         assert_eq!(runs.len(), 0);
@@ -239,7 +278,6 @@ mod tests {
     #[test]
     fn test_load_nonexistent_gate_run() {
         let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
 
         let result = storage.load_gate_run_result("nonexistent");
         assert!(result.is_err());
@@ -247,8 +285,7 @@ mod tests {
 
     #[test]
     fn test_gate_run_with_no_git_context() {
-        let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
+        let (temp, storage) = setup_storage();
 
         let result = GateRunResult {
             schema_version: 1,
@@ -272,8 +309,8 @@ mod tests {
             findings: None,
         };
 
-        storage.save_gate_run_result(&result).unwrap();
-        let loaded = storage.load_gate_run_result("test-run-nogit").unwrap();
+        let run_id = record_gate_run(&temp, &storage, result, 1);
+        let loaded = storage.load_gate_run_result(&run_id).unwrap();
 
         assert!(loaded.commit.is_none());
         assert!(loaded.branch.is_none());

@@ -886,10 +886,6 @@ impl IssueStore for FailingSaveStorage {
         self.inner.read_events()
     }
 
-    fn save_gate_run_result(&self, result: &jit::domain::GateRunResult) -> anyhow::Result<()> {
-        self.inner.save_gate_run_result(result)
-    }
-
     fn load_gate_run_result(&self, run_id: &str) -> anyhow::Result<jit::domain::GateRunResult> {
         self.inner.load_gate_run_result(run_id)
     }

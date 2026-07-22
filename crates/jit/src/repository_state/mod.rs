@@ -46,11 +46,12 @@ pub use managed_document::{
 pub use materialize::{
     assemble_config, render_capture_closure, validate_capture_closure, ValidationCaptureClosure,
 };
+pub(crate) use mutation::captured_gate_run_result_paths;
 pub use mutation::{
-    finalize, finalize_audit_append, fresh_index_bytes, issue_draft, prefix_has_torn_tail,
-    profile_applied_event, serialize_event, serialize_gate_run, serialize_issue,
-    FixedMutationClock, IdAuthority, MutationClock, MutationContext, MutationError, MutationIntent,
-    SystemMutationClock,
+    finalize, finalize_audit_append, fresh_index_bytes, gate_run_result_relative_path, issue_draft,
+    prefix_has_torn_tail, profile_applied_event, serialize_event, serialize_gate_run,
+    serialize_issue, FixedMutationClock, IdAuthority, MutationClock, MutationContext,
+    MutationError, MutationIntent, SystemMutationClock,
 };
 
 /// Finalize one typed gate-registry edit, its audit event, and every coupled

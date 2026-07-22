@@ -10,12 +10,15 @@ use crate::gate_execution;
 use crate::output::IssueShowResponse;
 use std::collections::HashMap;
 
+/// Maximum prompt file size in bytes (~1000 lines of 80 chars).
+const MAX_PROMPT_FILE_SIZE: u64 = 100_000;
+
 pub(super) struct PrecheckExecution {
     pub(super) runs: Vec<GateRunResult>,
     pub(super) error: Option<anyhow::Error>,
 }
 
-struct CapturedPrecheckGate<'a> {
+struct CapturedGateExecution<'a> {
     image: &'a crate::repository_state::RepositoryImage,
     issue: &'a Issue,
     issues: &'a [Issue],
@@ -23,6 +26,155 @@ struct CapturedPrecheckGate<'a> {
     gate: &'a crate::declarations::GateDefinition,
     runs: &'a [GateRunResult],
     prompt: Option<&'a str>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GateEvaluationEvidence {
+    gate: crate::declarations::GateDefinition,
+    inputs: Vec<(
+        crate::repository_state::VirtualPath,
+        Option<crate::repository_state::EntryIdentity>,
+    )>,
+    pinned: std::collections::BTreeMap<
+        (String, String),
+        crate::repository_state::PinnedDocumentEvidence,
+    >,
+    linked: std::collections::BTreeMap<
+        crate::repository_state::VirtualPath,
+        crate::repository_state::LinkedWorktreeEvidence,
+    >,
+    validation_view: Option<super::PrecheckValidationView>,
+}
+
+struct CapturedGateEvaluation {
+    evidence: GateEvaluationEvidence,
+    prompt: Option<String>,
+}
+
+struct CachedGateEvaluation {
+    evidence: GateEvaluationEvidence,
+    result: GateRunResult,
+}
+
+#[derive(Default)]
+struct CapturedGateRuns {
+    results: Vec<GateRunResult>,
+    inputs: Vec<crate::repository_state::VirtualPath>,
+}
+
+fn captured_repository_index(
+    image: &crate::repository_state::RepositoryImage,
+) -> Result<crate::repository_state::RepositoryIndex> {
+    use crate::repository_state::{RepositoryEntry, VirtualPath};
+
+    let path = VirtualPath::data("index.json")?;
+    match image.entry(&path)? {
+        RepositoryEntry::File { bytes, .. } => crate::storage::json::parse_repository_index(bytes)
+            .context("failed to parse captured issue index"),
+        RepositoryEntry::Absent => Err(anyhow!("captured repository has no .jit/index.json")),
+        _ => Err(anyhow!("captured .jit/index.json is not a regular file")),
+    }
+}
+
+fn captured_issue_record(
+    image: &crate::repository_state::RepositoryImage,
+    issue_id: &str,
+) -> Result<Option<Issue>> {
+    use crate::repository_state::{RepositoryEntry, VirtualPath};
+
+    let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
+    match image.entry(&path)? {
+        RepositoryEntry::File { bytes, .. } => {
+            let issue: Issue = serde_json::from_slice(bytes)
+                .with_context(|| format!("failed to parse captured issue at {path:?}"))?;
+            if issue.id != issue_id {
+                anyhow::bail!(
+                    "captured issue {issue_id} contains mismatched embedded id {}",
+                    issue.id
+                );
+            }
+            Ok(Some(issue))
+        }
+        RepositoryEntry::Absent => Ok(None),
+        _ => Err(anyhow!("captured issue at {path:?} is not a regular file")),
+    }
+}
+
+fn captured_bound_issue(
+    image: &crate::repository_state::RepositoryImage,
+    issue_id: &str,
+) -> Result<Issue> {
+    let index = captured_repository_index(image)?;
+    if !index.all_ids.iter().any(|id| id == issue_id) {
+        return Err(crate::storage::IssueNotFoundError::new(issue_id).into());
+    }
+    captured_issue_record(image, issue_id)?
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id).into())
+}
+
+fn captured_gate_registry(
+    image: &crate::repository_state::RepositoryImage,
+) -> Result<crate::declarations::GateRegistry> {
+    use crate::repository_state::{RepositoryEntry, VirtualPath};
+
+    let path = VirtualPath::data("gates.toml")?;
+    match image.entry(&path)? {
+        RepositoryEntry::File { bytes, .. } => crate::declarations::parse_gate_registry(bytes)
+            .context("failed to parse captured gate registry"),
+        RepositoryEntry::Absent => Ok(crate::declarations::GateRegistry::default()),
+        _ => Err(anyhow!("captured .jit/gates.toml is not a regular file")),
+    }
+}
+
+fn captured_direct_dependency_issues(
+    image: &crate::repository_state::RepositoryImage,
+    issue: &Issue,
+) -> Result<Vec<Issue>> {
+    Ok(issue
+        .dependencies
+        .iter()
+        .map(|id| captured_issue_record(image, id))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .collect())
+}
+
+fn checker_needs_validation_image(checker: &crate::declarations::GateChecker) -> bool {
+    matches!(
+        checker,
+        crate::declarations::GateChecker::RepositoryValidation
+            | crate::declarations::GateChecker::IssueValidation
+            | crate::declarations::GateChecker::LabelTargetValidation { .. }
+    )
+}
+
+fn required_automated_gate<'a>(
+    issue: &Issue,
+    registry: &'a crate::declarations::GateRegistry,
+    gate_key: &str,
+) -> Result<&'a crate::declarations::GateDefinition> {
+    if !issue.gates_required.iter().any(|key| key == gate_key) {
+        anyhow::bail!(
+            "Gate '{}' is not required for issue '{}'",
+            gate_key,
+            issue.id
+        );
+    }
+    let gate = registry
+        .gates
+        .get(gate_key)
+        .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
+    if gate.mode != GateMode::Auto {
+        anyhow::bail!(
+            "Gate '{}' is manual and cannot be automatically checked",
+            gate_key
+        );
+    }
+    if gate.checker.is_none() {
+        anyhow::bail!("Gate '{}' has no checker configured", gate_key);
+    }
+    Ok(gate)
 }
 
 pub(super) fn gate_state_from_run(
@@ -72,27 +224,160 @@ fn compact_run_history_for_context(runs: &[GateRunResult], gate_key: &str) -> Ve
 fn captured_gate_runs(
     image: &crate::repository_state::RepositoryImage,
     issue_id: &str,
-) -> Result<Vec<GateRunResult>> {
-    let mut runs = image
-        .entries()
-        .iter()
-        .filter(|(path, _)| {
-            let relative = path.relative().as_str();
-            relative.starts_with("gate-runs/") && relative.ends_with("/result.json")
+) -> Result<CapturedGateRuns> {
+    use crate::repository_state::RepositoryEntry;
+
+    let paths = crate::repository_state::captured_gate_run_result_paths(image)?
+        .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?;
+    let mut captured = paths
+        .into_iter()
+        .map(|path| {
+            let entry = image.entry(&path)?;
+            let identity = entry.identity().cloned();
+            let result = match entry {
+                RepositoryEntry::File { bytes, .. } => Some(
+                    serde_json::from_slice::<GateRunResult>(bytes).with_context(|| {
+                        format!("failed to parse captured gate run at {path:?}")
+                    })?,
+                ),
+                RepositoryEntry::Absent => None,
+                _ => {
+                    return Err(anyhow!(
+                        "captured gate run at {path:?} is not a regular file"
+                    ))
+                }
+            };
+            Ok((path, identity, result))
         })
-        .filter_map(|(_, entry)| match entry {
-            crate::repository_state::RepositoryEntry::File { bytes, .. } => Some(bytes),
-            _ => None,
-        })
-        .map(|bytes| serde_json::from_slice::<GateRunResult>(bytes).map_err(anyhow::Error::from))
         .collect::<Result<Vec<_>>>()?;
-    runs.retain(|run| run.issue_id == issue_id);
-    runs.sort_by(|left, right| {
+    captured.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut results = captured
+        .iter()
+        .filter_map(|(_, _, result)| result.clone())
+        .filter(|run| run.issue_id == issue_id)
+        .collect::<Vec<_>>();
+    results.sort_by(|left, right| {
         left.started_at
             .cmp(&right.started_at)
             .then_with(|| left.run_id.cmp(&right.run_id))
     });
-    Ok(runs)
+    let inputs = captured
+        .into_iter()
+        .filter(|(_, _, result)| result.as_ref().is_some_and(|run| run.issue_id == issue_id))
+        .map(|(path, _, _)| path)
+        .collect();
+    Ok(CapturedGateRuns { results, inputs })
+}
+
+fn captured_gate_evaluation(
+    image: &crate::repository_state::RepositoryImage,
+    issue: &Issue,
+    gate_key: &str,
+    gate: &crate::declarations::GateDefinition,
+    gate_runs: &CapturedGateRuns,
+) -> Result<CapturedGateEvaluation> {
+    use crate::declarations::GateChecker;
+    use crate::repository_state::VirtualPath;
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let checker = gate
+        .checker
+        .as_ref()
+        .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
+    let broad_validation = checker_needs_validation_image(checker);
+    let mut paths = if broad_validation {
+        image.entries().keys().cloned().collect::<BTreeSet<_>>()
+    } else {
+        BTreeSet::from([VirtualPath::data(format!("issues/{}.json", issue.id))?])
+    };
+    paths.extend(
+        issue
+            .dependencies
+            .iter()
+            .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+            .collect::<std::result::Result<Vec<_>, _>>()?,
+    );
+    paths.extend(gate_runs.inputs.iter().cloned());
+
+    let mut wanted_pinned = BTreeSet::new();
+    if matches!(checker, GateChecker::Exec { .. }) {
+        for document in &issue.documents {
+            match &document.commit {
+                Some(commit) => {
+                    wanted_pinned.insert((commit.clone(), document.path.clone()));
+                }
+                None => {
+                    paths.insert(VirtualPath::worktree(&document.path)?);
+                    wanted_pinned.insert(("HEAD".to_string(), document.path.clone()));
+                }
+            }
+        }
+    }
+
+    let prompt = match checker {
+        GateChecker::Exec {
+            pass_context: true,
+            prompt_file: Some(path),
+            ..
+        } => {
+            let configured_path = path;
+            let path = super::repo_rel_virtual_path(path).map_err(|_| {
+                anyhow!(
+                    "prompt_file '{}' resolves outside the repository",
+                    configured_path
+                )
+            })?;
+            let bytes = image
+                .file_bytes(&path)?
+                .ok_or_else(|| anyhow!("captured gate prompt file '{path:?}' is missing"))?;
+            if bytes.len() as u64 > MAX_PROMPT_FILE_SIZE {
+                anyhow::bail!(
+                    "prompt_file '{}' exceeds size limit ({} bytes > {} byte limit)",
+                    configured_path,
+                    bytes.len(),
+                    MAX_PROMPT_FILE_SIZE
+                );
+            }
+            paths.insert(path);
+            Some(String::from_utf8(bytes.to_vec())?)
+        }
+        _ => None,
+    };
+    let inputs = paths
+        .into_iter()
+        .map(|path| {
+            image
+                .entry(&path)
+                .map(|entry| (path, entry.identity().cloned()))
+        })
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let pinned = image
+        .pinned_evidence()
+        .iter()
+        .filter(|(key, _)| wanted_pinned.contains(*key))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let linked = image
+        .linked_worktree_evidence()
+        .iter()
+        .filter(|(path, _)| inputs.iter().any(|(input, _)| input == *path))
+        .map(|(path, value)| (path.clone(), value.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let validation_view = broad_validation.then(|| super::PrecheckValidationView {
+        listings: image.listing_fingerprints().clone(),
+        pinned: image.pinned_evidence().clone(),
+        linked: image.linked_worktree_evidence().clone(),
+    });
+    Ok(CapturedGateEvaluation {
+        evidence: GateEvaluationEvidence {
+            gate: gate.clone(),
+            inputs,
+            pinned,
+            linked,
+            validation_view,
+        },
+        prompt,
+    })
 }
 
 /// Remove the gate currently being evaluated from the issue's gate projections.
@@ -436,6 +721,162 @@ impl<S: IssueStore> CommandExecutor<S> {
         stale_binary_reason_for_repo(&real_root)
     }
 
+    fn bind_gate_target(
+        &self,
+        layout: &crate::repository_state::RepositoryLayout,
+        requested: &str,
+    ) -> Result<String>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
+        use crate::storage::RepositoryStateStoreError;
+
+        let normalized = requested.to_lowercase().replace('-', "");
+        if normalized.len() < crate::storage::MIN_ID_PREFIX_LENGTH {
+            return Err(crate::storage::InvalidIdPrefixError::new(requested).into());
+        }
+        let budget = CaptureBudget {
+            max_paths: 1 << 16,
+            max_listings: 256,
+            max_bytes: 512 * 1024 * 1024,
+            max_depth: 32,
+        };
+        for _ in 0..8 {
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let mut spec = CaptureSpec::phase_one([VirtualPath::data("index.json")?], budget)?;
+            let index_image = match session.capture(spec.clone()) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let index = captured_repository_index(&index_image)?;
+            let candidates = index
+                .all_ids
+                .iter()
+                .filter(|id| {
+                    if normalized.len() == 32 {
+                        id.as_str() == requested
+                    } else {
+                        id.to_lowercase().replace('-', "").starts_with(&normalized)
+                    }
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            spec.discover_paths(
+                candidates
+                    .iter()
+                    .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+                    .collect::<std::result::Result<Vec<_>, _>>()?,
+            )?;
+            let image = match session.capture(spec) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let issues = candidates
+                .iter()
+                .map(|id| {
+                    captured_issue_record(&image, id)?
+                        .ok_or_else(|| crate::storage::IssueNotFoundError::new(id).into())
+                })
+                .collect::<Result<Vec<_>>>()?;
+            return super::resolve_issue_from_capture(&issues, requested);
+        }
+        Err(anyhow!(
+            "gate target binding did not converge after repeated capture conflicts"
+        ))
+    }
+
+    fn capture_gate_evaluation_image(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        target_id: &str,
+        gate_key: &str,
+        run_paths: &[crate::repository_state::VirtualPath],
+    ) -> Result<Option<crate::repository_state::RepositoryImage>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::declarations::GateChecker;
+        use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
+        use crate::storage::RepositoryStateStoreError;
+        use std::collections::BTreeMap;
+
+        let budget = CaptureBudget {
+            max_paths: 1 << 16,
+            max_listings: 256,
+            max_bytes: 512 * 1024 * 1024,
+            max_depth: 32,
+        };
+        let mut paths = vec![
+            VirtualPath::data("index.json")?,
+            VirtualPath::data(format!("issues/{target_id}.json"))?,
+            VirtualPath::data("gates.toml")?,
+            VirtualPath::data("events.jsonl")?,
+            VirtualPath::data("gate-runs")?,
+        ];
+        paths.extend(run_paths.iter().cloned());
+        let mut spec = CaptureSpec::phase_one(paths, budget)?;
+        let initial = match session.capture(spec.clone()) {
+            Ok(image) => image,
+            Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        let issue = captured_bound_issue(&initial, target_id)?;
+        let registry = captured_gate_registry(&initial)?;
+        let gate = required_automated_gate(&issue, &registry, gate_key)?;
+        let checker = gate
+            .checker
+            .as_ref()
+            .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
+        if checker_needs_validation_image(checker) {
+            let Some(image) =
+                self.capture_proposed_base(session, &BTreeMap::new(), run_paths, None)?
+            else {
+                return Ok(None);
+            };
+            return Ok(Some(image));
+        }
+
+        spec.discover_paths(
+            issue
+                .dependencies
+                .iter()
+                .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+                .collect::<std::result::Result<Vec<_>, _>>()?,
+        )?;
+        if matches!(checker, GateChecker::Exec { .. }) {
+            for document in &issue.documents {
+                match &document.commit {
+                    Some(commit) => spec.discover_pinned(commit.clone(), document.path.clone())?,
+                    None => {
+                        spec.discover_paths([VirtualPath::worktree(&document.path)?])?;
+                        spec.discover_pinned("HEAD", document.path.clone())?;
+                    }
+                }
+            }
+        }
+        if let GateChecker::Exec {
+            pass_context: true,
+            prompt_file: Some(path),
+            ..
+        } = checker
+        {
+            let prompt = super::repo_rel_virtual_path(path)
+                .map_err(|_| anyhow!("prompt_file '{}' resolves outside the repository", path))?;
+            spec.discover_paths([prompt])?;
+        }
+        match session.capture(spec) {
+            Ok(image) if super::checker_consumes_run_history(checker) => {
+                super::capture_gate_run_results(session, image)
+            }
+            Ok(image) => Ok(Some(image)),
+            Err(RepositoryStateStoreError::RetryableConflict { .. }) => Ok(None),
+            Err(error) => Err(error.into()),
+        }
+    }
+
     /// Check a single gate for an issue
     ///
     /// Runs the configured native or `exec` checker for an automated gate,
@@ -447,128 +888,159 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let issue = self.storage.load_issue(&full_id)?;
+        use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
+        use crate::storage::RepositoryStateStoreError;
 
-        // Verify gate is required for this issue
-        if !issue.gates_required.contains(&gate_key.to_string()) {
-            anyhow::bail!(
-                "Gate '{}' is not required for issue '{}'",
+        let layout = self.require_layout()?;
+        let target_id = self.bind_gate_target(&layout, issue_id)?;
+        let mutation = MutationContext::production();
+        let mut cached = None::<CachedGateEvaluation>;
+        let run_id = mutation.identifier_at(0);
+        let result_path = crate::repository_state::gate_run_result_relative_path(&run_id)?;
+        let run_dir = result_path
+            .as_path()
+            .parent()
+            .ok_or_else(|| anyhow!("canonical gate-run result path has no parent"))?;
+        let run_paths = [
+            VirtualPath::data("gate-runs")?,
+            VirtualPath::data(run_dir)?,
+            VirtualPath::data(result_path.as_path())?,
+        ];
+        for _ in 0..8 {
+            let (image, issue, issues, registry, runs, captured) = {
+                let mut session = self.storage.open_mutation_session(layout.clone())?;
+                let Some(image) = self.capture_gate_evaluation_image(
+                    session.as_mut(),
+                    &target_id,
+                    gate_key,
+                    &run_paths,
+                )?
+                else {
+                    continue;
+                };
+                let issue = captured_bound_issue(&image, &target_id)?;
+                let registry = captured_gate_registry(&image)?;
+                let gate = required_automated_gate(&issue, &registry, gate_key)?;
+                let checker = gate
+                    .checker
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
+                let issues = if checker_needs_validation_image(checker) {
+                    super::captured_active_issues(&image)?
+                } else {
+                    std::iter::once(issue.clone())
+                        .chain(captured_direct_dependency_issues(&image, &issue)?)
+                        .collect()
+                };
+                let runs = if super::checker_consumes_run_history(checker) {
+                    captured_gate_runs(&image, &target_id)?
+                } else {
+                    CapturedGateRuns::default()
+                };
+                let captured = captured_gate_evaluation(&image, &issue, gate_key, gate, &runs)?;
+                (image, issue, issues, registry, runs, captured)
+            };
+            if !cached
+                .as_ref()
+                .is_some_and(|cached| cached.evidence == captured.evidence)
+            {
+                let gate = registry
+                    .gates
+                    .get(gate_key)
+                    .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
+                let result = self.execute_captured_gate(CapturedGateExecution {
+                    image: &image,
+                    issue: &issue,
+                    issues: &issues,
+                    gate_key,
+                    gate,
+                    runs: &runs.results,
+                    prompt: captured.prompt.as_deref(),
+                })?;
+                cached = Some(CachedGateEvaluation {
+                    evidence: captured.evidence.clone(),
+                    result,
+                });
+            }
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some(final_image) = self.capture_gate_evaluation_image(
+                session.as_mut(),
+                &target_id,
                 gate_key,
-                full_id
-            );
-        }
+                &run_paths,
+            )?
+            else {
+                continue;
+            };
+            let mut final_issue = captured_bound_issue(&final_image, &target_id)?;
+            let final_registry = captured_gate_registry(&final_image)?;
+            let final_gate = required_automated_gate(&final_issue, &final_registry, gate_key)?;
+            let final_runs = if final_gate
+                .checker
+                .as_ref()
+                .is_some_and(super::checker_consumes_run_history)
+            {
+                captured_gate_runs(&final_image, &target_id)?
+            } else {
+                CapturedGateRuns::default()
+            };
+            let final_captured = captured_gate_evaluation(
+                &final_image,
+                &final_issue,
+                gate_key,
+                final_gate,
+                &final_runs,
+            )?;
+            let Some(cached) = cached.as_ref() else {
+                continue;
+            };
+            if cached.evidence != final_captured.evidence {
+                continue;
+            }
 
-        // Load gate definition
-        let registry = self.storage.load_gate_registry()?;
-        let gate = registry
-            .gates
-            .get(gate_key)
-            .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
-
-        // Check if gate is automated
-        if gate.mode != GateMode::Auto {
-            anyhow::bail!(
-                "Gate '{}' is manual and cannot be automatically checked",
-                gate_key
-            );
-        }
-
-        // Get checker
-        let checker = gate
-            .checker
-            .as_ref()
-            .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
-
-        // Determine working directory: repo root (parent of .jit dir).
-        let repo_root = self.checker_repo_root();
-
-        // REQ-01/02: refuse to produce an EXEC checker verdict from a binary that
-        // predates, or no longer matches, the tree under review — checked
-        // BEFORE the checker process is spawned, so a stale binary never
-        // produces (or persists) a verdict at all. This covers the
-        // EVALUATOR's own binary; a checker script that itself shells out to
-        // `jit` (e.g. `scripts/jit-validate.sh`) resolves ITS `jit` from
-        // `PATH` independently, so it carries the same self-check at startup
-        // via `JIT_GATE_RUN` (see `gate_execution::execute_gate_checker_with_context`
-        // and the binary crate's startup dispatch). See `domain::build_provenance`
-        // for the identity predicate (REQ-03) and the warn-vs-fail rationale.
-        if matches!(checker, crate::declarations::GateChecker::Exec { .. }) {
-            if let Some(reason) = self.stale_binary_reason() {
-                return Err(
-                    crate::errors::StaleBinaryError::new(&full_id, gate_key, &reason).into(),
-                );
+            let (state, by) = gate_state_from_run(&cached.result)?;
+            final_issue.gates_status.insert(gate_key.to_string(), state);
+            let event = if cached.result.status == GateRunStatus::Passed {
+                Event::draft_gate_passed(target_id.clone(), gate_key.to_string(), by)
+            } else {
+                Event::draft_gate_failed(target_id.clone(), gate_key.to_string(), by)
+            };
+            let intents = [
+                MutationIntent::UpdateIssue {
+                    issue: Box::new(final_issue),
+                },
+                MutationIntent::RecordGateRun {
+                    draft: Box::new(cached.result.clone()),
+                },
+                MutationIntent::RecordEvent {
+                    phase: 1,
+                    event: Box::new(event),
+                },
+            ];
+            let plan = finalize(&layout, &final_image, &mutation, &intents)?;
+            match session.apply(&plan) {
+                Ok(_) => {
+                    let mut result = cached.result.clone();
+                    result.run_id = run_id;
+                    return Ok(result);
+                }
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
             }
         }
-
-        let working_dir = match checker {
-            crate::declarations::GateChecker::Exec {
-                working_dir: Some(subdir),
-                ..
-            } => repo_root.join(subdir),
-            _ => repo_root.clone(),
-        };
-
-        // Build context if pass_context is enabled
-        let context = self.build_gate_context(checker, &full_id, gate_key, gate, &repo_root)?;
-
-        let result = match checker {
-            crate::declarations::GateChecker::Exec { .. } => {
-                self.storage.run_external_process(|| {
-                    gate_execution::execute_gate_checker_with_context(
-                        gate_key,
-                        &full_id,
-                        gate.stage,
-                        checker,
-                        &working_dir,
-                        context.as_ref(),
-                        &issue.documents,
-                    )
-                })?
-            }
-            _ => self.execute_builtin_checker(gate_key, &full_id, gate.stage, checker)?,
-        };
-
-        let (state, by) = gate_state_from_run(&result)?;
-        let mut issue = self.storage.load_issue(&full_id)?;
-        issue.gates_status.insert(gate_key.to_string(), state);
-        let event = match result.status {
-            GateRunStatus::Passed => {
-                Event::draft_gate_passed(full_id.clone(), gate_key.to_string(), by)
-            }
-            _ => Event::draft_gate_failed(full_id.clone(), gate_key.to_string(), by),
-        };
-        self.publish_gate_evaluation(result, issue, event)
+        Err(anyhow!(
+            "gate evaluation did not converge after repeated capture conflicts"
+        ))
     }
 
-    /// Execute a portable checker without spawning a subprocess.
-    fn execute_builtin_checker(
-        &self,
-        gate_key: &str,
-        issue_id: &str,
-        stage: GateStage,
-        checker: &crate::declarations::GateChecker,
-    ) -> Result<GateRunResult>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        self.execute_builtin_checker_with_repository_view(gate_key, issue_id, stage, checker, None)
-    }
-
-    /// Execute a built-in checker, optionally supplying an exact repository image
-    /// for a repository-validation check.
-    ///
-    /// Production file-backed callers leave `repository_image` absent and capture
-    /// the live whole-repository image through the recovered session. Tests can
-    /// supply a captured or overlaid image explicitly to exercise this identical
-    /// checker-result conversion.
+    /// Execute a built-in checker against one exact repository image.
     fn execute_builtin_checker_with_repository_view(
         &self,
         gate_key: &str,
         issue_id: &str,
         stage: GateStage,
         checker: &crate::declarations::GateChecker,
-        repository_image: Option<&crate::repository_state::RepositoryImage>,
+        repository_image: &crate::repository_state::RepositoryImage,
     ) -> Result<GateRunResult>
     where
         S: crate::storage::RepositoryStateStore,
@@ -581,41 +1053,13 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let (command, mut findings, explicit_failure) = match checker {
             GateChecker::RepositoryValidation => {
-                let (findings, failed) = if let Some(image) = repository_image {
-                    gate_findings_from_report(crate::validation::repository::validate_repository(
-                        image,
-                    ))
-                } else if self.storage.is_file_backed() {
-                    gate_findings_from_report(self.validate_repository_report()?)
-                } else {
-                    // Pure in-memory stores have no repository byte source. Keep
-                    // their established storage-backed command-test behavior.
-                    let integrity =
-                        self.validate_integrity_silent()
-                            .err()
-                            .map(|error| GateFinding {
-                                id: "repository-integrity".to_string(),
-                                severity: "high".to_string(),
-                                disposition: Some("blocking".to_string()),
-                                origin: Some("issue-impact".to_string()),
-                                summary: error.to_string(),
-                                file: None,
-                                line: None,
-                                references: Vec::new(),
-                            });
-                    let integrity_failed = integrity.is_some();
-                    let report = self.run_rules(None)?;
-                    let mut findings = gate_findings_from_rule_report(&report);
-                    findings.extend(integrity);
-                    (findings, report.has_errors() || integrity_failed)
-                };
+                let (findings, failed) = gate_findings_from_report(
+                    crate::validation::repository::validate_repository(repository_image),
+                );
                 ("builtin:repository_validation", findings, failed)
             }
             GateChecker::IssueValidation => {
-                let report = match repository_image {
-                    Some(image) => captured_issue_rule_report(image, issue_id)?,
-                    None => self.run_rules(Some(issue_id))?,
-                };
+                let report = captured_issue_rule_report(repository_image, issue_id)?;
                 let failed = report.has_errors();
                 (
                     "builtin:issue_validation",
@@ -624,17 +1068,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             }
             GateChecker::LabelTargetValidation { label_namespace } => {
-                let captured_issues = repository_image
-                    .map(super::captured_active_issues)
-                    .transpose()?;
-                let issue = match &captured_issues {
-                    Some(issues) => issues
-                        .iter()
-                        .find(|issue| issue.id == issue_id)
-                        .cloned()
-                        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id))?,
-                    None => self.storage.load_issue(issue_id)?,
-                };
+                let captured_issues = super::captured_active_issues(repository_image)?;
+                let issue = captured_issues
+                    .iter()
+                    .find(|issue| issue.id == issue_id)
+                    .cloned()
+                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id))?;
                 let prefix = format!("{label_namespace}:");
                 let targets: Vec<&str> = issue
                     .labels
@@ -667,13 +1106,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                         true,
                     )
                 } else {
-                    let report: RuleReport = match (repository_image, captured_issues.as_ref()) {
-                        (Some(image), Some(issues)) => {
-                            let target = super::resolve_issue_from_capture(issues, targets[0])?;
-                            captured_scope_rule_report(image, &target)?
-                        }
-                        _ => self.validate_scope(targets[0])?,
-                    };
+                    let target = super::resolve_issue_from_capture(&captured_issues, targets[0])?;
+                    let report: RuleReport = captured_scope_rule_report(repository_image, &target)?;
                     let failed = report.has_errors();
                     (
                         "builtin:label_target_validation",
@@ -792,105 +1226,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(runs.into_iter().next_back())
     }
 
-    /// Maximum prompt file size in bytes (~1000 lines of 80 chars).
-    const MAX_PROMPT_FILE_SIZE: u64 = 100_000;
-
-    /// Build structured context for a gate checker when `pass_context` is enabled.
-    ///
-    /// Returns `None` if the checker does not request context.
-    fn build_gate_context(
-        &self,
-        checker: &crate::declarations::GateChecker,
-        issue_id: &str,
-        gate_key: &str,
-        gate: &crate::declarations::GateDefinition,
-        repo_root: &std::path::Path,
-    ) -> Result<Option<GateContext>> {
-        let (pass_context, prompt, prompt_file) = match checker {
-            crate::declarations::GateChecker::Exec {
-                pass_context,
-                prompt,
-                prompt_file,
-                ..
-            } => (*pass_context, prompt.as_deref(), prompt_file.as_deref()),
-            _ => return Ok(None),
-        };
-
-        if !pass_context {
-            return Ok(None);
-        }
-
-        // Resolve prompt: prompt_file takes precedence over inline prompt
-        let resolved_prompt = if let Some(pf) = prompt_file {
-            let path = repo_root.join(pf);
-
-            // Path traversal guard: resolved path must stay within repo root
-            let canonical = path
-                .canonicalize()
-                .with_context(|| format!("Failed to resolve prompt file: {}", path.display()))?;
-            let canonical_root = repo_root
-                .canonicalize()
-                .with_context(|| format!("Failed to resolve repo root: {}", repo_root.display()))?;
-            if !canonical.starts_with(&canonical_root) {
-                anyhow::bail!("prompt_file '{}' resolves outside the repository", pf);
-            }
-
-            // Size guard
-            let metadata = std::fs::metadata(&canonical).with_context(|| {
-                format!("Failed to read prompt file metadata: {}", path.display())
-            })?;
-            if metadata.len() > Self::MAX_PROMPT_FILE_SIZE {
-                anyhow::bail!(
-                    "prompt_file '{}' exceeds size limit ({} bytes > {} byte limit)",
-                    pf,
-                    metadata.len(),
-                    Self::MAX_PROMPT_FILE_SIZE
-                );
-            }
-
-            Some(
-                std::fs::read_to_string(&canonical)
-                    .with_context(|| format!("Failed to read prompt file: {}", path.display()))?,
-            )
-        } else {
-            prompt.map(|s| s.to_string())
-        };
-
-        // Load all runs for this issue once: they enrich the per-gate `gates`
-        // array in IssueShowResponse and seed this gate's run history below.
-        let all_runs = self.storage.list_gate_runs_for_issue(issue_id)?;
-
-        // Build issue data (reuse IssueShowResponse for consistent JSON structure)
-        let issue = self.storage.load_issue(issue_id)?;
-        let enriched_deps = self.get_dependencies_enriched(&issue);
-        let issue_response = IssueShowResponse::from_issue(issue, enriched_deps, &all_runs);
-        let mut issue_json =
-            serde_json::to_value(&issue_response).context("Failed to serialize issue to JSON")?;
-        omit_current_gate_projection(&mut issue_json, gate_key);
-
-        // Build gate definition JSON
-        let gate_json = serde_json::json!({
-            "key": gate.key,
-            "title": gate.title,
-            "description": gate.description,
-            "stage": gate.stage,
-        });
-
-        let run_history = compact_run_history_for_context(&all_runs, gate_key);
-
-        Ok(Some(GateContext {
-            schema_version: 1,
-            prompt: resolved_prompt,
-            issue: issue_json,
-            gate: gate_json,
-            run_history,
-        }))
-    }
-
     fn build_captured_gate_context(
         &self,
         checker: &crate::declarations::GateChecker,
-        input: &CapturedPrecheckGate<'_>,
+        input: &CapturedGateExecution<'_>,
     ) -> Result<Option<GateContext>> {
         let (pass_context, inline_prompt, prompt_file) = match checker {
             crate::declarations::GateChecker::Exec {
@@ -906,18 +1245,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
         let prompt = match (prompt_file, input.prompt) {
             (Some(path), Some(prompt)) => {
-                if prompt.len() as u64 > Self::MAX_PROMPT_FILE_SIZE {
+                if prompt.len() as u64 > MAX_PROMPT_FILE_SIZE {
                     anyhow::bail!(
                         "prompt_file '{}' exceeds size limit ({} bytes > {} byte limit)",
                         path,
                         prompt.len(),
-                        Self::MAX_PROMPT_FILE_SIZE
+                        MAX_PROMPT_FILE_SIZE
                     );
                 }
                 Some(prompt.to_string())
             }
             (Some(path), None) => anyhow::bail!(
-                "captured precheck input is missing configured prompt_file '{}'",
+                "captured gate input is missing configured prompt_file '{}'",
                 path
             ),
             (None, _) => inline_prompt.map(str::to_string),
@@ -949,10 +1288,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         }))
     }
 
-    fn execute_captured_precheck_gate(
-        &self,
-        input: CapturedPrecheckGate<'_>,
-    ) -> Result<GateRunResult>
+    fn execute_captured_gate(&self, input: CapturedGateExecution<'_>) -> Result<GateRunResult>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -999,7 +1335,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 &input.issue.id,
                 input.gate.stage,
                 checker,
-                Some(input.image),
+                input.image,
             ),
         }
     }
@@ -1114,7 +1450,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         let issues = super::captured_active_issues(image)?;
-        let mut history = captured_gate_runs(image, &issue.id)?;
         let mut projected_issue = issue.clone();
         let mut failed_gates = Vec::new();
         let mut runs = Vec::new();
@@ -1127,17 +1462,33 @@ impl<S: IssueStore> CommandExecutor<S> {
             .filter(|(_, gate)| gate.stage == GateStage::Precheck)
             .collect();
         precheck_gates.sort_by_key(|(_, gate)| gate.priority);
+        let mut history = if precheck_gates.iter().any(|(_, gate)| {
+            gate.mode == GateMode::Auto
+                && gate
+                    .checker
+                    .as_ref()
+                    .is_some_and(super::checker_consumes_run_history)
+        }) {
+            captured_gate_runs(image, &issue.id)?.results
+        } else {
+            Vec::new()
+        };
 
         for (gate_key, gate) in precheck_gates {
             match gate.mode {
                 GateMode::Auto => {
-                    let result = match self.execute_captured_precheck_gate(CapturedPrecheckGate {
+                    let checker_history = gate
+                        .checker
+                        .as_ref()
+                        .filter(|checker| super::checker_consumes_run_history(checker))
+                        .map_or(&[][..], |_| history.as_slice());
+                    let result = match self.execute_captured_gate(CapturedGateExecution {
                         image,
                         issue: &projected_issue,
                         issues: &issues,
                         gate_key,
                         gate,
-                        runs: &history,
+                        runs: checker_history,
                         prompt: captured_prompts.get(gate_key).map(String::as_str),
                     }) {
                         Ok(result) => result,
@@ -1564,6 +1915,9 @@ assert = { require-section = { heading = "Summary" } }
         let repo = tempfile::tempdir().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         storage.init().unwrap();
+        storage
+            .write_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n")
+            .unwrap();
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
@@ -1586,6 +1940,205 @@ assert = { require-section = { heading = "Summary" } }
         (repo, executor, issue_id)
     }
 
+    fn add_exec_gate<S: IssueStore + crate::storage::RepositoryStateStore>(
+        executor: &CommandExecutor<S>,
+        issue_id: &str,
+        gate_key: &str,
+        title: &str,
+        command: String,
+        prompt_file: Option<String>,
+    ) {
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            gate_key.to_string(),
+            crate::declarations::GateDefinition {
+                version: 1,
+                key: gate_key.to_string(),
+                title: title.to_string(),
+                description: "Race fixture".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command,
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: true,
+                    prompt: Some("inline prompt".to_string()),
+                    prompt_file,
+                }),
+                priority: 100,
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+        executor.add_gate(issue_id, gate_key.to_string()).unwrap();
+    }
+
+    fn write_corrupt_gate_run(repo: &std::path::Path) {
+        let path = repo.join(".jit/gate-runs/corrupt/result.json");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, "{ corrupt").unwrap();
+    }
+
+    fn capture_gate_evidence(
+        executor: &CommandExecutor<JsonFileStorage>,
+        issue_id: &str,
+        gate_key: &str,
+    ) -> super::GateEvaluationEvidence {
+        use crate::storage::RepositoryStateStore;
+
+        let layout = crate::storage::discover_repository_layout(
+            executor.storage.root().parent().unwrap(),
+            executor.storage.root(),
+        )
+        .unwrap();
+        let result =
+            crate::repository_state::gate_run_result_relative_path("evidence-probe").unwrap();
+        let run_paths = [
+            crate::repository_state::VirtualPath::data("gate-runs/evidence-probe").unwrap(),
+            crate::repository_state::VirtualPath::data(result.as_path()).unwrap(),
+        ];
+        let mut session = executor.storage.open_mutation_session(layout).unwrap();
+        let image = executor
+            .capture_gate_evaluation_image(session.as_mut(), issue_id, gate_key, &run_paths)
+            .unwrap()
+            .unwrap();
+        let issue = super::captured_bound_issue(&image, issue_id).unwrap();
+        let registry = super::captured_gate_registry(&image).unwrap();
+        let runs = if registry.gates[gate_key]
+            .checker
+            .as_ref()
+            .is_some_and(crate::commands::checker_consumes_run_history)
+        {
+            super::captured_gate_runs(&image, issue_id).unwrap()
+        } else {
+            super::CapturedGateRuns::default()
+        };
+        super::captured_gate_evaluation(&image, &issue, gate_key, &registry.gates[gate_key], &runs)
+            .unwrap()
+            .evidence
+    }
+
+    #[test]
+    fn test_exec_gate_ignores_unrelated_malformed_issue_and_unsafe_prompt() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "selected-safe",
+            "Selected safe",
+            "true".to_string(),
+            None,
+        );
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "unselected-unsafe",
+            "Unselected unsafe",
+            "true".to_string(),
+            Some("../../outside".to_string()),
+        );
+        let unrelated = "00000000-0000-4000-8000-000000000001";
+        std::fs::write(
+            repo.path().join(format!(".jit/issues/{unrelated}.json")),
+            [],
+        )
+        .unwrap();
+        let index_path = repo.path().join(".jit/index.json");
+        let mut index: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&index_path).unwrap()).unwrap();
+        index["all_ids"]
+            .as_array_mut()
+            .unwrap()
+            .push(unrelated.into());
+        std::fs::write(index_path, serde_json::to_vec_pretty(&index).unwrap()).unwrap();
+
+        let result = executor.check_gate(&issue_id, "selected-safe").unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Passed);
+    }
+
+    #[test]
+    fn test_exec_without_context_ignores_unrelated_corrupt_gate_run() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "no-context",
+            "No context",
+            "true".to_string(),
+            None,
+        );
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let Some(GateChecker::Exec { pass_context, .. }) = registry
+            .gates
+            .get_mut("no-context")
+            .and_then(|gate| gate.checker.as_mut())
+        else {
+            panic!("test gate must use the exec checker")
+        };
+        *pass_context = false;
+        executor.storage.save_gate_registry(&registry).unwrap();
+        write_corrupt_gate_run(repo.path());
+
+        let result = executor.check_gate(&issue_id, "no-context").unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Passed);
+    }
+
+    #[test]
+    fn test_exec_with_context_rejects_corrupt_gate_run_with_path() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "with-context",
+            "With context",
+            "true".to_string(),
+            None,
+        );
+        write_corrupt_gate_run(repo.path());
+
+        let error = executor.check_gate(&issue_id, "with-context").unwrap_err();
+
+        assert!(format!("{error:#}").contains("gate-runs/corrupt/result.json"));
+    }
+
+    #[test]
+    fn test_review_placeholder_ignores_unsupported_target_documents() {
+        let (_repo, executor, issue_id) = setup_file_repository();
+        executor
+            .add_gate(&issue_id, "editable-review".to_string())
+            .unwrap();
+        let mut issue = executor.storage.load_issue(&issue_id).unwrap();
+        issue.documents.push(crate::domain::DocumentReference::new(
+            "../../outside".to_string(),
+        ));
+        executor.storage.save_issue(issue).unwrap();
+
+        let result = executor.check_gate(&issue_id, "editable-review").unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Passed);
+    }
+
+    #[test]
+    fn test_builtin_gate_evidence_changes_with_broad_validation_input() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        let before = capture_gate_evidence(&executor, &issue_id, "not-a-reserved-repository-key");
+        std::fs::write(
+            repo.path().join(".jit/rules.toml"),
+            "# changed broad validation input\n",
+        )
+        .unwrap();
+
+        let after = capture_gate_evidence(&executor, &issue_id, "not-a-reserved-repository-key");
+
+        assert_ne!(before, after);
+    }
+
     #[test]
     fn test_repository_validation_checker_uses_injected_overlay_result_path() {
         let (_repo, executor, issue_id) = setup_file_repository();
@@ -1598,7 +2151,7 @@ assert = { require-section = { heading = "Summary" } }
                 &issue_id,
                 GateStage::Postcheck,
                 &GateChecker::RepositoryValidation,
-                Some(&live_image),
+                &live_image,
             )
             .unwrap();
         assert_eq!(live.status, GateRunStatus::Passed);
@@ -1629,7 +2182,7 @@ assert = { require-section = { heading = "Summary" } }
                 &issue_id,
                 GateStage::Postcheck,
                 &GateChecker::RepositoryValidation,
-                Some(&planned_image),
+                &planned_image,
             )
             .unwrap();
 
@@ -1682,13 +2235,17 @@ assert = { require-section = { heading = "Summary" } }
     fn test_repository_validation_file_backend_reports_missing_index_through_view() {
         let (repo, executor, issue_id) = setup_file_repository();
         std::fs::remove_file(repo.path().join(".jit/index.json")).unwrap();
+        let image = executor
+            .capture_validation_image_with(&std::collections::BTreeMap::new())
+            .unwrap();
 
         let result = executor
-            .execute_builtin_checker(
+            .execute_builtin_checker_with_repository_view(
                 "not-a-reserved-repository-key",
                 &issue_id,
                 GateStage::Postcheck,
                 &GateChecker::RepositoryValidation,
+                &image,
             )
             .unwrap();
 
@@ -2081,6 +2638,30 @@ assert = { require-section = { heading = "Summary" } }
                 example_integration: None,
             },
         );
+        registry.gates.insert(
+            "postcheck-with-unsafe-prompt".to_string(),
+            crate::declarations::GateDefinition {
+                version: 1,
+                key: "postcheck-with-unsafe-prompt".to_string(),
+                title: "Postcheck".to_string(),
+                description: "Must not enter precheck capture".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "exit 0".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: true,
+                    prompt: None,
+                    prompt_file: Some("../../outside".to_string()),
+                }),
+                priority: 100,
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
         executor.storage.save_gate_registry(&registry).unwrap();
 
         // Create issue with precheck
@@ -2090,6 +2671,9 @@ assert = { require-section = { heading = "Summary" } }
         executor.storage.save_issue(issue).unwrap();
         executor
             .add_gate(&issue_id, "precheck".to_string())
+            .unwrap();
+        executor
+            .add_gate(&issue_id, "postcheck-with-unsafe-prompt".to_string())
             .unwrap();
 
         // Try to start work - should run prechecks
@@ -2103,6 +2687,94 @@ assert = { require-section = { heading = "Summary" } }
 
         let gate_state = issue.gates_status.get("precheck").unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "precheck",
+            "Precheck",
+            "true".to_string(),
+            None,
+        );
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.get_mut("precheck").unwrap().stage = GateStage::Precheck;
+        executor.storage.save_gate_registry(&registry).unwrap();
+        let mut issue = executor.storage.load_issue(&issue_id).unwrap();
+        issue.state = State::Ready;
+        executor.storage.save_issue(issue).unwrap();
+
+        let root = repo.path().join(".jit/gate-runs");
+        for index in 0..257 {
+            let run_id = format!("history-{index}");
+            let run_dir = root.join(&run_id);
+            std::fs::create_dir_all(&run_dir).unwrap();
+            let mut run = prior_run(&run_id, "history", index, None);
+            run.issue_id = issue_id.clone();
+            std::fs::write(
+                run_dir.join("result.json"),
+                serde_json::to_vec_pretty(&run).unwrap(),
+            )
+            .unwrap();
+        }
+        std::fs::write(root.join("clutter-file"), "ignored").unwrap();
+        std::os::unix::fs::symlink("clutter-file", root.join("clutter-link")).unwrap();
+        assert!(std::process::Command::new("mkfifo")
+            .arg(root.join("clutter-fifo"))
+            .status()
+            .unwrap()
+            .success());
+
+        executor
+            .update_issue_state(&issue_id, State::InProgress)
+            .unwrap();
+
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::InProgress);
+        assert_eq!(
+            issue.gates_status["precheck"].status,
+            crate::domain::GateStatus::Passed
+        );
+    }
+
+    #[test]
+    fn test_lifecycle_precheck_without_context_ignores_corrupt_gate_run() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "precheck-no-context",
+            "Precheck no context",
+            "true".to_string(),
+            None,
+        );
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let gate = registry.gates.get_mut("precheck-no-context").unwrap();
+        gate.stage = GateStage::Precheck;
+        let Some(GateChecker::Exec { pass_context, .. }) = gate.checker.as_mut() else {
+            panic!("test gate must use the exec checker")
+        };
+        *pass_context = false;
+        executor.storage.save_gate_registry(&registry).unwrap();
+        let mut issue = executor.storage.load_issue(&issue_id).unwrap();
+        issue.state = State::Ready;
+        executor.storage.save_issue(issue).unwrap();
+        write_corrupt_gate_run(repo.path());
+
+        executor
+            .update_issue_state(&issue_id, State::InProgress)
+            .unwrap();
+
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::InProgress);
+        assert_eq!(
+            issue.gates_status["precheck-no-context"].status,
+            crate::domain::GateStatus::Passed
+        );
     }
 
     #[test]
@@ -2387,13 +3059,13 @@ assert = { require-section = { heading = "Summary" } }
         let executor = setup();
 
         // Write a prompt file relative to repo root
-        let repo_root = executor.storage.root().parent().unwrap().to_path_buf();
-        let prompt_path = repo_root.join("review-prompt.md");
-        std::fs::write(
-            &prompt_path,
-            "You are a senior engineer. Review for security issues.",
-        )
-        .unwrap();
+        executor
+            .storage
+            .write_repo_file(
+                "review-prompt.md",
+                "You are a senior engineer. Review for security issues.",
+            )
+            .unwrap();
 
         // Define a gate with prompt_file
         let mut registry = executor.storage.load_gate_registry().unwrap();
@@ -2438,9 +3110,329 @@ assert = { require-section = { heading = "Summary" } }
             context["prompt"],
             "You are a senior engineer. Review for security issues."
         );
+    }
 
-        // Clean up
-        let _ = std::fs::remove_file(&prompt_path);
+    #[cfg(unix)]
+    #[test]
+    fn test_check_gate_reexecutes_when_prompt_changes_during_checker() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        std::fs::write(repo.path().join("review-prompt.md"), "old prompt").unwrap();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "prompt-race",
+            "Prompt race",
+            "if [ ! -f .prompt-race-seen ]; then : > .prompt-race-seen; printf 'new prompt' > review-prompt.md; fi; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"".to_string(),
+            Some("review-prompt.md".to_string()),
+        );
+
+        let result = executor.check_gate(&issue_id, "prompt-race").unwrap();
+        let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
+
+        assert_eq!(context["prompt"], "new prompt");
+        assert_eq!(
+            std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
+            "xx"
+        );
+        assert_eq!(
+            executor
+                .storage
+                .list_gate_runs_for_issue(&issue_id)
+                .unwrap()
+                .into_iter()
+                .filter(|run| run.gate_key == "prompt-race")
+                .count(),
+            1
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_check_gate_rebases_final_update_when_issue_changes_during_checker() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        let issue_path = format!(".jit/issues/{issue_id}.json");
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "issue-race",
+            "Issue race",
+            format!(
+                "if [ ! -f .issue-race-seen ]; then : > .issue-race-seen; sed -i 's/\"title\": \"Test\"/\"title\": \"Changed concurrently\"/' {issue_path}; fi; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\""
+            ),
+            None,
+        );
+
+        let result = executor.check_gate(&issue_id, "issue-race").unwrap();
+        let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
+
+        assert_eq!(context["issue"]["title"], "Changed concurrently");
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().title,
+            "Changed concurrently"
+        );
+        assert_eq!(
+            std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
+            "xx"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_check_gate_reexecutes_when_direct_dependency_changes() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        let dependency = crate::domain::types::fixture_issue("Dependency".into(), "Test".into());
+        let dependency_id = dependency.id.clone();
+        executor.storage.save_issue(dependency).unwrap();
+        executor.add_dependency(&issue_id, &dependency_id).unwrap();
+        let dependency_path = format!(".jit/issues/{dependency_id}.json");
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "dependency-race",
+            "Dependency race",
+            format!(
+                "if [ ! -f .dependency-race-seen ]; then : > .dependency-race-seen; sed -i 's/\"title\": \"Dependency\"/\"title\": \"Changed dependency\"/' {dependency_path}; fi; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\""
+            ),
+            None,
+        );
+
+        let result = executor.check_gate(&issue_id, "dependency-race").unwrap();
+        let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
+
+        assert_eq!(
+            context["issue"]["dependencies"][0]["title"],
+            "Changed dependency"
+        );
+        assert_eq!(
+            std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
+            "xx"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_check_gate_reexecutes_when_gate_definition_changes_during_checker() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        std::fs::write(
+            repo.path().join("gate-race.sh"),
+            "if [ ! -f .gate-race-seen ]; then : > .gate-race-seen; sed -i 's/Original race title/Changed race title/' .jit/gates.toml; fi\nprintf x >> checker-count\ncat \"$JIT_CONTEXT_FILE\"\n",
+        )
+        .unwrap();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "gate-race",
+            "Original race title",
+            "sh gate-race.sh".to_string(),
+            None,
+        );
+
+        let result = executor.check_gate(&issue_id, "gate-race").unwrap();
+        let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
+
+        assert_eq!(context["gate"]["title"], "Changed race title");
+        assert_eq!(
+            std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
+            "xx"
+        );
+        assert_eq!(
+            executor
+                .storage
+                .list_gate_runs_for_issue(&issue_id)
+                .unwrap()
+                .into_iter()
+                .filter(|run| run.gate_key == "gate-race")
+                .count(),
+            1
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_check_gate_never_retargets_bound_short_id_after_replacement() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        let replacement_id = format!("{}-ffff-4fff-8fff-ffffffffffff", &issue_id[..8]);
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "target-race",
+            "Target race",
+            format!(
+                "if [ ! -f .target-race-seen ]; then : > .target-race-seen; sed -i 's/{issue_id}/{replacement_id}/g' .jit/index.json; rm .jit/issues/{issue_id}.json; cp replacement.json .jit/issues/{replacement_id}.json; fi; true"
+            ),
+            None,
+        );
+        let mut replacement = executor.storage.load_issue(&issue_id).unwrap();
+        replacement.id = replacement_id.clone();
+        replacement.gates_status.clear();
+        std::fs::write(
+            repo.path().join("replacement.json"),
+            serde_json::to_vec_pretty(&replacement).unwrap(),
+        )
+        .unwrap();
+
+        let error = executor
+            .check_gate(&issue_id[..8], "target-race")
+            .unwrap_err();
+
+        assert!(
+            error
+                .downcast_ref::<crate::storage::IssueNotFoundError>()
+                .is_some(),
+            "bound target disappearance must be typed, got {error:?}"
+        );
+        assert!(!executor
+            .storage
+            .load_issue(&replacement_id)
+            .unwrap()
+            .gates_status
+            .contains_key("target-race"));
+        assert!(executor
+            .storage
+            .list_gate_runs_for_issue(&replacement_id)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn test_check_gate_rejects_noncanonical_full_issue_ids() {
+        let (_repo, executor, issue_id) = setup_file_repository();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "canonical-id",
+            "Canonical id",
+            "true".to_string(),
+            None,
+        );
+
+        for requested in [issue_id.to_uppercase(), issue_id.replace('-', "")] {
+            let error = executor.check_gate(&requested, "canonical-id").unwrap_err();
+            assert!(
+                error
+                    .downcast_ref::<crate::storage::IssueNotFoundError>()
+                    .is_some(),
+                "noncanonical full id {requested} must not resolve: {error:?}"
+            );
+        }
+        assert!(executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_check_gate_reexecutes_for_new_same_issue_run_but_not_unrelated_run() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        let mut concurrent = prior_run(
+            "concurrent",
+            "run-race",
+            chrono::Utc::now().timestamp(),
+            None,
+        );
+        concurrent.issue_id = issue_id.clone();
+        std::fs::write(
+            repo.path().join("concurrent-run.json"),
+            serde_json::to_vec_pretty(&concurrent).unwrap(),
+        )
+        .unwrap();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "run-race",
+            "Run race",
+            "if [ ! -f .run-race-seen ]; then : > .run-race-seen; mkdir -p .jit/gate-runs/concurrent; cp concurrent-run.json .jit/gate-runs/concurrent/result.json; fi; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"".to_string(),
+            None,
+        );
+
+        let result = executor.check_gate(&issue_id, "run-race").unwrap();
+        let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
+            "xx"
+        );
+        assert_eq!(context["run_history"][0]["run_id"], "concurrent");
+
+        let (repo, executor, issue_id) = setup_file_repository();
+        concurrent.issue_id = "unrelated-issue".to_string();
+        std::fs::write(
+            repo.path().join("concurrent-run.json"),
+            serde_json::to_vec_pretty(&concurrent).unwrap(),
+        )
+        .unwrap();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "run-race",
+            "Run race",
+            "mkdir -p .jit/gate-runs/concurrent; cp concurrent-run.json .jit/gate-runs/concurrent/result.json; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"".to_string(),
+            None,
+        );
+
+        executor.check_gate(&issue_id, "run-race").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
+            "x"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_check_gate_reuses_checker_result_after_apply_only_conflict() {
+        let executor = setup();
+        let issue = crate::domain::types::fixture_issue("Apply race".into(), "Test".into());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        let temp = tempfile::tempdir().unwrap();
+        let count = temp.path().join("checker-count");
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "apply-race",
+            "Apply race",
+            format!("printf x >> {}; true", count.display()),
+            None,
+        );
+        executor.storage.inject_repository_state_apply_conflicts(1);
+
+        let result = executor.check_gate(&issue_id, "apply-race").unwrap();
+
+        assert_eq!(std::fs::read_to_string(count).unwrap(), "x");
+        let runs = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .filter(|run| run.gate_key == "apply-race")
+            .collect::<Vec<_>>();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].run_id, result.run_id);
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().gates_status["apply-race"].status,
+            crate::domain::GateStatus::Passed
+        );
+        assert_eq!(
+            executor
+                .storage
+                .read_events()
+                .unwrap()
+                .into_iter()
+                .filter(|event| {
+                    matches!(
+                        event,
+                        crate::domain::Event::GatePassed {
+                            issue_id: event_issue,
+                            gate_key,
+                            ..
+                        } if event_issue == &issue_id && gate_key == "apply-race"
+                    )
+                })
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -2621,13 +3613,14 @@ assert = { require-section = { heading = "Summary" } }
         let executor = setup();
 
         // Write a prompt file that exceeds the size limit (~100KB, well over 1000 lines)
-        let repo_root = executor.storage.root().parent().unwrap().to_path_buf();
-        let prompt_path = repo_root.join("huge-prompt.md");
         let big_content = (0..1100)
             .map(|_| "x".repeat(100))
             .collect::<Vec<_>>()
             .join("\n"); // 1100 lines of 100 chars = ~110KB
-        std::fs::write(&prompt_path, &big_content).unwrap();
+        executor
+            .storage
+            .write_repo_file("huge-prompt.md", &big_content)
+            .unwrap();
 
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
@@ -2669,8 +3662,6 @@ assert = { require-section = { heading = "Summary" } }
             "Expected size limit error, got: {}",
             err
         );
-
-        let _ = std::fs::remove_file(&prompt_path);
     }
 
     #[test]

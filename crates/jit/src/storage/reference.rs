@@ -18,11 +18,12 @@
 //!   `events.jsonl`. The tag vocabulary is NOT restated here: it is the event
 //!   catalog's own projection ([`crate::domain::event_catalog`]), which this page
 //!   links to.
-//! - The gate-run path comes from [`JsonFileStorage::result_path`], the single
-//!   source of a run's on-disk location; the record's example is a
-//!   [`GateRunResult`] encoded with `serde_json::to_string_pretty`, the encoding
-//!   [`save_gate_run_result`](crate::storage::IssueStore::save_gate_run_result)
-//!   writes; and each field's presence when unset is read off those encodings.
+//! - The gate-run path comes from
+//!   [`gate_run_result_relative_path`](crate::repository_state::gate_run_result_relative_path),
+//!   shared by the repository-state finalizer and storage readers; the record's
+//!   example is a [`GateRunResult`] encoded by the repository-state finalizer
+//!   with `serde_json::to_string_pretty`; each field's presence when unset is
+//!   read off that encoding.
 //! - [`GateRunField`] names the record's fields. Conformance tests hold it against
 //!   the property list schemars derives from [`GateRunResult`] itself and against
 //!   the serialized record, so a field added to the record fails the suite until
@@ -34,9 +35,11 @@ use crate::domain::{
     EventTag, GateFinding, GateFindings, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
     SHORT_ID_LENGTH,
 };
-use crate::storage::{JsonFileStorage, MIN_ID_PREFIX_LENGTH};
+use crate::repository_state::gate_run_result_relative_path;
+use crate::storage::MIN_ID_PREFIX_LENGTH;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use std::path::Path;
 
 /// Repo-relative path of the committed reference this module projects.
 pub const REFERENCE_PATH: &str = "docs/reference/storage-records.md";
@@ -380,9 +383,9 @@ fn cell(text: &str) -> String {
 /// from the constants that enforce them, the event-log block from
 /// [`EventTag::sample`] records encoded the way the log is written, and the
 /// gate-run path, example record, and field table from
-/// [`JsonFileStorage::result_path`] and [`GateRunResult`] — so the page cannot
-/// drift from the code that writes the files. The conformance test in this module
-/// asserts the committed file equals this output.
+/// [`gate_run_result_relative_path`] and [`GateRunResult`] — so the page cannot
+/// drift from the code that writes and reads the files. The conformance test in
+/// this module asserts the committed file equals this output.
 ///
 /// # Errors
 ///
@@ -391,9 +394,9 @@ pub fn render_reference_markdown() -> Result<String> {
     let example_run = serde_json::to_string_pretty(&sample_gate_run())?;
     let events = event_log_sample()?;
 
-    // The run's path, straight from the function storage resolves it with, so the
-    // page names the layout the code writes rather than a copy of it.
-    let result_path = JsonFileStorage::new(".jit").result_path("<run-id>");
+    // The run's path, straight from the pure helper finalization and readers
+    // share, so the page names the live layout rather than a prose copy of it.
+    let result_path = Path::new(".jit").join(gate_run_result_relative_path("<run-id>")?.as_path());
     let result_path = result_path.display();
 
     // One line per rule, so the interpolated minimum cannot skew the wrapping.
@@ -484,8 +487,8 @@ pub fn render_reference_markdown() -> Result<String> {
          The `<run-id>` is a UUID v4 minted per execution, so runs accumulate: a rerun\n\
          writes a new directory beside the old one, and the history of a gate on an issue\n\
          is the set of run directories whose record names that issue. The record is\n\
-         written as pretty-printed JSON, through the temp-file-and-rename pattern every\n\
-         other `.jit/` write uses.\n\
+         written as pretty-printed JSON in the same recoverable repository transaction as\n\
+         its coupled issue and event updates.\n\
          \n\
          ```json\n\
          {example_run}\n\
@@ -551,7 +554,8 @@ mod tests {
     }
 
     /// REQ-04 (encoding): the projected keys are the keys the record actually
-    /// writes — the same `serde_json` encoding `save_gate_run_result` persists.
+    /// writes — the same `serde_json` encoding the repository-state finalizer
+    /// persists.
     #[test]
     fn test_gate_run_fields_match_serialized_record() {
         let record = serde_json::to_value(sample_gate_run()).expect("a gate run serializes");
@@ -704,12 +708,13 @@ mod tests {
         );
     }
 
-    /// REQ-03: the page names the path storage writes a run to, taken from
-    /// `JsonFileStorage::result_path` rather than reconstructed.
+    /// REQ-03: the page names the path shared by finalization and readers, taken
+    /// from the canonical relative-path helper rather than reconstructed.
     #[test]
     fn test_render_projects_the_storage_result_path() {
         let page = render_reference_markdown().expect("the reference renders");
-        let path = JsonFileStorage::new(".jit").result_path("<run-id>");
+        let path =
+            Path::new(".jit").join(gate_run_result_relative_path("<run-id>").unwrap().as_path());
         assert!(page.contains(&format!("`{}`", path.display())));
     }
 

@@ -16,9 +16,9 @@
 
 use super::{
     CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationIntent,
-    MaterializationPlan, PlanHashError, RepositoryAction, RepositoryDelta, RepositoryImage,
-    RepositoryLayout, RepositoryLayoutError, RepositorySeed, RepositorySeedKind, SeedError,
-    VirtualPath,
+    MaterializationPlan, PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry,
+    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositorySeed, RepositorySeedKind,
+    RootRelativePath, SeedError, VirtualPath,
 };
 use crate::declarations::GateRegistry;
 use crate::domain::{Assignee, Event, GateRunResult, GateStatus, Issue, Priority, State};
@@ -463,6 +463,48 @@ fn index_path() -> Result<VirtualPath, RepositoryLayoutError> {
 /// The canonical path for one issue record.
 fn issue_path(id: &str) -> Result<VirtualPath, RepositoryLayoutError> {
     VirtualPath::data(format!("issues/{id}.json"))
+}
+
+/// Canonical data-root-relative path for one gate-run result record.
+///
+/// A run id is exactly one path component. Rejecting empty, nested, and lexical
+/// escape spellings here keeps finalization and every storage reader on the same
+/// `gate-runs/<run-id>/result.json` shape.
+pub fn gate_run_result_relative_path(
+    run_id: &str,
+) -> Result<RootRelativePath, RepositoryLayoutError> {
+    let run_id_path = RootRelativePath::parse(run_id)?;
+    if run_id_path.depth() != 1 {
+        return Err(RepositoryLayoutError::LexicalEscape(run_id.to_owned()));
+    }
+    RootRelativePath::parse(format!("gate-runs/{run_id}/result.json"))
+}
+
+/// Exact canonical result leaves for ordinary direct gate-run directories in a
+/// captured root listing. Non-directory clutter is intentionally ignored.
+pub(crate) fn captured_gate_run_result_paths(
+    image: &RepositoryImage,
+) -> Result<Option<Vec<VirtualPath>>, RepositoryLayoutError> {
+    let root = VirtualPath::data("gate-runs")?;
+    let Some(listing) = image.listing_fingerprints().get(&root) else {
+        return Ok(None);
+    };
+    listing
+        .children()
+        .keys()
+        .filter_map(|run_id| {
+            let child = VirtualPath::data(format!("gate-runs/{run_id}")).ok()?;
+            matches!(
+                image.entries().get(&child),
+                Some(RepositoryEntry::Directory { .. })
+            )
+            .then_some(run_id)
+        })
+        .map(|run_id| {
+            gate_run_result_relative_path(run_id).and_then(|path| VirtualPath::data(path.as_path()))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }
 
 /// Serialize an issue to its exact on-disk bytes (pretty, no trailing newline).
@@ -972,8 +1014,11 @@ pub fn finalize(
         let run_id = context.allocate();
         let mut result = draft.clone();
         result.run_id = run_id.clone();
-        let dir = VirtualPath::data(format!("gate-runs/{run_id}"))?;
-        let file = VirtualPath::data(format!("gate-runs/{run_id}/result.json"))?;
+        let result_path = gate_run_result_relative_path(&run_id)?;
+        let dir = VirtualPath::data(result_path.as_path().parent().ok_or_else(|| {
+            RepositoryLayoutError::LexicalEscape(result_path.as_path().display().to_string())
+        })?)?;
+        let file = VirtualPath::data(result_path.as_path())?;
         // The run directory is freshly named by an allocated id, so it is absent.
         actions.push(RepositoryAction::CreateDirectory {
             path: dir,
@@ -1289,6 +1334,20 @@ mod tests {
             max_listings: 2,
             max_bytes: 1 << 20,
             max_depth: 6,
+        }
+    }
+
+    #[test]
+    fn test_gate_run_result_relative_path_accepts_exactly_one_run_id_component() {
+        assert_eq!(
+            gate_run_result_relative_path("run-123").unwrap().as_path(),
+            std::path::Path::new("gate-runs/run-123/result.json")
+        );
+        for invalid in ["", ".", "nested/run", "../run", "run\\child"] {
+            assert!(
+                gate_run_result_relative_path(invalid).is_err(),
+                "{invalid:?} must not escape the one-child gate-run layout"
+            );
         }
     }
 

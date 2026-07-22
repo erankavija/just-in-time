@@ -260,13 +260,6 @@ pub trait IssueStore: Clone {
             .collect())
     }
 
-    /// Save a gate run result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the result cannot be persisted.
-    fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()>;
-
     /// Load a gate run result by run ID.
     ///
     /// # Errors

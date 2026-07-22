@@ -112,7 +112,6 @@ use std::sync::OnceLock;
 /// Finalizer-assigned record identities returned after one semantic publication.
 struct MutationPublication {
     created_issue_ids: Vec<String>,
-    gate_run_ids: Vec<String>,
 }
 
 /// Closed issue-local operations whose final record is derived from the issue
@@ -263,6 +262,16 @@ struct CachedPrecheckExecution {
     execution: gate_check::PrecheckExecution,
 }
 
+fn checker_consumes_run_history(checker: &crate::declarations::GateChecker) -> bool {
+    matches!(
+        checker,
+        crate::declarations::GateChecker::Exec {
+            pass_context: true,
+            ..
+        }
+    )
+}
+
 fn captured_precheck_plan(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
@@ -283,6 +292,13 @@ fn captured_precheck_plan(
             && !matches!(gate.checker, Some(GateChecker::Exec { .. }))
             && !matches!(gate.checker, Some(GateChecker::ReviewPlaceholder))
     });
+    let consumes_history = gates.iter().any(|(_, gate)| {
+        gate.mode == GateMode::Auto
+            && gate
+                .checker
+                .as_ref()
+                .is_some_and(checker_consumes_run_history)
+    });
     let mut paths = if broad_builtin {
         image.entries().keys().cloned().collect::<BTreeSet<_>>()
     } else {
@@ -299,14 +315,22 @@ fn captured_precheck_plan(
                 .map(|id| VirtualPath::data(format!("issues/{id}.json")))
                 .collect::<std::result::Result<Vec<_>, _>>()?,
         );
-        for (path, entry) in image.entries() {
-            let relative = path.relative().as_str();
-            if relative.starts_with("gate-runs/") && relative.ends_with("/result.json") {
-                if let crate::repository_state::RepositoryEntry::File { bytes, .. } = entry {
-                    let run: crate::domain::GateRunResult = serde_json::from_slice(bytes)?;
-                    if run.issue_id == issue.id {
-                        paths.insert(path.clone());
+        if consumes_history {
+            let run_paths = crate::repository_state::captured_gate_run_result_paths(image)?
+                .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?;
+            for path in run_paths {
+                match image.entry(&path)? {
+                    crate::repository_state::RepositoryEntry::File { bytes, .. } => {
+                        let run: crate::domain::GateRunResult = serde_json::from_slice(bytes)
+                            .with_context(|| {
+                                format!("failed to parse captured gate run at {path:?}")
+                            })?;
+                        if run.issue_id == issue.id {
+                            paths.insert(path);
+                        }
                     }
+                    crate::repository_state::RepositoryEntry::Absent => {}
+                    _ => anyhow::bail!("captured gate run at {path:?} is not a regular file"),
                 }
             }
         }
@@ -1684,6 +1708,59 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
     Ok(issues)
 }
 
+/// Close gate-run history over one complete root listing and exact canonical
+/// result leaves. Direct non-directory occupants are captured as evidence but
+/// ignored as storage clutter, matching the typed readers.
+fn capture_gate_run_results(
+    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    image: crate::repository_state::RepositoryImage,
+) -> Result<Option<crate::repository_state::RepositoryImage>> {
+    use crate::repository_state::VirtualPath;
+    use crate::storage::RepositoryStateStoreError;
+
+    let root = VirtualPath::data("gate-runs")?;
+    let mut spec = image.capture_spec().clone();
+    let image = if image.listing_fingerprints().contains_key(&root) {
+        image
+    } else {
+        spec.discover_paths([root.clone()])?;
+        spec.discover_listing(root.clone())?;
+        match session.capture(spec.clone()) {
+            Ok(image) => image,
+            Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+            Err(error) => return Err(error.into()),
+        }
+    };
+    let children = image
+        .listing_fingerprints()
+        .get(&root)
+        .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?
+        .children()
+        .keys()
+        .map(|run_id| VirtualPath::data(format!("gate-runs/{run_id}")))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    if children.is_empty() {
+        return Ok(Some(image));
+    }
+    spec.discover_paths(children)?;
+    let image = match session.capture(spec.clone()) {
+        Ok(image) => image,
+        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    let results = crate::repository_state::captured_gate_run_result_paths(&image)?
+        .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?;
+    if results.is_empty() {
+        return Ok(Some(image));
+    }
+    spec.discover_paths(results)?;
+    match session.capture(spec) {
+        Ok(image) => Ok(Some(image)),
+        Err(RepositoryStateStoreError::RetryableConflict { .. }) => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
 fn resolve_issue_from_capture(issues: &[Issue], requested: &str) -> Result<String> {
     if let Some(issue) = issues.iter().find(|issue| issue.id == requested) {
         return Ok(issue.id.clone());
@@ -1847,20 +1924,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             let created_issue_ids = (0..create_count)
                 .map(|index| context.identifier_at(index as u64))
                 .collect::<Vec<_>>();
-            let mut gate_keys = intents
-                .iter()
-                .filter_map(|intent| match intent {
-                    MutationIntent::RecordGateRun { draft } => {
-                        Some((draft.issue_id.clone(), draft.gate_key.clone()))
-                    }
-                    _ => None,
-                })
-                .collect::<Vec<_>>();
-            gate_keys.sort();
-            let gate_run_ids = (0..gate_keys.len())
-                .map(|index| context.identifier_at((create_count + index) as u64))
-                .collect::<Vec<_>>();
-
             let mut paths = BTreeSet::new();
             for intent in &intents {
                 match intent {
@@ -1902,11 +1965,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             for id in &created_issue_ids {
                 paths.insert(VirtualPath::data(format!("issues/{id}.json"))?);
             }
-            for id in &gate_run_ids {
-                paths.insert(VirtualPath::data("gate-runs")?);
-                paths.insert(VirtualPath::data(format!("gate-runs/{id}"))?);
-                paths.insert(VirtualPath::data(format!("gate-runs/{id}/result.json"))?);
-            }
             let budget = CaptureBudget {
                 max_paths: paths.len().saturating_add(16),
                 max_listings: 0,
@@ -1921,12 +1979,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let plan = finalize(&layout, &image, &context, &intents)?;
             match session.apply(&plan) {
-                Ok(_) => {
-                    return Ok(MutationPublication {
-                        created_issue_ids,
-                        gate_run_ids,
-                    })
-                }
+                Ok(_) => return Ok(MutationPublication { created_issue_ids }),
                 Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
                 Err(error) => return Err(error.into()),
             }
@@ -2056,37 +2109,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             .into_iter()
             .next()
             .ok_or_else(|| anyhow!("issue finalizer returned no created issue identity"))
-    }
-
-    fn publish_gate_evaluation(
-        &self,
-        mut result: crate::domain::GateRunResult,
-        issue: Issue,
-        event: Event,
-    ) -> Result<crate::domain::GateRunResult>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::repository_state::MutationIntent;
-        let intents = vec![
-            MutationIntent::UpdateIssue {
-                issue: Box::new(issue),
-            },
-            MutationIntent::RecordGateRun {
-                draft: Box::new(result.clone()),
-            },
-            MutationIntent::RecordEvent {
-                phase: 1,
-                event: Box::new(event),
-            },
-        ];
-        let publication = self.publish_repository_mutation(intents)?;
-        result.run_id = publication
-            .gate_run_ids
-            .into_iter()
-            .next()
-            .ok_or_else(|| anyhow!("gate-run finalizer returned no record identity"))?;
-        Ok(result)
     }
 
     /// Get reference to the storage backend
@@ -2631,16 +2653,25 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .as_ref()
                 .filter(|_| expected_precheck.is_some())
                 .is_some_and(|cached| cached.execution.error.is_some());
-            let precheck_run_paths = (0..precheck_runs.len())
-                .flat_map(|index| {
-                    let id = context.identifier_at(index as u64);
-                    [
-                        format!("gate-runs/{id}"),
-                        format!("gate-runs/{id}/result.json"),
-                    ]
-                })
-                .map(crate::repository_state::VirtualPath::data)
-                .collect::<std::result::Result<Vec<_>, _>>()?;
+            let mut precheck_run_paths =
+                vec![crate::repository_state::VirtualPath::data("gate-runs")?];
+            precheck_run_paths.extend(
+                (0..precheck_runs.len())
+                    .map(|index| {
+                        let id = context.identifier_at(index as u64);
+                        let result = crate::repository_state::gate_run_result_relative_path(&id)?;
+                        let directory = result.as_path().parent().ok_or_else(|| {
+                            anyhow!("canonical gate-run result path has no parent")
+                        })?;
+                        Ok([
+                            crate::repository_state::VirtualPath::data(directory)?,
+                            crate::repository_state::VirtualPath::data(result.as_path())?,
+                        ])
+                    })
+                    .collect::<Result<Vec<_>>>()?
+                    .into_iter()
+                    .flatten(),
+            );
 
             let claims_guard = coordinate_claims
                 .then(|| claims_mutation_guard(&layout))
