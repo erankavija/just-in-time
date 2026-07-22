@@ -91,7 +91,7 @@ Test names follow `test_<function>_<scenario>` and describe the scenario in full
 - **No unsafe code** — `#![deny(unsafe_code)]` enforced.
 - **Result-based errors** — `thiserror` custom types with descriptive messages. No panics in library code.
 - **Naming** — Verbs for actions (`add_dependency`, `claim_issue`), `is_`/`has_` for predicates (`is_blocked`, `has_passing_gates`).
-- **Public API documentation** — Document purpose and material contracts, including relevant errors and invariants. Add examples only when they clarify non-obvious behavior; prefer one type- or module-level walkthrough over repetitive method examples.
+- **Public API documentation** — Document purpose and material contracts, including relevant errors and invariants. Do not require an example for every public API, and avoid tautological examples. Add examples only when they clarify non-obvious behavior; prefer one type- or module-level walkthrough over repetitive method examples.
 - **CLI commands must support `--json`** for machine-readable output. List-emitting commands wrap collections in the envelope `{"count": N, "<collection>": [...]}`.
 - **Git is optional** — Core jit commands must work without Git; claims and leases are the documented exception (`@/charter/D-4`).
 
