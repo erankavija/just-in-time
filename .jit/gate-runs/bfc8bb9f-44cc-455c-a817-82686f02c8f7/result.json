@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/docs-mechanical.sh",
+  "commit": "697bb65a41ebf24e9354b66757de6e53468135b0",
+  "completed_at": "2026-07-22T19:38:07.350025739Z",
+  "duration_ms": 834,
+  "exit_code": 0,
+  "gate_key": "docs-mechanical",
+  "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+  "message": null,
+  "run_id": "bfc8bb9f-44cc-455c-a817-82686f02c8f7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-22T19:38:06.515755517Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nOK: all cited paths and @/ items resolve\n\n== M5 projections ==\nOK: projections fresh\n\n",
+  "tree_dirty": true
+}
