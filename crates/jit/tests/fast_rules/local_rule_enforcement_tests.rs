@@ -866,10 +866,6 @@ impl IssueStore for FailingSaveStorage {
         self.inner.resolve_issue_id(partial_id)
     }
 
-    fn delete_issue(&self, id: &str) -> anyhow::Result<()> {
-        self.inner.delete_issue(id)
-    }
-
     fn list_issues(&self) -> anyhow::Result<Vec<Issue>> {
         self.inner.list_issues()
     }

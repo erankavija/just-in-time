@@ -8,6 +8,7 @@ use jit::storage::{InMemoryStorage, IssueStore};
 #[test]
 fn test_validation_detects_broken_dependency() {
     let storage = InMemoryStorage::new();
+    storage.add_repo_file(".jit/config.toml", "");
     let executor = crate::memory_executor(storage.clone());
 
     // Create two issues
@@ -43,8 +44,11 @@ fn test_validation_detects_broken_dependency() {
     // Validation should pass
     assert!(executor.validate_silent().is_ok());
 
-    // Delete issue1, leaving broken reference in issue2
-    storage.delete_issue(&issue1_id).unwrap();
+    // Corrupt the stored edge directly; production dependency commands reject
+    // this shape before publication.
+    let mut issue2 = storage.load_issue(&issue2_id).unwrap();
+    issue2.dependencies = vec!["00000000-0000-0000-0000-000000000000".to_string()];
+    storage.save_issue(issue2).unwrap();
 
     // Validation should fail
     let result = executor.validate_silent();

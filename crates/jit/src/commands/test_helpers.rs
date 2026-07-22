@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 pub(crate) enum OpenRaceAction {
     Save(Box<crate::domain::Issue>),
     Delete(String),
+    WriteRepoFile { path: String, content: String },
 }
 
 struct OpenRace {
@@ -26,7 +27,30 @@ impl crate::storage::TransactionFailureInjector for OpenRace {
             let storage = self.storage.lock().unwrap().clone().unwrap();
             match self.action.lock().unwrap().take().unwrap() {
                 OpenRaceAction::Save(issue) => storage.save_issue(*issue).unwrap(),
-                OpenRaceAction::Delete(id) => storage.delete_issue(&id).unwrap(),
+                OpenRaceAction::Delete(id) => {
+                    let bytes = storage
+                        .read_repo_file(".jit/index.json")
+                        .unwrap()
+                        .expect("race fixture index exists");
+                    let mut index: serde_json::Value = serde_json::from_str(&bytes).unwrap();
+                    index["all_ids"]
+                        .as_array_mut()
+                        .unwrap()
+                        .retain(|active| active.as_str() != Some(id.as_str()));
+                    index["deleted_ids"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(serde_json::Value::String(id));
+                    storage
+                        .write_repo_file(
+                            ".jit/index.json",
+                            &serde_json::to_string_pretty(&index).unwrap(),
+                        )
+                        .unwrap();
+                }
+                OpenRaceAction::WriteRepoFile { path, content } => {
+                    storage.write_repo_file(&path, &content).unwrap();
+                }
             }
         }
         Ok(())

@@ -208,13 +208,6 @@ pub trait IssueStore: Clone {
     /// - Multiple issues match (ambiguous): "Ambiguous ID '{prefix}' matches multiple issues: ..."
     fn resolve_issue_id(&self, partial_id: &str) -> Result<String>;
 
-    /// Delete an issue by ID.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the issue does not exist or cannot be deleted.
-    fn delete_issue(&self, id: &str) -> Result<()>;
-
     /// List all issues in the repository.
     ///
     /// # Errors
@@ -523,27 +516,6 @@ mod tests {
             let titles: Vec<_> = issues.iter().map(|i| i.title.as_str()).collect();
             assert!(titles.contains(&"Issue 1"));
             assert!(titles.contains(&"Issue 2"));
-        }
-
-        // Test with both backends
-        let temp_dir = tempfile::tempdir().unwrap();
-        test_with_storage(JsonFileStorage::new(temp_dir.path()));
-        test_with_storage(InMemoryStorage::new());
-    }
-
-    #[test]
-    fn test_trait_delete_issue() {
-        fn test_with_storage<S: IssueStore>(storage: S) {
-            storage.init().unwrap();
-
-            let issue =
-                crate::domain::types::fixture_issue("Delete me".to_string(), "Test".to_string());
-            storage.save_issue(issue.clone()).unwrap();
-
-            storage.delete_issue(&issue.id).unwrap();
-
-            let result = storage.load_issue(&issue.id);
-            assert!(result.is_err());
         }
 
         // Test with both backends

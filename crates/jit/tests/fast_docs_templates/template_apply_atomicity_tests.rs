@@ -152,9 +152,6 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
         self.resolve_calls.fetch_add(1, Ordering::SeqCst);
         self.inner.resolve_issue_id(partial_id)
     }
-    fn delete_issue(&self, id: &str) -> Result<()> {
-        self.inner.delete_issue(id)
-    }
     fn list_issues(&self) -> Result<Vec<Issue>> {
         self.inner.list_issues()
     }

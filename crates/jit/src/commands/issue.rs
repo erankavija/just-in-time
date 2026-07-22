@@ -47,6 +47,111 @@ pub(super) fn blocking_dependencies(
         .collect()
 }
 
+struct DerivedIssueDeletion {
+    intents: Vec<crate::repository_state::MutationIntent>,
+    error_after_apply: Option<crate::errors::TransitionBlockedError>,
+}
+
+/// Derive deletion, dependent-edge cleanup, and resulting automatic readiness
+/// transitions from one captured active graph.
+fn derive_issue_deletion(
+    image: &crate::repository_state::RepositoryImage,
+    context: &crate::repository_state::MutationContext,
+    issues: &[Issue],
+    target_id: &str,
+) -> Result<DerivedIssueDeletion> {
+    use crate::repository_state::MutationIntent;
+
+    let declarations = declarations_from_image(image)?;
+    let config = crate::repository_state::assemble_config(image)?;
+    let mut projected = issues
+        .iter()
+        .filter(|issue| issue.id != target_id)
+        .cloned()
+        .collect::<Vec<_>>();
+    let dependent_ids = projected
+        .iter_mut()
+        .filter(|issue| issue.dependencies.iter().any(|id| id == target_id))
+        .map(|issue| {
+            issue.dependencies.retain(|id| id != target_id);
+            issue.id.clone()
+        })
+        .collect::<Vec<_>>();
+    let plan_content = validate::plan_content_from_image(image, &projected)?;
+
+    let mut intents = vec![MutationIntent::DeleteIssue {
+        issue_id: target_id.to_string(),
+    }];
+    let mut error_after_apply = None;
+    for dependent_id in dependent_ids {
+        let position = projected
+            .iter()
+            .position(|issue| issue.id == dependent_id)
+            .ok_or_else(|| anyhow!("captured dependent {dependent_id} disappeared"))?;
+        let mut dependent = projected[position].clone();
+        let resolved = crate::domain::queries::build_issue_map(&projected);
+        if dependent.should_auto_transition_to_ready(&resolved) {
+            match derive_state_transition(
+                dependent.clone(),
+                State::Ready,
+                false,
+                CapturedTransitionEvidence {
+                    issues: &projected,
+                    declarations: &declarations,
+                    config: &config,
+                    plan_content: &plan_content,
+                    context,
+                },
+            )? {
+                DerivedStateTransition::Applied {
+                    issue,
+                    events,
+                    changed: true,
+                    ..
+                } => {
+                    dependent = *issue;
+                    intents.extend(events.into_iter().map(|(phase, event)| {
+                        MutationIntent::RecordEvent {
+                            phase,
+                            event: Box::new(event),
+                        }
+                    }));
+                }
+                DerivedStateTransition::GraphBlocked { error, events } => {
+                    error_after_apply.get_or_insert(error);
+                    intents.extend(events.into_iter().map(|(phase, event)| {
+                        MutationIntent::RecordEvent {
+                            phase,
+                            event: Box::new(event),
+                        }
+                    }));
+                }
+                DerivedStateTransition::Applied { changed: false, .. } => {}
+            }
+        }
+        projected[position] = dependent.clone();
+        intents.push(MutationIntent::UpdateIssue {
+            issue: Box::new(dependent),
+        });
+        intents.push(MutationIntent::RecordEvent {
+            phase: 2,
+            event: Box::new(Event::draft_issue_updated(
+                dependent_id,
+                "dependency-cascade-delete".to_string(),
+                vec!["dependencies".to_string()],
+            )),
+        });
+    }
+    intents.push(MutationIntent::RecordEvent {
+        phase: 1,
+        event: Box::new(Event::draft_issue_deleted(target_id.to_string())),
+    });
+    Ok(DerivedIssueDeletion {
+        intents,
+        error_after_apply,
+    })
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     /// Hard-reject an explicit `--type <kind>` whose kind is not declared in the
     /// configured `[type_hierarchy]`, deciding through the SAME rule engine the
@@ -504,57 +609,76 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(id)?;
+        use crate::repository_state::{finalize, MutationContext};
+        use crate::storage::RepositoryStateStoreError;
 
-        // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
-
-        let mut updates = Vec::new();
-        let mut events = vec![(1, Event::draft_issue_deleted(full_id.clone()))];
-        for mut dependent in self.storage.list_issues()? {
-            if !dependent.dependencies.iter().any(|d| d == &full_id) {
+        let layout = self.require_layout()?;
+        let context = MutationContext::production();
+        for _ in 0..8 {
+            let (expected_target, expected_mode) = {
+                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
+                let Some(image) = self.capture_proposed_base(
+                    preflight.as_mut(),
+                    &std::collections::BTreeMap::new(),
+                    &[],
+                    None,
+                )?
+                else {
+                    continue;
+                };
+                let issues = captured_active_issues(&image)?;
+                let target = resolve_issue_from_capture(&issues, id)?;
+                let config = crate::repository_state::assemble_config(&image)?;
+                (
+                    target,
+                    self.config_manager.enforcement_mode_from_config(&config)?,
+                )
+            };
+            // Claims coordination is acquired before repository serialization;
+            // the target and policy are then re-resolved from the held image.
+            let claims_guard = (expected_mode != crate::config::EnforcementMode::Off)
+                .then(|| claims_mutation_guard(&layout))
+                .transpose()?
+                .flatten();
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some(image) = self.capture_proposed_base(
+                session.as_mut(),
+                &std::collections::BTreeMap::new(),
+                &[],
+                None,
+            )?
+            else {
+                continue;
+            };
+            let issues = captured_active_issues(&image)?;
+            let target_id = resolve_issue_from_capture(&issues, id)?;
+            let config = crate::repository_state::assemble_config(&image)?;
+            let current_mode = self.config_manager.enforcement_mode_from_config(&config)?;
+            if target_id != expected_target || current_mode != expected_mode {
                 continue;
             }
-            dependent.dependencies.retain(|d| d != &full_id);
-            let dependent_id = dependent.id.clone();
-            updates.push(dependent);
-            events.push((
-                2,
-                Event::draft_issue_updated(
-                    dependent_id,
-                    "dependency-cascade-delete".to_string(),
-                    vec!["dependencies".to_string()],
-                ),
-            ));
-        }
-        let mut intents = updates
-            .into_iter()
-            .map(
-                |issue| crate::repository_state::MutationIntent::UpdateIssue {
-                    issue: Box::new(issue),
-                },
-            )
-            .collect::<Vec<_>>();
-        intents.push(crate::repository_state::MutationIntent::DeleteIssue {
-            issue_id: full_id.clone(),
-        });
-        intents.extend(events.into_iter().map(|(phase, event)| {
-            crate::repository_state::MutationIntent::RecordEvent {
-                phase,
-                event: Box::new(event),
+            let warnings = captured_lease_warnings(
+                current_mode,
+                std::slice::from_ref(&target_id),
+                &issues,
+                claims_guard.as_ref(),
+            )?;
+            let derived = derive_issue_deletion(&image, &context, &issues, &target_id)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            match session.apply(&plan) {
+                Ok(_) => {
+                    if let Some(error) = derived.error_after_apply {
+                        return Err(error.into());
+                    }
+                    return Ok(warnings);
+                }
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
             }
-        }));
-        self.publish_repository_mutation(intents)?;
-
-        // Removing an edge can unblock a dependent stuck in Backlog, mirroring
-        // the readiness check `remove_dependency(_ies)` runs after an edge is
-        // removed.
-        self.check_auto_transitions()?;
-
-        Ok(warnings)
+        }
+        Err(anyhow!(
+            "issue deletion did not converge after repeated capture conflicts"
+        ))
     }
 
     /// Update issue state with precheck/postcheck hooks
@@ -741,6 +865,19 @@ mod tests {
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
 
+    struct DeleteFailure(std::sync::Mutex<Option<crate::storage::TransactionFailurePoint>>);
+
+    impl crate::storage::TransactionFailureInjector for DeleteFailure {
+        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+            let mut selected = self.0.lock().unwrap();
+            if selected.as_ref() == Some(point) {
+                selected.take();
+                return Err(std::io::Error::other("injected issue deletion failure"));
+            }
+            Ok(())
+        }
+    }
+
     fn setup() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
@@ -774,6 +911,28 @@ enforce_leases = "off"
         storage.save_gate_registry(&registry).unwrap();
 
         crate::commands::test_helpers::memory_executor(storage)
+    }
+
+    fn remove_active_index_membership(storage: &InMemoryStorage, id: &str) {
+        let bytes = storage
+            .read_repo_file(".jit/index.json")
+            .unwrap()
+            .expect("fixture index exists");
+        let mut index: serde_json::Value = serde_json::from_str(&bytes).unwrap();
+        index["all_ids"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|active| active.as_str() != Some(id));
+        index["deleted_ids"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::Value::String(id.to_string()));
+        storage
+            .write_repo_file(
+                ".jit/index.json",
+                &serde_json::to_string_pretty(&index).unwrap(),
+            )
+            .unwrap();
     }
 
     #[test]
@@ -1717,6 +1876,214 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
+    fn test_delete_issue_cascade_auto_ready_commits_one_timestamp() {
+        let executor = setup();
+        let mut dependency =
+            crate::domain::types::fixture_issue("Dependency".to_string(), String::new());
+        dependency.state = State::Ready;
+        let dependency_id = dependency.id.clone();
+        executor.storage.save_issue(dependency).unwrap();
+        let mut dependent =
+            crate::domain::types::fixture_issue("Dependent".to_string(), String::new());
+        dependent.state = State::Backlog;
+        dependent.dependencies = vec![dependency_id.clone()];
+        let dependent_id = dependent.id.clone();
+        executor.storage.save_issue(dependent).unwrap();
+
+        executor.delete_issue(&dependency_id).unwrap();
+
+        let updated = executor.storage.load_issue(&dependent_id).unwrap();
+        assert!(updated.dependencies.is_empty());
+        assert_eq!(updated.state, State::Ready);
+        assert!(executor.storage.load_issue(&dependency_id).is_err());
+        let index: serde_json::Value = serde_json::from_str(
+            &executor
+                .storage
+                .read_repo_file(".jit/index.json")
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(index["deleted_ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|id| id.as_str() == Some(dependency_id.as_str())));
+        let events = executor.storage.read_events().unwrap();
+        let mutation_events = events
+            .iter()
+            .filter(|event| {
+                event.get_issue_id() == dependency_id || event.get_issue_id() == dependent_id
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(mutation_events.len(), 3);
+        assert!(mutation_events
+            .iter()
+            .any(|event| event.get_type() == "issue_deleted"));
+        assert!(mutation_events
+            .iter()
+            .any(|event| event.get_type() == "issue_updated"));
+        assert!(mutation_events
+            .iter()
+            .any(|event| event.get_type() == "issue_state_changed"));
+        let timestamps = mutation_events
+            .iter()
+            .map(|event| serde_json::to_value(event).unwrap()["timestamp"].clone())
+            .collect::<Vec<_>>();
+        assert!(timestamps.windows(2).all(|pair| pair[0] == pair[1]));
+    }
+
+    #[test]
+    fn test_delete_issue_missing_index_changes_nothing() {
+        let storage = InMemoryStorage::new();
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        let issue = crate::domain::types::fixture_issue("Doomed".into(), String::new());
+        let issue_path = format!(".jit/issues/{}.json", issue.id);
+        let issue_bytes = serde_json::to_string_pretty(&issue).unwrap();
+        storage.add_repo_file(&issue_path, &issue_bytes);
+        let executor = crate::commands::test_helpers::memory_executor(storage.clone());
+
+        assert!(executor.delete_issue(&issue.id).is_err());
+        assert_eq!(
+            storage.read_repo_file(&issue_path).unwrap(),
+            Some(issue_bytes)
+        );
+        assert!(storage.read_repo_file(".jit/index.json").unwrap().is_none());
+        assert!(storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_delete_issue_malformed_index_changes_nothing() {
+        let executor = setup();
+        let issue = crate::domain::types::fixture_issue("Doomed".into(), String::new());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor
+            .storage
+            .add_repo_file(".jit/index.json", "not valid JSON");
+        let issue_path = format!(".jit/issues/{issue_id}.json");
+        let issue_before = executor.storage.read_repo_file(&issue_path).unwrap();
+
+        assert!(executor.delete_issue(&issue_id).is_err());
+        assert_eq!(
+            executor.storage.read_repo_file(".jit/index.json").unwrap(),
+            Some("not valid JSON".to_string())
+        );
+        assert_eq!(
+            executor.storage.read_repo_file(&issue_path).unwrap(),
+            issue_before
+        );
+        assert!(executor.storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_delete_issue_retries_when_lease_mode_changes_after_preflight() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        let issue = crate::domain::types::fixture_issue("Doomed".into(), String::new());
+        let issue_id = issue.id.clone();
+        storage.save_issue(issue).unwrap();
+        let storage = crate::commands::test_helpers::with_open_race(
+            storage,
+            2,
+            crate::commands::test_helpers::OpenRaceAction::WriteRepoFile {
+                path: ".jit/config.toml".to_string(),
+                content: "[worktree]\nenforce_leases = \"warn\"\n".to_string(),
+            },
+        );
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+
+        let warnings = executor.delete_issue(&issue_id).unwrap();
+
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("No active lease"));
+        assert!(executor.storage.load_issue(&issue_id).is_err());
+        assert_eq!(
+            executor
+                .storage
+                .read_events()
+                .unwrap()
+                .iter()
+                .filter(|event| event.get_type() == "issue_deleted")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_delete_issue_rechecks_ambiguous_target_after_preflight() {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        let mut target = crate::domain::types::fixture_issue("Target".into(), String::new());
+        target.id = "22221111111111111111111111111111".to_string();
+        storage.save_issue(target.clone()).unwrap();
+        let mut collision = crate::domain::types::fixture_issue("Collision".into(), String::new());
+        collision.id = "22222222222222222222222222222222".to_string();
+        let storage = crate::commands::test_helpers::with_open_race(
+            storage,
+            2,
+            crate::commands::test_helpers::OpenRaceAction::Save(Box::new(collision.clone())),
+        );
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+
+        let error = executor
+            .delete_issue("2222")
+            .expect_err("recaptured prefix must become ambiguous");
+
+        assert!(error
+            .downcast_ref::<crate::storage::AmbiguousIdError>()
+            .is_some());
+        assert!(executor.storage.load_issue(&target.id).is_ok());
+        assert!(executor.storage.load_issue(&collision.id).is_ok());
+        assert!(executor.storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_delete_issue_atomic_failure_recovers_old_graph() {
+        use crate::storage::RepositoryStateStore;
+
+        let failures = std::sync::Arc::new(DeleteFailure(std::sync::Mutex::new(Some(
+            crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+        ))));
+        let storage = InMemoryStorage::with_repository_state_failures(failures);
+        storage.init().unwrap();
+        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        let recovered = storage.without_repository_state_failures();
+        let layout = storage.repository_layout();
+        let dependency =
+            crate::domain::types::fixture_issue("Dependency".to_string(), String::new());
+        let dependency_id = dependency.id.clone();
+        storage.save_issue(dependency).unwrap();
+        let mut dependent =
+            crate::domain::types::fixture_issue("Dependent".to_string(), String::new());
+        dependent.state = State::Backlog;
+        dependent.dependencies = vec![dependency_id.clone()];
+        let dependent_id = dependent.id.clone();
+        storage.save_issue(dependent).unwrap();
+        let executor = CommandExecutor::new(storage).with_layout(layout.clone());
+
+        assert!(executor.delete_issue(&dependency_id).is_err());
+        drop(recovered.open_mutation_session(layout.clone()).unwrap());
+
+        let unchanged = recovered.load_issue(&dependent_id).unwrap();
+        assert_eq!(unchanged.state, State::Backlog);
+        assert_eq!(unchanged.dependencies, vec![dependency_id.clone()]);
+        assert!(recovered.load_issue(&dependency_id).is_ok());
+        assert!(recovered.read_events().unwrap().is_empty());
+
+        CommandExecutor::new(recovered.clone())
+            .with_layout(layout)
+            .delete_issue(&dependency_id)
+            .unwrap();
+        let updated = recovered.load_issue(&dependent_id).unwrap();
+        assert_eq!(updated.state, State::Ready);
+        assert!(updated.dependencies.is_empty());
+        assert!(recovered.load_issue(&dependency_id).is_err());
+    }
+
+    #[test]
     fn test_add_dependency_logs_issue_updated_event() {
         let executor = setup();
 
@@ -1977,8 +2344,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_remove_dependencies_removes_dangling_edge_by_raw_id() {
-        // Reproduces a pre-existing dangling edge the way legacy data (or a raw
-        // `IssueStore::delete_issue` bypassing the executor's cascade) could:
+        // Reproduces a pre-existing dangling edge the way legacy or externally
+        // edited repository data could:
         // A depends on B, then B's file disappears without A's `dependencies`
         // being cleaned up. `jit dep rm` (the plural `remove_dependencies`)
         // must still remove the edge by matching A's raw stored id, even
@@ -1994,8 +2361,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         executor.storage.save_issue(b).unwrap();
         executor.add_dependency(&a_id, &b_id).unwrap();
 
-        // Bypass the executor's cascading delete to reproduce a dangling edge.
-        executor.storage.delete_issue(&b_id).unwrap();
+        // Corrupt canonical membership directly to reproduce a dangling edge.
+        remove_active_index_membership(&executor.storage, &b_id);
         assert!(
             executor.storage.resolve_issue_id(&b_id).is_err(),
             "the deleted id must no longer resolve, matching the reported bug"
@@ -2032,7 +2399,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let b_id = b.id.clone();
         executor.storage.save_issue(b).unwrap();
         executor.add_dependency(&a_id, &b_id).unwrap();
-        executor.storage.delete_issue(&b_id).unwrap();
+        remove_active_index_membership(&executor.storage, &b_id);
 
         let prefix = b_id[..8].to_string();
         let result = executor

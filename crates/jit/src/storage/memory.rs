@@ -504,29 +504,6 @@ impl IssueStore for InMemoryStorage {
         }
     }
 
-    fn delete_issue(&self, id: &str) -> Result<()> {
-        let _repo_lock = self.repo_lock.acquire()?;
-        let mut state = self.repository_state();
-        let vpath = Self::issue_vpath(id);
-        if !state.entries.contains_key(&vpath) {
-            return Err(IssueNotFoundError::new(id).into());
-        }
-        let mut index = Self::data_entry_bytes(&state, &Self::index_vpath())
-            .map(|bytes| crate::repository_state::RepositoryIndex::parse(&bytes))
-            .transpose()
-            .map_err(|error| anyhow!(error))?
-            .unwrap_or_default();
-        index.all_ids.retain(|active| active != id);
-        if !index.deleted_ids.iter().any(|deleted| deleted == id) {
-            index.deleted_ids.push(id.to_string());
-            index.deleted_ids.sort();
-        }
-        let index_bytes = index.to_pretty_bytes()?;
-        state.entries.remove(&vpath);
-        Self::put_data_entry(&mut state, Self::index_vpath(), index_bytes);
-        Ok(())
-    }
-
     fn list_issues(&self) -> Result<Vec<Issue>> {
         Self::load_issues(&self.repository_state())
     }
@@ -853,52 +830,6 @@ mod tests {
         let result = storage.load_issue("nonexistent");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
-    }
-
-    #[test]
-    fn test_delete_issue() {
-        let storage = InMemoryStorage::new();
-        storage.init().unwrap();
-
-        let issue =
-            crate::domain::types::fixture_issue("Delete me".to_string(), "Test".to_string());
-        storage.save_issue(issue.clone()).unwrap();
-
-        storage.delete_issue(&issue.id).unwrap();
-
-        let result = storage.load_issue(&issue.id);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_delete_nonexistent_issue_fails() {
-        let storage = InMemoryStorage::new();
-        storage.init().unwrap();
-
-        let result = storage.delete_issue("nonexistent");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_delete_issue_malformed_index_leaves_repository_unchanged() {
-        let storage = InMemoryStorage::new();
-        let issue =
-            crate::domain::types::fixture_issue("Delete me".to_string(), "Test".to_string());
-        storage.save_issue(issue.clone()).unwrap();
-        {
-            let mut state = storage.repository_state();
-            InMemoryStorage::put_data_entry(
-                &mut state,
-                InMemoryStorage::index_vpath(),
-                b"not valid JSON".to_vec(),
-            );
-        }
-        let before = storage.repository_state().entries.clone();
-
-        let result = storage.delete_issue(&issue.id);
-
-        assert!(result.is_err());
-        assert_eq!(storage.repository_state().entries, before);
     }
 
     #[test]

@@ -1114,34 +1114,6 @@ impl IssueStore for JsonFileStorage {
         }
     }
 
-    fn delete_issue(&self, id: &str) -> Result<()> {
-        let issue_path = self.issue_path(id);
-        let index_lock_path = self.root.join(".index.lock");
-        let issue_lock_path = issue_path.with_extension("lock");
-
-        // Lock in order: repository write lock, then index, then issue
-        let _repo_lock = self.repo_lock.acquire()?;
-        let _index_lock = self.locker.lock_exclusive(&index_lock_path)?;
-        let _issue_lock = self.locker.lock_exclusive(&issue_lock_path)?;
-
-        fs::remove_file(&issue_path).context("Failed to delete issue file")?;
-        // Clean up lock file too
-        let _ = fs::remove_file(&issue_lock_path);
-
-        // Update index: remove from all_ids and add to deleted_ids
-        let mut index = self.load_index()?;
-        index.all_ids.retain(|i| i != id);
-
-        // Add to deleted_ids if not already there (idempotent)
-        if !index.deleted_ids.contains(&id.to_string()) {
-            index.deleted_ids.push(id.to_string());
-        }
-
-        self.save_index(&index)?;
-
-        Ok(())
-    }
-
     fn list_issues(&self) -> Result<Vec<Issue>> {
         let index_lock_path = self.root.join(".index.lock");
         let _lock = self.locker.lock_shared(&index_lock_path)?;
@@ -2154,24 +2126,6 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_issue_removes_file_and_updates_index() {
-        let (_temp, storage) = setup_storage();
-        storage.init().unwrap();
-
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
-        let issue_id = issue.id.clone();
-
-        storage.save_issue(issue.clone()).unwrap();
-        assert!(storage.issue_path(&issue_id).exists());
-
-        storage.delete_issue(&issue_id).unwrap();
-        assert!(!storage.issue_path(&issue_id).exists());
-
-        let index = storage.load_index().unwrap();
-        assert!(!index.all_ids.contains(&issue_id));
-    }
-
-    #[test]
     fn test_load_nonexistent_issue_returns_error() {
         let (_temp, storage) = setup_storage();
         storage.init().unwrap();
@@ -3087,50 +3041,6 @@ mod tests {
             let index = storage.load_index().unwrap();
             assert_eq!(index.schema_version, 2);
             assert!(index.deleted_ids.is_empty());
-        }
-
-        #[test]
-        fn test_delete_issue_adds_to_deleted_ids() {
-            let temp_dir = TempDir::new().unwrap();
-            let storage = JsonFileStorage::new(temp_dir.path());
-            storage.init().unwrap();
-
-            // Create an issue
-            let issue =
-                crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
-            let issue_id = issue.id.clone();
-            storage.save_issue(issue.clone()).unwrap();
-
-            // Verify it's in all_ids
-            let index_before = storage.load_index().unwrap();
-            assert!(index_before.all_ids.contains(&issue_id));
-            assert!(!index_before.deleted_ids.contains(&issue_id));
-
-            // Delete the issue
-            storage.delete_issue(&issue_id).unwrap();
-
-            // Verify it's now in deleted_ids and removed from all_ids
-            let index_after = storage.load_index().unwrap();
-            assert!(!index_after.all_ids.contains(&issue_id));
-            assert!(index_after.deleted_ids.contains(&issue_id));
-        }
-
-        #[test]
-        fn test_aggregated_index_filters_deleted_ids() {
-            let temp_dir = TempDir::new().unwrap();
-            let storage = JsonFileStorage::new(temp_dir.path());
-            storage.init().unwrap();
-
-            // Create and delete an issue
-            let issue =
-                crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
-            let issue_id = issue.id.clone();
-            storage.save_issue(issue.clone()).unwrap();
-            storage.delete_issue(&issue_id).unwrap();
-
-            // Aggregated index should NOT include the deleted issue
-            let aggregated = storage.load_aggregated_index().unwrap();
-            assert!(!aggregated.all_ids.contains(&issue_id));
         }
     }
 
