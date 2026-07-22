@@ -703,10 +703,11 @@ fn push_gitattributes_action(
 /// every unrelated byte.
 ///
 /// An absent file is created with the jit block; an existing file already holding
-/// the line-set is unchanged; a file missing the block gets it appended (with the
-/// required separator). A non-UTF-8 file, a jit block present for a DIFFERENT data
-/// root (competing claim), or a symlink/directory/unsupported occupant is a typed
-/// error aborting init before any journaling.
+/// the exact marker line followed by the exact rule line is unchanged; a file
+/// missing the block gets it appended (with the required separator). A non-UTF-8
+/// file, a jit block present for a DIFFERENT data root (competing claim), or a
+/// symlink/directory/unsupported occupant is a typed error aborting init before
+/// any journaling.
 fn resolve_gitattributes(
     entry: &RepositoryEntry,
     line: &str,
@@ -718,12 +719,21 @@ fn resolve_gitattributes(
             let content = std::str::from_utf8(bytes).map_err(|_| {
                 InitializationError::UnsafeGitattributes(".gitattributes is not valid UTF-8".into())
             })?;
-            if content.contains(line) {
+            let mut lines = content.lines().peekable();
+            let mut claim_is_installed = false;
+            while let Some(candidate) = lines.next() {
+                if candidate != GITATTRIBUTES_MARKER {
+                    continue;
+                }
+                if lines.peek().copied() != Some(line) {
+                    return Err(InitializationError::UnsafeGitattributes(
+                        "a jit merge-driver block is present for a different data root".into(),
+                    ));
+                }
+                claim_is_installed = true;
+            }
+            if claim_is_installed {
                 Ok((GitattributesStatus::Unchanged, None))
-            } else if content.contains(GITATTRIBUTES_MARKER) {
-                Err(InitializationError::UnsafeGitattributes(
-                    "a jit merge-driver block is present for a different data root".into(),
-                ))
             } else {
                 let separator = if content.ends_with('\n') {
                     "\n"
@@ -976,11 +986,51 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_gitattributes_present_line_is_unchanged() {
+    fn test_resolve_gitattributes_exact_owned_block_is_unchanged() {
         let entry = file(format!("# JIT merge drivers\n{LINE}\n").as_bytes());
         let (status, bytes) = resolve_gitattributes(&entry, LINE).unwrap();
         assert_eq!(status, GitattributesStatus::Unchanged);
         assert!(bytes.is_none());
+    }
+
+    #[test]
+    fn test_resolve_gitattributes_commented_rule_does_not_satisfy_claim() {
+        let content = format!("# {LINE}\n");
+        let entry = file(content.as_bytes());
+        let (status, bytes) = resolve_gitattributes(&entry, LINE).unwrap();
+        assert_eq!(status, GitattributesStatus::Modified);
+        assert_eq!(
+            bytes.unwrap(),
+            format!("{content}\n# JIT merge drivers\n{LINE}\n").into_bytes()
+        );
+    }
+
+    #[test]
+    fn test_resolve_gitattributes_rule_substrings_do_not_satisfy_claim() {
+        for content in [
+            format!("prefix {LINE}\n"),
+            format!("{LINE} # unrelated suffix\n"),
+        ] {
+            let entry = file(content.as_bytes());
+            let (status, bytes) = resolve_gitattributes(&entry, LINE).unwrap();
+            assert_eq!(status, GitattributesStatus::Modified);
+            assert_eq!(
+                bytes.unwrap(),
+                format!("{content}\n# JIT merge drivers\n{LINE}\n").into_bytes()
+            );
+        }
+    }
+
+    #[test]
+    fn test_resolve_gitattributes_commented_marker_does_not_claim_rule() {
+        let content = format!("# {GITATTRIBUTES_MARKER}\n{LINE}\n");
+        let entry = file(content.as_bytes());
+        let (status, bytes) = resolve_gitattributes(&entry, LINE).unwrap();
+        assert_eq!(status, GitattributesStatus::Modified);
+        assert_eq!(
+            bytes.unwrap(),
+            format!("{content}\n# JIT merge drivers\n{LINE}\n").into_bytes()
+        );
     }
 
     #[test]
