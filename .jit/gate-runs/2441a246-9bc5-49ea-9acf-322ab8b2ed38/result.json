@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "3651b1a4742bed5d51ec5d09df3b35fbae0547b4",
+  "completed_at": "2026-07-22T19:02:57.396896374Z",
+  "duration_ms": 222140,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/initialize.rs",
+        "id": "F1",
+        "line": 721,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Substring matching can treat comments or unrelated text as the required .gitattributes merge-driver rule, leaving eligible init without the actual claim."
+      },
+      {
+        "disposition": "blocking",
+        "id": "F2",
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "REQ-01 is materially unverified because mcp-ci is pending with no recorded execution evidence."
+      }
+    ],
+    "summary": "Two unresolved issue-impact blockers: an unsafe .gitattributes claim match and missing MCP validation evidence.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+  "message": null,
+  "run_id": "2441a246-9bc5-49ea-9acf-322ab8b2ed38",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-22T18:59:15.256437148Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10497 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f8b32-4764-7152-8d9a-c9f4971c4953\n--------\nuser\n--- 10484 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 70 reachable commits tagged `jit:49adf23b` (9bef65a7 through 6710865a)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 — dev/vision/9db27a3a-charter.md; @/invariant/atomic-writes — .jit/invariants.toml; @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci passed (exit 0, 2026-07-22T18:52:30Z); mcp-ci pending; docs-mechanical pending\nTruncation recovery: recovered truncated aggregate inventories with per-commit name-status reads and narrowed current-file/individual-patch reads\n\n1. [blocking, issue-impact, high] [`crates/jit/src/repository_state/initialize.rs:721`](crates/jit/src/repository_state/initialize.rs:721) treats any substring occurrence of the required `.gitattributes` rule as an installed claim. For example, `# .jit/events.jsonl merge=union` returns `Unchanged` without adding a real attribute rule; a comment containing the marker similarly becomes a false competing claim. Parse and match the owned block/rule as complete lines so eligible init always installs its line-set while preserving unrelated content.\n\n2. [blocking, issue-impact, medium] REQ-01 remains materially unverified: the only recorded executable evidence is passing `cargo-ci`; `mcp-ci` is pending with no run or exit code. The issue explicitly requires cumulative MCP (as well as human/JSON/schema) coverage for affected commands.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two unresolved issue-impact blockers: an unsafe .gitattributes claim match and missing MCP validation evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Substring matching can treat comments or unrelated text as the required .gitattributes merge-driver rule, leaving eligible init without the actual claim.\",\"file\":\"crates/jit/src/repository_state/initialize.rs\",\"line\":721,\"references\":[]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-01 is materially unverified because mcp-ci is pending with no recorded execution evidence.\",\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
