@@ -18,12 +18,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-22T18:56:22.023094070Z",
+      "updated_at": "2026-07-22T19:15:54.133168543Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-07-22T19:02:57.619081921Z",
+      "updated_at": "2026-07-22T19:20:19.734967722Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -43,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Migrate all consumers and delete predecessors",
-  "updated_at": "2026-07-22T19:03:25.090260591Z"
+  "updated_at": "2026-07-22T19:20:19.734967722Z"
 }

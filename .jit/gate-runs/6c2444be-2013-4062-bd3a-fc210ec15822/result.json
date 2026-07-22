@@ -1,0 +1,47 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "84a77938ee62f153b78980951b75b8eabf1c5d20",
+  "completed_at": "2026-07-22T19:20:19.510176640Z",
+  "duration_ms": 253565,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/init.rs",
+        "id": "F1",
+        "line": 371,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Git-attributes path escaping leaves glob metacharacters active and rewrites literal backslashes, so an arbitrary nested JIT_DATA_DIR can receive an incorrect merge rule."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F2",
+        "line": 2057,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-4"
+        ],
+        "severity": "medium",
+        "summary": "Init JSON exposes only created/modified path lists, leaving not_applicable indistinguishable from unchanged instead of reporting the required attributes disposition."
+      }
+    ],
+    "summary": "Two issue-impact blockers remain in the Git-attributes contract: incomplete path escaping and missing public four-state disposition reporting.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+  "message": null,
+  "run_id": "6c2444be-2013-4062-bd3a-fc210ec15822",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-22T19:16:05.944295381Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 14109 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.6\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f8b41-b1d9-7071-9cba-05ed0b72ca84\n--------\nuser\n--- 14096 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 72 reachable commits tagged `jit:49adf23b` (9bef65a7 through 84a77938); uncommitted gate metadata excluded\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 — dev/vision/9db27a3a-charter.md; @/invariant/atomic-writes — .jit/invariants.toml; @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci passed (exit 0, 2026-07-22T19:10:58Z); mcp-ci passed (exit 0, 2026-07-22T19:03:23Z); docs-mechanical pending\nTruncation recovery: narrowed per-commit stats/name-status, individual init/export patches, and current affected-source reads\n\n1. [blocking, issue-impact, high] [init.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/init.rs:371) does not fully Git-escape an arbitrary nested `JIT_DATA_DIR`: it escapes only space, `#`, and `!`, converts a literal backslash to `/`, and leaves glob metacharacters such as `*`, `?`, and `[` active. Eligible init can therefore publish a merge rule that matches the wrong paths or fails to match its selected data root, violating the required literal Git-escaped claim. Git attributes uses `.gitignore` pattern semantics, including backslash escaping. [Git documentation](https://git-scm.com/docs/gitattributes/2.17.0.html)\n\n2. [blocking, issue-impact, medium] [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2057) exposes only `created_paths` and `modified_paths`; it never emits the typed attributes disposition. `not_applicable` and eligible-but-`unchanged` are therefore indistinguishable to CLI/JSON consumers, despite the required four-state Git-optional attributes contract. This also prevents consumers from observing Git-free operation under [@/charter/D-4](https://example.invalid/).\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-impact blockers remain in the Git-attributes contract: incomplete path escaping and missing public four-state disposition reporting.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Git-attributes path escaping leaves glob metacharacters active and rewrites literal backslashes, so an arbitrary nested JIT_DATA_DIR can receive an incorrect merge rule.\",\"file\":\"crates/jit/src/commands/init.rs\",\"line\":371,\"references\":[]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Init JSON exposes only created/modified path lists, leaving not_applicable indistinguishable from unchanged instead of reporting the required attributes disposition.\",\"file\":\"crates/jit/src/main.rs\",\"line\":2057,\"references\":[\"@/charter/D-4\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
