@@ -2,31 +2,37 @@
 
 use super::CommandExecutor;
 use crate::domain::artifact_classifier::{
-    artifact_destination_root, artifact_mirror_destination, classify_artifacts,
-    preferred_container_destination_root, validate_proposed_layout,
-    ArtifactClassificationInventory, ArtifactClassificationPolicy, ArtifactLocation,
-    ArtifactLocationFacts,
+    artifact_destination_root, artifact_mirror_destination, classification_facts_from_evidence,
+    classify_artifacts, preferred_container_destination_root,
+    resolve_container_destination as derive_container_destination, ArtifactClassificationInventory,
+    ArtifactClassificationPolicy, ArtifactLocation, ArtifactLocationFacts,
 };
-use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
+use crate::domain::artifact_discovery::{
+    discover_archive_artifacts as derive_archive_artifacts, expand_artifact_closure,
+    ArtifactClosure, ArtifactClosureState, ArtifactEvidence, ArtifactEvidenceMap,
+    ArtifactListingScope,
+};
+use crate::domain::artifact_execution::ArchiveExecutionResult;
 use crate::domain::artifact_inventory::{
     inventory_explicit_roots, pinned_root_requests, ExplicitRootTarget, PinnedRootEvidence,
     PinnedRootEvidenceMap,
 };
 use crate::domain::artifact_plan::{
-    normalize_artifact_path, ArchiveCandidates, ArtifactAction, ArtifactPlan, BlockerCode,
-    ContentIdentity, PendingDeletion, PlanBlocker, PlanTarget, PlanWarning, ReferenceChange,
-    WarningCode,
+    normalize_artifact_path, ArchiveCandidates, ArtifactPlan, BlockerCode, PlanBlocker, PlanTarget,
 };
+#[cfg(test)]
+use crate::domain::artifact_plan::{ArtifactAction, WarningCode};
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Event, Issue};
 use crate::storage::{
     collect_artifact_classification_facts, discover_archive_artifacts,
-    resolve_container_destination, GitRevisionResolver, IssueStore, JsonFileStorage,
-    VerifiedArtifact,
+    resolve_container_destination, validate_repo_relative_path, GitRevisionResolver, IssueStore,
+    JsonFileStorage, RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
 
+#[derive(Clone, Copy)]
 enum ArchiveTarget<'a> {
     Document(&'a str),
     Container(&'a str),
@@ -176,12 +182,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         let policy =
             ArtifactClassificationPolicy::from_documentation(config.documentation.as_ref());
-        let target_for_layout = match (&target, root_container_id.as_deref()) {
-            (ArchiveTarget::Document(path), _) => PlanTarget::Document {
+        let target_for_layout = match &target {
+            ArchiveTarget::Document(path) => PlanTarget::Document {
                 path: normalize_artifact_path(path),
             },
-            (ArchiveTarget::Container(_), Some(id)) => PlanTarget::Container { id: id.into() },
-            (ArchiveTarget::Container(_), None) => unreachable!("container id was resolved"),
+            ArchiveTarget::Container(_) => PlanTarget::Container {
+                id: root_container_id
+                    .as_deref()
+                    .context("container id was not resolved")?
+                    .into(),
+            },
         };
         let legacy_root = artifact_destination_root(&target_for_layout, &policy.archive_root);
         let (destination_root, destination_conflicts) = match root_container_id.as_deref() {
@@ -210,10 +220,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         // durable issue records for exact apply/observe decisions below.
         let mut inventory_issues = issues.clone();
         remap_archived_references(&mut inventory_issues, &destination_root);
-        let explicit_target = match (&target, root_container_id.as_deref()) {
-            (ArchiveTarget::Document(path), _) => ExplicitRootTarget::Document(path),
-            (ArchiveTarget::Container(_), Some(id)) => ExplicitRootTarget::Container(id),
-            (ArchiveTarget::Container(_), None) => unreachable!("container id was resolved"),
+        let explicit_target = match &target {
+            ArchiveTarget::Document(path) => ExplicitRootTarget::Document(path),
+            ArchiveTarget::Container(_) => ExplicitRootTarget::Container(
+                root_container_id
+                    .as_deref()
+                    .context("container id was not resolved")?,
+            ),
         };
         let pinned = inventory_issues_pinned_evidence(
             pinned_root_requests(&inventory_issues, &hierarchy, explicit_target)?,
@@ -274,726 +287,611 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 }
 
-/// Deterministic archive failure-injection boundary.
-///
-/// Production uses the default no-op implementation. Tests can fail or edit a
-/// named phase without replacing storage, changing permissions, or using global
-/// mutable state.
-pub trait ArchiveExecutionHooks {
-    fn before_stage(&mut self, _index: usize, _source: &str) -> Result<()> {
-        Ok(())
+fn capture_more(
+    session: &mut dyn RepositoryMutationSession,
+    image: &mut crate::repository_state::RepositoryImage,
+    paths: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
+    listings: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
+) -> Result<bool> {
+    let paths = paths.into_iter().collect::<BTreeSet<_>>();
+    let listings = listings.into_iter().collect::<BTreeSet<_>>();
+    if paths.iter().all(|path| {
+        image
+            .capture_spec()
+            .paths()
+            .any(|captured| captured == path)
+    }) && listings
+        .iter()
+        .all(|path| image.capture_spec().listings().contains(path))
+    {
+        return Ok(true);
     }
-    fn before_relink(&mut self, _index: usize, _issue: &str) -> Result<()> {
-        Ok(())
+    let mut spec = image.capture_spec().clone();
+    spec.discover_paths(paths)?;
+    for listing in listings {
+        spec.discover_listing(listing)?;
     }
-    fn before_publish(&mut self, _index: usize, _destination: &str) -> Result<()> {
-        Ok(())
-    }
-    fn before_marker_inspect(&mut self, _destination: &str) -> Result<()> {
-        Ok(())
-    }
-    fn before_event_append(&mut self) -> Result<()> {
-        Ok(())
-    }
-    fn before_revert(&mut self, _index: usize, _issue: &str) -> Result<()> {
-        Ok(())
-    }
-    fn before_delete(&mut self, _index: usize, _source: &str) -> Result<()> {
-        Ok(())
+    match session.capture(spec) {
+        Ok(next) if next.has_stable_overlap(image) => {
+            *image = next;
+            Ok(true)
+        }
+        Ok(_) => Ok(false),
+        Err(RepositoryStateStoreError::RetryableConflict { .. }) => Ok(false),
+        Err(error) => Err(error.into()),
     }
 }
 
-#[derive(Default)]
-struct NoArchiveExecutionHooks;
-impl ArchiveExecutionHooks for NoArchiveExecutionHooks {}
-
-struct StagedPublication {
-    source: String,
-    destination: String,
-    identity: ContentIdentity,
-    staged: VerifiedArtifact,
+fn capture_pinned_more(
+    session: &mut dyn RepositoryMutationSession,
+    image: &mut crate::repository_state::RepositoryImage,
+    requests: &BTreeSet<(String, String)>,
+) -> Result<bool> {
+    if requests
+        .iter()
+        .all(|request| image.pinned_evidence().contains_key(request))
+    {
+        return Ok(true);
+    }
+    let mut spec = image.capture_spec().clone();
+    for (revision, path) in requests {
+        spec.discover_pinned(revision.clone(), path.clone())?;
+    }
+    match session.capture(spec) {
+        Ok(next) if next.has_stable_overlap(image) => {
+            *image = next;
+            Ok(true)
+        }
+        Ok(_) => Ok(false),
+        Err(RepositoryStateStoreError::RetryableConflict { .. }) => Ok(false),
+        Err(error) => Err(error.into()),
+    }
 }
 
-#[derive(Default)]
-struct ArchiveCoverage {
-    publications: BTreeSet<(String, String, u64)>,
-    reference_changes: BTreeSet<(String, usize, String, String)>,
+fn image_path(
+    layout: &crate::repository_state::RepositoryLayout,
+    path: &str,
+) -> Result<crate::repository_state::VirtualPath> {
+    Ok(layout.classify_and_canonicalize(layout.worktree_root().join(path))?)
 }
 
-struct FailedExecutionState<'a> {
-    plan: &'a ArtifactPlan,
-    artifacts: &'a [crate::domain::artifact_plan::ArtifactPlanEntry],
-    coverage: &'a ArchiveCoverage,
-    publications: Vec<ArchivePublication>,
-    reconciling: bool,
+fn image_evidence(
+    image: &crate::repository_state::RepositoryImage,
+    path: &str,
+    scope: ArtifactListingScope,
+) -> Result<ArtifactEvidence> {
+    use crate::repository_state::RepositoryEntry;
+    let vpath = image_path(image.layout(), path)?;
+    Ok(match image.entry(&vpath)? {
+        RepositoryEntry::Absent => ArtifactEvidence::Missing,
+        RepositoryEntry::File { bytes, .. } => ArtifactEvidence::File(bytes.clone()),
+        RepositoryEntry::Symlink { .. } => ArtifactEvidence::Symlink,
+        RepositoryEntry::Unsupported { .. } => ArtifactEvidence::Unsupported,
+        RepositoryEntry::Directory { .. } => {
+            let entries = match scope {
+                ArtifactListingScope::MetadataOnly => Vec::new(),
+                ArtifactListingScope::ImmediateChildren => image
+                    .listing_fingerprints()
+                    .get(&vpath)
+                    .context("archive directory listing was not captured")?
+                    .children()
+                    .keys()
+                    .map(|name| normalize_artifact_path(&format!("{path}/{name}")))
+                    .collect(),
+                ArtifactListingScope::RecursiveFiles => image
+                    .entries()
+                    .iter()
+                    .filter(|(candidate, entry)| {
+                        image.layout().resolve(candidate).is_ok_and(|physical| {
+                            physical.starts_with(image.layout().worktree_root().join(path))
+                        }) && !matches!(
+                            entry,
+                            RepositoryEntry::Directory { .. } | RepositoryEntry::Absent
+                        )
+                    })
+                    .map(|(candidate, _)| {
+                        Ok(image
+                            .layout()
+                            .resolve(candidate)?
+                            .strip_prefix(image.layout().worktree_root())?
+                            .to_string_lossy()
+                            .replace('\\', "/"))
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+            };
+            ArtifactEvidence::Directory { scope, entries }
+        }
+    })
 }
 
-impl ArchiveCoverage {
-    fn from_events(events: &[Event], target: &PlanTarget, destination_root: &str) -> Self {
-        events
+fn capture_artifact_evidence(
+    session: &mut dyn RepositoryMutationSession,
+    image: &mut crate::repository_state::RepositoryImage,
+    paths: impl IntoIterator<Item = String>,
+    evidence: &mut ArtifactEvidenceMap,
+) -> Result<bool> {
+    let paths = paths.into_iter().collect::<BTreeSet<_>>();
+    for path in &paths {
+        if validate_repo_relative_path(path).is_err() {
+            evidence.insert(path.clone(), ArtifactEvidence::InvalidPath);
+        }
+    }
+    loop {
+        let mut requested = BTreeMap::new();
+        let unresolved = paths
             .iter()
-            .filter_map(|event| match event {
-                Event::ArtifactArchiveExecuted {
-                    target: event_target,
-                    destination_root: event_root,
-                    publications,
-                    reference_changes,
-                    ..
-                } if event_target == target && event_root == destination_root => {
-                    Some((publications, reference_changes))
+            .filter(|path| !evidence.contains_key(path.as_str()))
+            .cloned()
+            .collect::<Vec<_>>();
+        for path in &unresolved {
+            let mut prefix = std::path::PathBuf::new();
+            for component in std::path::Path::new(path).components() {
+                prefix.push(component);
+                let prefix = prefix.to_string_lossy().replace('\\', "/");
+                let Some(fact) = evidence.get(&prefix).cloned() else {
+                    requested.insert(prefix.clone(), image_path(image.layout(), &prefix)?);
+                    break;
+                };
+                if prefix == *path {
+                    break;
                 }
-                _ => None,
-            })
-            .fold(Self::default(), |mut coverage, (publications, changes)| {
-                coverage
-                    .publications
-                    .extend(publications.iter().map(|publication| {
-                        (
-                            publication.destination.clone(),
-                            publication.content_identity.sha256().to_string(),
-                            publication.content_identity.byte_size(),
-                        )
-                    }));
-                coverage
-                    .reference_changes
-                    .extend(changes.iter().map(|change| {
-                        (
-                            change.issue.clone(),
-                            change.document_index,
-                            change.from_path.clone(),
-                            change.to_path.clone(),
-                        )
-                    }));
-                coverage
-            })
+                let descendant = match fact {
+                    ArtifactEvidence::Directory { .. } | ArtifactEvidence::Missing => None,
+                    ArtifactEvidence::Symlink => Some(ArtifactEvidence::Symlink),
+                    ArtifactEvidence::InvalidPath => Some(ArtifactEvidence::InvalidPath),
+                    ArtifactEvidence::File(_) | ArtifactEvidence::Unsupported => {
+                        Some(ArtifactEvidence::Unsupported)
+                    }
+                };
+                if let Some(descendant) = descendant {
+                    evidence.insert(path.clone(), descendant);
+                    break;
+                }
+            }
+        }
+        if requested.is_empty() {
+            return Ok(true);
+        }
+        if !capture_more(session, image, requested.values().cloned(), [])? {
+            return Ok(false);
+        }
+        for (path, _) in requested {
+            evidence.insert(
+                path.clone(),
+                image_evidence(image, &path, ArtifactListingScope::MetadataOnly)?,
+            );
+        }
     }
+}
 
-    fn covers_change(&self, change: &ReferenceChange) -> bool {
-        self.reference_changes.contains(&(
-            change.issue.clone(),
-            change.document_index,
-            change.from_path.clone(),
-            change.to_path.clone(),
-        ))
+fn capture_directory_tree(
+    session: &mut dyn RepositoryMutationSession,
+    mut image: crate::repository_state::RepositoryImage,
+    root: &str,
+) -> Result<Option<crate::repository_state::RepositoryImage>> {
+    use crate::repository_state::RepositoryEntry;
+    let root_path = image_path(image.layout(), root)?;
+    if !image.entries().contains_key(&root_path)
+        && !capture_more(session, &mut image, [root_path.clone()], [])?
+    {
+        return Ok(None);
     }
-
-    fn covers_publication(&self, destination: &str, identity: &ContentIdentity) -> bool {
-        self.publications.contains(&(
-            destination.to_string(),
-            identity.sha256().to_string(),
-            identity.byte_size(),
-        ))
+    match image.entry(&root_path)? {
+        RepositoryEntry::Absent
+        | RepositoryEntry::File { .. }
+        | RepositoryEntry::Symlink { .. }
+        | RepositoryEntry::Unsupported { .. } => return Ok(Some(image)),
+        RepositoryEntry::Directory { .. } => {}
+    }
+    if !image.listing_fingerprints().contains_key(&root_path)
+        && !capture_more(session, &mut image, [], [root_path.clone()])?
+    {
+        return Ok(None);
+    }
+    let root_physical = image.layout().resolve(&root_path)?;
+    loop {
+        let mut paths = BTreeSet::new();
+        for (directory, listing) in image.listing_fingerprints() {
+            if image
+                .layout()
+                .resolve(directory)?
+                .starts_with(&root_physical)
+            {
+                for name in listing.children().keys() {
+                    let child = image
+                        .layout()
+                        .classify_and_canonicalize(image.layout().resolve(directory)?.join(name))?;
+                    if !image.entries().contains_key(&child) {
+                        paths.insert(child);
+                    }
+                }
+            }
+        }
+        if !paths.is_empty() {
+            if !capture_more(session, &mut image, paths, [])? {
+                return Ok(None);
+            }
+            continue;
+        }
+        let listings = image
+            .entries()
+            .iter()
+            .filter(|(path, entry)| {
+                matches!(entry, RepositoryEntry::Directory { .. })
+                    && image
+                        .layout()
+                        .resolve(path)
+                        .is_ok_and(|physical| physical.starts_with(&root_physical))
+                    && !image.listing_fingerprints().contains_key(path)
+            })
+            .map(|(path, _)| path.clone())
+            .collect::<BTreeSet<_>>();
+        if listings.is_empty() {
+            return Ok(Some(image));
+        }
+        if !capture_more(session, &mut image, [], listings)? {
+            return Ok(None);
+        }
     }
 }
 
 impl CommandExecutor<JsonFileStorage> {
+    fn capture_archive_plan(
+        &self,
+        session: &mut dyn RepositoryMutationSession,
+        target: ArchiveTarget<'_>,
+    ) -> Result<Option<(crate::repository_state::RepositoryImage, ArtifactPlan)>> {
+        let Some(mut image) = self.capture_proposed_base_without_documents(session)? else {
+            return Ok(None);
+        };
+        let config = crate::repository_state::assemble_config(&image)?;
+        let namespaces = crate::config_manager::namespaces_from_config(&config);
+        let hierarchy = crate::repository_state::hierarchy_config(&namespaces);
+        let issues = super::captured_active_issues(&image)?;
+        let root_id = match target {
+            ArchiveTarget::Document(_) => None,
+            ArchiveTarget::Container(id) => Some(super::resolve_issue_from_capture(&issues, id)?),
+        };
+        let policy =
+            ArtifactClassificationPolicy::from_documentation(config.documentation.as_ref());
+        let plan_target = match target {
+            ArchiveTarget::Document(path) => PlanTarget::Document {
+                path: normalize_artifact_path(path),
+            },
+            ArchiveTarget::Container(_) => PlanTarget::Container {
+                id: root_id
+                    .as_deref()
+                    .context("container id was not resolved")?
+                    .into(),
+            },
+        };
+        let legacy = artifact_destination_root(&plan_target, &policy.archive_root);
+        let mut conflicts = Vec::new();
+        let destination = if let Some(id) = root_id.as_deref() {
+            let issue = issues
+                .iter()
+                .find(|issue| issue.id == id)
+                .context("captured container missing")?;
+            let preferred =
+                preferred_container_destination_root(issue, &hierarchy, &policy.archive_root);
+            if policy.archive_root.is_empty() {
+                preferred
+            } else {
+                let archive_root = std::path::Path::new(&legacy)
+                    .parent()
+                    .context("archive root missing")?
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                let archive_path = image_path(image.layout(), &archive_root)?;
+                let mut root_evidence = ArtifactEvidenceMap::new();
+                if !capture_artifact_evidence(
+                    session,
+                    &mut image,
+                    [archive_root.clone()],
+                    &mut root_evidence,
+                )? {
+                    return Ok(None);
+                }
+                let archive_is_directory = matches!(
+                    root_evidence.get(&archive_root),
+                    Some(ArtifactEvidence::Directory { .. })
+                );
+                let children = if archive_is_directory {
+                    if !capture_more(session, &mut image, [], [archive_path.clone()])? {
+                        return Ok(None);
+                    }
+                    image
+                        .listing_fingerprints()
+                        .get(&archive_path)
+                        .context("archive root listing was not captured")?
+                        .children()
+                        .keys()
+                        .map(|name| normalize_artifact_path(&format!("{archive_root}/{name}")))
+                        .collect::<Vec<_>>()
+                } else {
+                    Vec::new()
+                };
+                let mut child_paths = children
+                    .iter()
+                    .map(|path| image_path(image.layout(), path))
+                    .collect::<Result<Vec<_>>>()?;
+                if archive_is_directory {
+                    child_paths.push(image_path(image.layout(), &legacy)?);
+                }
+                if !capture_more(session, &mut image, child_paths, [])? {
+                    return Ok(None);
+                }
+                let mut markers = Vec::new();
+                for path in &children {
+                    let child = image_path(image.layout(), path)?;
+                    if matches!(
+                        image.entry(&child)?,
+                        crate::repository_state::RepositoryEntry::Directory { .. }
+                    ) {
+                        markers.push(image_path(
+                            image.layout(),
+                            &format!("{path}/.jit-container"),
+                        )?);
+                    }
+                }
+                if !capture_more(session, &mut image, markers, [])? {
+                    return Ok(None);
+                }
+                let mut evidence = ArtifactEvidenceMap::from([
+                    (
+                        archive_root.clone(),
+                        if archive_is_directory {
+                            image_evidence(
+                                &image,
+                                &archive_root,
+                                ArtifactListingScope::ImmediateChildren,
+                            )?
+                        } else {
+                            root_evidence
+                                .remove(&archive_root)
+                                .context("archive root evidence was not derived")?
+                        },
+                    ),
+                    (
+                        legacy.clone(),
+                        if archive_is_directory {
+                            image_evidence(&image, &legacy, ArtifactListingScope::MetadataOnly)?
+                        } else {
+                            ArtifactEvidence::Missing
+                        },
+                    ),
+                ]);
+                for child in children {
+                    let fact = image_evidence(&image, &child, ArtifactListingScope::MetadataOnly)?;
+                    if matches!(fact, ArtifactEvidence::Directory { .. }) {
+                        let marker = format!("{child}/.jit-container");
+                        evidence.insert(
+                            marker.clone(),
+                            image_evidence(&image, &marker, ArtifactListingScope::MetadataOnly)?,
+                        );
+                    }
+                    evidence.insert(child, fact);
+                }
+                let resolved = derive_container_destination(&preferred, &legacy, id, &evidence)?;
+                conflicts = resolved.conflicting_roots;
+                resolved.destination_root
+            }
+        } else {
+            legacy.clone()
+        };
+        let mut inventory_issues = issues.clone();
+        remap_archived_references(&mut inventory_issues, &destination);
+        let explicit = match target {
+            ArchiveTarget::Document(path) => ExplicitRootTarget::Document(path),
+            ArchiveTarget::Container(_) => ExplicitRootTarget::Container(
+                root_id
+                    .as_deref()
+                    .context("container id was not resolved")?,
+            ),
+        };
+        let pinned_requests = pinned_root_requests(&inventory_issues, &hierarchy, explicit)?;
+        if !capture_pinned_more(session, &mut image, &pinned_requests)? {
+            return Ok(None);
+        }
+        let pinned = pinned_requests
+            .into_iter()
+            .map(|request| -> Result<_> {
+                let captured = image.pinned_evidence().get(&request).with_context(|| {
+                    format!(
+                        "captured pinned evidence is missing for {} at {}",
+                        request.1, request.0
+                    )
+                })?;
+                let fact = match captured.commit_oid() {
+                    Some(oid) => PinnedRootEvidence::Resolved(
+                        crate::domain::artifact_plan::ArtifactVersion::pinned(oid)?,
+                    ),
+                    None if captured.unavailable_reason().is_some() => {
+                        PinnedRootEvidence::Unavailable
+                    }
+                    None => bail!(
+                        "captured pinned evidence is malformed for {} at {}",
+                        request.1,
+                        request.0
+                    ),
+                };
+                Ok((request, fact))
+            })
+            .collect::<Result<_>>()?;
+        let inventory = inventory_explicit_roots(&inventory_issues, &hierarchy, explicit, &pinned)?;
+        let roots = inventory
+            .artifacts()
+            .iter()
+            .filter(|entry| !entry.version().is_pinned())
+            .map(|entry| entry.source().to_string())
+            .chain(
+                issues
+                    .iter()
+                    .flat_map(|issue| issue.documents.iter())
+                    .filter(|doc| doc.commit.is_none())
+                    .map(|doc| normalize_artifact_path(&doc.path)),
+            )
+            .collect::<BTreeSet<_>>();
+        let mut evidence = ArtifactEvidenceMap::new();
+        let mut state = ArtifactClosureState::new(roots);
+        let parsed = loop {
+            match expand_artifact_closure(state, &evidence) {
+                ArtifactClosure::Complete(parsed) => break parsed,
+                ArtifactClosure::Needs {
+                    paths,
+                    state: next_state,
+                } => {
+                    if !capture_artifact_evidence(
+                        session,
+                        &mut image,
+                        paths.iter().cloned(),
+                        &mut evidence,
+                    )? {
+                        return Ok(None);
+                    }
+                    state = next_state;
+                }
+            }
+        };
+        let (discovered, embedded) =
+            derive_archive_artifacts(inventory, &issues, &evidence, &parsed)?;
+        let mut blockers = discovered.blockers;
+        blockers.extend(
+            conflicts
+                .into_iter()
+                .map(|root| PlanBlocker::new(BlockerCode::DestinationConflict, Some(root))),
+        );
+        if let Some(id) = root_id.as_deref() {
+            if issues
+                .iter()
+                .find(|issue| issue.id == id)
+                .is_some_and(|issue| !issue.is_effectively_terminal())
+            {
+                blockers.push(PlanBlocker::new(
+                    BlockerCode::NonTerminalTarget,
+                    None::<String>,
+                ));
+            }
+        }
+        let artifacts = discovered.artifacts;
+        let mut paths = artifacts
+            .iter()
+            .filter(|a| !a.version().is_pinned())
+            .flat_map(|a| {
+                [
+                    a.source().to_string(),
+                    artifact_mirror_destination(&destination, a.source()),
+                ]
+            })
+            .collect::<BTreeSet<_>>();
+        if matches!(plan_target, PlanTarget::Container { .. }) {
+            paths.insert(format!("{destination}/.jit-container"));
+        }
+        let ancestors = paths
+            .iter()
+            .flat_map(|path| {
+                std::path::Path::new(path)
+                    .ancestors()
+                    .skip(1)
+                    .filter(|p| !p.as_os_str().is_empty())
+                    .map(|p| p.to_string_lossy().replace('\\', "/"))
+            })
+            .collect::<BTreeSet<_>>();
+        paths.extend(ancestors);
+        if !capture_artifact_evidence(session, &mut image, paths.iter().cloned(), &mut evidence)? {
+            return Ok(None);
+        }
+        if matches!(plan_target, PlanTarget::Container { .. })
+            && matches!(
+                evidence.get(&destination),
+                Some(ArtifactEvidence::Directory { .. })
+            )
+        {
+            let Some(next) = capture_directory_tree(session, image, &destination)? else {
+                return Ok(None);
+            };
+            image = next;
+            evidence.insert(
+                destination.clone(),
+                image_evidence(&image, &destination, ArtifactListingScope::RecursiveFiles)?,
+            );
+        }
+        let mut facts = classification_facts_from_evidence(
+            &plan_target,
+            &destination,
+            &artifacts,
+            &policy,
+            embedded,
+            &evidence,
+        )?;
+        apply_recorded_residue_identities(
+            &mut facts.locations,
+            &plan_target,
+            &destination,
+            &crate::repository_state::captured_archive_events(&image)?,
+        );
+        let plan = classify_artifacts(
+            ArtifactClassificationInventory::new(plan_target, artifacts, blockers)
+                .with_destination_root(destination),
+            policy,
+            facts,
+        )?;
+        Ok(Some((image, plan)))
+    }
+
     /// Execute a freshly recomputed document archive plan under one write guard.
     pub fn execute_archive_document(&self, path: &str) -> Result<ArchiveExecutionResult> {
-        self.execute_archive_document_with_hooks(path, &mut NoArchiveExecutionHooks)
+        self.execute_archive_transaction(ArchiveTarget::Document(path))
     }
 
     /// Execute a freshly recomputed container archive plan under one write guard.
     pub fn execute_archive_container(&self, id: &str) -> Result<ArchiveExecutionResult> {
-        self.execute_archive_container_with_hooks(id, &mut NoArchiveExecutionHooks)
+        self.execute_archive_transaction(ArchiveTarget::Container(id))
     }
 
-    #[doc(hidden)]
-    pub fn execute_archive_document_with_hooks<H: ArchiveExecutionHooks>(
-        &self,
-        path: &str,
-        hooks: &mut H,
-    ) -> Result<ArchiveExecutionResult> {
-        self.execute_archive_target(ArchiveTarget::Document(path), hooks)
-    }
-
-    #[doc(hidden)]
-    pub fn execute_archive_container_with_hooks<H: ArchiveExecutionHooks>(
-        &self,
-        id: &str,
-        hooks: &mut H,
-    ) -> Result<ArchiveExecutionResult> {
-        self.execute_archive_target(ArchiveTarget::Container(id), hooks)
-    }
-
-    fn execute_archive_target<H: ArchiveExecutionHooks>(
+    fn execute_archive_transaction(
         &self,
         target: ArchiveTarget<'_>,
-        hooks: &mut H,
     ) -> Result<ArchiveExecutionResult> {
-        // This guard belongs to the same storage instance and thread used for
-        // every nested read/write below. It intentionally spans recomputation
-        // through the final deletion attempt.
-        let _repo_write_guard = self.storage.acquire_repo_write_lock()?;
-        let plan = self.plan_archive_target(target)?;
-        // REQ-05 (`jit:45a140ae`): when a blocker is caused by lifecycle state,
-        // refuse with a diagnostic that names the permitted next action instead of
-        // the generic ineligibility from `executable_artifacts` below. The same
-        // guidance is carried in the plan JSON a preview emits.
-        if let Some((code, guidance)) = plan
-            .blockers()
-            .iter()
-            .chain(
-                plan.artifacts()
-                    .iter()
-                    .flat_map(|artifact| artifact.blockers()),
-            )
-            .find_map(|blocker| {
-                blocker
-                    .code
-                    .guidance()
-                    .map(|guidance| (blocker.code, guidance))
-            })
-        {
-            let target = match plan.target() {
-                PlanTarget::Container { id } => format!("container {}", &id[..id.len().min(8)]),
-                PlanTarget::Document { path } => format!("document {path}"),
+        let layout = self.require_layout()?;
+        let context = crate::repository_state::MutationContext::production();
+        for _ in 0..8 {
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some((image, plan)) = self.capture_archive_plan(session.as_mut(), target)? else {
+                continue;
             };
-            bail!("cannot archive {target}: {} — {guidance}", code.as_str());
-        }
-        let artifacts = plan.executable_artifacts()?;
-
-        let prior_events = self.storage.read_artifact_archive_events()?;
-        let coverage =
-            ArchiveCoverage::from_events(&prior_events, plan.target(), plan.destination_root());
-        let mut stage_index = 0;
-        let mut staged = Vec::new();
-        for artifact in artifacts.iter().filter(|artifact| {
-            matches!(
-                artifact.action(),
-                ArtifactAction::Move | ArtifactAction::Copy
-            ) && !artifact.already_archived()
-        }) {
-            hooks.before_stage(stage_index, artifact.source())?;
-            stage_index += 1;
-            let identity = artifact
-                .content_identity()
-                .context("executable publication lacks content identity")?
-                .clone();
-            let destination = artifact
-                .destination()
-                .context("executable publication lacks destination")?
-                .to_string();
-            let verified = self.storage.verify_staged_artifact(
-                self.storage.stage_artifact(artifact.source())?,
-                &identity,
-            )?;
-            staged.push(StagedPublication {
-                source: artifact.source().to_string(),
-                destination,
-                identity,
-                staged: verified,
-            });
-        }
-        validate_proposed_layout(&plan)?;
-
-        let marker = self.prepare_container_marker(&plan, hooks, &mut stage_index)?;
-        if let Some((publication, staged_marker)) = marker.as_ref() {
-            if !publication.adopted {
-                self.storage
-                    .preflight_staged_artifact(staged_marker, &publication.destination)?;
-            }
-        }
-        for publication in &staged {
-            self.storage
-                .preflight_staged_artifact(&publication.staged, &publication.destination)?;
-        }
-        let mut publications = artifacts
-            .iter()
-            .filter(|artifact| artifact.already_archived())
-            .filter_map(|artifact| {
-                let destination = artifact.destination()?;
-                let identity = artifact.content_identity()?;
-                (!coverage.covers_publication(destination, identity)).then(|| ArchivePublication {
-                    source: Some(artifact.source().to_string()),
-                    destination: destination.to_string(),
-                    content_identity: identity.clone(),
-                    adopted: true,
-                })
-            })
-            .collect::<Vec<_>>();
-        let mut reconciling = !publications.is_empty();
-        let mut publish_index = 0;
-
-        if let Some((publication, staged_marker)) = marker {
-            if publication.adopted {
-                if !coverage
-                    .covers_publication(&publication.destination, &publication.content_identity)
-                {
-                    reconciling = true;
-                    publications.push(publication);
-                }
-            } else {
-                let publish = hooks
-                    .before_publish(publish_index, &publication.destination)
-                    .and_then(|()| {
-                        self.storage
-                            .publish_staged_artifact(staged_marker, &publication.destination)
-                    });
-                publish_index += 1;
-                if let Err(cause) = publish {
-                    return Err(self.record_failed_execution_mutations(
-                        FailedExecutionState {
-                            plan: &plan,
-                            artifacts,
-                            coverage: &coverage,
-                            publications,
-                            reconciling,
-                        },
-                        hooks,
-                        cause,
-                    ));
-                }
-                publications.push(publication);
-            }
-        }
-        for publication in staged {
-            let durable = ArchivePublication {
-                source: Some(publication.source),
-                destination: publication.destination,
-                content_identity: publication.identity,
-                adopted: false,
-            };
-            let publish = hooks
-                .before_publish(publish_index, &durable.destination)
-                .and_then(|()| {
-                    self.storage
-                        .publish_staged_artifact(publication.staged, &durable.destination)
-                });
-            publish_index += 1;
-            if let Err(cause) = publish {
-                return Err(self.record_failed_execution_mutations(
-                    FailedExecutionState {
-                        plan: &plan,
-                        artifacts,
-                        coverage: &coverage,
-                        publications,
-                        reconciling,
-                    },
-                    hooks,
-                    cause,
-                ));
-            }
-            publications.push(durable);
-        }
-
-        let (saved_snapshots, mut event_changes, observed_uncovered_change) =
-            match self.apply_reference_changes(artifacts, &coverage, hooks) {
-                Ok(applied) => applied,
-                Err(cause) => {
-                    return Err(self.record_failed_execution_mutations(
-                        FailedExecutionState {
-                            plan: &plan,
-                            artifacts,
-                            coverage: &coverage,
-                            publications,
-                            reconciling,
-                        },
-                        hooks,
-                        cause,
-                    ));
-                }
-            };
-        if observed_uncovered_change {
-            reconciling = true;
-        }
-        event_changes.sort_by(|left, right| {
-            (
-                &left.issue,
-                left.document_index,
-                &left.from_path,
-                &left.to_path,
-            )
-                .cmp(&(
-                    &right.issue,
-                    right.document_index,
-                    &right.from_path,
-                    &right.to_path,
-                ))
-        });
-        event_changes.dedup();
-
-        let mut warnings = plan.warnings().to_vec();
-        warnings.extend(
-            artifacts
+            if let Some((code, guidance)) = plan
+                .blockers()
                 .iter()
-                .flat_map(|artifact| artifact.warnings().iter().cloned()),
-        );
-        let deletion_candidates = self.preflight_deletions(artifacts, &mut warnings)?;
-        let event_needed = !publications.is_empty()
-            || !event_changes.is_empty()
-            || !deletion_candidates.is_empty();
-        let planned_deletions = artifacts
-            .iter()
-            .flat_map(|artifact| artifact.pending_deletions().iter().cloned())
-            .collect::<Vec<_>>();
-
-        if event_needed {
-            let event = Event::draft_artifact_archive_executed(
-                plan.target().clone(),
-                plan.destination_root().to_string(),
-                publications.clone(),
-                event_changes.clone(),
-                planned_deletions.clone(),
-                reconciling,
-            );
-            let append = hooks
-                .before_event_append()
-                .and_then(|()| self.storage.append_event(&event));
-            if let Err(cause) = append {
-                return Err(rollback_reference_changes(
-                    &self.storage,
-                    saved_snapshots,
-                    hooks,
-                    cause,
-                ));
-            }
-        }
-
-        let mut deleted_sources = Vec::new();
-        for (index, deletion) in deletion_candidates.iter().enumerate() {
-            let attempt = hooks.before_delete(index, &deletion.source).and_then(|()| {
-                self.storage
-                    .delete_artifact_if_identity(&deletion.source, &deletion.content_identity)
-            });
-            match attempt {
-                Ok(()) => deleted_sources.push(deletion.source.clone()),
-                Err(_) => warnings.push(PlanWarning::new(
-                    WarningCode::DeletionFailed,
-                    Some(&deletion.source),
-                )),
-            }
-        }
-        canonicalize_warnings(&mut warnings);
-
-        // Coupled retirement (`jit:45a140ae`): a successful container archival
-        // retires the container into Archived as its final durable step, recording
-        // its pre-archive terminal state. Idempotent — a reconciling rerun finds it
-        // already Archived and the transition chokepoint's no-op guard does
-        // nothing. Document archival has no container to retire. This runs after
-        // the artifact commit point, so a rerun after a mid-flight failure (which
-        // left the container Done/Rejected) still reaches Archived.
-        if let PlanTarget::Container { id } = plan.target() {
-            self.publish_captured_state_transition(
-                id,
-                crate::domain::State::Archived,
-                false,
-                false,
-                false,
-            )?;
-        }
-
-        Ok(ArchiveExecutionResult {
-            schema_version: 1,
-            target: plan.target().clone(),
-            destination_root: plan.destination_root().to_string(),
-            publications,
-            reference_changes: event_changes,
-            planned_deletions,
-            deleted_sources,
-            warnings,
-            event_appended: event_needed,
-            reconciling,
-        })
-    }
-
-    fn prepare_container_marker<H: ArchiveExecutionHooks>(
-        &self,
-        plan: &ArtifactPlan,
-        hooks: &mut H,
-        stage_index: &mut usize,
-    ) -> Result<Option<(ArchivePublication, VerifiedArtifact)>> {
-        let PlanTarget::Container { id } = plan.target() else {
-            return Ok(None);
-        };
-        let destination = format!("{}/.jit-container", plan.destination_root());
-        let bytes = format!("{id}\n").into_bytes();
-        let identity = ContentIdentity::from_bytes(&bytes);
-        hooks.before_marker_inspect(&destination)?;
-        match self.storage.stage_artifact_if_exists(&destination)? {
-            Some(existing) => {
-                let verified = self
-                    .storage
-                    .verify_staged_artifact(existing, &identity)
-                    .with_context(|| {
-                        format!("container ownership marker changed after planning: {destination}")
-                    })?;
-                Ok(Some((
-                    ArchivePublication {
-                        source: None,
-                        destination,
-                        content_identity: identity,
-                        adopted: true,
-                    },
-                    verified,
-                )))
-            }
-            None => {
-                hooks.before_stage(*stage_index, &destination)?;
-                *stage_index += 1;
-                let verified = self.storage.verify_staged_artifact(
-                    self.storage.stage_artifact_bytes(&bytes)?,
-                    &identity,
-                )?;
-                Ok(Some((
-                    ArchivePublication {
-                        source: None,
-                        destination,
-                        content_identity: identity,
-                        adopted: false,
-                    },
-                    verified,
-                )))
-            }
-        }
-    }
-
-    fn apply_reference_changes<H: ArchiveExecutionHooks>(
-        &self,
-        artifacts: &[crate::domain::artifact_plan::ArtifactPlanEntry],
-        coverage: &ArchiveCoverage,
-        hooks: &mut H,
-    ) -> Result<(Vec<Issue>, Vec<ReferenceChange>, bool)> {
-        let changes = artifacts
-            .iter()
-            .flat_map(|artifact| artifact.reference_changes().iter().cloned())
-            .collect::<Vec<_>>();
-        let grouped = changes.into_iter().fold(
-            BTreeMap::<String, Vec<ReferenceChange>>::new(),
-            |mut grouped, change| {
-                grouped
-                    .entry(change.issue.clone())
-                    .or_default()
-                    .push(change);
-                grouped
-            },
-        );
-        let mut prepared = Vec::new();
-        let mut observed = Vec::new();
-        for (issue_id, changes) in grouped {
-            let original = self.storage.load_issue(&issue_id)?;
-            let mut updated = original.clone();
-            let mut applied = Vec::new();
-            for change in changes {
-                let document = updated
-                    .documents
-                    .get_mut(change.document_index)
-                    .ok_or_else(|| {
-                        anyhow!(
-                            "planned document index {} is absent on issue {}",
-                            change.document_index,
-                            issue_id
-                        )
-                    })?;
-                if document.commit.is_some() {
-                    bail!("planned relink points at pinned issue document: {issue_id}");
-                }
-                let actual = normalize_artifact_path(&document.path);
-                if actual == change.from_path {
-                    document.path = change.to_path.clone();
-                    document.assets.clear();
-                    applied.push(change);
-                } else if actual == change.to_path {
-                    if !coverage.covers_change(&change) {
-                        observed.push(change);
-                    }
-                } else {
-                    bail!(
-                        "planned relink no longer matches issue {} document {}: expected {} or {}, found {}",
-                        issue_id,
-                        change.document_index,
-                        change.from_path,
-                        change.to_path,
-                        actual
-                    );
-                }
-            }
-            if !applied.is_empty() {
-                prepared.push((original, updated, applied));
-            }
-        }
-
-        let observed_uncovered = !observed.is_empty();
-        let mut snapshots = Vec::new();
-        let mut event_changes = observed;
-        for (index, (original, updated, applied)) in prepared.into_iter().enumerate() {
-            if let Err(cause) = hooks
-                .before_relink(index, &original.id)
-                .and_then(|()| self.storage.save_issue(updated))
-            {
-                return Err(rollback_reference_changes(
-                    &self.storage,
-                    snapshots,
-                    hooks,
-                    cause,
-                ));
-            }
-            event_changes.extend(applied);
-            snapshots.push(original);
-        }
-        Ok((snapshots, event_changes, observed_uncovered))
-    }
-
-    fn record_failed_execution_mutations<H: ArchiveExecutionHooks>(
-        &self,
-        state: FailedExecutionState<'_>,
-        hooks: &mut H,
-        cause: anyhow::Error,
-    ) -> anyhow::Error {
-        let reference_changes = match self
-            .durable_uncovered_reference_changes(state.artifacts, state.coverage)
-        {
-            Ok(changes) => changes,
-            Err(inspect) => {
-                return cause.context(format!(
-                    "archive failed after a durable mutation and residual reference inspection failed: {inspect:#}"
-                ));
-            }
-        };
-        if state.publications.is_empty() && reference_changes.is_empty() {
-            return cause;
-        }
-        let event = Event::draft_artifact_archive_executed(
-            state.plan.target().clone(),
-            state.plan.destination_root().to_string(),
-            state.publications,
-            reference_changes,
-            Vec::new(),
-            state.reconciling,
-        );
-        match hooks
-            .before_event_append()
-            .and_then(|()| self.storage.append_event(&event))
-        {
-            Ok(()) => cause.context(
-                "archive aborted after durable mutations; their exact successful subset was recorded",
-            ),
-            Err(record) => cause.context(format!(
-                "archive aborted after durable mutations and recording that subset failed: {record:#}; rerun will reconcile"
-            )),
-        }
-    }
-
-    fn durable_uncovered_reference_changes(
-        &self,
-        artifacts: &[crate::domain::artifact_plan::ArtifactPlanEntry],
-        coverage: &ArchiveCoverage,
-    ) -> Result<Vec<ReferenceChange>> {
-        let mut issues = BTreeMap::new();
-        let candidates = artifacts
-            .iter()
-            .flat_map(|artifact| artifact.reference_changes())
-            .filter(|change| !coverage.covers_change(change))
-            .collect::<Vec<_>>();
-        let mut changes = Vec::new();
-        for change in candidates {
-            if !issues.contains_key(&change.issue) {
-                issues.insert(
-                    change.issue.clone(),
-                    self.storage.load_issue(&change.issue)?,
-                );
-            }
-            if issues[&change.issue]
-                .documents
-                .get(change.document_index)
-                .is_some_and(|document| {
-                    document.commit.is_none()
-                        && normalize_artifact_path(&document.path) == change.to_path
+                .chain(
+                    plan.artifacts()
+                        .iter()
+                        .flat_map(|artifact| artifact.blockers()),
+                )
+                .find_map(|blocker| {
+                    blocker
+                        .code
+                        .guidance()
+                        .map(|guidance| (blocker.code, guidance))
                 })
             {
-                changes.push(change.clone());
+                bail!("cannot archive target: {} — {guidance}", code.as_str());
+            }
+            let (materialization, result) =
+                crate::repository_state::finalize_archive_execution(&image, &context, &plan)?;
+            if materialization.delta().actions().is_empty() {
+                return Ok(result);
+            }
+            match session.apply(&materialization) {
+                Ok(_) => return Ok(result),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
             }
         }
-        changes.sort_by(|left, right| {
-            (
-                &left.issue,
-                left.document_index,
-                &left.from_path,
-                &left.to_path,
-            )
-                .cmp(&(
-                    &right.issue,
-                    right.document_index,
-                    &right.from_path,
-                    &right.to_path,
-                ))
-        });
-        changes.dedup();
-        Ok(changes)
+        Err(anyhow!(
+            "archive execution did not converge after repeated capture conflicts"
+        ))
     }
-
-    fn preflight_deletions(
-        &self,
-        artifacts: &[crate::domain::artifact_plan::ArtifactPlanEntry],
-        warnings: &mut Vec<PlanWarning>,
-    ) -> Result<Vec<PendingDeletion>> {
-        let mut candidates = Vec::new();
-        for artifact in artifacts {
-            for deletion in artifact.pending_deletions() {
-                let durable = artifact.reference_changes().iter().all(|change| {
-                    self.storage
-                        .load_issue(&change.issue)
-                        .ok()
-                        .and_then(|issue| issue.documents.get(change.document_index).cloned())
-                        .is_some_and(|document| {
-                            document.commit.is_none()
-                                && normalize_artifact_path(&document.path) == change.to_path
-                        })
-                });
-                if !durable {
-                    warnings.push(PlanWarning::new(
-                        WarningCode::DeletionFailed,
-                        Some(&deletion.source),
-                    ));
-                    continue;
-                }
-                let verified = self
-                    .storage
-                    .stage_artifact(&deletion.source)
-                    .and_then(|stage| {
-                        self.storage
-                            .verify_staged_artifact(stage, &deletion.content_identity)
-                    });
-                match verified {
-                    Ok(stage) => {
-                        drop(stage);
-                        candidates.push(deletion.clone());
-                    }
-                    Err(_) => warnings.push(PlanWarning::new(
-                        WarningCode::DeletionFailed,
-                        Some(&deletion.source),
-                    )),
-                }
-            }
-        }
-        Ok(candidates)
-    }
-}
-
-fn rollback_reference_changes<H: ArchiveExecutionHooks>(
-    storage: &JsonFileStorage,
-    snapshots: Vec<Issue>,
-    hooks: &mut H,
-    cause: anyhow::Error,
-) -> anyhow::Error {
-    for (index, snapshot) in snapshots.into_iter().rev().enumerate() {
-        if let Err(revert) = hooks
-            .before_revert(index, &snapshot.id)
-            .and_then(|()| storage.restore_issue_verbatim(snapshot))
-        {
-            return cause.context(format!(
-                "archive reference rollback failed after durable mutation: {revert:#}; rerun will reconcile the adopted state"
-            ));
-        }
-    }
-    cause.context("archive aborted; every applied reference change was reverted")
-}
-
-fn canonicalize_warnings(warnings: &mut Vec<PlanWarning>) {
-    warnings.sort_by(|left, right| {
-        (left.code.as_str(), left.path.as_deref())
-            .cmp(&(right.code.as_str(), right.path.as_deref()))
-    });
-    warnings.dedup();
 }
 
 #[cfg(test)]
@@ -1009,19 +907,6 @@ mod tests {
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         CommandExecutor::new(storage).with_layout(layout)
-    }
-
-    #[derive(Default)]
-    struct FaultHooks {
-        fail_stage: Option<usize>,
-        fail_publish: Option<usize>,
-        fail_relink: Option<usize>,
-        fail_event: bool,
-        fail_revert: Option<usize>,
-        fail_delete: Option<usize>,
-        edit_before_delete: Option<(std::path::PathBuf, Vec<u8>)>,
-        torn_event_path: Option<std::path::PathBuf>,
-        marker_inspect: Option<Box<dyn FnOnce() -> Result<()>>>,
     }
 
     #[test]
@@ -1085,67 +970,6 @@ mod tests {
         );
     }
 
-    impl ArchiveExecutionHooks for FaultHooks {
-        fn before_stage(&mut self, index: usize, _source: &str) -> Result<()> {
-            if self.fail_stage == Some(index) {
-                bail!("injected stage failure {index}");
-            }
-            Ok(())
-        }
-
-        fn before_relink(&mut self, index: usize, _issue: &str) -> Result<()> {
-            if self.fail_relink == Some(index) {
-                bail!("injected relink failure {index}");
-            }
-            Ok(())
-        }
-
-        fn before_publish(&mut self, index: usize, _destination: &str) -> Result<()> {
-            if self.fail_publish == Some(index) {
-                bail!("injected publication failure {index}");
-            }
-            Ok(())
-        }
-
-        fn before_marker_inspect(&mut self, _destination: &str) -> Result<()> {
-            if let Some(inspect) = self.marker_inspect.take() {
-                inspect()?;
-            }
-            Ok(())
-        }
-
-        fn before_event_append(&mut self) -> Result<()> {
-            if let Some(path) = self.torn_event_path.take() {
-                use std::io::Write;
-                std::fs::OpenOptions::new()
-                    .append(true)
-                    .open(path)?
-                    .write_all(b"{\"type\":\"artifact_archive")?;
-            }
-            if self.fail_event {
-                bail!("injected event append failure");
-            }
-            Ok(())
-        }
-
-        fn before_revert(&mut self, index: usize, _issue: &str) -> Result<()> {
-            if self.fail_revert == Some(index) {
-                bail!("injected revert failure {index}");
-            }
-            Ok(())
-        }
-
-        fn before_delete(&mut self, index: usize, _source: &str) -> Result<()> {
-            if let Some((path, bytes)) = self.edit_before_delete.take() {
-                fs::write(path, bytes)?;
-            }
-            if self.fail_delete == Some(index) {
-                bail!("injected deletion failure {index}");
-            }
-            Ok(())
-        }
-    }
-
     fn executable_document_repo(
         owner_count: usize,
         content: &str,
@@ -1180,21 +1004,8 @@ mod tests {
                 id
             })
             .collect();
-        (repo, CommandExecutor::new(storage), ids)
-    }
-
-    fn assert_guard_released(storage: &JsonFileStorage) {
-        let storage = storage.clone();
-        let (sender, receiver) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let acquired = storage.acquire_repo_write_lock().is_ok();
-            sender.send(acquired).unwrap();
-        });
-        assert_eq!(
-            receiver.recv_timeout(std::time::Duration::from_secs(2)),
-            Ok(true),
-            "failed execution retained the repository write guard"
-        );
+        let executor = executor(&repo, storage);
+        (repo, executor, ids)
     }
 
     #[test]
@@ -1234,6 +1045,102 @@ mod tests {
                 .unwrap()
                 .len(),
             1
+        );
+    }
+
+    #[test]
+    fn test_execute_non_directory_archive_root_is_blocked_without_descending() {
+        let (repo, executor, _) = executable_document_repo(1, "source");
+        fs::write(repo.path().join("archive"), b"occupied").unwrap();
+
+        assert!(executor
+            .execute_archive_document("fixtures/root.md")
+            .is_err());
+        assert_eq!(fs::read(repo.path().join("archive")).unwrap(), b"occupied");
+        assert!(repo.path().join("fixtures/root.md").exists());
+    }
+
+    #[test]
+    fn test_execute_archive_root_nested_under_data_uses_data_paths() {
+        let (repo, executor, _) = executable_document_repo(1, "source");
+        fs::write(
+            repo.path().join(".jit/config.toml"),
+            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \".jit/archive\"\n",
+        )
+        .unwrap();
+
+        executor
+            .execute_archive_document("fixtures/root.md")
+            .unwrap();
+        assert_eq!(
+            fs::read(repo.path().join(".jit/archive/fixtures/root.md")).unwrap(),
+            b"source"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_execute_symlink_source_is_blocked_without_following_it() {
+        use std::os::unix::fs::symlink;
+
+        let (repo, executor, _) = executable_document_repo(1, "source");
+        fs::remove_file(repo.path().join("fixtures/root.md")).unwrap();
+        fs::write(repo.path().join("outside.md"), b"outside").unwrap();
+        symlink("../outside.md", repo.path().join("fixtures/root.md")).unwrap();
+
+        assert!(executor
+            .execute_archive_document("fixtures/root.md")
+            .is_err());
+        assert_eq!(
+            fs::read(repo.path().join("outside.md")).unwrap(),
+            b"outside"
+        );
+        assert!(!repo.path().join("archive/fixtures/root.md").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_execute_nested_archive_root_symlink_is_blocked_without_descending() {
+        use std::os::unix::fs::symlink;
+
+        let (repo, executor, id) = configured_repo();
+        fs::write(
+            repo.path().join(".jit/config.toml"),
+            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"safe/archive\"\n\n[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n[type_hierarchy.label_associations]\nepic = \"epic\"\n",
+        )
+        .unwrap();
+        fs::create_dir(repo.path().join("outside")).unwrap();
+        symlink("outside", repo.path().join("safe")).unwrap();
+
+        assert!(executor.execute_archive_container(&id).is_err());
+        assert!(fs::read_dir(repo.path().join("outside"))
+            .unwrap()
+            .next()
+            .is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_execute_preserves_executable_source_mode() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let (repo, executor, _) = executable_document_repo(1, "source");
+        fs::set_permissions(
+            repo.path().join("fixtures/root.md"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+
+        executor
+            .execute_archive_document("fixtures/root.md")
+            .unwrap();
+        assert_eq!(
+            fs::metadata(repo.path().join("archive/fixtures/root.md"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o755
         );
     }
 
@@ -1289,203 +1196,6 @@ mod tests {
             .is_err());
         assert!(active_repo.path().join("fixtures/root.md").exists());
         assert!(!active_repo.path().join("archive/fixtures/root.md").exists());
-    }
-
-    #[test]
-    fn test_partial_staging_and_partial_relink_failures_cleanup_and_restore_exactly() {
-        let (repo, executor, _) = executable_document_repo(1, "![asset](asset.png)\n");
-        fs::write(repo.path().join("fixtures/asset.png"), b"asset").unwrap();
-        let mut stage_fault = FaultHooks {
-            fail_stage: Some(1),
-            ..Default::default()
-        };
-        assert!(executor
-            .execute_archive_document_with_hooks("fixtures/root.md", &mut stage_fault)
-            .is_err());
-        assert!(repo.path().join("fixtures/root.md").exists());
-        assert!(!repo.path().join("archive/fixtures/root.md").exists());
-        assert_eq!(
-            fs::read_dir(repo.path().join(".jit/tmp")).unwrap().count(),
-            0
-        );
-        assert_guard_released(&executor.storage);
-
-        let (repo, executor, ids) = executable_document_repo(2, "two owners");
-        let before = ids
-            .iter()
-            .map(|id| executor.storage.load_issue(id).unwrap())
-            .collect::<Vec<_>>();
-        let mut relink_fault = FaultHooks {
-            fail_relink: Some(1),
-            ..Default::default()
-        };
-        assert!(executor
-            .execute_archive_document_with_hooks("fixtures/root.md", &mut relink_fault)
-            .is_err());
-        for snapshot in before {
-            assert_eq!(executor.storage.load_issue(&snapshot.id).unwrap(), snapshot);
-        }
-        assert!(repo.path().join("fixtures/root.md").exists());
-        assert_guard_released(&executor.storage);
-    }
-
-    #[test]
-    fn test_later_publication_failure_records_only_successful_publications_before_return() {
-        let (repo, executor, _) = executable_document_repo(1, "![asset](asset.png)\n");
-        fs::write(repo.path().join("fixtures/asset.png"), b"asset").unwrap();
-        let mut fault = FaultHooks {
-            fail_publish: Some(1),
-            ..Default::default()
-        };
-        assert!(executor
-            .execute_archive_document_with_hooks("fixtures/root.md", &mut fault)
-            .is_err());
-        let first_events = executor.storage.read_artifact_archive_events().unwrap();
-        assert_eq!(first_events.len(), 1);
-        let first_publications = match &first_events[0] {
-            Event::ArtifactArchiveExecuted {
-                publications,
-                reference_changes,
-                planned_deletions,
-                ..
-            } => {
-                assert!(reference_changes.is_empty());
-                assert!(planned_deletions.is_empty());
-                publications.clone()
-            }
-            _ => unreachable!(),
-        };
-        assert_eq!(first_publications.len(), 1);
-
-        executor
-            .execute_archive_document("fixtures/root.md")
-            .unwrap();
-        let events = executor.storage.read_artifact_archive_events().unwrap();
-        assert_eq!(events.len(), 2);
-        let destinations = events
-            .iter()
-            .flat_map(|event| match event {
-                Event::ArtifactArchiveExecuted { publications, .. } => publications.as_slice(),
-                _ => &[],
-            })
-            .map(|publication| publication.destination.clone())
-            .collect::<Vec<_>>();
-        assert_eq!(destinations.len(), 2);
-        assert_eq!(destinations.iter().collect::<BTreeSet<_>>().len(), 2);
-    }
-
-    #[test]
-    fn test_post_publication_relink_failure_records_publication_and_rerun_does_not_duplicate_it() {
-        let (_repo, executor, ids) = executable_document_repo(2, "two owners");
-        let before = ids
-            .iter()
-            .map(|id| executor.storage.load_issue(id).unwrap())
-            .collect::<Vec<_>>();
-        let mut fault = FaultHooks {
-            fail_relink: Some(1),
-            ..Default::default()
-        };
-        assert!(executor
-            .execute_archive_document_with_hooks("fixtures/root.md", &mut fault)
-            .is_err());
-        for snapshot in &before {
-            assert_eq!(
-                executor.storage.load_issue(&snapshot.id).unwrap(),
-                *snapshot
-            );
-        }
-        let first_events = executor.storage.read_artifact_archive_events().unwrap();
-        assert!(matches!(
-            first_events.as_slice(),
-            [Event::ArtifactArchiveExecuted {
-                publications,
-                reference_changes,
-                planned_deletions,
-                ..
-            }] if publications.len() == 1
-                && reference_changes.is_empty()
-                && planned_deletions.is_empty()
-        ));
-
-        executor
-            .execute_archive_document("fixtures/root.md")
-            .unwrap();
-        let events = executor.storage.read_artifact_archive_events().unwrap();
-        assert_eq!(events.len(), 2);
-        assert!(matches!(
-            &events[1],
-            Event::ArtifactArchiveExecuted {
-                publications,
-                reference_changes,
-                ..
-            } if publications.is_empty() && reference_changes.len() == 2
-        ));
-    }
-
-    #[test]
-    fn test_failed_relink_compensation_records_exact_residual_reference() {
-        let (_repo, executor, ids) = executable_document_repo(2, "two owners");
-        let mut fault = FaultHooks {
-            fail_relink: Some(1),
-            fail_revert: Some(0),
-            ..Default::default()
-        };
-        assert!(executor
-            .execute_archive_document_with_hooks("fixtures/root.md", &mut fault)
-            .is_err());
-        let destination_count = ids
-            .iter()
-            .filter(|id| {
-                executor.storage.load_issue(id).unwrap().documents[0].path
-                    == "archive/fixtures/root.md"
-            })
-            .count();
-        assert_eq!(destination_count, 1);
-        let events = executor.storage.read_artifact_archive_events().unwrap();
-        assert!(matches!(
-            events.as_slice(),
-            [Event::ArtifactArchiveExecuted {
-                publications,
-                reference_changes,
-                planned_deletions,
-                ..
-            }] if publications.len() == 1
-                && reference_changes.len() == 1
-                && planned_deletions.is_empty()
-        ));
-    }
-
-    #[test]
-    fn test_event_failure_compensates_and_torn_tail_rerun_reconciles() {
-        let (repo, executor, ids) = executable_document_repo(1, "event failure");
-        let before = executor.storage.load_issue(&ids[0]).unwrap();
-        let mut fault = FaultHooks {
-            fail_event: true,
-            torn_event_path: Some(repo.path().join(".jit/events.jsonl")),
-            ..Default::default()
-        };
-        assert!(executor
-            .execute_archive_document_with_hooks("fixtures/root.md", &mut fault)
-            .is_err());
-        assert_eq!(executor.storage.load_issue(&ids[0]).unwrap(), before);
-        assert!(repo.path().join("fixtures/root.md").exists());
-        assert!(repo.path().join("archive/fixtures/root.md").exists());
-        assert_guard_released(&executor.storage);
-
-        let rerun = executor
-            .execute_archive_document("fixtures/root.md")
-            .unwrap();
-        assert!(rerun.reconciling);
-        assert!(rerun.event_appended);
-        assert!(!repo.path().join("fixtures/root.md").exists());
-        assert_eq!(
-            executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .len(),
-            1
-        );
     }
 
     #[test]
@@ -1573,111 +1283,6 @@ mod tests {
     }
 
     #[test]
-    fn test_failed_event_and_revert_reconcile_and_edited_source_is_retained_stably() {
-        let (repo, executor, ids) = executable_document_repo(1, "original");
-        let mut double_fault = FaultHooks {
-            fail_event: true,
-            fail_revert: Some(0),
-            ..Default::default()
-        };
-        assert!(executor
-            .execute_archive_document_with_hooks("fixtures/root.md", &mut double_fault)
-            .is_err());
-        assert_eq!(
-            executor.storage.load_issue(&ids[0]).unwrap().documents[0].path,
-            "archive/fixtures/root.md"
-        );
-        assert_guard_released(&executor.storage);
-        let reconciled = executor
-            .execute_archive_document("fixtures/root.md")
-            .unwrap();
-        assert!(reconciled.reconciling);
-        assert_eq!(reconciled.reference_changes.len(), 1);
-        assert!(matches!(
-            executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .last(),
-            Some(Event::ArtifactArchiveExecuted {
-                reference_changes,
-                reconciling: true,
-                ..
-            }) if reference_changes.len() == 1
-        ));
-        assert!(!repo.path().join("fixtures/root.md").exists());
-
-        let (edited_repo, edited_executor, _) = executable_document_repo(1, "original");
-        let mut edit_fault = FaultHooks {
-            edit_before_delete: Some((
-                edited_repo.path().join("fixtures/root.md"),
-                b"edited after planning".to_vec(),
-            )),
-            ..Default::default()
-        };
-        let first = edited_executor
-            .execute_archive_document_with_hooks("fixtures/root.md", &mut edit_fault)
-            .unwrap();
-        assert!(first
-            .warnings
-            .iter()
-            .any(|warning| warning.code == WarningCode::DeletionFailed));
-        assert_eq!(
-            fs::read(edited_repo.path().join("fixtures/root.md")).unwrap(),
-            b"edited after planning"
-        );
-        let event_count = edited_executor
-            .storage
-            .read_artifact_archive_events()
-            .unwrap()
-            .len();
-        let stable = edited_executor
-            .execute_archive_document("fixtures/root.md")
-            .unwrap();
-        assert!(!stable.event_appended);
-        assert!(stable
-            .warnings
-            .iter()
-            .any(|warning| warning.code == WarningCode::DeletionFailed));
-        assert_eq!(
-            edited_executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .len(),
-            event_count
-        );
-    }
-
-    #[test]
-    fn test_deletion_failure_rerun_converges_without_duplicate_destination_or_reference() {
-        let (repo, executor, ids) = executable_document_repo(1, "delete retry");
-        let mut fault = FaultHooks {
-            fail_delete: Some(0),
-            ..Default::default()
-        };
-        let first = executor
-            .execute_archive_document_with_hooks("fixtures/root.md", &mut fault)
-            .unwrap();
-        assert!(first
-            .warnings
-            .iter()
-            .any(|warning| warning.code == WarningCode::DeletionFailed));
-        assert!(repo.path().join("fixtures/root.md").exists());
-        assert!(repo.path().join("archive/fixtures/root.md").exists());
-
-        let second = executor
-            .execute_archive_document("fixtures/root.md")
-            .unwrap();
-        assert_eq!(second.deleted_sources, vec!["fixtures/root.md"]);
-        assert!(!repo.path().join("fixtures/root.md").exists());
-        assert_eq!(
-            executor.storage.load_issue(&ids[0]).unwrap().documents[0].path,
-            "archive/fixtures/root.md"
-        );
-    }
-
-    #[test]
     fn test_execution_preserves_positive_relative_and_root_relative_multi_edge_layout() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
@@ -1706,23 +1311,6 @@ mod tests {
         assert!(repo.path().join("archive/fixtures/child.md").exists());
         assert!(repo.path().join("shared/global.md").exists());
         assert!(!repo.path().join("archive/shared/global.md").exists());
-    }
-
-    #[test]
-    fn test_preflight_refuses_deletion_until_every_selected_reference_is_durable() {
-        let (repo, executor, _) = executable_document_repo(1, "still linked");
-        let plan = executor
-            .preview_archive_document("fixtures/root.md")
-            .unwrap();
-        let mut warnings = Vec::new();
-        let candidates = executor
-            .preflight_deletions(plan.executable_artifacts().unwrap(), &mut warnings)
-            .unwrap();
-        assert!(candidates.is_empty());
-        assert!(warnings
-            .iter()
-            .any(|warning| warning.code == WarningCode::DeletionFailed));
-        assert!(repo.path().join("fixtures/root.md").exists());
     }
 
     #[test]
@@ -1763,47 +1351,6 @@ mod tests {
     }
 
     #[test]
-    fn test_replaced_identical_destination_uses_identity_bound_coverage_once() {
-        let (repo, executor, _) = executable_document_repo(1, "original");
-        let mut retain_source = FaultHooks {
-            fail_delete: Some(0),
-            ..Default::default()
-        };
-        executor
-            .execute_archive_document_with_hooks("fixtures/root.md", &mut retain_source)
-            .unwrap();
-        let source = repo.path().join("fixtures/root.md");
-        let destination = repo.path().join("archive/fixtures/root.md");
-        fs::remove_file(&destination).unwrap();
-        fs::write(&source, b"replacement").unwrap();
-        fs::write(&destination, b"replacement").unwrap();
-
-        let reconciled = executor
-            .execute_archive_document("fixtures/root.md")
-            .unwrap();
-        assert!(reconciled.reconciling);
-        assert!(reconciled.event_appended);
-        assert!(reconciled.publications.iter().any(|publication| {
-            publication.destination == "archive/fixtures/root.md"
-                && publication.adopted
-                && publication.content_identity == ContentIdentity::from_bytes(b"replacement")
-        }));
-        assert_eq!(
-            executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .len(),
-            2
-        );
-        let stable = executor
-            .execute_archive_document("fixtures/root.md")
-            .unwrap();
-        assert!(!stable.event_appended);
-        assert!(stable.publications.is_empty());
-    }
-
-    #[test]
     fn test_publication_only_execution_records_one_event() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
@@ -1815,7 +1362,7 @@ mod tests {
         .unwrap();
         fs::create_dir(repo.path().join("docs")).unwrap();
         fs::write(repo.path().join("docs/permanent.md"), b"permanent").unwrap();
-        let executor = CommandExecutor::new(storage);
+        let executor = executor(&repo, storage);
         let result = executor
             .execute_archive_document("docs/permanent.md")
             .unwrap();
@@ -1849,7 +1396,7 @@ mod tests {
         fs::create_dir(repo.path().join("docs")).unwrap();
         fs::write(repo.path().join("docs/permanent.md"), b"permanent").unwrap();
         fs::write(repo.path().join("archive/docs/permanent.md"), b"permanent").unwrap();
-        let executor = CommandExecutor::new(storage);
+        let executor = executor(&repo, storage);
 
         let first = executor
             .execute_archive_document("docs/permanent.md")
@@ -1915,61 +1462,6 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[test]
-    fn test_container_marker_reinspection_rejects_leaf_and_parent_symlink_races() {
-        use std::os::unix::fs::symlink;
-
-        let (leaf_repo, leaf_executor, leaf_id) = configured_repo();
-        let leaf_root = leaf_repo.path().join("archive").join(&leaf_id[..8]);
-        fs::create_dir_all(&leaf_root).unwrap();
-        let leaf_marker = leaf_root.join(".jit-container");
-        let leaf_bytes = format!("{leaf_id}\n");
-        fs::write(&leaf_marker, &leaf_bytes).unwrap();
-        let leaf_target = leaf_repo.path().join("matching-marker");
-        fs::write(&leaf_target, &leaf_bytes).unwrap();
-        let mut leaf_race = FaultHooks {
-            marker_inspect: Some(Box::new(move || {
-                fs::remove_file(&leaf_marker)?;
-                symlink(&leaf_target, &leaf_marker)?;
-                Ok(())
-            })),
-            ..Default::default()
-        };
-        assert!(leaf_executor
-            .execute_archive_container_with_hooks(&leaf_id, &mut leaf_race)
-            .is_err());
-        assert!(leaf_executor
-            .storage
-            .read_artifact_archive_events()
-            .unwrap()
-            .is_empty());
-
-        let (parent_repo, parent_executor, parent_id) = configured_repo();
-        let parent_root = parent_repo.path().join("archive").join(&parent_id[..8]);
-        fs::create_dir_all(&parent_root).unwrap();
-        fs::write(parent_root.join(".jit-container"), format!("{parent_id}\n")).unwrap();
-        let external = parent_repo.path().join("matching-container");
-        fs::create_dir(&external).unwrap();
-        fs::write(external.join(".jit-container"), format!("{parent_id}\n")).unwrap();
-        let mut parent_race = FaultHooks {
-            marker_inspect: Some(Box::new(move || {
-                fs::remove_file(parent_root.join(".jit-container"))?;
-                fs::remove_dir(&parent_root)?;
-                symlink(&external, &parent_root)?;
-                Ok(())
-            })),
-            ..Default::default()
-        };
-        assert!(parent_executor
-            .execute_archive_container_with_hooks(&parent_id, &mut parent_race)
-            .is_err());
-        assert!(parent_executor
-            .storage
-            .read_artifact_archive_events()
-            .unwrap()
-            .is_empty());
-    }
-
     #[test]
     fn test_container_relinks_only_terminal_inside_unpinned_owner() {
         fn git(repo: &std::path::Path, args: &[&str]) -> String {

@@ -5,6 +5,7 @@
 //! It performs no filesystem I/O and imports no validation, storage, command, or
 //! profile modules.
 
+mod archive;
 mod default_rules;
 mod export;
 mod image;
@@ -22,6 +23,8 @@ mod rule_serialize;
 mod rules_document;
 mod rules_gates_projection;
 
+pub(crate) use archive::captured_archive_events;
+pub use archive::finalize_archive_execution;
 pub use default_rules::{
     default_rule_membership_diff, default_rule_membership_diff_from_identities, default_ruleset,
     hierarchy_config, reconcile_default_rules_with_config, type_hierarchy_known_schema,

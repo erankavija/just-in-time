@@ -233,6 +233,33 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         precheck_target: Option<&str>,
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
+        self.capture_proposed_base_inner(session, overrides, extra_paths, precheck_target, true)
+    }
+
+    pub(crate) fn capture_proposed_base_without_documents(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
+        self.capture_proposed_base_inner(
+            session,
+            &std::collections::BTreeMap::new(),
+            &[],
+            None,
+            false,
+        )
+    }
+
+    fn capture_proposed_base_inner(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        overrides: &std::collections::BTreeMap<
+            crate::repository_state::VirtualPath,
+            Option<Vec<u8>>,
+        >,
+        extra_paths: &[crate::repository_state::VirtualPath],
+        precheck_target: Option<&str>,
+        capture_documents: bool,
+    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, VirtualPath,
         };
@@ -294,7 +321,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         }
         let mut phase_three = spec.clone();
         let image_two = match session.capture(spec) {
-            Ok(image) => image,
+            Ok(image) if image.has_stable_overlap(&image_one) => image,
+            Ok(_) => return Ok(None),
             Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
             Err(error) => return Err(error.into()),
         };
@@ -302,7 +330,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         let issues = effective_issues(&image_two, &all_ids, &effective)?;
         let mut full_config = config.clone();
         full_config.templates = effective_templates(&image_two, &config, &effective)?;
-        let (worktree_docs, pinned) = document_capture_closure(&issues, &full_config)?;
+        let (worktree_docs, pinned) = if capture_documents {
+            document_capture_closure(&issues, &full_config)?
+        } else {
+            (Vec::new(), Vec::new())
+        };
         phase_three.discover_paths(worktree_docs)?;
         let mut capture_precheck_history = false;
         if let Some(raw_target) = precheck_target {
@@ -364,7 +396,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             phase_three.discover_pinned(revision, path)?;
         }
         let image_three = match session.capture(phase_three.clone()) {
-            Ok(base) => base,
+            Ok(base) if base.has_stable_overlap(&image_two) => base,
+            Ok(_) => return Ok(None),
             Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
             Err(error) => return Err(error.into()),
         };

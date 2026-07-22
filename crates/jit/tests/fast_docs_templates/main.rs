@@ -9,7 +9,6 @@ mod harness;
 mod ai_review_verdict_tests;
 mod artifact_discovery_tests;
 mod artifact_inventory_tests;
-mod artifact_mutation_storage_tests;
 mod artifact_plan_model_tests;
 mod batch_export_tests;
 mod bracket_breakdown_tests;

@@ -308,6 +308,11 @@ impl PinnedDocumentEvidence {
         self.bytes.as_deref()
     }
 
+    /// Canonical commit OID when Git resolved the requested revision.
+    pub fn commit_oid(&self) -> Option<&str> {
+        self.commit_oid.as_deref()
+    }
+
     /// The stable Git-unavailable/not-found/read-failed reason, when the path had
     /// no captured bytes at the requested revision.
     pub fn unavailable_reason(&self) -> Option<&str> {
@@ -765,6 +770,33 @@ impl RepositoryImage {
     /// canonical logical `Data(...)` path it resolves.
     pub fn linked_worktree_evidence(&self) -> &BTreeMap<VirtualPath, LinkedWorktreeEvidence> {
         &self.linked_worktree
+    }
+
+    /// Whether a later capture preserves every fact already present in `prior`.
+    ///
+    /// Capture expansion may add paths and evidence, but it must not silently
+    /// replace facts that pure derivation has already consumed. A changed root
+    /// layout or any changed/removed entry, listing, pinned result, or linked
+    /// worktree result requires the caller to restart derivation from the newer
+    /// image.
+    pub(crate) fn has_stable_overlap(&self, prior: &Self) -> bool {
+        self.layout == prior.layout
+            && prior
+                .entries
+                .iter()
+                .all(|(path, evidence)| self.entries.get(path) == Some(evidence))
+            && prior
+                .listings
+                .iter()
+                .all(|(path, evidence)| self.listings.get(path) == Some(evidence))
+            && prior
+                .pinned
+                .iter()
+                .all(|(request, evidence)| self.pinned.get(request) == Some(evidence))
+            && prior
+                .linked_worktree
+                .iter()
+                .all(|(path, evidence)| self.linked_worktree.get(path) == Some(evidence))
     }
 }
 
@@ -1548,6 +1580,81 @@ mod tests {
             captured.entry(&unrequested),
             Err(CaptureError::UndiscoveredRepositoryPath(_))
         ));
+    }
+
+    #[test]
+    fn test_capture_overlap_rejects_changed_prior_evidence() {
+        let baseline = image(1, 2);
+        assert!(baseline.has_stable_overlap(&baseline));
+        assert!(!image(2, 2).has_stable_overlap(&baseline));
+        assert!(!image(1, 3).has_stable_overlap(&baseline));
+
+        let request = ("HEAD".to_owned(), "README.md".to_owned());
+        let mut with_external = baseline.clone();
+        with_external
+            .spec
+            .discover_pinned(request.0.clone(), request.1.clone())
+            .unwrap();
+        with_external.pinned.insert(
+            request.clone(),
+            PinnedDocumentEvidence::new(
+                &request.0,
+                &request.1,
+                PinnedSourceClass::GitUnavailable,
+                None,
+                None,
+                None,
+                None,
+                Some("first failure".into()),
+            )
+            .unwrap(),
+        );
+        let linked = VirtualPath::data("linked.toml").unwrap();
+        with_external
+            .spec
+            .discover_linked_worktree(linked.clone())
+            .unwrap();
+        with_external.linked_worktree.insert(
+            linked.clone(),
+            LinkedWorktreeEvidence::new(
+                linked.clone(),
+                LinkedWorktreeSourceClass::Absent,
+                None,
+                None,
+            )
+            .unwrap(),
+        );
+
+        let mut changed_pinned = with_external.clone();
+        changed_pinned.pinned.insert(
+            request.clone(),
+            PinnedDocumentEvidence::new(
+                &request.0,
+                &request.1,
+                PinnedSourceClass::GitUnavailable,
+                None,
+                None,
+                None,
+                None,
+                Some("second failure".into()),
+            )
+            .unwrap(),
+        );
+        assert!(!changed_pinned.has_stable_overlap(&with_external));
+
+        let mut changed_linked = with_external.clone();
+        let bytes = b"changed".to_vec();
+        changed_linked.linked_worktree.insert(
+            linked.clone(),
+            LinkedWorktreeEvidence::new(
+                linked,
+                LinkedWorktreeSourceClass::MainWorktree,
+                Some(EntryIdentity::for_bytes("linked", &bytes).unwrap()),
+                Some(bytes),
+            )
+            .unwrap(),
+        );
+        assert!(!changed_linked.has_stable_overlap(&with_external));
     }
 
     #[test]

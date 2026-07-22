@@ -63,7 +63,6 @@ pub mod worktree;
 #[cfg(test)]
 pub mod test_helpers;
 
-pub use archive::ArchiveExecutionHooks;
 pub use batch_create::{
     BatchCreateOutcome, BatchIssueDef, BatchValidationError, BatchValidationProblem,
 };

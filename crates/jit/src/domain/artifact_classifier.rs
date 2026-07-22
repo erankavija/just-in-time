@@ -190,7 +190,8 @@ pub fn resolve_container_destination(
         .parent()
         .ok_or(ArtifactEvidenceError::MissingArchiveRoot)?;
     let archive_root = normalize_artifact_path(&archive_root.to_string_lossy());
-    let children = match required_resolution_evidence(evidence, &archive_root)? {
+    let archive_evidence = required_resolution_evidence(evidence, &archive_root)?;
+    let children = match archive_evidence {
         ArtifactEvidence::Directory { scope, entries } => {
             if *scope != ArtifactListingScope::ImmediateChildren {
                 return Err(ArtifactEvidenceError::WrongListingScope { path: archive_root });
@@ -203,6 +204,12 @@ pub fn resolve_container_destination(
         | ArtifactEvidence::File(_)
         | ArtifactEvidence::InvalidPath => &[],
     };
+    if !matches!(archive_evidence, ArtifactEvidence::Directory { .. }) {
+        return Ok(ResolvedContainerDestination {
+            destination_root: preferred_root.to_string(),
+            conflicting_roots: Vec::new(),
+        });
+    }
     let mut matching_roots = Vec::new();
     for child in children {
         if matches!(

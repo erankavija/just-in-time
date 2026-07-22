@@ -666,6 +666,23 @@ pub fn finalize(
     context: &MutationContext,
     intents: &[MutationIntent],
 ) -> Result<MaterializationPlan, MutationError> {
+    let delta = finalize_delta(layout, image, context, intents)?;
+    let seed = context.repository_seed(intents)?;
+    MaterializationPlan::new(
+        image,
+        &seed,
+        &MaterializationIntent::SemanticMutation,
+        delta,
+    )
+    .map_err(Into::into)
+}
+
+pub(super) fn finalize_delta(
+    layout: &RepositoryLayout,
+    image: &RepositoryImage,
+    context: &MutationContext,
+    intents: &[MutationIntent],
+) -> Result<RepositoryDelta, MutationError> {
     context.begin();
     let mut actions: Vec<RepositoryAction> = Vec::new();
     let mut pending_events: Vec<PendingEvent> = Vec::new();
@@ -1065,15 +1082,7 @@ pub fn finalize(
         )?);
     }
 
-    let delta = RepositoryDelta::new(layout, actions)?;
-    let seed = context.repository_seed(intents)?;
-    MaterializationPlan::new(
-        image,
-        &seed,
-        &MaterializationIntent::SemanticMutation,
-        delta,
-    )
-    .map_err(Into::into)
+    RepositoryDelta::new(layout, actions).map_err(Into::into)
 }
 
 /// Compose the audit-log append action for a set of pending events over the

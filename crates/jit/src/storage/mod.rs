@@ -9,7 +9,6 @@ use crate::domain::{Event, Issue};
 use anyhow::Result;
 
 pub mod artifact_discovery;
-pub mod artifact_mutation;
 pub mod artifact_planning;
 pub mod atomic_write;
 pub mod claim_coordinator;
@@ -44,7 +43,6 @@ pub mod worktree_paths;
 
 // Re-export for convenience
 pub use artifact_discovery::{discover_archive_artifacts, ArtifactDiscoveryError};
-pub use artifact_mutation::{ArtifactMutationError, StagedArtifact, VerifiedArtifact};
 pub use artifact_planning::{collect_artifact_classification_facts, resolve_container_destination};
 pub use claim_coordinator::{ClaimAcquireLimits, ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
