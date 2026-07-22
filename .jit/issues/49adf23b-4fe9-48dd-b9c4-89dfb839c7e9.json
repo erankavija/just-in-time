@@ -18,7 +18,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-22T18:38:16.157919822Z",
+      "updated_at": "2026-07-22T18:56:22.023094070Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Migrate all consumers and delete predecessors",
-  "updated_at": "2026-07-22T18:38:16.157919822Z"
+  "updated_at": "2026-07-22T18:56:22.023094070Z"
 }
