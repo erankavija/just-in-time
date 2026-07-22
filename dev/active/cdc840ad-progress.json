@@ -310,6 +310,14 @@
       "situation": "After the transition cutover rework counter reached two, final independent review found five correctness gaps: Ready precheck classification can change without detection; precheck evidence omits consumed gate status, run history, and prompt-file bytes; lease evidence uses ambient cwd without the coordinator/claims lock; dependency removal does not re-resolve raw IDs on recapture; and postchecks re-resolve a short ID after commit. The diff passes its focused 20-test matrix, formatting, and Clippy, but duplicates full-repository preflight/recapture and grows by 752 net lines while retaining those evidence holes.",
       "resolution": "Invoker selected option 1 and authorized one narrow guided correction with a counter reset, limited to the five reviewed evidence/identity defects, deletion of adjacent duplicate blocking logic where practical, focused adversarial regressions, and independent verification.",
       "recommendation": "Authorize one narrow guided correction and counter reset: recompute precheck classification on recapture; replace blanket output exclusions with purpose-specific checker evidence that captures manual statuses, relevant run history, checker outputs, and prompt-file bytes; acquire the explicit-layout coordinator and claims lock across capture and publication; re-resolve original dependency IDs; return the canonical lifecycle ID for postchecks; delete duplicated blocking logic where practical; add focused adversarial regressions; then require independent verification."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "open",
+      "opened_at": "2026-07-22T03:24:15+03:00",
+      "situation": "After the issue rework counter reached two, independent review of the captured gate-preset cutover found a backend-parity blocker: CreateGatePreset publishes custom preset bytes into InMemoryStorage's aggregate repository image, but InMemoryStorage::list_gate_presets and get_gate_preset still read builtins only, so an immediately created preset is invisible to list/show on that backend. The JSON reader and captured apply path use the centralized custom-file policy correctly.",
+      "recommendation": "Authorize one narrow guided correction and counter reset: make the in-memory read methods project custom preset JSON files from the aggregate repository image through the shared load_presets_from_custom_files policy, add one create-to-list/show backend-parity regression, rerun the preset/template/cargo checks, and require independent re-review. Do not add another preset cache or compatibility fallback."
     }
   ],
   "rework_counts": {
