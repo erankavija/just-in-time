@@ -1964,9 +1964,6 @@ fn run() -> Result<()> {
             for warning in &init_warnings {
                 output_ctx.print_warning(warning)?;
             }
-            for warning in &init_result.warnings {
-                eprintln!("Warning: {warning}");
-            }
 
             // The worktree `.gitattributes` merge-driver claim is published as part
             // of the init transaction itself (every init and re-init now); its typed

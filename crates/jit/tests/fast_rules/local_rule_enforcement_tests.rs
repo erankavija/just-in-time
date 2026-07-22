@@ -22,12 +22,11 @@ fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     storage.init().unwrap();
     std::fs::create_dir_all(storage.root()).unwrap();
     // Disable lease enforcement so updates do not require a claim.
-    std::fs::write(
-        storage.root().join("config.toml"),
-        "[worktree]\nenforce_leases = \"off\"\n",
-    )
-    .unwrap();
+    let config = "[worktree]\nenforce_leases = \"off\"\n";
+    std::fs::write(storage.root().join("config.toml"), config).unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+    storage.add_repo_file(".jit/config.toml", config);
+    storage.add_repo_file(".jit/rules.toml", rules_toml);
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
 }
@@ -396,12 +395,12 @@ assert = { json-schema = "schemas/no-bad.json" }
     // Schema: the `bad` namespace must NOT be present.
     let schemas = executor.storage().root().join("schemas");
     std::fs::create_dir_all(&schemas).unwrap();
-    std::fs::write(
-        schemas.join("no-bad.json"),
-        r#"{ "type": "object",
-             "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#,
-    )
-    .unwrap();
+    let schema = r#"{ "type": "object",
+             "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#;
+    std::fs::write(schemas.join("no-bad.json"), schema).unwrap();
+    executor
+        .storage()
+        .add_repo_file(".jit/schemas/no-bad.json", schema);
 
     let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
@@ -521,12 +520,12 @@ assert = { json-schema = "schemas/no-bad.json" }
     );
     let schemas = executor.storage().root().join("schemas");
     std::fs::create_dir_all(&schemas).unwrap();
-    std::fs::write(
-        schemas.join("no-bad.json"),
-        r#"{ "type": "object",
-             "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#,
-    )
-    .unwrap();
+    let schema = r#"{ "type": "object",
+             "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#;
+    std::fs::write(schemas.join("no-bad.json"), schema).unwrap();
+    executor
+        .storage()
+        .add_repo_file(".jit/schemas/no-bad.json", schema);
 
     // Seed an issue that already violates the rule (it carries a `bad:` label).
     let mut issue = crate::fixture_issue("An epic".to_string(), String::new());

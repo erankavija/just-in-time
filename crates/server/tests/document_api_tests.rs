@@ -8,11 +8,10 @@ use jit_server::routes::AppState;
 use jit_server::watcher::ChangeTracker;
 use std::sync::Arc;
 
-/// Helper to create test server with initialized storage
+/// Helper to create a test server with empty storage.
 async fn create_test_server() -> TestServer {
     let storage = InMemoryStorage::new();
     let executor = CommandExecutor::new(storage);
-    executor.init().expect("Failed to init");
 
     let state = AppState {
         executor: Arc::new(executor),
@@ -26,8 +25,8 @@ async fn create_test_server() -> TestServer {
 /// Helper to create test server with a test issue
 async fn create_test_server_with_issue() -> (TestServer, String) {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
-    executor.init().expect("Failed to init");
+    let layout = storage.repository_layout();
+    let executor = CommandExecutor::new(storage).with_layout(layout);
 
     // Create a test issue
     let (issue_id, _) = executor
@@ -80,8 +79,8 @@ async fn test_get_document_content_missing_document() {
 #[tokio::test]
 async fn test_get_document_content_not_yet_implemented() {
     let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
-    executor.init().expect("Failed to init");
+    let layout = storage.repository_layout();
+    let executor = CommandExecutor::new(storage).with_layout(layout);
 
     // Create issue with document reference
     let (issue_id, _) = executor

@@ -198,6 +198,9 @@ pub enum InitializationError {
     /// The finalizer could not compose the audit-log append.
     #[error(transparent)]
     Mutation(#[from] MutationError),
+    /// Existing default-rule materialization could not be derived safely.
+    #[error("failed to materialize initialization rules: {0}")]
+    RuleMaterialization(String),
     /// A scaffold path is occupied by an unexpected filesystem kind.
     #[error("initialization target '{path}' is occupied by an unsupported filesystem kind")]
     UnexpectedOccupant {
@@ -481,7 +484,31 @@ pub fn finalize_initialization(
     context: &MutationContext,
 ) -> Result<MaterializationPlan, InitializationError> {
     let mut actions = Vec::new();
-    push_file_actions(base, &scaffold.desired_files()?, &mut actions)?;
+    let config_path = VirtualPath::data("config.toml")?;
+    let rules_path = VirtualPath::data("rules.toml")?;
+    let existing_rules = matches!(base.entry(&rules_path)?, RepositoryEntry::File { .. });
+    let profile_changes_rules_authority = scaffold.profile.as_ref().is_some_and(|profile| {
+        profile
+            .targets
+            .iter()
+            .any(|target| target.path == config_path || target.path == rules_path)
+    });
+    let compose_rules = existing_rules || profile_changes_rules_authority;
+    let generated_paths: std::collections::BTreeSet<VirtualPath> = scaffold
+        .schemas
+        .iter()
+        .map(|(name, _)| VirtualPath::data(format!("schemas/{name}")))
+        .collect::<Result<_, _>>()?;
+    let desired = scaffold.desired_files()?;
+    let final_authority = authored_rule_overrides(base, &desired, &config_path, &rules_path)?;
+    let publishable = desired
+        .into_iter()
+        .filter(|file| !compose_rules || !generated_paths.contains(&file.path))
+        .collect::<Vec<_>>();
+    push_file_actions(base, &publishable, &mut actions)?;
+    if compose_rules {
+        compose_existing_default_rules(base, final_authority, &mut actions)?;
+    }
     if let Some(profile) = &scaffold.profile {
         push_record_action(base, profile, &mut actions)?;
     }
@@ -499,6 +526,97 @@ pub fn finalize_initialization(
         &MaterializationIntent::InitializeRepository,
         delta,
     )?)
+}
+
+/// Select the final authored config/rules bytes before derived materialization.
+///
+/// Existing authored files fall through to `base`; an absent scaffold target or
+/// an always-written profile target becomes an overlay. Schema files are
+/// deliberately excluded because they are outputs of the rules materializer.
+fn authored_rule_overrides(
+    base: &RepositoryImage,
+    desired: &[DesiredFile],
+    config_path: &VirtualPath,
+    rules_path: &VirtualPath,
+) -> Result<BTreeMap<VirtualPath, Option<Vec<u8>>>, InitializationError> {
+    desired
+        .iter()
+        .filter(|file| file.path == *config_path || file.path == *rules_path)
+        .try_fold(BTreeMap::new(), |mut overrides, file| {
+            let absent = matches!(base.entry(&file.path)?, RepositoryEntry::Absent);
+            if absent || file.policy == WritePolicy::Always {
+                overrides.insert(file.path.clone(), Some(file.bytes.clone()));
+            }
+            Ok(overrides)
+        })
+}
+
+/// Compose default rules from the final authored config/rules image and merge the
+/// derived writes back against the captured base preimages.
+///
+/// The caller excludes scaffold schema actions first. A derived action replaces
+/// any raw profile/scaffold action for the same target; an unchanged authored
+/// rules file keeps its raw action so a fresh repository still publishes it.
+fn compose_existing_default_rules(
+    base: &RepositoryImage,
+    final_authority: BTreeMap<VirtualPath, Option<Vec<u8>>>,
+    actions: &mut Vec<RepositoryAction>,
+) -> Result<(), InitializationError> {
+    let proposed = super::apply_overlay(base, final_authority)
+        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
+    let config = super::materialize::assemble_config(&proposed)
+        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
+    let derived = super::materialize::compose_default_ruleset(&proposed, &config)
+        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
+    for action in derived {
+        actions.retain(|existing| existing.path() != action.path());
+        actions.push(rebase_action(base, action)?);
+    }
+    Ok(())
+}
+
+/// Replace an action's proposed-image precondition with the captured base
+/// precondition while preserving its exact desired effect and owner.
+fn rebase_action(
+    base: &RepositoryImage,
+    action: RepositoryAction,
+) -> Result<RepositoryAction, InitializationError> {
+    let expected = ExpectedPreimage::of(base.entry(action.path())?);
+    Ok(match action {
+        RepositoryAction::CreateDirectory { path, owner, .. } => {
+            RepositoryAction::CreateDirectory {
+                path,
+                owner,
+                expected,
+            }
+        }
+        RepositoryAction::WriteFile {
+            path,
+            owner,
+            bytes,
+            mode,
+            ..
+        } => RepositoryAction::WriteFile {
+            path,
+            owner,
+            expected,
+            bytes,
+            mode,
+        },
+        RepositoryAction::SetMode {
+            path, owner, mode, ..
+        } => RepositoryAction::SetMode {
+            path,
+            owner,
+            expected,
+            mode,
+        },
+        RepositoryAction::DeleteFile { path, owner, .. } => RepositoryAction::DeleteFile {
+            path,
+            owner,
+            expected,
+        },
+    })
 }
 
 /// Compose the `events.jsonl` action for an init/profile delta.

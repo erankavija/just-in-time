@@ -25,9 +25,6 @@ pub struct FreshInitResult {
     pub profile: Option<ProfileApplyResult>,
     /// Outcome of the worktree `.gitattributes` merge-driver claim.
     pub gitattributes: GitattributesStatus,
-    /// Non-fatal diagnostics. The recovered session owns transaction recovery, so
-    /// this is empty in normal operation and retained only for output stability.
-    pub warnings: Vec<String>,
 }
 
 impl CommandExecutor<JsonFileStorage> {
@@ -155,7 +152,6 @@ impl CommandExecutor<JsonFileStorage> {
                         project_name,
                         profile,
                         gitattributes,
-                        warnings: Vec::new(),
                     });
                 }
                 Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
@@ -480,6 +476,15 @@ mod tests {
                 .count(),
             1
         );
+        assert!(fs::read_to_string(repo.path().join(".jit/rules.toml"))
+            .unwrap()
+            .contains("name = \"namespace-unique-brackets\""));
+        assert!(fs::read_to_string(
+            repo.path()
+                .join(".jit/schemas/default-type-hierarchy-known.json")
+        )
+        .unwrap()
+        .contains("planning"));
         assert_repo_valid(repo.path());
     }
 
@@ -534,6 +539,64 @@ mod tests {
             fs::read(repo.path().join(".jit/profiles/jit-dogfood.json")).unwrap(),
             compact_record
         );
+    }
+
+    #[test]
+    fn test_reinit_refreshes_default_rule_membership_header_and_type_schema() {
+        const SQUAD_NAMESPACE: &str = "\
+\n[namespaces.squad]\n\
+description = \"Owning squad\"\n\
+unique = true\n";
+
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        executor_with_layout(&storage, repo.path())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
+
+        let config_path = repo.path().join(".jit/config.toml");
+        let rules_path = repo.path().join(".jit/rules.toml");
+        let config = fs::read_to_string(&config_path).unwrap().replacen(
+            "task = 4 }",
+            "task = 4, planning = 3 }",
+            1,
+        ) + SQUAD_NAMESPACE;
+        fs::write(&config_path, &config).unwrap();
+        let authored_rule = "\
+\n[[rules]]\n\
+name = \"custom-shape\"\n\
+# authored content survives re-init\n\
+severity = \"warn\"\n\
+assert = { require-section = { heading = \"Goals\" } }\n";
+        let stale_rules = fs::read_to_string(&rules_path).unwrap().replacen(
+            crate::repository_state::rules_file_header(),
+            "# stale\n\n",
+            1,
+        ) + authored_rule;
+        fs::write(&rules_path, stale_rules).unwrap();
+
+        executor_with_layout(&storage, repo.path())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
+
+        let refreshed = fs::read_to_string(&rules_path).unwrap();
+        assert!(refreshed.starts_with(crate::repository_state::rules_file_header()));
+        assert!(refreshed.contains("name = \"namespace-unique-squad\""));
+        assert!(refreshed.contains("# authored content survives re-init"));
+        assert!(fs::read_to_string(
+            repo.path()
+                .join(".jit/schemas/default-type-hierarchy-known.json")
+        )
+        .unwrap()
+        .contains("planning"));
+
+        fs::write(&config_path, config.replace(SQUAD_NAMESPACE, "")).unwrap();
+        executor_with_layout(&storage, repo.path())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
+        let refreshed = fs::read_to_string(&rules_path).unwrap();
+        assert!(!refreshed.contains("name = \"namespace-unique-squad\""));
+        assert!(refreshed.contains("# authored content survives re-init"));
     }
 
     #[test]

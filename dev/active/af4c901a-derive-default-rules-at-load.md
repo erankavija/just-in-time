@@ -5,6 +5,11 @@
 **Priority:** high
 **Date:** 2026-07-14
 
+> Superseded implementation note (`jit:49adf23b`): the command/storage publisher
+> APIs described below were deleted. Recovered re-init and repository config edits
+> now compose the same pure repository-state default-rules materializer in one
+> transaction.
+
 ## Problem Statement
 
 The fixed default rules (`label-format`, `namespace-registry`,

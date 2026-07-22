@@ -676,11 +676,13 @@ mod sdd_lifecycle {
         storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), "").unwrap();
+        storage.add_repo_file(".jit/config.toml", "");
 
         // Read the example rules.toml and copy the schemas/ dir into the storage root.
         let sdd_dir = example_dir("sdd");
         let rules_toml = std::fs::read_to_string(sdd_dir.join("rules.toml")).unwrap();
-        std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+        std::fs::write(storage.root().join("rules.toml"), &rules_toml).unwrap();
+        storage.add_repo_file(".jit/rules.toml", &rules_toml);
 
         // Copy the schemas/ directory so json-schema references resolve.
         let schemas_src = sdd_dir.join("schemas");
@@ -688,7 +690,12 @@ mod sdd_lifecycle {
         std::fs::create_dir_all(&schemas_dst).unwrap();
         for entry in std::fs::read_dir(&schemas_src).unwrap() {
             let entry = entry.unwrap();
-            std::fs::copy(entry.path(), schemas_dst.join(entry.file_name())).unwrap();
+            let content = std::fs::read_to_string(entry.path()).unwrap();
+            std::fs::write(schemas_dst.join(entry.file_name()), &content).unwrap();
+            storage.add_repo_file(
+                &format!(".jit/schemas/{}", entry.file_name().to_string_lossy()),
+                &content,
+            );
         }
 
         crate::memory_executor(storage)
@@ -1579,6 +1586,7 @@ mod research {
         storage.init().unwrap();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), "").unwrap();
+        storage.add_repo_file(".jit/config.toml", "");
         // Write only the done-scoped coverage rule: no local schema rules needed
         // because the graph test does not write through the write-path validator.
         let rules_toml = r#"
@@ -1590,6 +1598,7 @@ enforce = true
 assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependencies" } }
 "#;
         std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+        storage.add_repo_file(".jit/rules.toml", rules_toml);
         crate::memory_executor(storage)
     }
 

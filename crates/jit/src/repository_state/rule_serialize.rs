@@ -4,10 +4,8 @@
 //! This is the inverse of the [`rules`](crate::declarations::rules) loader: it
 //! renders an arbitrary in-memory [`RuleSet`] (typically the built-in
 //! [`default_ruleset`](crate::repository_state::default_ruleset)) into a
-//! complete, reloadable `rules.toml`. This module produces CONTENT only and
-//! performs no I/O; `jit init` persists that content through the storage layer
-//! ([`write_validation_ruleset`](crate::storage::ruleset_store::write_validation_ruleset))
-//! so the file becomes the single operative source of truth.
+//! complete, reloadable `rules.toml`. This module produces content only; the
+//! repository-state transaction owns publication.
 //!
 //! # Why a custom renderer (no `Serialize` derive)
 //!
@@ -21,10 +19,10 @@
 //!
 //! A [`Assertion::JsonSchema`] rule carries its schema inline (the built-in
 //! defaults synthesize it; a loaded rule read it from a file). TOML cannot carry
-//! raw JSON Schema (DR §8.1), so the serializer writes each schema to
-//! `schemas/<sanitized-rule-name>.json` and emits a `json-schema = "schemas/…"`
-//! reference. The returned [`SerializedRuleSet`] lists those files so the caller
-//! writes them alongside `rules.toml`.
+//! raw JSON Schema (DR §8.1), so the serializer returns each schema as
+//! `schemas/<sanitized-rule-name>.json` content and emits a matching
+//! `json-schema = "schemas/…"` reference. The repository-state transaction
+//! publishes those files alongside `rules.toml`.
 //!
 //! # Round-trip contract
 //!
@@ -83,27 +81,10 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
     }
 }
 
-/// The pretty-printed JSON content of the baked `type-hierarchy-known` (`origin
-/// = "default"`) schema for `namespaces` — the write-path type enum that rule
-/// references.
-///
-/// Pure: performs no I/O. The storage layer
-/// ([`write_baked_schema`](crate::storage::ruleset_store::write_baked_schema))
-/// writes this verbatim to `schemas/<TYPE_HIERARCHY_SCHEMA_FILE>`. Building the
-/// content from the SAME [`type_hierarchy_known_schema`] the in-memory default
-/// uses keeps the materialized write-path rule in lock-step with config (R5).
-pub fn type_hierarchy_schema_content(namespaces: &crate::domain::LabelNamespaces) -> String {
-    pretty_schema(&super::default_rules::type_hierarchy_known_schema(
-        namespaces,
-    ))
-}
-
 /// Render a single rule as a standalone, reloadable `[[rules]]` block (with
 /// the same trailing blank line [`serialize_ruleset`] puts between rules) —
-/// the single-rule analogue used to APPEND one newly-derived default rule
-/// (e.g. a `namespace-unique-<ns>` membership row —
-/// [`crate::storage::ruleset_store::sync_namespace_unique_rules`]) without
-/// re-serializing the rest of the file.
+/// the single-rule analogue used to append one newly-derived default rule
+/// without re-serializing the rest of the file.
 ///
 /// `rule.assert` must not be an [`Assertion::JsonSchema`] variant: that kind
 /// needs a companion `schemas/<name>.json` file, and this function renders
@@ -146,10 +127,8 @@ fn unique_schema_stem(identity: &str, used_stems: &mut HashSet<String>) -> Strin
 }
 
 /// The generated leading comment block of `.jit/rules.toml`, stating the current
-/// default-rule contract. The storage layer
-/// ([`rewrite_rules_header`](crate::storage::ruleset_store::rewrite_rules_header))
-/// republishes this header over an existing ruleset file so it never lags a
-/// change to the contract, preserving the rule bodies below it.
+/// default-rule contract. Repository-state materialization republishes it while
+/// preserving the rule bodies below it.
 pub fn rules_file_header() -> &'static str {
     FILE_HEADER
 }

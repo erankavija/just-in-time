@@ -5,6 +5,11 @@
 **Priority:** normal
 **Date:** 2026-07-16
 
+> Superseded implementation note (`jit:49adf23b`): the command/storage publisher
+> APIs described below were deleted. Recovered re-init and repository config edits
+> now compose the same pure repository-state default-rules materializer in one
+> transaction.
+
 ## Problem Statement
 
 `jit:af4c901a` made default-rule MEMBERSHIP (the `namespace-unique-*` family)

@@ -445,12 +445,10 @@ pub fn default_rule_membership_diff(
 
 /// [`default_rule_membership_diff`] over bare `(name, origin)` identities.
 ///
-/// This is the variant the write-through sync uses
-/// ([`sync_default_rule_membership`](crate::commands::CommandExecutor::sync_default_rule_membership)):
-/// the membership decision needs only each rule's identity, so reading
-/// identities directly (see `storage::ruleset_store`) keeps the sync
-/// independent of full [`RuleSet`] validation — a custom rule whose assertion
-/// fails to load (bad schema reference, malformed assert table) must not
+/// This is the variant repository-state materialization uses: the membership
+/// decision needs only each rule's identity, keeping the edit independent of
+/// full [`RuleSet`] validation — a custom rule whose assertion fails to load
+/// (bad schema reference, malformed assert table) must not
 /// strand `rules.toml` out of sync after `config.toml` was already saved
 /// (jit:d74a9ed1 review F1).
 ///

@@ -7,7 +7,6 @@ use jit::storage::InMemoryStorage;
 fn test_query_by_label_exact_match() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Create issues with various labels
     let (milestone_id, _) = executor
@@ -62,7 +61,6 @@ fn test_query_by_label_exact_match() {
 fn test_query_by_label_wildcard_namespace() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Create issues with various milestones
     let (v1_id, _) = executor
@@ -117,7 +115,6 @@ fn test_query_by_label_wildcard_namespace() {
 fn test_query_by_label_no_matches() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Create issue without the queried label
     let (_id, _) = executor
@@ -143,7 +140,6 @@ fn test_query_by_label_no_matches() {
 fn test_query_by_label_empty_repo() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Query with no issues
     let results = executor.query_by_label("milestone:v1.0").unwrap();
@@ -155,7 +151,6 @@ fn test_query_by_label_empty_repo() {
 fn test_query_by_label_wildcard_matches_all_in_namespace() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Create issues with multiple types
     let (task_id, _) = executor
@@ -211,7 +206,6 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
 fn test_query_by_label_case_sensitive() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Create issue with specific case
     let (_id, _) = executor
@@ -246,7 +240,6 @@ fn test_query_by_label_at_prefixed_value_matches_whole() {
     // further.
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     let (matching_id, _) = executor
         .create_issue(
@@ -284,7 +277,6 @@ fn test_query_by_label_at_prefixed_value_matches_whole() {
 fn test_query_by_label_invalid_pattern() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Invalid pattern (no colon)
     let result = executor.query_by_label("invalidlabel");
@@ -299,7 +291,6 @@ fn test_query_by_label_invalid_pattern() {
 fn test_query_by_label_multiple_labels_per_issue() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Create issue with multiple labels
     let (multi_id, _) = executor

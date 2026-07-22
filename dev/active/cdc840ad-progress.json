@@ -65,7 +65,7 @@
             "1-5": "done (waves 1-4 packages + init/profile session publication)",
             "6": "done \u2014 canonical profile consumers: 6c7ca9d2 (derive_profile_materializations + build_profile_claims), b0e5beb9 (commands rewired), 3d4af231 (planner/render/snapshot/preset/view-triad deleted)",
             "7": "done \u2014 (a) verified pre-satisfied; (b) 9153f0e5 image-projected plan content; (c) e4ac6863 finalize_config_edit + ddb574b0 re-init unification (closes the gitattributes gap, pinned test); (d) 6565df41 events via finalizer; (e) d3619a13 MutationIntent::UpdateIssue; (f) held",
-            "8": "IN PROGRESS \u2014 accepted gate-registry CRUD 0c799014, document link publication e33d69e7, canonical startup recovery ebbb22ef, captured dependency add/reduction f1382bb6, atomic template application edadf8ea, bounded captured listings 5925d837, captured lifecycle/field/dependency-removal transitions 41d599f0, captured labels/type-fix 39f7d9cc, atomic issue deletion cascade a23d8c2b, captured gate-preset create/apply 88c0b6be, captured standalone gate evaluation 0216d9bb, pure archive discovery/pinned evidence ab8e68e9, pure archive marker/location evidence 008aaf0a, captured graph file exports e41978bf, atomic archive transaction cutover, and captured graph/snapshot repository export cutover. Independent review passes; publish_ambient_issue_mutation, IssueStore::delete_issue, IssueStore::save_gate_preset, IssueStore::save_gate_run_result, main's raw graph writer, archive staging/rollback, and repository-contained graph/snapshot raw publishers are deleted. Snapshot repository payloads are capped at 128 MiB; the remaining intent-to-plan clone is bounded transient RAM debt, not a resident allocation. Remaining publisher packages: dead rules/init publishers, fixture migration, and final IssueStore write-API deletion/absence scans."
+            "8": "IN PROGRESS \u2014 accepted gate-registry CRUD 0c799014, document link publication e33d69e7, canonical startup recovery ebbb22ef, captured dependency add/reduction f1382bb6, atomic template application edadf8ea, bounded captured listings 5925d837, captured lifecycle/field/dependency-removal transitions 41d599f0, captured labels/type-fix 39f7d9cc, atomic issue deletion cascade a23d8c2b, captured gate-preset create/apply 88c0b6be, captured standalone gate evaluation 0216d9bb, pure archive discovery/pinned evidence ab8e68e9, pure archive marker/location evidence 008aaf0a, captured graph file exports e41978bf, atomic archive transaction cutover, captured graph/snapshot repository export cutover ecb28939, and the net-negative rules/CommandExecutor-init predecessor cleanup. Independent review passes; dead rules writers and their command/storage wrappers, RuleMembershipSync, CommandExecutor::init, FreshInitResult's empty warnings, raw graph/snapshot publishers, archive staging/rollback, and previously accepted IssueStore write methods are deleted. Canonical re-init now composes rules/header/membership/schemas from final profile-overlaid authority in one recovered plan. Snapshot repository payloads are capped at 128 MiB; the remaining intent-to-plan clone is bounded transient RAM debt, not a resident allocation. Remaining publisher packages: migrate the broad IssueStore::init/JSON fixture population, delete final IssueStore write APIs/test doubles, and run structural absence scans."
           }
         }
       ]
@@ -350,6 +350,16 @@
       "situation": "After graph-export rework attempt two closed the external symlink-alias bypass, independent review found that the shared no-follow absolute-directory walker converts every normal path component to UTF-8. On Unix this regresses all repository sessions beneath a valid non-UTF-8 ancestor; a reproduced jit init now fails before publication with an unsafe-target error. Focused graph/export/store tests, formatting, strict Clippy, and diff checks otherwise pass.",
       "resolution": "Invoker selected option 1 and authorized one narrow guided correction with a counter reset, limited to preserving OsStr components in the existing capability walk, one Unix regression, focused checks, and independent re-review.",
       "recommendation": "Authorize one narrow guided correction with a counter reset: preserve OsStr path components through the existing capability walk, add one Unix non-UTF-8-ancestor repository-session regression, rerun graph/store/init focused checks, and require independent re-review. Do not change export classification, capability publication, snapshot behavior, or other repository-state semantics."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "resolved",
+      "opened_at": "2026-07-22T14:48:55+03:00",
+      "resolved_at": "2026-07-22T14:55:00+03:00",
+      "situation": "After snapshot-export rework attempt two passed, independent review of the net-negative rules/init predecessor cleanup found that canonical re-init does not preserve the deleted rules write-through behavior: InitializationScaffold keeps an existing rules.toml with IfAbsent while only schemas refresh, so config membership/header edits remain stale. The corresponding canonical regression was deleted instead of migrated, three pure rules-document edge cases were lost, and the cumulative fast_rules/server suites remain red on stale InMemory fixtures that lack captured config or an attached repository layout.",
+      "resolution": "Invoker selected option 1 and authorized one narrowly guided correction with a counter reset, limited to canonical re-init rules composition, the lost compact regressions, the 13 fast_rules fixtures, and the 2 server fixtures, followed by independent re-review.",
+      "recommendation": "Authorize one narrowly guided correction with a counter reset: compose existing rules.toml membership/header updates into canonical recovered initialization and restore its re-init regression; preserve simultaneous add/drop, indented rule-header, and ruleset false-positive parser cases as pure tests; migrate only the 13 fast_rules and 2 server fixtures needed to the final in-memory repository-state/layout boundary; rerun focused and cumulative suites; then require independent re-review. Do not restore any deleted publisher or init wrapper."
     }
   ],
   "rework_counts": {
@@ -357,7 +367,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 2
+    "49adf23b": 1
   },
   "started_at": "2026-07-18T16:22:26Z"
 }

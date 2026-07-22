@@ -7,7 +7,6 @@ use jit::storage::InMemoryStorage;
 fn test_query_strategic_returns_milestone_issues() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Create issues with strategic types
     let (milestone_id, _) = executor
@@ -47,7 +46,6 @@ fn test_query_strategic_returns_milestone_issues() {
 fn test_query_strategic_returns_epic_issues() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     let (epic_id, _) = executor
         .create_issue(
@@ -72,7 +70,6 @@ fn test_query_strategic_returns_epic_issues() {
 fn test_query_strategic_returns_both_milestone_and_epic() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     let (milestone_id, _) = executor
         .create_issue(
@@ -125,7 +122,6 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
 fn test_query_strategic_excludes_tactical_only() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Create only tactical issues
     executor
@@ -163,7 +159,6 @@ fn test_query_strategic_excludes_tactical_only() {
 fn test_query_strategic_includes_mixed_labels() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Issue with both strategic type and tactical labels
     let (mixed_id, _) = executor
@@ -193,7 +188,6 @@ fn test_query_strategic_includes_mixed_labels() {
 fn test_query_strategic_with_custom_strategic_namespace() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     // Strategic classification is type-based, not namespace-based
     // No need to add custom namespace - config handles this
@@ -240,7 +234,6 @@ fn test_query_strategic_with_custom_strategic_namespace() {
 fn test_query_strategic_empty_repo() {
     let storage = InMemoryStorage::new();
     let executor = crate::memory_executor(storage);
-    executor.init().unwrap();
 
     let strategic = executor.query_strategic().unwrap();
 

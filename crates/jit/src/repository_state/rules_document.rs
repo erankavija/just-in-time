@@ -7,9 +7,8 @@
 //! every other byte: [`rewrite_header`] republishes the leading generated comment
 //! region, and [`splice_default_membership`] appends newly generated
 //! `namespace-unique-*` blocks and drops obsolete `origin = "default"` ones. Both
-//! are pure `&str -> String` transforms so the same edit runs in the mutation
-//! derive pipeline and behind the storage read/write boundary without a second
-//! implementation.
+//! are pure `&str -> String` transforms consumed directly by the mutation derive
+//! pipeline.
 
 use crate::declarations::rules::DEFAULT_ORIGIN;
 use anyhow::{Context, Result};
@@ -231,4 +230,182 @@ pub fn splice_default_membership(
         rebuilt.push_str(block);
     }
     Ok(rebuilt)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const RULES: &str = "\
+# generated header\n\
+\n\
+[[rules]]\n\
+name = \"label-format\"\n\
+origin = \"default\"\n\
+assert = { require-section = { heading = \"H\" } }\n\
+\n\
+[[rules]]\n\
+name = \"namespace-unique-team\"\n\
+origin = \"default\"\n\
+assert = { require-label = { label = \"team:*\", min = 0, max = 1 } }\n\
+\n\
+[[rules]]\n\
+name = \"custom-shape\"\n\
+# authored comment\n\
+assert = { require-section = { heading = \"Goals\" } }\n";
+
+    const SQUAD: &str = "\
+[[rules]]\n\
+name = \"namespace-unique-squad\"\n\
+origin = \"default\"\n\
+assert = { require-label = { label = \"squad:*\", min = 0, max = 1 } }\n\n";
+
+    #[test]
+    fn test_parse_rule_identities_ignores_assertion_details() {
+        let content = "[[rules]]\nname = \"broken\"\norigin = \"custom\"\n\
+                       assert = { json-schema = \"missing.json\" }\n";
+        assert_eq!(
+            parse_rule_identities(content).unwrap(),
+            vec![("broken".to_string(), Some("custom".to_string()))]
+        );
+    }
+
+    #[test]
+    fn test_rewrite_header_preserves_rules_and_other_content() {
+        let content = "# old\n\n[[rules]]\nname = \"keep\"\n# authored\n\
+                       assert = { require-section = { heading = \"H\" } }\n";
+        let updated = rewrite_header(content, "# new\n\n").unwrap();
+        assert!(updated.starts_with("# new\n\n"));
+        assert!(!updated.contains("# old"));
+        assert!(updated.contains("name = \"keep\"\n# authored"));
+        assert_eq!(rewrite_header(&updated, "# new\n\n").unwrap(), updated);
+
+        let no_rules = "# old\n\n[extra]\nnote = \"keep\"\n";
+        assert_eq!(
+            rewrite_header(no_rules, "# new\n\n").unwrap(),
+            "# new\n\n[extra]\nnote = \"keep\"\n"
+        );
+        assert_eq!(rewrite_header("\n\n", "# new\n\n").unwrap(), "# new\n\n");
+    }
+
+    #[test]
+    fn test_splice_add_preserves_original_bytes_and_inserts_separator() {
+        assert_eq!(
+            splice_default_membership(RULES, &[SQUAD.to_string()], &[]).unwrap(),
+            format!("{RULES}{SQUAD}")
+        );
+
+        let without_newline = RULES.trim_end_matches('\n');
+        let updated =
+            splice_default_membership(without_newline, &[SQUAD.to_string()], &[]).unwrap();
+        assert!(updated.contains("heading = \"Goals\" } }\n[[rules]]"));
+        assert_eq!(parse_rule_identities(&updated).unwrap().len(), 4);
+    }
+
+    #[test]
+    fn test_splice_drop_only_removes_matching_default_rule() {
+        let updated =
+            splice_default_membership(RULES, &[], &["namespace-unique-team".to_string()]).unwrap();
+        assert!(!updated.contains("name = \"namespace-unique-team\""));
+        assert!(updated.contains("# generated header"));
+        assert!(updated.contains("name = \"label-format\""));
+        assert!(updated.contains("name = \"custom-shape\"\n# authored comment"));
+
+        let custom = "[[rules]]\nname = \"namespace-unique-team\"\n\
+                      origin = \"custom\"\nassert = { require-section = { heading = \"H\" } }\n";
+        assert_eq!(
+            splice_default_membership(custom, &[], &["namespace-unique-team".to_string()]).unwrap(),
+            custom
+        );
+    }
+
+    #[test]
+    fn test_splice_add_and_drop_are_one_deterministic_edit() {
+        let updated = splice_default_membership(
+            RULES,
+            &[SQUAD.to_string()],
+            &["namespace-unique-team".to_string()],
+        )
+        .unwrap();
+        assert!(!updated.contains("name = \"namespace-unique-team\""));
+        assert!(updated.contains("name = \"namespace-unique-squad\""));
+        assert!(updated.contains("name = \"custom-shape\"\n# authored comment"));
+        assert_eq!(parse_rule_identities(&updated).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_splice_drop_first_or_only_rule_preserves_leading_trivia() {
+        let first = "# HEADER\n\n[[rules]]\nname = \"namespace-unique-team\"\n\
+                     origin = \"default\"\nassert = { require-section = { heading = \"H\" } }\n\n\
+                     [[rules]]\nname = \"custom\"\nassert = { require-section = { heading = \"H\" } }\n";
+        let updated =
+            splice_default_membership(first, &[], &["namespace-unique-team".to_string()]).unwrap();
+        assert!(updated.starts_with("# HEADER\n\n[[rules]]\nname = \"custom\""));
+
+        let only = "# HEADER\n\n[[rules]]\nname = \"namespace-unique-team\"\n\
+                    origin = \"default\"\nassert = { require-section = { heading = \"H\" } }\n";
+        assert_eq!(
+            splice_default_membership(only, &[], &["namespace-unique-team".to_string()]).unwrap(),
+            "# HEADER\n\n"
+        );
+    }
+
+    #[test]
+    fn test_splice_drop_preserves_trailing_tables_and_order() {
+        let content = "[preamble]\nx = 1\n\n# rules header\n\n[[rules]]\n\
+                       name = \"namespace-unique-team\"\norigin = \"default\"\n\
+                       assert = { require-section = { heading = \"H\" } }\n\n\
+                       [extra]\nnote = \"keep\"\n";
+        let updated =
+            splice_default_membership(content, &[], &["namespace-unique-team".to_string()])
+                .unwrap();
+        assert!(updated.starts_with("[preamble]\nx = 1\n"));
+        assert!(updated.contains("# rules header"));
+        assert!(updated.contains("[extra]\nnote = \"keep\""));
+        assert!(parse_rule_identities(&updated).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_splice_handles_toml_rule_header_variants_and_embedded_marker() {
+        for header in [
+            "[[ rules ]]",
+            "[[\trules\t]]",
+            "[[\"rules\"]]",
+            "[['rules']]",
+            "[[rules]] # note",
+            "  [[rules]]",
+        ] {
+            let content = format!(
+                "[[rules]]\nname = \"default\"\norigin = \"default\"\n\
+                 assert = {{ require-section = {{ heading = \"H\" }} }}\n\n\
+                 {header}\nname = \"custom\"\ndescription = '''inside\n[[rules]]\n'''\n\
+                 assert = {{ require-section = {{ heading = \"H\" }} }}\n"
+            );
+            let updated = splice_default_membership(&content, &[SQUAD.to_string()], &[]).unwrap();
+            assert!(updated.starts_with(&content));
+            assert_eq!(parse_rule_identities(&updated).unwrap().len(), 3);
+        }
+
+        let non_rule_array = "\
+[[rules]]\n\
+name = \"default\"\n\
+origin = \"default\"\n\
+assert = { require-section = { heading = \"H\" } }\n\
+\n\
+[[ruleset]]\n\
+name = \"not-a-rule\"\n";
+        let updated = splice_default_membership(non_rule_array, &[SQUAD.to_string()], &[]).unwrap();
+        assert!(updated.starts_with(non_rule_array));
+        assert!(updated.contains("[[ruleset]]\nname = \"not-a-rule\""));
+        assert_eq!(parse_rule_identities(&updated).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_splice_empty_or_missing_drop_is_noop() {
+        assert_eq!(splice_default_membership(RULES, &[], &[]).unwrap(), RULES);
+        assert_eq!(
+            splice_default_membership(RULES, &[], &["missing".to_string()]).unwrap(),
+            RULES
+        );
+    }
 }
