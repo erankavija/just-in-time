@@ -95,6 +95,8 @@ pub(crate) enum RepositoryJournalActionKind {
     },
     SetMode {
         mode: FileMode,
+        stage: ControlName,
+        backup: ControlName,
     },
     DeleteFile {
         backup: ControlName,

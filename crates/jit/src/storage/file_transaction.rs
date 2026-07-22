@@ -759,7 +759,13 @@ fn initial_repository_journal(
                         unreachable!("RepositoryDelta validates SetMode preimages")
                     };
                     (
-                        RepositoryJournalActionKind::SetMode { mode: *mode },
+                        RepositoryJournalActionKind::SetMode {
+                            mode: *mode,
+                            stage: ControlName::new(format!("mode-{index}"))
+                                .map_err(anyhow::Error::msg)?,
+                            backup: ControlName::new(format!("backup-{index}"))
+                                .map_err(anyhow::Error::msg)?,
+                        },
                         RepositoryFinalIdentity::File {
                             identity: identity.clone(),
                             mode: *mode,
@@ -870,7 +876,11 @@ fn execute_repository_delta(
         return Err(error);
     }
 
-    let published = publish_repository_actions(roots, &control, &mut journal, injector);
+    let published =
+        publish_repository_actions(roots, &control, &mut journal, injector).and_then(|_| {
+            repository_check(injector, FailurePoint::RepositoryBeforeCommitDecision)?;
+            ensure_repository_commit_roots_are_live(roots, &journal)
+        });
     if let Err(error) = published {
         if error.downcast_ref::<RepositoryInterruption>().is_some()
             || data_stage_was_published(roots, &journal)?
@@ -887,7 +897,6 @@ fn execute_repository_delta(
         return Err(error);
     }
 
-    repository_check(injector, FailurePoint::RepositoryBeforeCommitDecision)?;
     journal.decision = TransactionDecision::Committed;
     write_repository_journal(&control.transaction, &journal)?;
     if let Err(source) = repository_check(injector, FailurePoint::RepositoryAfterCommit) {
@@ -1000,8 +1009,33 @@ fn prepare_repository_actions(
                         RepositoryActionProgress::Prepared
                     };
                 }
-                RepositoryAction::SetMode { .. } => {
-                    journal.actions[index].progress = RepositoryActionProgress::Prepared;
+                RepositoryAction::SetMode { mode, .. } => {
+                    let (stage, backup) = set_mode_control_names(&journal.actions[index].action);
+                    let (parent, leaf) = open_parent(root, &relative, false)?;
+                    let current = inspect_repository_leaf(&parent, &leaf)?;
+                    ensure_repository_expected(&path, &journal.actions[index].expected, &current)?;
+                    let RepositoryEntry::File { bytes, .. } = current else {
+                        return Err(FileTransactionError::UnsupportedTarget {
+                            path: format!("{path:?}"),
+                        }
+                        .into());
+                    };
+                    stage_bytes(stages, stage.as_str(), &bytes)?;
+                    set_mode(stages, stage.as_str(), repository_unix_mode(*mode))?;
+                    sync_directory(stages)?;
+                    journal.actions[index].final_identity = repository_final_identity(
+                        &inspect_repository_leaf(stages, stage.as_str())?,
+                    )?;
+                    prepare_repository_backup(
+                        &parent,
+                        &leaf,
+                        backups,
+                        &backup,
+                        &journal.actions[index].expected,
+                        &path,
+                        (injector, index),
+                    )?;
+                    journal.actions[index].progress = RepositoryActionProgress::BackupReady;
                 }
                 RepositoryAction::DeleteFile { .. } => {
                     let backup = delete_file_backup_name(&journal.actions[index].action);
@@ -1055,6 +1089,15 @@ fn write_file_control_names(kind: &RepositoryJournalActionKind) -> (ControlName,
     }
 }
 
+fn set_mode_control_names(kind: &RepositoryJournalActionKind) -> (ControlName, ControlName) {
+    match kind {
+        RepositoryJournalActionKind::SetMode { stage, backup, .. } => {
+            (stage.clone(), backup.clone())
+        }
+        _ => unreachable!("journal and normalized delta stay aligned"),
+    }
+}
+
 fn delete_file_backup_name(kind: &RepositoryJournalActionKind) -> ControlName {
     match kind {
         RepositoryJournalActionKind::DeleteFile { backup } => backup.clone(),
@@ -1064,7 +1107,7 @@ fn delete_file_backup_name(kind: &RepositoryJournalActionKind) -> ControlName {
 
 /// Create and synchronize the rollback backup of a replace/delete target during
 /// preparation. The live target is verified against the recorded preimage, then
-/// hard-linked into the backup area and reverified there, so a subsequent
+/// copied into the backup area and reverified there, so a subsequent
 /// publication converges to the exact original file even if a non-cooperating
 /// writer swaps the target afterward.
 fn prepare_repository_backup(
@@ -1079,20 +1122,25 @@ fn prepare_repository_backup(
     let (injector, index) = failure;
     let current = inspect_repository_leaf(parent, leaf)?;
     ensure_repository_expected(path, expected, &current)?;
-    parent
-        .hard_link(leaf, backups, backup.as_str())
-        .map_err(|error| {
-            if error.kind() == ErrorKind::AlreadyExists {
-                FileTransactionError::UnexpectedOccupant {
-                    path: format!("backup {}", backup.as_str()),
-                }
-                .into()
-            } else {
-                anyhow::Error::new(error)
+    let RepositoryEntry::File { bytes, mode, .. } = current else {
+        return Err(FileTransactionError::UnsupportedTarget {
+            path: format!("{path:?}"),
+        }
+        .into());
+    };
+    stage_bytes(backups, backup.as_str(), &bytes).map_err(|error| {
+        if error.kind() == ErrorKind::AlreadyExists {
+            FileTransactionError::UnexpectedOccupant {
+                path: format!("backup {}", backup.as_str()),
             }
-        })?;
+            .into()
+        } else {
+            anyhow::Error::new(error)
+        }
+    })?;
+    set_mode(backups, backup.as_str(), repository_unix_mode(mode))?;
     let saved = inspect_repository_leaf(backups, backup.as_str())?;
-    if !repository_matches_expected(expected, &saved) {
+    if !repository_file_content_matches_expected(expected, &saved) {
         return Err(FileTransactionError::UnexpectedOccupant {
             path: format!("{path:?}"),
         }
@@ -1198,6 +1246,16 @@ fn publish_repository_actions(
         drop(stage);
 
         repository_check(injector, FailurePoint::RepositoryBeforeDataRootPublication)?;
+        // The injector boundary is also the last point at which an external
+        // writer can deterministically replace the absent root's parent after
+        // session-level revalidation. Tie the held parent capability back to
+        // its live ambient name immediately before the irreversible rename;
+        // the post-publication check detects a later replacement.
+        ensure_repository_data_parent_is_live(roots)?;
+        repository_check(
+            injector,
+            FailurePoint::RepositoryAfterDataParentBindingCheck,
+        )?;
         rename_noreplace_cap(
             &roots.data_parent,
             stage_name.as_str(),
@@ -1247,6 +1305,7 @@ fn publish_repository_actions(
             ensure_repository_final(&path, &action.final_identity, &actual)?;
         }
         repository_check(injector, FailurePoint::RepositoryAfterDataRootPublication)?;
+        ensure_repository_published_data_root_is_live(roots, journal)?;
     }
     Ok(())
 }
@@ -1268,6 +1327,15 @@ fn publish_repository_action(
     repository_check(
         injector,
         FailurePoint::RepositoryBeforeTargetMutation { action: index },
+    )?;
+    // Session apply revalidates roots before entering the kernel, but the
+    // failure-injection boundary above can model a whole-root replacement in
+    // the remaining window. Rebind the held capability to the live root name
+    // before mutation; the final check detects a later replacement.
+    ensure_repository_mutation_root_is_live(roots, path.root_class())?;
+    repository_check(
+        injector,
+        FailurePoint::RepositoryAfterRootBindingCheck { action: index },
     )?;
     let stages = stage_authority(control, path.root_class());
     match &journal.actions[index].action {
@@ -1294,8 +1362,12 @@ fn publish_repository_action(
             }
             sync_directory(&parent)?;
         }
-        RepositoryJournalActionKind::SetMode { mode } => {
-            set_repository_mode_if_identity(&parent, &leaf, expected, *mode, &path)?;
+        RepositoryJournalActionKind::SetMode { stage, .. } => {
+            move_repository_file_aside_if_identity(
+                &parent, &leaf, expected, &path, control, index,
+            )?;
+            rename_noreplace_cap(stages, stage.as_str(), &parent, &leaf)
+                .map_err(map_noreplace_error)?;
             sync_directory(&parent)?;
         }
         RepositoryJournalActionKind::DeleteFile { .. } => {
@@ -1317,7 +1389,8 @@ fn publish_repository_action(
         injector,
         FailurePoint::RepositoryVerifyFinalIdentity { action: index },
     )?;
-    ensure_repository_final(&path, &journal.actions[index].final_identity, &actual)
+    ensure_repository_final(&path, &journal.actions[index].final_identity, &actual)?;
+    ensure_repository_mutation_root_is_live(roots, path.root_class())
 }
 
 fn move_repository_file_aside_if_identity(
@@ -1343,45 +1416,6 @@ fn move_repository_file_aside_if_identity(
         path: format!("{path:?}"),
     }
     .into())
-}
-
-/// Set `mode` on `leaf` only if its live identity still matches `expected`,
-/// verified on the same handle the permission change is applied to.
-fn set_repository_mode_if_identity(
-    parent: &Dir,
-    leaf: &str,
-    expected: &ExpectedPreimage,
-    mode: FileMode,
-    path: &VirtualPath,
-) -> Result<()> {
-    let mut file = open_regular_file_nofollow(parent, leaf)?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-    let metadata = file.metadata()?;
-    let observed = RepositoryEntry::File {
-        identity: repository_entry_identity(&metadata, &bytes)?,
-        bytes,
-        mode: repository_file_mode(&metadata),
-    };
-    if !repository_matches_expected(expected, &observed) {
-        return Err(FileTransactionError::UnexpectedOccupant {
-            path: format!("{path:?}"),
-        }
-        .into());
-    }
-    #[cfg(unix)]
-    {
-        use cap_std::fs::PermissionsExt;
-        if let Some(mode) = repository_unix_mode(mode) {
-            file.set_permissions(cap_std::fs::Permissions::from_mode(mode & 0o7777))?;
-            file.sync_all()?;
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = (mode, file);
-    }
-    Ok(())
 }
 
 /// Atomically rename `leaf` into transaction control and verify that the removed
@@ -1494,7 +1528,7 @@ fn rollback_repository_action(
             .into());
         }
     }
-    if repository_matches_expected(&action.expected, &current) {
+    if repository_file_content_matches_expected(&action.expected, &current) {
         remove_redundant_backup(control, action)?;
         return Ok(());
     }
@@ -1514,31 +1548,13 @@ fn rollback_repository_action(
                 restore_verified_backup(&parent, &leaf, backups, backup, &action.expected)?;
             }
         }
-        RepositoryJournalActionKind::SetMode { .. } => {
-            let RepositoryFinalIdentity::File {
-                identity: final_identity,
-                mode: final_mode,
-            } = &action.final_identity
-            else {
-                unreachable!("SetMode has a file final identity")
-            };
-            let ExpectedPreimage::File {
-                mode: original_mode,
-                ..
-            } = action.expected
-            else {
-                unreachable!("SetMode has a file preimage")
-            };
-            // Verify the live target is the mode-changed file and restore the
-            // original mode on the SAME handle, so a bystander swapped in after the
-            // inspect above is never chmodded (the publication side uses the same
-            // helper, covered by the canonical SetMode race tests).
-            let expected_final = ExpectedPreimage::File {
-                identity: final_identity.clone(),
-                mode: *final_mode,
-            };
-            set_repository_mode_if_identity(&parent, &leaf, &expected_final, original_mode, &path)?;
-            sync_directory(&parent)?;
+        RepositoryJournalActionKind::SetMode { backup, .. } => {
+            if !matches!(current, RepositoryEntry::Absent) {
+                ensure_repository_final(&path, &action.final_identity, &current)?;
+                parent.remove_file(&leaf)?;
+                sync_directory(&parent)?;
+            }
+            restore_verified_backup(&parent, &leaf, backups, backup, &action.expected)?;
         }
         RepositoryJournalActionKind::DeleteFile { backup } => {
             if !matches!(current, RepositoryEntry::Absent) {
@@ -1551,7 +1567,14 @@ fn rollback_repository_action(
         }
     }
     let restored = inspect_repository_leaf(&parent, &leaf)?;
-    ensure_repository_expected(&path, &action.expected, &restored)
+    if repository_file_content_matches_expected(&action.expected, &restored) {
+        Ok(())
+    } else {
+        Err(FileTransactionError::UnexpectedOccupant {
+            path: format!("{path:?}"),
+        }
+        .into())
+    }
 }
 
 fn restore_verified_backup(
@@ -1562,7 +1585,7 @@ fn restore_verified_backup(
     expected: &ExpectedPreimage,
 ) -> Result<()> {
     let saved = inspect_repository_leaf(backups, backup.as_str())?;
-    if !repository_matches_expected(expected, &saved) {
+    if !repository_file_content_matches_expected(expected, &saved) {
         return Err(FileTransactionError::UnexpectedOccupant {
             path: format!("backup {}", backup.as_str()),
         }
@@ -1578,6 +1601,7 @@ fn restore_verified_backup(
 fn remove_redundant_backup(control: &ControlDirs, action: &RepositoryJournalAction) -> Result<()> {
     let backup = match &action.action {
         RepositoryJournalActionKind::WriteFile { backup, .. }
+        | RepositoryJournalActionKind::SetMode { backup, .. }
         | RepositoryJournalActionKind::DeleteFile { backup } => Some(backup),
         _ => None,
     };
@@ -1585,7 +1609,7 @@ fn remove_redundant_backup(control: &ControlDirs, action: &RepositoryJournalActi
         let backups = backup_authority(control, action.path.root);
         let saved = inspect_repository_leaf(backups, backup.as_str())?;
         if !matches!(saved, RepositoryEntry::Absent) {
-            if !repository_matches_expected(&action.expected, &saved) {
+            if !repository_file_content_matches_expected(&action.expected, &saved) {
                 return Err(FileTransactionError::UnexpectedOccupant {
                     path: format!("backup {}", backup.as_str()),
                 }
@@ -1623,6 +1647,7 @@ fn recover_repository_journal(
         TransactionDecision::Prepared if published_absent_root => {
             verify_repository_final_actions(roots, &journal)?;
             repository_check(injector, FailurePoint::RepositoryBeforeCommitDecision)?;
+            ensure_repository_commit_roots_are_live(roots, &journal)?;
             journal.decision = TransactionDecision::Committed;
             write_repository_journal(&control.transaction, &journal)?;
         }
@@ -1649,9 +1674,20 @@ fn validate_repository_journal(journal: &RepositoryTransactionJournal, id: &str)
     if journal.transaction_id != id {
         return Err(FileTransactionError::LayoutMismatch.into());
     }
+    if journal.data_root_was_absent {
+        if journal.data_stage.is_none() && journal.data_stage_identity.is_some() {
+            return Err(FileTransactionError::LayoutMismatch.into());
+        }
+    } else if journal.data_stage.is_some() || journal.data_stage_identity.is_some() {
+        return Err(FileTransactionError::LayoutMismatch.into());
+    }
     let mut seen = HashSet::new();
     let mut identities: BTreeMap<&EntryIdentity, ()> = BTreeMap::new();
+    let mut control_names = HashSet::new();
     for action in &journal.actions {
+        if action.owner.is_empty() || action.owner.chars().any(char::is_control) {
+            return Err(FileTransactionError::LayoutMismatch.into());
+        }
         if !seen.insert((action.path.root, action.path.relative.clone())) {
             return Err(FileTransactionError::DuplicateTarget {
                 path: format!("{:?}", action.path.relative),
@@ -1663,12 +1699,85 @@ fn validate_repository_journal(journal: &RepositoryTransactionJournal, id: &str)
         // paths are a hard-link alias (the same pairwise rule delta normalization
         // enforces). An `Absent` preimage carries no identity and cannot collide.
         if let Some(identity) = action.expected.identity() {
+            identity
+                .validate()
+                .map_err(|_| FileTransactionError::LayoutMismatch)?;
             if identities.insert(identity, ()).is_some() {
                 return Err(FileTransactionError::AliasedTarget {
                     path: format!("{:?}", action.path.relative),
                 }
                 .into());
             }
+        }
+        match &action.final_identity {
+            RepositoryFinalIdentity::Absent => {}
+            RepositoryFinalIdentity::Directory { identity, .. }
+            | RepositoryFinalIdentity::File { identity, .. } => identity
+                .validate()
+                .map_err(|_| FileTransactionError::LayoutMismatch)?,
+        }
+        let valid_shape = match (&action.action, &action.expected, &action.final_identity) {
+            (
+                RepositoryJournalActionKind::CreateDirectory { mode, stage },
+                ExpectedPreimage::Absent,
+                RepositoryFinalIdentity::Directory {
+                    mode: final_mode, ..
+                },
+            ) => *mode == *final_mode && control_names.insert((action.path.root, stage.as_str())),
+            (
+                RepositoryJournalActionKind::WriteFile {
+                    mode,
+                    stage,
+                    backup,
+                },
+                ExpectedPreimage::Absent | ExpectedPreimage::File { .. },
+                RepositoryFinalIdentity::File {
+                    mode: final_mode, ..
+                },
+            ) => {
+                *mode == *final_mode
+                    && stage != backup
+                    && control_names.insert((action.path.root, stage.as_str()))
+                    && control_names.insert((action.path.root, backup.as_str()))
+            }
+            (
+                RepositoryJournalActionKind::SetMode {
+                    mode,
+                    stage,
+                    backup,
+                },
+                ExpectedPreimage::File { .. },
+                RepositoryFinalIdentity::File {
+                    mode: final_mode, ..
+                },
+            ) => {
+                *mode == *final_mode
+                    && stage != backup
+                    && control_names.insert((action.path.root, stage.as_str()))
+                    && control_names.insert((action.path.root, backup.as_str()))
+            }
+            (
+                RepositoryJournalActionKind::DeleteFile { backup },
+                ExpectedPreimage::File { .. },
+                RepositoryFinalIdentity::Absent,
+            ) => control_names.insert((action.path.root, backup.as_str())),
+            _ => false,
+        };
+        if !valid_shape
+            || (journal.data_root_was_absent
+                && action.path.root == RepositoryRootClass::Data
+                && !matches!(
+                    (&action.action, &action.expected),
+                    (
+                        RepositoryJournalActionKind::CreateDirectory { .. },
+                        ExpectedPreimage::Absent
+                    ) | (
+                        RepositoryJournalActionKind::WriteFile { .. },
+                        ExpectedPreimage::Absent
+                    )
+                ))
+        {
+            return Err(FileTransactionError::LayoutMismatch.into());
         }
     }
     Ok(())
@@ -1750,7 +1859,12 @@ fn verify_repository_restored_actions(
         }
         let path = journal_virtual_path(roots, &action.path)?;
         let actual = inspect_repository_target(roots, &path, None)?;
-        ensure_repository_expected(&path, &action.expected, &actual)?;
+        if !repository_file_content_matches_expected(&action.expected, &actual) {
+            return Err(FileTransactionError::UnexpectedOccupant {
+                path: format!("{path:?}"),
+            }
+            .into());
+        }
         remove_redundant_backup(control, action)?;
     }
     Ok(())
@@ -1766,7 +1880,10 @@ fn data_stage_was_published(
     let Some(expected) = journal.data_stage_identity.as_ref() else {
         return Ok(false);
     };
-    let stage = journal.data_stage.as_ref().expect("absent root has stage");
+    let stage = journal
+        .data_stage
+        .as_ref()
+        .ok_or(FileTransactionError::LayoutMismatch)?;
     if metadata_optional(&roots.data_parent, stage.as_str())?.is_some() {
         return Ok(false);
     }
@@ -1931,6 +2048,184 @@ fn repository_live_root(roots: &RepositoryKernelRoots, class: RepositoryRootClas
     }
 }
 
+fn ensure_repository_mutation_root_is_live(
+    roots: &RepositoryKernelRoots,
+    class: RepositoryRootClass,
+) -> Result<()> {
+    match class {
+        RepositoryRootClass::Worktree => ensure_ambient_directory_matches_capability(
+            roots.layout.worktree_root(),
+            &roots.worktree,
+        ),
+        RepositoryRootClass::Data => {
+            ensure_repository_data_parent_is_live(roots)?;
+            let data =
+                roots
+                    .data
+                    .as_ref()
+                    .ok_or_else(|| FileTransactionError::UnsupportedFilesystem {
+                        operation: "data root is not published".into(),
+                    })?;
+            let live = roots
+                .data_parent
+                .symlink_metadata(&roots.data_leaf)
+                .map_err(|error| {
+                    if error.kind() == ErrorKind::NotFound {
+                        anyhow::Error::new(FileTransactionError::UnexpectedOccupant {
+                            path: roots.layout.data_root().display().to_string(),
+                        })
+                    } else {
+                        anyhow::Error::new(error)
+                    }
+                })?;
+            if live.is_symlink()
+                || !live.is_dir()
+                || capability_metadata_identity(&live)?
+                    != capability_metadata_identity(&data.dir_metadata()?)?
+            {
+                return Err(FileTransactionError::UnexpectedOccupant {
+                    path: roots.layout.data_root().display().to_string(),
+                }
+                .into());
+            }
+            Ok(())
+        }
+    }
+}
+
+fn ensure_repository_data_parent_is_live(roots: &RepositoryKernelRoots) -> Result<()> {
+    let parent =
+        roots
+            .layout
+            .data_root()
+            .parent()
+            .ok_or_else(|| FileTransactionError::InvalidPath {
+                path: roots.layout.data_root().display().to_string(),
+            })?;
+    ensure_ambient_directory_matches_capability(parent, &roots.data_parent)
+}
+
+fn ensure_repository_commit_roots_are_live(
+    roots: &RepositoryKernelRoots,
+    journal: &RepositoryTransactionJournal,
+) -> Result<()> {
+    if journal
+        .actions
+        .iter()
+        .any(|action| action.path.root == RepositoryRootClass::Worktree)
+    {
+        ensure_repository_mutation_root_is_live(roots, RepositoryRootClass::Worktree)?;
+    }
+    if journal
+        .actions
+        .iter()
+        .any(|action| action.path.root == RepositoryRootClass::Data)
+    {
+        if journal.data_root_was_absent {
+            ensure_repository_published_data_root_is_live(roots, journal)?;
+        } else {
+            ensure_repository_mutation_root_is_live(roots, RepositoryRootClass::Data)?;
+        }
+    }
+    Ok(())
+}
+
+fn ensure_repository_published_data_root_is_live(
+    roots: &RepositoryKernelRoots,
+    journal: &RepositoryTransactionJournal,
+) -> Result<()> {
+    ensure_repository_data_parent_is_live(roots)?;
+    let expected = journal.data_stage_identity.as_ref().ok_or_else(|| {
+        FileTransactionError::UnexpectedOccupant {
+            path: roots.layout.data_root().display().to_string(),
+        }
+    })?;
+    let actual = inspect_repository_leaf(&roots.data_parent, &roots.data_leaf)?;
+    if actual.identity() != Some(expected) {
+        return Err(FileTransactionError::UnexpectedOccupant {
+            path: roots.layout.data_root().display().to_string(),
+        }
+        .into());
+    }
+    Ok(())
+}
+
+fn ensure_ambient_directory_matches_capability(path: &Path, directory: &Dir) -> Result<()> {
+    let live = std::fs::symlink_metadata(path)?;
+    if !live.is_dir()
+        || ambient_metadata_identity(&live)?
+            != capability_metadata_identity(&directory.dir_metadata()?)?
+    {
+        return Err(FileTransactionError::UnexpectedOccupant {
+            path: path.display().to_string(),
+        }
+        .into());
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn capability_metadata_identity(metadata: &cap_std::fs::Metadata) -> Result<String> {
+    Ok(format!("{}:{}", metadata.dev(), metadata.ino()))
+}
+
+#[cfg(windows)]
+fn capability_metadata_identity(metadata: &cap_std::fs::Metadata) -> Result<String> {
+    let volume =
+        cap_primitives::fs::_WindowsByHandle::volume_serial_number(metadata).ok_or_else(|| {
+            FileTransactionError::UnsupportedFilesystem {
+                operation: "Windows volume identity".into(),
+            }
+        })?;
+    let index = cap_primitives::fs::_WindowsByHandle::file_index(metadata).ok_or_else(|| {
+        FileTransactionError::UnsupportedFilesystem {
+            operation: "Windows file identity".into(),
+        }
+    })?;
+    Ok(format!("{volume}:{index}"))
+}
+
+#[cfg(not(any(unix, windows)))]
+fn capability_metadata_identity(metadata: &cap_std::fs::Metadata) -> Result<String> {
+    Ok(format!(
+        "{}:{}",
+        metadata.len(),
+        metadata.permissions().readonly()
+    ))
+}
+
+#[cfg(unix)]
+fn ambient_metadata_identity(metadata: &std::fs::Metadata) -> Result<String> {
+    use std::os::unix::fs::MetadataExt as _;
+    Ok(format!("{}:{}", metadata.dev(), metadata.ino()))
+}
+
+#[cfg(windows)]
+fn ambient_metadata_identity(metadata: &std::fs::Metadata) -> Result<String> {
+    use std::os::windows::fs::MetadataExt as _;
+    let volume = metadata.volume_serial_number().ok_or_else(|| {
+        FileTransactionError::UnsupportedFilesystem {
+            operation: "Windows volume identity".into(),
+        }
+    })?;
+    let index =
+        metadata
+            .file_index()
+            .ok_or_else(|| FileTransactionError::UnsupportedFilesystem {
+                operation: "Windows file identity".into(),
+            })?;
+    Ok(format!("{volume}:{index}"))
+}
+
+#[cfg(not(any(unix, windows)))]
+fn ambient_metadata_identity(metadata: &std::fs::Metadata) -> Result<String> {
+    Ok(format!(
+        "{}:{}",
+        metadata.len(),
+        metadata.permissions().readonly()
+    ))
+}
+
 fn inspect_repository_target(
     roots: &RepositoryKernelRoots,
     path: &VirtualPath,
@@ -2009,10 +2304,7 @@ fn repository_entry_identity(
     metadata: &cap_std::fs::Metadata,
     bytes: &[u8],
 ) -> Result<EntryIdentity> {
-    #[cfg(unix)]
-    let object = format!("{}:{}", metadata.dev(), metadata.ino());
-    #[cfg(not(unix))]
-    let object = format!("{}:{}", metadata.len(), metadata.permissions().readonly());
+    let object = capability_metadata_identity(metadata)?;
     EntryIdentity::for_bytes(object, bytes).map_err(Into::into)
 }
 
@@ -2050,6 +2342,30 @@ fn repository_unix_mode(mode: FileMode) -> Option<u32> {
 
 fn repository_matches_expected(expected: &ExpectedPreimage, actual: &RepositoryEntry) -> bool {
     ExpectedPreimage::of(actual) == *expected
+}
+
+fn repository_file_content_matches_expected(
+    expected: &ExpectedPreimage,
+    actual: &RepositoryEntry,
+) -> bool {
+    match (expected, actual) {
+        (
+            ExpectedPreimage::File {
+                identity: expected_identity,
+                mode: expected_mode,
+            },
+            RepositoryEntry::File {
+                identity: actual_identity,
+                mode: actual_mode,
+                ..
+            },
+        ) => {
+            expected_identity.sha256() == actual_identity.sha256()
+                && expected_identity.byte_size() == actual_identity.byte_size()
+                && expected_mode == actual_mode
+        }
+        _ => repository_matches_expected(expected, actual),
+    }
 }
 
 fn ensure_repository_expected(
@@ -2486,6 +2802,8 @@ mod tests {
             },
             action: RepositoryJournalActionKind::SetMode {
                 mode: FileMode::Executable,
+                stage: ControlName::new(format!("mode-{relative}")).unwrap(),
+                backup: ControlName::new(format!("backup-{relative}")).unwrap(),
             },
             progress: RepositoryActionProgress::Planned,
         };
@@ -2523,5 +2841,48 @@ mod tests {
             mode: FileMode::Executable,
         };
         assert!(validate_repository_journal(&valid, "txn").is_ok());
+    }
+
+    #[test]
+    fn test_validate_repository_journal_rejects_inconsistent_stage_and_action_shape() {
+        use crate::repository_state::RootRelativePath;
+
+        let identity = EntryIdentity::for_bytes("7:99", b"file").unwrap();
+        let action = RepositoryJournalAction {
+            path: RepositoryJournalPath {
+                root: RepositoryRootClass::Worktree,
+                relative: RootRelativePath::parse("target").unwrap(),
+            },
+            owner: "owner".into(),
+            expected: ExpectedPreimage::Absent,
+            final_identity: RepositoryFinalIdentity::File {
+                identity: identity.clone(),
+                mode: FileMode::Executable,
+            },
+            action: RepositoryJournalActionKind::SetMode {
+                mode: FileMode::Executable,
+                stage: ControlName::new("mode").unwrap(),
+                backup: ControlName::new("backup").unwrap(),
+            },
+            progress: RepositoryActionProgress::Planned,
+        };
+        let journal = RepositoryTransactionJournal {
+            version: REPOSITORY_JOURNAL_VERSION,
+            transaction_id: "txn".into(),
+            layout_digest: "layout".into(),
+            owner_digest: "owner".into(),
+            plan_hash: "plan".into(),
+            data_root_was_absent: true,
+            data_stage: None,
+            data_stage_identity: Some(identity),
+            decision: TransactionDecision::Prepared,
+            actions: vec![action],
+        };
+
+        assert!(validate_repository_journal(&journal, "txn").is_err());
+        let mut invalid_action = journal;
+        invalid_action.data_root_was_absent = false;
+        invalid_action.data_stage_identity = None;
+        assert!(validate_repository_journal(&invalid_action, "txn").is_err());
     }
 }

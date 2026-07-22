@@ -612,6 +612,9 @@ impl RepositoryMutationSession for MemoryMutationSession {
                 failures.check(&TransactionFailurePoint::RepositoryBeforeTargetMutation {
                     action: index,
                 })?;
+                failures.check(&TransactionFailurePoint::RepositoryAfterRootBindingCheck {
+                    action: index,
+                })?;
                 if matches!(action, RepositoryAction::DeleteFile { .. }) {
                     failures.check(&TransactionFailurePoint::RepositoryBeforeDeleteRename {
                         action: index,
@@ -639,6 +642,7 @@ impl RepositoryMutationSession for MemoryMutationSession {
         let absent_root = !original.data_root_exists && candidate.data_root_exists;
         if absent_root {
             failures.check(&TransactionFailurePoint::RepositoryBeforeDataRootPublication)?;
+            failures.check(&TransactionFailurePoint::RepositoryAfterDataParentBindingCheck)?;
             // Publish the staged root: it becomes a real Directory entry, so a
             // later capture of Data("") is a Directory on both backends. Idempotent
             // with an explicit CreateDirectory Data("") (which the kernel does not
@@ -1178,10 +1182,7 @@ fn entry_identity(
     metadata: &cap_std::fs::Metadata,
     bytes: &[u8],
 ) -> Result<EntryIdentity, RepositoryStateStoreError> {
-    #[cfg(unix)]
-    let object = format!("{}:{}", metadata.dev(), metadata.ino());
-    #[cfg(not(unix))]
-    let object = format!("{}:{}", metadata.len(), metadata.permissions().readonly());
+    let object = capability_metadata_identity(metadata)?;
     EntryIdentity::for_bytes(object, bytes).map_err(Into::into)
 }
 
@@ -1560,11 +1561,7 @@ fn ensure_capability_identity(
     expected: &str,
     path: &Path,
 ) -> Result<(), RepositoryStateStoreError> {
-    let metadata = directory.dir_metadata()?;
-    #[cfg(unix)]
-    let actual = format!("{}:{}", metadata.dev(), metadata.ino());
-    #[cfg(not(unix))]
-    let actual = format!("{}:{}", metadata.len(), metadata.permissions().readonly());
+    let actual = capability_metadata_identity(&directory.dir_metadata()?)?;
     if actual == expected {
         Ok(())
     } else {
@@ -1603,6 +1600,38 @@ pub(crate) fn capability_dir_identity(directory: &Dir) -> Option<String> {
         let _ = directory;
         None
     }
+}
+
+#[cfg(unix)]
+fn capability_metadata_identity(
+    metadata: &cap_std::fs::Metadata,
+) -> Result<String, RepositoryStateStoreError> {
+    Ok(format!("{}:{}", metadata.dev(), metadata.ino()))
+}
+
+#[cfg(windows)]
+fn capability_metadata_identity(
+    metadata: &cap_std::fs::Metadata,
+) -> Result<String, RepositoryStateStoreError> {
+    let volume =
+        cap_primitives::fs::_WindowsByHandle::volume_serial_number(metadata).ok_or_else(|| {
+            RepositoryStateStoreError::UnsafeTarget("Windows volume identity unavailable".into())
+        })?;
+    let index = cap_primitives::fs::_WindowsByHandle::file_index(metadata).ok_or_else(|| {
+        RepositoryStateStoreError::UnsafeTarget("Windows file identity unavailable".into())
+    })?;
+    Ok(format!("{volume}:{index}"))
+}
+
+#[cfg(not(any(unix, windows)))]
+fn capability_metadata_identity(
+    metadata: &cap_std::fs::Metadata,
+) -> Result<String, RepositoryStateStoreError> {
+    Ok(format!(
+        "{}:{}",
+        metadata.len(),
+        metadata.permissions().readonly()
+    ))
 }
 
 fn revalidate_layout_capabilities(
@@ -1646,7 +1675,7 @@ fn discover_root_evidence(
     match std::fs::symlink_metadata(path) {
         Ok(metadata) if metadata.is_dir() => Ok(RepositoryRootEvidence::new(
             path,
-            std_metadata_identity(&metadata),
+            std_metadata_identity(&metadata)?,
             true,
         )),
         Ok(_) => Err(RepositoryStateStoreError::UnsafeTarget(
@@ -1664,7 +1693,7 @@ fn discover_root_evidence(
                 path,
                 format!(
                     "absent:{}:{}",
-                    std_metadata_identity(&metadata),
+                    std_metadata_identity(&metadata)?,
                     leaf.to_string_lossy()
                 ),
                 true,
@@ -1698,14 +1727,36 @@ fn ensure_symlink_free_ancestry(
 }
 
 #[cfg(unix)]
-fn std_metadata_identity(metadata: &std::fs::Metadata) -> String {
+fn std_metadata_identity(
+    metadata: &std::fs::Metadata,
+) -> Result<String, RepositoryStateStoreError> {
     use std::os::unix::fs::MetadataExt as _;
-    format!("{}:{}", metadata.dev(), metadata.ino())
+    Ok(format!("{}:{}", metadata.dev(), metadata.ino()))
 }
 
-#[cfg(not(unix))]
-fn std_metadata_identity(metadata: &std::fs::Metadata) -> String {
-    format!("{}:{}", metadata.len(), metadata.permissions().readonly())
+#[cfg(windows)]
+fn std_metadata_identity(
+    metadata: &std::fs::Metadata,
+) -> Result<String, RepositoryStateStoreError> {
+    use std::os::windows::fs::MetadataExt as _;
+    let volume = metadata.volume_serial_number().ok_or_else(|| {
+        RepositoryStateStoreError::UnsafeTarget("Windows volume identity unavailable".into())
+    })?;
+    let index = metadata.file_index().ok_or_else(|| {
+        RepositoryStateStoreError::UnsafeTarget("Windows file identity unavailable".into())
+    })?;
+    Ok(format!("{volume}:{index}"))
+}
+
+#[cfg(not(any(unix, windows)))]
+fn std_metadata_identity(
+    metadata: &std::fs::Metadata,
+) -> Result<String, RepositoryStateStoreError> {
+    Ok(format!(
+        "{}:{}",
+        metadata.len(),
+        metadata.permissions().readonly()
+    ))
 }
 
 fn lexical_absolute(path: &Path) -> Result<PathBuf, RepositoryStateStoreError> {
@@ -1761,6 +1812,31 @@ mod tests {
     use std::collections::{BTreeMap, HashMap, HashSet};
     use std::sync::Mutex;
     use tempfile::TempDir;
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_metadata_identity_distinguishes_equal_size_files_and_directories() {
+        let temp = TempDir::new().unwrap();
+        let first = temp.path().join("first");
+        let second = temp.path().join("second");
+        std::fs::write(&first, b"same").unwrap();
+        std::fs::write(&second, b"same").unwrap();
+        assert_ne!(
+            std_metadata_identity(&std::fs::metadata(&first).unwrap()).unwrap(),
+            std_metadata_identity(&std::fs::metadata(&second).unwrap()).unwrap()
+        );
+
+        let first_dir = temp.path().join("first-dir");
+        let second_dir = temp.path().join("second-dir");
+        std::fs::create_dir(&first_dir).unwrap();
+        std::fs::create_dir(&second_dir).unwrap();
+        let first_cap = Dir::open_ambient_dir(&first_dir, ambient_authority()).unwrap();
+        let second_cap = Dir::open_ambient_dir(&second_dir, ambient_authority()).unwrap();
+        assert_ne!(
+            capability_metadata_identity(&first_cap.dir_metadata().unwrap()).unwrap(),
+            capability_metadata_identity(&second_cap.dir_metadata().unwrap()).unwrap()
+        );
+    }
 
     fn budget() -> CaptureBudget {
         CaptureBudget {
@@ -2292,6 +2368,116 @@ mod tests {
             b"original"
         );
         assert!(!data.join("tmp/transactions").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_rollback_backup_is_independent_of_mutated_original_inode() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let target = data.join("a.txt");
+        let alias = temp.path().join("outside-alias");
+        std::fs::write(&target, b"original").unwrap();
+        std::fs::hard_link(&target, &alias).unwrap();
+        let hook_alias = alias.clone();
+        let injector = Arc::new(HookThenFail {
+            hook_point: TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+            failure_point: TransactionFailurePoint::RepositoryBeforeAction { action: 1 },
+            hook: Mutex::new(Some(Box::new(move || {
+                std::fs::write(&hook_alias, b"mutated through alias").unwrap();
+            }))),
+        });
+        let layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let first = VirtualPath::data("a.txt").unwrap();
+        let second = VirtualPath::data("b.txt").unwrap();
+        let image = session
+            .capture(CaptureSpec::phase_one([first.clone(), second.clone()], budget()).unwrap())
+            .unwrap();
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![
+                RepositoryAction::write_file(
+                    first.clone(),
+                    "replace",
+                    ExpectedPreimage::of(image.entry(&first).unwrap()),
+                    b"replacement".to_vec(),
+                    FileMode::Regular,
+                ),
+                RepositoryAction::write_file(
+                    second,
+                    "later",
+                    ExpectedPreimage::Absent,
+                    b"later".to_vec(),
+                    FileMode::Regular,
+                ),
+            ],
+        )
+        .unwrap();
+
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
+        drop(session);
+        drop(
+            JsonFileStorage::new(&data)
+                .open_mutation_session(layout)
+                .unwrap(),
+        );
+
+        assert_eq!(std::fs::read(target).unwrap(), b"original");
+        assert_eq!(std::fs::read(alias).unwrap(), b"mutated through alias");
+        assert!(!data.join("b.txt").exists());
+        assert!(!data.join("tmp/transactions").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_set_mode_replaces_inode_without_chmodding_external_hard_link() {
+        use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+
+        let temp = TempDir::new().unwrap();
+        let outside = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let target = data.join("mode.txt");
+        let alias = outside.path().join("alias.txt");
+        std::fs::write(&target, b"same bytes").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o644)).unwrap();
+        std::fs::hard_link(&target, &alias).unwrap();
+        let original_inode = std::fs::metadata(&target).unwrap().ino();
+        let layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::new(&data);
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let path = VirtualPath::data("mode.txt").unwrap();
+        let image = session
+            .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+            .unwrap();
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![RepositoryAction::set_mode(
+                path,
+                "mode",
+                ExpectedPreimage::of(
+                    image
+                        .entry(&VirtualPath::data("mode.txt").unwrap())
+                        .unwrap(),
+                ),
+                FileMode::Executable,
+            )],
+        )
+        .unwrap();
+
+        session.apply(&test_plan(&image, &delta)).unwrap();
+
+        let target_metadata = std::fs::metadata(&target).unwrap();
+        let alias_metadata = std::fs::metadata(&alias).unwrap();
+        assert_ne!(target_metadata.ino(), original_inode);
+        assert_eq!(alias_metadata.ino(), original_inode);
+        assert_ne!(target_metadata.permissions().mode() & 0o111, 0);
+        assert_eq!(alias_metadata.permissions().mode() & 0o111, 0);
+        assert_eq!(std::fs::read(target).unwrap(), b"same bytes");
+        assert_eq!(std::fs::read(alias).unwrap(), b"same bytes");
     }
 
     #[test]
@@ -3565,11 +3751,13 @@ mod tests {
             RepositoryBeforePreparedJournal { action: 0 },
             RepositoryBeforeAction { action: 0 },
             RepositoryBeforeTargetMutation { action: 0 },
+            RepositoryAfterRootBindingCheck { action: 0 },
             RepositorySyncTargetParent { action: 0 },
             RepositoryVerifyFinalIdentity { action: 0 },
             RepositoryBeforePublishedJournal { action: 0 },
             RepositoryAfterAction { action: 0 },
             RepositoryBeforeDataRootPublication,
+            RepositoryAfterDataParentBindingCheck,
             RepositoryAfterDataRootPublication,
             RepositoryBeforeCommitDecision,
             RepositoryAfterCommit,
@@ -4263,6 +4451,119 @@ mod tests {
             session.apply(&test_plan(&image, &delta)),
             Err(RepositoryStateStoreError::RetryableConflict { .. })
         ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_existing_data_root_replacement_during_publication_never_succeeds() {
+        for point in [
+            TransactionFailurePoint::RepositoryBeforeTargetMutation { action: 0 },
+            TransactionFailurePoint::RepositoryAfterRootBindingCheck { action: 0 },
+            TransactionFailurePoint::RepositoryBeforeCommitDecision,
+        ] {
+            let outer = TempDir::new().unwrap();
+            let worktree = outer.path().join("project");
+            let data = worktree.join(".jit");
+            let replacement = worktree.join(".jit-replacement");
+            let detached = worktree.join(".jit-detached");
+            std::fs::create_dir_all(&data).unwrap();
+            std::fs::create_dir(&replacement).unwrap();
+            std::fs::write(replacement.join("replacement-marker"), b"live").unwrap();
+
+            let hook_data = data.clone();
+            let hook_replacement = replacement.clone();
+            let hook_detached = detached.clone();
+            let injector = Arc::new(HookAt {
+                point,
+                hook: Mutex::new(Some(Box::new(move || {
+                    std::fs::rename(&hook_data, &hook_detached).unwrap();
+                    std::fs::rename(&hook_replacement, &hook_data).unwrap();
+                }))),
+            });
+            let layout = discover_repository_layout(&worktree, &data).unwrap();
+            let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
+            let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+            let path = VirtualPath::data("new.txt").unwrap();
+            let spec =
+                CaptureSpec::phase_one([VirtualPath::data("").unwrap(), path.clone()], budget())
+                    .unwrap();
+            let image = session.capture(spec).unwrap();
+            let delta = RepositoryDelta::new(
+                &layout,
+                vec![RepositoryAction::write_file(
+                    path,
+                    "root-swap",
+                    ExpectedPreimage::Absent,
+                    b"planned".to_vec(),
+                    FileMode::Regular,
+                )],
+            )
+            .unwrap();
+
+            assert!(session.apply(&test_plan(&image, &delta)).is_err());
+            assert_eq!(
+                std::fs::read(data.join("replacement-marker")).unwrap(),
+                b"live"
+            );
+            assert!(!data.join("new.txt").exists());
+            assert!(!detached.join("new.txt").exists());
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_absent_data_parent_replacement_during_publication_never_succeeds() {
+        for point in [
+            TransactionFailurePoint::RepositoryBeforeDataRootPublication,
+            TransactionFailurePoint::RepositoryAfterDataParentBindingCheck,
+            TransactionFailurePoint::RepositoryBeforeCommitDecision,
+        ] {
+            let outer = TempDir::new().unwrap();
+            let worktree = outer.path().join("project");
+            let data = worktree.join(".jit");
+            let replacement = outer.path().join("replacement-project");
+            let detached = outer.path().join("detached-project");
+            std::fs::create_dir(&worktree).unwrap();
+            std::fs::create_dir(&replacement).unwrap();
+            std::fs::write(replacement.join("replacement-marker"), b"live").unwrap();
+
+            let hook_worktree = worktree.clone();
+            let hook_replacement = replacement.clone();
+            let hook_detached = detached.clone();
+            let injector = Arc::new(HookAt {
+                point,
+                hook: Mutex::new(Some(Box::new(move || {
+                    std::fs::rename(&hook_worktree, &hook_detached).unwrap();
+                    std::fs::rename(&hook_replacement, &hook_worktree).unwrap();
+                }))),
+            });
+            let layout = discover_repository_layout(&worktree, &data).unwrap();
+            let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
+            let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+            let path = VirtualPath::data("index.json").unwrap();
+            let spec =
+                CaptureSpec::phase_one([VirtualPath::data("").unwrap(), path.clone()], budget())
+                    .unwrap();
+            let image = session.capture(spec).unwrap();
+            let delta = RepositoryDelta::new(
+                &layout,
+                vec![RepositoryAction::write_file(
+                    path,
+                    "root-publication",
+                    ExpectedPreimage::Absent,
+                    b"{}".to_vec(),
+                    FileMode::Regular,
+                )],
+            )
+            .unwrap();
+
+            assert!(session.apply(&test_plan(&image, &delta)).is_err());
+            assert_eq!(
+                std::fs::read(worktree.join("replacement-marker")).unwrap(),
+                b"live"
+            );
+            assert!(!data.exists());
+        }
     }
 
     #[cfg(unix)]

@@ -1785,14 +1785,28 @@ fn stale_gate_child_precheck() -> Result<()> {
         return Ok(());
     }
     let current_dir = env::current_dir()?;
-    let jit_dir = if let Ok(custom_dir) = env::var("JIT_DATA_DIR") {
-        current_dir.join(custom_dir)
+    let (jit_dir, non_git_worktree_root) = if let Ok(custom_dir) = env::var("JIT_DATA_DIR") {
+        let target = normalize_absolute_path(&current_dir.join(custom_dir));
+        let worktree_root = jit::storage::discovery::discover_jit_dir(&current_dir)
+            .filter(|candidate| candidate == &target)
+            .and_then(|candidate| candidate.parent().map(Path::to_path_buf))
+            .unwrap_or_else(|| current_dir.clone());
+        (target, worktree_root)
     } else {
-        jit::storage::discovery::discover_jit_dir(&current_dir)
-            .unwrap_or_else(|| current_dir.join(".jit"))
+        match jit::storage::discovery::discover_jit_dir(&current_dir) {
+            Some(discovered) => {
+                let worktree_root = discovered
+                    .parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(|| current_dir.clone());
+                (discovered, worktree_root)
+            }
+            None => (current_dir.join(".jit"), current_dir.clone()),
+        }
     };
-    let worktree =
-        jit::storage::worktree_paths::WorktreePaths::detect_with_non_git_root(&current_dir)?;
+    let worktree = jit::storage::worktree_paths::WorktreePaths::detect_with_non_git_root(
+        &non_git_worktree_root,
+    )?;
     let layout = jit::storage::discover_repository_layout(worktree.worktree_root, &jit_dir)?;
     let executor = CommandExecutor::new(JsonFileStorage::new(&jit_dir)).with_layout(layout);
     refuse_if_stale_gate_child(&executor)

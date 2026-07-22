@@ -54,7 +54,7 @@ impl EntryIdentity {
         self.byte_size
     }
 
-    fn validate(&self) -> Result<(), CaptureError> {
+    pub(crate) fn validate(&self) -> Result<(), CaptureError> {
         if self.object.is_empty() || self.object.chars().any(char::is_control) {
             return Err(CaptureError::InvalidEntryIdentity(
                 "object identity is empty or contains control characters".into(),
