@@ -22,12 +22,12 @@ impl InMemoryStorage {
 
         let issue_bytes = serialize_issue(issue).expect("fixture issue serializes");
         let index_bytes = index.to_pretty_bytes().expect("fixture index serializes");
-        self.add_repo_file(
-            &format!(".jit/issues/{}.json", issue.id),
+        self.add_data_file(
+            format!("issues/{}.json", issue.id),
             std::str::from_utf8(&issue_bytes).expect("issue JSON is UTF-8"),
         );
-        self.add_repo_file(
-            ".jit/index.json",
+        self.add_data_file(
+            "index.json",
             std::str::from_utf8(&index_bytes).expect("index JSON is UTF-8"),
         );
     }

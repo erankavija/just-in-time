@@ -22,11 +22,13 @@ use std::collections::{BTreeMap, HashMap};
 
 /// Configuration components used by capture and materialization.
 ///
-/// Exactly the plan-enumerated narrowed components — hierarchy, namespaces, item
-/// kinds, projections, documentation roots — and no whole-`JitConfig` field:
-/// every consumer takes the one component it needs.
+/// The plan-enumerated components are exposed directly. The complete parsed
+/// configuration is retained privately so materialization consumers that still
+/// need several components can derive their view from this one parse instead of
+/// reparsing captured bytes into a competing authority.
 #[derive(Debug, Clone)]
 pub struct ConfigurationDeclarations {
+    parsed: JitConfig,
     /// Type hierarchy declaration.
     pub hierarchy: Option<HierarchyConfigToml>,
     /// Label namespace declarations.
@@ -39,6 +41,26 @@ pub struct ConfigurationDeclarations {
     pub documentation: Option<DocumentationConfig>,
 }
 
+impl ConfigurationDeclarations {
+    /// Authored project identity from this authoritative parse.
+    pub fn project_name(&self) -> Option<&crate::config::ProjectName> {
+        self.parsed.project.as_ref()?.name.as_ref()
+    }
+
+    /// Build the projection/default-rule configuration view from this parse.
+    ///
+    /// `invariants.toml` is a sibling declaration, so its registry is supplied by
+    /// the captured-image assembler rather than parsed from `config.toml`.
+    pub(crate) fn materialization_config(
+        &self,
+        invariants: invariants::InvariantRegistry,
+    ) -> JitConfig {
+        let mut config = self.parsed.clone();
+        config.invariants = invariants;
+        config
+    }
+}
+
 /// Parse captured `config.toml` bytes without filesystem access or validation.
 pub fn parse_configuration(
     bytes: &[u8],
@@ -46,6 +68,7 @@ pub fn parse_configuration(
     let text = std::str::from_utf8(bytes)?;
     let config: JitConfig = toml::from_str(text)?;
     Ok(ConfigurationDeclarations {
+        parsed: config.clone(),
         hierarchy: config.type_hierarchy.clone(),
         namespaces: config.namespaces.clone().unwrap_or_default(),
         item_kinds: config.item_kinds.clone().unwrap_or_default(),
@@ -92,6 +115,33 @@ target = "docs/reference.md"
         );
         assert_eq!(
             parsed.projections["reference"].target.as_deref(),
+            Some("docs/reference.md")
+        );
+    }
+
+    #[test]
+    fn test_materialization_config_comes_from_the_same_authoritative_parse() {
+        let parsed = parse_configuration(
+            br#"
+[version]
+schema = 7
+[validation]
+content_format = "html"
+[projection.reference]
+kind = "definition"
+target = "docs/reference.md"
+"#,
+        )
+        .unwrap();
+
+        let config = parsed.materialization_config(invariants::InvariantRegistry::empty());
+        assert_eq!(config.version.unwrap().schema, 7);
+        assert_eq!(
+            config.validation.unwrap().content_format.as_deref(),
+            Some("html")
+        );
+        assert_eq!(
+            config.projection.unwrap()["reference"].target.as_deref(),
             Some("docs/reference.md")
         );
     }

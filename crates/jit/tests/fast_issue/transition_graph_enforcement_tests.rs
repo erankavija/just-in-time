@@ -24,10 +24,10 @@ use jit::storage::{InMemoryStorage, IssueStore};
 fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
-    storage.add_repo_file(".jit/config.toml", "");
-    storage.add_repo_file(".jit/rules.toml", rules_toml);
-    storage.add_repo_file(
-        ".jit/gates.toml",
+    storage.add_data_file("config.toml", "");
+    storage.add_data_file("rules.toml", rules_toml);
+    storage.add_data_file(
+        "gates.toml",
         r#"[[gates]]
 key = "tests"
 title = "Tests"

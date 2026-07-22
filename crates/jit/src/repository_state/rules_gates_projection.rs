@@ -6,8 +6,8 @@
 //! into a config-selected target, reusing the SAME projection primitives:
 //!
 //! - the [`ProjectionMode`] / [`ProjectionStyle`] configuration knobs,
-//! - the region-splice function [`splice_region`], and
-//! - the shared, typed [`ProjectionError`] plus the storage atomic-write boundary.
+//! - the strict managed-document engine, and
+//! - the shared, typed [`ProjectionError`] plus the storage transaction boundary.
 //!
 //! [`render_rules_and_gates_markdown`] is the built-in `full`-style render for the
 //! `rule` + `gate` registry-first kinds: it takes the two registries directly,

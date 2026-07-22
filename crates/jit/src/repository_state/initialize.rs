@@ -2,16 +2,16 @@
 //!
 //! `repository_state` owns fresh-config rendering and the complete init/profile
 //! delta. A command submits semantic choices — the template config skeleton, the
-//! project name, and (for a profile) its derived contribution and provenance
+//! project name, and (for a profile) its neutral claims and provenance
 //! metadata — and this module renders every neutral byte and composes one exact
 //! [`RepositoryDelta`] over the captured base image, including the audit append.
 //! The command opens the recovered session, captures the base under its guard,
 //! and applies the returned plan; it never hand-builds a transaction or a
 //! command-local final-byte inventory.
 //!
-//! The profile's asset/region/registry bytes arrive as a [`ProfileContribution`]
-//! the command derives through
-//! [`derive_profile_materializations`](super::derive_profile_materializations).
+//! The profile's asset/region/registry claims arrive as a
+//! [`ProfileApplicationInput`]; this module alone derives and compares their final
+//! bytes.
 //! Finalization derives the coupled default-rule/schema closure and composes the
 //! `ProfileApplied` line from the captured `events.jsonl` prefix (id, timestamp,
 //! and torn-tail handling are never command-owned). Every byte flows through
@@ -19,10 +19,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::config::{JitConfig, ProjectName};
+use crate::config::ProjectName;
 use crate::config_manager::namespaces_from_config;
 use crate::declarations::{serialize_gate_registry, GateRegistry};
-use crate::domain::ProfileOrigin;
 
 use super::default_rules::default_ruleset;
 use super::image::{
@@ -36,6 +35,8 @@ use super::mutation::{
 use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
 use super::rule_serialize::serialize_ruleset;
 use super::MaterializationPlan;
+use super::{ProfileApplicationInput, ProfileTargetDisposition, ProfileTargetMaterialization};
+use super::{ProfileTargetConflictError, RepositoryStateError};
 
 /// Stable ownership identity for the neutral scaffold materialization.
 const SCAFFOLD_OWNER: &str = "repository-init";
@@ -56,93 +57,6 @@ pub fn render_repo_config(base_config_toml: &str, project_name: &ProjectName) ->
         base_config_toml,
         project_name.as_str()
     )
-}
-
-/// One profile asset target carried into the init/profile delta.
-///
-/// The bytes come from the command's `derive_profile_materializations`; this type
-/// carries them to the producer as a canonical claim.
-#[derive(Debug, Clone)]
-pub struct ProfileTargetContribution {
-    /// Canonical target path.
-    pub path: VirtualPath,
-    /// Exact final bytes.
-    pub bytes: Vec<u8>,
-    /// Exact final mode.
-    pub mode: FileMode,
-}
-
-/// The complete profile contribution merged into an init or apply delta.
-#[derive(Debug, Clone)]
-pub struct ProfileContribution {
-    /// Profile identity.
-    pub id: String,
-    /// Profile declaration version.
-    pub version: String,
-    /// Exact package identity.
-    pub package_hash: String,
-    /// Non-noop asset targets (the command's derivation pre-filters unchanged ones).
-    pub targets: Vec<ProfileTargetContribution>,
-    /// Package contribution hashes keyed by repository target. Besides identifying
-    /// the audit payload, these prove package ownership of config/rules authority
-    /// when finalization derives the coupled default-rule/schema closure.
-    pub target_hashes: BTreeMap<String, String>,
-    /// Canonical applied-provenance record path (`.jit/profiles/<id>.json`).
-    pub record_path: VirtualPath,
-    /// Exact provenance record bytes.
-    pub record_bytes: Vec<u8>,
-    /// Whether the captured provenance record differs from `record_bytes`.
-    pub record_changed: bool,
-    /// Whether direct package-target or provenance changes require profiled init
-    /// to append `ProfileApplied`. Standalone profile finalization instead audits
-    /// every non-empty complete delta, including a schema-only repair. In both
-    /// paths the finalizer owns the event id, timestamp, and torn-tail handling.
-    pub emit_event: bool,
-    /// Whether the `.jit/profiles` directory must be created.
-    pub ensure_profiles_dir: bool,
-}
-
-impl ProfileContribution {
-    /// Every explicit profile path a standalone application may touch — asset
-    /// targets, provenance, audit log, profiles directory, and their ancestors.
-    /// The declaration-driven capture closure separately discovers any default
-    /// rule/schema file actions coupled to a profile-owned config or rules
-    /// registry; this method includes their shared schema-directory preimage.
-    pub fn delta_paths(&self) -> Result<Vec<VirtualPath>, InitializationError> {
-        let mut paths: Vec<VirtualPath> = self
-            .targets
-            .iter()
-            .map(|target| target.path.clone())
-            .collect();
-        paths.push(self.record_path.clone());
-        paths.push(VirtualPath::data("events.jsonl")?);
-        if profile_owns_default_rule_authority(self) {
-            paths.push(VirtualPath::data("schemas")?);
-        }
-        if self.ensure_profiles_dir {
-            paths.push(VirtualPath::data("profiles")?);
-        }
-        with_ancestor_dirs(paths)
-    }
-
-    /// The proposed bytes for every profile target, for the command's capture
-    /// closure and proposed-state validation overlay.
-    pub fn overlay_overrides(
-        &self,
-    ) -> Result<BTreeMap<VirtualPath, Option<Vec<u8>>>, InitializationError> {
-        let mut overrides: BTreeMap<VirtualPath, Option<Vec<u8>>> = self
-            .targets
-            .iter()
-            .map(|target| (target.path.clone(), Some(target.bytes.clone())))
-            .collect();
-        // The audit-log bytes are composed by the finalizer, not the command, so
-        // they are not a proposed override here; the finalized delta's own
-        // `events.jsonl` action carries them into the validation overlay.
-        if self.record_changed {
-            overrides.insert(self.record_path.clone(), Some(self.record_bytes.clone()));
-        }
-        Ok(overrides)
-    }
 }
 
 /// The Git-attributes line-set claim eligibility for this initialization.
@@ -210,12 +124,23 @@ pub enum InitializationError {
     /// Existing default-rule materialization could not be derived safely.
     #[error("failed to materialize initialization rules: {0}")]
     RuleMaterialization(String),
+    /// A profile asset would overwrite an unowned authored occupant.
+    #[error(transparent)]
+    ProfileTargetConflict(#[from] ProfileTargetConflictError),
     /// A scaffold path is occupied by an unexpected filesystem kind.
     #[error("initialization target '{path}' is occupied by an unsupported filesystem kind")]
     UnexpectedOccupant {
         /// The offending path.
         path: String,
     },
+    #[error("installed profile record '{path:?}' conflicts with embedded package {id}@{version}")]
+    InstalledRecordConflict {
+        path: VirtualPath,
+        id: String,
+        version: String,
+    },
+    #[error("profile metadata path '{0:?}' has unsupported filesystem state")]
+    UnsupportedMetadataPath(VirtualPath),
 }
 
 /// When a desired file is written.
@@ -230,6 +155,7 @@ enum WritePolicy {
 }
 
 /// One desired file target with its write policy and ownership.
+#[derive(Clone)]
 struct DesiredFile {
     path: VirtualPath,
     bytes: Vec<u8>,
@@ -251,7 +177,7 @@ pub struct InitializationScaffold {
     gates: Vec<u8>,
     rules: Vec<u8>,
     schemas: Vec<(String, Vec<u8>)>,
-    profile: Option<ProfileContribution>,
+    profile: Option<ProfileApplicationInput>,
     project_name: ProjectName,
     gitattributes: GitattributesClaim,
 }
@@ -269,7 +195,7 @@ impl InitializationScaffold {
     pub fn render(
         config_skeleton: &str,
         project_name: ProjectName,
-        profile: Option<ProfileContribution>,
+        profile: Option<ProfileApplicationInput>,
     ) -> Result<Self, InitializationError> {
         let config = render_repo_config(config_skeleton, &project_name);
         Self::from_config(config, project_name, profile)
@@ -280,10 +206,12 @@ impl InitializationScaffold {
     pub fn from_config(
         config: String,
         project_name: ProjectName,
-        profile: Option<ProfileContribution>,
+        profile: Option<ProfileApplicationInput>,
     ) -> Result<Self, InitializationError> {
-        let parsed: JitConfig = toml::from_str(&config)
+        let parsed = crate::declarations::parse_configuration(config.as_bytes())
             .map_err(|error| InitializationError::Config(error.to_string()))?;
+        let parsed = parsed
+            .materialization_config(crate::declarations::invariants::InvariantRegistry::empty());
         let namespaces = namespaces_from_config(&parsed);
         let serialized = serialize_ruleset(&default_ruleset(&namespaces));
         let schemas = serialized
@@ -309,11 +237,6 @@ impl InitializationScaffold {
     pub fn with_gitattributes(mut self, claim: GitattributesClaim) -> Self {
         self.gitattributes = claim;
         self
-    }
-
-    /// The canonical project identity this scaffold publishes.
-    pub fn project_name(&self) -> &ProjectName {
-        &self.project_name
     }
 
     /// The eligible Git-attributes events line, if any.
@@ -359,7 +282,7 @@ impl InitializationScaffold {
     }
 
     /// Whether the scaffold carries an embedded profile contribution.
-    pub fn profile(&self) -> Option<&ProfileContribution> {
+    pub fn profile(&self) -> Option<&ProfileApplicationInput> {
         self.profile.as_ref()
     }
 
@@ -406,11 +329,8 @@ impl InitializationScaffold {
         }
         // The audit log is not a neutral scaffold file: the finalizer composes it
         // (an empty log for a plain init, a `ProfileApplied` append for a profiled
-        // one) from the captured prefix. See `finalize_initialization`.
-        if let Some(profile) = &self.profile {
-            files.extend(profile_asset_files(profile));
-        }
-        Ok(dedup_last_wins(files))
+        // one) from the captured prefix. See `derive_initialization_plan`.
+        Ok(files)
     }
 
     /// Directories the scaffold must create that hold no delta file. Only the
@@ -435,6 +355,11 @@ impl InitializationScaffold {
         paths.push(VirtualPath::data("events.jsonl")?);
         if let Some(profile) = &self.profile {
             paths.push(profile.record_path.clone());
+            paths.push(VirtualPath::data("profiles")?);
+            paths.extend(profile.claims.target_paths()?);
+            if profile_owns_default_rule_authority(profile) {
+                paths.push(VirtualPath::data("schemas")?);
+            }
         }
         if self.gitattributes_line().is_some() {
             paths.push(VirtualPath::worktree(".gitattributes")?);
@@ -448,20 +373,30 @@ impl InitializationScaffold {
     pub fn overlay_overrides(
         &self,
     ) -> Result<BTreeMap<VirtualPath, Option<Vec<u8>>>, InitializationError> {
-        let mut overrides: BTreeMap<VirtualPath, Option<Vec<u8>>> = self
+        let overrides: BTreeMap<VirtualPath, Option<Vec<u8>>> = self
             .desired_files()?
             .into_iter()
             .map(|file| (file.path, Some(file.bytes)))
             .collect();
-        if let Some(profile) = &self.profile {
-            if profile.record_changed {
-                overrides.insert(
-                    profile.record_path.clone(),
-                    Some(profile.record_bytes.clone()),
-                );
-            }
-        }
         Ok(overrides)
+    }
+
+    /// Enumerate the profile render closure implied by this scaffold over `base`.
+    ///
+    /// Unlike [`Self::overlay_overrides`], this applies `IfAbsent` policy before
+    /// deriving declarations, so a re-init closes over preserved authored files
+    /// rather than the neutral defaults used only by the first probe capture.
+    pub fn profile_capture_closure(
+        &self,
+        base: &RepositoryImage,
+    ) -> Result<Vec<VirtualPath>, InitializationError> {
+        let Some(profile) = &self.profile else {
+            return Ok(Vec::new());
+        };
+        let proposed = super::apply_overlay(base, desired_overrides(base, &self.desired_files()?)?)
+            .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
+        super::profile_apply::profile_capture_closure(&proposed, &profile.claims)
+            .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
     }
 
     fn seed(&self) -> Result<RepositorySeed, InitializationError> {
@@ -487,7 +422,7 @@ impl InitializationScaffold {
 /// by the finalizer (`context`): a plain init creates it empty, a profiled init
 /// appends one `ProfileApplied` record. An empty delta (nothing to publish) is a
 /// complete no-op.
-pub fn finalize_initialization(
+pub(super) fn derive_initialization_plan(
     base: &RepositoryImage,
     scaffold: &InitializationScaffold,
     context: &MutationContext,
@@ -506,9 +441,41 @@ pub fn finalize_initialization(
         .iter()
         .map(|(name, _)| VirtualPath::data(format!("schemas/{name}")))
         .collect::<Result<_, _>>()?;
-    let desired = scaffold.desired_files()?;
+    let mut desired = scaffold.desired_files()?;
+    let neutral_proposed = super::apply_overlay(base, desired_overrides(base, &desired)?)
+        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
+    let mut profile_targets = Vec::new();
+    let mut profile_changed = false;
+    if let Some(profile) = &scaffold.profile {
+        let derived = super::profile_apply::compose_profile_targets(
+            &neutral_proposed,
+            profile.claims.clone(),
+        )
+        .map_err(profile_composition_error)?;
+        for (path, (bytes, mode)) in derived {
+            let disposition = profile_target_disposition(&neutral_proposed, &path, &bytes, mode)?;
+            profile_targets.push(ProfileTargetMaterialization {
+                path: path.clone(),
+                disposition,
+                mode,
+            });
+            if disposition != ProfileTargetDisposition::Unchanged {
+                profile_changed = true;
+                desired.push(DesiredFile {
+                    path,
+                    bytes,
+                    mode,
+                    policy: WritePolicy::Always,
+                    owner: PROFILE_OWNER,
+                });
+            }
+        }
+        profile_changed |= profile_record_changed(base, profile)?;
+    }
+    let desired = dedup_last_wins(desired);
     let final_authority = authored_rule_overrides(base, &desired, &config_path, &rules_path)?;
     let publishable = desired
+        .clone()
         .into_iter()
         .filter(|file| !compose_rules || !generated_paths.contains(&file.path))
         .collect::<Vec<_>>();
@@ -517,9 +484,10 @@ pub fn finalize_initialization(
         compose_existing_default_rules(base, final_authority, &mut actions)?;
     }
     if let Some(profile) = &scaffold.profile {
-        push_record_action(base, profile, &mut actions)?;
+        push_record_action(base, profile, profile_changed, &mut actions)?;
     }
-    if let Some(action) = events_action(base, scaffold.profile.as_ref(), context)? {
+    if let Some(action) = events_action(base, scaffold.profile.as_ref(), profile_changed, context)?
+    {
         actions.push(action);
     }
     push_gitattributes_action(base, scaffold, &mut actions)?;
@@ -532,7 +500,67 @@ pub fn finalize_initialization(
         &seed,
         &MaterializationIntent::InitializeRepository,
         delta,
-    )?)
+    )?
+    .with_profile_targets(profile_targets))
+}
+
+fn desired_overrides(
+    base: &RepositoryImage,
+    desired: &[DesiredFile],
+) -> Result<BTreeMap<VirtualPath, Option<Vec<u8>>>, InitializationError> {
+    desired
+        .iter()
+        .try_fold(BTreeMap::new(), |mut overlay, file| {
+            if file.policy == WritePolicy::Always
+                || matches!(base.entry(&file.path)?, RepositoryEntry::Absent)
+            {
+                overlay.insert(file.path.clone(), Some(file.bytes.clone()));
+            }
+            Ok(overlay)
+        })
+}
+
+fn profile_target_disposition(
+    base: &RepositoryImage,
+    path: &VirtualPath,
+    bytes: &[u8],
+    mode: FileMode,
+) -> Result<ProfileTargetDisposition, InitializationError> {
+    Ok(match base.entry(path)? {
+        RepositoryEntry::Absent => ProfileTargetDisposition::Create,
+        RepositoryEntry::File {
+            bytes: existing,
+            mode: existing_mode,
+            ..
+        } if existing.as_slice() == bytes && *existing_mode == mode => {
+            ProfileTargetDisposition::Unchanged
+        }
+        _ => ProfileTargetDisposition::Update,
+    })
+}
+
+fn profile_record_changed(
+    base: &RepositoryImage,
+    profile: &ProfileApplicationInput,
+) -> Result<bool, InitializationError> {
+    match base.entry(&profile.record_path)? {
+        RepositoryEntry::Absent => Ok(true),
+        RepositoryEntry::File { bytes, .. } => {
+            let existing = serde_json::from_slice::<super::AppliedProfileRecord>(bytes);
+            if existing.is_ok_and(|existing| existing == profile.record()) {
+                Ok(false)
+            } else {
+                Err(InitializationError::InstalledRecordConflict {
+                    path: profile.record_path.clone(),
+                    id: profile.id.clone(),
+                    version: profile.version.clone(),
+                })
+            }
+        }
+        _ => Err(InitializationError::UnsupportedMetadataPath(
+            profile.record_path.clone(),
+        )),
+    }
 }
 
 /// Select the final authored config/rules bytes before derived materialization.
@@ -635,11 +663,12 @@ fn rebase_action(
 /// left untouched when already present.
 fn events_action(
     base: &RepositoryImage,
-    profile: Option<&ProfileContribution>,
+    profile: Option<&ProfileApplicationInput>,
+    profile_changed: bool,
     context: &MutationContext,
 ) -> Result<Option<RepositoryAction>, InitializationError> {
     if let Some(profile) = profile {
-        if profile.emit_event {
+        if profile_changed {
             return profile_event_action(base, profile, context);
         }
     }
@@ -662,13 +691,13 @@ fn events_action(
 /// Compose one profile-applied audit append over the captured event prefix.
 fn profile_event_action(
     base: &RepositoryImage,
-    profile: &ProfileContribution,
+    profile: &ProfileApplicationInput,
     context: &MutationContext,
 ) -> Result<Option<RepositoryAction>, InitializationError> {
     let event = profile_applied_event(
         profile.id.clone(),
         profile.version.clone(),
-        ProfileOrigin::Embedded,
+        profile.origin,
         profile.package_hash.clone(),
         profile.target_hashes.clone(),
     );
@@ -755,30 +784,81 @@ fn resolve_gitattributes(
 
 /// Compose the complete profile-application delta over an existing repository's
 /// captured base image (no neutral scaffold).
-pub fn finalize_profile_application(
+pub(super) fn derive_profile_application_plan(
     base: &RepositoryImage,
-    profile: &ProfileContribution,
+    profile: &ProfileApplicationInput,
     context: &MutationContext,
 ) -> Result<MaterializationPlan, InitializationError> {
-    let files = profile_asset_files(profile);
+    let derived = super::profile_apply::compose_profile_targets(base, profile.claims.clone())
+        .map_err(profile_composition_error)?;
+    let mut targets = Vec::with_capacity(derived.len());
+    let files = derived
+        .into_iter()
+        .map(|(path, (bytes, mode))| {
+            let disposition = profile_target_disposition(base, &path, &bytes, mode)?;
+            targets.push(ProfileTargetMaterialization {
+                path: path.clone(),
+                disposition,
+                mode,
+            });
+            Ok(
+                (disposition != ProfileTargetDisposition::Unchanged).then_some(DesiredFile {
+                    path,
+                    bytes,
+                    mode,
+                    policy: WritePolicy::Always,
+                    owner: PROFILE_OWNER,
+                }),
+            )
+        })
+        .collect::<Result<Vec<_>, InitializationError>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
     let mut actions = Vec::new();
     push_file_actions(base, &files, &mut actions)?;
     let config_path = VirtualPath::data("config.toml")?;
     let rules_path = VirtualPath::data("rules.toml")?;
-    if profile_owns_default_rule_authority(profile) {
+    if profile.target_hashes.contains_key(".jit/config.toml")
+        || profile.target_hashes.contains_key(".jit/rules.toml")
+    {
         let authority = authored_rule_overrides(base, &files, &config_path, &rules_path)?;
         compose_existing_default_rules(base, authority, &mut actions)?;
     }
-    push_record_action(base, profile, &mut actions)?;
+    match base.entry(&profile.record_path)? {
+        RepositoryEntry::Absent => actions.push(RepositoryAction::WriteFile {
+            path: profile.record_path.clone(),
+            owner: PROFILE_OWNER.to_string(),
+            expected: ExpectedPreimage::Absent,
+            bytes: serialize_profile_record(profile)?,
+            mode: FileMode::Regular,
+        }),
+        RepositoryEntry::File { .. } => {
+            profile_record_changed(base, profile)?;
+        }
+        _ => {
+            return Err(InitializationError::UnsupportedMetadataPath(
+                profile.record_path.clone(),
+            ))
+        }
+    }
     if !actions.is_empty() {
-        if let Some(action) = profile_event_action(base, profile, context)? {
+        let event = profile_applied_event(
+            profile.id.clone(),
+            profile.version.clone(),
+            profile.origin,
+            profile.package_hash.clone(),
+            profile.target_hashes.clone(),
+        );
+        if let Some(action) = finalize_audit_append(base, context, vec![(2, event)])? {
             actions.push(action);
         }
     }
-    let explicit = if profile.ensure_profiles_dir {
-        vec![VirtualPath::data("profiles")?]
-    } else {
-        Vec::new()
+    let profiles = VirtualPath::data("profiles")?;
+    let explicit = match base.entry(&profiles)? {
+        RepositoryEntry::Absent => vec![profiles],
+        RepositoryEntry::Directory { .. } => Vec::new(),
+        _ => return Err(InitializationError::UnsupportedMetadataPath(profiles)),
     };
     let mut all = directory_actions(base, &actions, &explicit)?;
     all.extend(actions);
@@ -793,12 +873,10 @@ pub fn finalize_profile_application(
         facts,
         BTreeMap::new(),
     )?;
-    Ok(MaterializationPlan::new(
-        base,
-        &seed,
-        &MaterializationIntent::ApplyProfile,
-        delta,
-    )?)
+    Ok(
+        MaterializationPlan::new(base, &seed, &MaterializationIntent::ApplyProfile, delta)?
+            .with_profile_targets(targets),
+    )
 }
 
 /// Deduplicate desired files by canonical path, keeping the LAST occurrence so a
@@ -816,23 +894,9 @@ fn dedup_last_wins(files: Vec<DesiredFile>) -> Vec<DesiredFile> {
 /// The profile's asset targets (the planner pre-filtered unchanged ones). The
 /// audit log and provenance record are handled by their own policies at the call
 /// sites, so they are not included here.
-fn profile_asset_files(profile: &ProfileContribution) -> Vec<DesiredFile> {
-    profile
-        .targets
-        .iter()
-        .map(|target| DesiredFile {
-            path: target.path.clone(),
-            bytes: target.bytes.clone(),
-            mode: target.mode,
-            policy: WritePolicy::Always,
-            owner: PROFILE_OWNER,
-        })
-        .collect()
-}
-
 /// Whether the profile package contributes either authored input of the coupled
 /// default-rule/schema materialization.
-fn profile_owns_default_rule_authority(profile: &ProfileContribution) -> bool {
+fn profile_owns_default_rule_authority(profile: &ProfileApplicationInput) -> bool {
     profile.target_hashes.contains_key(".jit/config.toml")
         || profile.target_hashes.contains_key(".jit/rules.toml")
 }
@@ -840,15 +904,16 @@ fn profile_owns_default_rule_authority(profile: &ProfileContribution) -> bool {
 /// Emit the provenance-record write only when the command proved it changed.
 fn push_record_action(
     base: &RepositoryImage,
-    profile: &ProfileContribution,
+    profile: &ProfileApplicationInput,
+    changed: bool,
     actions: &mut Vec<RepositoryAction>,
 ) -> Result<(), InitializationError> {
-    if profile.record_changed {
+    if changed && profile_record_changed(base, profile)? {
         push_file_actions(
             base,
             &[DesiredFile {
                 path: profile.record_path.clone(),
-                bytes: profile.record_bytes.clone(),
+                bytes: serialize_profile_record(profile)?,
                 mode: FileMode::Regular,
                 policy: WritePolicy::Always,
                 owner: PROFILE_OWNER,
@@ -857,6 +922,22 @@ fn push_record_action(
         )?;
     }
     Ok(())
+}
+
+fn serialize_profile_record(
+    profile: &ProfileApplicationInput,
+) -> Result<Vec<u8>, InitializationError> {
+    profile
+        .record()
+        .to_bytes()
+        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
+}
+
+fn profile_composition_error(error: RepositoryStateError) -> InitializationError {
+    match error {
+        RepositoryStateError::ProfileTargetConflict(error) => error.into(),
+        error => InitializationError::RuleMaterialization(error.to_string()),
+    }
 }
 
 /// Emit `CreateDirectory` actions for every ancestor directory of the written

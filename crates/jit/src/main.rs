@@ -100,6 +100,9 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         || error
             .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()
+        || error
+            .downcast_ref::<jit::repository_state::RepositoryStateError>()
+            .is_some_and(|error| error.is_profile_target_conflict())
     {
         return ExitCode::ValidationFailed;
     }
@@ -756,6 +759,9 @@ fn profile_json_error(error: &anyhow::Error, command: &str) -> jit::output::Json
         || error
             .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()
+        || error
+            .downcast_ref::<jit::repository_state::RepositoryStateError>()
+            .is_some_and(|error| error.is_profile_target_conflict())
     {
         JsonError::new(ErrorCode::PROFILE_CONFLICT, error.to_string(), command)
     } else {
@@ -1785,7 +1791,10 @@ fn stale_gate_child_precheck() -> Result<()> {
         jit::storage::discovery::discover_jit_dir(&current_dir)
             .unwrap_or_else(|| current_dir.join(".jit"))
     };
-    let executor = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let worktree =
+        jit::storage::worktree_paths::WorktreePaths::detect_with_non_git_root(&current_dir)?;
+    let layout = jit::storage::discover_repository_layout(worktree.worktree_root, &jit_dir)?;
+    let executor = CommandExecutor::new(JsonFileStorage::new(&jit_dir)).with_layout(layout);
     refuse_if_stale_gate_child(&executor)
 }
 
@@ -1927,7 +1936,7 @@ fn run() -> Result<()> {
     } else {
         0
     };
-    let mut executor = CommandExecutor::new(storage.clone()).with_layout(executor_layout);
+    let mut executor = CommandExecutor::new(storage.clone()).with_layout(executor_layout.clone());
 
     match &command {
         Commands::Init {
@@ -1964,24 +1973,6 @@ fn run() -> Result<()> {
                 profile_result(executor.validate_profile_id(id), "init", *json)?;
             }
 
-            // Snapshot which core repository files already exist so the `--json`
-            // envelope can report exactly what THIS run created, rather than the
-            // full idempotent set the init transaction always ensures.
-            let index_existed = jit_dir.join("index.json").exists();
-            let gates_existed = jit_dir.join("gates.toml").exists();
-            let events_existed = jit_dir.join("events.jsonl").exists();
-            let config_existed = jit_dir.join("config.toml").exists();
-            let rules_existed = jit_dir.join("rules.toml").exists();
-
-            // `jit init` bypasses the non-init startup `validate()` gate, so a
-            // re-init over an EXISTING repository must run the index format guard
-            // itself: refuse a too-new on-disk `schema_version` with the typed
-            // RepositoryFormatTooNewError (exit 10) rather than writing into a repo
-            // this binary would misread (jit:def64ac4). A fresh init has no index.
-            if index_existed {
-                profile_result(storage.validate(), "init", *json)?;
-            }
-
             // Every init and re-init — plain, profiled, or over an existing root —
             // publishes through the recovered session: `run_initialization` fills
             // only the missing neutral scaffold state (authored config/gates/rules
@@ -2012,14 +2003,13 @@ fn run() -> Result<()> {
             // created/modified path lists.
             let gitattributes_outcome = init_result.gitattributes;
 
-            // The `[project]` identity is seeded inside the init transaction when
-            // `config.toml` was absent; report it as created only then. An existing
-            // `[project]` table is preserved (the scaffold is `IfAbsent`).
-            let project_name = (!config_existed).then(|| init_result.project_name.clone());
-
             // `.jit/rules.toml` (the operative ruleset) is scaffolded inside the
-            // init transaction when absent; an existing file is never clobbered.
-            let scaffolded = !rules_existed;
+            // init transaction when absent; the applied plan is the sole preimage
+            // authority for whether this run created it.
+            let scaffolded = init_result
+                .created_paths
+                .iter()
+                .any(|path| path == ".jit/rules.toml");
             if scaffolded {
                 let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
             }
@@ -2038,40 +2028,14 @@ fn run() -> Result<()> {
             let _ = output_ctx.print_success(&message);
 
             if *json {
-                let mut created_paths = Vec::new();
-                if !index_existed {
-                    created_paths.push(".jit/index.json".to_string());
-                }
-                if !gates_existed {
-                    created_paths.push(".jit/gates.toml".to_string());
-                }
-                if !events_existed {
-                    created_paths.push(".jit/events.jsonl".to_string());
-                }
-                if project_name.is_some() {
-                    created_paths.push(".jit/config.toml".to_string());
-                }
-                if scaffolded {
-                    created_paths.push(".jit/rules.toml".to_string());
-                }
-                use jit::repository_state::GitattributesStatus;
-                if gitattributes_outcome == GitattributesStatus::Created {
-                    created_paths.push(".gitattributes".to_string());
-                }
-
-                let mut modified_paths = Vec::new();
-                if gitattributes_outcome == GitattributesStatus::Modified {
-                    modified_paths.push(".gitattributes".to_string());
-                }
-
                 let payload = InitResponse {
                     repository_root: current_dir.display().to_string(),
                     data_dir: jit_dir.display().to_string(),
                     repository_id: worktree_identity.map(|identity| identity.worktree_id),
                     hierarchy_template: chosen.name.clone(),
                     gitattributes_status: gitattributes_outcome,
-                    created_paths,
-                    modified_paths,
+                    created_paths: init_result.created_paths,
+                    modified_paths: init_result.modified_paths,
                     profile: profile_result,
                 };
                 let output = JsonOutput::success(payload, "init").with_message(message);
@@ -5215,10 +5179,7 @@ fn run() -> Result<()> {
                         let output = JsonOutput::success(&result, "doc assets").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
-                        // Get repository root to check if assets exist
-                        let repo_root = executor.storage().root().parent().ok_or_else(|| {
-                            jit::errors::InvalidArgumentError::new("Invalid storage path")
-                        })?;
+                        let repo_root = executor_layout.worktree_root();
 
                         output_ctx.print_data(format!(
                             "Assets for document {} (issue {}):",
@@ -6764,7 +6725,9 @@ fn run() -> Result<()> {
                 // Wrap any integrity violation in the typed ValidationFailedError
                 // (message preserved verbatim) so the top-level handler classifies
                 // it as a validation failure by downcast rather than by message text.
-                let (integrity_error, rule_report) = match executor.validate_repository_report()? {
+                let (validation_report, divergence_report) =
+                    executor.validate_repository_report_with_divergences()?;
+                let (integrity_error, rule_report) = match validation_report {
                     Ok(report) => (None, report.rule_report),
                     Err(failure) => {
                         let (error, report) = failure.into_parts();
@@ -6791,18 +6754,6 @@ fn run() -> Result<()> {
                     .iter()
                     .filter(|f| !f.is_error())
                     .collect();
-
-                // Membership-vs-DAG divergences are advisory: they surface here as
-                // a warning-severity count but never change the exit status (a repo
-                // with real labels must not start failing `jit validate`). A
-                // resolution error degrades to an empty report rather than failing
-                // the whole validate run.
-                let divergence_report = executor.detect_divergences().unwrap_or_else(|_| {
-                    jit::output::DivergenceResponse {
-                        count: 0,
-                        divergences: Vec::new(),
-                    }
-                });
 
                 if json {
                     use jit::output::JsonOutput;

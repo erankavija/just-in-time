@@ -23,6 +23,12 @@ pub const ENFORCEMENT_DRIFT_RULE: &str = "enforcement-drift";
 /// more gate definitions still use [`GateChecker::ReviewPlaceholder`].
 pub const REVIEW_PLACEHOLDER_RULE: &str = "review-placeholder";
 
+struct CapturedRepairPlan {
+    image: crate::repository_state::RepositoryImage,
+    declarations: crate::repository_state::CapturedRepositoryDeclarations,
+    plan: Option<crate::repository_state::MaterializationPlan>,
+}
+
 impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// Validate with optional fix mode.
     ///
@@ -93,70 +99,31 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
     /// Validate the exact repository through the closed-image pipeline.
     ///
-    /// A file-backed repository captures a bounded whole-repository image through
-    /// the recovered mutation session and validates it with
+    /// Every backend captures a bounded whole-repository image through the recovered
+    /// mutation session and validates it with
     /// [`validate_repository`](crate::validation::repository::validate_repository),
-    /// so every pass reads only image-projected content and no live filesystem or
-    /// Git I/O. A pure in-memory store has no persisted index or Git evidence and
-    /// retains the storage-backed integrity+rules path below for command unit
-    /// tests.
+    /// so every pass reads only image-projected content and no ambient filesystem or
+    /// Git I/O. The same canonical repair plan supplies derived-state expectations
+    /// for validation and `--fix`, including exactly proven installed-profile assets
+    /// and regions.
     pub fn validate_silent(&self) -> Result<()> {
-        if self.storage.is_file_backed() {
-            let image = self.capture_validation_image()?;
-            let report = crate::validation::repository::validate_repository(&image)?;
-            if report.rule_report.has_errors() {
-                let messages = report
-                    .rule_report
-                    .findings
-                    .iter()
-                    .filter(|finding| finding.is_error())
-                    .map(|finding| format!("[{}] {}", finding.rule, finding.message))
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                return Err(anyhow!(
-                    "Validation failed with {} rule error(s):\n{}",
-                    report.rule_report.error_count(),
-                    messages
-                ));
-            }
-            return Ok(());
+        let report = self.capture_validation_report()?.0?;
+        if report.rule_report.has_errors() {
+            let messages = report
+                .rule_report
+                .findings
+                .iter()
+                .filter(|finding| finding.is_error())
+                .map(|finding| format!("[{}] {}", finding.rule, finding.message))
+                .collect::<Vec<_>>()
+                .join("\n");
+            return Err(anyhow!(
+                "Validation failed with {} rule error(s):\n{}",
+                report.rule_report.error_count(),
+                messages
+            ));
         }
-
-        // Repository-integrity checks (broken deps, gates, docs, DAG, isolated
-        // nodes, transitive reduction, claims index). Label/type-label/namespace
-        // checks are NO LONGER here: they are default rules evaluated below.
-        self.validate_integrity_silent()?;
-
-        // Built-in enforcement-drift pass (REQ-01/REQ-02), computed FIRST and
-        // tolerantly so an unloadable rule set / gate registry surfaces as a
-        // declared-but-unenforced finding rather than crashing the run (REQ-01
-        // "missing OR unloadable"). Gated on declared invariants, so a repo
-        // without `.jit/invariants.toml` is unaffected. Captured up front so the
-        // finding is reported even when the malformed ruleset makes the rule
-        // evaluation below hard-error.
-        let drift_findings = self.enforcement_drift_findings()?;
-        let drift_error_message = graph_findings_error_message(&drift_findings);
-
-        // Local rules (built-in defaults + user rules) across every issue. The
-        // former hard-coded label/type/namespace checks live here now: an
-        // `error`-severity finding (e.g. a value outside a namespace enum, a bad
-        // pattern, a missing required label) fails validation — matching the old
-        // `validate_labels`/`validate_type_hierarchy` hard-reject behavior — while
-        // `warn` findings never fail.
-        let issues = self.storage.list_issues()?;
-        let rule_eval = self.rule_eval_error_message(&issues);
-
-        // Combine the drift error (if any) with the rule-evaluation error (if any)
-        // so a malformed ruleset reports BOTH the drift finding AND the parse
-        // problem, rather than losing the drift finding to an early `?`.
-        match (drift_error_message, rule_eval) {
-            (Some(drift), Ok(Some(rules))) => Err(anyhow!("{drift}\n{rules}")),
-            (Some(drift), Err(load_err)) => Err(anyhow!("{drift}\n{load_err}")),
-            (Some(drift), Ok(None)) => Err(anyhow!(drift)),
-            (None, Ok(Some(rules))) => Err(anyhow!(rules)),
-            (None, Err(load_err)) => Err(load_err),
-            (None, Ok(None)) => Ok(()),
-        }
+        Ok(())
     }
 
     /// Capture the bounded whole-repository validation image through the recovered
@@ -287,7 +254,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         let effective = |image: &crate::repository_state::RepositoryImage,
                          repo_rel: &str|
          -> Result<Option<Vec<u8>>> {
-            let vpath = super::repo_rel_virtual_path(repo_rel)?;
+            let vpath = image.layout().classify_repository_relative(repo_rel)?;
             match overrides.get(&vpath) {
                 Some(value) => Ok(value.clone()),
                 None => super::image_repo_bytes(image, repo_rel),
@@ -304,7 +271,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         // item-kind, issue, and schema entries drop out), and the subsequent
         // `validate_repository` pass surfaces the parse error as a finding.
         let config = effective_config(&image_one, &effective)
-            .unwrap_or_else(|_| toml::from_str("").expect("empty configuration parses"));
+            .unwrap_or_else(|_| empty_materialization_config());
         let all_ids = effective_index_ids(&image_one, &effective).unwrap_or_default();
         let rules_text = effective(&image_one, ".jit/rules.toml")?
             .map(String::from_utf8)
@@ -312,7 +279,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         let schema_rules = rules_text.as_deref().filter(|content| {
             crate::declarations::rules::RuleSet::schema_requests(content).is_ok()
         });
-        let closure = validate_capture_closure(&config, &all_ids, schema_rules)?;
+        let closure =
+            validate_capture_closure(image_one.layout(), &config, &all_ids, schema_rules)?;
 
         let mut spec = CaptureSpec::phase_one(registries()?, budget)?;
         spec.discover_paths(closure.paths)?;
@@ -379,9 +347,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             phase_three.discover_paths(
                 prompt_paths
                     .map(|path| {
-                        super::repo_rel_virtual_path(path).map_err(|_| {
-                            anyhow!("prompt_file '{}' resolves outside the repository", path)
-                        })
+                        image_two
+                            .layout()
+                            .classify_repository_relative(path)
+                            .map_err(|_| {
+                                anyhow!("prompt_file '{}' resolves outside the repository", path)
+                            })
                     })
                     .collect::<Result<Vec<_>>>()?,
             )?;
@@ -423,101 +394,116 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             crate::validation::repository::RepositoryValidationFailure,
         >,
     > {
-        let image = self.capture_validation_image()?;
-        Ok(crate::validation::repository::validate_repository(&image))
+        Ok(self.capture_validation_report()?.0)
+    }
+
+    /// Validate and derive advisory hierarchy divergences from one captured image.
+    pub fn validate_repository_report_with_divergences(
+        &self,
+    ) -> Result<(
+        std::result::Result<
+            crate::validation::repository::RepositoryValidationReport,
+            crate::validation::repository::RepositoryValidationFailure,
+        >,
+        crate::output::DivergenceResponse,
+    )> {
+        self.capture_validation_report()
+    }
+
+    fn capture_validation_report(
+        &self,
+    ) -> Result<(
+        std::result::Result<
+            crate::validation::repository::RepositoryValidationReport,
+            crate::validation::repository::RepositoryValidationFailure,
+        >,
+        crate::output::DivergenceResponse,
+    )> {
+        let layout = self.require_layout()?;
+        let mut session = self.storage().open_mutation_session(layout)?;
+        let seed = repair_seed()?;
+        let package = crate::profile::jit_dogfood_package()?;
+        for _ in 0..8 {
+            let Some(derived) = self.capture_repair_plan(session.as_mut(), &seed, &package)? else {
+                continue;
+            };
+            let captured = match derived {
+                Ok(derived) => derived,
+                Err(failure) => {
+                    return Ok((
+                        Err(failure),
+                        crate::output::DivergenceResponse {
+                            count: 0,
+                            divergences: Vec::new(),
+                        },
+                    ));
+                }
+            };
+            let divergences = captured_divergences(&captured.image, captured.declarations.config())
+                .unwrap_or_else(|_| crate::output::DivergenceResponse {
+                    count: 0,
+                    divergences: Vec::new(),
+                });
+            let report = crate::validation::repository::validate_repository_with_materializations(
+                &captured.image,
+                &captured.declarations,
+                captured.plan.as_ref(),
+            );
+            return Ok((report, divergences));
+        }
+        Err(anyhow!(
+            "repository validation did not converge after repeated capture conflicts"
+        ))
     }
 
     /// Repair derived state (default rules/schemas plus every configured
     /// projection) through the recovered session (`jit validate --fix`).
     ///
     /// The complete owned-materialization set is derived from declared authority
-    /// over one captured image ([`MaterializationIntent::RepairDerivedState`]) and
+    /// over one captured image (`MaterializationRequest::RepairDerivedState`) and
     /// applied through the same session; a coherent repository yields an empty
     /// delta (no action). Repair is ownership-safe by construction — `rules.toml`
     /// splices only the generated default spans and region projections splice only
     /// their managed region, so authored content is preserved. In `dry_run` the
     /// delta is derived but not applied. Returns the number of repaired targets and
-    /// a per-target message. In-memory stores keep the legacy path and repair
-    /// nothing.
+    /// a per-target message. JSON and memory stores execute this same path.
     fn repair_derived_state(&self, dry_run: bool) -> Result<(usize, Vec<String>)> {
-        use crate::repository_state::{
-            derive_materializations, render_capture_closure, CaptureBudget, CaptureSpec,
-            MaterializationIntent, RepositoryAction, RepositorySeed, RepositorySeedKind,
-            VirtualPath,
-        };
+        use crate::repository_state::RepositoryAction;
         use crate::storage::RepositoryStateStoreError;
-        use std::collections::BTreeMap;
-
-        if !self.storage.is_file_backed() {
-            return Ok((0, Vec::new()));
-        }
 
         let layout = self.require_layout()?;
         let mut session = self.storage().open_mutation_session(layout)?;
-        let budget = CaptureBudget {
-            max_paths: 1 << 16,
-            max_listings: 64,
-            max_bytes: 256 * 1024 * 1024,
-            max_depth: 16,
-        };
-        let seed = RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "validate --fix".to_string(),
-            },
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )?;
-        let registries = || -> Result<[VirtualPath; 4]> {
-            Ok([
-                VirtualPath::data("config.toml")?,
-                VirtualPath::data("invariants.toml")?,
-                VirtualPath::data("rules.toml")?,
-                VirtualPath::data("gates.toml")?,
-            ])
-        };
+        let seed = repair_seed()?;
+        let package = crate::profile::jit_dogfood_package()?;
         for _ in 0..8 {
-            let image_one = match session.capture(CaptureSpec::phase_one(registries()?, budget)?) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            let Some(derived) = self.capture_repair_plan(session.as_mut(), &seed, &package)? else {
+                continue;
             };
-            let config_one = crate::repository_state::assemble_config(&image_one)?;
-            let rules_text = super::image_repo_bytes(&image_one, ".jit/rules.toml")?
-                .map(String::from_utf8)
-                .transpose()?;
-            let closure = render_capture_closure(&config_one, &[], rules_text.as_deref())?;
-            let mut phase_two = CaptureSpec::phase_one(registries()?, budget)?;
-            phase_two.discover_paths(closure)?;
-            let image = match session.capture(phase_two) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            };
-
-            let declarations = super::declarations_from_image(&image)?;
-            let plan = derive_materializations(
-                &image,
-                declarations.borrowed(),
-                &seed,
-                MaterializationIntent::RepairDerivedState,
-            )?;
-            // One message per content-changing target (directory/mode actions are
-            // structural companions of a write); a coherent repository emits none.
-            let messages: Vec<String> =
-                plan.delta()
-                    .actions()
-                    .iter()
-                    .filter_map(|action| match action {
-                        RepositoryAction::WriteFile { path, .. } => {
-                            Some(format!("✓ Repaired derived-state target {path:?}"))
-                        }
-                        RepositoryAction::DeleteFile { path, .. } => {
-                            Some(format!("✓ Removed obsolete derived-state target {path:?}"))
-                        }
-                        RepositoryAction::CreateDirectory { .. }
-                        | RepositoryAction::SetMode { .. } => None,
-                    })
-                    .collect();
+            let mut captured = derived.map_err(|failure| failure.into_error())?;
+            if let Some(error) = captured.declarations.take_rules_load_error() {
+                return Err(error);
+            }
+            let plan = captured.plan.ok_or_else(|| {
+                anyhow!("derived-state repair has no plan for loadable declarations")
+            })?;
+            // One message per changed owned target. Include mode-only drift: an
+            // executable profile asset can have correct bytes but still require a
+            // transaction, and treating that delta as empty would skip repair.
+            let changed = plan
+                .delta()
+                .actions()
+                .iter()
+                .filter_map(|action| match action {
+                    RepositoryAction::WriteFile { path, .. }
+                    | RepositoryAction::DeleteFile { path, .. }
+                    | RepositoryAction::SetMode { path, .. } => Some(path),
+                    RepositoryAction::CreateDirectory { .. } => None,
+                })
+                .collect::<std::collections::BTreeSet<_>>();
+            let messages = changed
+                .into_iter()
+                .map(|path| format!("✓ Repaired derived-state target {path:?}"))
+                .collect::<Vec<_>>();
             if messages.is_empty() {
                 return Ok((0, Vec::new()));
             }
@@ -534,6 +520,187 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             "derived-state repair did not converge after repeated capture conflicts"
         ))
     }
+
+    /// Capture one complete validation closure and derive its exact repair plan.
+    ///
+    /// The immutable embedded profile contributes repair claims only when its
+    /// captured applied-profile record exactly matches the package identity and
+    /// target hashes. The record is the existing provenance authority; no second
+    /// ownership inventory is inferred from filenames or occupants.
+    fn capture_repair_plan(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        seed: &crate::repository_state::RepositorySeed,
+        package: &crate::profile::EmbeddedProfilePackage<'_>,
+    ) -> Result<
+        Option<
+            std::result::Result<
+                CapturedRepairPlan,
+                crate::validation::repository::RepositoryValidationFailure,
+            >,
+        >,
+    > {
+        use crate::repository_state::{
+            derive_materialization, MaterializationRequest, RepositoryEntry, VirtualPath,
+        };
+
+        let metadata = &package.manifest().profile;
+        let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
+        let layout = self.require_layout()?;
+        let mut profile_paths = package
+            .hashes()
+            .targets
+            .keys()
+            .map(|path| {
+                layout
+                    .classify_repository_relative(path)
+                    .map_err(Into::into)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        profile_paths.push(record_path.clone());
+
+        let Some(image) = self.capture_proposed_base(
+            session,
+            &std::collections::BTreeMap::new(),
+            &profile_paths,
+            None,
+        )?
+        else {
+            return Ok(None);
+        };
+        let profiles = match image.entry(&record_path)? {
+            RepositoryEntry::Absent => Vec::new(),
+            RepositoryEntry::File { bytes, .. } => {
+                let actual: crate::repository_state::AppliedProfileRecord = match serde_json::from_slice(
+                    bytes,
+                )
+                .context("invalid applied profile provenance")
+                {
+                    Ok(actual) => actual,
+                    Err(error) => return Ok(Some(Err(
+                        crate::validation::repository::RepositoryValidationFailure::materialization(
+                            error,
+                        ),
+                    ))),
+                };
+                let expected = super::profile::expected_record(package);
+                if actual != expected {
+                    return Ok(Some(Err(
+                        crate::validation::repository::RepositoryValidationFailure::materialization(anyhow!(
+                            "applied profile provenance for '{}@{}' does not match the resolvable embedded package",
+                            metadata.id,
+                            metadata.version
+                        )),
+                    )));
+                }
+                match crate::profile::build_profile_repair_claims(package, image.layout()) {
+                    Ok(claims) => vec![claims],
+                    Err(error) => return Ok(Some(Err(
+                        crate::validation::repository::RepositoryValidationFailure::materialization(
+                            error.into(),
+                        ),
+                    ))),
+                }
+            }
+            _ => {
+                return Ok(Some(Err(
+                    crate::validation::repository::RepositoryValidationFailure::materialization(
+                        anyhow!(
+                            "applied profile provenance path {:?} is not a regular file",
+                            record_path
+                        ),
+                    ),
+                )));
+            }
+        };
+        let declarations = match crate::repository_state::validation_declarations_from_image(&image)
+        {
+            Ok(declarations) => declarations,
+            Err(error) => {
+                return Ok(Some(Err(
+                    crate::validation::repository::RepositoryValidationFailure::declaration(error),
+                )))
+            }
+        };
+        let plan =
+            if declarations.rules_loaded() {
+                match derive_materialization(
+                    &image,
+                    MaterializationRequest::RepairDerivedState {
+                        declarations: declarations.borrowed(),
+                        profiles,
+                        seed,
+                    },
+                ) {
+                    Ok(plan) => Some(plan),
+                    Err(error) => return Ok(Some(Err(
+                        crate::validation::repository::RepositoryValidationFailure::materialization(
+                            error.into(),
+                        ),
+                    ))),
+                }
+            } else {
+                None
+            };
+        Ok(Some(Ok(CapturedRepairPlan {
+            image,
+            declarations,
+            plan,
+        })))
+    }
+}
+
+fn captured_divergences(
+    image: &crate::repository_state::RepositoryImage,
+    config: &JitConfig,
+) -> Result<crate::output::DivergenceResponse> {
+    use crate::domain::type_taxonomy::HierarchyConfig;
+    use crate::output::{DivergenceResponse, DivergenceView};
+
+    let issues = captured_active_issues(image)?;
+    let namespaces = crate::config_manager::namespaces_from_config(config);
+    let hierarchy = match namespaces.type_hierarchy {
+        Some(types) => {
+            HierarchyConfig::new(types, namespaces.label_associations.unwrap_or_default())?
+        }
+        None => HierarchyConfig::default(),
+    };
+    let issue_refs = issues.iter().collect::<Vec<_>>();
+    let divergences =
+        crate::graph::hierarchy::detect_membership_divergences(&issue_refs, &hierarchy);
+    let by_id = issues
+        .iter()
+        .map(|issue| (issue.id.as_str(), issue))
+        .collect::<std::collections::HashMap<_, _>>();
+    let divergences = divergences
+        .into_iter()
+        .map(|divergence| {
+            let issue = by_id.get(divergence.issue_id.as_str());
+            DivergenceView {
+                short_id: divergence.issue_id.chars().take(8).collect(),
+                title: issue.map(|issue| issue.title.clone()).unwrap_or_default(),
+                id: divergence.issue_id,
+                label: divergence.label,
+                namespace: divergence.namespace,
+                value: divergence.value,
+            }
+        })
+        .collect::<Vec<_>>();
+    Ok(DivergenceResponse {
+        count: divergences.len(),
+        divergences,
+    })
+}
+
+fn repair_seed() -> Result<crate::repository_state::RepositorySeed> {
+    crate::repository_state::RepositorySeed::new(
+        crate::repository_state::RepositorySeedKind::Command {
+            name: "validate derived state".to_string(),
+        },
+        Default::default(),
+        Default::default(),
+    )
+    .map_err(Into::into)
 }
 
 /// Effective-bytes byte source over a captured image and a proposed overlay.
@@ -547,15 +714,23 @@ fn effective_config(
 ) -> Result<JitConfig> {
     let config_bytes = effective(image, ".jit/config.toml")?
         .ok_or_else(|| anyhow!("captured image has no .jit/config.toml"))?;
-    let mut config: JitConfig =
-        toml::from_str(&String::from_utf8(config_bytes)?).context("invalid .jit/config.toml")?;
-    config.invariants = match effective(image, ".jit/invariants.toml")? {
+    let declarations = crate::declarations::parse_configuration(&config_bytes)
+        .context("invalid .jit/config.toml")?;
+    let invariants = match effective(image, ".jit/invariants.toml")? {
         Some(bytes) => crate::declarations::invariants::InvariantRegistry::from_toml_str(
             &String::from_utf8(bytes)?,
         )?,
         None => crate::declarations::invariants::InvariantRegistry::empty(),
     };
-    Ok(config)
+    Ok(declarations.materialization_config(invariants))
+}
+
+/// Canonical empty declaration view for best-effort closure planning after a
+/// malformed config; the validation pass remains responsible for the finding.
+fn empty_materialization_config() -> JitConfig {
+    crate::declarations::parse_configuration(b"")
+        .expect("empty configuration parses")
+        .materialization_config(crate::declarations::invariants::InvariantRegistry::empty())
 }
 
 /// Parse the (possibly overlaid) repository index's live issue ids.
@@ -702,8 +877,8 @@ pub(crate) fn plan_content_from_image(
     // breakable containers, so no external plan docs), and `validate_repository`
     // is the authority that reports the parse error. Only a genuinely missing
     // required plan document (below) is a hard error.
-    let mut config = effective_config(image, effective)
-        .unwrap_or_else(|_| toml::from_str("").expect("empty configuration parses"));
+    let mut config =
+        effective_config(image, effective).unwrap_or_else(|_| empty_materialization_config());
     config.templates = effective_templates(image, &config, effective)?;
     let all_ids = effective_index_ids(image, effective).unwrap_or_default();
     let all_issues = effective_issues(image, &all_ids, effective).unwrap_or_default();
@@ -854,24 +1029,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     // Note: apply_dependency_reversal is removed - we don't reverse dependencies
     // Type hierarchy is orthogonal to DAG structure
-
-    /// Evaluate local + graph rules + the dangling-link pass and return a combined
-    /// error message if any produces an error-severity finding; `Ok(None)` when
-    /// clean. A malformed rule SOURCE surfaces as an `Err` (its own load failure),
-    /// which the caller combines with any enforcement-drift finding so neither is
-    /// lost. Does NOT include the enforcement-drift pass (the caller runs that
-    /// separately and tolerantly).
-    fn rule_eval_error_message(&self, issues: &[Issue]) -> Result<Option<String>>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        if let Some(message) = self.local_rules_error_message(issues)? {
-            return Ok(Some(message));
-        }
-        let mut graph_findings = self.evaluate_graph_rules(issues)?;
-        graph_findings.extend(self.dangling_link_findings(issues)?);
-        Ok(graph_findings_error_message(&graph_findings))
-    }
 
     /// Built-in validate pass: report every node→item link label whose qualified
     /// id cannot be resolved as a finding, rather than silently dropping it
@@ -1091,46 +1248,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .collect()
             })
         }
-    }
-
-    /// Evaluate the EFFECTIVE local rules for every issue and, if any produces an
-    /// `error`-severity finding, return a single combined message; otherwise
-    /// `None`. This is the migrated replacement for the former hard-coded
-    /// `validate_labels`/`validate_type_hierarchy` whole-repo checks: those always
-    /// hard-rejected on a violation, so any `error` finding here fails validation.
-    /// `warn` findings are never fatal.
-    fn local_rules_error_message(&self, issues: &[Issue]) -> Result<Option<String>> {
-        use crate::declarations::rules::Severity;
-
-        let ruleset = self.effective_rules()?;
-        let repo_format = self.repo_content_format()?;
-        let mut errors: Vec<(String, String)> = Vec::new();
-        for issue in issues {
-            let evaluation = crate::validation::evaluate_local(issue, ruleset, repo_format)
-                .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
-            for finding in evaluation.findings() {
-                if finding.severity == Severity::Error {
-                    errors.push((
-                        issue.id.clone(),
-                        format!("[{}] {}", finding.rule, finding.message),
-                    ));
-                }
-            }
-        }
-
-        if errors.is_empty() {
-            return Ok(None);
-        }
-        let body = errors
-            .iter()
-            .map(|(id, msg)| format!("  issue {}: {}", &id[..8.min(id.len())], msg))
-            .collect::<Vec<_>>()
-            .join("\n");
-        Ok(Some(format!(
-            "Validation failed with {} rule error(s):\n{}",
-            errors.len(),
-            body
-        )))
     }
 
     /// Run the repository-integrity checks ONLY, without evaluating declarative
@@ -1766,7 +1883,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         use git2::Repository;
 
         // Try to open git repository
-        let repo = match Repository::open(".") {
+        let layout = self.require_layout()?;
+        let repo = match Repository::open(layout.worktree_root()) {
             Ok(r) => r,
             Err(_) => {
                 // If not a git repo, skip document validation
@@ -2190,39 +2308,6 @@ pub(crate) fn planning_node_plan_path(planning: &Issue) -> Option<String> {
         .map(|d| d.path.clone())
 }
 
-/// Build a human-readable error message from any `error`-severity graph-rule
-/// findings, or `None` if none fail validation.
-///
-/// `warn`/`off` findings are intentionally excluded: only `Severity::Error`
-/// findings (which include `config-error` findings, attributed to a rule with
-/// error severity) make `jit validate` fail.
-fn graph_findings_error_message(
-    findings: &[crate::validation::graph::GraphFinding],
-) -> Option<String> {
-    use crate::declarations::rules::Severity;
-
-    let errors: Vec<&crate::validation::graph::GraphFinding> = findings
-        .iter()
-        .filter(|f| f.finding.severity == Severity::Error)
-        .collect();
-
-    if errors.is_empty() {
-        return None;
-    }
-
-    let body = errors
-        .iter()
-        .map(|f| format!("  [{}] {}", f.finding.rule, f.finding.message))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    Some(format!(
-        "Graph rule validation failed with {} error(s):\n{}",
-        errors.len(),
-        body
-    ))
-}
-
 /// Group `(rule_name, message)` pairs into a map of rule name to its messages,
 /// preserving first-seen order within each rule.
 fn group_messages(
@@ -2416,6 +2501,52 @@ mod tests {
     use crate::storage::JsonFileStorage;
     use chrono::Duration;
 
+    fn profiled_memory_fixture() -> crate::storage::InMemoryStorage {
+        use crate::commands::test_helpers::{memory_executor, seed_repo_file};
+
+        fn seed_tree(
+            storage: &crate::storage::InMemoryStorage,
+            root: &std::path::Path,
+            current: &std::path::Path,
+        ) {
+            for entry in std::fs::read_dir(current).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    seed_tree(storage, root, &path);
+                } else {
+                    seed_repo_file(
+                        storage,
+                        path.strip_prefix(root).unwrap().to_str().unwrap(),
+                        &std::fs::read_to_string(&path).unwrap(),
+                    );
+                }
+            }
+        }
+
+        let source = tempfile::tempdir().unwrap();
+        let source_storage = JsonFileStorage::new(source.path().join(".jit"));
+        let source_layout =
+            crate::storage::discover_repository_layout(source.path(), source_storage.root())
+                .unwrap();
+        CommandExecutor::new(source_storage)
+            .with_layout(source_layout)
+            .initialize_fresh_repository(
+                source.path(),
+                &HierarchyTemplate::default(),
+                Some("jit-dogfood"),
+            )
+            .unwrap();
+
+        let storage = crate::storage::InMemoryStorage::new();
+        seed_tree(&storage, source.path(), source.path());
+        // The text-only fixture seeder does not retain executable bits. Exercise
+        // the same repair path once to restore those modes before returning.
+        memory_executor(storage.clone())
+            .validate_with_fix(true, false)
+            .unwrap();
+        storage
+    }
+
     // Note: validate_leases() and validate_branch_drift() require git repository setup
     // and are integration-tested through manual testing and real usage.
     // Unit tests focus on pure functions like format_duration().
@@ -2501,13 +2632,253 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files() {
+        let repo = tempfile::tempdir().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        CommandExecutor::new(storage.clone())
+            .with_layout(layout)
+            .initialize_fresh_repository(
+                repo.path(),
+                &HierarchyTemplate::default(),
+                Some("jit-dogfood"),
+            )
+            .unwrap();
+
+        let owned = [
+            ".jit/rules.toml",
+            ".jit/schemas/default-type-hierarchy-known.json",
+            ".jit/reference/rules-and-gates.md",
+            "AGENTS.md",
+            ".agents/skills/jit-manage/SKILL.md",
+        ];
+        let baseline = owned
+            .iter()
+            .map(|path| (*path, std::fs::read(repo.path().join(path)).unwrap()))
+            .collect::<std::collections::BTreeMap<_, _>>();
+        let unowned = repo.path().join(".jit/schemas/default-unowned.json");
+        std::fs::write(&unowned, b"{}\n").unwrap();
+
+        let rules = String::from_utf8(baseline[".jit/rules.toml"].clone()).unwrap();
+        std::fs::write(
+            repo.path().join(".jit/rules.toml"),
+            rules.replacen('#', "# stale ", 1),
+        )
+        .unwrap();
+        let mut schema = baseline[".jit/schemas/default-type-hierarchy-known.json"].clone();
+        schema.push(b' ');
+        std::fs::write(
+            repo.path()
+                .join(".jit/schemas/default-type-hierarchy-known.json"),
+            schema,
+        )
+        .unwrap();
+        std::fs::write(
+            repo.path().join(".jit/reference/rules-and-gates.md"),
+            b"STALE\n",
+        )
+        .unwrap();
+        let agents = String::from_utf8(baseline["AGENTS.md"].clone()).unwrap();
+        std::fs::write(
+            repo.path().join("AGENTS.md"),
+            agents
+                .replace("_No invariants declared._", "STALE INVARIANTS")
+                .replace("## JIT workflow", "## STALE workflow"),
+        )
+        .unwrap();
+        std::fs::write(
+            repo.path().join(".agents/skills/jit-manage/SKILL.md"),
+            b"STALE\n",
+        )
+        .unwrap();
+
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        let mut executor = CommandExecutor::new(storage).with_layout(layout);
+        let first_error = format!("{:#}", executor.validate_silent().unwrap_err());
+        let second_error = format!("{:#}", executor.validate_silent().unwrap_err());
+        assert_eq!(
+            first_error, second_error,
+            "drift diagnostics must be stable"
+        );
+        for path in owned {
+            assert!(
+                first_error.contains(path.trim_start_matches(".jit/")),
+                "diagnostics must identify {path}: {first_error}"
+            );
+        }
+
+        let (fixes, _) = executor.validate_with_fix(true, false).unwrap();
+        assert!(fixes >= baseline.len());
+        for (path, bytes) in baseline {
+            assert_eq!(
+                std::fs::read(repo.path().join(path)).unwrap(),
+                bytes,
+                "{path}"
+            );
+        }
+        assert_eq!(std::fs::read(&unowned).unwrap(), b"{}\n");
+        assert_eq!(executor.validate_with_fix(true, false).unwrap().0, 0);
+    }
+
+    #[test]
+    fn test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs() {
+        let repo = tempfile::tempdir().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        CommandExecutor::new(storage.clone())
+            .with_layout(layout)
+            .initialize_fresh_repository(
+                repo.path(),
+                &HierarchyTemplate::default(),
+                Some("jit-dogfood"),
+            )
+            .unwrap();
+
+        let rules_path = repo.path().join(".jit/rules.toml");
+        let agents_path = repo.path().join("AGENTS.md");
+        let rules = std::fs::read(&rules_path).unwrap();
+        let agents = std::fs::read_to_string(&agents_path).unwrap();
+        std::fs::write(
+            &rules_path,
+            String::from_utf8(rules.clone()).unwrap() + "\n",
+        )
+        .unwrap();
+        std::fs::write(
+            &agents_path,
+            agents.replacen(
+                "<!-- jit:invariants:begin -->",
+                "<!-- jit:invariants:begin -->\n<!-- jit:invariants:begin -->",
+                1,
+            ),
+        )
+        .unwrap();
+        let before_rules = std::fs::read(&rules_path).unwrap();
+        let before_agents = std::fs::read(&agents_path).unwrap();
+
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        let mut executor = CommandExecutor::new(storage).with_layout(layout);
+        let error = executor.validate_with_fix(true, false).unwrap_err();
+        assert!(format!("{error:#}").contains("invariants"), "{error:#}");
+        assert_eq!(std::fs::read(&rules_path).unwrap(), before_rules);
+        assert_eq!(std::fs::read(&agents_path).unwrap(), before_agents);
+    }
+
+    #[test]
+    fn test_validate_fix_repairs_owned_materializations_in_memory() {
+        use crate::commands::test_helpers::{memory_executor, seed_repo_file};
+        use crate::storage::IssueStore;
+
+        let storage = profiled_memory_fixture();
+        let mut executor = memory_executor(storage.clone());
+        executor.validate_silent().unwrap();
+
+        let owned = [
+            ".jit/rules.toml",
+            ".jit/schemas/default-type-hierarchy-known.json",
+            ".jit/reference/rules-and-gates.md",
+            "AGENTS.md",
+            ".agents/skills/jit-manage/SKILL.md",
+        ];
+        let baseline = owned
+            .iter()
+            .map(|path| {
+                (
+                    *path,
+                    storage.read_repo_file(path).unwrap().expect("owned file"),
+                )
+            })
+            .collect::<std::collections::BTreeMap<_, _>>();
+        seed_repo_file(&storage, ".jit/schemas/default-unowned.json", "{}\n");
+        seed_repo_file(
+            &storage,
+            ".jit/rules.toml",
+            &baseline[".jit/rules.toml"].replacen('#', "# stale ", 1),
+        );
+        seed_repo_file(
+            &storage,
+            ".jit/schemas/default-type-hierarchy-known.json",
+            &(baseline[".jit/schemas/default-type-hierarchy-known.json"].clone() + " "),
+        );
+        seed_repo_file(&storage, ".jit/reference/rules-and-gates.md", "STALE\n");
+        seed_repo_file(
+            &storage,
+            "AGENTS.md",
+            &baseline["AGENTS.md"]
+                .replace("_No invariants declared._", "STALE INVARIANTS")
+                .replace("## JIT workflow", "## STALE workflow"),
+        );
+        seed_repo_file(&storage, ".agents/skills/jit-manage/SKILL.md", "STALE\n");
+
+        let error = format!("{:#}", executor.validate_silent().unwrap_err());
+        for path in owned {
+            assert!(
+                error.contains(path.trim_start_matches(".jit/")),
+                "diagnostics must identify {path}: {error}"
+            );
+        }
+        let (fixes, _) = executor.validate_with_fix(true, false).unwrap();
+        assert!(fixes >= baseline.len());
+        for (path, content) in baseline {
+            assert_eq!(
+                storage.read_repo_file(path).unwrap().unwrap(),
+                content,
+                "{path}"
+            );
+        }
+        assert_eq!(
+            storage
+                .read_repo_file(".jit/schemas/default-unowned.json")
+                .unwrap()
+                .unwrap(),
+            "{}\n"
+        );
+        assert_eq!(executor.validate_with_fix(true, false).unwrap().0, 0);
+    }
+
+    #[test]
+    fn test_validate_fix_rejects_ambiguous_region_without_memory_writes() {
+        use crate::commands::test_helpers::{memory_executor, seed_repo_file};
+        use crate::storage::IssueStore;
+
+        let storage = profiled_memory_fixture();
+        let rules = storage.read_repo_file(".jit/rules.toml").unwrap().unwrap() + "\n";
+        let agents = storage
+            .read_repo_file("AGENTS.md")
+            .unwrap()
+            .unwrap()
+            .replacen(
+                "<!-- jit:invariants:begin -->",
+                "<!-- jit:invariants:begin -->\n<!-- jit:invariants:begin -->",
+                1,
+            );
+        seed_repo_file(&storage, ".jit/rules.toml", &rules);
+        seed_repo_file(&storage, "AGENTS.md", &agents);
+
+        let mut executor = memory_executor(storage.clone());
+        let error = executor.validate_with_fix(true, false).unwrap_err();
+        assert!(format!("{error:#}").contains("invariants"), "{error:#}");
+        assert_eq!(
+            storage.read_repo_file(".jit/rules.toml").unwrap().unwrap(),
+            rules
+        );
+        assert_eq!(
+            storage.read_repo_file("AGENTS.md").unwrap().unwrap(),
+            agents
+        );
+    }
+
+    #[test]
     fn test_validate_type_fix_is_noop_after_captured_repair() {
         use crate::commands::test_helpers::memory_executor;
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(
-            ".jit/config.toml",
+        storage.add_data_file(
+            "config.toml",
             "[worktree]\nenforce_leases = \"off\"\n\
              [type_hierarchy.types]\ntask = 4\n\
              [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
@@ -2677,11 +3048,11 @@ source-of-truth = \"registry-first\"
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
-        storage.add_repo_file(".jit/config.toml", CANONICAL_ITEM_KINDS);
+        storage.add_data_file("config.toml", CANONICAL_ITEM_KINDS);
         // The registry-first `invariant` kind reads its toml through the storage
         // boundary at the descriptor path, so seed the in-memory repo-file map (not
         // the real fs) at `.jit/invariants.toml`.
-        storage.add_repo_file(".jit/invariants.toml", REGISTRY_TOML);
+        storage.add_data_file("invariants.toml", REGISTRY_TOML);
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
@@ -2697,7 +3068,7 @@ source-of-truth = \"registry-first\"
         std::fs::create_dir_all(storage.root()).unwrap();
         // Invariant registry through the storage boundary (descriptor path); the
         // `config.toml` is parsed from the real `.jit` root by `cached_config`.
-        storage.add_repo_file(".jit/invariants.toml", REGISTRY_TOML);
+        storage.add_data_file("invariants.toml", REGISTRY_TOML);
         let config = format!(
             "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
              [namespaces.satisfies]\ndescription = \"satisfied item\"\nunique = false\n\
@@ -2705,7 +3076,7 @@ source-of-truth = \"registry-first\"
              {CANONICAL_ITEM_KINDS}"
         );
         std::fs::write(storage.root().join("config.toml"), &config).unwrap();
-        storage.add_repo_file(".jit/config.toml", &config);
+        storage.add_data_file("config.toml", &config);
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
@@ -2720,8 +3091,8 @@ source-of-truth = \"registry-first\"
             .map(|issue| issue.id)
             .collect::<Vec<_>>();
         ids.sort();
-        storage.add_repo_file(
-            ".jit/index.json",
+        storage.add_data_file(
+            "index.json",
             &serde_json::json!({"schema_version": 2, "all_ids": ids, "deleted_ids": []})
                 .to_string(),
         );
@@ -2778,9 +3149,9 @@ description = \"Full Rust CI pipeline must pass.\"
         std::fs::create_dir_all(storage.root()).unwrap();
         let config = format!("{CANONICAL_ITEM_KINDS}\n{RULE_AND_GATE_ITEM_KINDS}");
         std::fs::write(storage.root().join("config.toml"), config).unwrap();
-        storage.add_repo_file(".jit/invariants.toml", REGISTRY_TOML);
-        storage.add_repo_file(".jit/rules.toml", ONE_RULE);
-        storage.add_repo_file(".jit/gates.toml", ONE_GATE);
+        storage.add_data_file("invariants.toml", REGISTRY_TOML);
+        storage.add_data_file("rules.toml", ONE_RULE);
+        storage.add_data_file("gates.toml", ONE_GATE);
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }

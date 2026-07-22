@@ -322,7 +322,7 @@ fn test_add_document_rejects_asset_closure_over_fixed_budget_without_writes() {
         .map(|index| format!("![asset](./asset-{index}.png)"))
         .collect::<Vec<_>>()
         .join("\n");
-    h.storage.add_repo_file("docs/guide.md", &content);
+    h.storage.add_worktree_file("docs/guide.md", &content);
     let issue_before = h.storage.load_issue(&id).unwrap();
     let events_before = h.storage.read_events().unwrap();
 

@@ -7,9 +7,8 @@
 //! image-projected bytes through one byte-read closure, so no path forks its
 //! config/rules/gates loaders.
 
-use crate::config::{JitConfig, ProjectionMode};
-use crate::declarations::invariants::InvariantRegistry;
-use crate::declarations::rules::{RuleConfigError, RuleSet, Severity};
+use crate::config::JitConfig;
+use crate::declarations::rules::{RuleSet, Severity};
 use crate::declarations::GateChecker;
 use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
@@ -20,19 +19,12 @@ use crate::domain::item::{
 };
 use crate::domain::{parse_known_events, Issue, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
-use crate::repository_state::{
-    render_projection_body, require_target, splice_region, ProjectionInputs, RepositoryEntry,
-    RepositoryImage,
-};
+use crate::repository_state::{RepositoryEntry, RepositoryImage, RepositoryIndex};
 use crate::validation::engine::Finding;
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
-use serde::Deserialize;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::io::{Error as IoError, ErrorKind};
-use std::path::{Path, PathBuf};
-
-const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 2;
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::path::Path;
 
 /// One named stage in whole-repository validation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -85,6 +77,30 @@ impl RepositoryValidationFailure {
         Self { error, report }
     }
 
+    pub(crate) fn declaration(error: anyhow::Error) -> Self {
+        Self::new(
+            error.context("declaration validation pass"),
+            RepositoryValidationReport {
+                passes: Vec::new(),
+                issue_count: 0,
+                event_count: 0,
+                rule_report: RuleReport::default(),
+            },
+        )
+    }
+
+    pub(crate) fn materialization(error: anyhow::Error) -> Self {
+        Self::new(
+            error.context("derived-materialization validation pass"),
+            RepositoryValidationReport {
+                passes: Vec::new(),
+                issue_count: 0,
+                event_count: 0,
+                rule_report: RuleReport::default(),
+            },
+        )
+    }
+
     /// Partial validation report collected from the exact supplied view.
     pub fn report(&self) -> &RepositoryValidationReport {
         &self.report
@@ -120,11 +136,7 @@ impl std::error::Error for RepositoryValidationFailure {
 /// captured closure fails typed as `UndiscoveredRepositoryPath` (closed-read
 /// discipline), never a silent absence.
 fn image_read(image: &RepositoryImage, repo_rel: &str) -> Result<Option<Vec<u8>>> {
-    use crate::repository_state::VirtualPath;
-    let vpath = match repo_rel.strip_prefix(".jit/") {
-        Some(rest) => VirtualPath::data(rest),
-        None => VirtualPath::worktree(repo_rel),
-    }?;
+    let vpath = image.layout().classify_repository_relative(repo_rel)?;
     Ok(image.file_bytes(&vpath)?.map(<[u8]>::to_vec))
 }
 
@@ -140,54 +152,95 @@ fn image_read(image: &RepositoryImage, repo_rel: &str) -> Result<Option<Vec<u8>>
 pub fn validate_repository(
     image: &RepositoryImage,
 ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
-    let read = move |path: &str| image_read(image, path);
-    let read: &ReadBytes<'_> = &read;
-    let mut passes = Vec::new();
-    let config = match load_config(read).context("effective-config validation pass") {
-        Ok(config) => config,
-        Err(error) => {
-            return Err(RepositoryValidationFailure::new(
-                error,
+    let declarations = crate::repository_state::validation_declarations_from_image(image)
+        .map_err(RepositoryValidationFailure::declaration)?;
+    let seed = crate::repository_state::RepositorySeed::new(
+        crate::repository_state::RepositorySeedKind::Command {
+            name: "validate repository".to_string(),
+        },
+        Default::default(),
+        Default::default(),
+    )
+    .map_err(|error| {
+        RepositoryValidationFailure::new(
+            error.into(),
+            RepositoryValidationReport {
+                passes: Vec::new(),
+                issue_count: 0,
+                event_count: 0,
+                rule_report: RuleReport::default(),
+            },
+        )
+    })?;
+    let expected = declarations
+        .rules_loaded()
+        .then(|| {
+            crate::repository_state::derive_materialization(
+                image,
+                crate::repository_state::MaterializationRequest::RepairDerivedState {
+                    declarations: declarations.borrowed(),
+                    profiles: Vec::new(),
+                    seed: &seed,
+                },
+            )
+        })
+        .transpose()
+        .map_err(|error| {
+            RepositoryValidationFailure::new(
+                error.into(),
                 RepositoryValidationReport {
-                    passes,
+                    passes: Vec::new(),
                     issue_count: 0,
                     event_count: 0,
                     rule_report: RuleReport::default(),
                 },
-            ));
-        }
-    };
+            )
+        })?;
+    validate_repository_with_materializations(image, &declarations, expected.as_ref())
+}
+
+pub(crate) fn validate_repository_with_materializations(
+    image: &RepositoryImage,
+    declarations: &crate::repository_state::CapturedRepositoryDeclarations,
+    expected: Option<&crate::repository_state::MaterializationPlan>,
+) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
+    let read = move |path: &str| image_read(image, path);
+    let read: &ReadBytes<'_> = &read;
+    let mut passes = Vec::new();
+    let config = declarations.config().clone();
+    if let Err(error) = config.validate_item_kinds() {
+        return Err(RepositoryValidationFailure::new(
+            anyhow!(error).context("effective-config validation pass"),
+            RepositoryValidationReport {
+                passes,
+                issue_count: 0,
+                event_count: 0,
+                rule_report: RuleReport::default(),
+            },
+        ));
+    }
     passes.push(RepositoryValidationPass::EffectiveConfig);
 
     let namespaces = crate::config_manager::namespaces_from_config(&config);
-    let (rules, rules_loaded, mut findings) = match load_rules(read, &config, &namespaces) {
-        Ok(rules) => (rules, true, Vec::new()),
-        Err(error) => (
-            RuleSet::empty(),
-            false,
-            vec![ReportedFinding::new(
-                None,
-                &Finding {
-                    rule: "rules-file".to_string(),
-                    severity: Severity::Error,
-                    message: format!("config error: {error:#}"),
-                },
-            )],
-        ),
-    };
-    passes.push(RepositoryValidationPass::RulesAndSchemas);
+    let rules = declarations.rules().clone();
+    let rules_loaded = declarations.rules_loaded();
+    let mut findings = Vec::new();
+    if rules_loaded {
+        passes.push(RepositoryValidationPass::RulesAndSchemas);
+    } else if let Some(error) = declarations.rules_load_error() {
+        findings.push(ReportedFinding::new(
+            None,
+            &Finding {
+                rule: "rules-file".to_string(),
+                severity: Severity::Error,
+                message: format!("config error: {error:#}"),
+            },
+        ));
+    }
 
     let mut structural_error = None;
-    let gates = match load_gates(read).context("gates validation pass") {
-        Ok(gates) => {
-            passes.push(RepositoryValidationPass::Gates);
-            Some(gates)
-        }
-        Err(error) => {
-            structural_error = Some(error);
-            None
-        }
-    };
+    let gates = declarations.gates().clone();
+    passes.push(RepositoryValidationPass::Gates);
 
     let records = match load_records(read, image).context("records validation pass") {
         Ok(records) => {
@@ -202,8 +255,8 @@ pub fn validate_repository(
         }
     };
 
-    if let (Some(records), Some(gates)) = (&records, &gates) {
-        let integrity_error = validate_integrity(image, &records.issues, gates)
+    if let Some(records) = &records {
+        let integrity_error = validate_integrity(image, &records.issues, &gates)
             .context("repository-integrity validation pass")
             .err();
         if let Some(error) = integrity_error {
@@ -220,7 +273,7 @@ pub fn validate_repository(
         }
     }
 
-    let mut namespace_and_hierarchy_complete = true;
+    let mut namespace_and_hierarchy_complete = rules_loaded;
     if rules_loaded {
         if let Some(records) = &records {
             match collect_rule_findings(read, &records.issues, &rules, &namespaces, &config)
@@ -238,16 +291,12 @@ pub fn validate_repository(
             namespace_and_hierarchy_complete = false;
         }
     }
-    if let Some(gates) = &gates {
-        findings.extend(collect_enforcement_drift_findings(
-            &config,
-            rules_loaded.then_some(&rules),
-            gates,
-        ));
-        findings.extend(collect_review_placeholder_findings(gates));
-    } else {
-        namespace_and_hierarchy_complete = false;
-    }
+    findings.extend(collect_enforcement_drift_findings(
+        &config,
+        rules_loaded.then_some(&rules),
+        &gates,
+    ));
+    findings.extend(collect_review_placeholder_findings(&gates));
     if namespace_and_hierarchy_complete {
         passes.push(RepositoryValidationPass::NamespaceAndHierarchy);
     }
@@ -268,21 +317,17 @@ pub fn validate_repository(
         }
     }
 
-    if rules_loaded {
-        if let Some(gates) = &gates {
-            match validate_projections(read, &config, &rules, gates)
-                .context("projections validation pass")
-            {
-                Ok(()) => passes.push(RepositoryValidationPass::Projections),
-                Err(error) => {
-                    if structural_error.is_none() {
-                        structural_error = Some(error);
-                    }
+    if let Some(expected) = expected {
+        match validate_materializations(image, expected)
+            .context("derived-materialization validation pass")
+        {
+            Ok(()) => passes.push(RepositoryValidationPass::Projections),
+            Err(error) => {
+                if structural_error.is_none() {
+                    structural_error = Some(error);
                 }
             }
         }
-    } else if gates.is_some() {
-        passes.push(RepositoryValidationPass::Projections);
     }
 
     let (issue_count, event_count) = records.as_ref().map_or((0, 0), |records| {
@@ -319,137 +364,17 @@ fn required_text(read: &ReadBytes<'_>, path: &str) -> Result<String> {
     read_text(read, path)?.ok_or_else(|| anyhow!("required repository file '{path}' is missing"))
 }
 
-fn load_config(read: &ReadBytes<'_>) -> Result<JitConfig> {
-    let mut config: JitConfig = toml::from_str(
-        read_text(read, ".jit/config.toml")?
-            .as_deref()
-            .unwrap_or(""),
-    )
-    .context("invalid .jit/config.toml")?;
-    let hierarchy_types: Vec<&str> = config
-        .type_hierarchy
-        .as_ref()
-        .map(|hierarchy| hierarchy.types.keys().map(String::as_str).collect())
-        .unwrap_or_default();
-    config.templates = match read_text(read, ".jit/templates.toml")? {
-        Some(content) => {
-            crate::templates::TemplateRegistry::from_toml_str(&content, &hierarchy_types)
-                .context("invalid .jit/templates.toml")?
-        }
-        None => crate::templates::TemplateRegistry::empty(),
-    };
-    config.invariants = match read_text(read, ".jit/invariants.toml")? {
-        Some(content) => {
-            InvariantRegistry::from_toml_str(&content).context("invalid .jit/invariants.toml")?
-        }
-        None => InvariantRegistry::empty(),
-    };
-    config
-        .validate_item_kinds()
-        .context("invalid [item_kinds] in .jit/config.toml")?;
-    Ok(config)
-}
-
-fn load_rules(
-    read: &ReadBytes<'_>,
-    config: &JitConfig,
-    namespaces: &crate::domain::LabelNamespaces,
-) -> Result<RuleSet> {
-    let Some(content) = read_text(read, ".jit/rules.toml")? else {
-        return Ok(crate::repository_state::default_ruleset(namespaces));
-    };
-    let schemas = RuleSet::schema_requests(&content)?.into_iter().try_fold(
-        BTreeMap::new(),
-        |mut schemas, request| {
-            let path = format!(".jit/{}", request.reference);
-            let synthetic_path = PathBuf::from(&path);
-            match read(&path) {
-                Ok(Some(bytes)) => {
-                    schemas.insert(request.reference, bytes);
-                }
-                Ok(None) if !request.required => {}
-                Ok(None) => {
-                    return Err(RuleConfigError::SchemaIo {
-                        rule: request.rule,
-                        path: synthetic_path,
-                        source: IoError::new(
-                            ErrorKind::NotFound,
-                            "schema absent from repository image",
-                        ),
-                    });
-                }
-                Err(_) if !request.required => {}
-                Err(error) => {
-                    return Err(RuleConfigError::SchemaIo {
-                        rule: request.rule,
-                        path: synthetic_path,
-                        source: IoError::other(error.to_string()),
-                    });
-                }
-            }
-            Ok(schemas)
-        },
-    )?;
-    let parsed = RuleSet::parse(&content, Some(config), schemas)?;
-    Ok(crate::repository_state::reconcile_default_rules_with_config(parsed, namespaces))
-}
-
-#[derive(Deserialize)]
-struct GatesFile {
-    #[serde(default)]
-    gates: Vec<crate::declarations::GateDefinition>,
-}
-
-fn load_gates(read: &ReadBytes<'_>) -> Result<GateRegistry> {
-    let content = read_text(read, ".jit/gates.toml")?.unwrap_or_default();
-    let file: GatesFile = toml::from_str(&content).context("invalid .jit/gates.toml")?;
-    let mut gates = HashMap::new();
-    for gate in file.gates {
-        let key = gate.key.clone();
-        if gates.insert(key.clone(), gate).is_some() {
-            return Err(anyhow!("duplicate gate key '{key}' in .jit/gates.toml"));
-        }
-    }
-    Ok(GateRegistry { gates })
-}
-
-#[derive(Deserialize)]
-struct RepositoryIndex {
-    schema_version: u32,
-    #[serde(default)]
-    all_ids: Vec<String>,
-    #[serde(default)]
-    deleted_ids: Vec<String>,
-}
-
 struct Records {
     issues: Vec<Issue>,
     event_count: usize,
 }
 
 fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records> {
-    let index: RepositoryIndex = serde_json::from_str(&required_text(read, ".jit/index.json")?)
-        .context("invalid .jit/index.json")?;
-    if index.schema_version > SUPPORTED_INDEX_SCHEMA_VERSION {
-        return Err(anyhow!(
-            "repository index schema {} is newer than supported schema {}",
-            index.schema_version,
-            SUPPORTED_INDEX_SCHEMA_VERSION
-        ));
-    }
-    let mut seen = HashSet::new();
-    if let Some(id) = index.all_ids.iter().find(|id| !seen.insert(id.as_str())) {
-        return Err(anyhow!("duplicate issue id '{id}' in .jit/index.json"));
-    }
-    if let Some(id) = index
-        .deleted_ids
-        .iter()
-        .find(|id| seen.contains(id.as_str()))
-    {
-        return Err(anyhow!(
-            "issue id '{id}' is both live and deleted in .jit/index.json"
-        ));
-    }
+    let index = RepositoryIndex::parse(
+        &read(".jit/index.json")?
+            .ok_or_else(|| anyhow!("required repository file '.jit/index.json' is missing"))?,
+    )
+    .context("invalid .jit/index.json")?;
     let issues = index
         .all_ids
         .iter()
@@ -916,58 +841,25 @@ fn collect_item_link_findings(
     Ok(findings)
 }
 
-fn projected_content(
-    read: &ReadBytes<'_>,
-    target: &str,
-    mode: ProjectionMode,
-    rendered: &str,
-    begin: &str,
-    end: &str,
-) -> Result<String> {
-    match mode {
-        ProjectionMode::SeparateFile => Ok(rendered.to_string()),
-        ProjectionMode::Region => {
-            let current = read_text(read, target)?
-                .ok_or_else(|| anyhow!("projection target '{target}' is missing"))?;
-            Ok(splice_region(&current, rendered, begin, end)?)
-        }
-    }
-}
-
-fn validate_projections(
-    read: &ReadBytes<'_>,
-    config: &JitConfig,
-    rules: &RuleSet,
-    gates: &GateRegistry,
+fn validate_materializations(
+    image: &RepositoryImage,
+    expected: &crate::repository_state::MaterializationPlan,
 ) -> Result<()> {
-    let Some(projections) = config.projection.as_ref() else {
-        return Ok(());
-    };
-    let inputs = ProjectionInputs {
-        config,
-        rules,
-        gates,
-    };
-    for (name, projection) in projections {
-        // Re-render the body through the SAME generic code path `jit project
-        // render` uses (binding freshness to the projection code, never a stored
-        // mirror), then compare the spliced-in result against the target's bytes.
-        let mut render_read = |path: &str| read_text(read, path);
-        let (body, _count) = render_projection_body(projection, &inputs, &mut render_read)?;
-        let target = require_target(projection, name)?;
-        let expected = projected_content(
-            read,
-            &target,
-            projection.mode(),
-            &body,
-            &projection.region_begin(name),
-            &projection.region_end(name),
-        )?;
-        let actual = read_text(read, &target)?
-            .ok_or_else(|| anyhow!("projection target '{target}' is missing"))?;
-        if actual != expected {
-            return Err(anyhow!("projection '{name}' target '{target}' is stale"));
-        }
+    let drift = crate::repository_state::compare_materializations(image, expected)?;
+    if !drift.is_empty() {
+        let details = drift
+            .iter()
+            .map(|finding| {
+                let kind = match &finding.kind {
+                    crate::repository_state::MaterializationDriftKind::Missing => "missing",
+                    crate::repository_state::MaterializationDriftKind::Stale => "stale",
+                    crate::repository_state::MaterializationDriftKind::Unexpected => "unexpected",
+                };
+                format!("- {:?}: {kind}", finding.path)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(anyhow!("derived-state drift:\n{details}"));
     }
     Ok(())
 }
@@ -977,6 +869,7 @@ mod tests {
     use super::*;
     use crate::hierarchy_templates::HierarchyTemplate;
     use crate::storage::{IssueStore, JsonFileStorage};
+    use std::path::PathBuf;
 
     fn fixture() -> tempfile::TempDir {
         let repo = tempfile::tempdir().unwrap();
@@ -1015,10 +908,10 @@ mod tests {
 
     /// Read a repo-relative fixture file's bytes, or `None` when absent.
     fn read_fixture(repo: &tempfile::TempDir, repo_rel: &str) -> Option<Vec<u8>> {
-        let path = match repo_rel.strip_prefix(".jit/") {
-            Some(rest) => repo.path().join(".jit").join(rest),
-            None => repo.path().join(repo_rel),
-        };
+        let layout = executor(repo).require_layout().unwrap();
+        let path = layout
+            .resolve(&layout.classify_repository_relative(repo_rel).unwrap())
+            .unwrap();
         std::fs::read(path).ok()
     }
 
@@ -1034,15 +927,54 @@ mod tests {
         repo: &tempfile::TempDir,
         changes: impl IntoIterator<Item = (P, Option<Vec<u8>>)>,
     ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
+        let executor = executor(repo);
         let overrides = crate::commands::overrides_from_repo_changes(
+            &executor.require_layout().unwrap(),
             changes
                 .into_iter()
                 .map(|(path, value)| (path.into(), value)),
         )
         .unwrap();
-        let image = executor(repo)
-            .capture_validation_image_with(&overrides)
-            .unwrap();
+        let image = executor.capture_validation_image_with(&overrides).unwrap();
+        validate_repository(&image)
+    }
+
+    /// Validate a semantic proposal together with the exact coupled derived-state
+    /// writes the canonical materializer would publish for that proposal.
+    fn validate_materialized_overlaid<P: Into<PathBuf>>(
+        repo: &tempfile::TempDir,
+        changes: impl IntoIterator<Item = (P, Option<Vec<u8>>)>,
+    ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
+        let executor = executor(repo);
+        let layout = executor.require_layout().unwrap();
+        let mut overrides = crate::commands::overrides_from_repo_changes(
+            &layout,
+            changes
+                .into_iter()
+                .map(|(path, value)| (path.into(), value)),
+        )
+        .unwrap();
+        let proposed = executor.capture_validation_image_with(&overrides).unwrap();
+        let declarations = crate::repository_state::declarations_from_image(&proposed).unwrap();
+        let seed = crate::repository_state::RepositorySeed::new(
+            crate::repository_state::RepositorySeedKind::Command {
+                name: "validation test proposal".to_string(),
+            },
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        let plan = crate::repository_state::derive_materialization(
+            &proposed,
+            crate::repository_state::MaterializationRequest::RepairDerivedState {
+                declarations: declarations.borrowed(),
+                profiles: Vec::new(),
+                seed: &seed,
+            },
+        )
+        .unwrap();
+        overrides.extend(crate::commands::validation_overlay(plan.delta()));
+        let image = executor.capture_validation_image_with(&overrides).unwrap();
         validate_repository(&image)
     }
 
@@ -1058,6 +990,36 @@ mod tests {
         let planned = validate_overlaid::<&str>(&repo, []).unwrap();
         assert_eq!(plain, planned);
         assert_eq!(plain.passes.len(), 8);
+    }
+
+    #[test]
+    fn test_unloadable_rules_preserve_rules_file_and_enforcement_drift_findings() {
+        let repo = fixture();
+        std::fs::write(
+            repo.path().join(".jit/rules.toml"),
+            "[[rules]]\nname = \"bad-rule\"\nseverity = \"error\"\n\
+             assert = { this-is-not-a-valid-kind = { foo = 1 } }\n",
+        )
+        .unwrap();
+        std::fs::write(
+            repo.path().join(".jit/invariants.toml"),
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+             enforced-by = \"@/rule/bad-rule\"\n",
+        )
+        .unwrap();
+
+        let report = validate_live(&repo).unwrap();
+        assert!(report.rule_report.findings.iter().any(
+            |finding| finding.rule == "rules-file" && finding.message.contains("config error")
+        ));
+        assert!(report.rule_report.findings.iter().any(|finding| {
+            finding.rule == crate::commands::ENFORCEMENT_DRIFT_RULE
+                && finding.message.contains("declared-but-unenforced")
+                && finding.message.contains("failed to load")
+        }));
+        assert!(!report
+            .passes
+            .contains(&RepositoryValidationPass::Projections));
     }
 
     #[test]
@@ -1082,10 +1044,15 @@ mod tests {
     #[test]
     fn test_overlay_rules_ignore_disagreeing_live_bytes() {
         let repo = fixture();
+        let rules = read_fixture(&repo, ".jit/rules.toml").unwrap();
         std::fs::write(repo.path().join(".jit/rules.toml"), "not toml = [").unwrap();
-        assert!(validate_overlaid(&repo, [put(".jit/rules.toml", "")]).is_ok());
-        let live = validate_live(&repo).unwrap();
-        assert_eq!(live.rule_report.findings[0].rule, "rules-file");
+        assert!(validate_overlaid(&repo, [(".jit/rules.toml", Some(rules))]).is_ok());
+        assert!(validate_live(&repo)
+            .unwrap()
+            .rule_report
+            .findings
+            .iter()
+            .any(|finding| finding.rule == "rules-file"));
     }
 
     #[test]
@@ -1095,7 +1062,7 @@ mod tests {
         std::fs::create_dir_all(repo.path().join(".jit/schemas")).unwrap();
         std::fs::write(repo.path().join(".jit/rules.toml"), rules).unwrap();
         std::fs::write(repo.path().join(".jit/schemas/planned.json"), "not json").unwrap();
-        assert!(validate_overlaid(
+        assert!(validate_materialized_overlaid(
             &repo,
             [
                 put(".jit/rules.toml", rules),
@@ -1103,9 +1070,13 @@ mod tests {
             ],
         )
         .is_ok());
-        let live_report = validate_live(&repo).unwrap();
-        assert!(live_report.rule_report.has_errors());
-        assert_eq!(live_report.rule_report.findings[0].rule, "rules-file");
+        assert!(validate_live(&repo)
+            .unwrap()
+            .rule_report
+            .findings
+            .iter()
+            .any(|finding| finding.rule == "rules-file"
+                && finding.message.contains("not valid JSON")));
     }
 
     #[test]
@@ -1170,7 +1141,7 @@ mod tests {
     #[test]
     fn test_overlay_namespace_and_hierarchy_judge_planned_config() {
         let repo = fixture();
-        let report = validate_overlaid(
+        let report = validate_materialized_overlaid(
             &repo,
             [put(
                 ".jit/config.toml",
@@ -1189,7 +1160,7 @@ mod tests {
     #[test]
     fn test_repository_view_keeps_non_enforced_rule_error_reportable() {
         let repo = fixture();
-        let report = validate_overlaid(
+        let report = validate_materialized_overlaid(
             &repo,
             [put(
                 ".jit/rules.toml",
@@ -1207,6 +1178,8 @@ mod tests {
     fn test_repository_failure_retains_partial_rule_report() {
         let repo = fixture();
         let store = JsonFileStorage::new(repo.path().join(".jit"));
+        let layout = crate::storage::discover_repository_layout(repo.path(), store.root()).unwrap();
+        store.configure_repository_layout(&layout);
         let mut issue = store.list_issues().unwrap().remove(0);
         issue.dependencies.push("nonexistent".to_string());
         let rules = "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
@@ -1214,7 +1187,7 @@ mod tests {
                      assert = { require-label = { label = \"req:*\", min = 1 } }\n";
         let live = validate_live(&repo).unwrap();
         assert!(!live.rule_report.has_errors());
-        let failure = validate_overlaid(
+        let failure = validate_materialized_overlaid(
             &repo,
             [
                 (
@@ -1261,9 +1234,11 @@ mod tests {
         )
         .unwrap();
 
+        executor(&repo).validate_with_fix(true, false).unwrap();
         let live = validate_live(&repo).unwrap();
         assert!(!live.rule_report.has_errors(), "{:?}", live.rule_report);
-        let planned = validate_overlaid(&repo, [(".jit/invariants.toml", None)]).unwrap();
+        let planned =
+            validate_materialized_overlaid(&repo, [(".jit/invariants.toml", None)]).unwrap();
         assert!(planned
             .rule_report
             .findings
@@ -1305,6 +1280,9 @@ style = \"full\"
         )
         .unwrap_err()
         .to_string();
-        assert!(error.contains("projections validation pass"), "{error}");
+        assert!(
+            error.contains("derived-materialization validation pass"),
+            "{error}"
+        );
     }
 }

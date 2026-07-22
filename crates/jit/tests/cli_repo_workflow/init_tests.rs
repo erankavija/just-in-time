@@ -280,38 +280,25 @@ fn test_init_json_reports_repository_id_and_created_paths_outside_git() {
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(
-        json["repository_root"],
-        temp.path().to_string_lossy().as_ref()
+        json,
+        serde_json::json!({
+            "repository_root": temp.path().to_string_lossy(),
+            "data_dir": temp.path().join(".jit").to_string_lossy(),
+            "repository_id": null,
+            "hierarchy_template": "default",
+            "gitattributes_status": "not_applicable",
+            "created_paths": [
+                ".jit/index.json",
+                ".jit/gates.toml",
+                ".jit/events.jsonl",
+                ".jit/config.toml",
+                ".jit/rules.toml"
+            ],
+            "modified_paths": [],
+            "profile": null,
+            "message": "Initialized jit repository"
+        })
     );
-    assert_eq!(
-        json["data_dir"],
-        temp.path().join(".jit").to_string_lossy().as_ref()
-    );
-    assert_eq!(json["hierarchy_template"], "default");
-    assert_eq!(json["gitattributes_status"], "not_applicable");
-    assert!(
-        json["repository_id"].is_null(),
-        "repository_id should be null outside a git repository, got: {json}"
-    );
-
-    let created: Vec<&str> = json["created_paths"]
-        .as_array()
-        .expect("created_paths should be an array")
-        .iter()
-        .map(|v| v.as_str().unwrap())
-        .collect();
-    for path in [
-        ".jit/index.json",
-        ".jit/gates.toml",
-        ".jit/events.jsonl",
-        ".jit/config.toml",
-        ".jit/rules.toml",
-    ] {
-        assert!(
-            created.contains(&path),
-            "created_paths should report {path} on a fresh init, got: {created:?}"
-        );
-    }
 }
 
 #[test]
@@ -632,13 +619,64 @@ fn test_init_json_idempotent_reports_empty_created_paths() {
     );
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    let created = json["created_paths"]
-        .as_array()
-        .expect("created_paths should be an array");
-    assert!(
-        created.is_empty(),
-        "a re-init should create nothing, got: {created:?}"
+    assert_eq!(json["created_paths"], serde_json::json!([]));
+    assert_eq!(json["modified_paths"], serde_json::json!([]));
+}
+
+#[test]
+fn test_init_json_disjoint_data_root_reports_canonical_plan_paths() {
+    let worktree = TempDir::new().unwrap();
+    let external = TempDir::new().unwrap();
+    let data_dir = external.path().join("repository-data");
+    let status = Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(worktree.path())
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = Command::new(jit_binary())
+        .args(["init", "--json"])
+        .env("JIT_DATA_DIR", &data_dir)
+        .current_dir(worktree.path())
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "disjoint init failed: {out:?}");
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["data_dir"], data_dir.to_string_lossy().as_ref());
+    assert_eq!(json["gitattributes_status"], "not_applicable");
+    assert_eq!(
+        json["created_paths"],
+        serde_json::json!([
+            ".jit/index.json",
+            ".jit/gates.toml",
+            ".jit/events.jsonl",
+            ".jit/config.toml",
+            ".jit/rules.toml"
+        ])
     );
+    assert!(!worktree.path().join(".gitattributes").exists());
+    assert!(json["modified_paths"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn test_init_json_reinit_reports_only_file_restored_by_plan() {
+    let temp = TempDir::new().unwrap();
+    let first = jit_init(temp.path(), &["--json"]);
+    assert!(first.status.success());
+    fs::remove_file(temp.path().join(".jit/gates.toml")).unwrap();
+
+    let out = jit_init(temp.path(), &["--json"]);
+    assert!(out.status.success(), "re-init failed: {out:?}");
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        json["created_paths"],
+        serde_json::json!([".jit/gates.toml"])
+    );
+    assert_eq!(json["modified_paths"], serde_json::json!([]));
 }
 
 #[test]

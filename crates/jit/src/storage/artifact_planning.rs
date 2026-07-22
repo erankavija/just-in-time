@@ -11,10 +11,14 @@ use crate::domain::artifact_discovery::{
 use crate::domain::artifact_plan::{
     normalize_artifact_path, ArtifactPlanEntry, ArtifactVersion, PlanTarget,
 };
+use crate::repository_state::RootRelativePath;
+use crate::storage::file_transaction::open_regular_file_nofollow;
+use crate::storage::repository_state_store::{open_absolute_dir_nofollow, open_child_dir_nofollow};
 use crate::storage::{validate_repo_relative_path, IssueStore, PathReadError};
 use anyhow::{anyhow, Result};
-use std::fs;
-use std::path::{Path, PathBuf};
+use cap_std::fs::Dir;
+use std::io::{ErrorKind, Read};
+use std::path::Path;
 
 /// Acquire the exact marker, child, and legacy evidence needed to resolve a destination.
 pub fn resolve_container_destination<S: IssueStore>(
@@ -140,34 +144,63 @@ pub(crate) fn inspect_artifact_evidence<S: IssueStore>(
         return Ok(ArtifactEvidence::InvalidPath);
     }
     validate_repo_relative_path(path)?;
-    let repo_root = repository_root(storage).map_err(PathReadError::Other)?;
-    if path_has_symlink(&repo_root, path)? {
-        return Ok(ArtifactEvidence::Symlink);
-    }
-    let absolute = repo_root.join(path);
-    let metadata = match fs::symlink_metadata(&absolute) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(ArtifactEvidence::Missing)
+    let layout = storage.repository_layout().map_err(PathReadError::Other)?;
+    let root = open_absolute_dir_nofollow(layout.worktree_root()).map_err(other)?;
+    inspect_artifact_from_root(&root, path, listing_scope)
+}
+
+fn inspect_artifact_from_root(
+    root: &Dir,
+    path: &str,
+    listing_scope: ArtifactListingScope,
+) -> Result<ArtifactEvidence, PathReadError> {
+    let relative = RootRelativePath::parse(path)
+        .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
+    let components = relative
+        .as_path()
+        .components()
+        .map(|component| component.as_os_str().to_owned())
+        .collect::<Vec<_>>();
+    let (leaf, parents) = components
+        .split_last()
+        .ok_or_else(|| PathReadError::InvalidPath(path.to_string()))?;
+    let mut parent = root.try_clone().map_err(PathReadError::from)?;
+    for component in parents {
+        let metadata = match parent.symlink_metadata(component) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                return Ok(ArtifactEvidence::Missing)
+            }
+            Err(error) => return Err(error.into()),
+        };
+        if metadata.is_symlink() {
+            return Ok(ArtifactEvidence::Symlink);
         }
+        parent = open_child_dir_nofollow(&parent, component).map_err(other)?;
+    }
+    let metadata = match parent.symlink_metadata(leaf) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(ArtifactEvidence::Missing),
         Err(error) => return Err(error.into()),
     };
+    if metadata.is_symlink() {
+        return Ok(ArtifactEvidence::Symlink);
+    }
     if metadata.is_file() {
-        return storage
-            .read_path_bytes(path, None)
-            .map(|(bytes, _)| ArtifactEvidence::File(bytes))
-            .or_else(|error| match error {
-                PathReadError::NotFound(_) => Ok(ArtifactEvidence::Missing),
-                error => Err(error),
-            });
+        let mut file =
+            open_regular_file_nofollow(&parent, &leaf.to_string_lossy()).map_err(other)?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes).map_err(PathReadError::from)?;
+        return Ok(ArtifactEvidence::File(bytes));
     }
     if !metadata.is_dir() {
         return Ok(ArtifactEvidence::Unsupported);
     }
+    let directory = open_child_dir_nofollow(&parent, leaf).map_err(other)?;
     let entries = match listing_scope {
         ArtifactListingScope::MetadataOnly => Vec::new(),
-        ArtifactListingScope::ImmediateChildren => list_immediate_children(&absolute, &repo_root)?,
-        ArtifactListingScope::RecursiveFiles => list_recursive_files(&absolute, &repo_root)?,
+        ArtifactListingScope::ImmediateChildren => list_immediate_children(&directory, path)?,
+        ArtifactListingScope::RecursiveFiles => list_recursive_files(&directory, path)?,
     };
     Ok(ArtifactEvidence::Directory {
         scope: listing_scope,
@@ -175,46 +208,33 @@ pub(crate) fn inspect_artifact_evidence<S: IssueStore>(
     })
 }
 
-fn path_has_symlink(repo_root: &Path, relative: &str) -> std::io::Result<bool> {
-    let mut candidate = repo_root.to_path_buf();
-    for component in Path::new(relative).components() {
-        candidate.push(component.as_os_str());
-        match fs::symlink_metadata(&candidate) {
-            Ok(metadata) if metadata.file_type().is_symlink() => return Ok(true),
-            Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-            Err(error) => return Err(error),
-        }
-    }
-    Ok(false)
-}
-
-fn list_immediate_children(
-    directory: &Path,
-    repo_root: &Path,
-) -> Result<Vec<String>, PathReadError> {
-    let mut entries = fs::read_dir(directory)?
+fn list_immediate_children(directory: &Dir, relative: &str) -> Result<Vec<String>, PathReadError> {
+    let mut entries = directory
+        .entries()?
         .map(|entry| {
             entry
                 .map_err(PathReadError::from)
-                .and_then(|entry| relative_path(entry.path(), repo_root))
+                .and_then(|entry| child_path(relative, entry.file_name()))
         })
         .collect::<Result<Vec<_>, _>>()?;
     entries.sort();
     Ok(entries)
 }
 
-fn list_recursive_files(directory: &Path, repo_root: &Path) -> Result<Vec<String>, PathReadError> {
-    let mut pending = vec![directory.to_path_buf()];
+fn list_recursive_files(directory: &Dir, relative: &str) -> Result<Vec<String>, PathReadError> {
+    let mut pending = vec![(directory.try_clone()?, relative.to_string())];
     let mut files = Vec::new();
-    while let Some(current) = pending.pop() {
-        for entry in fs::read_dir(current)? {
+    while let Some((current, prefix)) = pending.pop() {
+        for entry in current.entries()? {
             let entry = entry?;
-            let metadata = fs::symlink_metadata(entry.path())?;
-            if metadata.is_dir() && !metadata.file_type().is_symlink() {
-                pending.push(entry.path());
+            let name = entry.file_name();
+            let path = child_path(&prefix, name.clone())?;
+            let metadata = current.symlink_metadata(&name)?;
+            if metadata.is_dir() && !metadata.is_symlink() {
+                let child = open_child_dir_nofollow(&current, &name).map_err(other)?;
+                pending.push((child, path));
             } else {
-                files.push(relative_path(entry.path(), repo_root)?);
+                files.push(path);
             }
         }
     }
@@ -222,27 +242,22 @@ fn list_recursive_files(directory: &Path, repo_root: &Path) -> Result<Vec<String
     Ok(files)
 }
 
-fn relative_path(path: PathBuf, repo_root: &Path) -> Result<String, PathReadError> {
-    path.strip_prefix(repo_root)
-        .map_err(anyhow::Error::from)?
-        .to_str()
+fn child_path(relative: &str, name: std::ffi::OsString) -> Result<String, PathReadError> {
+    name.to_str()
         .ok_or_else(|| anyhow!("artifact path is not valid UTF-8"))
-        .map(|path| path.replace('\\', "/"))
+        .map(|name| format!("{relative}/{name}"))
         .map_err(PathReadError::Other)
 }
 
-fn repository_root<S: IssueStore>(storage: &S) -> Result<PathBuf> {
-    storage
-        .root()
-        .parent()
-        .map(Path::to_path_buf)
-        .ok_or_else(|| anyhow!("invalid storage path: {}", storage.root().display()))
+fn other(error: impl Into<anyhow::Error>) -> PathReadError {
+    PathReadError::Other(error.into())
 }
 
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use crate::storage::JsonFileStorage;
+    use std::fs;
     use std::os::unix::fs::symlink;
     use tempfile::TempDir;
 
@@ -252,6 +267,9 @@ mod tests {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         fs::create_dir(storage.root()).unwrap();
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        storage.configure_repository_layout(&layout);
         fs::create_dir_all(repo.path().join("archive/sub")).unwrap();
         fs::write(repo.path().join("archive/sub/nested.md"), "nested").unwrap();
         fs::create_dir(repo.path().join("outside")).unwrap();

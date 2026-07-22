@@ -24,6 +24,33 @@ mod validation_tests;
 fn memory_executor(
     storage: jit::storage::InMemoryStorage,
 ) -> jit::commands::CommandExecutor<jit::storage::InMemoryStorage> {
+    use jit::storage::IssueStore;
+
+    if storage
+        .read_repo_file(".jit/config.toml")
+        .unwrap()
+        .is_none()
+    {
+        storage.add_data_file("config.toml", "");
+    }
+    if storage.read_repo_file(".jit/index.json").unwrap().is_none() {
+        let mut ids = storage
+            .list_issues()
+            .unwrap()
+            .into_iter()
+            .map(|issue| issue.id)
+            .collect::<Vec<_>>();
+        ids.sort();
+        storage.add_data_file(
+            "index.json",
+            &serde_json::json!({
+                "schema_version": 2,
+                "all_ids": ids,
+                "deleted_ids": [],
+            })
+            .to_string(),
+        );
+    }
     let layout = storage.repository_layout();
     jit::commands::CommandExecutor::new(storage).with_layout(layout)
 }

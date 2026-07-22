@@ -10,13 +10,13 @@ use anyhow::Result;
 
 pub mod artifact_discovery;
 pub mod artifact_planning;
-pub mod atomic_write;
+pub(crate) mod atomic_write;
 pub mod claim_coordinator;
 pub mod clock;
 pub mod control_plane;
 pub mod discovery;
 pub mod errors;
-pub mod file_transaction;
+pub(crate) mod file_transaction;
 pub mod gate_runs;
 pub mod gate_store;
 pub mod git_revision;
@@ -33,7 +33,6 @@ pub mod repository_state_store;
 pub mod ruleset_store;
 pub mod temp_cleanup;
 mod test_support;
-mod transaction_action;
 mod transaction_journal;
 mod transaction_recovery;
 mod transaction_staging;
@@ -52,9 +51,7 @@ pub use errors::{
     InvalidIdPrefixError, IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError,
     RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
-pub use file_transaction::{
-    FileTransactionKernel, FileTransactionOutcome, FileTransactionPlan, TransactionControlLocation,
-};
+pub(crate) use file_transaction::{FileTransactionKernel, TransactionControlLocation};
 pub use git_revision::{GitRevisionError, GitRevisionResolver, PinnedArtifactRead};
 pub use json::{JsonFileStorage, RetainedMutationSessionGuard, RetainedSessionSuspendedError};
 pub use lock::FileLocker;
@@ -65,11 +62,9 @@ pub use repository_state_store::{
     discover_repository_layout, RecoveryDispatchReport, RepositoryApplyOutcome,
     RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
 };
-pub use transaction_action::TransactionAction;
-pub use transaction_journal::TransactionDecision;
+pub(crate) use transaction_recovery::FileTransactionError;
 pub use transaction_recovery::{
-    FailurePoint as TransactionFailurePoint, FileTransactionError, NoTransactionFailures,
-    RecoveryRequiredError, RecoveryState, TransactionFailureInjector,
+    FailurePoint as TransactionFailurePoint, NoTransactionFailures, TransactionFailureInjector,
 };
 pub use warnings::StorageWarning;
 
@@ -82,6 +77,20 @@ pub use memory::InMemoryStorage;
 /// changes through [`RepositoryStateStore`]. Implementations must be `Clone` to
 /// support shared access patterns.
 pub trait IssueStore: Clone {
+    /// Bind the canonical repository layout used by repository-relative read
+    /// helpers. File-backed storage retains this explicit authority instead of
+    /// inferring a worktree from the selected data-root parent.
+    #[doc(hidden)]
+    fn configure_repository_layout(&self, _layout: &crate::repository_state::RepositoryLayout) {}
+
+    /// Return the explicit repository layout bound to this backend.
+    ///
+    /// Repository-relative readers use this authority instead of deriving a
+    /// worktree from the data-root spelling.
+    #[doc(hidden)]
+    fn repository_layout(&self) -> Result<crate::repository_state::RepositoryLayout> {
+        anyhow::bail!("repository layout is not available for this storage backend")
+    }
     /// Acquire this backend's repository-wide write lock, held until the returned
     /// guard drops.
     ///

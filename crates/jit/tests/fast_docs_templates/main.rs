@@ -34,7 +34,7 @@ fn seed_memory_data_file(storage: &jit::storage::InMemoryStorage, name: &str, co
 
     std::fs::create_dir_all(storage.root()).unwrap();
     std::fs::write(storage.root().join(name), content).unwrap();
-    storage.add_repo_file(&format!(".jit/{name}"), content);
+    storage.add_data_file(name, content);
 }
 
 fn fixture_issue(title: String, description: String) -> jit::domain::Issue {

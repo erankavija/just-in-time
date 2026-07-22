@@ -106,13 +106,14 @@ fn test_command_exit_codes_validate_integrity_emits_4() {
 #[test]
 fn test_command_exit_codes_validate_rule_findings_emits_1() {
     let temp = setup();
-    fs::write(
-        temp.path().join(".jit/rules.toml"),
-        "[[rules]]\nname = \"epic-needs-req\"\nwhen = { type = \"epic\" }\n\
+    let rules_path = temp.path().join(".jit/rules.toml");
+    let mut rules = fs::read_to_string(&rules_path).unwrap();
+    rules.push_str(
+        "\n[[rules]]\nname = \"epic-needs-req\"\nwhen = { type = \"epic\" }\n\
          severity = \"error\"\nenforce = false\n\
          assert = { require-label = { label = \"req:*\", min = 1 } }\n",
-    )
-    .unwrap();
+    );
+    fs::write(rules_path, rules).unwrap();
     // An epic missing its `req:*` label violates the error-severity rule; the
     // `epic:auth` identity label keeps the finding to the rule under test.
     create_issue(

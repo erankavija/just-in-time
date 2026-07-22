@@ -136,7 +136,7 @@ applies_to = ["epic"]
   from = "subject"
   to = "breakdown"
 "#;
-    h.storage.add_repo_file(".jit/templates.toml", templates);
+    h.storage.add_data_file("templates.toml", templates);
 
     let result = h
         .executor

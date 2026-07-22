@@ -108,11 +108,6 @@ use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::sync::OnceLock;
 
-/// Finalizer-assigned record identities returned after one semantic publication.
-struct MutationPublication {
-    created_issue_ids: Vec<String>,
-}
-
 /// Closed issue-local operations whose final record is derived from the issue
 /// captured by the mutation session. Ordinary commands use this instead of
 /// constructing a full-record `UpdateIssue` from an earlier storage read.
@@ -196,7 +191,7 @@ enum DerivedStateTransition {
 
 struct CapturedTransitionEvidence<'a> {
     issues: &'a [Issue],
-    declarations: &'a ImageDeclarations,
+    declarations: &'a crate::repository_state::CapturedRepositoryDeclarations,
     config: &'a JitConfig,
     plan_content: &'a std::collections::HashMap<String, String>,
     context: &'a crate::repository_state::MutationContext,
@@ -345,7 +340,7 @@ fn captured_precheck_plan(
             ..
         }) = &gate.checker
         {
-            let path = repo_rel_virtual_path(path)?;
+            let path = image.layout().classify_repository_relative(path)?;
             let bytes = image
                 .file_bytes(&path)?
                 .ok_or_else(|| anyhow!("captured precheck prompt file '{:?}' is missing", path))?;
@@ -593,7 +588,7 @@ struct CapturedFieldUpdateOutcome {
 
 fn derive_write_validation(
     issue: &Issue,
-    declarations: &ImageDeclarations,
+    declarations: &crate::repository_state::CapturedRepositoryDeclarations,
     config: &JitConfig,
     force: bool,
 ) -> Result<WriteValidation> {
@@ -1482,12 +1477,10 @@ pub enum RedundancyPolicy {
 
 /// Outcome of the unified write-time validation pass.
 ///
-/// Produced by the executor's `validate_for_write` entry point BEFORE an issue
-/// is persisted. It carries the non-blocking warnings to surface to the caller
-/// and the list of `enforce` rules that a `--force` write is bypassing. The
-/// bypass events are intentionally NOT emitted during validation: the caller
-/// emits them through the captured mutation only after validation succeeds, so a save
-/// that fails never leaves a false "bypass happened" entry in the audit log.
+/// Derived from the captured declaration bundle before an issue is persisted. It
+/// carries the non-blocking warnings and the `enforce` rules bypassed by a forced
+/// write. Bypass events are emitted only by the same captured mutation, so a
+/// failed save never leaves a false audit entry.
 #[derive(Debug, Clone, Default)]
 pub struct WriteValidation {
     /// Non-blocking warnings (legacy validator + local `warn`/non-enforce
@@ -1501,31 +1494,6 @@ pub struct WriteValidation {
 
 type PhasedEvents = Vec<(u8, Event)>;
 
-/// Owned repository declarations assembled from a captured [`RepositoryImage`].
-///
-/// The declaration bundle a session-driven producer graph consumes — the parsed
-/// configuration, the authored gate registry, and the EFFECTIVE rule set (the
-/// authored `rules.toml` with its `origin = "default"` family reconciled against
-/// the configuration, or the in-memory defaults when no `rules.toml` was
-/// captured) — every part read from the captured image bytes, never the live
-/// filesystem.
-pub(crate) struct ImageDeclarations {
-    configuration: crate::declarations::ConfigurationDeclarations,
-    gates: crate::declarations::GateRegistry,
-    rules: RuleSet,
-}
-
-impl ImageDeclarations {
-    /// Borrow these owned declarations as the bundle the pure producers take.
-    pub(crate) fn borrowed(&self) -> crate::repository_state::RepositoryDeclarations<'_> {
-        crate::repository_state::RepositoryDeclarations {
-            configuration: &self.configuration,
-            gates: &self.gates,
-            rules: &self.rules,
-        }
-    }
-}
-
 /// Convert repo-relative planned changes into a canonical overlay-override map.
 ///
 /// Each `(repo-relative path, Some(bytes) | None)` becomes a
@@ -1537,17 +1505,14 @@ impl ImageDeclarations {
 /// that need a compact `.jit`-prefix path adapter.
 #[cfg(test)]
 pub(crate) fn overrides_from_repo_changes(
+    layout: &crate::repository_state::RepositoryLayout,
     changes: impl IntoIterator<Item = (std::path::PathBuf, Option<Vec<u8>>)>,
 ) -> Result<std::collections::BTreeMap<crate::repository_state::VirtualPath, Option<Vec<u8>>>> {
-    use crate::repository_state::VirtualPath;
     changes
         .into_iter()
         .map(|(path, value)| {
             let repo_rel = path.to_string_lossy();
-            let vpath = match repo_rel.strip_prefix(".jit/") {
-                Some(rest) => VirtualPath::data(rest),
-                None => VirtualPath::worktree(repo_rel.as_ref()),
-            }?;
+            let vpath = layout.classify_repository_relative(repo_rel.as_ref())?;
             Ok((vpath, value))
         })
         .collect()
@@ -1562,11 +1527,7 @@ fn image_repo_bytes(
     image: &crate::repository_state::RepositoryImage,
     repo_rel: &str,
 ) -> Result<Option<Vec<u8>>> {
-    use crate::repository_state::VirtualPath;
-    let vpath = match repo_rel.strip_prefix(".jit/") {
-        Some(rest) => VirtualPath::data(rest),
-        None => VirtualPath::worktree(repo_rel),
-    }?;
+    let vpath = image.layout().classify_repository_relative(repo_rel)?;
     Ok(image.file_bytes(&vpath)?.map(<[u8]>::to_vec))
 }
 
@@ -1590,80 +1551,6 @@ pub(crate) fn validation_overlay(
             RepositoryAction::CreateDirectory { .. } | RepositoryAction::SetMode { .. } => None,
         })
         .collect()
-}
-
-/// Map a configured repository-relative path to its canonical virtual path
-/// (`.jit/...` is `Data`, everything else `Worktree`).
-///
-/// Configuration accepts leading `./` components as repository-relative
-/// spelling. The typed path remains canonical and rejects every other lexical
-/// normalization, including an empty path after removing those components.
-pub(crate) fn repo_rel_virtual_path(path: &str) -> Result<crate::repository_state::VirtualPath> {
-    use crate::repository_state::VirtualPath;
-    let path = path.trim_start_matches("./");
-    if path.is_empty() {
-        anyhow::bail!("repository-relative path must name a descendant");
-    }
-    match path.strip_prefix(".jit/") {
-        Some("") => anyhow::bail!("repository-relative path must name a descendant"),
-        Some(rest) => Ok(VirtualPath::data(rest)?),
-        None => Ok(VirtualPath::worktree(path)?),
-    }
-}
-
-/// Assemble the configuration, effective rule set, and gate registry from a
-/// captured image, ready to drive the session-based materialization producers.
-///
-/// The effective rule set reconciles the authored `rules.toml`'s default family
-/// against the configuration exactly as the query-path loader does, but reads the
-/// rules bytes and every referenced schema from the captured image rather than the
-/// filesystem — so a mutation derives from the same closed evidence it will
-/// revalidate before journaling. A missing `.jit/config.toml` in the closure is a
-/// capture error.
-pub(crate) fn declarations_from_image(
-    image: &crate::repository_state::RepositoryImage,
-) -> Result<ImageDeclarations> {
-    use crate::declarations::{parse_configuration, parse_gate_registry, GateRegistry};
-    use crate::repository_state::{
-        assemble_config, default_ruleset, reconcile_default_rules_with_config, VirtualPath,
-    };
-
-    let config_bytes = image_repo_bytes(image, ".jit/config.toml")?
-        .ok_or_else(|| anyhow!("captured image has no .jit/config.toml"))?;
-    let configuration = parse_configuration(&config_bytes)?;
-    let jit_config = assemble_config(image)?;
-    let namespaces = crate::config_manager::namespaces_from_config(&jit_config);
-
-    let gates = match image_repo_bytes(image, ".jit/gates.toml")? {
-        Some(bytes) => parse_gate_registry(&bytes)?,
-        None => GateRegistry::default(),
-    };
-
-    let rules = match image_repo_bytes(image, ".jit/rules.toml")? {
-        Some(bytes) => {
-            let content = String::from_utf8(bytes)?;
-            // Schema references are data-root relative (`schemas/...`); the render
-            // closure captures them, so `file_bytes` resolves without a filesystem
-            // read. A captured-absent schema simply contributes no validator bytes.
-            let schemas = RuleSet::schema_requests(&content)?
-                .into_iter()
-                .filter_map(|request| {
-                    let vpath = VirtualPath::data(&request.reference).ok()?;
-                    let bytes = image.file_bytes(&vpath).ok().flatten()?.to_vec();
-                    Some((request.reference, bytes))
-                })
-                .collect::<Vec<_>>();
-            let user = RuleSet::parse(&content, Some(&jit_config), schemas)?;
-            reconcile_default_rules_with_config(user, &namespaces)
-        }
-        None => default_ruleset(&namespaces),
-    };
-
-    Ok(ImageDeclarations {
-        configuration,
-        gates,
-        rules,
-    })
 }
 
 /// Parse the active issue set from the captured index and issue records.
@@ -1858,6 +1745,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// supplies it at startup from the Git-optional worktree root plus the selected
     /// data root; tests supply a fixture layout over a temporary worktree.
     pub fn with_layout(mut self, layout: crate::repository_state::RepositoryLayout) -> Self {
+        self.storage.configure_repository_layout(&layout);
         self.layout = Some(layout);
         self
     }
@@ -1868,8 +1756,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// missing one is a construction-wiring error, reported rather than inferred
     /// from the storage parent.
     pub(crate) fn require_layout(&self) -> Result<crate::repository_state::RepositoryLayout> {
+        self.repository_layout().cloned()
+    }
+
+    /// Explicit repository layout selected when this executor was constructed.
+    pub fn repository_layout(&self) -> Result<&crate::repository_state::RepositoryLayout> {
         self.layout
-            .clone()
+            .as_ref()
             .ok_or_else(|| anyhow!("no repository layout configured for this command"))
     }
 
@@ -1902,117 +1795,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
         Err(anyhow!(
             "repository export did not converge after repeated capture conflicts"
-        ))
-    }
-
-    /// Publish one closed set of repository-owned issue/gate-run/audit intents.
-    ///
-    /// Capture paths are derived solely from the typed intents, so command callers
-    /// cannot submit a partial snapshot. Each retry opens a fresh session while
-    /// reusing the operation's sole identity/time authority.
-    fn publish_repository_mutation(
-        &self,
-        intents: Vec<crate::repository_state::MutationIntent>,
-    ) -> Result<MutationPublication>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        self.publish_repository_mutation_with(|_| Ok(intents.clone()))
-    }
-
-    fn publish_repository_mutation_with<F>(&self, build_intents: F) -> Result<MutationPublication>
-    where
-        S: crate::storage::RepositoryStateStore,
-        F: Fn(
-            &crate::repository_state::MutationContext,
-        ) -> Result<Vec<crate::repository_state::MutationIntent>>,
-    {
-        use crate::repository_state::{
-            finalize, CaptureBudget, CaptureSpec, MutationIntent, VirtualPath,
-        };
-        use crate::storage::RepositoryStateStoreError;
-        use std::collections::BTreeSet;
-
-        let layout = self.require_layout()?;
-        // Operation-scoped: each retry gets a fresh recovered session while
-        // identifiers and mutation time remain stable.
-        let context = crate::repository_state::MutationContext::production();
-        for _ in 0..8 {
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let intents = build_intents(&context)?;
-            let create_count = intents
-                .iter()
-                .map(|intent| match intent {
-                    MutationIntent::CreateIssue { .. } => 1,
-                    MutationIntent::CreateIssueBatch { drafts, .. } => drafts.len(),
-                    _ => 0,
-                })
-                .sum();
-            let created_issue_ids = (0..create_count)
-                .map(|index| context.identifier_at(index as u64))
-                .collect::<Vec<_>>();
-            let mut paths = BTreeSet::new();
-            for intent in &intents {
-                match intent {
-                    MutationIntent::CreateIssue { .. }
-                    | MutationIntent::CreateIssueBatch { .. } => {
-                        paths.insert(VirtualPath::data("issues")?);
-                        paths.insert(VirtualPath::data("index.json")?);
-                        paths.insert(VirtualPath::data("events.jsonl")?);
-                    }
-                    MutationIntent::ClaimIssue { issue_id, .. } => {
-                        paths.insert(VirtualPath::data(format!("issues/{issue_id}.json"))?);
-                        paths.insert(VirtualPath::data("events.jsonl")?);
-                    }
-                    MutationIntent::UpdateIssue { issue }
-                    | MutationIntent::RepairIssueLifecycle { issue } => {
-                        paths.insert(VirtualPath::data(format!("issues/{}.json", issue.id))?);
-                    }
-                    MutationIntent::DeleteIssue { issue_id } => {
-                        paths.insert(VirtualPath::data(format!("issues/{issue_id}.json"))?);
-                        paths.insert(VirtualPath::data("index.json")?);
-                    }
-                    MutationIntent::EditGateRegistry { .. } => {
-                        paths.insert(VirtualPath::data("gates.toml")?);
-                    }
-                    MutationIntent::CreateGatePreset { preset } => {
-                        paths.insert(VirtualPath::data("config")?);
-                        paths.insert(VirtualPath::data("config/gate-presets")?);
-                        paths.insert(VirtualPath::data(format!(
-                            "config/gate-presets/{}.json",
-                            preset.name
-                        ))?);
-                    }
-                    MutationIntent::RecordGateRun { .. } => {}
-                    MutationIntent::RecordEvent { .. } => {
-                        paths.insert(VirtualPath::data("events.jsonl")?);
-                    }
-                }
-            }
-            for id in &created_issue_ids {
-                paths.insert(VirtualPath::data(format!("issues/{id}.json"))?);
-            }
-            let budget = CaptureBudget {
-                max_paths: paths.len().saturating_add(16),
-                max_listings: 0,
-                max_bytes: 64 * 1024 * 1024,
-                max_depth: 8,
-            };
-            let spec = CaptureSpec::phase_one(paths, budget)?;
-            let image = match session.capture(spec) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            };
-            let plan = finalize(&layout, &image, &context, &intents)?;
-            match session.apply(&plan) {
-                Ok(_) => return Ok(MutationPublication { created_issue_ids }),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "repository mutation did not converge after repeated capture conflicts"
         ))
     }
 
@@ -2108,18 +1890,81 @@ impl<S: IssueStore> CommandExecutor<S> {
         ))
     }
 
-    fn publish_issue_creation(&self, draft: Issue, bypassed_rules: &[String]) -> Result<String>
+    fn publish_issue_creation(
+        &self,
+        draft: Issue,
+        explicit_type: bool,
+        force: bool,
+    ) -> Result<(String, WriteValidation)>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::MutationIntent;
-        let publication = self.publish_repository_mutation_with(|context| {
+        use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
+        use crate::storage::RepositoryStateStoreError;
+        use std::collections::BTreeMap;
+
+        let layout = self.require_layout()?;
+        let context = MutationContext::production();
+        for _ in 0..8 {
             let issue_id = context.identifier_at(0);
-            Ok(std::iter::once(MutationIntent::CreateIssue {
-                draft: Box::new(draft.clone()),
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some(image) = self.capture_proposed_base(
+                session.as_mut(),
+                &BTreeMap::new(),
+                &[
+                    VirtualPath::data("issues")?,
+                    VirtualPath::data(format!("issues/{issue_id}.json"))?,
+                ],
+                None,
+            )?
+            else {
+                continue;
+            };
+            let declarations = crate::repository_state::declarations_from_image(&image)?;
+            let mut final_draft = draft.clone();
+            if label_utils::type_label_value(&final_draft.labels).is_none() {
+                if let Some(default_type) = declarations
+                    .config()
+                    .validation
+                    .as_ref()
+                    .and_then(|validation| validation.default_type.as_deref())
+                {
+                    final_draft
+                        .labels
+                        .push(label_utils::type_label(default_type));
+                }
+            }
+            if explicit_type {
+                let repo_format = declarations
+                    .config()
+                    .validation
+                    .as_ref()
+                    .map(crate::config::ValidationConfig::content_format)
+                    .transpose()?
+                    .unwrap_or(crate::domain::ContentFormat::Markdown);
+                let evaluation = crate::validation::evaluate_local(
+                    &final_draft,
+                    declarations.rules(),
+                    repo_format,
+                )?;
+                if let Some(finding) = evaluation
+                    .findings()
+                    .into_iter()
+                    .find(|finding| finding.rule == "type-hierarchy-known")
+                {
+                    return Err(
+                        crate::errors::ValidationFailedError::new(finding.message.clone()).into(),
+                    );
+                }
+            }
+            let validation =
+                derive_write_validation(&final_draft, &declarations, declarations.config(), force)?;
+            let intents = std::iter::once(MutationIntent::CreateIssue {
+                draft: Box::new(final_draft),
             })
             .chain(
-                bypassed_rules
+                validation
+                    .bypassed_rules
                     .iter()
                     .map(|rule| MutationIntent::RecordEvent {
                         phase: 9,
@@ -2129,13 +1974,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                         )),
                     }),
             )
-            .collect())
-        })?;
-        publication
-            .created_issue_ids
-            .into_iter()
-            .next()
-            .ok_or_else(|| anyhow!("issue finalizer returned no created issue identity"))
+            .collect::<Vec<_>>();
+            let plan = finalize(&layout, &image, &context, &intents)?;
+            match session.apply(&plan) {
+                Ok(_) => return Ok((issue_id, validation)),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "issue creation did not converge after repeated capture conflicts"
+        ))
     }
 
     /// Get reference to the storage backend
@@ -2266,98 +2115,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             })
     }
 
-    /// Resolve the repo-level default content format from `[validation]
-    /// .content_format` (defaulting to Markdown when unset/absent), used as the
-    /// fallback for issues that carry no per-issue `content_format` when selecting
-    /// the [`ContentParser`](crate::document::ContentParser). A malformed value is
-    /// surfaced as an error rather than silently picking the wrong parser.
+    /// Resolve the repository's configured default content format.
     fn repo_content_format(&self) -> Result<crate::domain::ContentFormat> {
-        match self.cached_config()?.validation.as_ref() {
-            Some(validation) => validation.content_format(),
-            None => Ok(crate::domain::ContentFormat::Markdown),
-        }
-    }
-
-    /// Resolve the repository-wide validation strictness from
-    /// `[validation].strictness`, defaulting to [`Strictness::Loose`] when the
-    /// key (or the whole `[validation]` section) is absent. A malformed value is
-    /// surfaced as an error rather than silently defaulting, so a misconfigured
-    /// `config.toml` cannot quietly disable or widen enforcement.
-    ///
-    /// [`Strictness::Loose`]: crate::validation::Strictness::Loose
-    fn validation_strictness(&self) -> Result<crate::validation::Strictness> {
-        match self.cached_config()?.validation.as_ref() {
-            Some(validation) => validation.strictness(),
-            None => Ok(crate::validation::Strictness::Loose),
-        }
-    }
-
-    /// The single write-time validation entry point shared by issue create,
-    /// update, and the batch path (DR §7.5).
-    ///
-    /// `issue` MUST be the FINAL persisted shape — i.e. all field and state
-    /// mutations (create's auto-promotion to `Ready`, update's requested state
-    /// transition, bulk's projected after-update shape) already applied — so that
-    /// rules keyed on the final `state` are evaluated correctly.
-    ///
-    /// It evaluates the EFFECTIVE local rules (built-in defaults + user
-    /// `.jit/rules.toml`) via
-    /// [`evaluate_local`](crate::validation::evaluate_local), then applies the
-    /// repository's `[validation].strictness`
-    /// ([`Strictness`](crate::validation::Strictness)) to the block/allow
-    /// decision. Under the default [`Loose`](crate::validation::Strictness::Loose)
-    /// level the blocking semantics are:
-    ///
-    /// - An `error` finding from an `enforce = true` rule REJECTS the write
-    ///   unless `force` is set (DR §7.2).
-    /// - With `force`, the write is allowed and the bypassed rule names are
-    ///   returned in [`WriteValidation::bypassed_rules`] for the CALLER to log
-    ///   AFTER the write commits (DR §7.6) — they are NOT logged here, so a
-    ///   failed save cannot leave a false bypass entry in the audit log.
-    /// - `warn`/non-`enforce` findings never block; their messages are
-    ///   returned as warnings.
-    ///
-    /// [`Strict`](crate::validation::Strictness::Strict) widens the block set to
-    /// EVERY violation (any warning or error blocks);
-    /// [`Permissive`](crate::validation::Strictness::Permissive) empties it (no
-    /// violation blocks — all findings become warnings). Strictness modulates only
-    /// this decision; it never changes a rule's severity or `enforce` flag.
-    ///
-    /// The former hard-coded `IssueValidator` checks are now default rules inside
-    /// the effective rule set, so they run through this same path. A genuinely
-    /// misconfigured `.jit/rules.toml` or `config.toml` (parse/load error) is
-    /// surfaced as an error rather than silently disabling enforcement.
-    fn validate_for_write(&self, issue: &Issue, force: bool) -> Result<WriteValidation> {
-        let rules = self.effective_rules()?;
-        let repo_format = self.repo_content_format()?;
-        let strictness = self.validation_strictness()?;
-        let evaluation = crate::validation::evaluate_local(issue, rules, repo_format)
-            .map_err(|err| anyhow!("rule evaluation failed: {err}"))?
-            .with_strictness(strictness);
-
-        let blocking = evaluation.blocking_rules();
-        if !blocking.is_empty() && !force {
-            // Ordinary rejection: NOT logged (only --force bypasses are). Typed as a
-            // validation failure (exit 4) carrying the message verbatim, so the
-            // top-level handler classifies it by downcast rather than message text.
-            return Err(crate::errors::ValidationFailedError::new(
-                evaluation
-                    .rejection_message()
-                    .unwrap_or_else(|| "blocked by validation rule(s)".to_string()),
-            )
-            .into());
-        }
-
-        let mut warnings = Vec::new();
-        warnings.extend(evaluation.warnings());
-
-        // On a forced write `blocking` names the enforce rules being overridden;
-        // the caller logs them AFTER the write succeeds. When nothing blocks (or
-        // not forced), `blocking` is empty so no events are deferred.
-        Ok(WriteValidation {
-            warnings,
-            bypassed_rules: blocking,
-        })
+        self.cached_config()?
+            .validation
+            .as_ref()
+            .map(crate::config::ValidationConfig::content_format)
+            .transpose()
+            .map(|format| format.unwrap_or(crate::domain::ContentFormat::Markdown))
     }
 
     fn publish_captured_field_update(
@@ -2383,10 +2148,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 };
                 let issues = captured_active_issues(&image)?;
                 let target = resolve_issue_from_capture(&issues, &request.issue_id)?;
-                let config = crate::repository_state::assemble_config(&image)?;
+                let declarations = crate::repository_state::declarations_from_image(&image)?;
                 (
                     target,
-                    self.config_manager.enforcement_mode_from_config(&config)?,
+                    self.config_manager
+                        .enforcement_mode_from_config(declarations.config())?,
                 )
             };
             let claims_guard = request
@@ -2409,10 +2175,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .find(|issue| issue.id == expected_target)
                 .cloned()
                 .ok_or_else(|| crate::storage::IssueNotFoundError::new(&expected_target))?;
-            let declarations = declarations_from_image(&image)?;
-            let config = crate::repository_state::assemble_config(&image)?;
+            let declarations = crate::repository_state::declarations_from_image(&image)?;
+            let config = declarations.config();
             if request.enforce_lease
-                && self.config_manager.enforcement_mode_from_config(&config)? != expected_lease_mode
+                && self
+                    .config_manager
+                    .enforcement_mode_from_config(declarations.config())?
+                    != expected_lease_mode
             {
                 continue;
             }
@@ -2435,7 +2204,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 CapturedTransitionEvidence {
                     issues: &issues,
                     declarations: &declarations,
-                    config: &config,
+                    config,
                     plan_content: &plan_content,
                     context: &context,
                 },
@@ -2616,8 +2385,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                         ..
                     }
                 );
-                let config = crate::repository_state::assemble_config(&image)?;
-                let registry = declarations_from_image(&image)?.gates;
+                let declarations = crate::repository_state::declarations_from_image(&image)?;
+                let lease_mode = self
+                    .config_manager
+                    .enforcement_mode_from_config(declarations.config())?;
+                let registry = declarations.gates;
                 let plan = should_precheck
                     .then(|| captured_precheck_plan(&image, issue, &registry))
                     .transpose()?;
@@ -2628,7 +2400,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     image,
                     issue.clone(),
                     registry,
-                    self.config_manager.enforcement_mode_from_config(&config)?,
+                    lease_mode,
                     enforce_lease,
                 )
             };
@@ -2724,9 +2496,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .find(|issue| issue.id == expected_target)
                 .cloned()
                 .ok_or_else(|| crate::storage::IssueNotFoundError::new(&expected_target))?;
-            let config = crate::repository_state::assemble_config(&image)?;
+            let declarations = crate::repository_state::declarations_from_image(&image)?;
             if enforce_lease
-                && self.config_manager.enforcement_mode_from_config(&config)? != expected_lease_mode
+                && self
+                    .config_manager
+                    .enforcement_mode_from_config(declarations.config())?
+                    != expected_lease_mode
             {
                 continue;
             }
@@ -2738,8 +2513,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let evidence_matches = if expected.evidence.validation_view.is_some() {
                     expected.evidence.matches(&image)?
                 } else {
-                    let current_registry = declarations_from_image(&image)?.gates;
-                    captured_precheck_plan(&image, &issue, &current_registry)?.evidence
+                    captured_precheck_plan(&image, &issue, &declarations.gates)?.evidence
                         == expected.evidence
                 };
                 if !evidence_matches {
@@ -2900,7 +2674,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     (State::Done, false, false)
                 }
             };
-            let declarations = declarations_from_image(&image)?;
+            let declarations = crate::repository_state::declarations_from_image(&image)?;
+            let config = declarations.config();
             let mut after_apply_error = None;
             let effective_target = if divert && target == State::Done && issue.has_unpassed_gates()
             {
@@ -2939,7 +2714,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     CapturedTransitionEvidence {
                         issues: &issues,
                         declarations: &declarations,
-                        config: &config,
+                        config,
                         plan_content: &plan_content,
                         context: &context,
                     },
@@ -3223,8 +2998,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn require_active_lease(&self, issue_id: &str) -> Result<Option<String>> {
         use crate::config::EnforcementMode;
 
-        // Derive the mode from the cached config so a write command that also runs
-        // `validate_for_write` parses `config.toml` at most once (DR §6.1).
+        // This legacy preflight is rechecked from captured config by mutation
+        // coordinators that enforce leases during publication.
         let mode = self
             .config_manager
             .enforcement_mode_from_config(self.cached_config()?)?;
@@ -3261,15 +3036,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_repo_rel_virtual_path_normalizes_only_leading_current_directory_components() {
-        use crate::repository_state::VirtualPath;
+    fn test_repository_layout_normalizes_only_leading_current_directory_components() {
+        use crate::repository_state::{RepositoryLayout, RepositoryRootEvidence, VirtualPath};
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new("/repo", "worktree", true),
+            RepositoryRootEvidence::new("/external/jit-data", "data", true),
+        )
+        .unwrap();
 
         assert_eq!(
-            repo_rel_virtual_path("./scripts/code-review-prompt.md").unwrap(),
+            layout
+                .classify_repository_relative("./scripts/code-review-prompt.md")
+                .unwrap(),
             VirtualPath::worktree("scripts/code-review-prompt.md").unwrap()
         );
         assert_eq!(
-            repo_rel_virtual_path("././.jit/gates.toml").unwrap(),
+            layout
+                .classify_repository_relative("././.jit/gates.toml")
+                .unwrap(),
             VirtualPath::data("gates.toml").unwrap()
         );
 
@@ -3289,7 +3073,10 @@ mod tests {
             "./C:/prompt",
             control.as_str(),
         ] {
-            assert!(repo_rel_virtual_path(path).is_err(), "{path:?}");
+            assert!(
+                layout.classify_repository_relative(path).is_err(),
+                "{path:?}"
+            );
         }
         assert!(VirtualPath::worktree("./scripts/code-review-prompt.md").is_err());
     }
@@ -3300,7 +3087,7 @@ mod tests {
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(".jit/issues/existing.json", "{}");
+        storage.add_data_file("issues/existing.json", "{}");
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
         storage.inject_repository_state_apply_conflicts(1);
@@ -3339,8 +3126,8 @@ mod tests {
         use std::collections::HashMap;
 
         let storage = crate::storage::InMemoryStorage::new();
-        storage.add_repo_file(".jit/config.toml", "");
-        storage.add_repo_file("start-prompt.md", "captured prompt");
+        storage.add_data_file("config.toml", "");
+        storage.add_worktree_file("start-prompt.md", "captured prompt");
         let mut registry = GateRegistry::default();
         registry.gates.insert(
             "auto-start".to_string(),
@@ -3424,7 +3211,9 @@ mod tests {
             .into_iter()
             .find(|issue| issue.id == issue_id)
             .unwrap();
-        let registry = declarations_from_image(&image).unwrap().gates;
+        let registry = crate::repository_state::declarations_from_image(&image)
+            .unwrap()
+            .gates;
         captured_precheck_plan(&image, &issue, &registry).unwrap()
     }
 
@@ -4134,8 +3923,8 @@ enforce_leases = "strict"
         let (storage, executor, issue_id) = precheck_evidence_fixture();
         let before = capture_precheck_plan(&executor, &issue_id).evidence;
         let run = prior_precheck_run(&issue_id);
-        storage.add_repo_file(
-            ".jit/gate-runs/prior-run/result.json",
+        storage.add_data_file(
+            "gate-runs/prior-run/result.json",
             &serde_json::to_string(&run).unwrap(),
         );
 
@@ -4148,7 +3937,7 @@ enforce_leases = "strict"
         let before = capture_precheck_plan(&executor, &issue_id);
         assert_eq!(before.prompts["auto-start"], "captured prompt");
 
-        storage.add_repo_file("start-prompt.md", "mutated prompt");
+        storage.add_worktree_file("start-prompt.md", "mutated prompt");
         let after = capture_precheck_plan(&executor, &issue_id);
 
         assert_eq!(after.prompts["auto-start"], "mutated prompt");

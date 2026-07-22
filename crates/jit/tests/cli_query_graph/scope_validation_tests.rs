@@ -168,8 +168,8 @@ fn executor_with_rules_and_templates(
     std::fs::create_dir_all(storage.root()).unwrap();
     std::fs::write(storage.root().join("templates.toml"), templates_toml).unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    storage.add_repo_file(".jit/templates.toml", templates_toml);
-    storage.add_repo_file(".jit/rules.toml", rules_toml);
+    storage.add_data_file("templates.toml", templates_toml);
+    storage.add_data_file("rules.toml", rules_toml);
     let layout =
         jit::storage::discover_repository_layout(storage.root().parent().unwrap(), storage.root())
             .unwrap();
@@ -686,7 +686,7 @@ fn container_with_external_plan(
     // in-memory mutation session. Writing this fixture to the real `/tmp`
     // filesystem would recreate the retired ambient-read path.
     let plan_path = format!("dev/active/{c}-plan.md");
-    executor.storage().add_repo_file(
+    executor.storage().add_worktree_file(
         &plan_path,
         "## Success Criteria\n\n- [hard] REQ-77: declared only in the external plan\n",
     );
@@ -817,7 +817,7 @@ fn test_scope_resolves_plan_from_relinked_nondefault_path() {
 
     // Write the plan ONLY at the archived path; leave the template default absent.
     let archived = format!("dev/archive/features/{c}/plan.md");
-    executor.storage().add_repo_file(
+    executor.storage().add_worktree_file(
         &archived,
         "## Success Criteria\n\n- [hard] REQ-77: lives only at the archived path\n",
     );
@@ -855,7 +855,7 @@ fn test_scope_relinked_nondefault_plan_covered_is_clean() {
     );
 
     let archived = format!("dev/archive/features/{c}/plan.md");
-    executor.storage().add_repo_file(
+    executor.storage().add_worktree_file(
         &archived,
         "## Success Criteria\n\n- [hard] REQ-77: lives only at the archived path\n",
     );

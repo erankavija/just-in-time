@@ -1,64 +1,51 @@
 //! Typed recovery state and failure/race injection for the transaction kernel.
 
-use super::transaction_journal::TransactionDecision;
-
 /// Observable recovery state returned after prepare/commit/rollback.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum RecoveryState {
-    /// No durable transaction residue remains.
-    Clean,
+pub(crate) enum RecoveryState {
     /// A prepared journal remains and must be rolled back before another write.
     Prepared,
     /// A committed journal remains; final targets are authoritative and cleanup
     /// must finish before another write.
     Committed,
-    /// Rollback is terminal; only machine-local residue cleanup remains.
-    RolledBack,
-}
-
-impl From<TransactionDecision> for RecoveryState {
-    fn from(value: TransactionDecision) -> Self {
-        match value {
-            TransactionDecision::Prepared => Self::Prepared,
-            TransactionDecision::Committed => Self::Committed,
-            TransactionDecision::RolledBack => Self::RolledBack,
-        }
-    }
 }
 
 /// Stable injection points covering every durability boundary and action edge.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FailurePoint {
-    CreateExternalControl,
-    CreateInternalControl,
-    CreateJournal,
-    Stage { action: usize },
-    SyncStage { action: usize },
-    SyncJournal { decision: RecoveryState },
-    BeforeAction { action: usize },
-    AfterParentOpen { action: usize },
-    BeforeModeMutation { action: usize },
-    AfterRenameAside { action: usize },
-    AfterPublish { action: usize },
-    SyncTargetParent { action: usize },
-    ReverseAction { action: usize },
-    BeforeReverseModeMutation { action: usize },
-    SyncReverseParent { action: usize },
-    BeforeFreshRootRemoval,
-    AfterFreshRootRemoval,
-    CleanupTerminalResidue,
     RepositoryRecoveryExternal,
     RepositoryRecoveryInternal,
+    RepositoryBeforeControlCreation,
+    RepositoryCreateControl,
+    RepositoryBeforeInitialJournal,
+    RepositoryBeforeDataStageJournal,
+    RepositoryBeforePreparedJournal { action: usize },
+    RepositoryBeforePublishedJournal { action: usize },
+    RepositorySyncInitialJournal,
     RepositoryCreateCompanion,
     RepositorySweepCompanions,
     RepositoryPrepareIntent,
     RepositoryPrepareAction { action: usize },
+    RepositoryStageAction { action: usize },
+    RepositorySyncStage { action: usize },
+    RepositorySyncBackup { action: usize },
     RepositorySyncPreparedAction { action: usize },
     RepositoryBeforeAction { action: usize },
+    RepositoryBeforeTargetMutation { action: usize },
+    RepositoryBeforeDeleteRename { action: usize },
+    RepositorySyncTargetParent { action: usize },
+    RepositoryVerifyFinalIdentity { action: usize },
     RepositoryAfterAction { action: usize },
     RepositoryBeforeDataRootPublication,
     RepositoryAfterDataRootPublication,
+    RepositoryBeforeCommitDecision,
     RepositoryAfterCommit,
+    RepositoryBeforeReverseAction { action: usize },
+    RepositorySyncRollbackJournal { action: usize },
+    RepositoryBeforeRollbackDecision,
+    RepositoryBeforeStageCleanup,
+    RepositoryBeforeCompanionCleanup,
+    RepositoryBeforeControlCleanup,
     RepositoryCleanup,
 }
 
@@ -81,7 +68,7 @@ impl TransactionFailureInjector for NoTransactionFailures {
 /// Failure that means a durable journal must be recovered before further writes.
 #[derive(Debug, thiserror::Error)]
 #[error("transaction {transaction_id} requires recovery from {state:?}: {source}")]
-pub struct RecoveryRequiredError {
+pub(crate) struct RecoveryRequiredError {
     /// Transaction whose journal remains authoritative.
     pub transaction_id: String,
     /// Durable state recorded in that journal.
@@ -93,7 +80,7 @@ pub struct RecoveryRequiredError {
 
 /// Typed storage failures specific to durable file-set publication.
 #[derive(Debug, thiserror::Error)]
-pub enum FileTransactionError {
+pub(crate) enum FileTransactionError {
     #[error("invalid transaction target path: {path}")]
     InvalidPath { path: String },
     #[error("duplicate transaction target: {path}")]
@@ -106,8 +93,6 @@ pub enum FileTransactionError {
     UnexpectedOccupant { path: String },
     #[error("reserved bootstrap path is occupied by non-protocol state")]
     UnexpectedBootstrapOccupant,
-    #[error("transaction staging and target are on different volumes: {path}")]
-    CrossVolume { path: String },
     #[error("filesystem operation required for durable transactions is unsupported: {operation}")]
     UnsupportedFilesystem { operation: String },
     #[error("transaction journal does not match the selected repository layout")]

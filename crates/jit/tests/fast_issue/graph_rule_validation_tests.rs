@@ -16,9 +16,18 @@ fn store_with_rules(rules_toml: &str) -> InMemoryStorage {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
     std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    storage.add_repo_file(".jit/rules.toml", rules_toml);
-    storage.add_repo_file(".jit/config.toml", "");
+    let config: jit::config::JitConfig = toml::from_str("").unwrap();
+    let namespaces = jit::config_manager::namespaces_from_config(&config);
+    let defaults = jit::repository_state::serialize_ruleset(
+        &jit::repository_state::default_ruleset(&namespaces),
+    );
+    let rules = format!("{}{}", defaults.rules_toml, rules_toml);
+    std::fs::write(storage.root().join("rules.toml"), &rules).unwrap();
+    storage.add_data_file("rules.toml", &rules);
+    for schema in defaults.schema_files {
+        storage.add_data_file(format!("schemas/{}", schema.name), &schema.content);
+    }
+    storage.add_data_file("config.toml", "");
     storage
 }
 
@@ -30,8 +39,8 @@ fn executor_for(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
         .map(|issue| issue.id)
         .collect::<Vec<_>>();
     ids.sort();
-    storage.add_repo_file(
-        ".jit/index.json",
+    storage.add_data_file(
+        "index.json",
         &serde_json::json!({"schema_version": 2, "all_ids": ids, "deleted_ids": []}).to_string(),
     );
     let layout = storage.repository_layout();
@@ -73,8 +82,8 @@ fn test_validate_fails_on_error_severity_graph_rule_violation() {
     );
     let msg = result.unwrap_err().to_string();
     assert!(
-        msg.contains("Graph rule validation failed"),
-        "message should explain a graph rule failed: {msg}"
+        msg.contains("must depend on an issue matching the target selector"),
+        "message should explain the dependency-shape violation: {msg}"
     );
     assert!(
         msg.contains("task-needs-story-dep"),

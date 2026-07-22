@@ -19,18 +19,29 @@ use super::{
 use crate::config::{JitConfig, ProjectionMode};
 use crate::declarations::invariants::InvariantRegistry;
 use crate::repository_state::default_rule_membership_diff_from_identities;
+use std::collections::BTreeMap;
+
+pub(super) fn serialized_default_ruleset(config: &JitConfig) -> super::SerializedRuleSet {
+    let namespaces = crate::config_manager::namespaces_from_config(config);
+    serialize_ruleset(&default_ruleset(&namespaces))
+}
+
+/// Exact configured-projection actions and report counts from one render pass.
+pub(crate) struct ConfiguredProjections {
+    pub(crate) actions: Vec<RepositoryAction>,
+    pub(crate) counts: BTreeMap<String, usize>,
+}
 
 /// Map a repo-relative producer path onto its canonical [`VirtualPath`].
 ///
 /// The projection producers address the engine registries and worktree targets by
 /// their logical `.jit/...` / worktree-relative spellings; a `.jit/`-prefixed path
 /// is a `Data(...)` target and every other repo-relative path is `Worktree(...)`.
-fn image_path(repo_relative: &str) -> Result<VirtualPath, RepositoryStateError> {
-    let vpath = match repo_relative.strip_prefix(".jit/") {
-        Some(rest) => VirtualPath::data(rest),
-        None => VirtualPath::worktree(repo_relative),
-    }?;
-    Ok(vpath)
+fn image_path(
+    image: &RepositoryImage,
+    repo_relative: &str,
+) -> Result<VirtualPath, RepositoryStateError> {
+    Ok(image.layout().classify_repository_relative(repo_relative)?)
 }
 
 /// Read a repo-relative path as UTF-8 text from the captured image.
@@ -39,7 +50,7 @@ fn image_path(repo_relative: &str) -> Result<VirtualPath, RepositoryStateError> 
 /// image never captured fails with `UndiscoveredRepositoryPath`, never silent
 /// absence.
 fn read_text(image: &RepositoryImage, repo_relative: &str) -> anyhow::Result<Option<String>> {
-    let vpath = image_path(repo_relative)?;
+    let vpath = image_path(image, repo_relative)?;
     match image.file_bytes(&vpath)? {
         Some(bytes) => Ok(Some(String::from_utf8(bytes.to_vec())?)),
         None => Ok(None),
@@ -53,13 +64,23 @@ fn read_text(image: &RepositoryImage, repo_relative: &str) -> anyhow::Result<Opt
 /// invariant registry the `full` invariant view renders. An absent `invariants.toml`
 /// is an empty registry, matching the on-disk load boundary.
 pub fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConfig> {
-    let config_text = read_text(image, ".jit/config.toml")?
+    let config_bytes = image
+        .file_bytes(&image_path(image, ".jit/config.toml")?)?
         .ok_or_else(|| anyhow::anyhow!("captured image has no .jit/config.toml"))?;
-    let mut config: JitConfig = toml::from_str(&config_text)?;
+    let declarations = crate::declarations::parse_configuration(config_bytes)?;
+    assemble_config_from_declarations(image, &declarations)
+}
+
+/// Assemble the materialization view from the operation's authoritative config
+/// parse plus the captured sibling invariant registry.
+pub(crate) fn assemble_config_from_declarations(
+    image: &RepositoryImage,
+    declarations: &crate::declarations::ConfigurationDeclarations,
+) -> anyhow::Result<JitConfig> {
     // An invariants.toml outside the captured closure (or captured absent) is an
     // empty registry, matching the on-disk load boundary.
-    let invariants_path = image_path(".jit/invariants.toml")?;
-    config.invariants = if image.capture_spec().contains_path(&invariants_path) {
+    let invariants_path = image_path(image, ".jit/invariants.toml")?;
+    let invariants = if image.capture_spec().contains_path(&invariants_path) {
         match read_text(image, ".jit/invariants.toml")? {
             Some(text) => InvariantRegistry::from_toml_str(&text)?,
             None => InvariantRegistry::empty(),
@@ -67,7 +88,7 @@ pub fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConfig> {
     } else {
         InvariantRegistry::empty()
     };
-    Ok(config)
+    Ok(declarations.materialization_config(invariants))
 }
 
 /// Enumerate the phase-two capture closure for `jit project render`.
@@ -92,6 +113,7 @@ pub fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConfig> {
 /// validates names first, so this is a defensive guard rather than the primary
 /// diagnostic.
 pub fn render_capture_closure(
+    layout: &super::RepositoryLayout,
     config: &JitConfig,
     selected: &[String],
     rules_content: Option<&str>,
@@ -100,10 +122,10 @@ pub fn render_capture_closure(
     use crate::domain::item::resolve_item_kinds;
 
     let mut paths = vec![
-        image_path(".jit/config.toml")?,
-        image_path(".jit/invariants.toml")?,
-        image_path(".jit/rules.toml")?,
-        image_path(".jit/gates.toml")?,
+        layout.classify_repository_relative(".jit/config.toml")?,
+        layout.classify_repository_relative(".jit/invariants.toml")?,
+        layout.classify_repository_relative(".jit/rules.toml")?,
+        layout.classify_repository_relative(".jit/gates.toml")?,
     ];
     let registry = config.projection.clone().unwrap_or_default();
     let all_kinds = resolve_item_kinds(config.item_kinds.as_ref())?;
@@ -116,7 +138,7 @@ pub fn render_capture_closure(
         let projection = registry
             .get(name)
             .ok_or_else(|| anyhow::anyhow!("unknown projection '{name}'"))?;
-        paths.push(image_path(&super::require_target(projection, name)?)?);
+        paths.push(layout.classify_repository_relative(super::require_target(projection, name)?)?);
         for kind_name in projection.kinds() {
             let kind = all_kinds
                 .iter()
@@ -127,12 +149,12 @@ pub fn render_capture_closure(
             match kind.source_of_truth() {
                 SourceOfTruth::MarkdownFirst => {
                     if let Some(source) = kind.source() {
-                        paths.push(image_path(source)?);
+                        paths.push(layout.classify_repository_relative(source)?);
                     }
                 }
                 SourceOfTruth::RegistryFirst => {
                     if let Some(descriptor) = kind.toml_source() {
-                        paths.push(image_path(&descriptor.toml)?);
+                        paths.push(layout.classify_repository_relative(&descriptor.toml)?);
                     }
                 }
             }
@@ -184,6 +206,7 @@ pub struct ValidationCaptureClosure {
 /// the command boundary from the captured issue records (a later capture phase),
 /// which owns the planning-node resolution the closure cannot express purely.
 pub fn validate_capture_closure(
+    layout: &super::RepositoryLayout,
     config: &JitConfig,
     all_ids: &[String],
     rules_content: Option<&str>,
@@ -192,18 +215,18 @@ pub fn validate_capture_closure(
     use crate::domain::item::resolve_item_kinds;
 
     let mut paths = vec![
-        image_path(".jit/config.toml")?,
-        image_path(".jit/invariants.toml")?,
-        image_path(".jit/rules.toml")?,
-        image_path(".jit/gates.toml")?,
-        image_path(".jit/templates.toml")?,
-        image_path(".jit/index.json")?,
-        image_path(".jit/events.jsonl")?,
+        layout.classify_repository_relative(".jit/config.toml")?,
+        layout.classify_repository_relative(".jit/invariants.toml")?,
+        layout.classify_repository_relative(".jit/rules.toml")?,
+        layout.classify_repository_relative(".jit/gates.toml")?,
+        layout.classify_repository_relative(".jit/templates.toml")?,
+        layout.classify_repository_relative(".jit/index.json")?,
+        layout.classify_repository_relative(".jit/events.jsonl")?,
     ];
     // Every ordinary issue record named by the index, plus the complete listing
     // whole-repository validation reconciles against those ids.
     for id in all_ids {
-        paths.push(image_path(&format!(".jit/issues/{id}.json"))?);
+        paths.push(layout.classify_repository_relative(format!(".jit/issues/{id}.json"))?);
     }
     let listings = vec![VirtualPath::data("issues")?];
 
@@ -212,7 +235,7 @@ pub fn validate_capture_closure(
     let registry = config.projection.clone().unwrap_or_default();
     let all_kinds = resolve_item_kinds(config.item_kinds.as_ref())?;
     for (name, projection) in &registry {
-        paths.push(image_path(&super::require_target(projection, name)?)?);
+        paths.push(layout.classify_repository_relative(super::require_target(projection, name)?)?);
         for kind_name in projection.kinds() {
             let kind = all_kinds
                 .iter()
@@ -223,12 +246,12 @@ pub fn validate_capture_closure(
             match kind.source_of_truth() {
                 SourceOfTruth::MarkdownFirst => {
                     if let Some(source) = kind.source() {
-                        paths.push(image_path(source)?);
+                        paths.push(layout.classify_repository_relative(source)?);
                     }
                 }
                 SourceOfTruth::RegistryFirst => {
                     if let Some(descriptor) = kind.toml_source() {
-                        paths.push(image_path(&descriptor.toml)?);
+                        paths.push(layout.classify_repository_relative(&descriptor.toml)?);
                     }
                 }
             }
@@ -242,9 +265,9 @@ pub fn validate_capture_closure(
         .filter(|kind| kind.kind_scope().is_project())
     {
         if let Some(descriptor) = kind.toml_source() {
-            paths.push(image_path(&descriptor.toml)?);
+            paths.push(layout.classify_repository_relative(&descriptor.toml)?);
         } else if let Some(source) = kind.source() {
-            paths.push(image_path(source)?);
+            paths.push(layout.classify_repository_relative(source)?);
         }
     }
 
@@ -272,9 +295,12 @@ pub(crate) fn compose_configured_projections(
     config: &JitConfig,
     declarations: &RepositoryDeclarations<'_>,
     selected: Option<&std::collections::BTreeSet<String>>,
-) -> anyhow::Result<Vec<RepositoryAction>> {
+) -> anyhow::Result<ConfiguredProjections> {
     let Some(projections) = config.projection.as_ref() else {
-        return Ok(Vec::new());
+        return Ok(ConfiguredProjections {
+            actions: Vec::new(),
+            counts: BTreeMap::new(),
+        });
     };
 
     let inputs = ProjectionInputs {
@@ -289,14 +315,16 @@ pub(crate) fn compose_configured_projections(
     // participate; an out-of-scope projection contributes no claim, so its target
     // is left untouched.
     let mut claims: Vec<(VirtualPath, ManagedDocumentClaim)> = Vec::new();
+    let mut counts = BTreeMap::new();
     for (name, projection) in projections {
         if selected.is_some_and(|names| !names.contains(name)) {
             continue;
         }
         let mut read = |path: &str| read_text(image, path);
-        let (body, _count) = render_projection_body(projection, &inputs, &mut read)?;
+        let (body, count) = render_projection_body(projection, &inputs, &mut read)?;
+        counts.insert(name.clone(), count);
         let target = super::require_target(projection, name)?;
-        let vpath = image_path(&target)?;
+        let vpath = image_path(image, &target)?;
         let owner = format!("projection:{name}");
         let claim = match projection.mode() {
             ProjectionMode::SeparateFile => ManagedDocumentClaim::Base {
@@ -335,7 +363,7 @@ pub(crate) fn compose_configured_projections(
             mode: FileMode::Regular,
         });
     }
-    Ok(actions)
+    Ok(ConfiguredProjections { actions, counts })
 }
 
 /// Materialize the default-rule family (`rules.toml`) and its baked schema files
@@ -369,7 +397,7 @@ pub(crate) fn compose_default_ruleset(
     // A ruleset outside the captured closure (or captured absent) is not an owned
     // materialization: defaults live only in memory, nothing on disk to keep
     // coherent, so no rules/schema targets are owned.
-    let rules_path = image_path(".jit/rules.toml")?;
+    let rules_path = image_path(image, ".jit/rules.toml")?;
     if !image.capture_spec().contains_path(&rules_path) {
         return Ok(Vec::new());
     }
@@ -413,14 +441,14 @@ pub(crate) fn compose_default_ruleset(
     // schemas/default-*.json: config/default-rule generator owns the content.
     // Write each expected target the image actually captured (a target outside
     // the closure is not owned here and never fabricated).
-    let serialized = serialize_ruleset(&default_ruleset(&namespaces));
+    let serialized = serialized_default_ruleset(config);
     let expected_names: std::collections::BTreeSet<&str> = serialized
         .schema_files
         .iter()
         .map(|f| f.name.as_str())
         .collect();
     for schema in &serialized.schema_files {
-        let vpath = image_path(&format!(".jit/schemas/{}", schema.name))?;
+        let vpath = image_path(image, &format!(".jit/schemas/{}", schema.name))?;
         if !image.capture_spec().contains_path(&vpath) {
             continue;
         }
@@ -533,11 +561,12 @@ mod tests {
     use crate::declarations::rules::RuleSet;
     use crate::declarations::GateRegistry;
     use crate::repository_state::{
-        compare_materializations, derive_materializations, CaptureBudget, CaptureSpec,
-        EntryIdentity, MaterializationDriftKind, MaterializationIntent, RepositoryImage,
-        RepositoryLayout, RepositoryRootEvidence, RepositorySeed, RepositorySeedKind,
+        compare_materializations, derive_materialization, CaptureBudget, CaptureSpec,
+        EntryIdentity, MaterializationDriftKind, MaterializationIntent, MaterializationPlan,
+        MaterializationRequest, RepositoryImage, RepositoryLayout, RepositoryRootEvidence,
+        RepositorySeed, RepositorySeedKind,
     };
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::BTreeMap;
 
     const CONFIG: &str = r#"
 [project]
@@ -586,7 +615,7 @@ kind = "advisory"
         let mut worktree_paths = Vec::new();
         let mut entries = BTreeMap::new();
         for (repo_rel, contents) in files {
-            let vpath = image_path(repo_rel).unwrap();
+            let vpath = layout.classify_repository_relative(repo_rel).unwrap();
             let entry = match contents {
                 Some(text) => RepositoryEntry::File {
                     identity: EntryIdentity::for_bytes(*repo_rel, text.as_bytes()).unwrap(),
@@ -638,7 +667,8 @@ kind = "advisory"
         let config: JitConfig = toml::from_str(CONFIG).unwrap();
         // Selecting the single declared projection captures the four engine
         // registries, its region target, and its registry-first kind source.
-        let paths = render_capture_closure(&config, &["invariants".to_string()], None).unwrap();
+        let paths =
+            render_capture_closure(&layout(), &config, &["invariants".to_string()], None).unwrap();
         let expected: std::collections::BTreeSet<VirtualPath> = [
             VirtualPath::data("config.toml").unwrap(),
             VirtualPath::data("invariants.toml").unwrap(),
@@ -653,17 +683,18 @@ kind = "advisory"
             expected
         );
         // An empty selection enumerates the same closure (one projection declared).
-        let all = render_capture_closure(&config, &[], None).unwrap();
+        let all = render_capture_closure(&layout(), &config, &[], None).unwrap();
         assert!(all.contains(&VirtualPath::worktree("AGENTS.md").unwrap()));
         // An unknown selected name is a defensive error.
-        assert!(render_capture_closure(&config, &["nope".to_string()], None).is_err());
+        assert!(render_capture_closure(&layout(), &config, &["nope".to_string()], None).is_err());
     }
 
     #[test]
     fn test_validate_capture_closure_covers_registries_records_and_projections() {
         use std::collections::BTreeSet;
         let config: JitConfig = toml::from_str(CONFIG).unwrap();
-        let closure = validate_capture_closure(&config, &["abc".to_string()], None).unwrap();
+        let closure =
+            validate_capture_closure(&layout(), &config, &["abc".to_string()], None).unwrap();
         let paths: BTreeSet<VirtualPath> = closure.paths.into_iter().collect();
         for expected in [
             VirtualPath::data("config.toml").unwrap(),
@@ -683,7 +714,7 @@ kind = "advisory"
         // A referenced rule schema enters the closure when rules bytes are supplied.
         let rules = "[[rules]]\nname = \"shape\"\ntype = \"format\"\n\
              assert = { json-schema = \"schemas/custom.json\" }\n";
-        let with_schema = validate_capture_closure(&config, &[], Some(rules)).unwrap();
+        let with_schema = validate_capture_closure(&layout(), &config, &[], Some(rules)).unwrap();
         assert!(with_schema
             .paths
             .contains(&VirtualPath::data("schemas/custom.json").unwrap()));
@@ -696,14 +727,14 @@ kind = "advisory"
         // closure, so the effective-rule parse reads image-projected bytes.
         let rules = "[[rules]]\nname = \"shape\"\ntype = \"format\"\n\
              assert = { json-schema = \"schemas/custom.json\" }\n";
-        let paths = render_capture_closure(&config, &[], Some(rules)).unwrap();
+        let paths = render_capture_closure(&layout(), &config, &[], Some(rules)).unwrap();
         assert!(paths.contains(&VirtualPath::data("schemas/custom.json").unwrap()));
     }
 
     #[test]
     fn test_render_selection_scopes_to_named_projection() {
         use std::collections::BTreeSet;
-        let cfg = empty_config_decls();
+        let cfg = config_decls(CONFIG);
         let (g, r) = (gates(), rules());
         let image = image(&[
             (".jit/config.toml", Some(CONFIG)),
@@ -715,7 +746,7 @@ kind = "advisory"
         ]);
         // Selecting the declared projection renders it (stale region → write).
         let in_scope: BTreeSet<String> = ["invariants".to_string()].into_iter().collect();
-        let plan = derive_materializations(
+        let plan = derive_declared(
             &image,
             declarations(&cfg, &g, &r),
             &seed(),
@@ -731,7 +762,7 @@ kind = "advisory"
         // A selection naming only an out-of-scope projection renders nothing, so a
         // sibling projection's target is left untouched.
         let out_of_scope: BTreeSet<String> = ["absent".to_string()].into_iter().collect();
-        let plan2 = derive_materializations(
+        let plan2 = derive_declared(
             &image,
             declarations(&cfg, &g, &r),
             &seed(),
@@ -757,14 +788,38 @@ kind = "advisory"
             rules,
         }
     }
-    fn empty_config_decls() -> crate::declarations::ConfigurationDeclarations {
-        crate::declarations::ConfigurationDeclarations {
-            hierarchy: None,
-            namespaces: HashMap::new(),
-            item_kinds: HashMap::new(),
-            projections: BTreeMap::new(),
-            documentation: None,
-        }
+
+    fn derive_declared(
+        image: &RepositoryImage,
+        declarations: RepositoryDeclarations<'_>,
+        seed: &RepositorySeed,
+        intent: MaterializationIntent,
+    ) -> Result<MaterializationPlan, RepositoryStateError> {
+        let request = match intent {
+            MaterializationIntent::SemanticMutation => {
+                MaterializationRequest::SemanticMutation { declarations, seed }
+            }
+            MaterializationIntent::RenderConfiguredProjections { selected } => {
+                MaterializationRequest::RenderConfiguredProjections {
+                    declarations,
+                    seed,
+                    selected,
+                }
+            }
+            MaterializationIntent::RepairDerivedState => {
+                MaterializationRequest::RepairDerivedState {
+                    declarations,
+                    profiles: Vec::new(),
+                    seed,
+                }
+            }
+            other => panic!("unsupported test materialization intent: {other:?}"),
+        };
+        derive_materialization(image, request)
+    }
+
+    fn config_decls(config: &str) -> crate::declarations::ConfigurationDeclarations {
+        crate::declarations::parse_configuration(config.as_bytes()).unwrap()
     }
 
     fn seed() -> RepositorySeed {
@@ -784,7 +839,7 @@ kind = "advisory"
 
     #[test]
     fn test_derive_project_render_emits_write_for_stale_region() {
-        let cfg = empty_config_decls();
+        let cfg = config_decls(CONFIG);
         let (g, r) = (gates(), rules());
         let decls = declarations(&cfg, &g, &r);
         let image = image(&[
@@ -795,7 +850,7 @@ kind = "advisory"
                 Some(&agents_with_region("invariants", "STALE")),
             ),
         ]);
-        let plan = derive_materializations(
+        let plan = derive_declared(
             &image,
             decls,
             &seed(),
@@ -818,7 +873,7 @@ kind = "advisory"
 
     #[test]
     fn test_derive_project_render_fresh_region_emits_no_action() {
-        let cfg = empty_config_decls();
+        let cfg = config_decls(CONFIG);
         let (g, r) = (gates(), rules());
         let decls = declarations(&cfg, &g, &r);
         // First derive against a stale doc to obtain the exact fresh bytes.
@@ -830,7 +885,7 @@ kind = "advisory"
                 Some(&agents_with_region("invariants", "STALE")),
             ),
         ]);
-        let plan = derive_materializations(
+        let plan = derive_declared(
             &stale,
             declarations(&cfg, &g, &r),
             &seed(),
@@ -847,7 +902,7 @@ kind = "advisory"
             (".jit/invariants.toml", Some(INVARIANTS)),
             ("AGENTS.md", Some(&fresh_text)),
         ]);
-        let plan2 = derive_materializations(
+        let plan2 = derive_declared(
             &fresh,
             decls,
             &seed(),
@@ -875,16 +930,16 @@ kind = "advisory"
                 ("AGENTS.md", Some(&agents)),
             ])
         };
-        let cfg = empty_config_decls();
+        let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
-        let plan_a = derive_materializations(
+        let plan_a = derive_declared(
             &build(),
             declarations(&cfg, &g, &r),
             &seed(),
             MaterializationIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
-        let plan_b = derive_materializations(
+        let plan_b = derive_declared(
             &build(),
             declarations(&cfg, &g, &r),
             &seed(),
@@ -908,7 +963,7 @@ kind = "advisory"
 
     #[test]
     fn test_derive_then_compare_reports_stale_drift() {
-        let cfg = empty_config_decls();
+        let cfg = config_decls(CONFIG);
         let (g, r) = (gates(), rules());
         let stale = image(&[
             (".jit/config.toml", Some(CONFIG)),
@@ -918,7 +973,7 @@ kind = "advisory"
                 Some(&agents_with_region("invariants", "STALE")),
             ),
         ]);
-        let plan = derive_materializations(
+        let plan = derive_declared(
             &stale,
             declarations(&cfg, &g, &r),
             &seed(),
@@ -938,7 +993,7 @@ kind = "advisory"
         // Repair of a region projection splices ONLY the managed region; every
         // authored byte outside the markers is preserved unconditionally (ownership
         // matrix: configured region projection).
-        let cfg = empty_config_decls();
+        let cfg = config_decls(CONFIG);
         let (g, r) = (gates(), rules());
         let authored_prefix =
             "# Hand-authored heading\n\nAuthored intro the tool must never touch.\n\n";
@@ -951,7 +1006,7 @@ kind = "advisory"
             (".jit/invariants.toml", Some(INVARIANTS)),
             ("AGENTS.md", Some(&agents)),
         ]);
-        let plan = derive_materializations(
+        let plan = derive_declared(
             &image,
             declarations(&cfg, &g, &r),
             &seed(),
@@ -1002,9 +1057,9 @@ kind = "advisory"
             files.push((p, Some(c)));
         }
         let img = image(&files);
-        let cfg = empty_config_decls();
+        let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
-        let plan = derive_materializations(
+        let plan = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
             &seed(),
@@ -1046,9 +1101,9 @@ kind = "advisory"
             files.push((p, Some(c)));
         }
         let img = image(&files);
-        let cfg = empty_config_decls();
+        let cfg = config_decls(&config_full);
         let (g, r) = (gates(), rules());
-        let plan = derive_materializations(
+        let plan = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
             &seed(),
@@ -1117,9 +1172,9 @@ kind = "advisory"
             files.push((p, Some(c)));
         }
         let img = image(&files);
-        let cfg = empty_config_decls();
+        let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
-        let plan = derive_materializations(
+        let plan = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
             &seed(),
@@ -1166,9 +1221,9 @@ kind = "advisory"
             files.push((p, Some(c)));
         }
         let img = image(&files);
-        let cfg = empty_config_decls();
+        let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
-        let plan = derive_materializations(
+        let plan = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
             &seed(),
@@ -1225,9 +1280,9 @@ kind = "advisory"
             files.push((p, Some(c)));
         }
         let img = image(&files);
-        let cfg = empty_config_decls();
+        let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
-        let result = derive_materializations(
+        let result = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
             &seed(),
@@ -1272,9 +1327,9 @@ kind = "advisory"
             files.push((p, Some(c)));
         }
         let img = image(&files);
-        let cfg = empty_config_decls();
+        let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
-        let plan = derive_materializations(
+        let plan = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
             &seed(),
@@ -1307,7 +1362,7 @@ kind = "advisory"
         // A region-projection target carrying DUPLICATE begin markers has ambiguous
         // ownership: repair fails before publication rather than serializing a
         // whole-file fallback (ownership matrix: ambiguous ownership is non-repairable).
-        let cfg = empty_config_decls();
+        let cfg = config_decls(CONFIG);
         let (g, r) = (gates(), rules());
         let ambiguous = "# Doc\n\n<!-- jit:invariants:begin -->\nA\n<!-- jit:invariants:begin -->\nB\n<!-- jit:invariants:end -->\n";
         let image = image(&[
@@ -1315,7 +1370,7 @@ kind = "advisory"
             (".jit/invariants.toml", Some(INVARIANTS)),
             ("AGENTS.md", Some(ambiguous)),
         ]);
-        let result = derive_materializations(
+        let result = derive_declared(
             &image,
             declarations(&cfg, &g, &r),
             &seed(),

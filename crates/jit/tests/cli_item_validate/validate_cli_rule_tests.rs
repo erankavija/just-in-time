@@ -31,13 +31,23 @@ fn setup_repo_with_rules(rules_toml: &str) -> TempDir {
         .arg("init")
         .assert()
         .success();
-    fs::write(temp.path().join(".jit").join("rules.toml"), rules_toml).unwrap();
-
     // Register the `req` namespace used by the test rules.
     let config_path = temp.path().join(".jit").join("config.toml");
     let mut config = fs::read_to_string(&config_path).unwrap();
     config.push_str("\n[namespaces.req]\ndescription = \"Requirement id.\"\nunique = false\n");
     fs::write(config_path, config).unwrap();
+    bin()
+        .current_dir(temp.path())
+        .args(["validate", "--fix"])
+        .assert()
+        .success();
+
+    if !rules_toml.is_empty() {
+        let rules_path = temp.path().join(".jit").join("rules.toml");
+        let mut rules = fs::read_to_string(&rules_path).unwrap();
+        rules.push_str(rules_toml);
+        fs::write(rules_path, rules).unwrap();
+    }
     temp
 }
 

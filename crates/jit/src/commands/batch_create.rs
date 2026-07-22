@@ -232,58 +232,98 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        // FULL pre-validation: collect every problem, write nothing on failure.
-        let problems = self.collect_batch_problems(&defs)?;
-        if !problems.is_empty() {
-            return Err(BatchValidationError { problems }.into());
-        }
+        use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
+        use crate::storage::RepositoryStateStoreError;
+        use std::collections::BTreeMap;
 
-        let drafts = defs
-            .iter()
-            .map(|def| {
-                let priority = def
-                    .priority
-                    .as_deref()
-                    .map(Priority::from_str)
-                    .transpose()?
-                    .unwrap_or(Priority::Normal);
-                self.batch_candidate_issue(def, priority)
-            })
-            .collect::<Result<Vec<_>>>()?;
         let positions = defs
             .iter()
             .enumerate()
             .map(|(index, def)| (def.key.as_str(), index))
             .collect::<HashMap<_, _>>();
-        let mut dependencies = Vec::new();
-        for (dependent, def) in defs.iter().enumerate() {
-            dependencies.extend(
-                def.depends_on
-                    .iter()
-                    .map(|dependency| (dependent, positions[dependency.as_str()])),
-            );
+        let layout = self.require_layout()?;
+        let context = MutationContext::production();
+        let created_issue_ids = (0..defs.len())
+            .map(|index| context.identifier_at(index as u64))
+            .collect::<Vec<_>>();
+        let mut issue_paths = created_issue_ids
+            .iter()
+            .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        issue_paths.push(VirtualPath::data("issues")?);
+
+        for _ in 0..8 {
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some(image) =
+                self.capture_proposed_base(session.as_mut(), &BTreeMap::new(), &issue_paths, None)?
+            else {
+                continue;
+            };
+            let declarations = crate::repository_state::declarations_from_image(&image)?;
+            let problems = Self::collect_batch_problems_from_declarations(&defs, &declarations)?;
+            if !problems.is_empty() {
+                return Err(BatchValidationError { problems }.into());
+            }
+            let dependencies =
+                defs.iter()
+                    .enumerate()
+                    .try_fold(Vec::new(), |mut edges, (dependent, def)| {
+                        for dependency in &def.depends_on {
+                            let dependency =
+                                positions.get(dependency.as_str()).copied().ok_or_else(|| {
+                                    anyhow!("validated batch contains an unresolved dependency")
+                                })?;
+                            edges.push((dependent, dependency));
+                        }
+                        Ok::<_, anyhow::Error>(edges)
+                    })?;
+            let drafts = defs
+                .iter()
+                .map(|def| {
+                    let priority = def
+                        .priority
+                        .as_deref()
+                        .map(Priority::from_str)
+                        .transpose()?
+                        .unwrap_or(Priority::Normal);
+                    Ok(Self::batch_candidate_issue(
+                        def,
+                        priority,
+                        declarations.config(),
+                    ))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let intents = [MutationIntent::CreateIssueBatch {
+                drafts,
+                dependencies,
+            }];
+            let plan = finalize(&layout, &image, &context, &intents)?;
+            match session.apply(&plan) {
+                Ok(_) => {
+                    return Ok(BatchCreateOutcome {
+                        key_to_id: defs
+                            .into_iter()
+                            .zip(created_issue_ids)
+                            .map(|(def, id)| (def.key, id))
+                            .collect(),
+                    });
+                }
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
         }
-        let intent = crate::repository_state::MutationIntent::CreateIssueBatch {
-            drafts,
-            dependencies,
-        };
-        let publication = self.publish_repository_mutation(vec![intent])?;
-        Ok(BatchCreateOutcome {
-            key_to_id: defs
-                .into_iter()
-                .zip(publication.created_issue_ids)
-                .map(|(def, id)| (def.key, id))
-                .collect(),
-        })
+        Err(anyhow!(
+            "batch issue creation did not converge after repeated capture conflicts"
+        ))
     }
 
     /// Collect EVERY pre-validation problem for a batch (does not stop at the
     /// first). Returns an empty vec when the whole batch is valid.
     ///
     /// Reads the gate registry and config (type hierarchy) once for the batch.
-    fn collect_batch_problems(
-        &self,
+    fn collect_batch_problems_from_declarations(
         defs: &[BatchIssueDef],
+        declarations: &crate::repository_state::CapturedRepositoryDeclarations,
     ) -> Result<Vec<BatchValidationProblem>> {
         let mut problems = Vec::new();
 
@@ -322,11 +362,18 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // 4-7. Per-entry field validity: priority parse, type, gates, and the
         //       FULL write-time validation against each entry's final issue shape.
-        let known_types = self.batch_known_types()?;
-        let gate_registry = self
-            .storage
-            .load_gate_registry()
-            .context("Failed to load gate registry for batch validation")?;
+        let known_types = declarations
+            .config()
+            .type_hierarchy
+            .as_ref()
+            .map(|hierarchy| {
+                hierarchy
+                    .types
+                    .keys()
+                    .map(String::as_str)
+                    .collect::<HashSet<_>>()
+            });
+        let gate_registry = declarations.gates();
 
         for def in defs {
             // Priority must parse before we can build the candidate issue; a parse
@@ -374,10 +421,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             // namespace-uniqueness like a single `type:*`, every enforcing local
             // rule). This is what catches write-time-only violations BEFORE any
             // publication, so all entry-attributed problems are reported together.
-            // `validate_for_write` does not save; with `force = false` a blocking finding is returned as an
+            // This derivation does not save; a blocking finding is returned as an
             // error whose message we attribute to this entry's key.
-            let candidate = self.batch_candidate_issue(def, priority)?;
-            if let Err(err) = self.validate_for_write(&candidate, false) {
+            let candidate = Self::batch_candidate_issue(def, priority, declarations.config());
+            if let Err(err) =
+                derive_write_validation(&candidate, declarations, declarations.config(), false)
+            {
                 problems.push(BatchValidationProblem::WriteValidation {
                     key: def.key.clone(),
                     message: err.to_string(),
@@ -394,7 +443,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// default `type:<t>` label applied when the entry carries no `type:` label,
     /// the requested priority / gates / labels / content format, and the state
     /// implied by its declared dependencies.
-    fn batch_candidate_issue(&self, def: &BatchIssueDef, priority: Priority) -> Result<Issue> {
+    fn batch_candidate_issue(def: &BatchIssueDef, priority: Priority, config: &JitConfig) -> Issue {
         // Assemble labels as the write path does: the `type` field becomes a
         // `type:<t>` label, followed by the entry's explicit labels.
         let mut labels: Vec<String> = def
@@ -407,8 +456,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Apply the configured default type when no `type:*` label is present
         // (mirrors create_issue's write-time convenience).
-        if let Some(default_type) = self
-            .cached_config()?
+        if let Some(default_type) = config
             .validation
             .as_ref()
             .and_then(|v| v.default_type.as_deref())
@@ -431,18 +479,22 @@ impl<S: IssueStore> CommandExecutor<S> {
         } else {
             State::Backlog
         };
-        Ok(issue)
+        issue
     }
 
-    /// The set of known type names from the project's `[type_hierarchy]`, or
-    /// `None` when no hierarchy is configured (in which case any type is valid,
-    /// matching the write-path `type-hierarchy-known` rule's behavior).
-    fn batch_known_types(&self) -> Result<Option<HashSet<String>>> {
-        let config = self.cached_config()?;
-        Ok(config
-            .type_hierarchy
-            .as_ref()
-            .map(|h| h.types.keys().cloned().collect()))
+    #[cfg(test)]
+    fn collect_batch_problems(&self, defs: &[BatchIssueDef]) -> Result<Vec<BatchValidationProblem>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use std::collections::BTreeMap;
+
+        let mut session = self.storage.open_mutation_session(self.require_layout()?)?;
+        let image = self
+            .capture_proposed_base(session.as_mut(), &BTreeMap::new(), &[], None)?
+            .ok_or_else(|| anyhow!("batch validation capture conflicted"))?;
+        let declarations = crate::repository_state::declarations_from_image(&image)?;
+        Self::collect_batch_problems_from_declarations(defs, &declarations)
     }
 }
 
@@ -597,11 +649,10 @@ mod tests {
     fn test_collect_problems_unknown_type_with_hierarchy() {
         let exec = executor();
         // Configure a type hierarchy so type validity is enforced.
-        std::fs::write(
-            exec.storage().root().join("config.toml"),
+        exec.storage().add_data_file(
+            "config.toml",
             "[type_hierarchy]\ntypes = { epic = 2, task = 4 }\n",
-        )
-        .unwrap();
+        );
         let mut d = def("a", &[]);
         d.r#type = Some("widget".to_string());
         let problems = exec.collect_batch_problems(&[d]).unwrap();
@@ -641,6 +692,21 @@ mod tests {
         assert!(err.downcast_ref::<BatchValidationError>().is_some());
         // Zero issues created.
         assert_eq!(exec.storage().list_issues().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_batch_create_unknown_dependency_returns_typed_error_without_writes() {
+        let exec = executor();
+        let err = exec
+            .batch_create_from_json(vec![def("a", &["ghost"])])
+            .unwrap_err();
+        let validation = err.downcast_ref::<BatchValidationError>().unwrap();
+        assert!(validation.problems.iter().any(|problem| matches!(
+            problem,
+            BatchValidationProblem::UnknownDependency { key, missing }
+                if key == "a" && missing == "ghost"
+        )));
+        assert!(exec.storage().list_issues().unwrap().is_empty());
     }
 
     #[test]

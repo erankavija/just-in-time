@@ -89,6 +89,37 @@ fn test_profiled_init_publishes_valid_repo_and_applied_inventory() {
 }
 
 #[test]
+fn test_validate_plain_and_json_report_installed_profile_drift() {
+    let repo = TempDir::new().unwrap();
+    assert!(
+        jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"])
+            .status
+            .success()
+    );
+    fs::write(
+        repo.path().join(".agents/skills/jit-manage/SKILL.md"),
+        "STALE\n",
+    )
+    .unwrap();
+
+    let plain = jit(repo.path(), &["validate"]);
+    assert!(!plain.status.success(), "{plain:?}");
+    assert!(
+        String::from_utf8_lossy(&plain.stdout).contains("jit-manage/SKILL.md"),
+        "stdout={}",
+        String::from_utf8_lossy(&plain.stdout)
+    );
+
+    let structured = jit(repo.path(), &["validate", "--json"]);
+    assert!(!structured.status.success(), "{structured:?}");
+    let structured = json(&structured);
+    assert_eq!(structured["valid"], false);
+    assert!(structured["integrity_error"]
+        .as_str()
+        .is_some_and(|message| message.contains("jit-manage/SKILL.md")));
+}
+
+#[test]
 fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
     let repo = TempDir::new().unwrap();
     assert!(jit(repo.path(), &["init"]).status.success());

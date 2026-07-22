@@ -232,6 +232,7 @@ impl CapabilityRoots {
 
 struct JsonMutationSession {
     layout: RepositoryLayout,
+    storage: JsonFileStorage,
     recovery_report: RecoveryDispatchReport,
     roots: CapabilityRoots,
     kernel: FileTransactionKernel,
@@ -261,6 +262,24 @@ impl RepositoryStateStore for JsonFileStorage {
         &self,
         layout: RepositoryLayout,
     ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
+        let layout = match self.configured_layout() {
+            Ok(configured)
+                if configured.worktree_root() == layout.worktree_root()
+                    && configured.data_root() == layout.data_root() =>
+            {
+                configured
+            }
+            Ok(configured) => {
+                return Err(RepositoryStateStoreError::RetryableConflict {
+                    path: format!(
+                        "storage is bound to {} and cannot open {}",
+                        configured.worktree_root().display(),
+                        layout.worktree_root().display()
+                    ),
+                })
+            }
+            Err(_) => layout,
+        };
         if lexical_absolute(self.root())? != layout.data_root() {
             return Err(
                 RepositoryLayoutError::OutsideRepositoryRoots(self.root().to_path_buf()).into(),
@@ -308,7 +327,6 @@ impl RepositoryStateStore for JsonFileStorage {
         injector.check(&TransactionFailurePoint::RepositoryRecoveryExternal)?;
         let external_transactions = recover_location(
             &recovery_kernel,
-            &bootstrap_guard,
             TransactionControlLocation::ExternalBootstrap,
         )?;
         drop(recovery_kernel);
@@ -333,11 +351,8 @@ impl RepositoryStateStore for JsonFileStorage {
                 let repository_guard = self.acquire_repo_write_lock_raw()?;
                 let _events_guard = self.acquire_events_write_lock()?;
                 injector.check(&TransactionFailurePoint::RepositoryRecoveryInternal)?;
-                let internal_transactions = recover_location(
-                    &kernel,
-                    &repository_guard,
-                    TransactionControlLocation::InternalRepository,
-                )?;
+                let internal_transactions =
+                    recover_location(&kernel, TransactionControlLocation::InternalRepository)?;
                 // After internal-journal recovery, reclaim worktree-side companions
                 // left orphaned by a crash whose internal transaction is already gone.
                 let swept_companions = kernel.sweep_orphan_companions(&repository_guard)?;
@@ -355,8 +370,10 @@ impl RepositoryStateStore for JsonFileStorage {
             };
         let events_lock = roots.data.as_ref().map(|_| self.events_lock_spec());
 
+        self.configure_repository_layout(&layout);
         Ok(Box::new(JsonMutationSession {
             layout,
+            storage: self.clone(),
             recovery_report: RecoveryDispatchReport {
                 external_transactions,
                 internal_transactions,
@@ -462,10 +479,20 @@ impl RepositoryMutationSession for JsonMutationSession {
             .as_ref()
             .unwrap_or(&self._bootstrap_guard);
         let transaction_id = uuid::Uuid::new_v4().simple().to_string();
+        let published_absent_data_root = self.roots.data.is_none()
+            && delta
+                .actions()
+                .iter()
+                .any(|action| action.path().root_class() == RepositoryRootClass::Data);
         let outcome = self
             .kernel
             .execute_repository_delta(guard, &transaction_id, delta, plan.hash())
             .map_err(|error| map_transaction_error(error, &self.layout))?;
+        if published_absent_data_root {
+            let refreshed =
+                discover_repository_layout(self.layout.worktree_root(), self.layout.data_root())?;
+            self.storage.configure_repository_layout(&refreshed);
+        }
         self.captured = None;
         Ok(RepositoryApplyOutcome {
             transaction_hash: outcome.plan_hash,
@@ -530,6 +557,10 @@ impl RepositoryMutationSession for MemoryMutationSession {
             _plan_hash: plan_hash.clone(),
         });
         let failures = self.storage.repository_state_failures();
+        failures.check(&TransactionFailurePoint::RepositoryBeforeControlCreation)?;
+        failures.check(&TransactionFailurePoint::RepositoryCreateControl)?;
+        failures.check(&TransactionFailurePoint::RepositoryBeforeInitialJournal)?;
+        failures.check(&TransactionFailurePoint::RepositorySyncInitialJournal)?;
         failures.check(&TransactionFailurePoint::RepositoryPrepareIntent)?;
         // Model the kernel's create-companion boundary: an internal transaction
         // (data root already present) publishing a Worktree action creates a
@@ -541,13 +572,32 @@ impl RepositoryMutationSession for MemoryMutationSession {
         if original.data_root_exists && has_worktree_action {
             failures.check(&TransactionFailurePoint::RepositoryCreateCompanion)?;
         }
+        if !original.data_root_exists
+            && delta
+                .actions()
+                .iter()
+                .any(|action| action.path().root_class() == RepositoryRootClass::Data)
+        {
+            failures.check(&TransactionFailurePoint::RepositoryBeforeDataStageJournal)?;
+        }
         // Model the kernel's per-action prepare boundaries. The memory backend
         // stages nothing, but a failure here must still converge to the old state
         // exactly as the JSON kernel's prepared-journal rollback does.
         for index in 0..delta.actions().len() {
             failures.check(&TransactionFailurePoint::RepositoryPrepareAction { action: index })?;
+            failures.check(&TransactionFailurePoint::RepositoryStageAction { action: index })?;
+            failures.check(&TransactionFailurePoint::RepositorySyncStage { action: index })?;
+            if matches!(
+                delta.actions()[index].expected(),
+                ExpectedPreimage::File { .. }
+            ) {
+                failures.check(&TransactionFailurePoint::RepositorySyncBackup { action: index })?;
+            }
             failures
                 .check(&TransactionFailurePoint::RepositorySyncPreparedAction { action: index })?;
+            failures.check(&TransactionFailurePoint::RepositoryBeforePreparedJournal {
+                action: index,
+            })?;
         }
         for (index, action) in delta.actions().iter().enumerate() {
             // Staged Data actions of an absent-root delta have no per-action
@@ -559,12 +609,29 @@ impl RepositoryMutationSession for MemoryMutationSession {
             if !staged_absent_data {
                 failures
                     .check(&TransactionFailurePoint::RepositoryBeforeAction { action: index })?;
+                failures.check(&TransactionFailurePoint::RepositoryBeforeTargetMutation {
+                    action: index,
+                })?;
+                if matches!(action, RepositoryAction::DeleteFile { .. }) {
+                    failures.check(&TransactionFailurePoint::RepositoryBeforeDeleteRename {
+                        action: index,
+                    })?;
+                }
             }
             apply_memory_action(&self.layout, &mut candidate, action)?;
             if let Some(MemoryRecoveryResidue::Prepared { final_state, .. }) = &mut state.recovery {
                 **final_state = candidate.clone();
             }
             if !staged_absent_data {
+                failures.check(&TransactionFailurePoint::RepositorySyncTargetParent {
+                    action: index,
+                })?;
+                failures.check(&TransactionFailurePoint::RepositoryVerifyFinalIdentity {
+                    action: index,
+                })?;
+                failures.check(&TransactionFailurePoint::RepositoryBeforePublishedJournal {
+                    action: index,
+                })?;
                 failures
                     .check(&TransactionFailurePoint::RepositoryAfterAction { action: index })?;
             }
@@ -585,20 +652,34 @@ impl RepositoryMutationSession for MemoryMutationSession {
                 .entries
                 .entry(VirtualPath::data("")?)
                 .or_insert(published_root);
+            // Once the root rename is modeled, prepared recovery converges
+            // forward just like the file kernel's published-root detection.
+            state.entries = candidate.entries.clone();
+            state.data_root_exists = candidate.data_root_exists;
+            state.recovery = Some(MemoryRecoveryResidue::Committed {
+                final_state: Box::new(candidate.clone()),
+                _plan_hash: plan_hash.clone(),
+            });
+            failures.check(&TransactionFailurePoint::RepositoryAfterDataRootPublication)?;
         }
+        failures.check(&TransactionFailurePoint::RepositoryBeforeCommitDecision)?;
         state.entries = candidate.entries.clone();
         state.data_root_exists = candidate.data_root_exists;
         state.recovery = Some(MemoryRecoveryResidue::Committed {
             final_state: Box::new(candidate),
             _plan_hash: plan_hash.clone(),
         });
-        if absent_root {
-            failures.check(&TransactionFailurePoint::RepositoryAfterDataRootPublication)?;
-        }
         failures.check(&TransactionFailurePoint::RepositoryAfterCommit)?;
         // Model the kernel's post-commit cleanup boundary: past the commit point a
         // failure leaves committed residue and converges forward to the new state.
         failures.check(&TransactionFailurePoint::RepositoryCleanup)?;
+        if !absent_root {
+            failures.check(&TransactionFailurePoint::RepositoryBeforeStageCleanup)?;
+        }
+        if original.data_root_exists && has_worktree_action {
+            failures.check(&TransactionFailurePoint::RepositoryBeforeCompanionCleanup)?;
+        }
+        failures.check(&TransactionFailurePoint::RepositoryBeforeControlCleanup)?;
         state.recovery = None;
         self.captured = None;
         Ok(RepositoryApplyOutcome {
@@ -610,14 +691,13 @@ impl RepositoryMutationSession for MemoryMutationSession {
 
 fn recover_location(
     kernel: &FileTransactionKernel,
-    guard: &RepoWriteGuard,
     location: TransactionControlLocation,
 ) -> Result<Vec<String>, RepositoryStateStoreError> {
     let transactions = kernel.pending_repository_transactions(location)?;
-    transactions
+    let recovered = transactions
         .into_iter()
         .filter_map(
-            |id| match kernel.recover_repository_transaction(guard, location, &id) {
+            |id| match kernel.recover_repository_transaction(location, &id) {
                 Ok(RepositoryRecoveryDisposition::Recovered) => Some(Ok(id)),
                 Ok(
                     RepositoryRecoveryDisposition::SkippedCompanion
@@ -626,7 +706,9 @@ fn recover_location(
                 Err(error) => Some(Err(RepositoryStateStoreError::Transaction(error))),
             },
         )
-        .collect()
+        .collect::<Result<Vec<_>, _>>()?;
+    kernel.cleanup_empty_repository_control(location)?;
+    Ok(recovered)
 }
 
 fn map_transaction_error(
@@ -1276,6 +1358,7 @@ pub(crate) fn open_child_dir_nofollow(
     let mut options = OpenOptions::new();
     options.read(true);
     options._cap_fs_ext_follow(FollowSymlinks::No);
+    options._cap_fs_ext_maybe_dir(true);
     let file = parent.open_with(name, &options)?;
     if !file.metadata()?.is_dir() {
         return Err(RepositoryStateStoreError::UnsafeTarget(
@@ -1352,6 +1435,124 @@ pub(crate) fn read_repository_file_nofollow(
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
     Ok(Some(bytes))
+}
+
+/// Read one validated root-relative ordinary file through a confined root handle.
+///
+/// Symlinks may be followed, but capability resolution keeps every traversal
+/// beneath `root`; a raced path cannot redirect the final open outside it.
+pub(crate) fn read_repository_file_confined(
+    root: &Path,
+    relative: &RootRelativePath,
+) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+    if relative.is_root() {
+        return Err(RepositoryStateStoreError::UnsafeTarget(
+            root.display().to_string(),
+        ));
+    }
+    let root_dir = open_absolute_dir_nofollow(root)?;
+    read_confined_relative(root, &root_dir, relative.as_path(), 0)
+}
+
+fn read_confined_relative(
+    root_path: &Path,
+    root: &Dir,
+    relative: &Path,
+    symlink_depth: usize,
+) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+    if symlink_depth >= 40 {
+        return Err(RepositoryStateStoreError::UnsafeTarget(
+            relative.display().to_string(),
+        ));
+    }
+    let components = relative
+        .components()
+        .map(|component| match component {
+            Component::Normal(name) => Ok(name.to_os_string()),
+            _ => Err(RepositoryStateStoreError::UnsafeTarget(
+                relative.display().to_string(),
+            )),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut current = root.try_clone()?;
+    let mut traversed = PathBuf::new();
+    for (index, component) in components.iter().enumerate() {
+        let metadata = match current.symlink_metadata(component) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        if metadata.is_symlink() {
+            let target = current.read_link_contents(component)?;
+            let resolved =
+                resolve_confined_symlink(root_path, &traversed, &target, &components[index + 1..])?;
+            return read_confined_relative(root_path, root, &resolved, symlink_depth + 1);
+        }
+        if index + 1 == components.len() {
+            if !metadata.is_file() {
+                return Err(RepositoryStateStoreError::UnsafeTarget(
+                    relative.display().to_string(),
+                ));
+            }
+            let mut options = OpenOptions::new();
+            options.read(true);
+            options._cap_fs_ext_follow(FollowSymlinks::No);
+            let mut file = current.open_with(component, &options)?;
+            if !file.metadata()?.is_file() {
+                return Err(RepositoryStateStoreError::UnsafeTarget(
+                    relative.display().to_string(),
+                ));
+            }
+            let mut bytes = Vec::new();
+            file.read_to_end(&mut bytes)?;
+            return Ok(Some(bytes));
+        }
+        if !metadata.is_dir() {
+            return Err(RepositoryStateStoreError::UnsafeTarget(
+                relative.display().to_string(),
+            ));
+        }
+        current = open_child_dir_nofollow(&current, component)?;
+        traversed.push(component);
+    }
+    Err(RepositoryStateStoreError::UnsafeTarget(
+        relative.display().to_string(),
+    ))
+}
+
+fn resolve_confined_symlink(
+    root: &Path,
+    parent: &Path,
+    target: &Path,
+    tail: &[std::ffi::OsString],
+) -> Result<PathBuf, RepositoryStateStoreError> {
+    let is_absolute = target.is_absolute();
+    let target = if is_absolute {
+        target
+            .strip_prefix(root)
+            .map_err(|_| RepositoryStateStoreError::UnsafeTarget(target.display().to_string()))?
+    } else {
+        target
+    };
+    let mut resolved = if is_absolute {
+        PathBuf::new()
+    } else {
+        parent.to_path_buf()
+    };
+    for component in target.components() {
+        match component {
+            Component::CurDir => {}
+            Component::Normal(name) => resolved.push(name),
+            Component::ParentDir if resolved.pop() => {}
+            _ => {
+                return Err(RepositoryStateStoreError::UnsafeTarget(
+                    target.display().to_string(),
+                ))
+            }
+        }
+    }
+    resolved.extend(tail);
+    Ok(resolved)
 }
 
 fn ensure_capability_identity(
@@ -1743,6 +1944,10 @@ mod tests {
         fn one(point: TransactionFailurePoint) -> Arc<Self> {
             Arc::new(Self(Mutex::new(HashSet::from([point]))))
         }
+
+        fn is_consumed(&self) -> bool {
+            self.0.lock().unwrap().is_empty()
+        }
     }
 
     impl crate::storage::TransactionFailureInjector for SelectedFailures {
@@ -1751,6 +1956,43 @@ mod tests {
             // instance (whose state lives with the storage, not on disk) proceeds
             // with a clean boundary instead of re-tripping the injected point.
             if self.0.lock().unwrap().remove(point) {
+                Err(std::io::Error::other(format!("injected {point:?}")))
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    struct HookAt {
+        point: TransactionFailurePoint,
+        hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+    }
+
+    impl crate::storage::TransactionFailureInjector for HookAt {
+        fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
+            if point == &self.point {
+                if let Some(hook) = self.hook.lock().unwrap().take() {
+                    hook();
+                }
+            }
+            Ok(())
+        }
+    }
+
+    struct HookThenFail {
+        hook_point: TransactionFailurePoint,
+        failure_point: TransactionFailurePoint,
+        hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+    }
+
+    impl crate::storage::TransactionFailureInjector for HookThenFail {
+        fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
+            if point == &self.hook_point {
+                if let Some(hook) = self.hook.lock().unwrap().take() {
+                    hook();
+                }
+            }
+            if point == &self.failure_point {
                 Err(std::io::Error::other(format!("injected {point:?}")))
             } else {
                 Ok(())
@@ -1965,6 +2207,150 @@ mod tests {
     }
 
     #[test]
+    fn test_session_reclaims_empty_external_and_internal_control_roots() {
+        let markerless = TempDir::new().unwrap();
+        let markerless_data = markerless.path().join(".jit");
+        std::fs::create_dir(markerless.path().join(".jit-bootstrap")).unwrap();
+        let layout = discover_repository_layout(markerless.path(), &markerless_data).unwrap();
+        drop(
+            JsonFileStorage::new(&markerless_data)
+                .open_mutation_session(layout)
+                .unwrap(),
+        );
+        assert!(!markerless.path().join(".jit-bootstrap").exists());
+
+        let external = TempDir::new().unwrap();
+        let external_data = external.path().join(".jit");
+        std::fs::create_dir_all(external.path().join(".jit-bootstrap/transactions")).unwrap();
+        std::fs::write(
+            external
+                .path()
+                .join(".jit-bootstrap/transaction-protocol-v1"),
+            b"1\n",
+        )
+        .unwrap();
+        let layout = discover_repository_layout(external.path(), &external_data).unwrap();
+        drop(
+            JsonFileStorage::new(&external_data)
+                .open_mutation_session(layout)
+                .unwrap(),
+        );
+        assert!(!external.path().join(".jit-bootstrap").exists());
+
+        let internal = TempDir::new().unwrap();
+        let internal_data = internal.path().join(".jit");
+        std::fs::create_dir_all(internal_data.join("tmp/transactions")).unwrap();
+        let layout = discover_repository_layout(internal.path(), &internal_data).unwrap();
+        drop(
+            JsonFileStorage::new(&internal_data)
+                .open_mutation_session(layout)
+                .unwrap(),
+        );
+        assert!(!internal_data.join("tmp").exists());
+    }
+
+    #[test]
+    fn test_backup_sync_interruption_recovers_original_file() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        std::fs::write(data.join("replace.txt"), b"original").unwrap();
+        let layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(
+            &data,
+            SelectedFailures::one(TransactionFailurePoint::RepositorySyncBackup { action: 0 }),
+        );
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let path = VirtualPath::data("replace.txt").unwrap();
+        let spec = CaptureSpec::phase_one([path.clone()], budget()).unwrap();
+        let image = session.capture(spec).unwrap();
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![RepositoryAction::write_file(
+                path,
+                "replace",
+                ExpectedPreimage::of(
+                    image
+                        .entry(&VirtualPath::data("replace.txt").unwrap())
+                        .unwrap(),
+                ),
+                b"replacement".to_vec(),
+                FileMode::Regular,
+            )],
+        )
+        .unwrap();
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
+        drop(session);
+
+        drop(
+            JsonFileStorage::new(&data)
+                .open_mutation_session(layout)
+                .unwrap(),
+        );
+        assert_eq!(
+            std::fs::read(data.join("replace.txt")).unwrap(),
+            b"original"
+        );
+        assert!(!data.join("tmp/transactions").exists());
+    }
+
+    #[test]
+    fn test_rollback_journal_sync_interruption_remains_recoverable() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let raced = data.join("a.txt");
+        let hook_raced = raced.clone();
+        let injector = Arc::new(HookThenFail {
+            hook_point: TransactionFailurePoint::RepositoryBeforeTargetMutation { action: 0 },
+            failure_point: TransactionFailurePoint::RepositorySyncRollbackJournal { action: 1 },
+            hook: Mutex::new(Some(Box::new(move || {
+                std::fs::write(&hook_raced, b"bystander").unwrap();
+            }))),
+        });
+        let layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let paths = [
+            VirtualPath::data("a.txt").unwrap(),
+            VirtualPath::data("b.txt").unwrap(),
+        ];
+        let spec = CaptureSpec::phase_one(paths.clone(), budget()).unwrap();
+        let image = session.capture(spec).unwrap();
+        let delta = RepositoryDelta::new(
+            &layout,
+            paths
+                .into_iter()
+                .map(|path| {
+                    RepositoryAction::write_file(
+                        path,
+                        "rollback",
+                        ExpectedPreimage::Absent,
+                        b"planned".to_vec(),
+                        FileMode::Regular,
+                    )
+                })
+                .collect(),
+        )
+        .unwrap();
+
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
+        drop(session);
+        assert!(data.join("tmp/transactions").exists());
+        assert_eq!(std::fs::read(&raced).unwrap(), b"bystander");
+
+        std::fs::remove_file(&raced).unwrap();
+        drop(
+            JsonFileStorage::new(&data)
+                .open_mutation_session(layout)
+                .unwrap(),
+        );
+        assert!(!data.join("a.txt").exists());
+        assert!(!data.join("b.txt").exists());
+        assert!(!data.join("tmp/transactions").exists());
+    }
+
+    #[test]
     fn test_delete_recovery_refuses_post_crash_occupant() {
         let temp = TempDir::new().unwrap();
         let data = temp.path().join(".jit");
@@ -1998,6 +2384,166 @@ mod tests {
         let recovery = clean_storage.open_mutation_session(layout);
         assert!(recovery.is_err());
         assert_eq!(std::fs::read(data.join("victim")).unwrap(), b"new occupant");
+    }
+
+    #[test]
+    fn test_delete_restores_occupant_raced_in_before_atomic_rename() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let victim = data.join("victim");
+        let moved = data.join("victim-original");
+        std::fs::write(&victim, b"old").unwrap();
+        let hook_victim = victim.clone();
+        let hook_moved = moved.clone();
+        let injector = Arc::new(HookAt {
+            point: TransactionFailurePoint::RepositoryBeforeDeleteRename { action: 0 },
+            hook: Mutex::new(Some(Box::new(move || {
+                std::fs::rename(&hook_victim, &hook_moved).unwrap();
+                std::fs::write(&hook_victim, b"new occupant").unwrap();
+            }))),
+        });
+        let layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let spec =
+            CaptureSpec::phase_one([VirtualPath::data("victim").unwrap()], budget()).unwrap();
+        let image = session.capture(spec).unwrap();
+        let expected =
+            ExpectedPreimage::of(image.entry(&VirtualPath::data("victim").unwrap()).unwrap());
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![RepositoryAction::delete_file(
+                VirtualPath::data("victim").unwrap(),
+                "delete",
+                expected,
+            )],
+        )
+        .unwrap();
+
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
+        assert_eq!(std::fs::read(&victim).unwrap(), b"new occupant");
+        assert_eq!(std::fs::read(&moved).unwrap(), b"old");
+    }
+
+    #[test]
+    fn test_write_replacement_restores_occupant_raced_in_before_atomic_rename() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let target = data.join("target");
+        let original = data.join("target-original");
+        std::fs::write(&target, b"old").unwrap();
+        let hook_target = target.clone();
+        let hook_original = original.clone();
+        let injector = Arc::new(HookAt {
+            point: TransactionFailurePoint::RepositoryBeforeTargetMutation { action: 0 },
+            hook: Mutex::new(Some(Box::new(move || {
+                std::fs::rename(&hook_target, &hook_original).unwrap();
+                std::fs::write(&hook_target, b"bystander").unwrap();
+            }))),
+        });
+        let layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let path = VirtualPath::data("target").unwrap();
+        let image = session
+            .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+            .unwrap();
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![RepositoryAction::write_file(
+                path.clone(),
+                "replace",
+                ExpectedPreimage::of(image.entry(&path).unwrap()),
+                b"planned".to_vec(),
+                FileMode::Regular,
+            )],
+        )
+        .unwrap();
+
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
+        assert_eq!(std::fs::read(target).unwrap(), b"bystander");
+        assert_eq!(std::fs::read(original).unwrap(), b"old");
+    }
+
+    #[test]
+    fn test_missing_data_stage_identity_fails_closed_during_recovery() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        let layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(
+            &data,
+            SelectedFailures::one(TransactionFailurePoint::RepositoryBeforeDataStageJournal),
+        );
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let path = VirtualPath::data("index.json").unwrap();
+        let image = session
+            .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+            .unwrap();
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![RepositoryAction::write_file(
+                path,
+                "initialize",
+                ExpectedPreimage::Absent,
+                b"{}".to_vec(),
+                FileMode::Regular,
+            )],
+        )
+        .unwrap();
+
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
+        drop(session);
+        assert!(JsonFileStorage::new(&data)
+            .open_mutation_session(layout)
+            .is_err());
+        assert!(!data.exists());
+        assert!(temp
+            .path()
+            .read_dir()
+            .unwrap()
+            .filter_map(Result::ok)
+            .any(|entry| entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with("jit-stage-")));
+    }
+
+    #[test]
+    fn test_same_storage_reuses_its_own_absent_root_publication_evidence() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        let stale_layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::new(&data);
+        storage.configure_repository_layout(&stale_layout);
+        let path = VirtualPath::data("index.json").unwrap();
+        let mut first = storage.open_mutation_session(stale_layout.clone()).unwrap();
+        let image = first
+            .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+            .unwrap();
+        let delta = RepositoryDelta::new(
+            &stale_layout,
+            vec![RepositoryAction::write_file(
+                path.clone(),
+                "initialize",
+                ExpectedPreimage::Absent,
+                b"{}".to_vec(),
+                FileMode::Regular,
+            )],
+        )
+        .unwrap();
+        first.apply(&test_plan(&image, &delta)).unwrap();
+        drop(first);
+
+        let mut second = storage.open_mutation_session(stale_layout).unwrap();
+        let refreshed = second
+            .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+            .unwrap();
+        assert!(matches!(
+            refreshed.entry(&path),
+            Ok(RepositoryEntry::File { bytes, .. }) if bytes == b"{}"
+        ));
     }
 
     #[test]
@@ -2150,6 +2696,124 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_canonical_set_mode_leaf_symlink_swap_cannot_mutate_external_target() {
+        use std::os::unix::fs::{symlink, PermissionsExt as _};
+
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let target = data.join("mode.txt");
+        let moved = data.join("mode-original.txt");
+        std::fs::write(&target, b"inside").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let outside = TempDir::new().unwrap();
+        let outside_target = outside.path().join("outside.txt");
+        std::fs::write(&outside_target, b"outside").unwrap();
+        std::fs::set_permissions(&outside_target, std::fs::Permissions::from_mode(0o640)).unwrap();
+
+        let hook_target = target.clone();
+        let hook_moved = moved.clone();
+        let hook_outside = outside_target.clone();
+        let injector = Arc::new(HookAt {
+            point: TransactionFailurePoint::RepositoryBeforeTargetMutation { action: 0 },
+            hook: Mutex::new(Some(Box::new(move || {
+                std::fs::rename(&hook_target, &hook_moved).unwrap();
+                symlink(&hook_outside, &hook_target).unwrap();
+            }))),
+        });
+        let layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let spec =
+            CaptureSpec::phase_one([VirtualPath::data("mode.txt").unwrap()], budget()).unwrap();
+        let image = session.capture(spec).unwrap();
+        let expected = ExpectedPreimage::of(
+            image
+                .entry(&VirtualPath::data("mode.txt").unwrap())
+                .unwrap(),
+        );
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![RepositoryAction::set_mode(
+                VirtualPath::data("mode.txt").unwrap(),
+                "mode",
+                expected,
+                FileMode::Executable,
+            )],
+        )
+        .unwrap();
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
+        assert_eq!(
+            std::fs::metadata(&outside_target)
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o640
+        );
+        assert_eq!(
+            std::fs::metadata(&moved).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_canonical_set_mode_revalidates_identity_on_mutated_handle() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let target = data.join("mode.txt");
+        let moved = data.join("mode-original.txt");
+        std::fs::write(&target, b"inside").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let hook_target = target.clone();
+        let hook_moved = moved.clone();
+        let injector = Arc::new(HookAt {
+            point: TransactionFailurePoint::RepositoryBeforeTargetMutation { action: 0 },
+            hook: Mutex::new(Some(Box::new(move || {
+                std::fs::rename(&hook_target, &hook_moved).unwrap();
+                std::fs::write(&hook_target, b"unexpected").unwrap();
+                std::fs::set_permissions(&hook_target, std::fs::Permissions::from_mode(0o640))
+                    .unwrap();
+            }))),
+        });
+        let layout = discover_repository_layout(temp.path(), &data).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
+        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+        let spec =
+            CaptureSpec::phase_one([VirtualPath::data("mode.txt").unwrap()], budget()).unwrap();
+        let image = session.capture(spec).unwrap();
+        let expected = ExpectedPreimage::of(
+            image
+                .entry(&VirtualPath::data("mode.txt").unwrap())
+                .unwrap(),
+        );
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![RepositoryAction::set_mode(
+                VirtualPath::data("mode.txt").unwrap(),
+                "mode",
+                expected,
+                FileMode::Executable,
+            )],
+        )
+        .unwrap();
+        assert!(session.apply(&test_plan(&image, &delta)).is_err());
+        assert_eq!(
+            std::fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o640
+        );
+        assert_eq!(
+            std::fs::metadata(&moved).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
     }
 
     // --- Cross-backend conformance matrix ------------------------------------
@@ -2881,23 +3545,38 @@ mod tests {
         }
     }
 
-    /// Every repository failure point the kernel injects, so the conformance
-    /// matrix proves both backends fire — and converge at — identical boundaries.
+    /// Failure points reached by the shared absent-preimage conformance scenarios.
+    /// Backup and rollback-journal sync have dedicated existing-file/race tests.
     fn all_repository_failure_points() -> Vec<TransactionFailurePoint> {
         use TransactionFailurePoint::*;
         vec![
             RepositoryRecoveryExternal,
             RepositoryRecoveryInternal,
+            RepositoryBeforeControlCreation,
+            RepositoryCreateControl,
+            RepositoryBeforeInitialJournal,
+            RepositorySyncInitialJournal,
             RepositoryPrepareIntent,
             RepositoryCreateCompanion,
             RepositoryPrepareAction { action: 0 },
+            RepositoryStageAction { action: 0 },
+            RepositorySyncStage { action: 0 },
             RepositorySyncPreparedAction { action: 0 },
+            RepositoryBeforePreparedJournal { action: 0 },
             RepositoryBeforeAction { action: 0 },
+            RepositoryBeforeTargetMutation { action: 0 },
+            RepositorySyncTargetParent { action: 0 },
+            RepositoryVerifyFinalIdentity { action: 0 },
+            RepositoryBeforePublishedJournal { action: 0 },
             RepositoryAfterAction { action: 0 },
             RepositoryBeforeDataRootPublication,
             RepositoryAfterDataRootPublication,
+            RepositoryBeforeCommitDecision,
             RepositoryAfterCommit,
             RepositoryCleanup,
+            RepositoryBeforeStageCleanup,
+            RepositoryBeforeCompanionCleanup,
+            RepositoryBeforeControlCleanup,
             RepositorySweepCompanions,
         ]
     }
@@ -3017,10 +3696,8 @@ mod tests {
             .unwrap(),
         };
 
-        let json = JsonFileStorage::with_repository_state_failures(
-            &data,
-            SelectedFailures::one(point.clone()),
-        );
+        let json_failures = SelectedFailures::one(point.clone());
+        let json = JsonFileStorage::with_repository_state_failures(&data, json_failures.clone());
         let json_outcome = drive_edge(&json, &layout, make_spec(), &delta);
         let json_post = {
             let recovered = JsonFileStorage::new(&data);
@@ -3030,8 +3707,8 @@ mod tests {
             semantic_view(&session.capture(make_spec()).unwrap())
         };
 
-        let memory =
-            InMemoryStorage::with_repository_state_failures(SelectedFailures::one(point.clone()));
+        let memory_failures = SelectedFailures::one(point.clone());
+        let memory = InMemoryStorage::with_repository_state_failures(memory_failures.clone());
         if matches!(scenario, EdgeScenario::ExistingMixed) {
             seed_memory_existing(&memory, &[]);
         }
@@ -3056,6 +3733,89 @@ mod tests {
             json_post, memory_post,
             "convergence parity at {point:?} {scenario:?}"
         );
+        if json_outcome != EdgeOutcome::Applied {
+            assert!(
+                json_failures.is_consumed(),
+                "JSON failure point did not fire at {point:?} {scenario:?}"
+            );
+            assert!(
+                memory_failures.is_consumed(),
+                "memory failure point did not fire at {point:?} {scenario:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_recovery_decision_failure_points_are_consumed_and_recoverable() {
+        for point in [
+            TransactionFailurePoint::RepositoryBeforeReverseAction { action: 0 },
+            TransactionFailurePoint::RepositoryBeforeRollbackDecision,
+        ] {
+            let worktree = TempDir::new().unwrap();
+            let data = worktree.path().join(".jit");
+            std::fs::create_dir(&data).unwrap();
+            let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+            let first = VirtualPath::data("first.txt").unwrap();
+            let second = VirtualPath::data("second.txt").unwrap();
+
+            let interruption =
+                SelectedFailures::one(TransactionFailurePoint::RepositoryBeforeAction {
+                    action: 1,
+                });
+            let interrupted =
+                JsonFileStorage::with_repository_state_failures(&data, interruption.clone());
+            let mut session = interrupted.open_mutation_session(layout.clone()).unwrap();
+            let image = session
+                .capture(CaptureSpec::phase_one([first.clone(), second.clone()], budget()).unwrap())
+                .unwrap();
+            let delta = RepositoryDelta::new(
+                &layout,
+                vec![
+                    RepositoryAction::write_file(
+                        first,
+                        "recovery-decision",
+                        ExpectedPreimage::Absent,
+                        b"first".to_vec(),
+                        FileMode::Regular,
+                    ),
+                    RepositoryAction::write_file(
+                        second,
+                        "recovery-decision",
+                        ExpectedPreimage::Absent,
+                        b"second".to_vec(),
+                        FileMode::Regular,
+                    ),
+                ],
+            )
+            .unwrap();
+            let apply_error = session.apply(&test_plan(&image, &delta)).unwrap_err();
+            assert!(
+                interruption.is_consumed(),
+                "unexpected apply error: {apply_error:#}"
+            );
+            drop(session);
+
+            let failures = SelectedFailures::one(point.clone());
+            assert!(
+                JsonFileStorage::with_repository_state_failures(&data, failures.clone())
+                    .open_mutation_session(layout.clone())
+                    .is_err(),
+                "recovery unexpectedly succeeded at {point:?}"
+            );
+            assert!(
+                failures.is_consumed(),
+                "failure point did not fire: {point:?}"
+            );
+
+            drop(
+                JsonFileStorage::new(&data)
+                    .open_mutation_session(layout.clone())
+                    .unwrap_or_else(|error| panic!("recovery failed at {point:?}: {error:#}")),
+            );
+            assert!(!data.join("first.txt").exists());
+            assert!(!data.join("second.txt").exists());
+            assert!(!data.join("tmp/transactions").exists());
+        }
     }
 
     // --- Finding 2: cross-filesystem per-root staging (worktree companion) ----

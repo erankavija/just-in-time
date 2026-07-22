@@ -43,9 +43,8 @@ pub use image::{
 };
 pub(crate) use index::{RepositoryIndex, RepositoryIndexError, SUPPORTED_INDEX_SCHEMA_VERSION};
 pub use initialize::{
-    finalize_initialization, finalize_profile_application, render_repo_config, GitattributesClaim,
-    GitattributesStatus, InitializationError, InitializationScaffold, ProfileContribution,
-    ProfileTargetContribution,
+    render_repo_config, GitattributesClaim, GitattributesStatus, InitializationError,
+    InitializationScaffold,
 };
 pub use managed_document::{
     compose_managed_documents, render_managed_document, ManagedDocumentClaim, ManagedDocumentError,
@@ -115,12 +114,16 @@ pub use path::{
     InjectivityProof, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
-pub use profile_apply::{derive_profile_materializations, ProfileClaims};
-pub use projection::{
-    compose_projection, render_id_anchor_rows, render_invariants_markdown, require_target,
-    splice_region, ProjectionError,
+pub(crate) use profile_apply::profile_capture_closure;
+pub use profile_apply::{
+    AppliedProfileRecord, CompleteProjectionConfig, Contribution, KeyedArrayTarget, MapEntryTarget,
+    ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileRegionClaim,
+    ProfileTargetConflictError, SetStringTarget,
 };
-pub use projection_render::{render_projection_body, ProjectionInputs};
+pub use projection::{
+    render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,
+};
+pub(crate) use projection_render::{render_projection_body, ProjectionInputs};
 pub use rule_serialize::{
     render_rule_block, rules_file_header, serialize_ruleset, SchemaFile, SerializedRuleSet,
 };
@@ -140,6 +143,145 @@ pub struct RepositoryDeclarations<'a> {
     pub rules: &'a RuleSet,
 }
 
+/// One owned parse of every captured declaration consumed by materialization or
+/// validation.
+pub(crate) struct CapturedRepositoryDeclarations {
+    pub(crate) configuration: ConfigurationDeclarations,
+    pub(crate) config: crate::config::JitConfig,
+    pub(crate) gates: GateRegistry,
+    pub(crate) rules: RuleSet,
+    rules_load_error: Option<anyhow::Error>,
+}
+
+impl CapturedRepositoryDeclarations {
+    pub(crate) fn from_parts(
+        configuration: ConfigurationDeclarations,
+        config: crate::config::JitConfig,
+        gates: GateRegistry,
+        rules: RuleSet,
+    ) -> Self {
+        Self {
+            configuration,
+            config,
+            gates,
+            rules,
+            rules_load_error: None,
+        }
+    }
+
+    pub(crate) fn borrowed(&self) -> RepositoryDeclarations<'_> {
+        RepositoryDeclarations {
+            configuration: &self.configuration,
+            gates: &self.gates,
+            rules: &self.rules,
+        }
+    }
+
+    pub(crate) fn config(&self) -> &crate::config::JitConfig {
+        &self.config
+    }
+
+    pub(crate) fn rules(&self) -> &RuleSet {
+        &self.rules
+    }
+
+    pub(crate) fn gates(&self) -> &GateRegistry {
+        &self.gates
+    }
+
+    pub(crate) fn rules_loaded(&self) -> bool {
+        self.rules_load_error.is_none()
+    }
+
+    pub(crate) fn rules_load_error(&self) -> Option<&anyhow::Error> {
+        self.rules_load_error.as_ref()
+    }
+
+    pub(crate) fn take_rules_load_error(&mut self) -> Option<anyhow::Error> {
+        self.rules_load_error.take()
+    }
+}
+
+/// Parse one captured image into the canonical declaration bundle exactly once.
+pub(crate) fn declarations_from_image(
+    image: &RepositoryImage,
+) -> anyhow::Result<CapturedRepositoryDeclarations> {
+    let mut declarations = validation_declarations_from_image(image)?;
+    match declarations.take_rules_load_error() {
+        Some(error) => Err(error),
+        None => Ok(declarations),
+    }
+}
+
+/// Parse captured declarations for validation while preserving an unloadable
+/// rules source as reportable state. Configuration, gates, templates, and
+/// invariants remain strict; only rules use the empty-set sentinel because
+/// validation must still report bindings into an unloadable rule source.
+pub(crate) fn validation_declarations_from_image(
+    image: &RepositoryImage,
+) -> anyhow::Result<CapturedRepositoryDeclarations> {
+    let config_bytes = image
+        .file_bytes(&VirtualPath::data("config.toml")?)?
+        .ok_or_else(|| anyhow::anyhow!("captured image has no .jit/config.toml"))?;
+    let configuration = crate::declarations::parse_configuration(config_bytes)?;
+    let mut config = materialize::assemble_config_from_declarations(image, &configuration)?;
+    let hierarchy_types = config
+        .type_hierarchy
+        .as_ref()
+        .map(|hierarchy| {
+            hierarchy
+                .types
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    config.templates = match image.file_bytes(&VirtualPath::data("templates.toml")?) {
+        Ok(Some(bytes)) => crate::templates::TemplateRegistry::from_toml_str(
+            std::str::from_utf8(bytes)?,
+            &hierarchy_types,
+        )?,
+        Ok(None) | Err(CaptureError::UndiscoveredRepositoryPath(_)) => {
+            crate::templates::TemplateRegistry::empty()
+        }
+        Err(error) => return Err(error.into()),
+    };
+    let namespaces = crate::config_manager::namespaces_from_config(&config);
+    let gates = match image.file_bytes(&VirtualPath::data("gates.toml")?)? {
+        Some(bytes) => crate::declarations::parse_gate_registry(bytes)?,
+        None => GateRegistry::default(),
+    };
+    let rules = match image.file_bytes(&VirtualPath::data("rules.toml")?)? {
+        Some(bytes) => (|| -> anyhow::Result<RuleSet> {
+            let content = std::str::from_utf8(bytes)?;
+            let schemas = RuleSet::schema_requests(content)?
+                .into_iter()
+                .map(|request| -> anyhow::Result<_> {
+                    let path = VirtualPath::data(&request.reference)?;
+                    let bytes = image.file_bytes(&path)?.ok_or_else(|| {
+                        anyhow::anyhow!("captured image has no {}", request.reference)
+                    })?;
+                    Ok((request.reference, bytes.to_vec()))
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            let parsed = RuleSet::parse(content, Some(&config), schemas)?;
+            Ok(reconcile_default_rules_with_config(parsed, &namespaces))
+        })(),
+        None => Ok(default_ruleset(&namespaces)),
+    };
+    let (rules, rules_load_error) = match rules {
+        Ok(rules) => (rules, None),
+        Err(error) => (RuleSet { rules: Vec::new() }, Some(error)),
+    };
+    Ok(CapturedRepositoryDeclarations {
+        configuration,
+        config,
+        gates,
+        rules,
+        rules_load_error,
+    })
+}
+
 /// Complete deterministic pure materialization result.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaterializationPlan {
@@ -149,6 +291,23 @@ pub struct MaterializationPlan {
     delta: RepositoryDelta,
     /// Semantic hash covering the complete image and inputs.
     hash: String,
+    /// Per-projection row counts produced by a configured-projection render.
+    projection_counts: std::collections::BTreeMap<String, usize>,
+    profile_targets: Vec<ProfileTargetMaterialization>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ProfileTargetDisposition {
+    Unchanged,
+    Create,
+    Update,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ProfileTargetMaterialization {
+    pub(crate) path: VirtualPath,
+    pub(crate) disposition: ProfileTargetDisposition,
+    pub(crate) mode: FileMode,
 }
 
 impl MaterializationPlan {
@@ -167,6 +326,15 @@ impl MaterializationPlan {
         &self.hash
     }
 
+    /// Return the count produced for one configured projection in this plan.
+    pub(crate) fn projection_count(&self, name: &str) -> Option<usize> {
+        self.projection_counts.get(name).copied()
+    }
+
+    pub(crate) fn profile_targets(&self) -> &[ProfileTargetMaterialization] {
+        &self.profile_targets
+    }
+
     /// Close a delta into a plan whose identity is computed from all plan inputs.
     pub(crate) fn new(
         image: &RepositoryImage,
@@ -179,46 +347,128 @@ impl MaterializationPlan {
             image: image.clone(),
             delta,
             hash,
+            projection_counts: std::collections::BTreeMap::new(),
+            profile_targets: Vec::new(),
         })
+    }
+
+    fn with_projection_counts(mut self, counts: std::collections::BTreeMap<String, usize>) -> Self {
+        self.projection_counts = counts;
+        self
+    }
+
+    fn with_profile_targets(mut self, targets: Vec<ProfileTargetMaterialization>) -> Self {
+        self.profile_targets = targets;
+        self
     }
 }
 
-/// Invoke the constrained closed producer graph for one intent.
+/// Typed payload for one invocation of the closed materialization planner.
 ///
-/// The foundation currently has no declaration-derived file producer until the
-/// materializer package supplies those functions. The direct intent match is
-/// deliberately closed: callers cannot register callbacks or choose individual
-/// producer families. Adding a family requires extending this function.
-pub fn derive_materializations(
+/// Initialization and profile application carry semantic inputs that do not yet
+/// exist as declarations in the captured image. Keeping those inputs in variants
+/// of this request lets every consumer enter one planner without an untyped bag or
+/// a second plan vocabulary.
+pub enum MaterializationRequest<'a> {
+    /// Rebuild all declaration-owned state after a semantic mutation.
+    SemanticMutation {
+        /// Parsed declarations captured from the image.
+        declarations: RepositoryDeclarations<'a>,
+        /// Closed semantic seed for this operation.
+        seed: &'a RepositorySeed,
+    },
+    /// Render the selected configured projections (`None` selects all).
+    RenderConfiguredProjections {
+        /// Parsed declarations captured from the image.
+        declarations: RepositoryDeclarations<'a>,
+        /// Closed semantic seed for this operation.
+        seed: &'a RepositorySeed,
+        /// Declaration-scoped projection names.
+        selected: Option<std::collections::BTreeSet<String>>,
+    },
+    /// Repair all declaration-owned derived state.
+    RepairDerivedState {
+        /// Parsed declarations captured from the image.
+        declarations: RepositoryDeclarations<'a>,
+        /// Neutral claims for every installed profile whose exact embedded package
+        /// identity was proven from repository provenance.
+        profiles: Vec<ProfileClaims>,
+        /// Closed semantic seed for this operation.
+        seed: &'a RepositorySeed,
+    },
+    /// Derive a fresh or missing-file repository scaffold.
+    Initialize {
+        /// Fully rendered semantic scaffold contribution.
+        scaffold: &'a InitializationScaffold,
+        /// Stable mutation identity and time authority.
+        context: &'a MutationContext,
+    },
+    /// Derive one embedded profile application over an existing repository.
+    ApplyProfile {
+        /// Parsed package metadata and neutral canonical claims.
+        profile: ProfileApplicationInput,
+        /// Stable mutation identity and time authority.
+        context: &'a MutationContext,
+    },
+}
+
+/// Invoke the constrained closed producer graph for one typed request.
+///
+/// The direct request match is deliberately closed: callers cannot register
+/// callbacks or choose individual producer families. Adding a family requires
+/// extending this function.
+pub fn derive_materialization(
     image: &RepositoryImage,
-    declarations: RepositoryDeclarations<'_>,
-    seed: &RepositorySeed,
-    intent: MaterializationIntent,
+    request: MaterializationRequest<'_>,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
-    let delta = match &intent {
-        MaterializationIntent::SemanticMutation => derive_semantic_mutation(image, &declarations)?,
-        MaterializationIntent::RenderConfiguredProjections { selected } => {
-            derive_project_render(image, &declarations, selected.as_ref())?
+    let (delta, projection_counts, seed, intent) = match request {
+        MaterializationRequest::SemanticMutation { declarations, seed } => {
+            let delta = derive_semantic_mutation(image, &declarations)?;
+            (
+                delta,
+                Default::default(),
+                seed,
+                MaterializationIntent::SemanticMutation,
+            )
         }
-        MaterializationIntent::RepairDerivedState => derive_repair(image, &declarations)?,
-        MaterializationIntent::InitializeRepository | MaterializationIntent::ApplyProfile => {
-            // Init and profile application do not derive their bytes from
-            // declarations already present in the image (init CREATES those
-            // declarations); they are finalized by the dedicated
-            // `finalize_initialization`/`finalize_profile_application` entries.
-            return Err(RepositoryStateError::Producer(
-                "initialize/apply-profile intents are finalized by their dedicated entries, \
-                 not the declaration-derived producer graph"
-                    .to_string(),
-            ));
+        MaterializationRequest::RenderConfiguredProjections {
+            declarations,
+            seed,
+            selected,
+        } => {
+            let (delta, counts) = derive_project_render(image, &declarations, selected.as_ref())?;
+            (
+                delta,
+                counts,
+                seed,
+                MaterializationIntent::RenderConfiguredProjections { selected },
+            )
         }
-        MaterializationIntent::RepositoryExport => {
-            return Err(RepositoryStateError::Producer(
-                "repository exports are finalized by finalize_repository_export".to_string(),
-            ));
+        MaterializationRequest::RepairDerivedState {
+            declarations,
+            profiles,
+            seed,
+        } => {
+            let delta = derive_repair(image, &declarations, profiles)?;
+            (
+                delta,
+                Default::default(),
+                seed,
+                MaterializationIntent::RepairDerivedState,
+            )
+        }
+        MaterializationRequest::Initialize { scaffold, context } => {
+            return initialize::derive_initialization_plan(image, scaffold, context)
+                .map_err(Into::into);
+        }
+        MaterializationRequest::ApplyProfile { profile, context } => {
+            return initialize::derive_profile_application_plan(image, &profile, context)
+                .map_err(Into::into);
         }
     };
-    MaterializationPlan::new(image, seed, &intent, delta).map_err(Into::into)
+    MaterializationPlan::new(image, seed, &intent, delta)
+        .map(|plan| plan.with_projection_counts(projection_counts))
+        .map_err(Into::into)
 }
 
 /// Finalize an authored `config.toml` edit plus the complete coupled producer set
@@ -246,9 +496,10 @@ pub fn finalize_config_edit(
 ) -> Result<MaterializationPlan, RepositoryStateError> {
     // The edit must parse before any planning: a malformed config is a typed
     // planning error, not a published file.
-    crate::declarations::parse_configuration(edited_config_bytes).map_err(|error| {
-        RepositoryStateError::Producer(format!("invalid config.toml edit: {error:#}"))
-    })?;
+    let edited_configuration = crate::declarations::parse_configuration(edited_config_bytes)
+        .map_err(|error| {
+            RepositoryStateError::Producer(format!("invalid config.toml edit: {error:#}"))
+        })?;
 
     let config_path = VirtualPath::data("config.toml")?;
     let overlay = std::iter::once((config_path.clone(), Some(edited_config_bytes.to_vec())))
@@ -271,7 +522,12 @@ pub fn finalize_config_edit(
         bytes: edited_config_bytes.to_vec(),
         mode: FileMode::Regular,
     }];
-    actions.extend(compose_complete(&overlaid, &declarations)?);
+    let edited_declarations = RepositoryDeclarations {
+        configuration: &edited_configuration,
+        gates: declarations.gates,
+        rules: declarations.rules,
+    };
+    actions.extend(compose_complete(&overlaid, &edited_declarations)?);
     let delta = RepositoryDelta::new(base.layout(), actions)?;
     MaterializationPlan::new(base, seed, &MaterializationIntent::SemanticMutation, delta)
         .map_err(Into::into)
@@ -280,6 +536,9 @@ pub fn finalize_config_edit(
 /// Pure derivation failure.
 #[derive(Debug, thiserror::Error)]
 pub enum RepositoryStateError {
+    /// Initialization or profile materialization failed.
+    #[error(transparent)]
+    Initialization(#[from] InitializationError),
     /// Delta normalization rejected an alias or duplicate target.
     #[error(transparent)]
     Delta(#[from] DeltaError),
@@ -289,6 +548,12 @@ pub enum RepositoryStateError {
     /// Managed-document composition rejected an ambiguous or malformed claim.
     #[error(transparent)]
     ManagedDocument(#[from] ManagedDocumentError),
+    /// Projection declaration or source resolution failed.
+    #[error(transparent)]
+    Projection(#[from] ProjectionError),
+    /// A profile asset would overwrite an unowned authored occupant.
+    #[error(transparent)]
+    ProfileTargetConflict(#[from] ProfileTargetConflictError),
     /// Layout classification rejected a producer path.
     #[error(transparent)]
     Layout(#[from] RepositoryLayoutError),
@@ -304,6 +569,15 @@ pub enum RepositoryStateError {
 }
 
 impl RepositoryStateError {
+    /// Whether this derivation failed on an unowned profile target occupant.
+    pub fn is_profile_target_conflict(&self) -> bool {
+        matches!(
+            self,
+            Self::ProfileTargetConflict(_)
+                | Self::Initialization(InitializationError::ProfileTargetConflict(_))
+        )
+    }
+
     /// Wrap an opaque producer failure (an `anyhow` error from a relocated
     /// projection/serialization producer) into the typed derivation error.
     fn producer(error: anyhow::Error) -> Self {
@@ -311,13 +585,15 @@ impl RepositoryStateError {
     }
 
     /// Wrap a projection-composition producer failure, preserving a typed
-    /// [`ManagedDocumentError`] so a managed-region fault (an absent required
-    /// region, a competing claim) keeps its identity for exit-code mapping instead
-    /// of collapsing into an opaque string.
+    /// projection or managed-document failure keeps its identity for exit-code
+    /// mapping instead of collapsing into an opaque string.
     fn projection_producer(error: anyhow::Error) -> Self {
-        match error.downcast::<ManagedDocumentError>() {
-            Ok(managed) => Self::ManagedDocument(managed),
-            Err(error) => Self::producer(error),
+        match error.downcast::<ProjectionError>() {
+            Ok(projection) => Self::Projection(projection),
+            Err(error) => match error.downcast::<ManagedDocumentError>() {
+                Ok(managed) => Self::ManagedDocument(managed),
+                Err(error) => Self::producer(error),
+            },
         }
     }
 }
@@ -332,12 +608,14 @@ fn compose_complete(
     image: &RepositoryImage,
     declarations: &RepositoryDeclarations<'_>,
 ) -> Result<Vec<RepositoryAction>, RepositoryStateError> {
-    let config = materialize::assemble_config(image).map_err(RepositoryStateError::producer)?;
+    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)
+        .map_err(RepositoryStateError::producer)?;
     let mut actions = materialize::compose_default_ruleset(image, &config)?;
     actions.extend(
         // A semantic mutation is complete over EVERY declared projection.
         materialize::compose_configured_projections(image, &config, declarations, None)
-            .map_err(RepositoryStateError::producer)?,
+            .map_err(RepositoryStateError::producer)?
+            .actions,
     );
     Ok(actions)
 }
@@ -362,12 +640,16 @@ fn derive_project_render(
     image: &RepositoryImage,
     declarations: &RepositoryDeclarations<'_>,
     selected: Option<&std::collections::BTreeSet<String>>,
-) -> Result<RepositoryDelta, RepositoryStateError> {
-    let config = materialize::assemble_config(image).map_err(RepositoryStateError::producer)?;
-    let actions =
+) -> Result<(RepositoryDelta, std::collections::BTreeMap<String, usize>), RepositoryStateError> {
+    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)
+        .map_err(RepositoryStateError::producer)?;
+    let rendered =
         materialize::compose_configured_projections(image, &config, declarations, selected)
             .map_err(RepositoryStateError::projection_producer)?;
-    Ok(RepositoryDelta::new(image.layout(), actions)?)
+    Ok((
+        RepositoryDelta::new(image.layout(), rendered.actions)?,
+        rendered.counts,
+    ))
 }
 
 /// Repair intent: the same complete expected state, whose per-target composition is
@@ -378,11 +660,44 @@ fn derive_project_render(
 fn derive_repair(
     image: &RepositoryImage,
     declarations: &RepositoryDeclarations<'_>,
+    profiles: Vec<ProfileClaims>,
 ) -> Result<RepositoryDelta, RepositoryStateError> {
-    Ok(RepositoryDelta::new(
-        image.layout(),
-        compose_complete(image, declarations)?,
-    )?)
+    let mut actions = compose_complete(image, declarations)?;
+    let mut claimed = std::collections::BTreeSet::new();
+    for claims in profiles {
+        for (path, (bytes, mode)) in profile_apply::compose_profile_targets(image, claims)? {
+            if !claimed.insert(path.clone()) {
+                return Err(RepositoryStateError::AmbiguousOwnership(format!(
+                    "multiple installed profiles claim {path:?}"
+                )));
+            }
+            actions.retain(|action| action.path() != &path);
+            let expected = ExpectedPreimage::of(
+                image
+                    .entry(&path)
+                    .map_err(|error| RepositoryStateError::producer(error.into()))?,
+            );
+            if !matches!(
+                image
+                    .entry(&path)
+                    .map_err(|error| RepositoryStateError::producer(error.into()))?,
+                RepositoryEntry::File {
+                    bytes: existing,
+                    mode: existing_mode,
+                    ..
+                } if existing.as_slice() == bytes && *existing_mode == mode
+            ) {
+                actions.push(RepositoryAction::WriteFile {
+                    path,
+                    owner: "profile-repair".to_string(),
+                    expected,
+                    bytes,
+                    mode,
+                });
+            }
+        }
+    }
+    Ok(RepositoryDelta::new(image.layout(), actions)?)
 }
 
 /// Kind of mismatch between a captured image and expected materialization.

@@ -8,7 +8,7 @@ use jit::storage::{InMemoryStorage, IssueStore};
 #[test]
 fn test_validation_detects_broken_dependency() {
     let storage = InMemoryStorage::new();
-    storage.add_repo_file(".jit/config.toml", "");
+    storage.add_data_file("config.toml", "");
     let executor = crate::memory_executor(storage.clone());
 
     // Create two issues
@@ -60,7 +60,7 @@ fn test_validation_detects_broken_dependency() {
 #[test]
 fn test_validation_detects_cycle() {
     let storage = InMemoryStorage::new();
-    storage.add_repo_file(".jit/config.toml", "");
+    storage.add_data_file("config.toml", "");
     let executor = crate::memory_executor(storage.clone());
 
     // Create two issues
@@ -107,7 +107,7 @@ fn test_validation_detects_cycle() {
 #[test]
 fn test_validation_passes_with_valid_graph() {
     let storage = InMemoryStorage::new();
-    storage.add_repo_file(".jit/config.toml", "");
+    storage.add_data_file("config.toml", "");
     let executor = crate::memory_executor(storage.clone());
 
     // Create a valid dependency graph: A -> B -> C
@@ -226,7 +226,7 @@ fn test_validation_detects_invalid_gate_reference() {
 #[test]
 fn test_validation_detects_isolated_issues() {
     let storage = InMemoryStorage::new();
-    storage.add_repo_file(".jit/config.toml", "");
+    storage.add_data_file("config.toml", "");
     let executor = crate::memory_executor(storage.clone());
 
     // Create connected issues: A -> B
@@ -282,7 +282,7 @@ fn test_validation_detects_isolated_issues() {
 #[test]
 fn test_validation_passes_with_all_connected_issues() {
     let storage = InMemoryStorage::new();
-    storage.add_repo_file(".jit/config.toml", "");
+    storage.add_data_file("config.toml", "");
     let executor = crate::memory_executor(storage.clone());
 
     // Create a connected graph: A -> B -> C

@@ -11,7 +11,18 @@ use std::sync::{Arc, Mutex};
 
 /// Seed one exact repository-file precondition in the aggregate memory image.
 pub(crate) fn seed_repo_file(storage: &InMemoryStorage, path: &str, content: &str) {
-    storage.add_repo_file(path, content);
+    let layout = storage.repository_layout();
+    let path = layout
+        .classify_repository_relative(path)
+        .expect("fixture path is canonical");
+    match path.root_class() {
+        crate::repository_state::RepositoryRootClass::Data => {
+            storage.add_data_file(path.relative().as_path(), content)
+        }
+        crate::repository_state::RepositoryRootClass::Worktree => {
+            storage.add_worktree_file(path.relative().as_path(), content)
+        }
+    }
 }
 
 /// Seed one issue record and its active index membership without invoking a
@@ -98,7 +109,7 @@ pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStor
         .expect("memory fixture config path is valid")
         .is_none()
     {
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
     }
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
@@ -118,7 +129,7 @@ enforce_leases = "{}"
 "#,
         mode
     );
-    storage.add_repo_file(".jit/config.toml", &config_toml);
+    storage.add_data_file("config.toml", &config_toml);
 
     memory_executor(storage)
 }

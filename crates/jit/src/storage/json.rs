@@ -176,6 +176,9 @@ mod artifact_location_tests {
         .unwrap();
         symlink(repo.path().join("real"), repo.path().join("linked-dir")).unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        storage.configure_repository_layout(&layout);
 
         assert_eq!(
             storage.inspect_artifact_location("leaf.md").unwrap(),
@@ -257,6 +260,8 @@ pub struct JsonFileStorage {
     /// Canonical layout of the live mutation session, shared by every clone so
     /// reentry is admitted only for the same selected roots.
     active_mutation_layout: Arc<crate::storage::repository_state_store::ActiveLayoutTracker>,
+    /// Explicit worktree/data-root authority for repository-relative readers.
+    repository_layout: Arc<Mutex<Option<RepositoryLayout>>>,
 }
 
 /// The configured storage-lock acquisition timeout (`JIT_LOCK_TIMEOUT` seconds,
@@ -298,14 +303,15 @@ impl JsonFileStorage {
             retained_state: Arc::new(Mutex::new(RetainedSessionState::Idle)),
             repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
             active_mutation_layout: Arc::new(Default::default()),
+            repository_layout: Arc::new(Mutex::new(None)),
             root,
             locker: FileLocker::new(timeout),
         }
     }
 
     /// Construct storage with deterministic recovered-session failure injection.
-    #[cfg(test)]
-    pub(crate) fn with_repository_state_failures<P: AsRef<Path>>(
+    #[doc(hidden)]
+    pub fn with_repository_state_failures<P: AsRef<Path>>(
         root: P,
         failures: Arc<dyn crate::storage::TransactionFailureInjector>,
     ) -> Self {
@@ -324,6 +330,14 @@ impl JsonFileStorage {
         &self,
     ) -> Arc<crate::storage::repository_state_store::ActiveLayoutTracker> {
         Arc::clone(&self.active_mutation_layout)
+    }
+
+    pub(crate) fn configured_layout(&self) -> Result<RepositoryLayout> {
+        self.repository_layout
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+            .ok_or_else(|| anyhow!("no repository layout configured for storage reads"))
     }
 
     /// Open and retain this storage's canonical startup mutation session.
@@ -457,37 +471,23 @@ impl JsonFileStorage {
     ) -> Result<crate::domain::artifact_classifier::ArtifactLocation, crate::storage::PathReadError>
     {
         use crate::domain::artifact_classifier::ArtifactLocation;
+        use crate::domain::artifact_discovery::{ArtifactEvidence, ArtifactListingScope};
         use crate::domain::artifact_plan::ContentIdentity;
-        use crate::storage::PathReadError;
-
-        validate_repo_relative_input(path)?;
-        let repo_root = self.root.parent().ok_or_else(|| {
-            PathReadError::Other(
-                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
-            )
-        })?;
-        let mut candidate = repo_root.to_path_buf();
-        for component in Path::new(path).components() {
-            candidate.push(component.as_os_str());
-            match fs::symlink_metadata(&candidate) {
-                Ok(metadata) if metadata.file_type().is_symlink() => {
-                    return Ok(ArtifactLocation::Symlink);
-                }
-                Ok(_) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                    return Ok(ArtifactLocation::Missing);
-                }
-                Err(error) => return Err(PathReadError::Other(error.into())),
-            }
+        crate::storage::validate_repo_relative_path(path)?;
+        match crate::storage::artifact_planning::inspect_artifact_evidence(
+            self,
+            path,
+            ArtifactListingScope::MetadataOnly,
+        )? {
+            ArtifactEvidence::Missing => Ok(ArtifactLocation::Missing),
+            ArtifactEvidence::Symlink => Ok(ArtifactLocation::Symlink),
+            ArtifactEvidence::File(bytes) => Ok(ArtifactLocation::Regular(
+                ContentIdentity::from_bytes(&bytes),
+            )),
+            ArtifactEvidence::Directory { .. }
+            | ArtifactEvidence::Unsupported
+            | ArtifactEvidence::InvalidPath => Ok(ArtifactLocation::Unsupported),
         }
-
-        let metadata = fs::symlink_metadata(&candidate)?;
-        if !metadata.is_file() {
-            return Ok(ArtifactLocation::Unsupported);
-        }
-        fs::read(candidate)
-            .map(|bytes| ArtifactLocation::Regular(ContentIdentity::from_bytes(&bytes)))
-            .map_err(PathReadError::from)
     }
 
     fn issue_path(&self, id: &str) -> PathBuf {
@@ -570,11 +570,12 @@ impl JsonFileStorage {
 
     /// Load index from git HEAD.
     fn load_index_from_git(&self) -> Result<Option<Index>> {
-        let repo_root = self
-            .root
-            .parent()
-            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid .jit path"))?;
-        let repository = match git2::Repository::discover(repo_root) {
+        let layout = self.configured_layout()?;
+        let Some(data_relative) = layout.data_root().strip_prefix(layout.worktree_root()).ok()
+        else {
+            return Ok(None);
+        };
+        let repository = match git2::Repository::discover(layout.worktree_root()) {
             Ok(repository) => repository,
             Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
             Err(error) => return Err(error).context("Failed to open git repository"),
@@ -594,7 +595,7 @@ impl JsonFileStorage {
         let tree = head
             .peel_to_tree()
             .context("Failed to resolve the git HEAD tree")?;
-        let entry = match tree.get_path(Path::new(".jit/index.json")) {
+        let entry = match tree.get_path(&data_relative.join(INDEX_FILE)) {
             Ok(entry) => entry,
             Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
             Err(error) => return Err(error).context("Failed to resolve index from git HEAD"),
@@ -613,11 +614,12 @@ impl JsonFileStorage {
 
     /// Load index from main worktree.
     fn load_index_from_main_worktree(&self) -> Result<Option<Index>> {
-        let repo_root = self
-            .root
-            .parent()
-            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid .jit path"))?;
-        let repository = match git2::Repository::discover(repo_root) {
+        let layout = self.configured_layout()?;
+        let Some(data_relative) = layout.data_root().strip_prefix(layout.worktree_root()).ok()
+        else {
+            return Ok(None);
+        };
+        let repository = match git2::Repository::discover(layout.worktree_root()) {
             Ok(repository) => repository,
             Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
             Err(error) => return Err(error).context("Failed to open git repository"),
@@ -643,7 +645,7 @@ impl JsonFileStorage {
             )
         })?;
 
-        let main_index_path = main_worktree_root.join(".jit/index.json");
+        let main_index_path = main_worktree_root.join(data_relative).join(INDEX_FILE);
         let bytes = match fs::read(&main_index_path) {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -665,17 +667,22 @@ impl JsonFileStorage {
     /// (git ran successfully but reported the path is missing), and `Err` for
     /// genuine failures (git not available, repo corrupt, parse error, etc.).
     fn load_issue_from_git(&self, id: &str) -> Result<Option<Issue>> {
-        // Run git from repository root, not from .jit directory
-        let repo_root = self
-            .root
-            .parent()
-            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid .jit path"))?;
-
-        let git_path = format!("HEAD:.jit/issues/{}.json", id);
+        let layout = self.configured_layout()?;
+        let Some(data_relative) = layout.data_root().strip_prefix(layout.worktree_root()).ok()
+        else {
+            return Ok(None);
+        };
+        let git_path = format!(
+            "HEAD:{}",
+            data_relative
+                .join(ISSUES_DIR)
+                .join(format!("{id}.json"))
+                .display()
+        );
         let output = Command::new("git")
             .arg("show")
             .arg(&git_path)
-            .current_dir(repo_root)
+            .current_dir(layout.worktree_root())
             .output()
             .context("Failed to execute git command")?;
 
@@ -700,17 +707,17 @@ impl JsonFileStorage {
     /// (not in git, already in main worktree, non-standard layout), and `Err`
     /// for genuine I/O or parse failures on a file that does exist.
     fn load_issue_from_main_worktree(&self, id: &str) -> Result<Option<Issue>> {
-        // self.root is .jit/, we need to go up one level to the repo root
-        let repo_root = self
-            .root
-            .parent()
-            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid .jit path"))?;
+        let layout = self.configured_layout()?;
+        let Some(data_relative) = layout.data_root().strip_prefix(layout.worktree_root()).ok()
+        else {
+            return Ok(None);
+        };
 
         // We need to detect worktree context from git commands
         // First check if we're in a git repo at all
         let output = Command::new("git")
             .args(["rev-parse", "--git-common-dir"])
-            .current_dir(repo_root)
+            .current_dir(layout.worktree_root())
             .output();
 
         let output = match output {
@@ -723,7 +730,7 @@ impl JsonFileStorage {
         // Get worktree root
         let output = Command::new("git")
             .args(["rev-parse", "--show-toplevel"])
-            .current_dir(repo_root)
+            .current_dir(layout.worktree_root())
             .output()?;
 
         if !output.status.success() {
@@ -747,7 +754,8 @@ impl JsonFileStorage {
         };
 
         let main_issue_path = main_worktree_root
-            .join(".jit/issues")
+            .join(data_relative)
+            .join(ISSUES_DIR)
             .join(format!("{}.json", id));
 
         if !main_issue_path.exists() {
@@ -762,13 +770,12 @@ impl JsonFileStorage {
     ///
     /// Returns true if this is a secondary worktree, false if main worktree or not in git.
     pub fn is_secondary_worktree(&self) -> bool {
-        let repo_root = match self.root.parent() {
-            Some(root) => root,
-            None => return false,
+        let Ok(layout) = self.configured_layout() else {
+            return false;
         };
 
         // Check if .git exists
-        let git_path = repo_root.join(".git");
+        let git_path = layout.worktree_root().join(".git");
         if !git_path.exists() {
             return false;
         }
@@ -780,6 +787,33 @@ impl JsonFileStorage {
 }
 
 impl IssueStore for JsonFileStorage {
+    fn configure_repository_layout(&self, layout: &RepositoryLayout) {
+        // Bind once. A refreshed layout for the same roots may replace stale
+        // root-presence evidence after this process publishes an absent root;
+        // a clone can never redirect readers to different roots.
+        if self.root != layout.data_root() {
+            return;
+        }
+        let mut configured = self
+            .repository_layout
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        match configured.as_ref() {
+            None => *configured = Some(layout.clone()),
+            Some(current)
+                if current.worktree_root() == layout.worktree_root()
+                    && current.data_root() == layout.data_root() =>
+            {
+                *configured = Some(layout.clone());
+            }
+            Some(_) => {}
+        }
+    }
+
+    fn repository_layout(&self) -> Result<RepositoryLayout> {
+        self.configured_layout()
+    }
+
     fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard> {
         self.repo_lock.acquire()
     }
@@ -1248,14 +1282,23 @@ impl IssueStore for JsonFileStorage {
         rel_path: &str,
     ) -> Result<Option<String>, crate::storage::PathReadError> {
         use crate::storage::PathReadError;
-        // Reuse the validated, repo-root-relative working-tree read so the
-        // path-safety and containment checks live in ONE place. An absent file is
-        // mapped to `Ok(None)` (graceful); every other failure is propagated typed.
-        match self.read_path_text(rel_path, None) {
-            Ok((content, _label)) => Ok(Some(content)),
-            Err(PathReadError::NotFound(_)) => Ok(None),
-            Err(other) => Err(other),
-        }
+        crate::storage::validate_repo_relative_path(rel_path)?;
+        let layout = self.configured_layout().map_err(PathReadError::Other)?;
+        let path = layout
+            .classify_repository_relative(rel_path)
+            .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
+        let root = match path.root_class() {
+            crate::repository_state::RepositoryRootClass::Worktree => layout.worktree_root(),
+            crate::repository_state::RepositoryRootClass::Data => layout.data_root(),
+        };
+        crate::storage::repository_state_store::read_repository_file_confined(root, path.relative())
+            .map_err(|error| map_confined_read_error(error, rel_path))?
+            .map(|bytes| {
+                String::from_utf8(bytes)
+                    .map_err(anyhow::Error::from)
+                    .map_err(PathReadError::Other)
+            })
+            .transpose()
     }
 
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
@@ -1281,14 +1324,10 @@ impl IssueStore for JsonFileStorage {
         // and any `..` segment used for traversal.  This moves the invariant
         // out of individual route handlers and into the storage boundary so
         // every caller inherits it.
-        validate_repo_relative_input(path)?;
+        crate::storage::validate_repo_relative_path(path)?;
 
-        // Resolve repo root: parent of the .jit directory.
-        let repo_root = self.root.parent().ok_or_else(|| {
-            PathReadError::Other(
-                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
-            )
-        })?;
+        let layout = self.configured_layout().map_err(PathReadError::Other)?;
+        let repo_root = layout.worktree_root();
 
         if let Some(commit_ref) = at_commit {
             use git2::Repository;
@@ -1320,29 +1359,14 @@ impl IssueStore for JsonFileStorage {
             let short_hash = format!("{:.7}", commit.id());
             Ok((blob.content().to_vec(), short_hash))
         } else {
-            // Working-tree read.  Canonicalize the joined path and the repo root,
-            // then verify containment via the shared helper.  This catches
-            // symlinks that point outside the repo root (e.g.
-            // `docs/secret -> /etc/passwd`).
-            let joined = repo_root.join(path);
-            assert_canonical_contained(&joined, repo_root, path)?;
-            let canonical_joined = std::fs::canonicalize(&joined).map_err(|e| {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    PathReadError::NotFound(path.to_string())
-                } else {
-                    PathReadError::Other(anyhow!("Failed to canonicalize {}: {}", path, e))
-                }
-            })?;
-
-            fs::read(&canonical_joined)
-                .map(|bytes| (bytes, "working-tree".to_string()))
-                .map_err(|e| {
-                    if e.kind() == std::io::ErrorKind::NotFound {
-                        PathReadError::NotFound(path.to_string())
-                    } else {
-                        PathReadError::Other(anyhow!("Failed to read file {}: {}", path, e))
-                    }
-                })
+            let relative = crate::repository_state::RootRelativePath::parse(path)
+                .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
+            crate::storage::repository_state_store::read_repository_file_confined(
+                repo_root, &relative,
+            )
+            .map_err(|error| map_confined_read_error(error, path))?
+            .map(|bytes| (bytes, "working-tree".to_string()))
+            .ok_or_else(|| PathReadError::NotFound(path.to_string()))
         }
     }
 }
@@ -1357,50 +1381,20 @@ fn is_torn_event_prefix(line: &str, error: &serde_json::Error) -> bool {
     line.trim_start().starts_with('{') && error.is_eof()
 }
 
-/// Thin local alias for the shared
-/// [`validate_repo_relative_path`](crate::storage::validate_repo_relative_path),
-/// kept so the existing call sites in this module read unchanged.
-fn validate_repo_relative_input(path: &str) -> Result<(), crate::storage::PathReadError> {
-    crate::storage::validate_repo_relative_path(path)
-}
-
-/// Assert that `candidate` (an existing path) resolves WITHIN `repo_root`,
-/// rejecting symlink escapes.
-///
-/// The single canonicalize-then-`starts_with` containment idiom shared by the
-/// read and write paths: it canonicalizes both `candidate` and `repo_root`
-/// (following symlinks) and verifies the resolved candidate is a descendant of
-/// the resolved root. `candidate` must already exist (the caller resolves a
-/// possibly-not-yet-created target to an existing ancestor first); `rel_for_error`
-/// is the original repo-relative path used in the typed error messages.
-fn assert_canonical_contained(
-    candidate: &Path,
-    repo_root: &Path,
-    rel_for_error: &str,
-) -> Result<(), crate::storage::PathReadError> {
+fn map_confined_read_error(
+    error: RepositoryStateStoreError,
+    relative: &str,
+) -> crate::storage::PathReadError {
     use crate::storage::PathReadError;
-    let canonical_candidate = std::fs::canonicalize(candidate).map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            PathReadError::NotFound(rel_for_error.to_string())
-        } else {
-            PathReadError::Other(anyhow!(
-                "Failed to canonicalize {}: {}",
-                candidate.display(),
-                e
-            ))
+    match error {
+        RepositoryStateStoreError::UnsafeTarget(_) => {
+            PathReadError::OutsideRepoRoot(relative.to_string())
         }
-    })?;
-    let canonical_root = std::fs::canonicalize(repo_root).map_err(|e| {
-        PathReadError::Other(anyhow!(
-            "Failed to canonicalize repo root {}: {}",
-            repo_root.display(),
-            e
-        ))
-    })?;
-    if !canonical_candidate.starts_with(&canonical_root) {
-        return Err(PathReadError::OutsideRepoRoot(rel_for_error.to_string()));
+        RepositoryStateStoreError::Io(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            PathReadError::NotFound(relative.to_string())
+        }
+        error => PathReadError::Other(error.into()),
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -1408,6 +1402,41 @@ mod tests {
     use super::*;
     use crate::storage::IssueStore;
     use tempfile::TempDir;
+
+    fn configure_test_layout(storage: &JsonFileStorage, worktree: &Path, data: &Path) {
+        let layout = crate::storage::discover_repository_layout(worktree, data).unwrap();
+        storage.configure_repository_layout(&layout);
+    }
+
+    #[test]
+    fn test_layout_binding_rejects_different_roots_but_accepts_same_root_refresh() {
+        let worktree = TempDir::new().unwrap();
+        let other_worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        let storage = JsonFileStorage::new(&data);
+        let absent = crate::storage::discover_repository_layout(worktree.path(), &data).unwrap();
+        storage.configure_repository_layout(&absent);
+
+        let foreign =
+            crate::storage::discover_repository_layout(other_worktree.path(), &data).unwrap();
+        storage.configure_repository_layout(&foreign);
+        assert_eq!(
+            storage.configured_layout().unwrap().worktree_root(),
+            worktree.path()
+        );
+        assert!(matches!(
+            storage.open_mutation_session(foreign),
+            Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+
+        std::fs::create_dir(&data).unwrap();
+        let present = crate::storage::discover_repository_layout(worktree.path(), &data).unwrap();
+        storage.configure_repository_layout(&present);
+        assert_eq!(
+            storage.configured_layout().unwrap().data_identity(),
+            present.data_identity()
+        );
+    }
 
     fn retained_storage() -> (
         TempDir,
@@ -1579,6 +1608,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp.path().join(".jit"));
         fs::create_dir(storage.root()).unwrap();
+        configure_test_layout(&storage, temp.path(), storage.root());
 
         // Absent -> None (graceful).
         assert!(storage
@@ -1606,6 +1636,37 @@ mod tests {
             storage.read_repo_file("../escape.md"),
             Err(crate::storage::PathReadError::InvalidPath(_))
         ));
+    }
+
+    #[test]
+    fn test_disjoint_layout_reads_logical_data_and_worktree_roots() {
+        let worktree = TempDir::new().unwrap();
+        let external = TempDir::new().unwrap();
+        let data = external.path().join("selected-data");
+        fs::create_dir(&data).unwrap();
+        fs::create_dir(worktree.path().join("docs")).unwrap();
+        fs::write(worktree.path().join("docs/guide.md"), "worktree").unwrap();
+        fs::write(data.join("config.toml"), "data").unwrap();
+
+        let storage = JsonFileStorage::new(&data);
+        configure_test_layout(&storage, worktree.path(), &data);
+
+        assert_eq!(
+            storage.read_repo_file("docs/guide.md").unwrap().as_deref(),
+            Some("worktree")
+        );
+        assert_eq!(
+            storage
+                .read_repo_file(".jit/config.toml")
+                .unwrap()
+                .as_deref(),
+            Some("data")
+        );
+        assert_eq!(
+            storage.read_path_bytes("docs/guide.md", None).unwrap().0,
+            b"worktree"
+        );
+        assert!(!external.path().join("docs/guide.md").exists());
     }
 
     #[test]
@@ -1982,6 +2043,7 @@ mod tests {
 
             // Initialize secondary storage
             let secondary_storage = JsonFileStorage::new(&secondary_jit);
+            configure_test_layout(&secondary_storage, &secondary_path, &secondary_jit);
 
             // Should fall back to reading from main worktree
             let loaded = secondary_storage.load_issue(&issue_id).unwrap();
@@ -2131,6 +2193,11 @@ mod tests {
             );
 
             let secondary_storage = JsonFileStorage::new(secondary_path.join(".jit"));
+            configure_test_layout(
+                &secondary_storage,
+                &secondary_path,
+                &secondary_path.join(".jit"),
+            );
             assert_eq!(
                 secondary_storage.load_aggregated_index().unwrap().all_ids,
                 vec!["active-in-head"]
@@ -2171,6 +2238,7 @@ mod tests {
             fs::create_dir_all(secondary_jit.join("issues")).unwrap();
 
             let secondary_storage = JsonFileStorage::new(&secondary_jit);
+            configure_test_layout(&secondary_storage, &secondary_path, &secondary_jit);
             seed_index_preimage(&secondary_storage, &Index::default());
 
             // Aggregated index should include main worktree issue
@@ -2197,6 +2265,11 @@ mod tests {
 
             let (_secondary_container, secondary_path) = add_secondary_worktree(&repo_path);
             let secondary_storage = JsonFileStorage::new(secondary_path.join(".jit"));
+            configure_test_layout(
+                &secondary_storage,
+                &secondary_path,
+                &secondary_path.join(".jit"),
+            );
 
             fs::write(main_jit.join(INDEX_FILE), b"{ invalid json").unwrap();
             let malformed = secondary_storage
@@ -2420,6 +2493,7 @@ mod tests {
 
         // Build storage rooted at .jit (root = .jit dir, repo root = its parent).
         let storage = JsonFileStorage::new(&jit_dir);
+        configure_test_layout(&storage, repo_root.path(), &jit_dir);
 
         // Change CWD to a completely unrelated directory so that a naive
         // fs::read(path) using process CWD would fail to find the file.
@@ -2446,6 +2520,7 @@ mod tests {
         fs::create_dir_all(&jit_dir).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
+        configure_test_layout(&storage, repo_root.path(), &jit_dir);
 
         let result = storage.read_path_bytes("does_not_exist.md", None);
         assert!(
@@ -2466,6 +2541,7 @@ mod tests {
         let jit_dir = repo_root.path().join(".jit");
         fs::create_dir_all(&jit_dir).unwrap();
         let storage = JsonFileStorage::new(&jit_dir);
+        configure_test_layout(&storage, repo_root.path(), &jit_dir);
 
         let result = storage.read_path_bytes("", None);
         assert!(
@@ -2482,6 +2558,7 @@ mod tests {
         let jit_dir = repo_root.path().join(".jit");
         fs::create_dir_all(&jit_dir).unwrap();
         let storage = JsonFileStorage::new(&jit_dir);
+        configure_test_layout(&storage, repo_root.path(), &jit_dir);
 
         let result = storage.read_path_bytes("/etc/passwd", None);
         assert!(
@@ -2498,6 +2575,7 @@ mod tests {
         let jit_dir = repo_root.path().join(".jit");
         fs::create_dir_all(&jit_dir).unwrap();
         let storage = JsonFileStorage::new(&jit_dir);
+        configure_test_layout(&storage, repo_root.path(), &jit_dir);
 
         for bad in &["../etc/passwd", "a/../b", "foo/..", "a/../../b"] {
             let result = storage.read_path_bytes(bad, None);
@@ -2529,6 +2607,7 @@ mod tests {
         fs::write(nested_dir.join("archive..2024.md"), expected).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
+        configure_test_layout(&storage, repo_root.path(), &jit_dir);
 
         let (bytes, label) = storage
             .read_path_bytes("foo..bar.txt", None)
@@ -2562,6 +2641,7 @@ mod tests {
         unix_fs::symlink(&target, &link).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
+        configure_test_layout(&storage, repo_root.path(), &jit_dir);
         let (bytes, label) = storage
             .read_path_bytes("link.md", None)
             .expect("symlink inside repo must resolve and read successfully");
@@ -2589,6 +2669,7 @@ mod tests {
         unix_fs::symlink(outside.path(), &link).unwrap();
 
         let storage = JsonFileStorage::new(&jit_dir);
+        configure_test_layout(&storage, repo_root.path(), &jit_dir);
         let result = storage.read_path_bytes("docs/escape.txt", None);
         assert!(
             matches!(result, Err(PathReadError::OutsideRepoRoot(_))),
@@ -2604,8 +2685,11 @@ mod tests {
         /// Write a raw `index.json` carrying an explicit `schema_version` into a
         /// freshly-created `.jit`, returning the storage handle.
         fn storage_with_index_version(temp: &TempDir, version: u32) -> JsonFileStorage {
-            let storage = JsonFileStorage::new(temp.path());
-            let index_path = temp.path().join(INDEX_FILE);
+            let data = temp.path().join(".jit");
+            fs::create_dir(&data).unwrap();
+            let storage = JsonFileStorage::new(&data);
+            configure_test_layout(&storage, temp.path(), &data);
+            let index_path = data.join(INDEX_FILE);
             let raw = format!(
                 "{{\n  \"schema_version\": {version},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
             );
@@ -2693,8 +2777,11 @@ mod tests {
 
             for (raw, expected) in cases {
                 let temp_dir = TempDir::new().unwrap();
-                let storage = JsonFileStorage::new(temp_dir.path());
-                fs::write(temp_dir.path().join(INDEX_FILE), raw).unwrap();
+                let data = temp_dir.path().join(".jit");
+                fs::create_dir(&data).unwrap();
+                let storage = JsonFileStorage::new(&data);
+                configure_test_layout(&storage, temp_dir.path(), &data);
+                fs::write(data.join(INDEX_FILE), raw).unwrap();
                 let error = storage
                     .load_aggregated_index()
                     .expect_err("invalid local index must abort aggregation");

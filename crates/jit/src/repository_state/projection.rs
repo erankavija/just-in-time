@@ -15,7 +15,6 @@
 //! - [`render_invariants_markdown`] — the built-in `full` render of the invariant
 //!   registry (the rule + gate `full` render lives in
 //!   [`rules_gates_projection`](crate::repository_state::rules_gates_projection));
-//! - [`splice_region`] — the PURE region splice; and
 //! - [`require_target`] — resolve a projection's REQUIRED `target`, naming the
 //!   projection on omission (no default is applied, REQ-07).
 //!
@@ -32,86 +31,26 @@
 //! feeds which projection) lives in
 //! [`project_render`](crate::repository_state::projection_render).
 
-use crate::config::{ProjectionConfig, ProjectionMode, ProjectionStyle};
+use crate::config::{ProjectionConfig, ProjectionStyle};
 use crate::declarations::invariants::{InvariantKind, InvariantRegistry};
 use crate::domain::item::AddressableItem;
-use crate::storage::PathReadError;
-use anyhow::Result;
-use std::collections::BTreeMap;
 use thiserror::Error;
 
 /// Errors raised while rendering or writing a generic projection.
 ///
-/// Shared by [`splice_region`] and [`require_target`] here, the body-rendering
-/// wiring in [`project_render`](crate::repository_state::projection_render) (kind and source
-/// resolution), and the two-phase `jit project render` command that materializes
-/// and writes targets. Every variant carries enough context (the
-/// offending marker, the target path, the missing projection, the unknown kind, or
-/// the underlying I/O error) to point an author at the problem. A missing target,
-/// missing/malformed region, source, or kind NEVER silently clobbers a file or
-/// writes a partial one: it is a typed error raised BEFORE any write.
+/// Shared by [`require_target`] here, the body-rendering wiring in
+/// [`project_render`](crate::repository_state::projection_render), and the
+/// transaction-backed project-render command. Managed-region structure is
+/// validated exclusively by
+/// [`managed_document`](crate::repository_state::managed_document).
 #[derive(Debug, Error)]
 pub enum ProjectionError {
-    /// The configured begin marker was not found in the region-mode target.
-    #[error("projection region begin marker '{marker}' not found in target")]
-    MissingBeginMarker {
-        /// The begin marker that was searched for.
-        marker: String,
-    },
-
-    /// The configured end marker was not found after the begin marker.
-    #[error("projection region end marker '{marker}' not found after begin marker in target")]
-    MissingEndMarker {
-        /// The end marker that was searched for.
-        marker: String,
-    },
-
-    /// The end marker appears before the begin marker (malformed region).
-    #[error(
-        "projection region end marker '{end}' precedes begin marker '{begin}' in target (malformed region)"
-    )]
-    MarkersOutOfOrder {
-        /// The begin marker.
-        begin: String,
-        /// The end marker.
-        end: String,
-    },
-
-    /// Region mode requires an existing target file, but none was found.
-    #[error(
-        "region-mode projection target '{path}' does not exist (region mode cannot create it)"
-    )]
-    TargetNotFound {
-        /// The configured target path.
-        path: String,
-    },
-
     /// A projection declared no `target`. The path is required (the engine applies
     /// no default), so this surfaces before any render or write.
     #[error("projection '{projection}' declares no target (a projection must set `target`)")]
     MissingTarget {
         /// The `[projection.<name>]` name that omitted `target`.
         projection: String,
-    },
-
-    /// The region-mode target could not be read (invalid path or I/O failure).
-    #[error("failed to read projection target '{path}': {source}")]
-    Read {
-        /// The configured target path.
-        path: String,
-        /// The underlying typed read error.
-        source: PathReadError,
-    },
-
-    /// Writing the rendered projection failed (an invalid/escaping path is
-    /// rejected as [`PathReadError::InvalidPath`] before any write; an I/O
-    /// failure surfaces as [`PathReadError::Other`]).
-    #[error("failed to write projection target '{path}': {source}")]
-    Write {
-        /// The configured target path.
-        path: String,
-        /// The underlying typed write error.
-        source: PathReadError,
     },
 
     /// A projection declared a `kind` that no `[item_kinds.<name>]` table (or any
@@ -274,95 +213,6 @@ fn id_anchor_display<'a>(self_id: &str, text: &'a str) -> &'a str {
     }
 }
 
-/// Replace the text between `begin` and `end` in `existing` with `rendered`,
-/// byte-preserving everything OUTSIDE the delimiters (REQ-01).
-///
-/// Pure: performs no I/O. The markers themselves are preserved; only the bytes
-/// strictly between them are replaced. The rendered block is wrapped in newlines
-/// so the markers sit on their own visual lines while the surrounding text (the
-/// prefix up to and including `begin`, and the suffix from `end` onward) is
-/// returned verbatim. A missing/out-of-order marker is a typed
-/// [`ProjectionError`] rather than a silent clobber.
-pub fn splice_region(
-    existing: &str,
-    rendered: &str,
-    begin: &str,
-    end: &str,
-) -> Result<String, ProjectionError> {
-    let begin_at = existing
-        .find(begin)
-        .ok_or_else(|| ProjectionError::MissingBeginMarker {
-            marker: begin.to_string(),
-        })?;
-    let after_begin = begin_at + begin.len();
-
-    // Search for the end marker strictly AFTER the begin marker so a single
-    // shared substring cannot be mistaken for both.
-    let end_rel = existing[after_begin..].find(end).ok_or_else(|| {
-        // Distinguish "end never appears" from "end appears only before begin".
-        if existing.contains(end) {
-            ProjectionError::MarkersOutOfOrder {
-                begin: begin.to_string(),
-                end: end.to_string(),
-            }
-        } else {
-            ProjectionError::MissingEndMarker {
-                marker: end.to_string(),
-            }
-        }
-    })?;
-    let end_at = after_begin + end_rel;
-
-    // Reassemble: [prefix..=begin] + "\n" + rendered + "\n" + [end..suffix].
-    // The prefix (through the begin marker) and the suffix (from the end marker
-    // on) are sliced byte-exact from `existing`, so content outside the region is
-    // byte-preserved.
-    let prefix = &existing[..after_begin];
-    let suffix = &existing[end_at..];
-    Ok(format!(
-        "{prefix}\n{rendered}\n{suffix}",
-        rendered = rendered.trim_end_matches('\n')
-    ))
-}
-
-/// Compose one projection's rendered `body` into `pending`, threading region
-/// splices through progressively-updated target content.
-///
-/// `pending` maps each repo-relative target path to its in-progress content. In
-/// region mode the splice base is the target's PENDING content when another
-/// projection already rewrote it this pass, otherwise the bytes `read_base`
-/// returns (a `None` there is a typed [`ProjectionError::TargetNotFound`], since
-/// region mode cannot create a target); separate-file mode makes `body` the whole
-/// target. The composed content is stored back in `pending`, so several
-/// projections sharing ONE target each observe the prior one's change rather than
-/// overwriting it (last-writer-wins). Shared by the two-phase `jit project render`
-/// command and profile planning's projection re-render so both compose shared
-/// targets identically.
-pub fn compose_projection(
-    pending: &mut BTreeMap<String, String>,
-    target: &str,
-    mode: ProjectionMode,
-    body: &str,
-    begin: &str,
-    end: &str,
-    read_base: impl FnOnce(&str) -> Result<Option<String>>,
-) -> Result<()> {
-    let content = match mode {
-        ProjectionMode::SeparateFile => body.to_string(),
-        ProjectionMode::Region => {
-            let base = match pending.get(target) {
-                Some(current) => current.clone(),
-                None => read_base(target)?.ok_or_else(|| ProjectionError::TargetNotFound {
-                    path: target.to_string(),
-                })?,
-            };
-            splice_region(&base, body, begin, end)?
-        }
-    };
-    pending.insert(target.to_string(), content);
-    Ok(())
-}
-
 /// Resolve a projection's required `target`, naming the projection on omission.
 ///
 /// The engine applies no default target (REQ-07): a `[projection.<name>]` table
@@ -463,58 +313,6 @@ kind = "advisory"
         let md = render_invariants_markdown(&InvariantRegistry::empty(), ProjectionStyle::IdAnchor);
         assert_eq!(md, "_No invariants declared._\n");
         assert!(!md.contains("## Project invariants"));
-    }
-
-    #[test]
-    fn test_splice_region_byte_preserves_outside_and_replaces_inside() {
-        // The surrounding bytes (prefix and suffix) must be byte-identical after
-        // the splice; only the region between the markers changes (REQ-01).
-        let begin = "<!-- jit:invariants:begin -->";
-        let end = "<!-- jit:invariants:end -->";
-        let prefix = "# My Doc\n\nSome intro prose.\n\n";
-        let suffix = "\n\n## After\n\nTrailing content with trailing newline.\n";
-        let existing = format!("{prefix}{begin}\nOLD INNER\n{end}{suffix}");
-
-        let out = splice_region(&existing, "NEW INNER", begin, end).unwrap();
-
-        // Outside-the-region bytes are preserved EXACTLY.
-        assert!(out.starts_with(&format!("{prefix}{begin}")));
-        assert!(out.ends_with(&format!("{end}{suffix}")));
-        // Inside the region was correctly replaced.
-        assert!(out.contains("NEW INNER"));
-        assert!(!out.contains("OLD INNER"));
-        // Markers themselves survive.
-        assert!(out.contains(begin));
-        assert!(out.contains(end));
-
-        // Strong byte-preservation: reconstruct from the known prefix/suffix and
-        // compare the surrounding bytes literally.
-        let inner_start = out.find(begin).unwrap();
-        let inner_end = out.find(end).unwrap() + end.len();
-        assert_eq!(
-            &out[..inner_start + begin.len()],
-            format!("{prefix}{begin}")
-        );
-        assert_eq!(&out[inner_end..], suffix);
-    }
-
-    #[test]
-    fn test_splice_region_missing_begin_is_typed_error() {
-        let err = splice_region("no markers", "X", "<!--b-->", "<!--e-->").unwrap_err();
-        assert!(matches!(err, ProjectionError::MissingBeginMarker { .. }));
-    }
-
-    #[test]
-    fn test_splice_region_missing_end_is_typed_error() {
-        let err = splice_region("pre <!--b--> post", "X", "<!--b-->", "<!--e-->").unwrap_err();
-        assert!(matches!(err, ProjectionError::MissingEndMarker { .. }));
-    }
-
-    #[test]
-    fn test_splice_region_out_of_order_is_typed_error() {
-        // End appears, but only BEFORE begin.
-        let err = splice_region("<!--e--> ... <!--b-->", "X", "<!--b-->", "<!--e-->").unwrap_err();
-        assert!(matches!(err, ProjectionError::MarkersOutOfOrder { .. }));
     }
 
     /// Build an addressable row with the given self-id and text (project scope,

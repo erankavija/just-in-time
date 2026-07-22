@@ -62,7 +62,7 @@ fn derive_issue_deletion(
 ) -> Result<DerivedIssueDeletion> {
     use crate::repository_state::MutationIntent;
 
-    let declarations = declarations_from_image(image)?;
+    let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
     let mut projected = issues
         .iter()
@@ -153,39 +153,6 @@ fn derive_issue_deletion(
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Hard-reject an explicit `--type <kind>` whose kind is not declared in the
-    /// configured `[type_hierarchy]`, deciding through the SAME rule engine the
-    /// write path uses — NOT a parallel `config.toml` containment check.
-    ///
-    /// The `type-hierarchy-known` default rule (`repository_state::default_rules`)
-    /// reports an undeclared `type:<kind>` as an `error` finding, but because it
-    /// is `enforce = false` it only WARNS on the normal write path
-    /// (`validate_for_write`). An explicit `--type` is a deliberate, hard
-    /// contract, so this PROMOTES that one rule's finding to a hard rejection for
-    /// the explicit-type create/update path ONLY. The rule's global
-    /// severity/enforce is untouched, so non-`--type` writes (and every other
-    /// path) keep their existing warn-only behavior.
-    ///
-    /// Config stays the single source of truth via the existing validation layer:
-    /// the decision is the rule engine's `type-hierarchy-known` finding
-    /// for THIS issue's final shape. When no `[type_hierarchy]` is configured the
-    /// behavior matches that rule. `issue` MUST already carry the derived
-    /// `type:<kind>` label.
-    fn reject_undeclared_type(&self, issue: &Issue) -> Result<()> {
-        let rules = self.effective_rules()?;
-        let repo_format = self.repo_content_format()?;
-        let evaluation = crate::validation::evaluate_local(issue, rules, repo_format)
-            .map_err(|err| anyhow!("rule evaluation failed: {err}"))?;
-        if let Some(finding) = evaluation
-            .findings()
-            .into_iter()
-            .find(|finding| finding.rule == "type-hierarchy-known")
-        {
-            return Err(crate::errors::ValidationFailedError::new(finding.message.clone()).into());
-        }
-        Ok(())
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn create_issue(
         &self,
@@ -201,39 +168,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        // Config comes from the executor cache so it is not re-parsed per call.
-        // Label format and ALL namespace constraints (canonical format, uniqueness,
-        // registry, etc.) are now enforced SOLELY by the effective rule set inside
-        // `validate_for_write` (a0f0f342 migration) — no inline format/uniqueness
-        // check remains here.
-        let config = self.cached_config()?;
-
         // REQ-02: an explicit `--type <kind>` derives the canonical `type:<kind>`
         // label, replacing any caller-supplied `type:*` label. The command layer
         // owns this derivation (the CLI only forwards the typed value). Applied
         // BEFORE the default-type fallback so an explicit type suppresses the
-        // default. Kind validity is enforced below via `reject_undeclared_type`,
-        // which routes the decision through the rule engine on the final shape.
+        // default. The captured publisher validates kind membership and the final
+        // shape against the declarations in its mutation read set.
         let explicit_type = issue_type.is_some();
         if let Some(kind) = issue_type {
             labels.retain(|label| !label_utils::is_type_label(label));
             labels.push(label_utils::type_label(&kind));
-        }
-
-        // Apply the configured default type when the issue carries no `type:*`
-        // label. This is a write-time CONVENIENCE (not validation enforcement), so
-        // it survives the a0f0f342 migration that removed the hard-coded
-        // validator. The `[validation].default_type` config field remains its
-        // input until the config->rules migration (task 0abaddc0).
-        if let Some(default_type) = config
-            .validation
-            .as_ref()
-            .and_then(|v| v.default_type.as_deref())
-        {
-            let has_type = label_utils::type_label_value(&labels).is_some();
-            if !has_type {
-                labels.push(label_utils::type_label(default_type));
-            }
         }
 
         let mut issue = Issue::draft(title, description);
@@ -250,8 +194,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         // INTENTIONAL direct state write: this is the INITIAL state of an issue being
         // constructed, not a transition of an existing persisted issue. There is
         // no prior state to transition from, no dependency neighborhood yet (the
-        // issue has no dependencies by construction here), and `validate_for_write`
-        // below covers create-time validation.
+        // issue has no dependencies by construction here), and the captured
+        // publisher below covers create-time validation.
         if issue.dependencies.is_empty() {
             issue.state = State::Ready;
             // This direct write is the issue's INITIAL Ready state, so it does not
@@ -266,16 +210,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // (`type-hierarchy-known`), which only warns on the normal path.
         // Scoped to the explicit-type path so non-`--type` writes keep warn-only
         // behavior; runs before the write so a bad type changes nothing.
-        if explicit_type {
-            self.reject_undeclared_type(&issue)?;
-        }
-
-        // Single write-time validation entry point: runs the legacy validator
-        // plus the declarative local rules against the FINAL issue shape, and
-        // carries any `--force` bypass events into the same repository mutation.
-        let validation = self.validate_for_write(&issue, force)?;
-
-        let issue_id = self.publish_issue_creation(issue, &validation.bypassed_rules)?;
+        let (issue_id, validation) = self.publish_issue_creation(issue, explicit_type, force)?;
 
         Ok((issue_id, validation.warnings))
     }
@@ -408,7 +343,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// use jit::storage::InMemoryStorage;
     ///
     /// let storage = InMemoryStorage::new();
-    /// storage.add_repo_file(".jit/config.toml", "");
+    /// storage.add_data_file("config.toml", "");
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str| {
@@ -462,7 +397,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// use jit::storage::InMemoryStorage;
     ///
     /// let storage = InMemoryStorage::new();
-    /// storage.add_repo_file(".jit/config.toml", "");
+    /// storage.add_data_file("config.toml", "");
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str| {
@@ -693,7 +628,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// local-rule enforcement: `claim` carries no content edits and `reject`
     /// deliberately bypasses validation. Local rules are enforced on the
     /// content-bearing write paths (`create_issue`, `update_issue`, bulk update)
-    /// via `validate_for_write`. Transition-time GRAPH-rule enforcement (CC-2) and
+    /// from their captured declarations. Transition-time GRAPH-rule enforcement (CC-2) and
     /// the actual state mutation/publication are delegated to captured transition
     /// derivation (which skips enforcement for
     /// `Rejected`), so this path never sets `issue.state` directly.
@@ -886,7 +821,7 @@ mod tests {
 [worktree]
 enforce_leases = "off"
 "#;
-        storage.add_repo_file(".jit/config.toml", config_toml);
+        storage.add_data_file("config.toml", config_toml);
 
         let mut registry = storage.load_gate_registry().unwrap();
         for key in ["tests", "code-review"] {
@@ -1144,9 +1079,9 @@ enforce_leases = "off"
     #[test]
     fn test_captured_graph_blocked_claim_is_typed_and_does_not_assign() {
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-        storage.add_repo_file(
-            ".jit/rules.toml",
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_data_file(
+            "rules.toml",
             r#"
 [[rules]]
 name = "epic-claim-needs-design"
@@ -1210,7 +1145,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_claim_rechecks_ready_precheck_classification_after_preflight_race() {
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut registry = storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "manual-start".to_string(),
@@ -1912,11 +1847,12 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_delete_issue_missing_index_changes_nothing() {
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let issue = crate::domain::types::fixture_issue("Doomed".into(), String::new());
-        let issue_path = format!(".jit/issues/{}.json", issue.id);
+        let issue_relative = format!("issues/{}.json", issue.id);
+        let issue_path = format!(".jit/{issue_relative}");
         let issue_bytes = serde_json::to_string_pretty(&issue).unwrap();
-        storage.add_repo_file(&issue_path, &issue_bytes);
+        storage.add_data_file(&issue_relative, &issue_bytes);
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
 
         assert!(executor.delete_issue(&issue.id).is_err());
@@ -1936,7 +1872,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
             .storage
-            .add_repo_file(".jit/index.json", "not valid JSON");
+            .add_data_file("index.json", "not valid JSON");
         let issue_path = format!(".jit/issues/{issue_id}.json");
         let issue_before = executor.storage.read_repo_file(&issue_path).unwrap();
 
@@ -1955,7 +1891,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_delete_issue_retries_when_lease_mode_changes_after_preflight() {
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let issue = crate::domain::types::fixture_issue("Doomed".into(), String::new());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
@@ -1989,7 +1925,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_delete_issue_rechecks_ambiguous_target_after_preflight() {
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut target = crate::domain::types::fixture_issue("Target".into(), String::new());
         target.id = "22221111111111111111111111111111".to_string();
         crate::commands::test_helpers::seed_issue(&storage, target.clone());
@@ -2022,7 +1958,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
         ))));
         let storage = InMemoryStorage::with_repository_state_failures(failures);
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let recovered = storage.without_repository_state_failures();
         let layout = storage.repository_layout();
         let dependency =

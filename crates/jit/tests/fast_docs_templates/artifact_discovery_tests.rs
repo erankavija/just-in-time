@@ -8,7 +8,9 @@ use jit::domain::artifact_inventory::{
 use jit::domain::artifact_plan::{ArtifactVersion, BlockerCode, EdgeResolutionMode, WarningCode};
 use jit::domain::type_taxonomy::HierarchyConfig;
 use jit::domain::{DocumentReference, Issue, State};
-use jit::storage::{discover_archive_artifacts, JsonFileStorage};
+use jit::storage::{
+    discover_archive_artifacts, discover_repository_layout, IssueStore, JsonFileStorage,
+};
 use std::fs;
 use tempfile::TempDir;
 
@@ -43,9 +45,12 @@ impl Repo {
         let temp = std::sync::Arc::new(TempDir::new().unwrap());
         let root = temp.path().to_path_buf();
         fs::create_dir(root.join(".jit")).unwrap();
+        let storage = JsonFileStorage::new(root.join(".jit"));
+        let layout = discover_repository_layout(&root, storage.root()).unwrap();
+        storage.configure_repository_layout(&layout);
         Self {
             _temp: temp,
-            storage: JsonFileStorage::new(root.join(".jit")),
+            storage,
             root,
         }
     }

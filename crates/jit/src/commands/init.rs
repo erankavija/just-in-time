@@ -1,30 +1,29 @@
 use super::CommandExecutor;
-use crate::config::{slugify_project_name, JitConfig, ProjectName};
+use crate::config::{slugify_project_name, ProjectName};
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
     build_profile_claims, EmbeddedProfilePackage, ProfileApplicationStatus, ProfileApplyResult,
 };
 use crate::repository_state::{
-    apply_overlay, derive_profile_materializations, finalize_initialization, GitattributesClaim,
-    GitattributesStatus, InitializationScaffold, ProfileContribution, ProfileTargetContribution,
-    RepositoryEntry, VirtualPath,
+    apply_overlay, derive_materialization, ExpectedPreimage, GitattributesClaim,
+    GitattributesStatus, InitializationScaffold, MaterializationPlan, MaterializationRequest,
+    ProfileApplicationInput, ProfileTargetDisposition, RepositoryAction, VirtualPath,
 };
-use crate::storage::{
-    JsonFileStorage, RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
-};
+use crate::storage::{JsonFileStorage, RepositoryStateStore, RepositoryStateStoreError};
 use anyhow::{anyhow, Context, Result};
-use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Result of publishing a fresh repository scaffold.
 #[derive(Debug)]
 pub struct FreshInitResult {
-    /// Canonical project identity derived from the repository directory.
-    pub project_name: ProjectName,
     /// Applied profile result when initialization included one.
     pub profile: Option<ProfileApplyResult>,
     /// Outcome of the worktree `.gitattributes` merge-driver claim.
     pub gitattributes: GitattributesStatus,
+    /// Files whose canonical plan preimage was absent.
+    pub created_paths: Vec<String>,
+    /// Files whose canonical plan preimage was an existing file.
+    pub modified_paths: Vec<String>,
 }
 
 impl CommandExecutor<JsonFileStorage> {
@@ -77,33 +76,21 @@ impl CommandExecutor<JsonFileStorage> {
         for _ in 0..8 {
             let (config, project_name) =
                 self.resolve_init_config(session.as_mut(), repo_dir, template)?;
-            let neutral =
-                InitializationScaffold::from_config(config.clone(), project_name.clone(), None)?;
-            let profiled = match package.as_ref() {
-                Some(package) => {
-                    match self.compute_profile_contribution(session.as_mut(), package, &neutral)? {
-                        // A retryable capture conflict: re-attempt the whole init.
-                        None => continue,
-                        Some(pair) => Some(pair),
-                    }
-                }
+            let profile = match package.as_ref() {
+                Some(package) => Some(self.profile_input(package)?),
                 None => None,
             };
-            let (contribution, mut apply_result) = match profiled {
-                Some((contribution, result)) => (Some(contribution), Some(result)),
-                None => (None, None),
-            };
-            let scaffold = InitializationScaffold::from_config(config, project_name, contribution)?
+            let scaffold = InitializationScaffold::from_config(config, project_name, profile)?
                 .with_gitattributes(gitattributes.clone());
 
-            let extra_paths = scaffold.delta_paths()?;
+            let mut extra_paths = scaffold.delta_paths()?;
             // Probe capture: the deliberately over-inclusive scaffold overlay yields
             // a base good enough to finalize the exact delta. That delta's overlay
             // is the AUTHORITATIVE proposed state — only the files init writes — so a
             // preserved `IfAbsent` file (e.g. an existing `rules.toml` referencing a
             // custom schema) is not shadowed by its neutral default in the closure.
             let probe_overrides = scaffold.overlay_overrides()?;
-            let probe = match self.capture_proposed_base(
+            let mut probe = match self.capture_proposed_base(
                 session.as_mut(),
                 &probe_overrides,
                 &extra_paths,
@@ -112,8 +99,31 @@ impl CommandExecutor<JsonFileStorage> {
                 None => continue,
                 Some(base) => base,
             };
+            if scaffold.profile().is_some() {
+                extra_paths.extend(scaffold.profile_capture_closure(&probe)?);
+                let expanded = match self.capture_proposed_base(
+                    session.as_mut(),
+                    &probe_overrides,
+                    &extra_paths,
+                    None,
+                )? {
+                    None => continue,
+                    Some(base) => base,
+                };
+                if !expanded.has_stable_overlap(&probe) {
+                    continue;
+                }
+                probe = expanded;
+            }
             let delta_overlay = super::validation_overlay(
-                finalize_initialization(&probe, &scaffold, &context)?.delta(),
+                derive_materialization(
+                    &probe,
+                    MaterializationRequest::Initialize {
+                        scaffold: &scaffold,
+                        context: &context,
+                    },
+                )?
+                .delta(),
             );
 
             // Re-capture the base with the exact write set so the validation closure
@@ -128,30 +138,77 @@ impl CommandExecutor<JsonFileStorage> {
                 None => continue,
                 Some(base) => base,
             };
-            let plan = finalize_initialization(&base, &scaffold, &context)?;
-            let proposed = apply_overlay(&base, delta_overlay)?;
-            let validation = crate::validation::repository::validate_repository(&proposed)?;
+            let final_profile_closure = scaffold.profile_capture_closure(&base)?;
+            if final_profile_closure
+                .iter()
+                .any(|path| !base.capture_spec().contains_path(path))
+            {
+                continue;
+            }
+            let plan = derive_materialization(
+                &base,
+                MaterializationRequest::Initialize {
+                    scaffold: &scaffold,
+                    context: &context,
+                },
+            )?;
+            if plan.delta().actions().iter().any(|action| {
+                !base
+                    .capture_spec()
+                    .paths()
+                    .any(|path| path == action.path())
+            }) {
+                continue;
+            }
+            let profile_status = package.as_ref().map(|package| {
+                let record_path =
+                    VirtualPath::data(format!("profiles/{}.json", package.manifest().profile.id));
+                let changed_target = plan
+                    .profile_targets()
+                    .iter()
+                    .any(|target| target.disposition != ProfileTargetDisposition::Unchanged);
+                let changed_record = record_path.is_ok_and(|path| {
+                    plan.delta()
+                        .actions()
+                        .iter()
+                        .any(|action| action.path() == &path)
+                });
+                if changed_target || changed_record {
+                    ProfileApplicationStatus::Applied
+                } else {
+                    ProfileApplicationStatus::Unchanged
+                }
+            });
+            let proposed = apply_overlay(&base, super::validation_overlay(plan.delta()))?;
+            let validation = crate::validation::repository::validate_repository(&proposed)
+                .map_err(init_validation_error)?;
             if validation.rule_report.has_errors() {
                 anyhow::bail!(
                     "repository initialization produced {} validation error finding(s)",
                     validation.rule_report.error_count()
                 );
             }
+            let gitattributes = scaffold.gitattributes_status(&base)?;
+            let (created_paths, modified_paths) = init_response_paths(&plan, gitattributes)?;
 
             match session.apply(&plan) {
                 Ok(outcome) => {
-                    let project_name = scaffold.project_name().clone();
-                    let gitattributes = scaffold.gitattributes_status(&base)?;
-                    let profile = apply_result.take().map(|mut result| {
-                        if result.status == ProfileApplicationStatus::Applied {
-                            result.transaction_id = Some(outcome.transaction_hash.clone());
-                        }
-                        result
-                    });
+                    let profile = profile_status
+                        .zip(package.as_ref())
+                        .map(|(status, package)| ProfileApplyResult {
+                            id: package.manifest().profile.id.clone(),
+                            version: package.manifest().profile.version.clone(),
+                            status,
+                            plan_hash: plan.hash().to_string(),
+                            transaction_id: (status == ProfileApplicationStatus::Applied)
+                                .then(|| outcome.transaction_hash.clone()),
+                            warnings: Vec::new(),
+                        });
                     return Ok(FreshInitResult {
-                        project_name,
                         profile,
                         gitattributes,
+                        created_paths,
+                        modified_paths,
                     });
                 }
                 Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
@@ -192,12 +249,9 @@ impl CommandExecutor<JsonFileStorage> {
             Some(bytes) => {
                 let config =
                     String::from_utf8(bytes).context("existing .jit/config.toml is not UTF-8")?;
-                let parsed: JitConfig = toml::from_str(&config)
+                let parsed = crate::declarations::parse_configuration(config.as_bytes())
                     .context("Failed to parse existing init configuration")?;
-                let project_name = parsed
-                    .project
-                    .and_then(|project| project.name)
-                    .unwrap_or(generated_name);
+                let project_name = parsed.project_name().cloned().unwrap_or(generated_name);
                 Ok((config, project_name))
             }
             None => Ok((
@@ -210,120 +264,131 @@ impl CommandExecutor<JsonFileStorage> {
         }
     }
 
-    /// Compute one embedded profile's contribution to the initialization delta
-    /// through the canonical `repository_state` derivation, carrying its asset bytes,
-    /// provenance record, and audit-log image.
+    /// Capture the neutral proposed base and convert one embedded package into
+    /// complete neutral claims and provenance metadata.
     ///
     /// The base is captured under the held session, overlaid with the neutral
     /// scaffold state init will publish (schemas always; an existing
     /// config/gates/rules preserved), so the profile merges over the proposed neutral
     /// repository. Returns `Ok(None)` on a retryable capture conflict so the caller
     /// re-attempts the whole initialization.
-    fn compute_profile_contribution(
+    fn profile_input(
         &self,
-        session: &mut (dyn RepositoryMutationSession + '_),
         package: &EmbeddedProfilePackage<'_>,
-        neutral: &InitializationScaffold,
-    ) -> Result<Option<(ProfileContribution, ProfileApplyResult)>> {
+    ) -> Result<ProfileApplicationInput> {
         super::profile::reject_reserved_application_targets(
             package.hashes().targets.keys().map(String::as_str),
         )?;
         let metadata = &package.manifest().profile;
         let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
-        let profiles_dir = VirtualPath::data("profiles")?;
-        let events_path = VirtualPath::data("events.jsonl")?;
-        let neutral_files = neutral.neutral_files();
-
-        // Capture the base broad enough for the merge, region composition, and
-        // projection re-render: package content targets, the neutral scaffold files,
-        // and the application-owned record/events/profiles paths.
-        let mut content_paths = package
-            .hashes()
-            .targets
-            .keys()
-            .map(|target| super::repo_rel_virtual_path(target))
-            .collect::<Result<Vec<_>>>()?;
-        for (path, _) in &neutral_files {
-            content_paths.push(super::repo_rel_virtual_path(path)?);
-        }
-        content_paths.push(record_path.clone());
-        content_paths.push(profiles_dir.clone());
-        content_paths.push(events_path.clone());
-        let base =
-            match self.capture_proposed_base(session, &BTreeMap::new(), &content_paths, None)? {
-                None => return Ok(None),
-                Some(base) => base,
-            };
-
-        // The neutral overlay reflects only the scaffold state init publishes:
-        // schemas are always (re)written, but an existing config/gates/rules is
-        // preserved (`IfAbsent`). Overlaying a present file with its default would
-        // shadow the live declarations, so present non-schema neutral files fall
-        // through to their captured bytes.
-        let mut neutral_overrides: BTreeMap<VirtualPath, Option<Vec<u8>>> = BTreeMap::new();
-        for (path, bytes) in neutral_files {
-            let vpath = super::repo_rel_virtual_path(&path)?;
-            let absent = matches!(base.entry(&vpath)?, RepositoryEntry::Absent);
-            if path.starts_with(".jit/schemas/") || absent {
-                neutral_overrides.insert(vpath, Some(bytes));
-            }
-        }
-        let neutral_base = apply_overlay(&base, neutral_overrides)?;
-
-        let claims = build_profile_claims(package, &neutral_base)?;
-        let derived = derive_profile_materializations(&neutral_base, claims)?;
-
-        let record = super::profile::expected_record(package);
-        let record_matches =
-            super::profile::record_matches_in_image(&neutral_base, &record_path, &record)?;
-        let ensure_profiles_dir =
-            super::profile::profile_dir_needs_creation(&neutral_base, &profiles_dir)?;
-
-        let mut targets = Vec::new();
-        let mut all_unchanged = true;
-        for (path, (bytes, mode)) in &derived {
-            if super::profile::target_action(&neutral_base, path, bytes, *mode)?
-                != crate::profile::ProfileTargetAction::Unchanged
-            {
-                all_unchanged = false;
-                targets.push(ProfileTargetContribution {
-                    path: path.clone(),
-                    bytes: bytes.clone(),
-                    mode: *mode,
-                });
-            }
-        }
-        let profile_changed = !all_unchanged || !record_matches;
-
-        // The finalizer composes the ProfileApplied audit append from the captured
-        // events prefix (owning its id, timestamp, and torn-tail evidence); the
-        // command only signals whether the profile changed.
-        let contribution = ProfileContribution {
+        let layout = self.require_layout()?;
+        Ok(ProfileApplicationInput {
             id: metadata.id.clone(),
             version: metadata.version.clone(),
             package_hash: package.hashes().package.clone(),
             target_hashes: package.hashes().targets.clone(),
-            targets,
+            origin: crate::domain::ProfileOrigin::Embedded,
+            claims: build_profile_claims(package, &layout)?,
             record_path,
-            record_bytes: record.to_bytes()?,
-            record_changed: !record_matches,
-            emit_event: profile_changed,
-            ensure_profiles_dir,
-        };
-        let apply_result = ProfileApplyResult {
-            id: metadata.id.clone(),
-            version: metadata.version.clone(),
-            status: if profile_changed {
-                ProfileApplicationStatus::Applied
-            } else {
-                ProfileApplicationStatus::Unchanged
-            },
-            plan_hash: super::profile::profile_plan_hash(&derived),
-            transaction_id: None,
-            warnings: Vec::new(),
-        };
-        Ok(Some((contribution, apply_result)))
+        })
     }
+}
+
+/// Project the stable public init report from the exact finalized plan.
+///
+/// The response intentionally reports only the five user-facing scaffold files
+/// plus the worktree `.gitattributes` claim. Derived schemas, projections, and
+/// other materialization refreshes remain internal transaction details. Every
+/// reported creation or modification is nevertheless proven by the finalized
+/// action's expected preimage; no ambient filesystem probe participates.
+fn init_response_paths(
+    plan: &MaterializationPlan,
+    gitattributes: GitattributesStatus,
+) -> Result<(Vec<String>, Vec<String>)> {
+    let mut created = [
+        (".jit/index.json", "index.json"),
+        (".jit/gates.toml", "gates.toml"),
+        (".jit/events.jsonl", "events.jsonl"),
+        (".jit/config.toml", "config.toml"),
+        (".jit/rules.toml", "rules.toml"),
+    ]
+    .into_iter()
+    .map(|(reported, relative)| {
+        let path = VirtualPath::data(relative)?;
+        Ok(plan
+            .delta()
+            .actions()
+            .iter()
+            .find(|action| action.path() == &path)
+            .is_some_and(|action| {
+                matches!(
+                    action,
+                    RepositoryAction::WriteFile {
+                        expected: ExpectedPreimage::Absent,
+                        ..
+                    }
+                )
+            })
+            .then(|| reported.to_string()))
+    })
+    .collect::<Result<Vec<_>>>()?
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+    let mut modified = Vec::new();
+
+    let attributes_path = VirtualPath::worktree(".gitattributes")?;
+    let attributes_action = plan
+        .delta()
+        .actions()
+        .iter()
+        .find(|action| action.path() == &attributes_path);
+    match gitattributes {
+        GitattributesStatus::Created => match attributes_action {
+            Some(RepositoryAction::WriteFile {
+                expected: ExpectedPreimage::Absent,
+                ..
+            }) => created.push(".gitattributes".to_string()),
+            _ => anyhow::bail!(
+                "initialization report status {gitattributes:?} disagrees with finalized .gitattributes action"
+            ),
+        },
+        GitattributesStatus::Modified => match attributes_action {
+            Some(RepositoryAction::WriteFile {
+                expected: ExpectedPreimage::File { .. },
+                ..
+            }) => modified.push(".gitattributes".to_string()),
+            _ => anyhow::bail!(
+                "initialization report status {gitattributes:?} disagrees with finalized .gitattributes action"
+            ),
+        },
+        GitattributesStatus::NotApplicable | GitattributesStatus::Unchanged => {}
+    }
+
+    Ok((created, modified))
+}
+
+/// Preserve the startup-facing too-new-format error while deriving it from the
+/// same closed proposed image that init validates. Other structural failures keep
+/// their original validation context.
+fn init_validation_error(
+    failure: crate::validation::repository::RepositoryValidationFailure,
+) -> anyhow::Error {
+    let error = failure.into_error();
+    let unsupported = error.chain().find_map(|cause| {
+        cause
+            .downcast_ref::<crate::repository_state::RepositoryIndexError>()
+            .and_then(|error| match error {
+                crate::repository_state::RepositoryIndexError::UnsupportedVersion {
+                    found,
+                    supported,
+                } => Some((*found, *supported)),
+                _ => None,
+            })
+    });
+    unsupported.map_or(error, |(found, supported)| {
+        crate::storage::RepositoryFormatTooNewError::new(found, supported).into()
+    })
 }
 
 /// Resolve one embedded profile package by stable id.
@@ -397,7 +462,8 @@ fn git_events_pattern(relative: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::AppliedProfileRecord;
+    use crate::profile::jit_dogfood_package;
+    use crate::repository_state::AppliedProfileRecord;
     use crate::storage::{discover_repository_layout, IssueStore};
     use std::fs;
     use std::path::PathBuf;
@@ -593,6 +659,68 @@ mod tests {
             fs::read(repo.path().join(".jit/profiles/jit-dogfood.json")).unwrap(),
             compact_record
         );
+    }
+
+    #[test]
+    fn test_profiled_init_detects_projection_source_outside_final_capture() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let executor = executor_with_layout(&storage, repo.path());
+        executor
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
+
+        let config_path = repo.path().join(".jit/config.toml");
+        let mut config = fs::read_to_string(&config_path).unwrap();
+        let project_name = crate::declarations::parse_configuration(config.as_bytes())
+            .unwrap()
+            .project_name()
+            .cloned()
+            .unwrap();
+        config.push_str(
+            "\n[item_kinds.race]\nsection = \"race\"\nid-pattern = \"R-[0-9]+\"\n\
+             markers = []\nlink-namespaces = []\nscope = \"project\"\n\
+             source-of-truth = \"markdown-first\"\nsource = \"RACE.md\"\n\
+             [projection.race]\nkind = \"race\"\nmode = \"separate-file\"\n\
+             target = \"RACE.generated.md\"\nstyle = \"id-anchor\"\n",
+        );
+        fs::write(
+            repo.path().join("RACE.md"),
+            "## Race\n\n- **R-1** — recaptured\n",
+        )
+        .unwrap();
+
+        let package = jit_dogfood_package().unwrap();
+        let profile = executor.profile_input(&package).unwrap();
+        let proposed_config = config.as_bytes().to_vec();
+        let scaffold =
+            InitializationScaffold::from_config(config, project_name, Some(profile)).unwrap();
+        let layout = executor.require_layout().unwrap();
+        let mut session = executor.storage().open_mutation_session(layout).unwrap();
+        let image = executor
+            .capture_proposed_base(
+                session.as_mut(),
+                &Default::default(),
+                &scaffold.delta_paths().unwrap(),
+                None,
+            )
+            .unwrap()
+            .unwrap();
+        let proposed = apply_overlay(
+            &image,
+            [(
+                VirtualPath::data("config.toml").unwrap(),
+                Some(proposed_config),
+            )],
+        )
+        .unwrap();
+        let source = VirtualPath::worktree("RACE.md").unwrap();
+
+        assert!(!proposed.capture_spec().contains_path(&source));
+        assert!(scaffold
+            .profile_capture_closure(&proposed)
+            .unwrap()
+            .contains(&source));
     }
 
     #[test]

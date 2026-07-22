@@ -41,17 +41,24 @@ assert = { require-label = { label = "req:*", min = 1 } }
 /// Leases are disabled so the write path does not require a claim.
 fn executor(strictness: Option<&str>, rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     let storage = InMemoryStorage::new();
-    std::fs::create_dir_all(storage.root()).unwrap();
+    let defaults = jit::repository_state::serialize_ruleset(
+        &jit::repository_state::default_ruleset(&jit::domain::LabelNamespaces::default()),
+    );
     let validation = match strictness {
         Some(level) => format!("[validation]\nstrictness = \"{level}\"\n"),
         None => String::new(),
     };
-    std::fs::write(
-        storage.root().join("config.toml"),
-        format!("[worktree]\nenforce_leases = \"off\"\n{validation}"),
-    )
-    .unwrap();
-    std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+    storage.add_data_file(
+        "config.toml",
+        &format!("[worktree]\nenforce_leases = \"off\"\n{validation}"),
+    );
+    storage.add_data_file(
+        "rules.toml",
+        &format!("{}{rules_toml}", defaults.rules_toml),
+    );
+    for schema in defaults.schema_files {
+        storage.add_data_file(format!("schemas/{}", schema.name), &schema.content);
+    }
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
 }

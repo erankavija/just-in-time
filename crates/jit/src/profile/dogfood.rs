@@ -429,7 +429,9 @@ mod tests {
 
     #[test]
     fn test_live_assets_match_every_declared_source_tree_consumer() {
-        use crate::repository_state::splice_region;
+        use crate::repository_state::{
+            render_managed_document, ManagedDocumentClaim, RegionPlacement,
+        };
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let package = jit_dogfood_package().unwrap();
 
@@ -482,10 +484,22 @@ mod tests {
             let source =
                 std::str::from_utf8(package.source_bytes(&region.source).unwrap()).unwrap();
             if source.contains(inv_begin) {
-                let normalized_live =
-                    splice_region(body, "_No invariants declared._", inv_begin, inv_end).unwrap();
-                let normalized_source =
-                    splice_region(source, "_No invariants declared._", inv_begin, inv_end).unwrap();
+                let claim = ManagedDocumentClaim::Region {
+                    owner: "test".into(),
+                    region_id: "invariants".into(),
+                    begin: inv_begin.as_bytes().to_vec(),
+                    end: inv_end.as_bytes().to_vec(),
+                    content: b"_No invariants declared._".to_vec(),
+                    placement: RegionPlacement::RequireExisting,
+                };
+                let normalized_live = String::from_utf8(
+                    render_managed_document(body.as_bytes(), std::slice::from_ref(&claim)).unwrap(),
+                )
+                .unwrap();
+                let normalized_source = String::from_utf8(
+                    render_managed_document(source.as_bytes(), &[claim]).unwrap(),
+                )
+                .unwrap();
                 assert_eq!(
                     normalized_live, normalized_source,
                     "{} region prose drifted from the package",

@@ -126,6 +126,10 @@ impl<S: IssueStore> PublicationProbeStore<S> {
 }
 
 impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
+    fn configure_repository_layout(&self, layout: &jit::repository_state::RepositoryLayout) {
+        self.inner.configure_repository_layout(layout);
+    }
+
     fn acquire_repo_write_lock(&self) -> Result<jit::storage::RepoWriteGuard> {
         self.inner.acquire_repo_write_lock()
     }
@@ -347,7 +351,7 @@ fn bindings(container: &str) -> BTreeMap<String, String> {
 
 fn memory_storage() -> InMemoryStorage {
     let storage = InMemoryStorage::new();
-    storage.add_repo_file(".jit/config.toml", "");
+    storage.add_data_file("config.toml", "");
     storage
 }
 
@@ -576,10 +580,9 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
 fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
     let store = PublicationProbeStore::new(memory_storage());
     let (executor, container, _) = fixture(store.clone());
-    store.inner.add_repo_file(
-        ".jit/config.toml",
-        "[worktree]\nenforce_leases = \"warn\"\n",
-    );
+    store
+        .inner
+        .add_data_file("config.toml", "[worktree]\nenforce_leases = \"warn\"\n");
     let resolves_before = store.resolve_calls();
 
     let (_, warnings) = executor
@@ -651,7 +654,7 @@ fn assert_planning_document_capture(existing: bool) {
     let (executor, container, _) = fixture(store.clone());
     let target = format!("dev/active/{container}-plan.md");
     if existing {
-        store.inner.add_repo_file(&target, "existing plan\n");
+        store.inner.add_worktree_file(&target, "existing plan\n");
     }
 
     executor

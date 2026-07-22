@@ -214,7 +214,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// use jit::storage::InMemoryStorage;
     ///
     /// let storage = InMemoryStorage::new();
-    /// storage.add_repo_file(".jit/config.toml", "");
+    /// storage.add_data_file("config.toml", "");
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let (done, _) = executor

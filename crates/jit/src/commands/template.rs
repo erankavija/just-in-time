@@ -345,7 +345,7 @@ struct DerivedTemplateApply {
 
 struct CapturedTemplateApply {
     config: crate::config::JitConfig,
-    declarations: super::ImageDeclarations,
+    declarations: crate::repository_state::CapturedRepositoryDeclarations,
     issues: Vec<Issue>,
     derived: DerivedTemplateApply,
 }
@@ -501,7 +501,7 @@ fn template_declaration_closure(image: &RepositoryImage) -> Result<Vec<VirtualPa
         .file_bytes(&VirtualPath::data("rules.toml")?)?
         .map(std::str::from_utf8)
         .transpose()?;
-    render_capture_closure(&config, &[], rules)
+    render_capture_closure(image.layout(), &config, &[], rules)
 }
 
 fn template_operation_capture_paths(
@@ -609,12 +609,12 @@ fn template_config_from_image(image: &RepositoryImage) -> Result<crate::config::
 fn template_declarations_from_image(
     image: &RepositoryImage,
     config: &crate::config::JitConfig,
-) -> Result<super::ImageDeclarations> {
+) -> Result<crate::repository_state::CapturedRepositoryDeclarations> {
     if image
         .file_bytes(&VirtualPath::data("config.toml")?)?
         .is_some()
     {
-        return super::declarations_from_image(image);
+        return crate::repository_state::declarations_from_image(image);
     }
     let namespaces = crate::config_manager::namespaces_from_config(config);
     let rules = match image.file_bytes(&VirtualPath::data("rules.toml")?)? {
@@ -636,11 +636,14 @@ fn template_declarations_from_image(
         }
         None => crate::repository_state::default_ruleset(&namespaces),
     };
-    Ok(super::ImageDeclarations {
-        configuration: crate::declarations::parse_configuration(b"")?,
-        gates: parse_template_gate_registry(image)?,
-        rules,
-    })
+    Ok(
+        crate::repository_state::CapturedRepositoryDeclarations::from_parts(
+            crate::declarations::parse_configuration(b"")?,
+            config.clone(),
+            parse_template_gate_registry(image)?,
+            rules,
+        ),
+    )
 }
 
 fn parse_template_index(

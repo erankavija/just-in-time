@@ -1110,8 +1110,7 @@ mod tests {
 
     /// Helper to create a test issue
     fn create_test_issue(storage: &JsonFileStorage, title: &str) -> Result<String> {
-        let worktree = storage.root().parent().unwrap();
-        let layout = crate::storage::discover_repository_layout(worktree, storage.root())?;
+        let layout = storage.configured_layout()?;
         CommandExecutor::new(storage.clone())
             .with_layout(layout)
             .create_issue(

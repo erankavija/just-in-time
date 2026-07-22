@@ -437,7 +437,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 continue;
             };
             let issues = super::captured_active_issues(&image)?;
-            let declarations = super::declarations_from_image(&image)?;
+            let declarations = crate::repository_state::declarations_from_image(&image)?;
             let config = crate::repository_state::assemble_config(&image)?;
             if enforce_lease
                 && self.config_manager.enforcement_mode_from_config(&config)? != expected_lease_mode
@@ -1149,7 +1149,7 @@ mod captured_tests {
     #[test]
     fn test_dependency_add_rederives_and_preserves_concurrent_issue_change() {
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let dependency = crate::domain::types::fixture_issue("dependency".into(), String::new());
         let dependency_id = dependency.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, dependency);
@@ -1186,7 +1186,7 @@ mod captured_tests {
             crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
         ))));
         let storage = InMemoryStorage::with_repository_state_failures(failures);
-        storage.add_repo_file(".jit/config.toml", "");
+        storage.add_data_file("config.toml", "");
         let recovered = storage.without_repository_state_failures();
         let layout = storage.repository_layout();
 
@@ -1231,9 +1231,9 @@ mod captured_tests {
     #[test]
     fn test_dependency_removal_graph_block_commits_edge_and_attempt_event() {
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(".jit/config.toml", "");
-        storage.add_repo_file(
-            ".jit/rules.toml",
+        storage.add_data_file("config.toml", "");
+        storage.add_data_file(
+            "rules.toml",
             r#"
 [[rules]]
 name = "ready-needs-design"
@@ -1280,7 +1280,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_dependency_removal_duplicate_alias_is_not_found_after_first_match() {
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(".jit/config.toml", "");
+        storage.add_data_file("config.toml", "");
         let layout = storage.repository_layout();
         let dependency = crate::domain::types::fixture_issue("dependency".into(), String::new());
         let dependency_id = dependency.id.clone();
@@ -1302,7 +1302,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_single_removal_rejects_dependency_prefix_that_becomes_ambiguous() {
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut dependency = crate::domain::types::fixture_issue("dep".into(), String::new());
         dependency.id = "22221111111111111111111111111111".to_string();
         let mut source = crate::domain::types::fixture_issue("source".into(), String::new());
@@ -1341,7 +1341,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_single_removal_rejects_dependency_deleted_between_phases() {
         let storage = InMemoryStorage::new();
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut dependency = crate::domain::types::fixture_issue("dep".into(), String::new());
         dependency.id = "22221111111111111111111111111111".to_string();
         let mut source = crate::domain::types::fixture_issue("source".into(), String::new());

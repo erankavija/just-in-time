@@ -12,11 +12,11 @@ mod package;
 
 pub use crate::domain::ProfileOrigin;
 pub use application::{
-    AppliedProfileRecord, ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
-    ProfileListResult, ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary,
-    ProfileTargetAction, ProfileTargetChange,
+    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileListResult,
+    ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction,
+    ProfileTargetChange,
 };
-pub use apply_claims::{build_profile_claims, ProfileClaimError};
+pub use apply_claims::{build_profile_claims, build_profile_repair_claims, ProfileClaimError};
 pub use dogfood::{
     jit_dogfood_gate, jit_dogfood_package, jit_dogfood_planning_gate_keys, DogfoodProfileError,
     JIT_DOGFOOD_LIVE_SOURCE_PREFIX,

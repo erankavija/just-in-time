@@ -641,7 +641,7 @@ source-of-truth = \"registry-first\"
         );
         std::fs::write(storage.root().join("config.toml"), config).unwrap();
         if let Some(md) = source_md {
-            storage.add_repo_file("project-items.md", md);
+            storage.add_worktree_file("project-items.md", md);
         }
         CommandExecutor::new(storage)
     }
@@ -738,7 +738,7 @@ source-of-truth = \"registry-first\"
         );
         std::fs::write(storage.root().join("config.toml"), config).unwrap();
         if let Some(md) = source_md {
-            storage.add_repo_file("project-items.md", md);
+            storage.add_worktree_file("project-items.md", md);
         }
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);
@@ -845,10 +845,10 @@ source-of-truth = \"registry-first\"
         )
         .unwrap();
         if let Some(md) = rules_md {
-            storage.add_repo_file("rules.md", md);
+            storage.add_worktree_file("rules.md", md);
         }
         if let Some(md) = gates_md {
-            storage.add_repo_file("gates.md", md);
+            storage.add_worktree_file("gates.md", md);
         }
         CommandExecutor::new(storage)
     }
@@ -1135,7 +1135,7 @@ source-of-truth = \"registry-first\"
              source-of-truth = \"registry-first\"\n";
         std::fs::write(storage.root().join("config.toml"), config).unwrap();
         if let Some(toml) = policies_toml {
-            storage.add_repo_file("policies.toml", toml);
+            storage.add_worktree_file("policies.toml", toml);
         }
         CommandExecutor::new(storage)
     }
@@ -1212,7 +1212,7 @@ statement = \"Every dependency edge stays acyclic.\"
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
-        storage.add_repo_file(".jit/invariants.toml", invariants_toml);
+        storage.add_data_file("invariants.toml", invariants_toml);
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
@@ -1227,7 +1227,7 @@ statement = \"Every dependency edge stays acyclic.\"
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
-        storage.add_repo_file(".jit/rules.toml", rules_toml);
+        storage.add_data_file("rules.toml", rules_toml);
         CommandExecutor::new(storage)
     }
 
@@ -1346,7 +1346,7 @@ source-of-truth = \"registry-first\"
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), GATE_ITEM_KIND).unwrap();
-        storage.add_repo_file(".jit/gates.toml", gates_toml);
+        storage.add_data_file("gates.toml", gates_toml);
         CommandExecutor::new(storage)
     }
 
@@ -1434,8 +1434,8 @@ stage = \"postcheck\"
         std::fs::create_dir_all(storage.root()).unwrap();
         let config = format!("{CANONICAL_ITEM_KINDS}\n{GATE_ITEM_KIND}");
         std::fs::write(storage.root().join("config.toml"), config).unwrap();
-        storage.add_repo_file(".jit/rules.toml", rules_toml);
-        storage.add_repo_file(".jit/gates.toml", gates_toml);
+        storage.add_data_file("rules.toml", rules_toml);
+        storage.add_data_file("gates.toml", gates_toml);
         CommandExecutor::new(storage)
     }
 
@@ -1543,7 +1543,7 @@ stage = \"postcheck\"
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), config).unwrap();
         if let Some(inv) = invariants_toml {
-            storage.add_repo_file(".jit/invariants.toml", inv);
+            storage.add_data_file("invariants.toml", inv);
         }
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);

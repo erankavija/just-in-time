@@ -153,6 +153,23 @@ impl VirtualPath {
         &self.relative
     }
 
+    /// Canonical descendant directories above this path, nearest root first.
+    pub(crate) fn ancestor_directories(&self) -> Result<Vec<Self>, RepositoryLayoutError> {
+        let RootRelativePath::Descendant(relative) = &self.relative else {
+            return Ok(Vec::new());
+        };
+        let components = relative.split('/').collect::<Vec<_>>();
+        (1..components.len())
+            .map(|length| {
+                let relative = components[..length].join("/");
+                match self.root {
+                    RepositoryRootClass::Worktree => Self::worktree(relative),
+                    RepositoryRootClass::Data => Self::data(relative),
+                }
+            })
+            .collect()
+    }
+
     fn checked(self) -> Result<Self, RepositoryLayoutError> {
         let path = self.relative.as_str();
         let reserved = match self.root {
@@ -345,6 +362,45 @@ impl RepositoryLayout {
         virtual_path.checked()
     }
 
+    /// Classify an adopter-facing repository-relative spelling.
+    ///
+    /// Logical `.jit/...` paths always address the selected data root, including
+    /// when `JIT_DATA_DIR` selects a disjoint or differently named directory.
+    /// Every other spelling addresses the worktree root. Keeping this conversion
+    /// on the layout prevents consumers from maintaining competing `.jit` prefix
+    /// adapters.
+    pub fn classify_repository_relative(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<VirtualPath, RepositoryLayoutError> {
+        let original = path.as_ref();
+        let original_text = original.to_str().ok_or_else(|| {
+            RepositoryLayoutError::LexicalEscape(original.to_string_lossy().into())
+        })?;
+        let mut normalized = original_text;
+        while let Some(rest) = normalized.strip_prefix("./") {
+            normalized = rest;
+        }
+        if normalized.is_empty() {
+            return Err(RepositoryLayoutError::LexicalEscape(
+                original.display().to_string(),
+            ));
+        }
+        let path = Path::new(normalized);
+        let data_prefix = Path::new(".jit");
+        let virtual_path = match path.strip_prefix(data_prefix) {
+            Ok(relative) if !relative.as_os_str().is_empty() => VirtualPath::data(relative)?,
+            Ok(_) => {
+                return Err(RepositoryLayoutError::LexicalEscape(
+                    original.display().to_string(),
+                ));
+            }
+            Err(_) => VirtualPath::worktree(path)?,
+        };
+        self.ensure_canonical(&virtual_path)?;
+        Ok(virtual_path)
+    }
+
     /// Reject a Worktree spelling beneath a nested data root.
     pub fn ensure_canonical(&self, path: &VirtualPath) -> Result<(), RepositoryLayoutError> {
         path.ensure_semantic()?;
@@ -531,6 +587,28 @@ mod tests {
             layout.resolve(&VirtualPath::worktree(".jit/index.json").unwrap()),
             Err(RepositoryLayoutError::DataRootAlias(_))
         ));
+    }
+
+    #[test]
+    fn test_classify_repository_relative_maps_logical_data_and_worktree_paths() {
+        let layout = RepositoryLayout::new(root("/repo"), root("/external/data")).unwrap();
+
+        assert_eq!(
+            layout.classify_repository_relative(".jit/index.json"),
+            Ok(VirtualPath::data("index.json").unwrap())
+        );
+        assert_eq!(
+            layout.classify_repository_relative("docs/README.md"),
+            Ok(VirtualPath::worktree("docs/README.md").unwrap())
+        );
+        assert_eq!(
+            layout.classify_repository_relative("././.jit/index.json"),
+            Ok(VirtualPath::data("index.json").unwrap())
+        );
+        assert!(layout.classify_repository_relative("./").is_err());
+        assert!(layout
+            .classify_repository_relative(".jit/../outside")
+            .is_err());
     }
 
     #[test]

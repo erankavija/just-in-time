@@ -140,11 +140,7 @@ mod tests {
     }
 
     fn vpath(repo_rel: &str) -> VirtualPath {
-        match repo_rel.strip_prefix(".jit/") {
-            Some(rest) => VirtualPath::data(rest),
-            None => VirtualPath::worktree(repo_rel),
-        }
-        .unwrap()
+        layout().classify_repository_relative(repo_rel).unwrap()
     }
 
     fn file_entry(text: &str) -> RepositoryEntry {

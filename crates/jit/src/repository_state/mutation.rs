@@ -205,6 +205,14 @@ impl MutationContext {
         )
     }
 
+    /// Stable non-publishing context for deterministic previews.
+    pub fn preview() -> Self {
+        Self::deterministic(
+            [0; 32],
+            DateTime::<Utc>::from_timestamp(0, 0).expect("the Unix epoch is representable"),
+        )
+    }
+
     /// Derive an identifier at the finalizer's frozen allocation index without
     /// advancing that order. Command orchestration uses this only to capture the
     /// expected-absent paths of records whose finalizer-assigned ids are part of

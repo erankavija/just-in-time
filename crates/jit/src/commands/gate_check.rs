@@ -321,12 +321,15 @@ fn captured_gate_evaluation(
             ..
         } => {
             let configured_path = path;
-            let path = super::repo_rel_virtual_path(path).map_err(|_| {
-                anyhow!(
-                    "prompt_file '{}' resolves outside the repository",
-                    configured_path
-                )
-            })?;
+            let path = image
+                .layout()
+                .classify_repository_relative(path)
+                .map_err(|_| {
+                    anyhow!(
+                        "prompt_file '{}' resolves outside the repository",
+                        configured_path
+                    )
+                })?;
             let bytes = image
                 .file_bytes(&path)?
                 .ok_or_else(|| anyhow!("captured gate prompt file '{path:?}' is missing"))?;
@@ -415,7 +418,7 @@ fn captured_issue_rule_report(
         .iter()
         .find(|issue| issue.id == issue_id)
         .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id))?;
-    let declarations = super::declarations_from_image(image)?;
+    let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
     let repo_format = config
         .validation
@@ -483,7 +486,7 @@ fn captured_scope_rule_report(
 
     let all = super::captured_active_issues(image)?;
     let config = crate::repository_state::assemble_config(image)?;
-    let declarations = super::declarations_from_image(image)?;
+    let declarations = crate::repository_state::declarations_from_image(image)?;
     let container_type = all
         .iter()
         .find(|issue| issue.id == container_id)
@@ -666,23 +669,17 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Repository root used as the checker working directory and as the `git`
     /// context for stamping [`GateRunResult::commit`](crate::domain::GateRunResult).
     ///
-    /// This is the parent of the `.jit` directory. For `InMemoryStorage` in tests
-    /// the root is `"."`, whose parent is the empty path, so we fall back to the
-    /// current working directory to keep the path usable.
-    pub(crate) fn checker_repo_root(&self) -> std::path::PathBuf {
-        self.storage
-            .root()
-            .parent()
-            .filter(|p| !p.as_os_str().is_empty())
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| {
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
-            })
+    /// File-backed stores use the explicit repository layout, never the selected
+    /// data-root parent. In-memory tests retain the current-directory fallback.
+    pub(crate) fn checker_repo_root(&self) -> Result<std::path::PathBuf> {
+        if !self.storage.is_file_backed() {
+            return std::env::current_dir().context("Failed to resolve checker working directory");
+        }
+        self.require_layout()
+            .map(|layout| layout.worktree_root().to_path_buf())
     }
 
-    /// The repository's real on-disk root (parent of `.jit`), or `None` when
-    /// storage names no real repository at all — e.g. `InMemoryStorage`,
-    /// whose `root()` is the placeholder `"."`.
+    /// The explicit on-disk worktree root, or `None` for a non-file-backed store.
     ///
     /// Distinct from [`checker_repo_root`](Self::checker_repo_root), which
     /// falls back to the current working directory so the checker process
@@ -692,11 +689,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// executing inside, instead of staying silent for storage that names no
     /// real repository.
     pub(crate) fn real_repo_root(&self) -> Option<std::path::PathBuf> {
-        self.storage
-            .root()
-            .parent()
-            .filter(|p| !p.as_os_str().is_empty())
-            .map(|p| p.to_path_buf())
+        if !self.storage.is_file_backed() {
+            return None;
+        }
+        self.require_layout()
+            .ok()
+            .map(|layout| layout.worktree_root().to_path_buf())
     }
 
     /// Compare the running binary's own build provenance against the
@@ -863,7 +861,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             ..
         } = checker
         {
-            let prompt = super::repo_rel_virtual_path(path)
+            let prompt = initial
+                .layout()
+                .classify_repository_relative(path)
                 .map_err(|_| anyhow!("prompt_file '{}' resolves outside the repository", path))?;
             spec.discover_paths([prompt])?;
         }
@@ -1297,7 +1297,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .checker
             .as_ref()
             .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", input.gate_key))?;
-        let repo_root = self.checker_repo_root();
+        let repo_root = self.checker_repo_root()?;
         if matches!(checker, crate::declarations::GateChecker::Exec { .. }) {
             if let Some(reason) = self.stale_binary_reason() {
                 return Err(crate::errors::StaleBinaryError::new(
@@ -2012,11 +2012,7 @@ assert = { require-section = { heading = "Summary" } }
     ) -> super::GateEvaluationEvidence {
         use crate::storage::RepositoryStateStore;
 
-        let layout = crate::storage::discover_repository_layout(
-            executor.storage.root().parent().unwrap(),
-            executor.storage.root(),
-        )
-        .unwrap();
+        let layout = executor.require_layout().unwrap();
         let result =
             crate::repository_state::gate_run_result_relative_path("evidence-probe").unwrap();
         let run_paths = [
@@ -2190,16 +2186,19 @@ assert = { require-section = { heading = "Summary" } }
 
         let mut planned_issue = executor.storage.load_issue(&issue_id).unwrap();
         planned_issue.dependencies.push("nonexistent".to_string());
-        let overrides = crate::commands::overrides_from_repo_changes([
-            (
-                PathBuf::from(".jit/rules.toml"),
-                Some(LATE_REPOSITORY_RULE.as_bytes().to_vec()),
-            ),
-            (
-                PathBuf::from(format!(".jit/issues/{issue_id}.json")),
-                Some(serde_json::to_vec_pretty(&planned_issue).unwrap()),
-            ),
-        ])
+        let overrides = crate::commands::overrides_from_repo_changes(
+            live_image.layout(),
+            [
+                (
+                    PathBuf::from(".jit/rules.toml"),
+                    Some(LATE_REPOSITORY_RULE.as_bytes().to_vec()),
+                ),
+                (
+                    PathBuf::from(format!(".jit/issues/{issue_id}.json")),
+                    Some(serde_json::to_vec_pretty(&planned_issue).unwrap()),
+                ),
+            ],
+        )
         .unwrap();
         let planned_image = executor.capture_validation_image_with(&overrides).unwrap();
         let planned = executor

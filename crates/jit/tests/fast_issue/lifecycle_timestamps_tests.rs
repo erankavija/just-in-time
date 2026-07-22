@@ -53,10 +53,8 @@ fn repository_bytes(h: &TestHarness, id: &str) -> (Option<String>, Option<String
 }
 
 fn replace_index(h: &TestHarness, value: serde_json::Value) {
-    h.storage.add_repo_file(
-        ".jit/index.json",
-        &serde_json::to_string_pretty(&value).unwrap(),
-    );
+    h.storage
+        .add_data_file("index.json", &serde_json::to_string_pretty(&value).unwrap());
 }
 
 fn assert_backfill_rejected_without_writes(h: &TestHarness, id: &str) {
@@ -472,8 +470,8 @@ fn test_backfill_rejects_mismatched_embedded_issue_id_without_writes() {
     let (h, id) = backfill_candidate();
     let mut issue = h.get_issue(&id);
     issue.id = "44444444-4444-4444-8444-444444444444".into();
-    h.storage.add_repo_file(
-        &format!(".jit/issues/{id}.json"),
+    h.storage.add_data_file(
+        format!("issues/{id}.json"),
         &serde_json::to_string_pretty(&issue).unwrap(),
     );
 

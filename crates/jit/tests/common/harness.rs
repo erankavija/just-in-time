@@ -26,7 +26,7 @@ impl TestHarness {
         // Session-backed declaration mutations capture config from the same
         // aggregate image as gates/events; an empty file is the minimal valid
         // repository declaration set for generic harness tests.
-        storage.add_repo_file(".jit/config.toml", "");
+        storage.add_data_file("config.toml", "");
         // A synthetic canonical layout so session-backed mutations (e.g. the
         // validate-fix path) can open the in-memory mutation session. The in-memory
         // backend models its state in one aggregate map keyed by virtual path and
@@ -92,7 +92,7 @@ source-of-truth = \"registry-first\"
         )
         .unwrap();
         self.storage
-            .add_repo_file(".jit/config.toml", CANONICAL_ITEM_KINDS);
+            .add_data_file("config.toml", CANONICAL_ITEM_KINDS);
         self
     }
 
@@ -241,7 +241,7 @@ pub(crate) fn seed_memory_event(storage: &InMemoryStorage, event: &jit::domain::
     let event = jit::repository_state::serialize_event(event).unwrap();
     events.push_str(std::str::from_utf8(&event).unwrap());
     events.push('\n');
-    storage.add_repo_file(".jit/events.jsonl", &events);
+    storage.add_data_file("events.jsonl", &events);
 }
 
 /// Seed an exact authored gate registry into the in-memory aggregate.
@@ -250,7 +250,7 @@ pub(crate) fn seed_memory_gate_registry(
     registry: &jit::declarations::GateRegistry,
 ) {
     let bytes = jit::declarations::serialize_gate_registry(registry).unwrap();
-    storage.add_repo_file(".jit/gates.toml", std::str::from_utf8(&bytes).unwrap());
+    storage.add_data_file("gates.toml", std::str::from_utf8(&bytes).unwrap());
 }
 
 impl Default for TestHarness {

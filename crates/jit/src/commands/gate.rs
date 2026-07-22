@@ -327,7 +327,7 @@ fn capture_gate_preset_image(
         let rules_text = super::image_repo_bytes(&first, ".jit/rules.toml")?
             .map(String::from_utf8)
             .transpose()?;
-        render_capture_closure(&config, &[], rules_text.as_deref())?
+        render_capture_closure(first.layout(), &config, &[], rules_text.as_deref())?
     } else {
         Vec::new()
     };
@@ -972,7 +972,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// AND both commits are present and equal. A missing `HEAD` (no git / no
     /// commit) yields `false`, since the prior pass cannot be proven current.
     fn gate_passed_at_head(&self, full_id: &str, gate_key: &str) -> Result<bool> {
-        let head = crate::gate_execution::get_git_commit(&self.checker_repo_root());
+        let head = crate::gate_execution::get_git_commit(&self.checker_repo_root()?);
         let Some(head) = head else {
             return Ok(false);
         };
@@ -1086,7 +1086,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             let rules_text = super::image_repo_bytes(&image_one, ".jit/rules.toml")?
                 .map(String::from_utf8)
                 .transpose()?;
-            let closure = render_capture_closure(&config, &[], rules_text.as_deref())?;
+            let closure =
+                render_capture_closure(image_one.layout(), &config, &[], rules_text.as_deref())?;
             let mut spec = CaptureSpec::phase_one(registries()?, budget)?;
             spec.discover_paths(closure)?;
             let image = match session.capture(spec) {
@@ -1103,7 +1104,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
             };
             let derived = derive_gate_registry_mutation(registry, &request)?;
-            let mut declarations = super::declarations_from_image(&image)?;
+            let mut declarations = crate::repository_state::declarations_from_image(&image)?;
             declarations.gates = derived.registry.clone();
             let intents = vec![
                 MutationIntent::EditGateRegistry {
@@ -1254,7 +1255,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// std::env::set_var("JIT_TEST_MODE", "1"); // skip the main-history guard
     /// let storage = InMemoryStorage::new();
-    /// storage.add_repo_file(".jit/config.toml", "");
+    /// storage.add_data_file("config.toml", "");
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// executor
@@ -1405,7 +1406,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Ok((derived.result, warnings));
             }
             let plan = if derived.edits_registry {
-                let mut declarations = super::declarations_from_image(&image)?;
+                let mut declarations = crate::repository_state::declarations_from_image(&image)?;
                 declarations.gates = derived.registry;
                 finalize_gate_registry_edit(
                     &layout,
@@ -2199,7 +2200,7 @@ style = "full"
                 other => panic!("unexpected gate registry entry: {other:?}"),
             };
             let derived = derive_gate_registry_mutation(gates, &request).unwrap();
-            let mut declarations = crate::commands::declarations_from_image(image).unwrap();
+            let mut declarations = crate::repository_state::declarations_from_image(image).unwrap();
             declarations.gates = derived.registry.clone();
             let intents = vec![
                 MutationIntent::EditGateRegistry {

@@ -219,22 +219,16 @@ impl InMemoryStorage {
         crate::gate_presets::load_presets_from_custom_files(files)
     }
 
-    /// Map a repo-relative path to its canonical [`VirtualPath`] key in the
-    /// aggregate repository image: a `.jit/`-prefixed path is a `Data(...)` entry,
-    /// every other repo-relative path a `Worktree(...)` entry. This is the SAME
-    /// mapping the materialization producers and command capture specs use, so a
-    /// file seeded through [`InMemoryStorage::add_repo_file`] is captured by a
-    /// mutation session under the identical key.
+    /// Classify an `IssueStore` repository-relative input through the canonical
+    /// layout authority.
     fn repo_file_vpath(
+        &self,
         rel_path: &str,
     ) -> Result<crate::repository_state::VirtualPath, crate::storage::PathReadError> {
-        use crate::repository_state::VirtualPath;
         crate::storage::validate_repo_relative_path(rel_path)?;
-        match rel_path.strip_prefix(".jit/") {
-            Some(rest) => VirtualPath::data(rest),
-            None => VirtualPath::worktree(rel_path),
-        }
-        .map_err(|e| crate::storage::PathReadError::InvalidPath(e.to_string()))
+        self.repository_layout()
+            .classify_repository_relative(rel_path)
+            .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))
     }
 
     /// Mark the aggregate repository image as an EXISTING data root.
@@ -264,15 +258,26 @@ impl InMemoryStorage {
     /// repository image (the single store a mutation session captures and applies).
     fn insert_repo_file(
         &self,
-        rel_path: &str,
+        vpath: VirtualPath,
         content: &str,
     ) -> Result<(), crate::storage::PathReadError> {
         use crate::repository_state::{EntryIdentity, FileMode, RepositoryEntry};
-        let vpath = Self::repo_file_vpath(rel_path)?;
-        let identity = EntryIdentity::for_bytes(rel_path, content.as_bytes())
-            .map_err(|e| crate::storage::PathReadError::Other(anyhow!("{e}")))?;
+        self.repository_layout()
+            .ensure_canonical(&vpath)
+            .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
+        let identity = EntryIdentity::for_bytes(
+            format!(
+                "memory:{:?}:{}",
+                vpath.root_class(),
+                vpath.relative().as_str()
+            ),
+            content.as_bytes(),
+        )
+        .map_err(|e| crate::storage::PathReadError::Other(anyhow!("{e}")))?;
         let mut state = self.repository_state();
-        Self::mark_data_root_existing(&mut state);
+        if vpath.root_class() == RepositoryRootClass::Data {
+            Self::mark_data_root_existing(&mut state);
+        }
         Self::ensure_ancestor_dirs(&mut state, &vpath);
         state.entries.insert(
             vpath,
@@ -285,7 +290,7 @@ impl InMemoryStorage {
         Ok(())
     }
 
-    /// Seed an in-memory repository file at `rel_path` with `content`.
+    /// Seed an in-memory data-root file at `relative` with `content`.
     ///
     /// Mirrors the issue/gate seeding pattern: a test setter so command and domain
     /// tests can stage a config-declared file (e.g. a project-scope item source)
@@ -293,9 +298,19 @@ impl InMemoryStorage {
     /// return it, without touching disk. The file lands in the same aggregate image
     /// a mutation session captures, so seeded state and session-published state
     /// share one store.
-    pub fn add_repo_file(&self, rel_path: &str, content: &str) {
-        self.insert_repo_file(rel_path, content)
-            .expect("add_repo_file requires a valid repo-relative path");
+    pub fn add_data_file(&self, relative: impl AsRef<std::path::Path>, content: &str) {
+        let path = VirtualPath::data(relative)
+            .expect("add_data_file requires a canonical data-root-relative path");
+        self.insert_repo_file(path, content)
+            .expect("add_data_file requires a canonical repository path");
+    }
+
+    /// Seed an in-memory worktree file at `relative` with `content`.
+    pub fn add_worktree_file(&self, relative: impl AsRef<std::path::Path>, content: &str) {
+        let path = VirtualPath::worktree(relative)
+            .expect("add_worktree_file requires a canonical worktree-relative path");
+        self.insert_repo_file(path, content)
+            .expect("add_worktree_file requires a canonical repository path");
     }
 
     /// Canonical `Data(...)` identity for one issue record.
@@ -486,6 +501,10 @@ impl Default for InMemoryStorage {
 }
 
 impl IssueStore for InMemoryStorage {
+    fn repository_layout(&self) -> Result<crate::repository_state::RepositoryLayout> {
+        Ok(InMemoryStorage::repository_layout(self))
+    }
+
     fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard> {
         self.repo_lock.acquire()
     }
@@ -674,7 +693,7 @@ impl IssueStore for InMemoryStorage {
         // repository image (the one store a mutation session captures): a captured
         // File -> Some, absent or non-file -> None.
         use crate::repository_state::RepositoryEntry;
-        let vpath = Self::repo_file_vpath(rel_path)?;
+        let vpath = self.repo_file_vpath(rel_path)?;
         Ok(match self.repository_state().entries.get(&vpath) {
             Some(RepositoryEntry::File { bytes, .. }) => {
                 Some(String::from_utf8_lossy(bytes).into_owned())
@@ -883,7 +902,7 @@ mod tests {
 
         // Seeding any repository-owned file marks the data root as existing and
         // publishes the Data("") directory entry.
-        storage.add_repo_file(".jit/config.toml", "[project]\nname = \"x\"\n");
+        storage.add_data_file("config.toml", "[project]\nname = \"x\"\n");
         assert!(
             storage.repository_state().data_root_exists,
             "a seeded store is existing-root"
@@ -898,10 +917,24 @@ mod tests {
     }
 
     #[test]
+    fn test_worktree_fixture_does_not_materialize_data_root() {
+        let storage = InMemoryStorage::new();
+        storage.add_worktree_file("docs/guide.md", "guide");
+
+        let state = storage.repository_state();
+        assert!(!state.data_root_exists);
+        assert!(!state.entries.contains_key(&VirtualPath::data("").unwrap()));
+        assert!(matches!(
+            state.entries.get(&VirtualPath::worktree("docs/guide.md").unwrap()),
+            Some(RepositoryEntry::File { bytes, .. }) if bytes == b"guide"
+        ));
+    }
+
+    #[test]
     fn test_read_repo_file_present_absent_and_path_safety() {
         let storage = InMemoryStorage::new();
         // Present -> Some(content).
-        storage.add_repo_file("project-items.md", "hello");
+        storage.add_worktree_file("project-items.md", "hello");
         assert_eq!(
             storage
                 .read_repo_file("project-items.md")

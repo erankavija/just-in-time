@@ -255,7 +255,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .map(|target| self.transition_blockers(issue, target))
                 .unwrap_or(Ok(()));
 
-            if let Err(e) = blocked.and_then(|()| self.validate_update(issue, operations, false)) {
+            if let Err(e) = blocked.and_then(|()| self.validate_update_preview(issue, operations)) {
                 preview.would_fail.push((issue.id.clone(), e.to_string()));
             } else if changes.is_empty() {
                 // No changes - would be skipped
@@ -372,24 +372,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         updated
     }
 
-    /// Validate the field operations of an update: gate keys, assignee format, and
-    /// the local rules evaluated against the post-update shape. The dependency and
-    /// gate guards on a state change live in the captured transition derivation.
-    ///
-    /// Returns the [`WriteValidation`] outcome (non-blocking warnings plus any
-    /// `--force`-bypassed enforce rules). The caller emits the bypass events only
-    /// AFTER the issue write succeeds, so a failed save leaves no false bypass
-    /// entry. In a read-only preview (`force = false`) blocking rules surface as
-    /// an `Err` and `bypassed_rules` is always empty, so nothing is ever logged.
-    fn validate_update(
-        &self,
-        issue: &Issue,
-        operations: &UpdateOperations,
-        force: bool,
-    ) -> Result<WriteValidation> {
-        // Label format / uniqueness / registry are enforced SOLELY by
-        // `validate_for_write` against the projected post-update shape below
-        // (a0f0f342 migration) — no inline `validate_label_operations` call here.
+    /// Validate a read-only preview against the current repository view.
+    /// Publication re-derives the same checks from its captured mutation image.
+    fn validate_update_preview(&self, issue: &Issue, operations: &UpdateOperations) -> Result<()> {
+        // Label format, uniqueness, and registry rules are evaluated against the
+        // projected post-update shape below.
 
         // Validate gate operations - check that gates exist in registry
         if !operations.add_gates.is_empty() {
@@ -408,12 +395,22 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // The captured mutation coordinator owns dependency and gate guards.
 
-        // Enforce declarative local rules (and the legacy validator) against the
-        // POST-update shape so the batch path (`jit issue update --filter`)
-        // cannot bypass enforce rules. On `--force` the bypassed rules are
-        // returned for the caller to log AFTER its save; otherwise it blocks.
         let projected = Self::projected_after_update(issue, operations);
-        self.validate_for_write(&projected, force)
+        let repo_format = self.repo_content_format()?;
+        let strictness = self
+            .cached_config()?
+            .validation
+            .as_ref()
+            .map(crate::config::ValidationConfig::strictness)
+            .transpose()?
+            .unwrap_or_default();
+        let evaluation =
+            crate::validation::evaluate_local(&projected, self.effective_rules()?, repo_format)?
+                .with_strictness(strictness);
+        if let Some(message) = evaluation.rejection_message() {
+            return Err(crate::errors::ValidationFailedError::new(message).into());
+        }
+        Ok(())
     }
 }
 

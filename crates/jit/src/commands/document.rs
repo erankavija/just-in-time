@@ -258,13 +258,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Read content: try git first, fall back to filesystem if git unavailable
         let content = if at_commit.is_some() || doc.commit.is_some() {
             // Explicit version requested - require git
-            let repo = Repository::open(".")
+            let repo = Repository::open(self.require_layout()?.worktree_root())
                 .context("Git repository required when viewing specific commit version")?;
             self.read_file_from_git(&repo, &doc.path, reference)
                 .with_context(|| format!("Failed to read {} from git at {}", doc.path, reference))?
         } else {
             // No specific version - try git, fall back to filesystem
-            match Repository::open(".") {
+            match Repository::open(self.require_layout()?.worktree_root()) {
                 Ok(repo) => {
                     // Git available - read from git
                     self.read_file_from_git(&repo, &doc.path, "HEAD")
@@ -313,7 +313,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 ))
             })?;
 
-        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
+        let layout = self.require_layout()?;
+        let repo = Repository::open(layout.worktree_root())
+            .map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
         let commits = self.get_file_history(&repo, path)?;
 
@@ -347,7 +349,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 ))
             })?;
 
-        let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
+        let layout = self.require_layout()?;
+        let repo = Repository::open(layout.worktree_root())
+            .map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
         let to_ref = to.unwrap_or("HEAD");
 
@@ -515,12 +519,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 ))
             })?;
 
-        // Get repository root (parent of .jit directory)
-        let repo_root = self.storage.root().parent().ok_or_else(|| {
-            PathReadError::Other(
-                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
-            )
-        })?;
+        let layout = self.require_layout().map_err(PathReadError::Other)?;
+        let repo_root = layout.worktree_root();
 
         // Try to get history from git, return empty list if not available
         if let Ok(repo) = Repository::open(repo_root) {
@@ -566,12 +566,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 ))
             })?;
 
-        // Get repository root (parent of .jit directory)
-        let repo_root = self.storage.root().parent().ok_or_else(|| {
-            PathReadError::Other(
-                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
-            )
-        })?;
+        let layout = self.require_layout().map_err(PathReadError::Other)?;
+        let repo_root = layout.worktree_root();
 
         // Try to get diff from git, return error message if not available
         if let Ok(repo) = Repository::open(repo_root) {
@@ -925,12 +921,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::document::{AssetType, DocumentScope, LinkValidationResult, LinkValidator};
         use std::path::PathBuf;
 
-        // Get repository root
-        let repo_root = self
-            .storage
-            .root()
-            .parent()
-            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
+        let layout = self.require_layout()?;
+        let repo_root = layout.worktree_root();
 
         // Resolve the scope to the set of issues whose documents to check.
         let issues = match scope {
@@ -1529,8 +1521,8 @@ mod tests {
         });
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
-        storage.add_repo_file("docs/guide.md", "![logo](./logo.png)\n");
-        storage.add_repo_file("docs/logo.png", "png bytes");
+        storage.add_worktree_file("docs/guide.md", "![logo](./logo.png)\n");
+        storage.add_worktree_file("docs/logo.png", "png bytes");
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
 
@@ -1567,9 +1559,9 @@ mod tests {
         });
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
-        storage.add_repo_file("docs/guide.md", "![old](./old.png)\n");
-        storage.add_repo_file("docs/old.png", "old bytes");
-        storage.add_repo_file("docs/new.png", "new bytes");
+        storage.add_worktree_file("docs/guide.md", "![old](./old.png)\n");
+        storage.add_worktree_file("docs/old.png", "old bytes");
+        storage.add_worktree_file("docs/new.png", "new bytes");
 
         let layout = storage.repository_layout();
         let issue_path = VirtualPath::data(format!("issues/{id}.json")).unwrap();
@@ -1612,7 +1604,7 @@ mod tests {
         let mut concurrent = storage.load_issue(&id).unwrap();
         concurrent.labels.push("owner:concurrent".into());
         crate::commands::test_helpers::seed_issue(&storage, concurrent);
-        storage.add_repo_file("docs/guide.md", "![new](./new.png)\n");
+        storage.add_worktree_file("docs/guide.md", "![new](./new.png)\n");
         assert!(matches!(
             first_session.apply(&first_plan),
             Err(RepositoryStateStoreError::RetryableConflict { .. })

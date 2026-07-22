@@ -8,10 +8,21 @@ use jit_server::routes::AppState;
 use jit_server::watcher::ChangeTracker;
 use std::sync::Arc;
 
+fn test_memory_storage() -> InMemoryStorage {
+    let storage = InMemoryStorage::new();
+    storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+    storage.add_data_file(
+        "index.json",
+        r#"{"schema_version":2,"all_ids":[],"deleted_ids":[]}"#,
+    );
+    storage
+}
+
 /// Helper to create a test server with empty storage.
 async fn create_test_server() -> TestServer {
-    let storage = InMemoryStorage::new();
-    let executor = CommandExecutor::new(storage);
+    let storage = test_memory_storage();
+    let layout = storage.repository_layout();
+    let executor = CommandExecutor::new(storage).with_layout(layout);
 
     let state = AppState {
         executor: Arc::new(executor),
@@ -24,7 +35,7 @@ async fn create_test_server() -> TestServer {
 
 /// Helper to create test server with a test issue
 async fn create_test_server_with_issue() -> (TestServer, String) {
-    let storage = InMemoryStorage::new();
+    let storage = test_memory_storage();
     let layout = storage.repository_layout();
     let executor = CommandExecutor::new(storage).with_layout(layout);
 
@@ -78,7 +89,7 @@ async fn test_get_document_content_missing_document() {
 
 #[tokio::test]
 async fn test_get_document_content_not_yet_implemented() {
-    let storage = InMemoryStorage::new();
+    let storage = test_memory_storage();
     let layout = storage.repository_layout();
     let executor = CommandExecutor::new(storage).with_layout(layout);
 

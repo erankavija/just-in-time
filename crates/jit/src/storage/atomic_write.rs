@@ -34,12 +34,12 @@ pub(crate) struct ExternalExportOutcome {
 /// rename. The parent directory must already exist; the rename is atomic only
 /// within a single filesystem (the temp file stays in the target's directory to
 /// guarantee that).
-pub fn write_file_atomic(path: &Path, content: &str) -> Result<()> {
+pub(crate) fn write_file_atomic(path: &Path, content: &str) -> Result<()> {
     write_file_atomic_bytes(path, content.as_bytes())
 }
 
 /// Write arbitrary bytes to `path` atomically (temp file + rename).
-pub fn write_file_atomic_bytes(path: &Path, content: &[u8]) -> Result<()> {
+pub(crate) fn write_file_atomic_bytes(path: &Path, content: &[u8]) -> Result<()> {
     write_file_atomic_bytes_with_permissions(path, content, None)
 }
 
@@ -332,7 +332,7 @@ pub(crate) fn rename_noreplace_cap(
 /// before it is renamed onto the target. A failed write, permission update, or
 /// rename removes the temporary file on a best-effort basis and leaves an
 /// existing target untouched.
-pub fn write_file_atomic_bytes_with_permissions(
+fn write_file_atomic_bytes_with_permissions(
     path: &Path,
     content: &[u8],
     permissions: Option<fs::Permissions>,

@@ -1,34 +1,9 @@
 use crate::domain::ProfileOrigin;
 use crate::profile::ProfileManifest;
-use crate::repository_state::FileMode;
+use crate::repository_state::{AppliedProfileRecord, FileMode};
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::BTreeMap;
-
-/// Minimal repository-local provenance for one installed profile.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct AppliedProfileRecord {
-    /// Stable profile package identifier.
-    pub id: String,
-    /// Semantic package version.
-    pub version: String,
-    /// Package discovery origin.
-    pub origin: ProfileOrigin,
-    /// Hash of the complete canonical package.
-    pub package_hash: String,
-    /// Package contribution hashes keyed by repository target.
-    pub target_hashes: BTreeMap<String, String>,
-}
-
-impl AppliedProfileRecord {
-    /// Encode the stable installed-record image.
-    pub fn to_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
-        let mut bytes = serde_json::to_vec_pretty(self)?;
-        bytes.push(b'\n');
-        Ok(bytes)
-    }
-}
 
 /// Whether an application published a transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
@@ -169,7 +144,7 @@ pub struct ProfilePlanResult {
     pub version: String,
     /// Whether execution would publish.
     pub status: ProfilePlanStatus,
-    /// Stable identity of the package-target plan.
+    /// Identity of the complete canonical repository materialization plan.
     pub plan_hash: String,
     /// Every package target, sorted by path.
     pub targets: Vec<ProfileTargetChange>,
@@ -181,13 +156,13 @@ mod tests {
 
     #[test]
     fn test_installed_record_is_minimal_stable_json() {
-        let record = AppliedProfileRecord {
-            id: "example".to_string(),
-            version: "1.0.0".to_string(),
-            origin: ProfileOrigin::Embedded,
-            package_hash: "package".to_string(),
-            target_hashes: BTreeMap::from([("docs/example.md".to_string(), "target".to_string())]),
-        };
+        let record = AppliedProfileRecord::new(
+            "example",
+            "1.0.0",
+            ProfileOrigin::Embedded,
+            "package",
+            BTreeMap::from([("docs/example.md".to_string(), "target".to_string())]),
+        );
         let value: serde_json::Value = serde_json::from_slice(&record.to_bytes().unwrap()).unwrap();
         assert_eq!(
             value

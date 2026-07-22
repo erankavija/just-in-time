@@ -33,7 +33,6 @@ pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
         .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)?;
-
     // Claim coordination tests use this as a synthetic Git control directory.
     fs::create_dir(temp.path().join(".git"))?;
 

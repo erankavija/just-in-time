@@ -524,8 +524,8 @@ mod tests {
     }
 
     fn seed_issue_preimage(storage: &InMemoryStorage, issue: &Issue) {
-        storage.add_repo_file(
-            &format!(".jit/issues/{}.json", issue.id),
+        storage.add_data_file(
+            format!("issues/{}.json", issue.id),
             std::str::from_utf8(&crate::repository_state::serialize_issue(issue).unwrap()).unwrap(),
         );
         let index = crate::repository_state::RepositoryIndex {
@@ -533,8 +533,8 @@ mod tests {
             all_ids: vec![issue.id.clone()],
             deleted_ids: Vec::new(),
         };
-        storage.add_repo_file(
-            ".jit/index.json",
+        storage.add_data_file(
+            "index.json",
             std::str::from_utf8(&index.to_pretty_bytes().unwrap()).unwrap(),
         );
     }

@@ -85,48 +85,39 @@ pub fn prepare_server_storage(
 #[cfg(test)]
 mod recovery_startup_tests {
     use super::*;
-    use jit::storage::IssueStore;
+    use jit::commands::CommandExecutor;
+    use jit::hierarchy_templates::HierarchyTemplate;
+    use jit::storage::{TransactionFailureInjector, TransactionFailurePoint};
+    use std::sync::Arc;
     use tempfile::TempDir;
+
+    struct FailAfterCommit;
+
+    impl TransactionFailureInjector for FailAfterCommit {
+        fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
+            if point == &TransactionFailurePoint::RepositoryAfterCommit {
+                return Err(std::io::Error::other("interrupt after commit"));
+            }
+            Ok(())
+        }
+    }
 
     #[test]
     fn test_server_startup_recovers_committed_fresh_root_before_validation() {
         let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        std::fs::create_dir_all(storage.root().join("issues")).unwrap();
-        std::fs::write(
-            storage.root().join("index.json"),
-            "{\n  \"all_ids\": [],\n  \"deleted_ids\": [],\n  \"schema_version\": 2\n}",
-        )
-        .unwrap();
-        std::fs::write(storage.root().join("gates.toml"), "").unwrap();
-        std::fs::write(storage.root().join("events.jsonl"), "").unwrap();
-        let transaction = temp
-            .path()
-            .join(".jit-bootstrap/transactions/server-committed");
-        std::fs::create_dir_all(transaction.join("stages")).unwrap();
-        std::fs::create_dir_all(transaction.join("backups")).unwrap();
-        std::fs::write(
-            temp.path().join(".jit-bootstrap/transaction-protocol-v1"),
-            "1\n",
-        )
-        .unwrap();
-        std::fs::write(
-            transaction.join("journal.json"),
-            serde_json::to_vec_pretty(&serde_json::json!({
-                "version": 1,
-                "transaction_id": "server-committed",
-                "plan_hash": "test",
-                "fresh_root": true,
-                "decision": "committed",
-                "actions": []
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-
         let data = temp.path().join(".jit");
         let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
-        let (_storage, session) = prepare_server_storage(&data, layout).expect("startup recovery");
+        let interrupted =
+            JsonFileStorage::with_repository_state_failures(&data, Arc::new(FailAfterCommit));
+        let executor = CommandExecutor::new(interrupted).with_layout(layout);
+        assert!(executor
+            .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+            .is_err());
+
+        let recovered_layout =
+            jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let (_storage, session) =
+            prepare_server_storage(&data, recovered_layout).expect("startup recovery");
         assert_eq!(session.recovery_report().recovered_count(), 1);
         assert!(!temp.path().join(".jit-bootstrap").exists());
     }

@@ -1,15 +1,18 @@
 //! Tests for the jit recover command
 
 use assert_cmd::Command;
-use cap_std::{ambient_authority, fs::Dir};
+use jit::config::ProjectName;
+use jit::repository_state::{
+    derive_materialization, CaptureBudget, CaptureSpec, InitializationScaffold,
+    MaterializationRequest, MutationContext,
+};
 use jit::storage::{
-    FileTransactionKernel, FileTransactionPlan, RecoveryState, RepoWriteLock, TransactionAction,
-    TransactionFailureInjector, TransactionFailurePoint,
+    discover_repository_layout, JsonFileStorage, RepositoryStateStore, TransactionFailureInjector,
+    TransactionFailurePoint,
 };
 use predicates::prelude::*;
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::Duration;
 use tempfile::TempDir;
 
 fn jit_cmd() -> Command {
@@ -73,32 +76,41 @@ impl TransactionFailureInjector for SelectedFailures {
     }
 }
 
-fn leave_fresh_prepared_journal(temp: &TempDir, transaction_id: &str) {
-    let root = Dir::open_ambient_dir(temp.path(), ambient_authority()).unwrap();
+fn leave_fresh_prepared_journal(temp: &TempDir) {
+    let data = temp.path().join(".jit");
     let failures = Arc::new(SelectedFailures(HashSet::from([
-        TransactionFailurePoint::SyncJournal {
-            decision: RecoveryState::Prepared,
-        },
+        TransactionFailurePoint::RepositoryBeforeDataRootPublication,
     ])));
-    let kernel = FileTransactionKernel::with_injector(root, failures).unwrap();
-    let lock = RepoWriteLock::for_lock_path(
-        temp.path().join(".jit-bootstrap.lock"),
-        Duration::from_secs(1),
-    );
-    let guard = lock.acquire().unwrap();
-    kernel
-        .execute(
-            &guard,
-            FileTransactionPlan {
-                transaction_id: transaction_id.to_string(),
-                actions: vec![TransactionAction::WriteFile {
-                    path: ".jit/index.json".to_string(),
-                    contents: b"unpublished".to_vec(),
-                    unix_mode: None,
-                }],
-            },
-        )
-        .unwrap_err();
+    let storage = JsonFileStorage::with_repository_state_failures(&data, failures);
+    let layout = discover_repository_layout(temp.path(), &data).unwrap();
+    let scaffold = InitializationScaffold::render(
+        "",
+        "recovery-fixture".parse::<ProjectName>().unwrap(),
+        None,
+    )
+    .unwrap();
+    let spec = CaptureSpec::phase_one(
+        scaffold.delta_paths().unwrap(),
+        CaptureBudget {
+            max_paths: 128,
+            max_listings: 0,
+            max_bytes: 16 * 1024 * 1024,
+            max_depth: 16,
+        },
+    )
+    .unwrap();
+    let mut session = storage.open_mutation_session(layout).unwrap();
+    let image = session.capture(spec).unwrap();
+    let context = MutationContext::production();
+    let plan = derive_materialization(
+        &image,
+        MaterializationRequest::Initialize {
+            scaffold: &scaffold,
+            context: &context,
+        },
+    )
+    .unwrap();
+    session.apply(&plan).unwrap_err();
 }
 
 #[test]
@@ -150,7 +162,7 @@ fn test_recover_help_describes_purpose() {
 #[test]
 fn test_explicit_recover_restores_fresh_prepared_state_before_validation() {
     let temp = TempDir::new().unwrap();
-    leave_fresh_prepared_journal(&temp, "explicit-fresh");
+    leave_fresh_prepared_journal(&temp);
 
     jit_cmd()
         .current_dir(temp.path())
@@ -167,7 +179,7 @@ fn test_explicit_recover_restores_fresh_prepared_state_before_validation() {
 #[test]
 fn test_init_recovers_fresh_prepared_state_before_scaffolding() {
     let temp = TempDir::new().unwrap();
-    leave_fresh_prepared_journal(&temp, "init-fresh");
+    leave_fresh_prepared_journal(&temp);
 
     jit_cmd()
         .current_dir(temp.path())

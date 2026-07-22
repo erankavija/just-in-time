@@ -13,13 +13,13 @@
 //! the selected projections' sources and targets and the schema files the
 //! effective rules reference) and reads only that image-projected content. Every
 //! typed failure (unknown kind, missing source, missing target, absent markers)
-//! surfaces from the report render BEFORE the exact delta is applied, so a failing
-//! render leaves every target byte-identical (`@/inv/atomic-writes`) and keeps the
-//! validation exit code. The delta is scoped to the selected projections
+//! surfaces from the canonical derivation BEFORE the exact delta is applied, so a
+//! failing render leaves every target byte-identical (`@/inv/atomic-writes`) and
+//! keeps the validation exit code. The delta is scoped to the selected projections
 //! (declaration scope), so a single-name render leaves sibling targets untouched.
 
 use super::*;
-use crate::config::{ProjectionMode, ProjectionStyle};
+use crate::config::{JitConfig, ProjectionMode, ProjectionStyle};
 use std::collections::BTreeMap;
 
 /// The result of rendering ONE projection, serialized as an element of
@@ -70,6 +70,21 @@ fn style_token(style: ProjectionStyle) -> String {
     .to_string()
 }
 
+/// Select projection names from the configuration captured for this attempt.
+fn selected_projection_names(config: &JitConfig, name: Option<&str>) -> Result<Vec<String>> {
+    let registry = config.projection.as_ref();
+    match name {
+        Some(requested) if registry.is_some_and(|entries| entries.contains_key(requested)) => {
+            Ok(vec![requested.to_string()])
+        }
+        Some(requested) => Err(anyhow!("unknown projection '{requested}'")),
+        None => Ok(registry
+            .into_iter()
+            .flat_map(|entries| entries.keys().cloned())
+            .collect()),
+    }
+}
+
 impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// Render every declared projection, or the single `name`d one, into its
     /// configured documentation target through one recovered mutation session.
@@ -89,27 +104,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// keeps the validation exit code.
     pub fn project_render(&self, name: Option<&str>) -> Result<ProjectRenderResult> {
         use crate::repository_state::{
-            assemble_config, derive_materializations, render_capture_closure,
-            render_projection_body, require_target, CaptureBudget, CaptureSpec,
-            MaterializationIntent, ProjectionInputs, RepositorySeed, RepositorySeedKind,
+            assemble_config, derive_materialization, render_capture_closure, require_target,
+            CaptureBudget, CaptureSpec, MaterializationRequest, RepositorySeed, RepositorySeedKind,
             VirtualPath,
         };
         use crate::storage::RepositoryStateStoreError;
         use std::collections::BTreeSet;
-
-        let config = self.cached_config()?.clone();
-        let registry = config.projection.clone().unwrap_or_default();
-        // Validate and select the projection names up front so an unknown name is a
-        // clear error before any capture.
-        let selected_names: Vec<String> = match name {
-            Some(requested) => {
-                if !registry.contains_key(requested) {
-                    return Err(anyhow!("unknown projection '{requested}'"));
-                }
-                vec![requested.to_string()]
-            }
-            None => registry.keys().cloned().collect(),
-        };
 
         let layout = self.require_layout()?;
         let mut session = self.storage().open_mutation_session(layout)?;
@@ -145,11 +145,16 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 Err(error) => return Err(error.into()),
             };
             let config_one = assemble_config(&image_one)?;
+            let selected_names = selected_projection_names(&config_one, name)?;
             let rules_text = image_repo_bytes(&image_one, ".jit/rules.toml")?
                 .map(String::from_utf8)
                 .transpose()?;
-            let closure =
-                render_capture_closure(&config_one, &selected_names, rules_text.as_deref())?;
+            let closure = render_capture_closure(
+                image_one.layout(),
+                &config_one,
+                &selected_names,
+                rules_text.as_deref(),
+            )?;
             let mut phase_two = CaptureSpec::phase_one(registries()?, budget)?;
             phase_two.discover_paths(closure)?;
             let image = match session.capture(phase_two) {
@@ -158,65 +163,73 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 Err(error) => return Err(error.into()),
             };
 
-            // Render each selected projection body from image-projected content to
-            // build the stable report AND surface every typed `ProjectionError`
-            // (unknown kind, missing source, missing target, absent markers) BEFORE
-            // the derive — which stringifies producer errors — so the validation
-            // exit code is preserved.
-            let declarations = declarations_from_image(&image)?;
-            let config = assemble_config(&image)?;
-            let borrowed = declarations.borrowed();
-            let inputs = ProjectionInputs {
-                config: &config,
-                rules: borrowed.rules,
-                gates: borrowed.gates,
-            };
-            let mut projections = Vec::with_capacity(selected_names.len());
-            for proj_name in &selected_names {
-                let projection = registry
-                    .get(proj_name)
-                    .expect("selected projection name is declared");
-                let mut read = |path: &str| -> Result<Option<String>> {
-                    match image_repo_bytes(&image, path)? {
-                        Some(bytes) => Ok(Some(String::from_utf8(bytes)?)),
-                        None => Ok(None),
-                    }
-                };
-                let (_body, count) = render_projection_body(projection, &inputs, &mut read)
-                    .with_context(|| format!("projection '{proj_name}'"))?;
-                let target = require_target(projection, proj_name)
-                    .with_context(|| format!("projection '{proj_name}'"))?;
-                projections.push(ProjectionRenderReport {
-                    name: proj_name.clone(),
-                    target,
-                    mode: mode_token(projection.mode()),
-                    style: style_token(projection.style()),
-                    kinds: projection.kinds().to_vec(),
-                    count,
-                });
+            let declarations = crate::repository_state::declarations_from_image(&image)?;
+            let config = declarations.config();
+            let selected_names = selected_projection_names(config, name)?;
+            let final_rules = image_repo_bytes(&image, ".jit/rules.toml")?
+                .map(String::from_utf8)
+                .transpose()?;
+            let final_closure = render_capture_closure(
+                image.layout(),
+                config,
+                &selected_names,
+                final_rules.as_deref(),
+            )?;
+            let captured = image
+                .capture_spec()
+                .paths()
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            if final_closure.into_iter().collect::<BTreeSet<_>>() != captured {
+                continue;
             }
 
             // Derive the exact delta over the same image and apply it. The delta
             // is scoped to the selected projections (declaration scope), so a
             // single-name render leaves sibling targets untouched.
             let selected_set: BTreeSet<String> = selected_names.iter().cloned().collect();
-            let plan = derive_materializations(
+            let plan = derive_materialization(
                 &image,
-                declarations.borrowed(),
-                &seed,
-                MaterializationIntent::RenderConfiguredProjections {
+                MaterializationRequest::RenderConfiguredProjections {
+                    declarations: declarations.borrowed(),
+                    seed: &seed,
                     selected: Some(selected_set),
                 },
             )
-            // Surface a managed-region composition fault (an absent required region)
-            // as its typed error so it keeps the validation exit code, mirroring the
-            // report render's typed `ProjectionError`.
+            // Keep projection and managed-region failures typed so the command
+            // preserves their validation exit-code mapping.
             .map_err(|error| match error {
+                crate::repository_state::RepositoryStateError::Projection(projection) => {
+                    anyhow::Error::new(projection)
+                }
                 crate::repository_state::RepositoryStateError::ManagedDocument(managed) => {
                     anyhow::Error::new(managed)
                 }
                 other => anyhow::Error::new(other),
             })?;
+
+            let registry = config.projection.as_ref();
+            let projections = selected_names
+                .iter()
+                .map(|proj_name| {
+                    let projection = registry
+                        .and_then(|entries| entries.get(proj_name))
+                        .ok_or_else(|| anyhow!("unknown projection '{proj_name}'"))?;
+                    let target = require_target(projection, proj_name)
+                        .with_context(|| format!("projection '{proj_name}'"))?;
+                    let count = plan.projection_count(proj_name).ok_or_else(|| {
+                        anyhow!("projection '{proj_name}' produced no render report")
+                    })?;
+                    Ok(ProjectionRenderReport {
+                        name: proj_name.clone(),
+                        target,
+                        mode: mode_token(projection.mode()),
+                        style: style_token(projection.style()),
+                        kinds: projection.kinds().to_vec(),
+                        count,
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
             match session.apply(&plan) {
                 Ok(_) => {
                     return Ok(ProjectRenderResult {

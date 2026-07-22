@@ -24,8 +24,8 @@ fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     let config = "[worktree]\nenforce_leases = \"off\"\n";
     std::fs::write(storage.root().join("config.toml"), config).unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    storage.add_repo_file(".jit/config.toml", config);
-    storage.add_repo_file(".jit/rules.toml", rules_toml);
+    storage.add_data_file("config.toml", config);
+    storage.add_data_file("rules.toml", rules_toml);
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
 }
@@ -175,13 +175,10 @@ enforce = true
 assert = { json-schema = "schemas/needs-sections.json" }
 "#,
     );
-    let schemas = executor.storage().root().join("schemas");
-    std::fs::create_dir_all(&schemas).unwrap();
-    std::fs::write(
-        schemas.join("needs-sections.json"),
+    executor.storage().add_data_file(
+        "schemas/needs-sections.json",
         r#"{ "type": "object", "required": ["sections"] }"#,
-    )
-    .unwrap();
+    );
 
     // An epic with a body section: the description parses into a `sections`
     // projection, so `required: ["sections"]` is satisfied. Without the body
@@ -392,14 +389,11 @@ assert = { json-schema = "schemas/no-bad.json" }
 "#,
     );
     // Schema: the `bad` namespace must NOT be present.
-    let schemas = executor.storage().root().join("schemas");
-    std::fs::create_dir_all(&schemas).unwrap();
     let schema = r#"{ "type": "object",
              "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#;
-    std::fs::write(schemas.join("no-bad.json"), schema).unwrap();
     executor
         .storage()
-        .add_repo_file(".jit/schemas/no-bad.json", schema);
+        .add_data_file("schemas/no-bad.json", schema);
 
     let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
@@ -517,14 +511,11 @@ enforce = true
 assert = { json-schema = "schemas/no-bad.json" }
 "#,
     );
-    let schemas = executor.storage().root().join("schemas");
-    std::fs::create_dir_all(&schemas).unwrap();
     let schema = r#"{ "type": "object",
              "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#;
-    std::fs::write(schemas.join("no-bad.json"), schema).unwrap();
     executor
         .storage()
-        .add_repo_file(".jit/schemas/no-bad.json", schema);
+        .add_data_file("schemas/no-bad.json", schema);
 
     // Seed an issue that already violates the rule (it carries a `bad:` label).
     let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
@@ -714,8 +705,8 @@ fn test_no_bypass_event_when_publication_fails() {
     let config = "[worktree]\nenforce_leases = \"off\"\n";
     std::fs::write(inner.root().join("config.toml"), config).unwrap();
     std::fs::write(inner.root().join("rules.toml"), EPIC_NEEDS_REQ_ENFORCE).unwrap();
-    inner.add_repo_file(".jit/config.toml", config);
-    inner.add_repo_file(".jit/rules.toml", EPIC_NEEDS_REQ_ENFORCE);
+    inner.add_data_file("config.toml", config);
+    inner.add_data_file("rules.toml", EPIC_NEEDS_REQ_ENFORCE);
 
     let storage = FailingMutationStorage::new(inner);
     let layout = jit::repository_state::RepositoryLayout::new(
@@ -838,6 +829,10 @@ impl jit::storage::RepositoryStateStore for FailingMutationStorage {
 }
 
 impl IssueStore for FailingMutationStorage {
+    fn configure_repository_layout(&self, layout: &jit::repository_state::RepositoryLayout) {
+        self.inner.configure_repository_layout(layout);
+    }
+
     fn acquire_repo_write_lock(&self) -> anyhow::Result<jit::storage::RepoWriteGuard> {
         self.inner.acquire_repo_write_lock()
     }

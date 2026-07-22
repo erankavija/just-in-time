@@ -9,6 +9,7 @@
 
 use jit::commands::CommandExecutor;
 use jit::declarations::invariants::InvariantRegistry;
+use jit::declarations::rules::RuleSet;
 use jit::declarations::GateRegistry;
 use jit::declarations::{GateDefinition, GateMode, GateStage};
 use jit::repository_state::render_invariants_markdown;
@@ -71,23 +72,14 @@ source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-fie
 source-of-truth = "registry-first"
 "#;
 
-/// Build an `InMemoryStorage` whose `.jit` root carries `config.toml` and the
-/// given registry files.
-///
-/// The config and registries are written to the on-disk root (so `cached_config`
-/// loads item kinds + projections for name selection) AND seeded into the aggregate
-/// repository image (so the render's mutation session captures them), matching the
-/// dual read the migrated command performs.
+/// Build an `InMemoryStorage` whose aggregate repository image carries
+/// `config.toml` and the given registry files.
 fn storage_with(config_toml: &str, registries: &[(&str, &str)]) -> InMemoryStorage {
     std::env::set_var("JIT_TEST_MODE", "1");
     let storage = InMemoryStorage::new();
-    let root = storage.root().to_path_buf();
-    std::fs::create_dir_all(&root).unwrap();
-    std::fs::write(root.join("config.toml"), config_toml).unwrap();
-    storage.add_repo_file(".jit/config.toml", config_toml);
+    storage.add_data_file("config.toml", config_toml);
     for (name, content) in registries {
-        std::fs::write(root.join(name), content).unwrap();
-        storage.add_repo_file(&format!(".jit/{name}"), content);
+        storage.add_data_file(name, content);
     }
     storage
 }
@@ -152,7 +144,7 @@ style = "id-anchor"
 "#;
     let storage = storage_with(config, &[]);
     // The markdown source: a decision-log section whose bullets repeat their id.
-    storage.add_repo_file(
+    storage.add_worktree_file(
         "charter.md",
         "## Decision Log\n\n- D-1: JSON-in-git storage\n- D-2: Config-declared gates\n",
     );
@@ -162,7 +154,7 @@ style = "id-anchor"
     let begin = "<!-- jit:charter:begin -->";
     let end = "<!-- jit:charter:end -->";
     let original = format!("{prefix}{begin}\nstale\n{end}{suffix}");
-    storage.add_repo_file("AGENTS.md", &original);
+    storage.add_worktree_file("AGENTS.md", &original);
 
     let executor = render_executor(&storage);
     let result = executor.project_render(Some("charter")).unwrap();
@@ -186,6 +178,57 @@ style = "id-anchor"
     let _ = std::fs::remove_dir_all(storage.root());
 }
 
+/// Project rendering selects and reports from the captured config, even when
+/// another command has already populated the executor's filesystem config cache.
+#[test]
+fn test_project_render_uses_captured_config_when_executor_cache_is_stale() {
+    let captured_config = r#"
+[item_kinds.charter]
+section = "decision_log"
+id-pattern = "D-[0-9]+"
+markers = []
+link-namespaces = ["per"]
+scope = "project"
+source = "charter.md"
+source-of-truth = "markdown-first"
+
+[projection.charter]
+kind = "charter"
+mode = "separate-file"
+target = "CAPTURED.md"
+style = "id-anchor"
+"#;
+    let stale_config = r#"
+[projection.stale]
+kind = "stale"
+mode = "separate-file"
+target = "STALE.md"
+style = "id-anchor"
+"#;
+    let storage = storage_with(captured_config, &[]);
+    std::fs::create_dir_all(storage.root()).unwrap();
+    std::fs::write(storage.root().join("config.toml"), stale_config).unwrap();
+    storage.add_worktree_file(
+        "charter.md",
+        "## Decision Log\n\n- D-1: Captured authority\n",
+    );
+
+    let executor = render_executor(&storage);
+    executor
+        .effective_rules()
+        .expect("prime the executor's stale config cache");
+    let result = executor.project_render(Some("charter")).unwrap();
+
+    assert_eq!(result.projections[0].target, "CAPTURED.md");
+    assert_eq!(result.projections[0].count, 1);
+    assert_eq!(
+        storage.read_repo_file("CAPTURED.md").unwrap().unwrap(),
+        "- **D-1** — Captured authority\n"
+    );
+    assert!(storage.read_repo_file("STALE.md").unwrap().is_none());
+    let _ = std::fs::remove_dir_all(storage.root());
+}
+
 /// REQ-08 surface 3a: the migrated `invariants` (id-anchor) projection reproduces
 /// the typed invariant id-anchor render, computed LIVE from the same registry.
 #[test]
@@ -197,7 +240,7 @@ fn test_invariants_projection_parity_with_typed_render() {
     let storage = storage_with(&config, &[]);
     // The id-anchor path reads the descriptor's registry through `read_repo_file`
     // (the repo-file map), so seed it there, not only on the config root.
-    storage.add_repo_file(".jit/invariants.toml", INVARIANTS_TOML);
+    storage.add_data_file("invariants.toml", INVARIANTS_TOML);
     let executor = render_executor(&storage);
 
     executor.project_render(Some("invariants")).unwrap();
@@ -228,9 +271,9 @@ fn test_rules_and_gates_projection_parity_with_typed_render() {
     // `.jit/gates.toml`) for existence over the `read_repo_file` boundary before
     // rendering, so seed both there (the bytes are probed for presence; the render
     // itself reads the effective rules and the seeded gate registry).
-    storage.add_repo_file(".jit/rules.toml", RULES_TOML);
-    storage.add_repo_file(
-        ".jit/gates.toml",
+    storage.add_data_file("rules.toml", RULES_TOML);
+    storage.add_data_file(
+        "gates.toml",
         "[[gates]]\nkey = \"cargo-ci\"\ntitle = \"Cargo CI\"\ndescription = \"fmt + clippy\"\nstage = \"postcheck\"\nmode = \"manual\"\n",
     );
     let mut registry = GateRegistry::default();
@@ -241,17 +284,15 @@ fn test_rules_and_gates_projection_parity_with_typed_render() {
     crate::harness::seed_memory_gate_registry(&storage, &registry);
 
     let executor = render_executor(&storage);
-    // The command renders the EFFECTIVE rules (defaults merged with local
-    // rules.toml); the oracle must render the same set.
-    let effective = executor.effective_rules().unwrap().clone();
     executor.project_render(Some("rules-and-gates")).unwrap();
     let written = storage
         .read_repo_file(".jit/rules-and-gates.md")
         .unwrap()
         .expect("separate-file target written");
 
-    // Parity oracle: the typed rule+gate full render over the SAME effective
-    // registries the command used.
+    // Parity oracle: the typed rule+gate full render over the same captured
+    // authored registries the command used.
+    let effective = RuleSet::parse(RULES_TOML, None, std::iter::empty()).unwrap();
     let expected =
         render_rules_and_gates_markdown(&effective, &registry, jit::config::ProjectionStyle::Full);
     assert_eq!(written, expected);
@@ -292,7 +333,7 @@ fn test_missing_target_is_typed_error_naming_projection() {
         "{INVARIANT_KIND}\n[projection.invariants]\nkind = \"invariant\"\nstyle = \"id-anchor\"\n"
     );
     let storage = storage_with(&config, &[]);
-    storage.add_repo_file(".jit/invariants.toml", INVARIANTS_TOML);
+    storage.add_data_file("invariants.toml", INVARIANTS_TOML);
     let executor = render_executor(&storage);
 
     let err = executor.project_render(Some("invariants")).unwrap_err();
@@ -327,14 +368,14 @@ fn test_two_phase_render_writes_nothing_when_a_later_projection_fails() {
          target = \"SECOND.md\"\nstyle = \"id-anchor\"\n"
     );
     let storage = storage_with(&config, &[]);
-    storage.add_repo_file(".jit/invariants.toml", INVARIANTS_TOML);
+    storage.add_data_file("invariants.toml", INVARIANTS_TOML);
     // FIRST.md carries `a-good`'s default region markers (rendering succeeds);
     // SECOND.md carries NONE, so `b-bad` fails on its absent begin marker.
     let first_original =
         "# First\n\n<!-- jit:a-good:begin -->\nstale\n<!-- jit:a-good:end -->\n\n## Tail\n";
     let second_original = "# Second\n\nNo managed region here.\n";
-    storage.add_repo_file("FIRST.md", first_original);
-    storage.add_repo_file("SECOND.md", second_original);
+    storage.add_worktree_file("FIRST.md", first_original);
+    storage.add_worktree_file("SECOND.md", second_original);
 
     let executor = render_executor(&storage);
     // `a-good` sorts before `b-bad`, so it materializes (phase 1) before `b-bad`
@@ -393,7 +434,7 @@ source-of-truth = "registry-first"
     // guard probes the same store over `read_repo_file`, so seed the repo-file map
     // too.
     let storage = storage_with(&config, &[("invariants.toml", INVARIANTS_TOML)]);
-    storage.add_repo_file(".jit/invariants.toml", INVARIANTS_TOML);
+    storage.add_data_file("invariants.toml", INVARIANTS_TOML);
     let executor = render_executor(&storage);
 
     executor.project_render(Some("house")).unwrap();

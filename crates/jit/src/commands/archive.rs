@@ -169,11 +169,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let config = self.config_manager.load()?;
         let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
         let issues = self.storage.list_issues()?;
-        let repo_root = self
-            .storage
-            .root()
-            .parent()
-            .context("archive planning requires .jit beneath a repository root")?;
+        let layout = self.require_layout()?;
+        let repo_root = layout.worktree_root();
         let resolver = GitRevisionResolver::new(repo_root);
 
         let root_container_id = match target {
@@ -1696,7 +1693,9 @@ epic = "epic"
         )
         .unwrap();
         fs::write(repo.path().join("root.csv"), "a,b").unwrap();
-        let executor = CommandExecutor::new(storage.clone());
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
         let unconfigured = executor.preview_archive_document("root.csv").unwrap();
         assert_eq!(
             unconfigured.policy_status(),
@@ -1714,6 +1713,7 @@ epic = "epic"
         )
         .unwrap();
         let incomplete = CommandExecutor::new(storage)
+            .with_layout(layout)
             .preview_archive_document("root.csv")
             .unwrap();
         assert_eq!(
@@ -1740,6 +1740,8 @@ epic = "epic"
         )
         .unwrap();
         fs::write(repo.path().join("root.csv"), "a,b").unwrap();
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let fields = [
             "managed_paths = []",
             "permanent_paths = []",
@@ -1760,6 +1762,7 @@ epic = "epic"
             )
             .unwrap();
             let plan = CommandExecutor::new(storage.clone())
+                .with_layout(layout.clone())
                 .preview_archive_document("root.csv")
                 .unwrap();
             assert_eq!(
@@ -1776,6 +1779,7 @@ epic = "epic"
         )
         .unwrap();
         let configured = CommandExecutor::new(storage)
+            .with_layout(layout)
             .preview_archive_document("root.csv")
             .unwrap();
         assert_eq!(
@@ -1843,7 +1847,7 @@ epic = "epic"
         )
         .unwrap();
 
-        let plan = CommandExecutor::new(storage)
+        let plan = executor(&repo, storage)
             .preview_archive_document("fixtures/link.md")
             .unwrap();
         let artifact = plan
@@ -1881,7 +1885,7 @@ epic = "epic"
             regular_repo.path().join("archive"),
         )
         .unwrap();
-        let destination_symlink = CommandExecutor::new(regular_storage)
+        let destination_symlink = executor(&regular_repo, regular_storage)
             .preview_archive_document("fixtures/root.md")
             .unwrap();
         assert!(destination_symlink.artifacts()[0]
@@ -1920,7 +1924,7 @@ epic = "epic"
         outside.documents = vec![DocumentReference::new("docs/outside.md".into())];
         seed_archive_issue_precondition(&owner_storage, outside);
 
-        let owner_plan = CommandExecutor::new(owner_storage)
+        let owner_plan = executor(&owner_repo, owner_storage)
             .preview_archive_document("fixtures/selected.md")
             .unwrap();
         let selected = &owner_plan.artifacts()[0];

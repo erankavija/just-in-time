@@ -283,9 +283,15 @@ async fn search_issues<S: IssueStore>(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Build file patterns: always search .jit/issues/*.json + linked docs (from repo root)
-    let mut file_patterns = vec![".jit/issues/*.json".to_string()];
-    file_patterns.extend(linked_docs);
+    let layout = state.executor.repository_layout().map_err(|error| {
+        tracing::error!("Search has no repository layout: {:?}", error);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let nested_data = layout.data_root().strip_prefix(layout.worktree_root()).ok();
+    let mut file_patterns = linked_docs;
+    if let Some(relative) = nested_data {
+        file_patterns.push(format!("{}/issues/*.json", relative.display()));
+    }
 
     let options = SearchOptions {
         case_sensitive: params.case_sensitive,
@@ -295,12 +301,27 @@ async fn search_issues<S: IssueStore>(
         ..Default::default()
     };
 
-    // Search from repository root to include both .jit and linked documents
-    let search_dir = std::path::Path::new(".");
-    let results = jit::search::search(search_dir, &params.q, options).map_err(|e| {
-        tracing::error!("Search failed: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let mut results =
+        jit::search::search(layout.worktree_root(), &params.q, options).map_err(|e| {
+            tracing::error!("Search failed: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    if nested_data.is_none() && results.len() < params.limit {
+        let remaining = params.limit - results.len();
+        let data_options = SearchOptions {
+            case_sensitive: params.case_sensitive,
+            regex: params.regex,
+            max_results: Some(remaining),
+            file_patterns: vec!["issues/*.json".to_string()],
+            ..Default::default()
+        };
+        let mut data_results = jit::search::search(layout.data_root(), &params.q, data_options)
+            .map_err(|e| {
+                tracing::error!("Data-root search failed: {:?}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+        results.append(&mut data_results);
+    }
 
     let duration_ms = start.elapsed().as_millis();
 
@@ -1057,6 +1078,16 @@ mod tests {
         Arc::new(CommandExecutor::new(storage).with_layout(layout))
     }
 
+    fn test_memory_storage() -> InMemoryStorage {
+        let storage = InMemoryStorage::new();
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        storage.add_data_file(
+            "index.json",
+            r#"{"schema_version":2,"all_ids":[],"deleted_ids":[]}"#,
+        );
+        storage
+    }
+
     fn initialize_file_backed_test_repository(worktree_root: &std::path::Path) {
         use jit::hierarchy_templates::HierarchyTemplate;
         use jit::storage::JsonFileStorage;
@@ -1071,7 +1102,7 @@ mod tests {
     }
 
     fn create_test_app() -> TestServer {
-        let storage = InMemoryStorage::new();
+        let storage = test_memory_storage();
         let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1113,7 +1144,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_issues_with_data() {
-        let storage = InMemoryStorage::new();
+        let storage = test_memory_storage();
         let executor = test_executor(storage);
 
         // Create test issues
@@ -1159,16 +1190,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_graph() {
-        let storage = InMemoryStorage::new();
-
-        // Create config with enforcement off for test backward compatibility
-        std::fs::create_dir_all(storage.root()).unwrap();
-        let config_toml = r#"
-[worktree]
-enforce_leases = "off"
-"#;
-        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
-        storage.add_repo_file(".jit/config.toml", config_toml);
+        let storage = test_memory_storage();
 
         let executor = test_executor(storage);
 
@@ -1222,14 +1244,7 @@ enforce_leases = "off"
     /// `nodes` rather than `edges` (which differ in number here).
     #[tokio::test]
     async fn test_get_graph_body_carries_node_count() {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(
-            storage.root().join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        let storage = test_memory_storage();
 
         let executor = test_executor(storage);
         let new = |title: &str| {
@@ -1272,14 +1287,7 @@ enforce_leases = "off"
     /// type value, so the client derives none of them.
     #[tokio::test]
     async fn test_get_graph_nodes_carry_resolved_hierarchy() {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(
-            storage.root().join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-        storage.add_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        let storage = test_memory_storage();
 
         let executor = test_executor(storage);
         let new = |title: &str, labels: Vec<String>| {
@@ -1340,13 +1348,7 @@ enforce_leases = "off"
     /// A node with no `type:` label reports a null type and an orphan resolution.
     #[tokio::test]
     async fn test_get_graph_untyped_node_has_null_type() {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(
-            storage.root().join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let storage = test_memory_storage();
 
         let executor = test_executor(storage);
         executor
@@ -1382,7 +1384,7 @@ enforce_leases = "off"
 
     #[tokio::test]
     async fn test_get_status() {
-        let storage = InMemoryStorage::new();
+        let storage = test_memory_storage();
         let executor = test_executor(storage);
 
         let (_id, _) = executor
@@ -1586,7 +1588,7 @@ pattern = '^v\d+\.\d+$'
 
         // Write the fixture document at a subdirectory path relative to repo root.
         // This exercises the path-resolution fix: storage must resolve against
-        // `self.root.parent()` (repo root), not process CWD.
+        // the explicit RepositoryLayout worktree root, not process CWD.
         let doc_rel = "docs/readme.md";
         let doc_content = "# Fixture document\n\nSome content.";
         let doc_abs = temp.path().join(doc_rel);
@@ -1931,7 +1933,7 @@ pattern = '^v\d+\.\d+$'
 
     #[tokio::test]
     async fn test_get_changes_reflects_tracker_state() {
-        let storage = InMemoryStorage::new();
+        let storage = test_memory_storage();
         let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
 
@@ -2007,16 +2009,10 @@ pattern = '^v\d+\.\d+$'
         assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
     }
 
-    /// Verify that `get_document_by_path` returns HTTP 500 when the storage
-    /// layer returns `PathReadError::Other` (i.e., a non-NotFound I/O error).
-    ///
-    /// We trigger this by pointing the endpoint at a repo-relative path that
-    /// resolves to a directory inside the repo root.  `fs::canonicalize`
-    /// succeeds on a directory (so the containment check passes), but the
-    /// subsequent `fs::read` returns `EISDIR`, which maps to
-    /// `PathReadError::Other`.
+    /// A directory is not an ordinary document file and is rejected as an
+    /// unsafe path, not passed to `fs::read` as a server-side I/O failure.
     #[tokio::test]
-    async fn test_get_document_by_path_io_error_returns_500() {
+    async fn test_get_document_by_path_rejects_directory() {
         use jit::storage::JsonFileStorage;
         use std::fs;
 
@@ -2029,9 +2025,6 @@ pattern = '^v\d+\.\d+$'
         )
         .unwrap();
 
-        // Create a subdirectory at repo-root-relative "not-a-file".  The
-        // storage layer joins this against the repo root, canonicalizes it,
-        // then fs::read returns EISDIR → PathReadError::Other → 500.
         let dir_rel = "not-a-file";
         fs::create_dir_all(temp.path().join(dir_rel)).unwrap();
 
@@ -2052,16 +2045,13 @@ pattern = '^v\d+\.\d+$'
             .get("/documents")
             .add_query_param("path", dir_rel)
             .await;
-        assert_eq!(
-            response.status_code(),
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "reading a directory via get_document_by_path should return 500"
-        );
+        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.text(), "");
     }
 
-    /// Same invariant for the raw endpoint.
+    /// The standalone raw endpoint applies the same ordinary-file contract.
     #[tokio::test]
-    async fn test_get_document_raw_by_path_io_error_returns_500() {
+    async fn test_get_document_raw_by_path_rejects_directory() {
         use jit::storage::JsonFileStorage;
         use std::fs;
 
@@ -2093,24 +2083,13 @@ pattern = '^v\d+\.\d+$'
             .get("/documents/raw")
             .add_query_param("path", dir_rel)
             .await;
-        assert_eq!(
-            response.status_code(),
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "reading a directory via get_document_raw_by_path should return 500"
-        );
+        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.text(), "");
     }
 
-    /// `GET /issues/:id/documents/:path/content` must return 500 when reading
-    /// the document file fails with a genuine I/O error (e.g. EISDIR).
-    ///
-    /// The document is linked to a relative path with `skip_scan=true` so the
-    /// reference is stored without any read being attempted during linking.
-    /// When the route handler subsequently calls `read_document_content` →
-    /// `read_path_text` → `read_path_bytes`, the relative path is resolved
-    /// against the repo root.  Since that path is a directory, trying to read
-    /// it yields EISDIR, which maps to `PathReadError::Other` → HTTP 500.
+    /// Linked document content also rejects a directory as an unsafe path.
     #[tokio::test]
-    async fn test_get_document_content_io_error_returns_500() {
+    async fn test_get_document_content_rejects_directory() {
         use jit::domain::Priority;
         use jit::storage::JsonFileStorage;
         use std::fs;
@@ -2124,9 +2103,6 @@ pattern = '^v\d+\.\d+$'
         )
         .unwrap();
 
-        // Create a subdirectory at repo_root/broken-doc.  read_document_content
-        // resolves relative paths against repo_root, so reading "broken-doc"
-        // will attempt to read a directory → EISDIR → PathReadError::Other.
         let dir_path = temp.path().join("broken-doc");
         fs::create_dir_all(&dir_path).unwrap();
         // Use a relative path so the URL stays clean (no slashes in the segment).
@@ -2167,11 +2143,8 @@ pattern = '^v\d+\.\d+$'
         let encoded = percent_encode_segment(doc_rel);
         let url = format!("/issues/{}/documents/{}/content", id, encoded);
         let response = server.get(&url).await;
-        assert_eq!(
-            response.status_code(),
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "reading a directory via get_document_content should return 500"
-        );
+        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.text(), "");
     }
 
     #[tokio::test]
@@ -2235,14 +2208,9 @@ pattern = '^v\d+\.\d+$'
         assert_eq!(body["content_type"].as_str().unwrap(), "text/csv");
     }
 
-    /// `GET /issues/:id/documents/:path/raw` must return 500 when reading
-    /// the document file fails with a genuine I/O error (e.g. EISDIR).
-    ///
-    /// Same EISDIR trigger as `test_get_document_content_io_error_returns_500`
-    /// but exercises the `get_document_raw` handler path through
-    /// `read_document_bytes` → `read_path_bytes` → `PathReadError::Other`.
+    /// Linked raw document access applies the same ordinary-file contract.
     #[tokio::test]
-    async fn test_get_document_raw_io_error_returns_500() {
+    async fn test_get_document_raw_rejects_directory() {
         use jit::domain::Priority;
         use jit::storage::JsonFileStorage;
         use std::fs;
@@ -2256,7 +2224,6 @@ pattern = '^v\d+\.\d+$'
         )
         .unwrap();
 
-        // Directory → EISDIR when read → PathReadError::Other → 500.
         let dir_path = temp.path().join("broken-raw-doc");
         fs::create_dir_all(&dir_path).unwrap();
         let doc_rel = "broken-raw-doc";
@@ -2293,11 +2260,8 @@ pattern = '^v\d+\.\d+$'
 
         let url = format!("/issues/{}/documents/{}/raw", id, doc_rel);
         let response = server.get(&url).await;
-        assert_eq!(
-            response.status_code(),
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "reading a directory via get_document_raw should return 500"
-        );
+        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.text(), "");
     }
 
     #[tokio::test]

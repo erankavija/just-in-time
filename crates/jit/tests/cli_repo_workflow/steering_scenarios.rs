@@ -165,7 +165,8 @@ fn setup_scenario_repo(ruleset: &str) -> TempDir {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    // Overwrite rules.toml and install schemas/ from docs/examples/<ruleset>/.
+    // Preserve generated defaults and append the example rules. The canonical
+    // derived-state validator owns the default family and its schemas.
     let example_dir = workspace_root().join("docs/examples").join(ruleset);
     assert!(
         example_dir.exists(),
@@ -173,21 +174,40 @@ fn setup_scenario_repo(ruleset: &str) -> TempDir {
         example_dir.display()
     );
 
+    for name in ["config.toml", "templates.toml"] {
+        let source = example_dir.join(name);
+        if source.exists() {
+            fs::copy(&source, temp.path().join(".jit").join(name))
+                .unwrap_or_else(|e| panic!("failed to copy {}: {e}", source.display()));
+        }
+    }
+
     let rules_src = example_dir.join("rules.toml");
     let rules_dst = temp.path().join(".jit/rules.toml");
-    fs::copy(&rules_src, &rules_dst)
-        .unwrap_or_else(|e| panic!("failed to copy {}: {e}", rules_src.display()));
+    let mut rules = fs::read_to_string(&rules_dst).expect("read initialized rules");
+    rules.push_str(
+        &fs::read_to_string(&rules_src)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", rules_src.display())),
+    );
+    fs::write(&rules_dst, rules).expect("append example rules");
 
     let schemas_src = example_dir.join("schemas");
     if schemas_src.exists() {
         let schemas_dst = temp.path().join(".jit/schemas");
-        // Remove the scaffolded schemas dir first (jit init creates it).
-        if schemas_dst.exists() {
-            fs::remove_dir_all(&schemas_dst).unwrap();
-        }
         copy_dir_all(&schemas_src, &schemas_dst)
             .unwrap_or_else(|e| panic!("failed to copy schemas: {e}"));
     }
+
+    let repaired = jit_cmd(temp.path())
+        .args(["validate", "--fix"])
+        .output()
+        .expect("jit validate --fix failed to spawn");
+    assert!(
+        repaired.status.success(),
+        "ruleset repair failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&repaired.stdout),
+        String::from_utf8_lossy(&repaired.stderr)
+    );
 
     temp
 }
@@ -201,7 +221,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
         let dst_path = dst.join(entry.file_name());
         if ty.is_dir() {
             copy_dir_all(&entry.path(), &dst_path)?;
-        } else {
+        } else if !dst_path.exists() {
             fs::copy(entry.path(), dst_path)?;
         }
     }

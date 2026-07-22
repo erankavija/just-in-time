@@ -345,7 +345,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 std::iter::once((config_vpath.clone(), Some(edited_bytes.clone())))
                     .collect::<std::collections::BTreeMap<_, _>>(),
             )?;
-            let declarations = super::declarations_from_image(&overlaid)?;
+            let declarations = crate::repository_state::declarations_from_image(&overlaid)?;
             let plan = finalize_config_edit(&base, &edited_bytes, declarations.borrowed(), &seed)?;
             let proposed = apply_overlay(&base, super::validation_overlay(plan.delta()))?;
             let validation = crate::validation::repository::validate_repository(&proposed)?;
