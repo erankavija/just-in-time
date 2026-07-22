@@ -394,8 +394,10 @@
     {
       "category": "rework-exceeded",
       "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-22T21:39:09+03:00",
+      "resolved_at": "2026-07-22T21:47:16+03:00",
+      "resolution": "Invoker selected option 1 and authorized one narrow leading-./ adapter normalization with preserved unsafe-path rejection, focused regression coverage, and remaining gate evaluation.",
       "situation": "After rework attempt two, the complete workspace and cargo-ci gate pass, but code-review gate capture fails before checker execution: configured prompt_file './scripts/code-review-prompt.md' is handed to repo_rel_virtual_path, whose canonical RootRelativePath rejects the leading '.' component and the caller masks that typed error as 'resolves outside the repository'. The repository's own gates.toml intentionally uses the './scripts/...' spelling. This is a command-adapter compatibility defect from the typed repository-state cutover, not an unsafe-path relaxation request.",
       "recommendation": "Authorize one final narrow correction with counter reset: normalize exactly a leading './' at the configuration-to-VirtualPath adapter boundary, continue rejecting absolute paths, parent traversal, empty/interior dot components, and backslash/colon/control spellings; add focused capture/evaluation regressions using the repository-style prompt path; rerun code-review and remaining gates. Do not weaken RootRelativePath canonicality or edit gates.toml."
     }
@@ -405,7 +407,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 2
+    "49adf23b": 0
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
