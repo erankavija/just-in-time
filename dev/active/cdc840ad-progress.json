@@ -320,6 +320,14 @@
       "situation": "After the issue rework counter reached two, independent review of the captured gate-preset cutover found a backend-parity blocker: CreateGatePreset publishes custom preset bytes into InMemoryStorage's aggregate repository image, but InMemoryStorage::list_gate_presets and get_gate_preset still read builtins only, so an immediately created preset is invisible to list/show on that backend. The JSON reader and captured apply path use the centralized custom-file policy correctly.",
       "resolution": "Invoker selected option 1 and authorized one narrow guided correction with a counter reset, limited to in-memory custom-preset read parity, one create-to-list/show regression, bounded checks, and independent re-review.",
       "recommendation": "Authorize one narrow guided correction and counter reset: make the in-memory read methods project custom preset JSON files from the aggregate repository image through the shared load_presets_from_custom_files policy, add one create-to-list/show backend-parity regression, rerun the preset/template/cargo checks, and require independent re-review. Do not add another preset cache or compatibility fallback."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "open",
+      "opened_at": "2026-07-22T04:54:41+03:00",
+      "situation": "After rework attempt two, final independent review of the standalone gate-evaluation cutover found six remaining contract/parity defects: full-length IDs are normalized instead of requiring exact canonical spelling; every gate-runs root child is treated as a directory and per-run listings exhaust the 256-listing budget after roughly 255 runs; memory readers do not validate gate-run parent kinds like JSON; lifecycle capture/evidence still reconstructs and broadly matches gate-run result paths outside the canonical helper; JSON's leaf-only O_NOFOLLOW does not protect swappable parent components; and ReviewPlaceholder captures document evidence it never consumes.",
+      "recommendation": "Authorize one narrow guided correction with a counter reset: preserve exact full-ID resolution; replace per-run listings with one shared three-phase root-listing/direct-child-kind/exact-result closure used by standalone and lifecycle capture; mirror JSON parent-kind checks in memory; route every lifecycle result path and matcher through the canonical helper; open gate-run paths through retained no-follow directory capabilities; restrict document evidence to Exec; add bounded clutter, >256-run, parent-parity, full-ID, lifecycle, parent-swap, and placeholder-isolation regressions; then require independent final re-review."
     }
   ],
   "rework_counts": {
