@@ -1,7 +1,7 @@
 {
   "epic_id": "cdc840ad-9332-4936-9381-772318967f0f",
   "epic_short_id": "cdc840ad",
-  "last_handoff": "dev/active/cdc840ad-handoff-13.md",
+  "last_handoff": "dev/active/cdc840ad-handoff-14.md",
   "current_wave": 5,
   "waves": [
     {
@@ -65,7 +65,7 @@
             "1-5": "done (waves 1-4 packages + init/profile session publication)",
             "6": "done \u2014 canonical profile consumers: 6c7ca9d2 (derive_profile_materializations + build_profile_claims), b0e5beb9 (commands rewired), 3d4af231 (planner/render/snapshot/preset/view-triad deleted)",
             "7": "done \u2014 (a) verified pre-satisfied; (b) 9153f0e5 image-projected plan content; (c) e4ac6863 finalize_config_edit + ddb574b0 re-init unification (closes the gitattributes gap, pinned test); (d) 6565df41 events via finalizer; (e) d3619a13 MutationIntent::UpdateIssue; (f) held",
-            "8": "IN PROGRESS \u2014 accepted gate-registry CRUD 0c799014, document link publication e33d69e7, canonical startup recovery ebbb22ef, captured dependency add/reduction f1382bb6, atomic template application edadf8ea, bounded captured listings 5925d837, captured lifecycle/field/dependency-removal transitions 41d599f0, captured labels/type-fix 39f7d9cc, atomic issue deletion cascade a23d8c2b, captured gate-preset create/apply 88c0b6be, captured standalone gate evaluation 0216d9bb, pure archive discovery/pinned evidence ab8e68e9, pure archive marker/location evidence 008aaf0a, captured graph file exports e41978bf, atomic archive transaction cutover, captured graph/snapshot repository export cutover ecb28939, and the net-negative rules/CommandExecutor-init predecessor cleanup. Independent review passes; dead rules writers and their command/storage wrappers, RuleMembershipSync, CommandExecutor::init, FreshInitResult's empty warnings, raw graph/snapshot publishers, archive staging/rollback, and previously accepted IssueStore write methods are deleted. Canonical re-init now composes rules/header/membership/schemas from final profile-overlaid authority in one recovered plan. Snapshot repository payloads are capped at 128 MiB; the remaining intent-to-plan clone is bounded transient RAM debt, not a resident allocation. Remaining publisher packages: migrate the broad IssueStore::init/JSON fixture population, delete final IssueStore write APIs/test doubles, and run structural absence scans."
+            "8": "BLOCKED \u2014 final publisher deletion is net-negative and the legacy write API absence scan is clean, but rework attempt two failed independent review. Remaining defects are lexical-vs-normalized JIT_DATA_DIR root authority, a non-exhaustive/inexact claim-lock classifier (including dep rm), a public test-convenience RepositoryIndex codec without enforced serialization invariants, and two stale profile-finalizer comments. The dirty package is preserved at HEAD 377dc5e7 pending invoker direction."
           }
         }
       ]
@@ -370,6 +370,14 @@
       "resolution": "Invoker selected option 1 and authorized one narrowly scoped fixture-only correction with a counter reset. Production behavior, compatibility helpers, and restoration of IssueStore::init remain excluded.",
       "situation": "The IssueStore::init deletion package reached rework attempt two. Independent architectural re-review still found healthy fast-rules and server-route fixtures retaining partial bootstrap assumptions, and the cumulative fast_docs_templates target has five package-attributable failures: three template atomicity fixtures no longer create required repository preimages and two template-binding fixtures capture no config.toml. A sixth policy-text failure is pre-existing at HEAD and unrelated to this package. The patch is net-negative and its core trait/implementation/call deletion is sound, but acceptance is blocked until every healthy fixture uses canonical initialization and the cumulative target passes.",
       "recommendation": "Authorize one narrowly guided correction with a counter reset, limited to canonicalizing the reviewed fast-rules/server/template fixtures, preserving only explicit malformed or absent-state preimages, rerunning the full fast_rules, fast_docs_templates, and server targets, and one independent final re-review. Do not restore IssueStore::init, add a compatibility helper, or change production behavior."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "open",
+      "opened_at": "2026-07-22T18:38:53+03:00",
+      "situation": "The invoker-authorized fixture correction reached rework attempt two. Final semantic and architectural reviews agree that equivalent relative and absolute JIT_DATA_DIR spellings choose different profile worktree roots because the explicit path is compared before lexical normalization. Architectural review additionally found that coordinates_claims_first groups nested enums instead of exhaustively classifying leaves, incorrectly marks dep rm claim-first despite RemoveBatch disabling lease enforcement, exposes RepositoryIndex publicly only for fixture seeding without validating invariants on serialization, and leaves two profile-finalizer comments inconsistent with finalizer ownership. The package is net-negative (1506 additions, 2239 deletions), formatting/Clippy/MCP pass, and the full Rust workspace reaches only one pre-existing exact-policy-text failure, but acceptance remains blocked.",
+      "recommendation": "Authorize one final tightly bounded correction with a counter reset: normalize the selected explicit data root before root-authority comparison and add equivalent-path coverage; replace the claim-lock grouping with exhaustive per-leaf classification and a complete inventory test, excluding dep rm; keep RepositoryIndex internal behind an explicit aggregate fixture boundary or make a complete invariant-validating public codec; correct the two comments; then rerun focused/full gates and one independent final review. Do not restore any deleted publisher, add a compatibility fallback, or broaden production behavior."
     }
   ],
   "rework_counts": {
@@ -377,7 +385,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 0
+    "49adf23b": 2
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
