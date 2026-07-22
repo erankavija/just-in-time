@@ -7776,7 +7776,6 @@ fn run() -> Result<()> {
                 force,
                 json,
             } => {
-                use jit::commands::snapshot::SnapshotExporter;
                 use jit::snapshot::{SnapshotFormat, SnapshotScope};
 
                 // Parse scope
@@ -7788,20 +7787,18 @@ fn run() -> Result<()> {
                     .with_context(|| format!("Invalid format: {}", format))?;
 
                 // Determine source mode
-                let source_mode = SnapshotExporter::<jit::JsonFileStorage>::determine_source_mode(
+                let source_mode = executor.determine_snapshot_source_mode(
                     at.as_deref(),
                     working_tree,
                     committed_only,
                 )?;
 
-                // TODO: Add validation unless --force
                 if !force {
                     executor.validate_silent()?;
                 }
 
-                // Create exporter and export
-                let exporter = SnapshotExporter::new(storage);
-                let (result, warnings) = exporter.export(
+                let (result, warnings) = executor.export_snapshot(
+                    &current_dir,
                     &snapshot_scope,
                     &source_mode,
                     &snapshot_format,

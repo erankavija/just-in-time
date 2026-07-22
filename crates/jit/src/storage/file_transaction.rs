@@ -4,6 +4,7 @@
 //! module owns only storage mechanics: synchronized stages, a versioned journal,
 //! identity-checked forward/reverse actions, durable decisions, and cleanup.
 
+use super::atomic_write::rename_noreplace_cap;
 use super::repo_lock::RepoWriteGuard;
 use super::transaction_action::{
     FileIdentity, JournalActionKind, TargetIdentity, TransactionAction,
@@ -30,7 +31,6 @@ use cap_std::fs::MetadataExt as _;
 use cap_std::fs::{Dir, OpenOptions};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
-use std::ffi::OsStr;
 use std::io::{ErrorKind, Read};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -2461,37 +2461,6 @@ fn map_noreplace_error(error: std::io::Error) -> anyhow::Error {
         .into(),
         _ => anyhow::Error::new(error),
     }
-}
-
-#[cfg(target_os = "linux")]
-fn rename_noreplace_cap(
-    source_dir: &Dir,
-    source: impl AsRef<OsStr>,
-    target_dir: &Dir,
-    target: impl AsRef<OsStr>,
-) -> std::io::Result<()> {
-    use nix::fcntl::{renameat2, RenameFlags};
-    renameat2(
-        source_dir,
-        source.as_ref(),
-        target_dir,
-        target.as_ref(),
-        RenameFlags::RENAME_NOREPLACE,
-    )
-    .map_err(std::io::Error::from)
-}
-
-#[cfg(not(target_os = "linux"))]
-fn rename_noreplace_cap(
-    _source_dir: &Dir,
-    _source: impl AsRef<OsStr>,
-    _target_dir: &Dir,
-    _target: impl AsRef<OsStr>,
-) -> std::io::Result<()> {
-    Err(std::io::Error::new(
-        ErrorKind::Unsupported,
-        "atomic no-replace rename is unsupported on this target",
-    ))
 }
 
 fn create_transaction_dirs(base: Dir, transactions: Dir, id: &str) -> Result<ControlDirs> {

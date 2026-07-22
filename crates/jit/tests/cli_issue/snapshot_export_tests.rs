@@ -213,6 +213,7 @@ fn test_snapshot_export_label_scope() {
     // Verify manifest shows 2 issues
     let manifest_content = fs::read_to_string(snapshot_dir.join("manifest.json")).unwrap();
     assert!(manifest_content.contains("\"count\": 2"));
+    assert!(manifest_content.contains("\"scope\": \"label:epic:auth\""));
 }
 
 #[test]
@@ -320,4 +321,235 @@ fn test_snapshot_export_output_exists() {
     cmd.assert()
         .failure()
         .stderr(predicate::str::contains("already exists"));
+}
+
+#[test]
+fn test_snapshot_export_nested_data_and_external_destinations() {
+    let temp = TempDir::new().unwrap();
+    let repo = temp.path().join("repo");
+    fs::create_dir(&repo).unwrap();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&repo)
+        .arg("init")
+        .assert()
+        .success();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&repo)
+        .args(["issue", "create", "--title", "Test"])
+        .assert()
+        .success();
+    fs::create_dir(repo.join(".jit/exports")).unwrap();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&repo)
+        .args(["snapshot", "export", "--out", ".jit/exports/snapshot"])
+        .assert()
+        .success();
+    assert!(repo.join(".jit/exports/snapshot/manifest.json").is_file());
+
+    #[cfg(target_os = "linux")]
+    {
+        let external_directory = temp.path().join("external-snapshot");
+        Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+            .current_dir(&repo)
+            .args([
+                "snapshot",
+                "export",
+                "--out",
+                external_directory.to_str().unwrap(),
+            ])
+            .assert()
+            .success();
+        assert!(external_directory.join("manifest.json").is_file());
+    }
+
+    let external = temp.path().join("external.tar");
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&repo)
+        .args([
+            "snapshot",
+            "export",
+            "--format",
+            "tar",
+            "--out",
+            external.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    assert!(external.is_file());
+    let original = fs::read(&external).unwrap();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&repo)
+        .args([
+            "snapshot",
+            "export",
+            "--format",
+            "tar",
+            "--out",
+            external.to_str().unwrap(),
+        ])
+        .assert()
+        .code(6);
+    assert_eq!(fs::read(&external).unwrap(), original);
+    assert!(fs::read_dir(temp.path()).unwrap().all(|entry| {
+        !entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .ends_with(".tmp")
+    }));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_snapshot_export_rejects_repository_symlink_alias() {
+    use std::os::unix::fs::symlink;
+
+    let temp = TempDir::new().unwrap();
+    let repo = temp.path().join("repo");
+    let external = temp.path().join("external");
+    fs::create_dir(&repo).unwrap();
+    fs::create_dir(&external).unwrap();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&repo)
+        .arg("init")
+        .assert()
+        .success();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&repo)
+        .args(["issue", "create", "--title", "Test"])
+        .assert()
+        .success();
+    symlink(&external, repo.join("alias")).unwrap();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&repo)
+        .args(["snapshot", "export", "--out", "alias/snapshot"])
+        .assert()
+        .failure();
+    assert!(!external.join("snapshot").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_snapshot_export_rejects_external_symlink_alias_into_repository() {
+    use std::os::unix::fs::symlink;
+
+    let temp = TempDir::new().unwrap();
+    let repo = temp.path().join("repo");
+    fs::create_dir(&repo).unwrap();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&repo)
+        .arg("init")
+        .assert()
+        .success();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&repo)
+        .args(["issue", "create", "--title", "Test"])
+        .assert()
+        .success();
+    let alias = temp.path().join("alias");
+    symlink(&repo, &alias).unwrap();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&repo)
+        .args([
+            "snapshot",
+            "export",
+            "--out",
+            alias.join("snapshot").to_str().unwrap(),
+        ])
+        .assert()
+        .failure();
+    assert!(!repo.join("snapshot").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_snapshot_export_rejects_symlinked_document_source() {
+    use std::os::unix::fs::symlink;
+
+    let temp = TempDir::new().unwrap();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .arg("init")
+        .assert()
+        .success();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "create", "--title", "Test"])
+        .assert()
+        .success();
+    fs::create_dir(temp.path().join("docs")).unwrap();
+    fs::write(temp.path().join("real.md"), "secret").unwrap();
+    symlink("../real.md", temp.path().join("docs/link.md")).unwrap();
+    let issue_path = fs::read_dir(temp.path().join(".jit/issues"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "json")
+        })
+        .unwrap();
+    let mut issue: serde_json::Value =
+        serde_json::from_slice(&fs::read(&issue_path).unwrap()).unwrap();
+    issue["documents"] = serde_json::json!([{
+        "path": "docs/link.md",
+        "commit": null,
+        "label": null,
+        "doc_type": null,
+        "format": "markdown",
+        "assets": []
+    }]);
+    fs::write(&issue_path, serde_json::to_vec_pretty(&issue).unwrap()).unwrap();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "snapshot",
+            "export",
+            "--working-tree",
+            "--force",
+            "--out",
+            "snapshot",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Warning"));
+    assert!(!temp.path().join("snapshot/docs/link.md").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_snapshot_export_rejects_symlinked_data_source_without_output() {
+    use std::os::unix::fs::symlink;
+
+    let temp = TempDir::new().unwrap();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .arg("init")
+        .assert()
+        .success();
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "create", "--title", "Test"])
+        .assert()
+        .success();
+    fs::remove_file(temp.path().join(".jit/config.toml")).unwrap();
+    fs::write(temp.path().join("outside.toml"), "secret = true").unwrap();
+    symlink("../outside.toml", temp.path().join(".jit/config.toml")).unwrap();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "snapshot",
+            "export",
+            "--force",
+            "--working-tree",
+            "--out",
+            "snapshot",
+        ])
+        .assert()
+        .failure();
+    assert!(!temp.path().join("snapshot").exists());
 }

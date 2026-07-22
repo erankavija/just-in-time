@@ -87,10 +87,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{
-            classify_repository_export, finalize_repository_export, CaptureBudget,
-            RepositoryExportDestination, RepositoryExportIntent,
+            classify_repository_export, CaptureBudget, RepositoryExportDestination,
+            RepositoryExportIntent,
         };
-        use crate::storage::RepositoryStateStoreError;
 
         let layout = self.require_layout()?;
         match classify_repository_export(&layout, invocation_dir, requested)? {
@@ -106,23 +105,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     max_bytes: 512 * 1024 * 1024,
                     max_depth: 128,
                 };
-                for _ in 0..8 {
-                    let mut session = self.storage.open_mutation_session(layout.clone())?;
-                    let image = match session.capture(intent.capture_spec(budget)?) {
-                        Ok(image) => image,
-                        Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                        Err(error) => return Err(error.into()),
-                    };
-                    let plan = finalize_repository_export(&image, &intent)?;
-                    match session.apply(&plan) {
-                        Ok(_) => return Ok(()),
-                        Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                        Err(error) => return Err(error.into()),
-                    }
-                }
-                Err(anyhow::anyhow!(
-                    "graph export did not converge after repeated capture conflicts"
-                ))
+                self.publish_repository_export(&layout, &intent, budget)
             }
         }
     }

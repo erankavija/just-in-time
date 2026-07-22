@@ -4,6 +4,7 @@ use super::{RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, Virtua
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::{self, Write};
 
 /// Platform-neutral file mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -1414,9 +1415,38 @@ fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
 }
 
 fn hash_serialized(hasher: &mut Sha256, value: &impl Serialize) -> Result<(), PlanHashError> {
-    let bytes = serde_json::to_vec(value)?;
-    hash_field(hasher, &bytes);
+    let mut counter = ByteCounter::default();
+    serde_json::to_writer(&mut counter, value)?;
+    hasher.update(counter.0.to_be_bytes());
+    serde_json::to_writer(HashWriter(hasher), value)?;
     Ok(())
+}
+
+#[derive(Default)]
+struct ByteCounter(u64);
+
+impl Write for ByteCounter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.0 += bytes.len() as u64;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+struct HashWriter<'a>(&'a mut Sha256);
+
+impl Write for HashWriter<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.0.update(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 /// Capture closure failure.
@@ -2275,6 +2305,20 @@ mod tests {
         )
         .unwrap();
         assert_eq!(captured.file_bytes(&discovered).unwrap(), Some(&bytes[..]));
+    }
+
+    #[test]
+    fn test_hash_serialized_matches_buffered_length_prefixed_json_contract() {
+        let captured = image(1, 2);
+        let value = captured.entries.iter().collect::<Vec<_>>();
+        let mut streamed = Sha256::new();
+        hash_serialized(&mut streamed, &value).unwrap();
+
+        let mut buffered = Sha256::new();
+        let bytes = serde_json::to_vec(&value).unwrap();
+        hash_field(&mut buffered, &bytes);
+
+        assert_eq!(streamed.finalize(), buffered.finalize());
     }
 
     #[test]

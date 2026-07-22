@@ -1312,6 +1312,48 @@ pub(crate) fn open_absolute_dir_nofollow(path: &Path) -> Result<Dir, RepositoryS
     Ok(current)
 }
 
+/// Read one validated root-relative ordinary file without following links.
+///
+/// `Ok(None)` means the leaf or one of its parents is absent. Symlinked
+/// ancestors, symlink leaves, directories, and special files are unsafe rather
+/// than absence.
+pub(crate) fn read_repository_file_nofollow(
+    root: &Path,
+    relative: &RootRelativePath,
+) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+    if relative.is_root() {
+        return Err(RepositoryStateStoreError::UnsafeTarget(
+            root.display().to_string(),
+        ));
+    }
+    let root = open_absolute_dir_nofollow(root)?;
+    let Some((parent, leaf)) = open_capability_parent(&root, relative.as_path())? else {
+        return Ok(None);
+    };
+    let metadata = match parent.symlink_metadata(&leaf) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    if metadata.is_symlink() || !metadata.is_file() {
+        return Err(RepositoryStateStoreError::UnsafeTarget(
+            relative.as_path().display().to_string(),
+        ));
+    }
+    let mut options = OpenOptions::new();
+    options.read(true);
+    options._cap_fs_ext_follow(FollowSymlinks::No);
+    let mut file = parent.open_with(&leaf, &options)?;
+    if !file.metadata()?.is_file() {
+        return Err(RepositoryStateStoreError::UnsafeTarget(
+            relative.as_path().display().to_string(),
+        ));
+    }
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    Ok(Some(bytes))
+}
+
 fn ensure_capability_identity(
     directory: &Dir,
     expected: &str,

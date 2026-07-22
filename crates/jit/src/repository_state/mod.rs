@@ -32,7 +32,7 @@ pub use default_rules::{
 };
 pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,
-    RepositoryExportDestination, RepositoryExportIntent,
+    RepositoryExportDestination, RepositoryExportError, RepositoryExportIntent,
 };
 pub use image::{
     plan_hash, CaptureBudget, CaptureError, CaptureSpec, DeltaError, EntryIdentity,

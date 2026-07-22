@@ -1877,6 +1877,39 @@ impl<S: IssueStore> CommandExecutor<S> {
             .clone()
             .ok_or_else(|| anyhow!("no repository layout configured for this command"))
     }
+
+    /// Capture, finalize, and publish one typed repository export intent.
+    pub(crate) fn publish_repository_export(
+        &self,
+        layout: &crate::repository_state::RepositoryLayout,
+        intent: &crate::repository_state::RepositoryExportIntent,
+        budget: crate::repository_state::CaptureBudget,
+    ) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::finalize_repository_export;
+        use crate::storage::RepositoryStateStoreError;
+
+        for _ in 0..8 {
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let image = match session.capture(intent.capture_spec(budget)?) {
+                Ok(image) => image,
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let plan = finalize_repository_export(&image, intent)?;
+            match session.apply(&plan) {
+                Ok(_) => return Ok(()),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(anyhow!(
+            "repository export did not converge after repeated capture conflicts"
+        ))
+    }
+
     /// Publish one closed set of repository-owned issue/gate-run/audit intents.
     ///
     /// Capture paths are derived solely from the typed intents, so command callers
@@ -3487,6 +3520,43 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_publish_repository_export_retries_apply_conflict() {
+        use crate::repository_state::{CaptureBudget, RepositoryExportIntent, VirtualPath};
+        use crate::storage::{InMemoryStorage, IssueStore};
+
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        storage.add_repo_file(".jit/issues/existing.json", "{}");
+        let layout = storage.repository_layout();
+        let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
+        storage.inject_repository_state_apply_conflicts(1);
+        let intent = RepositoryExportIntent::new_absent_file(
+            VirtualPath::data("issues/snapshot.tar").unwrap(),
+            b"snapshot".to_vec(),
+        );
+
+        executor
+            .publish_repository_export(
+                &layout,
+                &intent,
+                CaptureBudget {
+                    max_paths: 4,
+                    max_listings: 1,
+                    max_bytes: 1024,
+                    max_depth: 8,
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            storage
+                .read_repo_file(".jit/issues/snapshot.tar")
+                .unwrap()
+                .as_deref(),
+            Some("snapshot")
+        );
+    }
 
     fn precheck_evidence_fixture() -> (
         crate::storage::InMemoryStorage,
