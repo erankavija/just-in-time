@@ -334,9 +334,11 @@
     {
       "category": "rework-exceeded",
       "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-22T11:17:15+03:00",
+      "resolved_at": "2026-07-22T11:41:33+03:00",
       "situation": "After archive rework attempt two, independent review of the net-negative discovery/pinned-evidence extraction found that closure acquisition reparses every accumulated prefix on each evidence wave, discards the completed parsed map, and parses the full closure again during derivation, producing roughly quadratic parsing on deep dependency chains. The new incremental closure and target-relevant pinned-request contracts also lack direct pure tests. Focused behavior tests, formatting, strict Clippy, and diff checks pass.",
+      "resolution": "Invoker selected option 1 and authorized one narrow guided correction with a counter reset, limited to persistent parsed closure state, direct pure boundary tests, contract documentation, and independent re-review; marker/location extraction and archive transaction work remain excluded.",
       "recommendation": "Authorize one narrow guided correction with a counter reset: carry the parsed accumulator through Needs waves into the completed derivation, add small pure tests for Needs-to-Complete reuse, terminal evidence, shared/cyclic reachability, and target-relevant deduplicated pin requests, fix stale resolver wording/public contract docs, rerun focused checks, and require independent re-review. Do not expand into marker/location extraction or archive transaction code in this correction."
     }
   ],
@@ -345,7 +347,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 2
+    "49adf23b": 0
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
