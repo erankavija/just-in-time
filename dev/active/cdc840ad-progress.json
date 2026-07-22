@@ -344,9 +344,11 @@
     {
       "category": "rework-exceeded",
       "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-22T12:24:01+03:00",
+      "resolved_at": "2026-07-22T12:52:06+03:00",
       "situation": "After graph-export rework attempt two closed the external symlink-alias bypass, independent review found that the shared no-follow absolute-directory walker converts every normal path component to UTF-8. On Unix this regresses all repository sessions beneath a valid non-UTF-8 ancestor; a reproduced jit init now fails before publication with an unsafe-target error. Focused graph/export/store tests, formatting, strict Clippy, and diff checks otherwise pass.",
+      "resolution": "Invoker selected option 1 and authorized one narrow guided correction with a counter reset, limited to preserving OsStr components in the existing capability walk, one Unix regression, focused checks, and independent re-review.",
       "recommendation": "Authorize one narrow guided correction with a counter reset: preserve OsStr path components through the existing capability walk, add one Unix non-UTF-8-ancestor repository-session regression, rerun graph/store/init focused checks, and require independent re-review. Do not change export classification, capability publication, snapshot behavior, or other repository-state semantics."
     }
   ],
@@ -355,7 +357,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 2
+    "49adf23b": 0
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
