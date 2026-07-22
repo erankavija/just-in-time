@@ -643,7 +643,7 @@ impl RepositoryImage {
             for name in listing.children().keys() {
                 listing_bytes =
                     listing_bytes.saturating_add(u64::try_from(name.len()).unwrap_or(u64::MAX));
-                let child = listing_child_path(parent, name)?;
+                let child = listing_child_path(&layout, parent, name)?;
                 if child.relative().depth() > spec.budget.max_depth {
                     return Err(CaptureError::DepthBudgetExceeded(child));
                 }
@@ -805,17 +805,15 @@ fn validate_listing_name(name: &str) -> Result<(), CaptureError> {
     Ok(())
 }
 
-fn listing_child_path(parent: &VirtualPath, name: &str) -> Result<VirtualPath, CaptureError> {
-    let relative = if parent.relative().is_root() {
-        name.to_owned()
-    } else {
-        format!("{}/{name}", parent.relative().as_str())
-    };
-    match parent.root_class() {
-        RepositoryRootClass::Worktree => VirtualPath::worktree(relative),
-        RepositoryRootClass::Data => VirtualPath::data(relative),
-    }
-    .map_err(Into::into)
+fn listing_child_path(
+    layout: &RepositoryLayout,
+    parent: &VirtualPath,
+    name: &str,
+) -> Result<VirtualPath, CaptureError> {
+    let physical = layout.resolve(parent)?.join(name);
+    layout
+        .classify_and_canonicalize(physical)
+        .map_err(Into::into)
 }
 
 fn validate_pinned_request(revision: &str, path: &str) -> Result<(), CaptureError> {
@@ -977,6 +975,11 @@ pub enum MaterializationIntent {
     /// Finalized by
     /// [`finalize_profile_application`](crate::repository_state::finalize_profile_application).
     ApplyProfile,
+    /// Publish one explicitly selected repository-contained export file.
+    /// Finalized by
+    /// [`finalize_repository_export`](crate::repository_state::finalize_repository_export),
+    /// not the declaration-derived producer graph.
+    RepositoryExport,
 }
 
 /// Stable ownership identity for a target claim.

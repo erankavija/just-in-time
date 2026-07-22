@@ -4928,12 +4928,10 @@ fn run() -> Result<()> {
                 };
 
                 if let Some(path) = output {
-                    // Write through the shared atomic primitive (temp file +
-                    // rename) so a reader never observes a partially written
-                    // export file (@/inv/atomic-writes), matching every storage write.
-                    jit::storage::atomic_write::write_file_atomic(
+                    executor.publish_graph_export(
+                        &current_dir,
                         std::path::Path::new(&path),
-                        &graph_output,
+                        graph_output.as_bytes(),
                     )?;
                     let _ = output_ctx.print_success(format!("Graph exported to: {}", path));
                 } else {

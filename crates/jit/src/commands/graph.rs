@@ -72,6 +72,61 @@ fn priority_str(priority: crate::domain::Priority) -> &'static str {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
+    /// Publish rendered graph bytes to an explicitly selected filesystem path.
+    ///
+    /// Repository-contained destinations use one captured recoverable delta;
+    /// destinations outside both selected roots retain the atomic external-file
+    /// behavior. Stdout export does not call this method and remains read-only.
+    pub fn publish_graph_export(
+        &self,
+        invocation_dir: &std::path::Path,
+        requested: &std::path::Path,
+        bytes: &[u8],
+    ) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{
+            classify_repository_export, finalize_repository_export, CaptureBudget,
+            RepositoryExportDestination, RepositoryExportIntent,
+        };
+        use crate::storage::RepositoryStateStoreError;
+
+        let layout = self.require_layout()?;
+        match classify_repository_export(&layout, invocation_dir, requested)? {
+            RepositoryExportDestination::External(path) => {
+                crate::storage::atomic_write::write_external_export_atomic(&path, bytes)
+            }
+            RepositoryExportDestination::Repository(target) => {
+                let intent = RepositoryExportIntent::new(target, bytes.to_vec());
+                let budget = CaptureBudget {
+                    // Includes children named by the complete parent listing.
+                    max_paths: 4096,
+                    max_listings: 1,
+                    max_bytes: 512 * 1024 * 1024,
+                    max_depth: 128,
+                };
+                for _ in 0..8 {
+                    let mut session = self.storage.open_mutation_session(layout.clone())?;
+                    let image = match session.capture(intent.capture_spec(budget)?) {
+                        Ok(image) => image,
+                        Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                        Err(error) => return Err(error.into()),
+                    };
+                    let plan = finalize_repository_export(&image, &intent)?;
+                    match session.apply(&plan) {
+                        Ok(_) => return Ok(()),
+                        Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                        Err(error) => return Err(error.into()),
+                    }
+                }
+                Err(anyhow::anyhow!(
+                    "graph export did not converge after repeated capture conflicts"
+                ))
+            }
+        }
+    }
+
     /// Build a dependency tree with specified depth
     ///
     /// Returns a tree structure that preserves parent-child relationships

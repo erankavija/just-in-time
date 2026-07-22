@@ -7,7 +7,10 @@
 //! than touching the filesystem themselves.
 
 use anyhow::{Context, Result};
+use cap_primitives::fs::FollowSymlinks;
+use cap_std::fs::{Dir, OpenOptions};
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -30,6 +33,64 @@ pub fn write_file_atomic(path: &Path, content: &str) -> Result<()> {
 /// Write arbitrary bytes to `path` atomically (temp file + rename).
 pub fn write_file_atomic_bytes(path: &Path, content: &[u8]) -> Result<()> {
     write_file_atomic_bytes_with_permissions(path, content, None)
+}
+
+/// Atomically publish an export proven to be outside the repository roots.
+pub(crate) fn write_external_export_atomic(
+    path: &crate::repository_state::ExternalExportPath,
+    content: &[u8],
+) -> Result<()> {
+    let target = path.as_path();
+    let parent_path = target
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("external export target has no parent"))?;
+    let leaf = target
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("external export target has no file name"))?;
+    let parent = super::repository_state_store::open_absolute_dir_nofollow(parent_path)
+        .with_context(|| format!("opening external export parent {}", parent_path.display()))?;
+    match parent.symlink_metadata(leaf) {
+        Ok(metadata) if metadata.is_file() && !metadata.is_symlink() => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Ok(_) => anyhow::bail!("external export target is not an ordinary file"),
+        Err(error) => return Err(error.into()),
+    }
+
+    let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let file_name = leaf.to_string_lossy();
+    let tmp_name = format!(".{file_name}.{}.{seq}.tmp", std::process::id());
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    options._cap_fs_ext_follow(FollowSymlinks::No);
+    let mut temp = parent
+        .open_with(&tmp_name, &options)
+        .with_context(|| format!("creating external export temporary file {tmp_name}"))?;
+    let publish = (|| -> Result<()> {
+        temp.write_all(content)?;
+        temp.sync_all()?;
+        drop(temp);
+        revalidate_external_parent(parent_path, &parent)?;
+        parent.rename(&tmp_name, &parent, leaf)?;
+        parent.try_clone()?.into_std_file().sync_all()?;
+        Ok(())
+    })();
+    if publish.is_err() {
+        let _ = parent.remove_file(&tmp_name);
+    }
+    publish
+}
+
+fn revalidate_external_parent(path: &Path, held: &Dir) -> Result<()> {
+    let fresh = super::repository_state_store::open_absolute_dir_nofollow(path)
+        .with_context(|| format!("revalidating external export parent {}", path.display()))?;
+    let held_identity = super::repository_state_store::capability_dir_identity(held)
+        .ok_or_else(|| anyhow::anyhow!("external parent identity is unavailable"))?;
+    let fresh_identity = super::repository_state_store::capability_dir_identity(&fresh)
+        .ok_or_else(|| anyhow::anyhow!("external parent identity is unavailable"))?;
+    if held_identity != fresh_identity {
+        anyhow::bail!("external export parent changed before publication");
+    }
+    Ok(())
 }
 
 /// Write bytes and optional permissions to `path` as one atomic publication.

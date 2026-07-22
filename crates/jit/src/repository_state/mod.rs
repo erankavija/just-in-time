@@ -6,6 +6,7 @@
 //! profile modules.
 
 mod default_rules;
+mod export;
 mod image;
 mod index;
 mod initialize;
@@ -25,6 +26,10 @@ pub use default_rules::{
     default_rule_membership_diff, default_rule_membership_diff_from_identities, default_ruleset,
     hierarchy_config, reconcile_default_rules_with_config, type_hierarchy_known_schema,
     DefaultRuleMembershipDiff, TYPE_HIERARCHY_SCHEMA_FILE,
+};
+pub(crate) use export::{
+    classify_repository_export, finalize_repository_export, ExternalExportPath,
+    RepositoryExportDestination, RepositoryExportIntent,
 };
 pub use image::{
     plan_hash, CaptureBudget, CaptureError, CaptureSpec, DeltaError, EntryIdentity,
@@ -203,6 +208,11 @@ pub fn derive_materializations(
                 "initialize/apply-profile intents are finalized by their dedicated entries, \
                  not the declaration-derived producer graph"
                     .to_string(),
+            ));
+        }
+        MaterializationIntent::RepositoryExport => {
+            return Err(RepositoryStateError::Producer(
+                "repository exports are finalized by finalize_repository_export".to_string(),
             ));
         }
     };

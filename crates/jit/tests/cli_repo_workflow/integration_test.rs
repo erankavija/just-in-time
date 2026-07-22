@@ -295,19 +295,22 @@ fn test_export_output_writes_complete_file() {
         .unwrap();
 
     let out_path = temp.path().join("graph.json");
-    let output = Command::new(jit)
-        .args([
-            "graph",
-            "export",
-            "--format",
-            "json",
-            "--output",
-            out_path.to_str().unwrap(),
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(output.status.success());
+    std::fs::write(&out_path, "old").unwrap();
+    for _ in 0..2 {
+        let output = Command::new(jit)
+            .args([
+                "graph",
+                "export",
+                "--format",
+                "json",
+                "--output",
+                out_path.to_str().unwrap(),
+            ])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+    }
 
     // The atomically written file is complete and parses as the full document;
     // no partial/temp residue is left beside it.
@@ -320,6 +323,91 @@ fn test_export_output_writes_complete_file() {
         .filter_map(|e| e.ok())
         .any(|e| e.file_name().to_string_lossy().contains(".graph.json."));
     assert!(!temp_residue, "atomic write left a temp file behind");
+}
+
+#[test]
+fn test_export_output_routes_repository_and_external_destinations() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+    let run = |path: &std::path::Path| {
+        Command::new(jit)
+            .args([
+                "graph",
+                "export",
+                "--format",
+                "json",
+                "--output",
+                path.to_str().unwrap(),
+            ])
+            .current_dir(temp.path())
+            .output()
+            .unwrap()
+    };
+
+    let nested_data = temp.path().join(".jit/exports/graph.json");
+    std::fs::create_dir(temp.path().join(".jit/exports")).unwrap();
+    assert!(run(&nested_data).status.success());
+    assert!(nested_data.is_file());
+
+    let external = TempDir::new().unwrap();
+    let outside = external.path().join("graph.json");
+    assert!(run(&outside).status.success());
+    assert!(outside.is_file());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_export_output_rejects_symlinked_repository_parent() {
+    let temp = setup_test_repo();
+    let external = TempDir::new().unwrap();
+    std::os::unix::fs::symlink(external.path(), temp.path().join("linked")).unwrap();
+
+    let output = Command::new(jit_binary())
+        .args([
+            "graph",
+            "export",
+            "--format",
+            "json",
+            "--output",
+            "linked/graph.json",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(!external.path().join("graph.json").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_export_output_rejects_external_parent_aliases_into_repository() {
+    let repo = setup_test_repo();
+    let external = TempDir::new().unwrap();
+    let worktree_alias = external.path().join("worktree");
+    let data_alias = external.path().join("issues");
+    std::os::unix::fs::symlink(repo.path(), &worktree_alias).unwrap();
+    std::os::unix::fs::symlink(repo.path().join(".jit/issues"), &data_alias).unwrap();
+
+    for (alias, escaped) in [
+        (worktree_alias, repo.path().join("escaped.json")),
+        (data_alias, repo.path().join(".jit/issues/escaped.json")),
+    ] {
+        let output = Command::new(jit_binary())
+            .args([
+                "graph",
+                "export",
+                "--format",
+                "json",
+                "--output",
+                alias.join("escaped.json").to_str().unwrap(),
+            ])
+            .current_dir(repo.path())
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(!escaped.exists());
+    }
 }
 
 #[test]

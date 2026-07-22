@@ -781,7 +781,7 @@ fn capture_memory_image(
     let listings = spec
         .listings()
         .iter()
-        .map(|path| memory_listing(state, path).map(|listing| (path.clone(), listing)))
+        .map(|path| memory_listing(layout, state, path).map(|listing| (path.clone(), listing)))
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
     let pinned = spec
         .pinned()
@@ -835,25 +835,27 @@ fn capture_memory_image(
 }
 
 fn memory_listing(
+    layout: &RepositoryLayout,
     state: &MemoryRepositoryState,
     path: &VirtualPath,
 ) -> Result<ListingFingerprint, RepositoryStateStoreError> {
+    let physical_parent = layout.resolve(path)?;
     let children = state
         .entries
         .iter()
         .filter(|(candidate, entry)| {
-            candidate.root_class() == path.root_class()
-                && entry.identity().is_some()
-                && candidate.relative().as_path().parent() == Some(path.relative().as_path())
+            entry.identity().is_some()
+                && layout
+                    .resolve(candidate)
+                    .ok()
+                    .and_then(|physical| physical.parent().map(Path::to_path_buf))
+                    .as_ref()
+                    == Some(&physical_parent)
         })
         .filter_map(|(candidate, entry)| {
+            let physical = layout.resolve(candidate).ok()?;
             Some((
-                candidate
-                    .relative()
-                    .as_path()
-                    .file_name()?
-                    .to_str()?
-                    .to_string(),
+                physical.file_name()?.to_str()?.to_string(),
                 entry.identity()?.clone(),
             ))
         })
@@ -1021,6 +1023,7 @@ fn inspect_capability_listing(
     } else {
         open_descendant_dir_nofollow(root, path.relative().as_path())?
     };
+    let physical_directory = layout.resolve(path)?;
     let mut children = BTreeMap::new();
     for entry in directory.entries()? {
         let entry = entry?;
@@ -1028,12 +1031,7 @@ fn inspect_capability_listing(
             .file_name()
             .into_string()
             .map_err(|_| RepositoryStateStoreError::UnsafeTarget("non-UTF-8 entry".into()))?;
-        let relative = if path.relative().is_root() {
-            RootRelativePath::parse(&name)?
-        } else {
-            RootRelativePath::parse(format!("{}/{}", path.relative().as_path().display(), name))?
-        };
-        let child = VirtualPath::from_root(path.root_class(), relative)?;
+        let child = layout.classify_and_canonicalize(physical_directory.join(&name))?;
         let identity = inspect_capability_entry(layout, roots, &child)?
             .identity()
             .cloned()
@@ -1259,40 +1257,59 @@ fn open_capability_parent(
 fn open_descendant_dir_nofollow(root: &Dir, path: &Path) -> Result<Dir, RepositoryStateStoreError> {
     let mut current = root.try_clone()?;
     for component in path.components() {
-        current = open_child_dir_nofollow(&current, &component.as_os_str().to_string_lossy())?;
+        current = open_child_dir_nofollow(&current, Path::new(component.as_os_str()))?;
     }
     Ok(current)
 }
 
 pub(crate) fn open_child_dir_nofollow(
     parent: &Dir,
-    name: &str,
+    name: impl AsRef<Path>,
 ) -> Result<Dir, RepositoryStateStoreError> {
+    let name = name.as_ref();
     let metadata = parent.symlink_metadata(name)?;
     if metadata.is_symlink() || !metadata.is_dir() {
-        return Err(RepositoryStateStoreError::UnsafeTarget(name.to_string()));
+        return Err(RepositoryStateStoreError::UnsafeTarget(
+            name.display().to_string(),
+        ));
     }
     let mut options = OpenOptions::new();
     options.read(true);
     options._cap_fs_ext_follow(FollowSymlinks::No);
     let file = parent.open_with(name, &options)?;
     if !file.metadata()?.is_dir() {
-        return Err(RepositoryStateStoreError::UnsafeTarget(name.to_string()));
+        return Err(RepositoryStateStoreError::UnsafeTarget(
+            name.display().to_string(),
+        ));
     }
     Ok(Dir::from_std_file(file.into_std()))
 }
 
 pub(crate) fn open_absolute_dir_nofollow(path: &Path) -> Result<Dir, RepositoryStateStoreError> {
-    if path.parent().is_none() {
-        return Dir::open_ambient_dir(path, ambient_authority()).map_err(Into::into);
+    if !path.is_absolute() {
+        return Err(RepositoryStateStoreError::UnsafeTarget(
+            path.display().to_string(),
+        ));
     }
-    let parent = path.parent().expect("checked above");
-    let leaf = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| RepositoryStateStoreError::UnsafeTarget(path.display().to_string()))?;
-    let parent = Dir::open_ambient_dir(parent, ambient_authority())?;
-    open_child_dir_nofollow(&parent, leaf)
+    let mut anchor = PathBuf::new();
+    let mut descendants = Vec::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir => anchor.push(component.as_os_str()),
+            Component::Normal(name) => descendants.push(name),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                return Err(RepositoryStateStoreError::UnsafeTarget(
+                    path.display().to_string(),
+                ))
+            }
+        }
+    }
+    let mut current = Dir::open_ambient_dir(&anchor, ambient_authority())?;
+    for name in descendants {
+        current = open_child_dir_nofollow(&current, name)?;
+    }
+    Ok(current)
 }
 
 fn ensure_capability_identity(
@@ -1317,13 +1334,28 @@ fn ensure_capability_identity(
 /// Directory-capability identity in the same `dev:ino` form the layout records
 /// for the absent-root parent. `None` on platforms without stable inode identity,
 /// where the absent-root parent binding is skipped.
-fn capability_dir_identity(directory: &Dir) -> Option<String> {
+pub(crate) fn capability_dir_identity(directory: &Dir) -> Option<String> {
     #[cfg(unix)]
     {
         let metadata = directory.dir_metadata().ok()?;
         Some(format!("{}:{}", metadata.dev(), metadata.ino()))
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt as _;
+        let metadata = directory
+            .try_clone()
+            .ok()?
+            .into_std_file()
+            .metadata()
+            .ok()?;
+        Some(format!(
+            "{}:{}",
+            metadata.volume_serial_number()?,
+            metadata.file_index()?
+        ))
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = directory;
         None
@@ -2573,6 +2605,67 @@ mod tests {
         );
         let mut memory_session = memory.open_mutation_session(layout).unwrap();
         assert!(memory_session.capture(spec()).is_err());
+    }
+
+    #[test]
+    fn test_conformance_worktree_root_listing_canonicalizes_nested_data_child() {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        let spec = || {
+            let root = VirtualPath::worktree("").unwrap();
+            let mut spec = CaptureSpec::phase_one([], budget()).unwrap();
+            spec.discover_paths([root.clone()]).unwrap();
+            spec.discover_listing(root).unwrap();
+            spec
+        };
+
+        let json = JsonFileStorage::new(&data);
+        let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
+        let json_image = json_session.capture(spec()).unwrap();
+
+        let memory = InMemoryStorage::new();
+        seed_memory_existing(&memory, &[]);
+        memory.repository_state().entries.insert(
+            VirtualPath::worktree("").unwrap(),
+            RepositoryEntry::Directory {
+                identity: EntryIdentity::for_bytes("mem-worktree-root", b"directory").unwrap(),
+                mode: FileMode::Executable,
+            },
+        );
+        let mut memory_session = memory.open_mutation_session(layout).unwrap();
+        let memory_image = memory_session.capture(spec()).unwrap();
+
+        for image in [&json_image, &memory_image] {
+            let listing = &image.listing_fingerprints()[&VirtualPath::worktree("").unwrap()];
+            assert!(listing.children().contains_key(".jit"));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_json_session_opens_beneath_non_utf8_ancestor() {
+        use std::os::unix::ffi::OsStringExt as _;
+
+        let temp = TempDir::new().unwrap();
+        let ancestor = temp
+            .path()
+            .join(std::ffi::OsString::from_vec(b"non-utf8-\xff".to_vec()));
+        let worktree = ancestor.join("repo");
+        let data = worktree.join(".jit");
+        std::fs::create_dir_all(&data).unwrap();
+        let layout = discover_repository_layout(&worktree, &data).unwrap();
+        let storage = JsonFileStorage::new(&data);
+        let mut session = storage.open_mutation_session(layout).unwrap();
+        let image = session
+            .capture(CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap())
+            .unwrap();
+
+        assert!(matches!(
+            image.entry(&VirtualPath::data("").unwrap()).unwrap(),
+            RepositoryEntry::Directory { .. }
+        ));
     }
 
     fn capture_listing_errors(
