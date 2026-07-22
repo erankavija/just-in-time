@@ -324,9 +324,11 @@
     {
       "category": "rework-exceeded",
       "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-22T04:54:41+03:00",
+      "resolved_at": "2026-07-22T09:52:01+03:00",
       "situation": "After rework attempt two, final independent review of the standalone gate-evaluation cutover found six remaining contract/parity defects: full-length IDs are normalized instead of requiring exact canonical spelling; every gate-runs root child is treated as a directory and per-run listings exhaust the 256-listing budget after roughly 255 runs; memory readers do not validate gate-run parent kinds like JSON; lifecycle capture/evidence still reconstructs and broadly matches gate-run result paths outside the canonical helper; JSON's leaf-only O_NOFOLLOW does not protect swappable parent components; and ReviewPlaceholder captures document evidence it never consumes.",
+      "resolution": "Invoker selected option 1 and authorized one narrow guided correction with a counter reset, limited to the six reviewed defects, shared gate-run closure consolidation, focused regressions, and independent final re-review.",
       "recommendation": "Authorize one narrow guided correction with a counter reset: preserve exact full-ID resolution; replace per-run listings with one shared three-phase root-listing/direct-child-kind/exact-result closure used by standalone and lifecycle capture; mirror JSON parent-kind checks in memory; route every lifecycle result path and matcher through the canonical helper; open gate-run paths through retained no-follow directory capabilities; restrict document evidence to Exec; add bounded clutter, >256-run, parent-parity, full-ID, lifecycle, parent-swap, and placeholder-isolation regressions; then require independent final re-review."
     }
   ],
@@ -335,7 +337,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 2
+    "49adf23b": 0
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
