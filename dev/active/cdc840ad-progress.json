@@ -65,7 +65,7 @@
             "1-5": "done (waves 1-4 packages + init/profile session publication)",
             "6": "done \u2014 canonical profile consumers: 6c7ca9d2 (derive_profile_materializations + build_profile_claims), b0e5beb9 (commands rewired), 3d4af231 (planner/render/snapshot/preset/view-triad deleted)",
             "7": "done \u2014 (a) verified pre-satisfied; (b) 9153f0e5 image-projected plan content; (c) e4ac6863 finalize_config_edit + ddb574b0 re-init unification (closes the gitattributes gap, pinned test); (d) 6565df41 events via finalizer; (e) d3619a13 MutationIntent::UpdateIssue; (f) held",
-            "8": "BLOCKED AT REWORK LIMIT \u2014 publisher deletion and four canonical doctest preimages are committed; the complete workspace passes. cargo-ci passed with 3,754 tests after disposable incremental cache cleanup. code-review cannot start because repository registry paths use './scripts/...' while the typed repo-relative adapter rejects the leading CurDir component and reports it as outside-repository. Rework count is two; invoker direction is required for a narrow adapter normalization plus regression."
+            "8": "BLOCKED ON EXTERNAL REVIEW AUTHORIZATION \u2014 prompt-path adapter fix 2ead106d is independently reviewed and cargo-ci passes at corrected source (3,755 tests). code-review now reaches its configured checker, but execution is paused before egress because scripts/ai-review.sh invokes external codex exec with repository review context. Explicit informed authorization is required; no checker ran and no data was sent."
           }
         }
       ]
@@ -400,6 +400,16 @@
       "resolution": "Invoker selected option 1 and authorized one narrow leading-./ adapter normalization with preserved unsafe-path rejection, focused regression coverage, and remaining gate evaluation.",
       "situation": "After rework attempt two, the complete workspace and cargo-ci gate pass, but code-review gate capture fails before checker execution: configured prompt_file './scripts/code-review-prompt.md' is handed to repo_rel_virtual_path, whose canonical RootRelativePath rejects the leading '.' component and the caller masks that typed error as 'resolves outside the repository'. The repository's own gates.toml intentionally uses the './scripts/...' spelling. This is a command-adapter compatibility defect from the typed repository-state cutover, not an unsafe-path relaxation request.",
       "recommendation": "Authorize one final narrow correction with counter reset: normalize exactly a leading './' at the configuration-to-VirtualPath adapter boundary, continue rejecting absolute paths, parent traversal, empty/interior dot components, and backslash/colon/control spellings; add focused capture/evaluation regressions using the repository-style prompt path; rerun code-review and remaining gates. Do not weaken RootRelativePath canonicality or edit gates.toml."
+    },
+    {
+      "category": "external-egress-authorization",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "resolved",
+      "opened_at": "2026-07-22T21:56:46+03:00",
+      "resolved_at": "2026-07-22T21:57:52+03:00",
+      "resolution": "Invoker explicitly approved the configured codex exec code-review egress and bounded repository review context.",
+      "situation": "The authoritative code-review gate is configured as scripts/ai-review.sh with REVIEWER_AGENT='codex exec ...'. Evaluating it sends repository review context, including captured issue/gate evidence and relevant repository content, to that external AI reviewer. The approval boundary rejected execution before the checker started because the invoker has not explicitly authorized this payload egress and destination.",
+      "recommendation": "Authorize the configured code-review gate to send its bounded repository review context to external codex exec, then run it normally and continue with mcp-ci/docs-mechanical. If authorization is withheld, the required gate remains pending and 49adf23b cannot complete; do not bypass or manually pass it."
     }
   ],
   "rework_counts": {
