@@ -330,6 +330,14 @@
       "situation": "After rework attempt two, final independent review of the standalone gate-evaluation cutover found six remaining contract/parity defects: full-length IDs are normalized instead of requiring exact canonical spelling; every gate-runs root child is treated as a directory and per-run listings exhaust the 256-listing budget after roughly 255 runs; memory readers do not validate gate-run parent kinds like JSON; lifecycle capture/evidence still reconstructs and broadly matches gate-run result paths outside the canonical helper; JSON's leaf-only O_NOFOLLOW does not protect swappable parent components; and ReviewPlaceholder captures document evidence it never consumes.",
       "resolution": "Invoker selected option 1 and authorized one narrow guided correction with a counter reset, limited to the six reviewed defects, shared gate-run closure consolidation, focused regressions, and independent final re-review.",
       "recommendation": "Authorize one narrow guided correction with a counter reset: preserve exact full-ID resolution; replace per-run listings with one shared three-phase root-listing/direct-child-kind/exact-result closure used by standalone and lifecycle capture; mirror JSON parent-kind checks in memory; route every lifecycle result path and matcher through the canonical helper; open gate-run paths through retained no-follow directory capabilities; restrict document evidence to Exec; add bounded clutter, >256-run, parent-parity, full-ID, lifecycle, parent-swap, and placeholder-isolation regressions; then require independent final re-review."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "open",
+      "opened_at": "2026-07-22T11:17:15+03:00",
+      "situation": "After archive rework attempt two, independent review of the net-negative discovery/pinned-evidence extraction found that closure acquisition reparses every accumulated prefix on each evidence wave, discards the completed parsed map, and parses the full closure again during derivation, producing roughly quadratic parsing on deep dependency chains. The new incremental closure and target-relevant pinned-request contracts also lack direct pure tests. Focused behavior tests, formatting, strict Clippy, and diff checks pass.",
+      "recommendation": "Authorize one narrow guided correction with a counter reset: carry the parsed accumulator through Needs waves into the completed derivation, add small pure tests for Needs-to-Complete reuse, terminal evidence, shared/cyclic reachability, and target-relevant deduplicated pin requests, fix stale resolver wording/public contract docs, rerun focused checks, and require independent re-review. Do not expand into marker/location extraction or archive transaction code in this correction."
     }
   ],
   "rework_counts": {
