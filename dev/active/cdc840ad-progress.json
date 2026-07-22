@@ -360,6 +360,14 @@
       "situation": "After snapshot-export rework attempt two passed, independent review of the net-negative rules/init predecessor cleanup found that canonical re-init does not preserve the deleted rules write-through behavior: InitializationScaffold keeps an existing rules.toml with IfAbsent while only schemas refresh, so config membership/header edits remain stale. The corresponding canonical regression was deleted instead of migrated, three pure rules-document edge cases were lost, and the cumulative fast_rules/server suites remain red on stale InMemory fixtures that lack captured config or an attached repository layout.",
       "resolution": "Invoker selected option 1 and authorized one narrowly guided correction with a counter reset, limited to canonical re-init rules composition, the lost compact regressions, the 13 fast_rules fixtures, and the 2 server fixtures, followed by independent re-review.",
       "recommendation": "Authorize one narrowly guided correction with a counter reset: compose existing rules.toml membership/header updates into canonical recovered initialization and restore its re-init regression; preserve simultaneous add/drop, indented rule-header, and ruleset false-positive parser cases as pure tests; migrate only the 13 fast_rules and 2 server fixtures needed to the final in-memory repository-state/layout boundary; rerun focused and cumulative suites; then require independent re-review. Do not restore any deleted publisher or init wrapper."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+      "status": "open",
+      "opened_at": "2026-07-22T17:16:03+03:00",
+      "situation": "The IssueStore::init deletion package reached rework attempt two. Independent architectural re-review still found healthy fast-rules and server-route fixtures retaining partial bootstrap assumptions, and the cumulative fast_docs_templates target has five package-attributable failures: three template atomicity fixtures no longer create required repository preimages and two template-binding fixtures capture no config.toml. A sixth policy-text failure is pre-existing at HEAD and unrelated to this package. The patch is net-negative and its core trait/implementation/call deletion is sound, but acceptance is blocked until every healthy fixture uses canonical initialization and the cumulative target passes.",
+      "recommendation": "Authorize one narrowly guided correction with a counter reset, limited to canonicalizing the reviewed fast-rules/server/template fixtures, preserving only explicit malformed or absent-state preimages, rerunning the full fast_rules, fast_docs_templates, and server targets, and one independent final re-review. Do not restore IssueStore::init, add a compatibility helper, or change production behavior."
     }
   ],
   "rework_counts": {
@@ -367,7 +375,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 1
+    "49adf23b": 2
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
