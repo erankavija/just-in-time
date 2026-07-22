@@ -1,7 +1,7 @@
 {
   "epic_id": "cdc840ad-9332-4936-9381-772318967f0f",
   "epic_short_id": "cdc840ad",
-  "last_handoff": "dev/active/cdc840ad-handoff-12.md",
+  "last_handoff": "dev/active/cdc840ad-handoff-13.md",
   "current_wave": 5,
   "waves": [
     {
@@ -364,8 +364,10 @@
     {
       "category": "rework-exceeded",
       "issue_id": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-22T17:16:03+03:00",
+      "resolved_at": "2026-07-22T17:24:51+03:00",
+      "resolution": "Invoker selected option 1 and authorized one narrowly scoped fixture-only correction with a counter reset. Production behavior, compatibility helpers, and restoration of IssueStore::init remain excluded.",
       "situation": "The IssueStore::init deletion package reached rework attempt two. Independent architectural re-review still found healthy fast-rules and server-route fixtures retaining partial bootstrap assumptions, and the cumulative fast_docs_templates target has five package-attributable failures: three template atomicity fixtures no longer create required repository preimages and two template-binding fixtures capture no config.toml. A sixth policy-text failure is pre-existing at HEAD and unrelated to this package. The patch is net-negative and its core trait/implementation/call deletion is sound, but acceptance is blocked until every healthy fixture uses canonical initialization and the cumulative target passes.",
       "recommendation": "Authorize one narrowly guided correction with a counter reset, limited to canonicalizing the reviewed fast-rules/server/template fixtures, preserving only explicit malformed or absent-state preimages, rerunning the full fast_rules, fast_docs_templates, and server targets, and one independent final re-review. Do not restore IssueStore::init, add a compatibility helper, or change production behavior."
     }
@@ -375,7 +377,7 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 2
+    "49adf23b": 0
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
