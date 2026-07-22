@@ -408,6 +408,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// use jit::storage::InMemoryStorage;
     ///
     /// let storage = InMemoryStorage::new();
+    /// storage.add_repo_file(".jit/config.toml", "");
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str| {
@@ -461,6 +462,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// use jit::storage::InMemoryStorage;
     ///
     /// let storage = InMemoryStorage::new();
+    /// storage.add_repo_file(".jit/config.toml", "");
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str| {
