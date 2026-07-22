@@ -165,7 +165,8 @@ pub enum GitattributesClaim {
 }
 
 /// The exact outcome of the Git-attributes line-set claim.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum GitattributesStatus {
     /// Not eligible (no Git worktree or an external data root); nothing was done.
     NotApplicable,

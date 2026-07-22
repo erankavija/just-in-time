@@ -288,6 +288,7 @@ fn test_init_json_reports_repository_id_and_created_paths_outside_git() {
         temp.path().join(".jit").to_string_lossy().as_ref()
     );
     assert_eq!(json["hierarchy_template"], "default");
+    assert_eq!(json["gitattributes_status"], "not_applicable");
     assert!(
         json["repository_id"].is_null(),
         "repository_id should be null outside a git repository, got: {json}"
@@ -357,6 +358,7 @@ fn test_init_json_inside_git_reports_gitattributes_created() {
     assert!(out.status.success(), "jit init --json failed: {:?}", out);
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["gitattributes_status"], "created");
     let created: Vec<&str> = json["created_paths"]
         .as_array()
         .unwrap()
@@ -377,6 +379,58 @@ fn test_init_json_inside_git_reports_gitattributes_created() {
 
     let content = fs::read_to_string(temp.path().join(".gitattributes")).unwrap();
     assert!(content.contains("# JIT merge drivers"));
+}
+
+#[test]
+fn test_init_nested_glob_data_dir_claims_only_literal_events_path() {
+    let temp = TempDir::new().unwrap();
+    let status = Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(temp.path())
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let data_dir = r#""lead space/glob*query?[set]"#;
+    fs::create_dir(temp.path().join(r#""lead space"#)).unwrap();
+    let out = Command::new(jit_binary())
+        .arg("init")
+        .env("JIT_DATA_DIR", data_dir)
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "jit init failed: {out:?}");
+
+    let attributes = fs::read_to_string(temp.path().join(".gitattributes")).unwrap();
+    assert!(
+        attributes.contains(
+            "\"\\\"lead space/glob\\\\*query\\\\?\\\\[set\\\\]/events.jsonl\" merge=union"
+        ),
+        "the literal nested data root must be Git-escaped: {attributes:?}"
+    );
+
+    let literal = Command::new("git")
+        .args(["check-attr", "merge", "--"])
+        .arg(format!("{data_dir}/events.jsonl"))
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(literal.status.success());
+    assert!(String::from_utf8(literal.stdout)
+        .unwrap()
+        .ends_with("merge: union\n"));
+
+    let wildcard_neighbor = Command::new("git")
+        .args(["check-attr", "merge", "--"])
+        .arg(r#""lead space/glob-neighborqueryXs/events.jsonl"#)
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(wildcard_neighbor.status.success());
+    assert!(String::from_utf8(wildcard_neighbor.stdout)
+        .unwrap()
+        .ends_with("merge: unspecified\n"));
 }
 
 // Regression (jit:7a60f987): `.jit/claims.jsonl` never gets a merge-driver
@@ -434,6 +488,7 @@ fn test_init_json_reinit_reports_gitattributes_absent_from_created_paths() {
     assert!(out.status.success());
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["gitattributes_status"], "unchanged");
     let created: Vec<&str> = json["created_paths"]
         .as_array()
         .unwrap()
@@ -485,6 +540,7 @@ fn test_init_json_reinit_reclaims_deleted_gitattributes() {
     assert!(out.status.success(), "re-init failed: {out:?}");
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["gitattributes_status"], "created");
     let created: Vec<&str> = json["created_paths"]
         .as_array()
         .unwrap()
@@ -520,6 +576,7 @@ fn test_init_json_appends_to_existing_gitattributes_reports_modified() {
     assert!(out.status.success(), "jit init --json failed: {:?}", out);
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["gitattributes_status"], "modified");
     let created: Vec<&str> = json["created_paths"]
         .as_array()
         .unwrap()

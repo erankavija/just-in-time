@@ -347,7 +347,7 @@ fn gitattributes_claim(layout: &crate::repository_state::RepositoryLayout) -> Gi
         return GitattributesClaim::NotApplicable;
     }
     GitattributesClaim::Eligible {
-        line: format!("{}/events.jsonl merge=union", git_escape_pattern(relative)),
+        line: format!("{} merge=union", git_events_pattern(relative)),
     }
 }
 
@@ -364,19 +364,34 @@ fn worktree_is_git_work_tree(worktree: &Path) -> bool {
         .is_some_and(|output| String::from_utf8_lossy(&output.stdout).trim() == "true")
 }
 
-/// Escape a worktree-relative data-root path for use as a `.gitattributes` pattern
-/// prefix, normalizing separators and escaping the characters Git treats specially
-/// in a pattern. The canonical `.jit` passes through unchanged.
-fn git_escape_pattern(relative: &Path) -> String {
-    let path = relative.to_string_lossy().replace('\\', "/");
-    let mut escaped = String::with_capacity(path.len());
-    for ch in path.chars() {
-        if matches!(ch, ' ' | '#' | '!') {
+/// Render the worktree-relative events path as a literal `.gitattributes` pattern.
+/// The canonical `.jit/events.jsonl` passes through unchanged; patterns containing
+/// whitespace or a quote use Git's C-style quoting layer.
+fn git_events_pattern(relative: &Path) -> String {
+    let path = relative.to_string_lossy();
+    let mut escaped = String::with_capacity(path.len() + "/events.jsonl".len());
+    for ch in path.chars().chain("/events.jsonl".chars()) {
+        if ch == std::path::MAIN_SEPARATOR {
+            escaped.push('/');
+            continue;
+        }
+        if matches!(ch, '#' | '!' | '*' | '?' | '[' | ']' | '\\') {
             escaped.push('\\');
         }
         escaped.push(ch);
     }
-    escaped
+    if !path.chars().any(|ch| ch == '"' || ch.is_whitespace()) {
+        return escaped;
+    }
+    let mut quoted = escaped.chars().fold(String::from("\""), |mut quoted, ch| {
+        if matches!(ch, '\\' | '"') {
+            quoted.push('\\');
+        }
+        quoted.push(ch);
+        quoted
+    });
+    quoted.push('"');
+    quoted
 }
 
 #[cfg(test)]
@@ -389,10 +404,49 @@ mod tests {
     use std::sync::{Arc, Barrier};
 
     #[test]
-    fn test_git_escape_pattern_default_and_special_chars() {
-        assert_eq!(git_escape_pattern(&PathBuf::from(".jit")), ".jit");
-        assert_eq!(git_escape_pattern(&PathBuf::from("da ta")), "da\\ ta");
-        assert_eq!(git_escape_pattern(&PathBuf::from("a/b")), "a/b");
+    fn test_git_events_pattern_preserves_default_and_quotes_lexical_specials() {
+        assert_eq!(
+            git_events_pattern(&PathBuf::from(".jit")),
+            ".jit/events.jsonl"
+        );
+        assert_eq!(
+            git_events_pattern(&PathBuf::from("da ta")),
+            "\"da ta/events.jsonl\""
+        );
+        assert_eq!(
+            git_events_pattern(&PathBuf::from("#data")),
+            "\\#data/events.jsonl"
+        );
+        assert_eq!(
+            git_events_pattern(&PathBuf::from("!data")),
+            "\\!data/events.jsonl"
+        );
+        assert_eq!(
+            git_events_pattern(&PathBuf::from("\"data")),
+            "\"\\\"data/events.jsonl\""
+        );
+        assert_eq!(
+            git_events_pattern(&PathBuf::from("a/b")),
+            "a/b/events.jsonl"
+        );
+    }
+
+    #[test]
+    fn test_git_events_pattern_escapes_globs_and_literal_backslash() {
+        assert_eq!(
+            git_events_pattern(&PathBuf::from("glob*/query?/open[close]")),
+            "glob\\*/query\\?/open\\[close\\]/events.jsonl"
+        );
+        #[cfg(unix)]
+        assert_eq!(
+            git_events_pattern(&PathBuf::from(r"back\slash")),
+            r"back\\slash/events.jsonl"
+        );
+        #[cfg(windows)]
+        assert_eq!(
+            git_events_pattern(&PathBuf::from(r"back\slash")),
+            "back/slash/events.jsonl"
+        );
     }
     use std::thread;
     use tempfile::TempDir;

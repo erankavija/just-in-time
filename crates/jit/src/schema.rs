@@ -463,6 +463,9 @@ impl CommandSchema {
         }
 
         let (schema, type_name) = match cmd_path {
+            // Repository initialization.
+            "init" => (Some(schema_to_value::<InitResponse>()), "InitResponse"),
+
             // Version command
             "version" => (
                 Some(schema_to_value::<crate::build_info::VersionInfo>()),
@@ -1147,6 +1150,36 @@ mod tests {
         assert!(
             !issue_create.unwrap().hidden,
             "issue create should not be hidden"
+        );
+    }
+
+    #[test]
+    fn test_init_schema_exposes_all_gitattributes_statuses() {
+        let schema = CommandSchema::generate();
+        let output = schema
+            .commands
+            .get("init")
+            .and_then(|command| command.output.as_ref())
+            .expect("init output schema");
+        assert_eq!(output.success, "InitResponse");
+
+        let success_schema = output.success_schema.as_ref().expect("init success schema");
+        assert!(
+            success_schema
+                .pointer("/properties/gitattributes_status")
+                .is_some(),
+            "init should publish gitattributes_status"
+        );
+        let statuses: Vec<&str> = success_schema
+            .pointer("/definitions/GitattributesStatus/oneOf")
+            .and_then(Value::as_array)
+            .expect("GitattributesStatus variants")
+            .iter()
+            .filter_map(|variant| variant.pointer("/enum/0").and_then(Value::as_str))
+            .collect();
+        assert_eq!(
+            statuses,
+            ["not_applicable", "unchanged", "created", "modified"]
         );
     }
 

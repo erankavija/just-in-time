@@ -491,8 +491,9 @@ transaction, recovery, and lifecycle contract.
 
 Inside a git repository, init also creates a worktree identity
 (`repository_id`, format `wt:<8-hex>`) used for lease/claim coordination, and
-sets up a `.gitattributes` union-merge driver for the tracked append-only log
-`.jit/events.jsonl` (so concurrent worktrees' event appends don't conflict) —
+sets up a `.gitattributes` union-merge driver for `events.jsonl` under the
+selected data directory (default `.jit/events.jsonl`, so concurrent worktrees'
+event appends don't conflict) —
 creating the file if absent, or appending the jit block to an existing one that
 doesn't already carry it. Lease/claim coordination state lives under `.git/jit/`
 (an untracked per-worktree control plane), not in the versioned `.jit/` tree.
@@ -509,6 +510,7 @@ and projection republishing, are not path-listed):
   "data_dir": "/path/to/repo/.jit",
   "repository_id": "wt:d5f301ab",
   "hierarchy_template": "default",
+  "gitattributes_status": "created",
   "created_paths": [
     ".jit/index.json",
     ".jit/gates.toml",
@@ -523,6 +525,9 @@ and projection republishing, are not path-listed):
 }
 ```
 
+`gitattributes_status` is `not_applicable` outside a Git worktree (or when the
+data directory is outside it), `unchanged` when the required block already
+exists, and otherwise `created` or `modified` in step with the path lists.
 `created_paths` lists files that did not exist before this run; `.gitattributes`
 appears there only when it didn't exist and was created fresh. If it already
 existed without the jit merge-driver block, this run instead appends to it and

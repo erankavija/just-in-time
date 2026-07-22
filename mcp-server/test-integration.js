@@ -280,6 +280,11 @@ async function main() {
 
     console.log('\nResponse formatting');
 
+    await runTest('init returns the Git-attributes disposition', async () => {
+      const initialized = await tester.callTool('jit_init', {});
+      assert.strictEqual(initialized.gitattributes_status, 'not_applicable');
+    });
+
     await runTest('default mode: content has summary + JSON, no structuredContent', async () => {
       await tester.callToolRaw('jit_init', {});
       await tester.callTool('jit_issue_create', { title: 'Content mode test' });

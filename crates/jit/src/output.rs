@@ -897,6 +897,27 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
 // Query Response Types
 // ============================================================================
 
+/// Machine-readable result of `jit init`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct InitResponse {
+    /// Repository directory initialization ran against.
+    pub repository_root: String,
+    /// Selected repository data directory.
+    pub data_dir: String,
+    /// Machine-local worktree identity, when inside a Git worktree.
+    pub repository_id: Option<String>,
+    /// Applied hierarchy template name.
+    pub hierarchy_template: String,
+    /// Exact disposition of the worktree Git-attributes claim.
+    pub gitattributes_status: crate::repository_state::GitattributesStatus,
+    /// Files absent before this run and created by it.
+    pub created_paths: Vec<String>,
+    /// Existing files modified by this run.
+    pub modified_paths: Vec<String>,
+    /// Applied profile result when initialization included one.
+    pub profile: Option<crate::profile::ProfileApplyResult>,
+}
+
 /// Response for `status` command
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct StatusResponse {

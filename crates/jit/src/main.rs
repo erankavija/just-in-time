@@ -25,7 +25,7 @@ use jit::cli::{
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate};
 use jit::domain::{GateRunResult, Priority, State};
-use jit::output::{ExitCode, JsonOutput, OutputContext};
+use jit::output::{ExitCode, InitResponse, JsonOutput, OutputContext};
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
 use std::path::{Component, Path, PathBuf};
@@ -2008,7 +2008,8 @@ fn run() -> Result<()> {
 
             // The worktree `.gitattributes` merge-driver claim is published as part
             // of the init transaction itself (every init and re-init now); its typed
-            // outcome is reported here for the `--json` created/modified path lists.
+            // outcome is reported here directly and drives the `--json`
+            // created/modified path lists.
             let gitattributes_outcome = init_result.gitattributes;
 
             // The `[project]` identity is seeded inside the init transaction when
@@ -2063,15 +2064,16 @@ fn run() -> Result<()> {
                     modified_paths.push(".gitattributes".to_string());
                 }
 
-                let payload = serde_json::json!({
-                    "repository_root": current_dir.display().to_string(),
-                    "data_dir": jit_dir.display().to_string(),
-                    "repository_id": worktree_identity.map(|identity| identity.worktree_id),
-                    "hierarchy_template": chosen.name,
-                    "created_paths": created_paths,
-                    "modified_paths": modified_paths,
-                    "profile": profile_result,
-                });
+                let payload = InitResponse {
+                    repository_root: current_dir.display().to_string(),
+                    data_dir: jit_dir.display().to_string(),
+                    repository_id: worktree_identity.map(|identity| identity.worktree_id),
+                    hierarchy_template: chosen.name.clone(),
+                    gitattributes_status: gitattributes_outcome,
+                    created_paths,
+                    modified_paths,
+                    profile: profile_result,
+                };
                 let output = JsonOutput::success(payload, "init").with_message(message);
                 println!("{}", output.to_json_string()?);
             }
