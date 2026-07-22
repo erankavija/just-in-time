@@ -1398,28 +1398,6 @@ impl IssueStore for JsonFileStorage {
         Ok(preset.clone())
     }
 
-    fn save_gate_preset(
-        &self,
-        preset: &crate::gate_presets::GatePresetDefinition,
-    ) -> Result<std::path::PathBuf> {
-        // Validate preset
-        preset.validate()?;
-        let _repo_lock = self.repo_lock.acquire()?;
-
-        // Create presets directory if needed
-        let presets_dir = self.root.join("config").join("gate-presets");
-        fs::create_dir_all(&presets_dir)?;
-
-        // Save preset (atomic: temp file + rename)
-        let preset_path = presets_dir.join(format!("{}.json", preset.name));
-        let json = serde_json::to_string_pretty(&preset)?;
-        let temp_path = preset_path.with_extension("json.tmp");
-        fs::write(&temp_path, json)?;
-        fs::rename(&temp_path, &preset_path)?;
-
-        Ok(preset_path)
-    }
-
     fn read_path_bytes(
         &self,
         path: &str,
@@ -2023,37 +2001,6 @@ mod tests {
         assert!(temp
             .path()
             .join(".jit/gate-runs/run-serialized/result.json")
-            .exists());
-    }
-
-    #[test]
-    fn test_save_gate_preset_waits_for_repository_guard() {
-        use crate::declarations::{GateMode, GateStage};
-        use crate::gate_presets::{GatePresetDefinition, GateTemplate};
-
-        let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        storage.init().unwrap();
-        let preset = GatePresetDefinition {
-            name: "serialized".to_string(),
-            description: "Serialized preset".to_string(),
-            gates: vec![GateTemplate {
-                key: "review".to_string(),
-                title: "Review".to_string(),
-                description: "Review gate".to_string(),
-                stage: GateStage::Postcheck,
-                mode: GateMode::Manual,
-                checker: None,
-            }],
-        };
-
-        assert_direct_writer_waits_for_repository_guard(&storage, move |storage| {
-            storage.save_gate_preset(&preset).map(|_| ())
-        });
-
-        assert!(temp
-            .path()
-            .join(".jit/config/gate-presets/serialized.json")
             .exists());
     }
 

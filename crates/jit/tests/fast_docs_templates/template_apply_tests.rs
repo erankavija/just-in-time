@@ -15,9 +15,7 @@
 //! reduced spine C→B→P→upstream.
 
 use crate::harness::TestHarness;
-use jit::declarations::{GateMode, GateStage};
 use jit::domain::Priority;
-use jit::gate_presets::{GatePresetDefinition, GateTemplate};
 use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
 use jit::templates::{GraphTemplate, TemplateRegistry};
@@ -857,73 +855,6 @@ applies_to  = ["epic"]
         before,
         "a propagated preset-load failure must create nothing"
     );
-}
-
-#[test]
-fn test_apply_rejects_duplicate_custom_preset_names_from_closed_listing() {
-    std::env::set_var("JIT_TEST_MODE", "1");
-    let temp = TempDir::new().unwrap();
-    let storage = JsonFileStorage::new(temp.path());
-    storage.init().unwrap();
-    std::fs::write(storage.root().join("config.toml"), "").unwrap();
-    let layout =
-        jit::storage::discover_repository_layout(temp.path().parent().unwrap(), storage.root())
-            .unwrap();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
-    let presets_dir = temp.path().join("config/gate-presets");
-    std::fs::create_dir_all(&presets_dir).unwrap();
-    let preset = GatePresetDefinition {
-        name: "duplicate".to_string(),
-        description: "Duplicate logical name".to_string(),
-        gates: vec![GateTemplate {
-            key: "duplicate-review".to_string(),
-            title: "Duplicate review".to_string(),
-            description: "Review".to_string(),
-            stage: GateStage::Postcheck,
-            mode: GateMode::Manual,
-            checker: None,
-        }],
-    };
-    let bytes = serde_json::to_vec(&preset).unwrap();
-    std::fs::write(presets_dir.join("first.json"), &bytes).unwrap();
-    std::fs::write(presets_dir.join("second.json"), bytes).unwrap();
-    let template = TemplateRegistry::from_toml_str(
-        r#"
-[[template]]
-name = "duplicate-preset"
-applies_to = ["epic"]
-  [[template.nodes]]
-  role = "planning"
-  type = "planning"
-  gates = ["duplicate"]
-"#,
-        &HIERARCHY,
-    )
-    .unwrap()
-    .get("duplicate-preset")
-    .unwrap()
-    .clone();
-    let (epic, _) = executor
-        .create_issue(
-            "Duplicate preset epic".to_string(),
-            "## Success Criteria\n\n- [hard] REQ-01: reject duplicates\n".to_string(),
-            Priority::Normal,
-            vec![],
-            vec!["type:epic".to_string()],
-            None,
-            None,
-            false,
-        )
-        .unwrap();
-    let before = executor.storage().list_issues().unwrap();
-
-    let error = executor
-        .apply_template_with(&template, &epic, &container_binding(&epic), false)
-        .unwrap_err();
-    assert!(error
-        .to_string()
-        .contains("duplicate custom gate preset name"));
-    assert_eq!(executor.storage().list_issues().unwrap(), before);
 }
 
 #[test]

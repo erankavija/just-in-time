@@ -724,29 +724,16 @@ fn parse_template_presets(
     image: &RepositoryImage,
 ) -> Result<HashMap<String, crate::gate_presets::GatePresetDefinition>> {
     let dir = VirtualPath::data("config/gate-presets")?;
-    let mut presets = crate::gate_presets::BuiltinPresets::load()?;
-    let mut custom_names = HashSet::new();
-    for path in listed_json_paths(image, &dir)? {
-        let bytes = image
-            .file_bytes(&path)?
-            .ok_or_else(|| anyhow!("listed custom preset is absent: {path:?}"))?;
-        let preset: crate::gate_presets::GatePresetDefinition = serde_json::from_slice(bytes)
-            .with_context(|| format!("failed to parse custom preset {path:?}"))?;
-        preset.validate().map_err(|_| {
-            crate::errors::InvalidArgumentError::new(format!(
-                "invalid custom gate preset in {path:?}"
-            ))
-        })?;
-        if !custom_names.insert(preset.name.clone()) {
-            return Err(crate::errors::InvalidArgumentError::new(format!(
-                "duplicate custom gate preset name '{}' in captured preset directory",
-                preset.name
-            ))
-            .into());
-        }
-        presets.insert(preset.name.clone(), preset);
-    }
-    Ok(presets)
+    let files = listed_json_paths(image, &dir)?
+        .into_iter()
+        .map(|path| {
+            let bytes = image
+                .file_bytes(&path)?
+                .ok_or_else(|| anyhow!("listed custom preset is absent: {path:?}"))?;
+            Ok((path.relative().as_str().to_string(), bytes.to_vec()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    crate::gate_presets::load_presets_from_custom_files(files).map(|(presets, _)| presets)
 }
 
 #[allow(clippy::too_many_arguments)]

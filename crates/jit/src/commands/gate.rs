@@ -224,6 +224,300 @@ struct DerivedGateRegistryMutation {
     outcome: CapturedGateRegistryOutcome,
 }
 
+struct DerivedGatePresetApplication {
+    registry: crate::declarations::GateRegistry,
+    intents: Vec<crate::repository_state::MutationIntent>,
+    result: GateAddResult,
+    edits_registry: bool,
+}
+
+const GATE_PRESET_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
+    crate::repository_state::CaptureBudget {
+        max_paths: 1 << 16,
+        max_listings: 64,
+        max_bytes: 512 * 1024 * 1024,
+        max_depth: 16,
+    };
+
+fn listed_gate_preset_paths(
+    image: &crate::repository_state::RepositoryImage,
+) -> Result<Vec<crate::repository_state::VirtualPath>> {
+    use crate::repository_state::VirtualPath;
+    let directory = VirtualPath::data("config/gate-presets")?;
+    let listing = image
+        .listing_fingerprints()
+        .get(&directory)
+        .ok_or_else(|| anyhow!("complete custom gate preset listing is absent"))?;
+    listing
+        .children()
+        .keys()
+        .filter(|name| name.ends_with(".json"))
+        .map(|name| VirtualPath::data(format!("config/gate-presets/{name}")).map_err(Into::into))
+        .collect()
+}
+
+fn parse_captured_gate_presets(
+    image: &crate::repository_state::RepositoryImage,
+) -> Result<std::collections::HashMap<String, crate::gate_presets::GatePresetDefinition>> {
+    let files = listed_gate_preset_paths(image)?
+        .into_iter()
+        .map(|path| {
+            let bytes = image
+                .file_bytes(&path)?
+                .ok_or_else(|| anyhow!("listed custom gate preset is absent: {path:?}"))?;
+            Ok((path.relative().as_str().to_string(), bytes.to_vec()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    crate::gate_presets::load_presets_from_custom_files(files).map(|(presets, _)| presets)
+}
+
+fn captured_gate_preset_fixed_paths() -> Result<Vec<crate::repository_state::VirtualPath>> {
+    use crate::repository_state::VirtualPath;
+    [
+        "config.toml".to_string(),
+        "index.json".to_string(),
+        "invariants.toml".to_string(),
+        "rules.toml".to_string(),
+        "gates.toml".to_string(),
+        "events.jsonl".to_string(),
+        "config".to_string(),
+        "config/gate-presets".to_string(),
+        "issues".to_string(),
+    ]
+    .into_iter()
+    .map(|path| VirtualPath::data(path).map_err(Into::into))
+    .collect()
+}
+
+fn capture_gate_preset_image(
+    session: &mut dyn crate::storage::RepositoryMutationSession,
+    include_projection_closure: bool,
+    create_target: Option<&str>,
+) -> Result<Option<crate::repository_state::RepositoryImage>> {
+    use crate::repository_state::{
+        assemble_config, render_capture_closure, CaptureSpec, VirtualPath,
+    };
+    use crate::storage::RepositoryStateStoreError;
+
+    let presets_dir = VirtualPath::data("config/gate-presets")?;
+    let issues_dir = VirtualPath::data("issues")?;
+    let mut first_spec = CaptureSpec::phase_one(
+        captured_gate_preset_fixed_paths()?,
+        GATE_PRESET_CAPTURE_BUDGET,
+    )?;
+    first_spec.discover_listing(presets_dir.clone())?;
+    first_spec.discover_listing(issues_dir.clone())?;
+    let first = match session.capture(first_spec) {
+        Ok(image) => image,
+        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    let discovered_presets = listed_gate_preset_paths(&first)?;
+    let index_bytes = first
+        .file_bytes(&VirtualPath::data("index.json")?)?
+        .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
+    let discovered_index = crate::storage::json::parse_repository_index(index_bytes)?;
+    let issue_paths = discovered_index
+        .all_ids
+        .iter()
+        .map(|id| VirtualPath::data(format!("issues/{id}.json")).map_err(Into::into))
+        .collect::<Result<Vec<_>>>()?;
+    let closure = if include_projection_closure {
+        let config = assemble_config(&first)?;
+        let rules_text = super::image_repo_bytes(&first, ".jit/rules.toml")?
+            .map(String::from_utf8)
+            .transpose()?;
+        render_capture_closure(&config, &[], rules_text.as_deref())?
+    } else {
+        Vec::new()
+    };
+
+    let mut spec = CaptureSpec::phase_one(
+        captured_gate_preset_fixed_paths()?,
+        GATE_PRESET_CAPTURE_BUDGET,
+    )?;
+    let create_path = create_target
+        .map(|name| VirtualPath::data(format!("config/gate-presets/{name}.json")))
+        .transpose()?;
+    spec.discover_paths(
+        discovered_presets
+            .iter()
+            .cloned()
+            .chain(issue_paths)
+            .chain(closure)
+            .chain(create_path),
+    )?;
+    spec.discover_listing(presets_dir)?;
+    spec.discover_listing(issues_dir.clone())?;
+    let image = match session.capture(spec) {
+        Ok(image) => image,
+        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    if listed_gate_preset_paths(&image)? != discovered_presets {
+        return Ok(None);
+    }
+    let current_index = image
+        .file_bytes(&VirtualPath::data("index.json")?)?
+        .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))
+        .and_then(crate::storage::json::parse_repository_index)?;
+    if current_index.schema_version != discovered_index.schema_version
+        || current_index.all_ids != discovered_index.all_ids
+        || current_index.deleted_ids != discovered_index.deleted_ids
+    {
+        return Ok(None);
+    }
+    let listing = image
+        .listing_fingerprints()
+        .get(&issues_dir)
+        .ok_or_else(|| anyhow!("complete issues listing is absent"))?;
+    let listed = listing
+        .children()
+        .keys()
+        .filter(|name| name.ends_with(".json"))
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    let indexed = current_index
+        .all_ids
+        .iter()
+        .map(|id| format!("{id}.json"))
+        .collect::<std::collections::BTreeSet<_>>();
+    if listed != indexed {
+        return Ok(None);
+    }
+    Ok(Some(image))
+}
+
+fn captured_gate_registry(
+    image: &crate::repository_state::RepositoryImage,
+) -> Result<crate::declarations::GateRegistry> {
+    use crate::repository_state::{RepositoryEntry, VirtualPath};
+    match image.entry(&VirtualPath::data("gates.toml")?)? {
+        RepositoryEntry::File { bytes, .. } => {
+            crate::declarations::parse_gate_registry(bytes).map_err(Into::into)
+        }
+        RepositoryEntry::Absent => Ok(crate::declarations::GateRegistry::default()),
+        _ => Err(anyhow!("captured gate registry is not an ordinary file")),
+    }
+}
+
+fn captured_gate_preset_issue(
+    image: &crate::repository_state::RepositoryImage,
+    issue_id: &str,
+) -> Result<Issue> {
+    use crate::repository_state::{RepositoryEntry, VirtualPath};
+    let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
+    let issue = match image.entry(&path)? {
+        RepositoryEntry::File { bytes, .. } => serde_json::from_slice::<Issue>(bytes)
+            .with_context(|| format!("failed to parse captured issue {issue_id}"))?,
+        RepositoryEntry::Absent => {
+            return Err(crate::storage::IssueNotFoundError::new(issue_id).into())
+        }
+        _ => return Err(anyhow!("captured issue path is not an ordinary file")),
+    };
+    if issue.id != issue_id {
+        return Err(anyhow!(
+            "captured issue identity mismatch: requested {issue_id}, found {}",
+            issue.id
+        ));
+    }
+    Ok(issue)
+}
+
+fn derive_gate_preset_application(
+    issue: Issue,
+    mut registry: crate::declarations::GateRegistry,
+    preset: &crate::gate_presets::GatePresetDefinition,
+    timeout_override: Option<u64>,
+    skip_precheck: bool,
+    skip_postcheck: bool,
+    except_gates: &[String],
+) -> Result<DerivedGatePresetApplication> {
+    use crate::declarations::{GateChecker, GateStage};
+    use crate::repository_state::MutationIntent;
+
+    let gates = preset
+        .gates
+        .iter()
+        .filter(|gate| {
+            !(skip_precheck && gate.stage == GateStage::Precheck
+                || skip_postcheck && gate.stage == GateStage::Postcheck
+                || except_gates.contains(&gate.key))
+        })
+        .collect::<Vec<_>>();
+    if gates.is_empty() {
+        return Err(anyhow!("No gates to apply after filtering"));
+    }
+
+    let mut intents = Vec::new();
+    let mut edits_registry = false;
+    for template in &gates {
+        let mut gate = template.to_gate();
+        if let (
+            Some(timeout),
+            Some(GateChecker::Exec {
+                timeout_seconds, ..
+            }),
+        ) = (timeout_override, gate.checker.as_mut())
+        {
+            *timeout_seconds = timeout;
+        }
+        let existed = registry.gates.contains_key(&gate.key);
+        if timeout_override.is_some() || !existed {
+            edits_registry = true;
+            registry.gates.insert(gate.key.clone(), gate.clone());
+            intents.push(MutationIntent::RecordEvent {
+                phase: 0,
+                event: Box::new(if existed {
+                    Event::draft_gate_definition_updated(gate.key)
+                } else {
+                    Event::draft_gate_definition_created(gate.key)
+                }),
+            });
+        }
+    }
+    if edits_registry {
+        intents.insert(
+            0,
+            MutationIntent::EditGateRegistry {
+                registry: Box::new(registry.clone()),
+            },
+        );
+    }
+    let keys = gates
+        .iter()
+        .map(|gate| gate.key.clone())
+        .collect::<Vec<_>>();
+    let issue_id = issue.id.clone();
+    let derived = super::derive_captured_issue_mutation(
+        issue,
+        &registry,
+        &super::CapturedIssueMutation::AddGates {
+            issue_id,
+            gate_keys: keys,
+        },
+    )?;
+    let super::CapturedIssueMutationOutcome::GatesAdded {
+        added,
+        already_exist,
+    } = derived.outcome
+    else {
+        return Err(anyhow!(
+            "unexpected result from captured gate preset application"
+        ));
+    };
+    intents.extend(derived.intents);
+    Ok(DerivedGatePresetApplication {
+        registry,
+        intents,
+        result: GateAddResult {
+            added,
+            already_exist,
+        },
+        edits_registry,
+    })
+}
+
 fn updated_gate_definition(current: GateDefinition, update: GateUpdate) -> Result<GateDefinition> {
     use crate::declarations::GateChecker;
 
@@ -1055,86 +1349,84 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::declarations::{GateChecker, GateStage};
+        use crate::repository_state::{finalize, finalize_gate_registry_edit, MutationContext};
+        use crate::storage::RepositoryStateStoreError;
 
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
-
-        // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
-
-        // Load preset
-        let preset = self.storage.get_gate_preset(preset_name)?;
-
-        // Filter gates based on options
-        let gates_to_apply: Vec<_> = preset
-            .gates
-            .iter()
-            .filter(|g| {
-                // Skip prechecks if requested
-                if skip_precheck && g.stage == GateStage::Precheck {
-                    return false;
-                }
-                // Skip postchecks if requested
-                if skip_postcheck && g.stage == GateStage::Postcheck {
-                    return false;
-                }
-                // Skip excepted gates
-                if except_gates.contains(&g.key) {
-                    return false;
-                }
-                true
-            })
-            .collect();
-
-        if gates_to_apply.is_empty() {
-            return Err(anyhow!("No gates to apply after filtering"));
-        }
-
-        // First, define gates in registry if they don't exist
-        let mut registry = self.storage.load_gate_registry()?;
-        // (key, pre-existing) per registry mutation, for the audit events below.
-        let mut definition_writes: Vec<(String, bool)> = Vec::new();
-        for gate_template in &gates_to_apply {
-            let mut gate = gate_template.to_gate();
-
-            // Apply timeout override if specified
-            if let Some(timeout) = timeout_override {
-                if let Some(GateChecker::Exec {
-                    timeout_seconds, ..
-                }) = &mut gate.checker
-                {
-                    *timeout_seconds = timeout;
-                }
-            }
-
-            // Add to registry (update if exists and timeout override specified, or add if new)
-            let existed = registry.gates.contains_key(&gate.key);
-            if timeout_override.is_some() || !existed {
-                definition_writes.push((gate.key.clone(), existed));
-                registry.gates.insert(gate.key.clone(), gate);
-            }
-        }
-
-        // Save updated registry
-        self.storage.save_gate_registry(&registry)?;
-
-        // @/inv/event-log: registry-scoped audit entries for the preset's
-        // definition writes (created for new keys, updated for overwrites).
-        for (key, existed) in definition_writes {
-            let event = if existed {
-                Event::draft_gate_definition_updated(key)
-            } else {
-                Event::draft_gate_definition_created(key)
+        let layout = self.require_layout()?;
+        let context = MutationContext::production();
+        for _ in 0..8 {
+            let (expected_target, expected_mode) = {
+                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
+                let Some(image) = capture_gate_preset_image(&mut *preflight, false, None)? else {
+                    continue;
+                };
+                let issues = super::captured_active_issues(&image)?;
+                let target = super::resolve_issue_from_capture(&issues, issue_id)?;
+                let config = crate::repository_state::assemble_config(&image)?;
+                (
+                    target,
+                    self.config_manager.enforcement_mode_from_config(&config)?,
+                )
             };
-            self.storage.append_event(&event)?;
+            let claims_guard = (expected_mode != crate::config::EnforcementMode::Off)
+                .then(|| super::claims_mutation_guard(&layout))
+                .transpose()?
+                .flatten();
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some(image) = capture_gate_preset_image(&mut *session, true, None)? else {
+                continue;
+            };
+            let issues = super::captured_active_issues(&image)?;
+            let target = super::resolve_issue_from_capture(&issues, issue_id)?;
+            let config = crate::repository_state::assemble_config(&image)?;
+            let mode = self.config_manager.enforcement_mode_from_config(&config)?;
+            if target != expected_target || mode != expected_mode {
+                continue;
+            }
+            let warnings = super::captured_lease_warnings(
+                mode,
+                std::slice::from_ref(&target),
+                &issues,
+                claims_guard.as_ref(),
+            )?;
+            let preset = parse_captured_gate_presets(&image)?
+                .remove(preset_name)
+                .ok_or_else(|| crate::storage::PresetNotFoundError::new(preset_name))?;
+            let issue = captured_gate_preset_issue(&image, &target)?;
+            let derived = derive_gate_preset_application(
+                issue,
+                captured_gate_registry(&image)?,
+                &preset,
+                timeout_override,
+                skip_precheck,
+                skip_postcheck,
+                except_gates,
+            )?;
+            if derived.intents.is_empty() {
+                return Ok((derived.result, warnings));
+            }
+            let plan = if derived.edits_registry {
+                let mut declarations = super::declarations_from_image(&image)?;
+                declarations.gates = derived.registry;
+                finalize_gate_registry_edit(
+                    &layout,
+                    &image,
+                    &context,
+                    &derived.intents,
+                    declarations.borrowed(),
+                )?
+            } else {
+                finalize(&layout, &image, &context, &derived.intents)?
+            };
+            match session.apply(&plan) {
+                Ok(_) => return Ok((derived.result, warnings)),
+                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
         }
-
-        // Now add gates to issue
-        let gate_keys: Vec<String> = gates_to_apply.iter().map(|g| g.key.clone()).collect();
-        self.add_gates(issue_id, &gate_keys)
+        Err(anyhow!(
+            "gate preset application did not converge after repeated capture conflicts"
+        ))
     }
 
     /// List all gate run results for an issue, optionally filtered by gate key.
@@ -1165,58 +1457,91 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         preset_name: &str,
         from_issue_id: &str,
-    ) -> Result<std::path::PathBuf> {
+    ) -> Result<std::path::PathBuf>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::gate_presets::{GatePresetDefinition, GateTemplate};
 
-        // Validate preset name
-        if preset_name.is_empty() {
-            return Err(anyhow!("Preset name cannot be empty"));
-        }
+        crate::gate_presets::validate_preset_name(preset_name)
+            .map_err(|error| crate::errors::InvalidArgumentError::new(error.to_string()))?;
         if crate::gate_presets::BuiltinPresets::load()?.contains_key(preset_name) {
-            return Err(anyhow!("Cannot override builtin preset: {}", preset_name));
+            return Err(crate::errors::InvalidArgumentError::new(format!(
+                "Cannot override builtin preset: {preset_name}"
+            ))
+            .into());
         }
 
-        let full_id = self.storage.resolve_issue_id(from_issue_id)?;
-        let issue = self.storage.load_issue(&full_id)?;
-
-        if issue.gates_required.is_empty() {
-            return Err(anyhow!("Issue has no gates to create preset from"));
+        let layout = self.require_layout()?;
+        let context = crate::repository_state::MutationContext::production();
+        for _ in 0..8 {
+            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let Some(image) = capture_gate_preset_image(&mut *session, false, Some(preset_name))?
+            else {
+                continue;
+            };
+            let issues = super::captured_active_issues(&image)?;
+            let full_id = super::resolve_issue_from_capture(&issues, from_issue_id)?;
+            let target = crate::repository_state::VirtualPath::data(format!(
+                "config/gate-presets/{preset_name}.json"
+            ))?;
+            if !matches!(
+                image.entry(&target)?,
+                crate::repository_state::RepositoryEntry::Absent
+            ) {
+                return Err(crate::errors::AlreadyExistsError::new(format!(
+                    "Custom gate preset '{preset_name}' already exists"
+                ))
+                .into());
+            }
+            let issue = captured_gate_preset_issue(&image, &full_id)?;
+            if issue.gates_required.is_empty() {
+                return Err(anyhow!("Issue has no gates to create preset from"));
+            }
+            let registry = captured_gate_registry(&image)?;
+            let gates = issue
+                .gates_required
+                .iter()
+                .map(|gate_key| {
+                    let gate = registry
+                        .gates
+                        .get(gate_key)
+                        .ok_or_else(|| crate::storage::GateNotFoundError::in_registry(gate_key))?;
+                    Ok(GateTemplate {
+                        key: gate.key.clone(),
+                        title: gate.title.clone(),
+                        description: gate.description.clone(),
+                        stage: gate.stage,
+                        mode: gate.mode,
+                        checker: gate.checker.clone(),
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let preset = GatePresetDefinition {
+                name: preset_name.to_string(),
+                description: format!("Custom preset created from issue {}", issue.short_id()),
+                gates,
+            };
+            let intents = [crate::repository_state::MutationIntent::CreateGatePreset {
+                preset: Box::new(preset),
+            }];
+            let plan = crate::repository_state::finalize(&layout, &image, &context, &intents)?;
+            match session.apply(&plan) {
+                Ok(_) => {
+                    return Ok(layout
+                        .data_root()
+                        .join("config/gate-presets")
+                        .join(format!("{preset_name}.json")))
+                }
+                Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. }) => {
+                    continue
+                }
+                Err(error) => return Err(error.into()),
+            }
         }
-
-        // Load gate definitions from registry
-        let registry = self.storage.load_gate_registry()?;
-        let mut gates = Vec::new();
-
-        for gate_key in &issue.gates_required {
-            // Dedicated GateNotFoundError (exit 3) so a gate-not-found is always
-            // this type by downcast; the InRegistry variant reproduces this site's
-            // original "Gate not found in registry: <key>" phrasing verbatim. The
-            // other ::single origins (gate_check.rs, bulk_update.rs) used a
-            // different wording carried by the Single variant.
-            let gate = registry
-                .gates
-                .get(gate_key)
-                .ok_or_else(|| crate::storage::GateNotFoundError::in_registry(gate_key))?;
-
-            gates.push(GateTemplate {
-                key: gate.key.clone(),
-                title: gate.title.clone(),
-                description: gate.description.clone(),
-                stage: gate.stage,
-                mode: gate.mode,
-                checker: gate.checker.clone(),
-            });
-        }
-
-        // Create preset
-        let preset = GatePresetDefinition {
-            name: preset_name.to_string(),
-            description: format!("Custom preset created from issue {}", issue.short_id()),
-            gates,
-        };
-
-        // Save preset via storage
-        self.storage.save_gate_preset(&preset)
+        Err(anyhow!(
+            "gate preset creation did not converge after repeated capture conflicts"
+        ))
     }
 }
 
@@ -1572,6 +1897,182 @@ enforce_leases = "off"
         );
         assert!(recovered.load_gate_registry().unwrap().gates.is_empty());
         assert!(recovered.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_gate_preset_apply_failure_recovers_registry_issue_and_events_together() {
+        use crate::storage::RepositoryStateStore;
+
+        let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
+            crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+        ))));
+        let storage = InMemoryStorage::with_repository_state_failures(failures);
+        storage.init().unwrap();
+        storage
+            .write_repo_file(".jit/config.toml", "[worktree]\nenforce_leases = \"off\"\n")
+            .unwrap();
+        let issue = crate::domain::types::fixture_issue("Preset target".into(), String::new());
+        let issue_id = issue.id.clone();
+        storage.save_issue(issue).unwrap();
+        let recovered = storage.without_repository_state_failures();
+        let layout = storage.repository_layout();
+        let executor = CommandExecutor::new(storage).with_layout(layout.clone());
+
+        assert!(executor
+            .apply_gate_preset(&issue_id, "plan-review", None, false, false, &[])
+            .is_err());
+        drop(
+            recovered
+                .open_mutation_session(layout)
+                .expect("recovery converges"),
+        );
+        assert!(recovered.load_gate_registry().unwrap().gates.is_empty());
+        assert!(recovered
+            .load_issue(&issue_id)
+            .unwrap()
+            .gates_required
+            .is_empty());
+        assert!(recovered.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_gate_preset_create_revalidates_absent_target_against_concurrent_creator() {
+        use crate::gate_presets::{GatePresetDefinition, GateTemplate};
+        use crate::repository_state::{finalize, MutationContext, MutationIntent};
+        use crate::storage::{RepositoryStateStore, RepositoryStateStoreError};
+
+        let executor = setup();
+        define_manual_gate(&executor, "review");
+        let mut issue = crate::domain::types::fixture_issue("Preset source".into(), String::new());
+        issue.gates_required.push("review".into());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        let layout = executor.storage.repository_layout();
+
+        let mut stale_session = executor
+            .storage
+            .open_mutation_session(layout.clone())
+            .unwrap();
+        let stale_image =
+            capture_gate_preset_image(stale_session.as_mut(), false, Some("race-preset"))
+                .unwrap()
+                .unwrap();
+        let preset = GatePresetDefinition {
+            name: "race-preset".into(),
+            description: "Captured race".into(),
+            gates: vec![GateTemplate {
+                key: "review".into(),
+                title: "review".into(),
+                description: String::new(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+            }],
+        };
+        let stale_plan = finalize(
+            &layout,
+            &stale_image,
+            &MutationContext::deterministic(
+                [91; 32],
+                chrono::DateTime::parse_from_rfc3339("2026-07-22T12:00:00Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            ),
+            &[MutationIntent::CreateGatePreset {
+                preset: Box::new(preset),
+            }],
+        )
+        .unwrap();
+
+        executor
+            .create_gate_preset("race-preset", &issue_id)
+            .unwrap();
+        assert!(matches!(
+            stale_session.apply(&stale_plan),
+            Err(RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+        assert!(executor
+            .storage
+            .read_repo_file(".jit/config/gate-presets/race-preset.json")
+            .unwrap()
+            .is_some());
+    }
+
+    #[test]
+    fn test_memory_gate_preset_create_is_visible_to_list_and_show() {
+        let executor = setup();
+        define_manual_gate(&executor, "review");
+        let mut issue = crate::domain::types::fixture_issue("Preset source".into(), String::new());
+        issue.gates_required.push("review".into());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+
+        let path = executor
+            .create_gate_preset("team-review", &issue_id)
+            .unwrap();
+        assert_eq!(
+            path,
+            executor
+                .storage
+                .repository_layout()
+                .data_root()
+                .join("config/gate-presets/team-review.json")
+        );
+
+        let listed = executor
+            .list_gate_presets()
+            .unwrap()
+            .into_iter()
+            .find(|preset| preset.name == "team-review")
+            .expect("created custom preset is listed");
+        assert!(!listed.builtin);
+        let shown = executor.show_gate_preset("team-review").unwrap();
+        assert_eq!(shown.gates.len(), 1);
+        assert_eq!(shown.gates[0].key, "review");
+    }
+
+    #[test]
+    fn test_memory_gate_preset_reader_rejects_non_regular_json_occupant() {
+        let executor = setup();
+        let path = crate::repository_state::VirtualPath::data("config/gate-presets/directory.json")
+            .unwrap();
+        executor.storage.repository_state().entries.insert(
+            path,
+            crate::repository_state::RepositoryEntry::Directory {
+                identity: crate::repository_state::EntryIdentity::for_bytes(
+                    "memory-preset-directory",
+                    b"directory",
+                )
+                .unwrap(),
+                mode: crate::repository_state::FileMode::Executable,
+            },
+        );
+
+        let error = executor
+            .list_gate_presets()
+            .expect_err("a .json directory must be rejected");
+        assert!(error.to_string().contains("must be an ordinary file"));
+    }
+
+    #[test]
+    fn test_gate_preset_create_reports_occupied_malformed_target_as_already_exists() {
+        let executor = setup();
+        define_manual_gate(&executor, "review");
+        let mut issue = crate::domain::types::fixture_issue("Preset source".into(), String::new());
+        issue.gates_required.push("review".into());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor
+            .storage
+            .write_repo_file(".jit/config/gate-presets/occupied.json", "{ malformed")
+            .unwrap();
+
+        let error = executor
+            .create_gate_preset("occupied", &issue_id)
+            .expect_err("an occupied exact target must not be parsed or overwritten");
+        assert!(error
+            .downcast_ref::<crate::errors::AlreadyExistsError>()
+            .is_some());
     }
 
     #[test]

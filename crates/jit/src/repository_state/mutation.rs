@@ -334,6 +334,13 @@ pub enum MutationIntent {
         /// Complete proposed registry after one closed semantic edit.
         registry: Box<GateRegistry>,
     },
+    /// Create one project-defined gate preset at its canonical path. The target
+    /// must be absent in the captured image; custom presets never overwrite one
+    /// another or shadow a builtin preset.
+    CreateGatePreset {
+        /// Validated semantic preset whose name determines the filename stem.
+        preset: Box<crate::gate_presets::GatePresetDefinition>,
+    },
     /// Delete an issue that ALREADY EXISTS in the captured image. The finalizer
     /// removes the issue record and transfers its id from active to deleted index
     /// membership in the same delta. Audit events remain explicit intents so the
@@ -423,6 +430,12 @@ pub enum MutationError {
          ProfileApplied marker to certify it; refusing to append (@/inv/event-log)"
     )]
     UncertifiedTornTail,
+    /// A custom preset is structurally invalid or collides with a builtin.
+    #[error("invalid custom gate preset: {0}")]
+    InvalidGatePreset(String),
+    /// The canonical custom-preset target was already occupied.
+    #[error("custom gate preset '{0}' already exists")]
+    GatePresetAlreadyExists(String),
 }
 
 /// Owner identity stamped on finalizer-produced actions.
@@ -874,6 +887,58 @@ pub fn finalize(
                     mode: FileMode::Regular,
                 });
             }
+        }
+    }
+
+    // Project-defined gate presets are repository-owned records too. Their name
+    // is both the semantic identity and canonical filename stem, so publication
+    // is create-only and path-safe rather than an ambient upsert.
+    for intent in intents {
+        if let MutationIntent::CreateGatePreset { preset } = intent {
+            preset
+                .validate()
+                .map_err(|error| MutationError::InvalidGatePreset(error.to_string()))?;
+            if crate::gate_presets::BuiltinPresets::load()
+                .map_err(|error| MutationError::InvalidGatePreset(error.to_string()))?
+                .contains_key(&preset.name)
+            {
+                return Err(MutationError::InvalidGatePreset(format!(
+                    "'{}' collides with a builtin preset",
+                    preset.name
+                )));
+            }
+            for parent in ["config", "config/gate-presets"] {
+                let path = VirtualPath::data(parent)?;
+                match image.entry(&path)? {
+                    crate::repository_state::RepositoryEntry::Absent => {
+                        actions.push(RepositoryAction::CreateDirectory {
+                            path,
+                            owner: OWNER.to_string(),
+                            expected: ExpectedPreimage::Absent,
+                        });
+                    }
+                    crate::repository_state::RepositoryEntry::Directory { .. } => {}
+                    _ => {
+                        return Err(MutationError::InvalidGatePreset(format!(
+                            "custom preset parent '{parent}' is not a directory"
+                        )))
+                    }
+                }
+            }
+            let path = VirtualPath::data(format!("config/gate-presets/{}.json", preset.name))?;
+            if !matches!(
+                image.entry(&path)?,
+                crate::repository_state::RepositoryEntry::Absent
+            ) {
+                return Err(MutationError::GatePresetAlreadyExists(preset.name.clone()));
+            }
+            actions.push(RepositoryAction::WriteFile {
+                path,
+                owner: OWNER.to_string(),
+                expected: ExpectedPreimage::Absent,
+                bytes: canonical_json(&**preset, true)?,
+                mode: FileMode::Regular,
+            });
         }
     }
 

@@ -1,8 +1,8 @@
 //! Preset manager for loading and managing gate presets
 
-use super::{BuiltinPresets, GatePresetDefinition, PresetInfo};
+use super::{GatePresetDefinition, PresetInfo};
 use anyhow::{Context, Result};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -16,14 +16,7 @@ pub struct PresetManager {
 impl PresetManager {
     /// Create a new preset manager
     pub fn new(jit_root: PathBuf) -> Result<Self> {
-        let mut presets = BuiltinPresets::load()?;
-
-        // Load custom presets and override builtin with same name
-        let custom_presets = Self::load_custom_presets(&jit_root)?;
-        let custom_names = custom_presets.keys().cloned().collect();
-        for (name, preset) in custom_presets {
-            presets.insert(name, preset);
-        }
+        let (presets, custom_names) = Self::load_presets(&jit_root)?;
 
         Ok(Self {
             jit_root,
@@ -33,49 +26,48 @@ impl PresetManager {
     }
 
     /// Load custom presets from .jit/config/gate-presets/
-    fn load_custom_presets(jit_root: &Path) -> Result<HashMap<String, GatePresetDefinition>> {
+    fn load_presets(
+        jit_root: &Path,
+    ) -> Result<(HashMap<String, GatePresetDefinition>, HashSet<String>)> {
         let presets_dir = jit_root.join("config").join("gate-presets");
-        let mut presets = HashMap::new();
 
-        // If directory doesn't exist, return empty map (not an error)
-        if !presets_dir.exists() {
-            return Ok(presets);
+        match fs::symlink_metadata(&presets_dir) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return super::load_presets_from_custom_files(Vec::new())
+            }
+            Err(error) => return Err(error.into()),
+            Ok(metadata) if !metadata.file_type().is_dir() => {
+                return Err(crate::errors::InvalidArgumentError::new(format!(
+                    "Custom preset root '{}' must be an ordinary directory",
+                    presets_dir.display()
+                ))
+                .into())
+            }
+            Ok(_) => {}
         }
 
         // Read all JSON files in the directory
-        let entries = fs::read_dir(&presets_dir)
-            .with_context(|| format!("Failed to read presets directory: {:?}", presets_dir))?;
-
-        for entry in entries {
-            let entry = entry?;
-            let path = entry.path();
-
-            // Skip non-JSON files
-            if path.extension() != Some(std::ffi::OsStr::new("json")) {
-                continue;
-            }
-
-            // Load and parse preset
-            let content = fs::read_to_string(&path)
-                .with_context(|| format!("Failed to read preset file: {:?}", path))?;
-
-            let preset: GatePresetDefinition = serde_json::from_str(&content)
-                .with_context(|| format!("Failed to parse preset file: {:?}", path))?;
-
-            // Validate preset. A validation failure is an argument error (exit 2):
-            // type it so the top-level handler classifies by downcast, preserving
-            // the historical exit code and the top-level message verbatim.
-            preset.validate().map_err(|_| {
-                crate::errors::InvalidArgumentError::new(format!(
-                    "Invalid preset in file: {:?}",
-                    path
-                ))
-            })?;
-
-            presets.insert(preset.name.clone(), preset);
-        }
-
-        Ok(presets)
+        let mut entries = fs::read_dir(&presets_dir)
+            .with_context(|| format!("Failed to read presets directory: {:?}", presets_dir))?
+            .collect::<std::io::Result<Vec<_>>>()?;
+        entries.sort_by_key(|entry| entry.file_name());
+        let files = entries
+            .into_iter()
+            .filter(|entry| entry.path().extension() == Some(std::ffi::OsStr::new("json")))
+            .map(|entry| {
+                let path = entry.path();
+                if !entry.file_type()?.is_file() {
+                    return Err(crate::errors::InvalidArgumentError::new(format!(
+                        "Custom preset file '{}' must be an ordinary file",
+                        path.display()
+                    ))
+                    .into());
+                }
+                let bytes = read_regular_preset_no_follow(&path)?;
+                Ok((entry.file_name().to_string_lossy().into_owned(), bytes))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        super::load_presets_from_custom_files(files)
     }
 
     /// Get a preset by name.
@@ -87,7 +79,8 @@ impl PresetManager {
 
     /// List all available presets.
     pub fn list_presets(&self) -> Vec<PresetInfo> {
-        self.presets
+        let mut presets = self
+            .presets
             .values()
             .map(|preset| PresetInfo {
                 name: preset.name.clone(),
@@ -95,7 +88,9 @@ impl PresetManager {
                 gate_count: preset.gates.len(),
                 builtin: !self.custom_names.contains(&preset.name),
             })
-            .collect()
+            .collect::<Vec<_>>();
+        presets.sort_by(|left, right| left.name.cmp(&right.name));
+        presets
     }
 
     /// Check if a preset exists.
@@ -107,6 +102,57 @@ impl PresetManager {
     pub fn custom_presets_dir(&self) -> PathBuf {
         self.jit_root.join("config").join("gate-presets")
     }
+}
+
+#[cfg(unix)]
+fn read_regular_preset_no_follow(path: &Path) -> Result<Vec<u8>> {
+    use nix::fcntl::{open, OFlag};
+    use nix::sys::stat::Mode;
+    use std::io::Read;
+
+    let metadata = fs::symlink_metadata(path)?;
+    if !metadata.file_type().is_file() {
+        return Err(crate::errors::InvalidArgumentError::new(format!(
+            "Custom preset file '{}' must be an ordinary file",
+            path.display()
+        ))
+        .into());
+    }
+    let file = open(
+        path,
+        OFlag::O_RDONLY | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW,
+        Mode::empty(),
+    )
+    .with_context(|| {
+        format!(
+            "opening preset file without following links: {}",
+            path.display()
+        )
+    })?;
+    let mut file = fs::File::from(file);
+    if !file.metadata()?.is_file() {
+        return Err(crate::errors::InvalidArgumentError::new(format!(
+            "Custom preset file '{}' must be an ordinary file",
+            path.display()
+        ))
+        .into());
+    }
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
+
+#[cfg(not(unix))]
+fn read_regular_preset_no_follow(path: &Path) -> Result<Vec<u8>> {
+    let metadata = fs::symlink_metadata(path)?;
+    if !metadata.file_type().is_file() {
+        return Err(crate::errors::InvalidArgumentError::new(format!(
+            "Custom preset file '{}' must be an ordinary file",
+            path.display()
+        ))
+        .into());
+    }
+    fs::read(path).with_context(|| format!("reading preset file: {}", path.display()))
 }
 
 #[cfg(test)]
@@ -183,18 +229,16 @@ mod tests {
     }
 
     #[test]
-    fn test_custom_preset_overrides_builtin() {
+    fn test_custom_preset_cannot_override_builtin() {
         let temp_dir = TempDir::new().unwrap();
         let presets_dir = temp_dir.path().join("config").join("gate-presets");
         fs::create_dir_all(&presets_dir).unwrap();
 
-        // Create custom "plan-review" preset that overrides builtin
         create_test_preset_file(&presets_dir, "plan-review").unwrap();
-
-        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
-
-        let preset = manager.get_preset("plan-review").unwrap();
-        assert_eq!(preset.description, "Custom preset plan-review");
+        let error = PresetManager::new(temp_dir.path().to_path_buf())
+            .err()
+            .expect("builtin collision must be rejected");
+        assert!(error.to_string().contains("collides with a builtin"));
     }
 
     #[test]
@@ -231,26 +275,38 @@ mod tests {
     }
 
     #[test]
-    fn test_overridden_builtin_listed_as_custom() {
+    fn test_custom_filename_must_match_embedded_name() {
         let temp_dir = TempDir::new().unwrap();
         let presets_dir = temp_dir.path().join("config").join("gate-presets");
         fs::create_dir_all(&presets_dir).unwrap();
 
-        // Override builtin "plan-review" with a custom version
-        create_test_preset_file(&presets_dir, "plan-review").unwrap();
+        create_test_preset_file(&presets_dir, "embedded-name").unwrap();
+        fs::rename(
+            presets_dir.join("embedded-name.json"),
+            presets_dir.join("different-name.json"),
+        )
+        .unwrap();
+        let error = PresetManager::new(temp_dir.path().to_path_buf())
+            .err()
+            .expect("filename mismatch must be rejected");
+        assert!(error.to_string().contains("must match embedded name"));
+    }
 
-        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
-        let list = manager.list_presets();
+    #[test]
+    fn test_list_presets_is_sorted_by_name() {
+        let temp_dir = TempDir::new().unwrap();
+        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        fs::create_dir_all(&presets_dir).unwrap();
+        create_test_preset_file(&presets_dir, "zeta-checks").unwrap();
+        create_test_preset_file(&presets_dir, "alpha-checks").unwrap();
 
-        let plan_review = list.iter().find(|p| p.name == "plan-review").unwrap();
-        assert!(
-            !plan_review.builtin,
-            "Overridden builtin should be listed as custom"
-        );
-
-        // Non-overridden builtins should still be listed as builtin
-        let coverage = list.iter().find(|p| p.name == "coverage-preview").unwrap();
-        assert!(coverage.builtin);
+        let names = PresetManager::new(temp_dir.path().to_path_buf())
+            .unwrap()
+            .list_presets()
+            .into_iter()
+            .map(|preset| preset.name)
+            .collect::<Vec<_>>();
+        assert!(names.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
     #[test]
@@ -264,6 +320,48 @@ mod tests {
 
         let result = PresetManager::new(temp_dir.path().to_path_buf());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_non_regular_json_preset_occupant_is_rejected() {
+        let temp_dir = TempDir::new().unwrap();
+        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        fs::create_dir_all(presets_dir.join("directory.json")).unwrap();
+
+        let error = PresetManager::new(temp_dir.path().to_path_buf())
+            .err()
+            .expect("a .json directory must be rejected");
+        assert!(error.to_string().contains("must be an ordinary file"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_symlink_json_preset_occupant_is_rejected_without_following() {
+        use std::os::unix::fs::symlink;
+
+        let temp_dir = TempDir::new().unwrap();
+        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        fs::create_dir_all(&presets_dir).unwrap();
+        create_test_preset_file(&presets_dir, "regular").unwrap();
+        symlink("regular.json", presets_dir.join("linked.json")).unwrap();
+
+        let error = PresetManager::new(temp_dir.path().to_path_buf())
+            .err()
+            .expect("a .json symlink must be rejected without following");
+        assert!(error.to_string().contains("must be an ordinary file"));
+    }
+
+    #[test]
+    fn test_non_directory_custom_preset_root_is_rejected() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_dir = temp_dir.path().join("config");
+        fs::create_dir_all(&config_dir).unwrap();
+        fs::write(config_dir.join("gate-presets"), "not a directory").unwrap();
+
+        let error = PresetManager::new(temp_dir.path().to_path_buf())
+            .err()
+            .expect("a non-directory preset root must be rejected");
+        assert!(error.to_string().contains("must be an ordinary directory"));
     }
 
     #[test]

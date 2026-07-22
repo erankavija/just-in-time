@@ -931,13 +931,6 @@ impl IssueStore for FailingSaveStorage {
         self.inner.get_gate_preset(name)
     }
 
-    fn save_gate_preset(
-        &self,
-        preset: &jit::gate_presets::GatePresetDefinition,
-    ) -> anyhow::Result<std::path::PathBuf> {
-        self.inner.save_gate_preset(preset)
-    }
-
     fn read_path_bytes(
         &self,
         path: &str,

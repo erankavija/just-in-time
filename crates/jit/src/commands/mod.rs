@@ -1885,6 +1885,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                     MutationIntent::EditGateRegistry { .. } => {
                         paths.insert(VirtualPath::data("gates.toml")?);
                     }
+                    MutationIntent::CreateGatePreset { preset } => {
+                        paths.insert(VirtualPath::data("config")?);
+                        paths.insert(VirtualPath::data("config/gate-presets")?);
+                        paths.insert(VirtualPath::data(format!(
+                            "config/gate-presets/{}.json",
+                            preset.name
+                        ))?);
+                    }
                     MutationIntent::RecordGateRun { .. } => {}
                     MutationIntent::RecordEvent { .. } => {
                         paths.insert(VirtualPath::data("events.jsonl")?);

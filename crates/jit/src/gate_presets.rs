@@ -28,7 +28,7 @@ pub use reference::{render_reference_markdown, REFERENCE_PATH};
 
 use crate::declarations::GateDefinition;
 use crate::declarations::{GateChecker, GateMode, GateStage};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -83,9 +83,7 @@ pub struct GatePresetDefinition {
 impl GatePresetDefinition {
     /// Validate preset structure
     pub fn validate(&self) -> Result<()> {
-        if self.name.is_empty() {
-            return Err(anyhow!("Preset name cannot be empty"));
-        }
+        validate_preset_name(&self.name)?;
 
         if self.description.is_empty() {
             return Err(anyhow!("Preset description cannot be empty"));
@@ -123,6 +121,88 @@ impl GatePresetDefinition {
 
         Ok(())
     }
+}
+
+/// Validate the canonical, path-safe spelling of a gate preset name.
+///
+/// Preset names are lowercase kebab case: they start with a lowercase ASCII
+/// letter and contain lowercase letters, digits, and single separating hyphens.
+/// This same spelling is used as the custom preset filename stem.
+pub fn validate_preset_name(name: &str) -> Result<()> {
+    let mut bytes = name.bytes();
+    if !bytes.next().is_some_and(|byte| byte.is_ascii_lowercase()) {
+        return Err(anyhow!(
+            "Preset name must be lowercase kebab case (for example 'ci-checks')"
+        ));
+    }
+    let mut previous_hyphen = false;
+    for byte in bytes {
+        match byte {
+            b'a'..=b'z' | b'0'..=b'9' => previous_hyphen = false,
+            b'-' if !previous_hyphen => previous_hyphen = true,
+            _ => {
+                return Err(anyhow!(
+                    "Preset name must be lowercase kebab case (for example 'ci-checks')"
+                ))
+            }
+        }
+    }
+    if previous_hyphen {
+        return Err(anyhow!(
+            "Preset name must be lowercase kebab case (for example 'ci-checks')"
+        ));
+    }
+    Ok(())
+}
+
+/// Parse the binary-shipped presets plus a captured set of custom JSON files.
+///
+/// This is the single pure policy boundary shared by filesystem and captured
+/// readers: canonical names, filename/name agreement, builtin collision
+/// rejection, and deterministic file-order diagnostics.
+pub(crate) fn load_presets_from_custom_files(
+    mut files: Vec<(String, Vec<u8>)>,
+) -> Result<(
+    HashMap<String, GatePresetDefinition>,
+    std::collections::HashSet<String>,
+)> {
+    files.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut presets = BuiltinPresets::load()?;
+    let builtin_names = presets
+        .keys()
+        .cloned()
+        .collect::<std::collections::HashSet<_>>();
+    let mut custom_names = std::collections::HashSet::new();
+    for (filename, bytes) in files {
+        let preset: GatePresetDefinition = serde_json::from_slice(&bytes)
+            .with_context(|| format!("Failed to parse custom gate preset file '{filename}'"))?;
+        preset.validate().map_err(|_| {
+            crate::errors::InvalidArgumentError::new(format!("Invalid preset in file: {filename}"))
+        })?;
+        let basename = filename.rsplit('/').next().unwrap_or_default();
+        let stem = basename.strip_suffix(".json").ok_or_else(|| {
+            crate::errors::InvalidArgumentError::new(format!(
+                "Custom preset file '{filename}' must have a .json extension"
+            ))
+        })?;
+        if stem != preset.name {
+            return Err(crate::errors::InvalidArgumentError::new(format!(
+                "Custom preset filename stem '{}' must match embedded name '{}'",
+                stem, preset.name
+            ))
+            .into());
+        }
+        if builtin_names.contains(&preset.name) {
+            return Err(crate::errors::InvalidArgumentError::new(format!(
+                "Custom preset '{}' collides with a builtin preset",
+                preset.name
+            ))
+            .into());
+        }
+        custom_names.insert(preset.name.clone());
+        presets.insert(preset.name.clone(), preset);
+    }
+    Ok((presets, custom_names))
 }
 
 /// Preset metadata for listing
@@ -196,6 +276,14 @@ mod tests {
         };
 
         assert!(preset.validate().is_err());
+    }
+
+    #[test]
+    fn test_preset_validation_rejects_path_and_non_kebab_names() {
+        for name in ["../escape", "Upper", "two--hyphens", "trailing-"] {
+            assert!(validate_preset_name(name).is_err(), "accepted {name}");
+        }
+        assert!(validate_preset_name("ci-checks-2").is_ok());
     }
 
     #[test]

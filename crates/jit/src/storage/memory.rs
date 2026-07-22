@@ -164,6 +164,41 @@ impl InMemoryStorage {
         Arc::clone(&self.active_mutation_layout)
     }
 
+    fn gate_presets_from_repository_state(
+        &self,
+    ) -> Result<(
+        std::collections::HashMap<String, crate::gate_presets::GatePresetDefinition>,
+        std::collections::HashSet<String>,
+    )> {
+        let files = self
+            .repository_state()
+            .entries
+            .iter()
+            .filter_map(|(path, entry)| {
+                if path.root_class() != RepositoryRootClass::Data {
+                    return None;
+                }
+                let filename = path
+                    .relative()
+                    .as_str()
+                    .strip_prefix("config/gate-presets/")?;
+                if filename.contains('/') || !filename.ends_with(".json") {
+                    return None;
+                }
+                Some(match entry {
+                    RepositoryEntry::File { bytes, .. } => {
+                        Ok((filename.to_string(), bytes.clone()))
+                    }
+                    _ => Err(crate::errors::InvalidArgumentError::new(format!(
+                        "Custom preset file '{filename}' must be an ordinary file"
+                    ))
+                    .into()),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        crate::gate_presets::load_presets_from_custom_files(files)
+    }
+
     /// Map a repo-relative path to its canonical [`VirtualPath`] key in the
     /// aggregate repository image: a `.jit/`-prefixed path is a `Data(...)` entry,
     /// every other repo-relative path a `Worktree(...)` entry. This is the SAME
@@ -604,36 +639,26 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
-        // InMemoryStorage only supports builtin presets (no custom presets in tests)
-        let presets = crate::gate_presets::BuiltinPresets::load()?;
-
-        Ok(presets
+        let (presets, custom_names) = self.gate_presets_from_repository_state()?;
+        let mut presets = presets
             .values()
             .map(|preset| crate::gate_presets::PresetInfo {
                 name: preset.name.clone(),
                 description: preset.description.clone(),
                 gate_count: preset.gates.len(),
-                builtin: true,
+                builtin: !custom_names.contains(&preset.name),
             })
-            .collect())
+            .collect::<Vec<_>>();
+        presets.sort_by(|left, right| left.name.cmp(&right.name));
+        Ok(presets)
     }
 
     fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition> {
-        let presets = crate::gate_presets::BuiltinPresets::load()?;
+        let (presets, _) = self.gate_presets_from_repository_state()?;
         presets
             .get(name)
             .cloned()
             .ok_or_else(|| PresetNotFoundError::new(name).into())
-    }
-
-    fn save_gate_preset(
-        &self,
-        _preset: &crate::gate_presets::GatePresetDefinition,
-    ) -> Result<std::path::PathBuf> {
-        // InMemoryStorage doesn't support saving custom presets
-        Err(anyhow!(
-            "InMemoryStorage does not support saving custom presets"
-        ))
     }
 
     fn read_repo_file(

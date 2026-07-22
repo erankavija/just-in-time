@@ -366,18 +366,6 @@ pub trait IssueStore: Clone {
     /// Returns an error if the preset is not found or cannot be loaded.
     fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition>;
 
-    /// Save a custom gate preset.
-    ///
-    /// Uses atomic writes (temp file + rename) to prevent corruption.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the preset is invalid or cannot be saved.
-    fn save_gate_preset(
-        &self,
-        preset: &crate::gate_presets::GatePresetDefinition,
-    ) -> Result<std::path::PathBuf>;
-
     /// Read file bytes from the repository, optionally at a specific git commit.
     ///
     /// When `at_commit` is `None`, reads from the working tree.  Returns

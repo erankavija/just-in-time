@@ -194,9 +194,6 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn get_gate_preset(&self, name: &str) -> Result<GatePresetDefinition> {
         self.inner.get_gate_preset(name)
     }
-    fn save_gate_preset(&self, preset: &GatePresetDefinition) -> Result<std::path::PathBuf> {
-        self.inner.save_gate_preset(preset)
-    }
     fn read_path_bytes(
         &self,
         path: &str,
