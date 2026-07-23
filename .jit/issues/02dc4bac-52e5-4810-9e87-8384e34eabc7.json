@@ -14,14 +14,15 @@
       "path": "dev/active/1cc809de-plan.md"
     }
   ],
+  "done_at": "2026-07-23T22:30:00.915989658Z",
   "first_ready_at": "2026-07-23T18:11:28.753153980Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "failed",
-      "updated_at": "2026-07-23T22:24:45.520281955Z",
+      "status": "passed",
+      "updated_at": "2026-07-23T22:29:33.541206403Z",
       "updated_by": "auto:executor"
     }
   },
@@ -32,7 +33,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "planning: Repository-state quality hardening",
-  "updated_at": "2026-07-23T22:27:39.805249715Z"
+  "updated_at": "2026-07-23T22:30:00.915989658Z"
 }
