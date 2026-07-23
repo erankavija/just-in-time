@@ -1,0 +1,41 @@
+{
+  "branch": "feat/129f3fad-provenance-build-inputs",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "2d58eb6ef4579acd66f0415b875f5f354fea0a51",
+  "completed_at": "2026-07-23T22:22:01.847860263Z",
+  "duration_ms": 96932,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F1",
+        "line": 151,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/02dc4bac/requirement/REQ-P1",
+          "@/issue/1cc809de/requirement/REQ-03",
+          "@/inv/atomic-writes",
+          "@/inv/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "S1.d incorrectly treats initial journal construction as pre-control; a mismatch leaves created transaction control until later recovery instead of immediate cleanup."
+      }
+    ],
+    "summary": "The S1.d journal-mismatch path still bypasses cleanup after transaction control has been created.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "02dc4bac-52e5-4810-9e87-8384e34eabc7",
+  "message": null,
+  "run_id": "8b7177b1-c5de-43a5-b610-145273322735",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T22:20:24.915547827Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9415 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9110-cccc-7101-adee-5d6299d86462\n--------\nuser\n--- 9402 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "## Plan document present and linked\n\nPass. The linked plan exists at `dev/active/1cc809de-plan.md` and is explicitly identified as planning node `02dc4bac`.\n\n## Completeness against criteria\n\nThe plan addresses REQ-01 through REQ-16, including the planning node’s REQ-P2–P4 constraints. In particular, the module-wide typed-error acceptance condition is stated at plan line 117, and `repair_target_paths` is public and deliberately independent of `derive_repair` at line 125.\n\n## Technical soundness and architectural fit\n\nThe revised S1.d design still misstates the transaction ordering. It therefore does not resolve the prior blocking feedback.\n\n## Decomposition and dependencies\n\nThe story and leaf wiring is coherent: S1/S3 may begin after breakdown, S2/S4 wait for S1, and S5 waits for all predecessors. The task boundaries are otherwise actionable.\n\n## Risks and actionability\n\nThe control-residue failure path is not mitigated. An implementation following S1.d would return directly after a journal-action mismatch while leaving newly created transaction control state for later recovery.\n\n1. **[blocking, high] S1.d’s journal-mismatch cleanup design is still incorrect.** The plan says the `initial_repository_journal` SetMode mismatch occurs “before any control file or journal byte is durable” and can return directly (plan line 151). In the current code, however, `execute_repository_delta` creates and synchronizes transaction control before calling `initial_repository_journal` (`crates/jit/src/storage/file_transaction.rs:855-861`); `create_repository_control` creates the transaction directories and may create a worktree companion (`:467-501`). A mismatch at `initial_repository_journal` therefore bypasses the prepare-loop cleanup at `:865-876`, leaving control residue until a later session’s recovery path removes a journal-less transaction (`:153-170`). The plan must instead validate/build the journal before control creation or explicitly perform equivalent immediate cleanup on this error path. This is the prior F2 finding, unresolved, and conflicts with REQ-03 plus `@/inv/atomic-writes` and `@/inv/derived-state-coherence`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The S1.d journal-mismatch path still bypasses cleanup after transaction control has been created.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"S1.d incorrectly treats initial journal construction as pre-control; a mismatch leaves created transaction control until later recovery instead of immediate cleanup.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":151,\"references\":[\"@/issue/02dc4bac/requirement/REQ-P1\",\"@/issue/1cc809de/requirement/REQ-03\",\"@/inv/atomic-writes\",\"@/inv/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
