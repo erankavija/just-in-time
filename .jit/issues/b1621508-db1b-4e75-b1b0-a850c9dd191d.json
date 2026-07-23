@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker-b162",
+  "claimed_at": "2026-07-23T06:31:37.071753079Z",
   "context": {},
   "created_at": "2026-07-18T15:06:44.274970031Z",
   "dependencies": [
@@ -21,7 +22,7 @@
     "component:validation"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Validate drift diagnosis and transactional repair",
-  "updated_at": "2026-07-23T02:40:39.552835818Z"
+  "updated_at": "2026-07-23T06:31:37.071753079Z"
 }
