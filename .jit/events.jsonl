@@ -8727,3 +8727,4 @@
 {"gate_key":"doc-review","id":"6f235bd9-7558-45b2-abe2-8e1ff0aecb93","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T13:30:50.246759568Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"588e629d-567d-43ea-9694-bada8d7ab837","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T13:35:16.226954236Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"docs-mechanical","id":"fee286e8-7150-4c74-b1cf-3707a53403ab","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T13:36:27.524146306Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"068e299b-b2ca-4de7-b0d4-02a488201cd7","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T13:37:34.182963882Z","type":"gate_passed","updated_by":"auto:executor"}

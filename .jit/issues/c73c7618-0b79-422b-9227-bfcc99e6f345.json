@@ -46,7 +46,7 @@
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-07-23T12:08:03.765010325Z",
+      "updated_at": "2026-07-23T13:37:34.182963882Z",
       "updated_by": "auto:executor"
     }
   },
@@ -61,5 +61,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document public contracts and complete release evidence",
-  "updated_at": "2026-07-23T13:36:27.524146306Z"
+  "updated_at": "2026-07-23T13:37:34.182963882Z"
 }
