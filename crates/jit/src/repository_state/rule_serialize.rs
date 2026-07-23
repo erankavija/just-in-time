@@ -126,9 +126,9 @@ fn unique_schema_stem(identity: &str, used_stems: &mut HashSet<String>) -> Strin
     }
 }
 
-/// The generated leading comment block of `.jit/rules.toml`, stating the current
-/// default-rule contract. Repository-state materialization republishes it while
-/// preserving the rule bodies below it.
+/// The initial leading comment block of `.jit/rules.toml`, stating the default-rule
+/// contract. New files receive this header; materialization preserves an existing
+/// authored header.
 pub fn rules_file_header() -> &'static str {
     FILE_HEADER
 }
