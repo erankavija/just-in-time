@@ -11,7 +11,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-23T14:45:03.639100104Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e10ba548-c146-491e-a313-2f807933995f",
   "labels": [
     "epic:repository-materialization",
@@ -21,5 +27,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Bound terminal-transition readiness work",
-  "updated_at": "2026-07-23T14:19:49.541340002Z"
+  "updated_at": "2026-07-23T14:45:03.639100104Z"
 }
