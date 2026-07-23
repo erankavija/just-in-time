@@ -51,7 +51,7 @@
     },
     "jit-validate": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:33:44.610665512Z",
+      "updated_at": "2026-07-23T09:23:07.781203483Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -97,5 +97,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Integrate repository-state cutover",
-  "updated_at": "2026-07-23T09:21:43.189722408Z"
+  "updated_at": "2026-07-23T09:23:07.781203483Z"
 }
