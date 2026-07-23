@@ -8,7 +8,8 @@
 //! nothing distinguishes that from a trustworthy run (jit:7446af34). The binary
 //! already knows the commit it was built from and whether that tree was dirty
 //! ([`build_info::version_info`](crate::build_info::version_info)); this module
-//! compares that against the repository's current `HEAD`.
+//! compares that against the repository's current `HEAD` and the paths that
+//! changed between them.
 //!
 //! # The identity predicate (REQ-03)
 //!
@@ -30,7 +31,7 @@
 //! plain string comparison never drives the verdict. The full refusal
 //! condition is therefore always both parts together: (1) this identity
 //! predicate holds, AND (2) [`assess_binary_provenance`] finds either a
-//! commit mismatch or a dirty build; a repository that fails part (1) —
+//! build-input change or a dirty build; a repository that fails part (1) —
 //! unrelated, no git, or an unresolvable build commit — never refuses,
 //! regardless of part (2).
 //!
@@ -65,9 +66,10 @@
 /// repository it is validating.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StaleBinaryReason {
-    /// The binary was built from a commit other than the repository's
-    /// current `HEAD`, and that build commit is a known commit in this
-    /// repository's history.
+    /// The repository has changed a path that can affect the binary since the
+    /// recorded build commit. This also represents a build-input change in an
+    /// otherwise unchanged `HEAD`, because the commit alone then no longer
+    /// describes the tree the gate is reviewing.
     CommitMismatch {
         /// Full commit hash the running binary was built from.
         built_from: String,
@@ -105,8 +107,48 @@ pub enum BinaryProvenance {
     NotApplicable,
 }
 
+/// Paths that are actual inputs to the production `jit` binary.
+///
+/// This is a positive build-input inventory, not a denylist of paths that are
+/// presumed safe. The source and manifest roots cover Cargo's compilation
+/// inputs; the profile and hook paths cover the files embedded by
+/// `include_dir!`/`include_str!` in production code. A newly added path
+/// elsewhere in the repository therefore remains irrelevant by construction.
+const BINARY_BUILD_INPUTS: &[&str] = &[
+    "Cargo.toml",
+    "Cargo.lock",
+    "crates/jit/Cargo.toml",
+    "crates/jit/Cargo.lock",
+    "crates/jit/build.rs",
+    "crates/jit/src/",
+    "profiles/jit-dogfood/",
+    "scripts/hooks/pre-commit",
+    "scripts/hooks/pre-push",
+];
+
+/// Whether `path` can affect the production `jit` binary.
+pub fn is_binary_build_input(path: &str) -> bool {
+    BINARY_BUILD_INPUTS.iter().any(|input| {
+        input.strip_suffix('/').map_or(path == *input, |prefix| {
+            path == prefix || path.starts_with(input)
+        })
+    })
+}
+
+/// Whether any changed repository path can affect the production `jit`
+/// binary.
+pub fn binary_build_inputs_changed<I, P>(paths: I) -> bool
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<str>,
+{
+    paths
+        .into_iter()
+        .any(|path| is_binary_build_input(path.as_ref()))
+}
+
 /// Compare a running binary's build commit/dirty flag against a repository's
-/// current `HEAD`.
+/// current `HEAD` and its changed build-input paths.
 ///
 /// `build_commit_known_in_repo` is the REQ-03 identity predicate (see the
 /// module docs): whether `build_commit` is a commit object the repository
@@ -114,18 +156,20 @@ pub enum BinaryProvenance {
 /// `git rev-parse --verify <build_commit>^{commit}` against the repository
 /// root) — this function performs no I/O of its own.
 ///
-/// Returns [`BinaryProvenance::Stale`] when identity is established AND
-/// either the build was dirty ([`StaleBinaryReason::DirtyBuild`], regardless
-/// of whether `build_commit` equals `repo_head`) or `build_commit` differs
-/// from `repo_head` ([`StaleBinaryReason::CommitMismatch`]). A build whose
-/// dirty flag is `None` (unknown at build time) is not itself treated as
-/// evidence of staleness — only a *confirmed* dirty build
-/// (`Some(true)`) is.
+/// `build_inputs_changed` is supplied by the I/O boundary after comparing the
+/// committed and working-tree path changes against
+/// [`is_binary_build_input`]. Returns [`BinaryProvenance::Stale`] when
+/// identity is established AND either the build was dirty
+/// ([`StaleBinaryReason::DirtyBuild`], regardless of whether `build_commit`
+/// equals `repo_head`) or a build-input path changed. A build whose dirty flag
+/// is `None` (unknown at build time) is not itself treated as evidence of
+/// staleness — only a *confirmed* dirty build (`Some(true)`) is.
 pub fn assess_binary_provenance(
     build_commit: Option<&str>,
     build_dirty: Option<bool>,
     repo_head: Option<&str>,
     build_commit_known_in_repo: bool,
+    build_inputs_changed: bool,
 ) -> BinaryProvenance {
     let (Some(build_commit), Some(repo_head)) = (build_commit, repo_head) else {
         return BinaryProvenance::NotApplicable;
@@ -138,7 +182,7 @@ pub fn assess_binary_provenance(
             built_from: build_commit.to_string(),
         });
     }
-    if build_commit != repo_head {
+    if build_inputs_changed {
         return BinaryProvenance::Stale(StaleBinaryReason::CommitMismatch {
             built_from: build_commit.to_string(),
             head: repo_head.to_string(),
@@ -162,6 +206,7 @@ mod tests {
             Some(false),
             Some(real.git_commit),
             true,
+            false,
         );
         assert_eq!(result, BinaryProvenance::Fresh);
     }
@@ -170,8 +215,13 @@ mod tests {
     #[test]
     fn test_assess_binary_provenance_fresh_when_dirty_unknown() {
         let real = build_info::version_info();
-        let result =
-            assess_binary_provenance(Some(real.git_commit), None, Some(real.git_commit), true);
+        let result = assess_binary_provenance(
+            Some(real.git_commit),
+            None,
+            Some(real.git_commit),
+            true,
+            false,
+        );
         assert_eq!(result, BinaryProvenance::Fresh);
     }
 
@@ -181,8 +231,13 @@ mod tests {
     fn test_assess_binary_provenance_stale_on_commit_mismatch() {
         let real = build_info::version_info();
         let other_head = "0000000000000000000000000000000000000000";
-        let result =
-            assess_binary_provenance(Some(real.git_commit), Some(false), Some(other_head), true);
+        let result = assess_binary_provenance(
+            Some(real.git_commit),
+            Some(false),
+            Some(other_head),
+            true,
+            true,
+        );
         assert_eq!(
             result,
             BinaryProvenance::Stale(StaleBinaryReason::CommitMismatch {
@@ -202,6 +257,7 @@ mod tests {
             Some(true),
             Some(real.git_commit),
             true,
+            false,
         );
         assert_eq!(
             result,
@@ -217,7 +273,7 @@ mod tests {
     fn test_assess_binary_provenance_not_applicable_without_repo_head() {
         let real = build_info::version_info();
         assert_eq!(
-            assess_binary_provenance(Some(real.git_commit), Some(false), None, false),
+            assess_binary_provenance(Some(real.git_commit), Some(false), None, false, false),
             BinaryProvenance::NotApplicable
         );
     }
@@ -226,7 +282,7 @@ mod tests {
     #[test]
     fn test_assess_binary_provenance_not_applicable_without_build_commit() {
         assert_eq!(
-            assess_binary_provenance(None, None, Some("deadbeef"), false),
+            assess_binary_provenance(None, None, Some("deadbeef"), false, true),
             BinaryProvenance::NotApplicable
         );
     }
@@ -238,8 +294,61 @@ mod tests {
     fn test_assess_binary_provenance_not_applicable_when_repo_unrelated() {
         let real = build_info::version_info();
         assert_eq!(
-            assess_binary_provenance(Some(real.git_commit), Some(false), Some("cafef00d"), false),
+            assess_binary_provenance(
+                Some(real.git_commit),
+                Some(false),
+                Some("cafef00d"),
+                false,
+                true,
+            ),
             BinaryProvenance::NotApplicable
+        );
+    }
+
+    #[test]
+    fn test_binary_build_input_inventory_ignores_unrelated_paths() {
+        assert!(is_binary_build_input("Cargo.toml"));
+        assert!(is_binary_build_input("crates/jit/src/main.rs"));
+        assert!(is_binary_build_input("profiles/jit-dogfood/manifest.toml"));
+        assert!(is_binary_build_input("scripts/hooks/pre-commit"));
+        assert!(!is_binary_build_input("docs/new-reference.md"));
+        assert!(!is_binary_build_input("scripts/new-tool.sh"));
+        assert!(!binary_build_inputs_changed([
+            "docs/new-reference.md",
+            "scripts/new-tool.sh",
+        ]));
+    }
+
+    #[test]
+    fn test_assess_binary_provenance_fresh_for_metadata_only_changes() {
+        let real = build_info::version_info();
+        assert_eq!(
+            assess_binary_provenance(
+                Some(real.git_commit),
+                Some(false),
+                Some("a-different-known-head"),
+                true,
+                false,
+            ),
+            BinaryProvenance::Fresh
+        );
+    }
+
+    #[test]
+    fn test_assess_binary_provenance_stale_for_same_head_build_input_change() {
+        let real = build_info::version_info();
+        assert_eq!(
+            assess_binary_provenance(
+                Some(real.git_commit),
+                Some(false),
+                Some(real.git_commit),
+                true,
+                true,
+            ),
+            BinaryProvenance::Stale(StaleBinaryReason::CommitMismatch {
+                built_from: real.git_commit.to_string(),
+                head: real.git_commit.to_string(),
+            })
         );
     }
 }

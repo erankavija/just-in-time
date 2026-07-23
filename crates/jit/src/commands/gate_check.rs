@@ -626,15 +626,17 @@ fn gate_findings_from_report(
 
 /// Compare the running binary's own build provenance
 /// ([`build_info::version_info`](crate::build_info::version_info)) against
-/// `repo_root`'s current `HEAD`, returning why it is stale, or `None` when it
-/// is fresh or the comparison does not apply (REQ-03).
+/// `repo_root`'s current `HEAD` and changed build-input paths, returning why it
+/// is stale, or `None` when it is fresh or the comparison does not apply
+/// (REQ-03).
 ///
 /// I/O boundary for [`domain::build_provenance`](crate::domain::build_provenance):
 /// resolves `repo_root`'s `HEAD` and whether the build commit is a known
 /// commit there via [`GitRevisionResolver`](crate::storage::GitRevisionResolver)'s
 /// `git rev-parse --verify <rev>^{commit}` semantics (the REQ-03 identity
 /// predicate — a plain string inequality is not enough, see the module docs),
-/// then hands both to
+/// then enumerates committed and working-tree changes and hands the resulting
+/// build-input predicate to
 /// [`assess_binary_provenance`](crate::domain::build_provenance::assess_binary_provenance)
 /// for the actual decision. The second resolution (whether the build commit
 /// is known) is skipped entirely when `HEAD` itself does not resolve, so a
@@ -651,14 +653,34 @@ fn stale_binary_reason_for_repo(
 
     let info = crate::build_info::version_info();
     let resolver = GitRevisionResolver::new(repo_root);
-    let repo_head = resolver.resolve_commit("HEAD").ok();
-    let known_in_repo = repo_head.is_some() && resolver.resolve_commit(info.git_commit).is_ok();
+    let repo_head = resolver.resolve_commit("HEAD").ok()?;
+    let known_in_repo = resolver.resolve_commit(info.git_commit).is_ok();
+    if !known_in_repo {
+        return None;
+    }
+
+    // A dirty build is unconditionally stale once identity is established, so
+    // it does not need a diff query. For clean builds, an inability to inspect
+    // either committed or working-tree changes keeps the guard silent rather
+    // than guessing that an installed binary is safe or stale.
+    let build_inputs_changed = if info.git_dirty == Some(true) {
+        false
+    } else {
+        let committed = resolver
+            .changed_paths_between(info.git_commit, repo_head.as_str())
+            .ok()?;
+        let working_tree = resolver.changed_worktree_paths().ok()?;
+        crate::domain::build_provenance::binary_build_inputs_changed(
+            committed.into_iter().chain(working_tree),
+        )
+    };
 
     match assess_binary_provenance(
         Some(info.git_commit),
         info.git_dirty,
-        repo_head.as_ref().map(|v| v.as_str()),
+        Some(repo_head.as_str()),
         known_in_repo,
+        build_inputs_changed,
     ) {
         BinaryProvenance::Stale(reason) => Some(reason),
         BinaryProvenance::Fresh | BinaryProvenance::NotApplicable => None,
@@ -4361,16 +4383,23 @@ assert = { require-section = { heading = "Summary" } }
             eprintln!("SKIP: checkout of the fetched build commit failed");
             return None;
         }
+        let source_path = temp.path().join("crates/jit/src/main.rs");
+        let mut source = std::fs::read(&source_path).ok()?;
+        source.extend_from_slice(b"\n// build-input change for stale-binary coverage\n");
+        std::fs::write(&source_path, source).ok()?;
+        if !run(&["add", "crates/jit/src/main.rs"]) {
+            eprintln!("SKIP: staging the build-input change failed");
+            return None;
+        }
         if !run(&[
             "-c",
             "user.name=Test",
             "-c",
             "user.email=test@example.com",
             "commit",
-            "--allow-empty",
             "-q",
             "-m",
-            "advance past the build commit",
+            "advance past the build commit with a source change",
         ]) {
             eprintln!("SKIP: advancing HEAD past the build commit failed");
             return None;

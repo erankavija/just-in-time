@@ -116,3 +116,28 @@ fn test_git_revision_resolver_reports_unavailable_git() {
         Err(GitRevisionError::GitUnavailable { .. })
     ));
 }
+
+#[test]
+fn test_git_revision_resolver_lists_committed_and_worktree_changes_without_losing_untracked_paths()
+{
+    let repo = Repo::new();
+    repo.write("src/main.rs", b"fn main() {}\n");
+    let base = repo.commit("source");
+
+    repo.write("docs/metadata.md", b"metadata-only change\n");
+    let head = repo.commit("documentation");
+    repo.write("src/main.rs", b"fn main() { println!(\"changed\"); }\n");
+    repo.write("Cargo.toml", b"[package]\nname = \"changed\"\n");
+    repo.write("new-top-level-tooling.txt", b"not compiled\n");
+
+    let resolver = GitRevisionResolver::new(&repo.root);
+    let committed = resolver.changed_paths_between(&base, &head).unwrap();
+    assert_eq!(committed, vec!["docs/metadata.md"]);
+
+    let worktree = resolver.changed_worktree_paths().unwrap();
+    assert!(worktree.iter().any(|path| path == "src/main.rs"));
+    assert!(worktree.iter().any(|path| path == "Cargo.toml"));
+    assert!(worktree
+        .iter()
+        .any(|path| path == "new-top-level-tooling.txt"));
+}

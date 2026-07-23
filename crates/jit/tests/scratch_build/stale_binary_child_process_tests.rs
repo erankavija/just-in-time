@@ -97,6 +97,29 @@ fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) -> Option<Pat
 /// disposable scratch repo — no ref in the real workspace is read, moved, or
 /// written. Returns `None` (skip) if any local git step fails.
 fn scratch_repo_stale_for(workspace_root: &Path, ancestor: &str) -> Option<TempDir> {
+    scratch_repo_advanced_with_change(
+        workspace_root,
+        ancestor,
+        "crates/jit/src/main.rs",
+        b"\n// build-input change for stale-binary coverage\n",
+    )
+}
+
+fn scratch_repo_metadata_only_for(workspace_root: &Path, ancestor: &str) -> Option<TempDir> {
+    scratch_repo_advanced_with_change(
+        workspace_root,
+        ancestor,
+        "docs/stale-binary-metadata.md",
+        b"metadata-only change for stale-binary coverage\n",
+    )
+}
+
+fn scratch_repo_advanced_with_change(
+    workspace_root: &Path,
+    ancestor: &str,
+    changed_path: &str,
+    change: &[u8],
+) -> Option<TempDir> {
     let temp = TempDir::new().ok()?;
     let run = |args: &[&str]| {
         Command::new("git")
@@ -115,13 +138,20 @@ fn scratch_repo_stale_for(workspace_root: &Path, ancestor: &str) -> Option<TempD
     if !run(&["checkout", "-q", "FETCH_HEAD"]) {
         return None;
     }
+    let path = temp.path().join(changed_path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok()?;
+    }
+    std::fs::write(path, change).ok()?;
+    if !run(&["add", changed_path]) {
+        return None;
+    }
     if !run(&[
         "-c",
         "user.name=Test",
         "-c",
         "user.email=test@example.com",
         "commit",
-        "--allow-empty",
         "-q",
         "-m",
         "advance past the build commit",
@@ -271,6 +301,47 @@ fn test_checker_child_stale_binary_fails_gate_run_visibly() {
         stderr.contains("predates the tree under review"),
         "the persisted run's stderr must carry the child's stale-binary refusal, \
          not a misleading downstream error: {stderr}"
+    );
+}
+
+/// The same child-process path stays usable when the repository advanced only
+/// through a metadata change. This covers the startup self-check separately
+/// from the evaluator-side guard above.
+#[cfg(unix)]
+#[test]
+fn test_checker_child_metadata_only_change_does_not_refuse() {
+    let workspace_root = workspace_root();
+    let Some(ancestor) = ancestor_commit(&workspace_root) else {
+        eprintln!("SKIP: workspace does not have 9+ commits to pick a safe ancestor from");
+        return;
+    };
+    let Some(child_binary) = build_stale_child_binary(&workspace_root, &ancestor) else {
+        eprintln!("SKIP: could not build the stale child binary (cargo unavailable?)");
+        return;
+    };
+    let Some(scratch) = scratch_repo_metadata_only_for(&workspace_root, &ancestor) else {
+        eprintln!("SKIP: could not construct the scratch repo (git unavailable?)");
+        return;
+    };
+    let issue_id = setup_gated_issue_with_validate_checker(scratch.path());
+
+    let bin_dir = TempDir::new().unwrap();
+    std::os::unix::fs::symlink(&child_binary, bin_dir.path().join("jit")).unwrap();
+    let real_path = std::env::var("PATH").unwrap_or_default();
+    let overridden_path = format!("{}:{}", bin_dir.path().display(), real_path);
+
+    let evaluate_output = Command::new(jit_binary())
+        .current_dir(scratch.path())
+        .env("PATH", &overridden_path)
+        .args(["gate", "evaluate", &issue_id, "g"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        evaluate_output.status.code(),
+        Some(0),
+        "metadata-only changes must not make the child stale: stdout={} stderr={}",
+        String::from_utf8_lossy(&evaluate_output.stdout),
+        String::from_utf8_lossy(&evaluate_output.stderr)
     );
 }
 
