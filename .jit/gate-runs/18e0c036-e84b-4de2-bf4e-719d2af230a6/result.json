@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "ade6a221751b7520e49f8ee0d384c0dc7d2e88a9",
+  "completed_at": "2026-07-23T11:14:16.994193120Z",
+  "duration_ms": 231647,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/provenance_contract/repository_state_cutover_tests.rs",
+        "id": "F1",
+        "line": 23,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Structural guards no longer prove absence of command-local publishers, compatibility seams, or independently delivered intermediate packages required by REQ-03."
+      }
+    ],
+    "summary": "The required structural guards no longer prove all REQ-03 cutover properties.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
+  "message": null,
+  "run_id": "18e0c036-e84b-4de2-bf4e-719d2af230a6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T11:10:25.346988394Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2943 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f8eab-6774-7432-8503-236bd4b8669f\n--------\nuser\n--- 2930 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 50dbf3af, 93372680, b98870ed, 537e9ed, a96d9f18, ade6a221 (`jit:c73c7618`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 and @/charter/D-11 (dev/vision/9db27a3a-charter.md); @/inv/atomic-writes and @/inv/derived-state-coherence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review pending; docs-mechanical pending; mcp-ci pending; jit-validate pending\nTruncation recovery: none\n\n1. **[blocking][issue-impact] Structural release evidence is incomplete.** [repository_state_cutover_tests.rs:23](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/provenance_contract/repository_state_cutover_tests.rs:23) now checks only five deleted paths and the `Storage` alias; the renderer test only checks three renderer definitions. The attributed `b98870ed` change removed the broader predecessor/command-local-publisher/compatibility-seam scan, and no remaining structural test guards those properties or independently delivered intermediate packages. This leaves hard REQ-03 unproven.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The required structural guards no longer prove all REQ-03 cutover properties.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Structural guards no longer prove absence of command-local publishers, compatibility seams, or independently delivered intermediate packages required by REQ-03.\",\"file\":\"crates/jit/tests/provenance_contract/repository_state_cutover_tests.rs\",\"line\":23,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

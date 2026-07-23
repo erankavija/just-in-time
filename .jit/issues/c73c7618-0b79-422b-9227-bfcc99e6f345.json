@@ -23,6 +23,11 @@
       "status": "passed",
       "updated_at": "2026-07-23T11:08:47.270675248Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-23T11:14:17.224430920Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
@@ -36,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document public contracts and complete release evidence",
-  "updated_at": "2026-07-23T11:08:47.270675248Z"
+  "updated_at": "2026-07-23T11:14:17.224430920Z"
 }
