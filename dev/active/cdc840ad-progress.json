@@ -2,7 +2,7 @@
   "epic_id": "cdc840ad-9332-4936-9381-772318967f0f",
   "epic_short_id": "cdc840ad",
   "last_handoff": "dev/active/cdc840ad-handoff-17.md",
-  "current_wave": 8,
+  "current_wave": 9,
   "waves": [
     {
       "wave_number": 1,
@@ -128,7 +128,7 @@
           "short_id": "c73c7618",
           "title": "Document public contracts and complete release evidence",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
