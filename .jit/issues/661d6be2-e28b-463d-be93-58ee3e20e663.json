@@ -25,18 +25,23 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-22T23:29:39.691574502Z",
+      "updated_at": "2026-07-23T02:08:30.452550493Z",
       "updated_by": "auto:executor"
     },
     "cargo-ci-features": {
-      "status": "failed",
-      "updated_at": "2026-07-22T23:30:11.773080531Z",
+      "status": "passed",
+      "updated_at": "2026-07-23T02:10:14.685529807Z",
       "updated_by": "auto:executor"
     },
     "dependency-audit": {
       "status": "pending",
       "updated_at": "2026-07-22T19:53:08.076500739Z",
       "updated_by": null
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-23T02:11:39.699776373Z",
+      "updated_by": "auto:executor"
     },
     "jit-validate": {
       "status": "passed",
@@ -45,12 +50,12 @@
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-07-22T19:50:37.787723076Z",
+      "updated_at": "2026-07-23T02:11:26.749837342Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
       "status": "passed",
-      "updated_at": "2026-07-22T19:50:23.151879482Z",
+      "updated_at": "2026-07-23T02:11:14.228281901Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
@@ -86,5 +91,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Integrate repository-state cutover",
-  "updated_at": "2026-07-22T23:30:11.773080531Z"
+  "updated_at": "2026-07-23T02:11:39.699776373Z"
 }
