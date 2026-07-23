@@ -94,21 +94,21 @@
           "short_id": "a3a788f3",
           "title": "Direct repository-state cutover",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rework"
         },
         {
           "id": "b1621508-db1b-4e75-b1b0-a850c9dd191d",
           "short_id": "b1621508",
           "title": "Validate drift diagnosis and transactional repair",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "ed3e773c-df1c-4a03-aed1-487b6498fd38",
           "short_id": "ed3e773c",
           "title": "Author the derived-state-coherence project invariant",
           "classification": "documentation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -422,7 +422,8 @@
     "a6a9b964": 1,
     "44d318ab": 1,
     "49adf23b": 1,
-    "661d6be2": 2
+    "661d6be2": 2,
+    "a3a788f3": 1
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
