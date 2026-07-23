@@ -94,7 +94,7 @@
           "short_id": "8f1c2595",
           "title": "Preserve authored rules while repairing derived assertions",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "a3a788f3-39c2-4218-adaa-1cc5112b30f4",
@@ -108,7 +108,7 @@
           "short_id": "b1621508",
           "title": "Validate drift diagnosis and transactional repair",
           "classification": "implementation",
-          "status": "blocked_on_8f1c2595"
+          "status": "in_progress"
         },
         {
           "id": "ed3e773c-df1c-4a03-aed1-487b6498fd38",
