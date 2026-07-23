@@ -32,7 +32,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Transactional repository materialization and derived-state coherence",
-  "updated_at": "2026-07-23T14:17:59.974448963Z"
+  "updated_at": "2026-07-23T14:52:22.536027721Z"
 }

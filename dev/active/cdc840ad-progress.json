@@ -152,9 +152,9 @@
           "short_id": "e10ba548",
           "title": "Bound terminal-transition readiness work",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "increment_status": {
-            "1": "IMPLEMENTED — production prefilter is +2/-1 and preserves the captured transition path. Deterministic regression: 64 blocked plus 1 eligible Backlog issue now opens exactly 2 mutation sessions instead of the predecessor's 130; Ready state, first_ready_at, one state-change event, and blocked records are preserved. Independent fresh-clone acceptance at f19c3261: 662 issues / 48 Backlog, no-op terminal retry completed in 2.32s versus the observed 90-100s predecessor; target state and timestamps plus all tracked .jit bytes were unchanged. The run created 665 ignored empty .jit/**/*.lock files on first access, recorded as machine-local storage-hygiene debt rather than semantic repository mutation."
+            "1": "IMPLEMENTED — production prefilter is +2/-1 and preserves the captured transition path. Deterministic regression: 64 blocked plus 1 eligible Backlog issue now opens exactly 2 mutation sessions instead of the predecessor's 130; Ready state, first_ready_at, one state-change event, and blocked records are preserved. Independent fresh-clone acceptance at f19c3261: 662 issues / 48 Backlog, no-op terminal retry completed in 2.32s versus the observed 90-100s predecessor; target state and timestamps plus all tracked .jit bytes were unchanged. A final exact-HEAD retry in the working repository completed in 2.337s with no tracked .jit change; completing e10ba548 and auto-promoting the epic completed in 7.499s. The fresh-clone run created 665 ignored empty .jit/**/*.lock files on first access, recorded as machine-local storage-hygiene debt rather than semantic repository mutation."
           }
         }
       ]
