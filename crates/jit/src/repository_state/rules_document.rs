@@ -242,7 +242,7 @@ mod tests {
     use super::*;
 
     const RULES: &str = "\
-# generated header\n\
+# authored header\n\
 \n\
 [[rules]]\n\
 name = \"label-format\"\n\
@@ -294,7 +294,7 @@ assert = { require-label = { label = \"squad:*\", min = 0, max = 1 } }\n\n";
         let updated =
             splice_default_membership(RULES, &[], &["namespace-unique-team".to_string()]).unwrap();
         assert!(!updated.contains("name = \"namespace-unique-team\""));
-        assert!(updated.contains("# generated header"));
+        assert!(updated.contains("# authored header"));
         assert!(updated.contains("name = \"label-format\""));
         assert!(updated.contains("name = \"custom-shape\"\n# authored comment"));
 
