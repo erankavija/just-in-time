@@ -724,7 +724,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reinit_refreshes_default_rule_membership_header_and_type_schema() {
+    fn test_reinit_refreshes_default_rule_membership_and_type_schema() {
         const SQUAD_NAMESPACE: &str = "\
 \n[namespaces.squad]\n\
 description = \"Owning squad\"\n\
@@ -750,19 +750,19 @@ name = \"custom-shape\"\n\
 # authored content survives re-init\n\
 severity = \"warn\"\n\
 assert = { require-section = { heading = \"Goals\" } }\n";
-        let stale_rules = fs::read_to_string(&rules_path).unwrap().replacen(
+        let authored_rules = fs::read_to_string(&rules_path).unwrap().replacen(
             crate::repository_state::rules_file_header(),
-            "# stale\n\n",
+            "# authored header survives re-init\n\n",
             1,
         ) + authored_rule;
-        fs::write(&rules_path, stale_rules).unwrap();
+        fs::write(&rules_path, authored_rules).unwrap();
 
         executor_with_layout(&storage, repo.path())
             .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
 
         let refreshed = fs::read_to_string(&rules_path).unwrap();
-        assert!(refreshed.starts_with(crate::repository_state::rules_file_header()));
+        assert!(refreshed.starts_with("# authored header survives re-init\n\n"));
         assert!(refreshed.contains("name = \"namespace-unique-squad\""));
         assert!(refreshed.contains("# authored content survives re-init"));
         assert!(fs::read_to_string(
