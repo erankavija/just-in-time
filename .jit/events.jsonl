@@ -8720,3 +8720,4 @@
 {"gate_key":"cargo-ci","id":"0df1915a-f4c4-4020-92c0-045f74d5aabb","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T12:00:26.824895171Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"953cf2e6-f08c-4dd1-a123-797b10690df1","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T12:05:05.075943967Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"docs-mechanical","id":"6f637546-71b3-4dff-8d61-38b4fa2931a3","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T12:07:04.238175838Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"19a252a9-94f0-4940-9f8f-0bc65633d5bd","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T12:08:03.765010325Z","type":"gate_passed","updated_by":"auto:executor"}
