@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-23T08:59:03.488898690Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a3a788f3-39c2-4218-adaa-1cc5112b30f4",
   "labels": [
     "type:story",
@@ -26,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Direct repository-state cutover",
-  "updated_at": "2026-07-23T06:31:33.458477134Z"
+  "updated_at": "2026-07-23T08:59:03.488898690Z"
 }
