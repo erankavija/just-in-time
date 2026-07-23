@@ -1,5 +1,7 @@
 # Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 9
 
+Status: archived after epic completion on 2026-07-23.
+
 **Date:** 2026-07-20T00:15:00+03:00
 **Session number:** 9
 **Prior handoffs:** `dev/active/cdc840ad-handoff.md` … `dev/active/cdc840ad-handoff-8.md`
@@ -62,7 +64,7 @@ None.
 ## Reference artefacts
 
 - Epic: `jit issue show cdc840ad --json`; active issue: `jit issue show 49adf23b --json`
-- Plan: `dev/active/cdc840ad-plan.md` (§2 contracts; §3 package ownership; the coverage map)
+- Plan: `dev/archive/cdc840ad-plan.md` (§2 contracts; §3 package ownership; the coverage map)
 - Progress: `dev/active/cdc840ad-progress.json`
 - Worker E dispatch brief (increments 6–8 + debt ledger + traps): session-bea3ce09 log; worker name `worker-49adf23b-e`
 - Worker D final conformance table (increment 5): session-bea3ce09 log

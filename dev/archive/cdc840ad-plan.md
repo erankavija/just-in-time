@@ -1,5 +1,7 @@
 # Plan: Transactional repository materialization and derived-state coherence (cdc840ad)
 
+Status: archived after epic completion on 2026-07-23.
+
 > Planning node: dc266cb6. Container criteria source: cdc840ad `## Success Criteria`.
 
 ## 1. Completeness vs criteria

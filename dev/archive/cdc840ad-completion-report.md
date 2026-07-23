@@ -153,7 +153,8 @@ conformance audits over gate bypasses. No required gate was removed or waived.
 - Lifecycle acceptance covers both deterministic work scaling (2 session opens
   instead of 130) and end-to-end repository timing (2.337-second no-op retry,
   unchanged tracked `.jit` state). Completing the blocker and automatically
-  promoting the epic took 7.499 seconds.
+  promoting the epic took 7.499 seconds; the final epic transition took 3.747
+  seconds.
 - The final stale-narrative and public-contract reviews found no current claim
   that the superseded publication or derivation paths remain authoritative.
   Historical epic research still described the work as open and referenced a

@@ -1,5 +1,7 @@
 # Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 7
 
+Status: archived after epic completion on 2026-07-23.
+
 **Date:** 2026-07-19T17:22:37+03:00
 **Session number:** 7
 **Prior handoffs:** `dev/active/cdc840ad-handoff.md`, `dev/active/cdc840ad-handoff-2.md`, `dev/active/cdc840ad-handoff-3.md`, `dev/active/cdc840ad-handoff-4.md`, `dev/active/cdc840ad-handoff-5.md`, `dev/active/cdc840ad-handoff-6.md`
@@ -84,7 +86,7 @@ Do not discard or overwrite the gate evidence. No source files are currently mod
 - Epic: `jit issue show cdc840ad --json`
 - Active issue and scope amendment: `jit issue show a6a9b964 --json`
 - Progress: `dev/active/cdc840ad-progress.json`
-- Plan: `dev/active/cdc840ad-plan.md`
+- Plan: `dev/archive/cdc840ad-plan.md`
 - Passing cargo-ci: `jit gate status a6a9b964 cargo-ci --all --json`
 - Open finding: `jit gate status a6a9b964 code-review --findings --json`
 - Source correction commit: `e17bda300884361b73ad00be20fb507ec2a369cb`

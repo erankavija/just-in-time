@@ -1,5 +1,7 @@
 # Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 11
 
+Status: archived after epic completion on 2026-07-23.
+
 **Date:** 2026-07-20T22:31:45+03:00  
 **Session number:** 11  
 **Prior handoffs:** `dev/active/cdc840ad-handoff.md` … `dev/active/cdc840ad-handoff-10.md`
@@ -141,9 +143,8 @@ There are no open invoker questions. The rework ledger is at 2 for `49adf23b`; d
 
 ## Reference artefacts
 
-- Plan: `dev/active/cdc840ad-plan.md`
+- Plan: `dev/archive/cdc840ad-plan.md`
 - Progress: `dev/active/cdc840ad-progress.json`
 - Prior detailed mechanism/ruling ledger: `dev/active/cdc840ad-handoff-10.md`
 - Active issue: `jit issue show 49adf23b --json`
 - Installer worktree: `.agents/worktrees/lead-install-clean`
-

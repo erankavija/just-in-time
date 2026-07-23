@@ -1,5 +1,7 @@
 # Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 3
 
+Status: archived after epic completion on 2026-07-23.
+
 **Date:** 2026-07-19T00:30:00+03:00
 **Session number:** 3
 **Prior handoffs:** `dev/active/cdc840ad-handoff.md`, `dev/active/cdc840ad-handoff-2.md`
@@ -47,7 +49,7 @@
 ## Reference artefacts
 
 - Epic: `jit issue show cdc840ad`
-- Design docs: `dev/active/cdc840ad-plan.md` (§2 is the binding target architecture)
+- Design docs: `dev/archive/cdc840ad-plan.md` (§2 is the binding target architecture)
 - Planning docs: `dev/active/cdc840ad-research.md`, `dev/active/cdc840ad-investigation.md`
 - Result artefacts: wave-1 merge `0d224f35`; product commits `6f4f11ac`, `ff542ec1`; passing gate runs cargo-ci `a9c08886`, code-review `f96dadb3`
 - Audit transcript: workflow `wf_bc2c48dc-2c7` (8 auditors + verify; 5 confirmed, 3 rejected)

@@ -1,5 +1,7 @@
 # Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 4
 
+Status: archived after epic completion on 2026-07-23.
+
 **Date:** 2026-07-19T01:43:46+03:00
 **Session number:** 4
 **Prior handoffs:** `dev/active/cdc840ad-handoff.md`, `dev/active/cdc840ad-handoff-2.md`, `dev/active/cdc840ad-handoff-3.md`
@@ -61,7 +63,7 @@ None.
 
 - Epic: `jit issue show cdc840ad`
 - Active issue: `jit issue show bacf2cd4`
-- Design docs: `dev/active/cdc840ad-plan.md`
+- Design docs: `dev/archive/cdc840ad-plan.md`
 - Planning docs: `dev/active/cdc840ad-research.md`, `dev/active/cdc840ad-investigation.md`
 - Progress: `dev/active/cdc840ad-progress.json`
 - Benchmark/result artefacts: no `bacf2cd4` gate runs yet; worker validation results are summarized above

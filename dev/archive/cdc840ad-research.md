@@ -1,6 +1,10 @@
 # Repository materialization coherence — architecture research
 
-> **Scope status (2026-07-18):** The container's scope was reduced by owner decision after this research was written. The sections **Explicit layout, recovered sessions, and claim reconciliation** (its claim-saga and root-binding material), **Claim v2 migration and credential closure**, and **Latest plan-review findings resolution (`2bd35931`, F1–F3)** describe root-binding and claims-v2 architectures that are no longer in cdc840ad's scope; they remain as historical research, not current guidance. The implementation plan (`dev/active/cdc840ad-plan.md`, decisions D19–D20 and its §4 findings table) is authoritative: claims keep their existing lease surface and synchronize repository-side issue/event state only through the shared transaction, and absent-root creation uses staged no-replace publication without binding records.
+Status: historical input, archived after epic completion on 2026-07-23. Any
+open-work or integration-branch language below is superseded by the final plan
+and completion report.
+
+> **Scope status (2026-07-18):** The container's scope was reduced by owner decision after this research was written. The sections **Explicit layout, recovered sessions, and claim reconciliation** (its claim-saga and root-binding material), **Claim v2 migration and credential closure**, and **Latest plan-review findings resolution (`2bd35931`, F1–F3)** describe root-binding and claims-v2 architectures that are no longer in cdc840ad's scope; they remain as historical research, not current guidance. The implementation plan (`dev/archive/cdc840ad-plan.md`, decisions D19–D20 and its §4 findings table) is authoritative: claims keep their existing lease surface and synchronize repository-side issue/event state only through the shared transaction, and absent-root creation uses staged no-replace publication without binding records.
 
 **Container:** `cdc840ad` — Transactional repository materialization and derived-state coherence  
 **Planning node:** `dc266cb6`  

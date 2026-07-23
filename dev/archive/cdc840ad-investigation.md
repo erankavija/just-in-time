@@ -1,6 +1,10 @@
 # Investigation: transactional repository materialization and derived-state coherence
 
-> **Scope status (2026-07-18):** Owner decision reduced cdc840ad's scope after this investigation was written: lease credential/claim-log/claim-command redesign and worktree/data-root binding are out of scope. The section **F4: claim acquisition is an explicit reconciliation saga** overstates the surviving requirement — only claim acquire's repository-side issue/event publication moves into the shared transaction, and the lease surface is otherwise unchanged. The implementation plan (`dev/active/cdc840ad-plan.md`, decisions D19–D20) is authoritative wherever this document proposes wider contracts. The code-level findings (current publishers, file:line citations, consumer sweep) remain valid grounding.
+Status: historical input, archived after epic completion on 2026-07-23. Any
+open-work or integration-branch language below is superseded by the final plan
+and completion report.
+
+> **Scope status (2026-07-18):** Owner decision reduced cdc840ad's scope after this investigation was written: lease credential/claim-log/claim-command redesign and worktree/data-root binding are out of scope. The section **F4: claim acquisition is an explicit reconciliation saga** overstates the surviving requirement — only claim acquire's repository-side issue/event publication moves into the shared transaction, and the lease surface is otherwise unchanged. The implementation plan (`dev/archive/cdc840ad-plan.md`, decisions D19–D20) is authoritative wherever this document proposes wider contracts. The code-level findings (current publishers, file:line citations, consumer sweep) remain valid grounding.
 
 ## Scope and method
 
@@ -1105,10 +1109,10 @@ fix categories at `docs/reference/cli-commands.md:2911-2937`.
   `dev/active/cdc840ad-research.md:72-217` resolves the final crate-root state,
   declaration ownership, profile inventory, and init deletion boundaries, and
   `dev/active/cdc840ad-research.md:219-300` evaluates managed-region topology.
-- `dev/active/cdc840ad-plan.md:21-37` is the final implementation-vocabulary decision:
+- `dev/archive/cdc840ad-plan.md:21-37` is the final implementation-vocabulary decision:
   crate-root `declarations` and `repository_state`, one `RepositoryStateStore`, deletion
   of both old images and every old publisher/init/profile inventory, and no re-export
-  bridge. Its research-to-final mapping at `dev/active/cdc840ad-plan.md:37` explicitly
+  bridge. Its research-to-final mapping at `dev/archive/cdc840ad-plan.md:37` explicitly
   supersedes the earlier possible `validation::materialization` placement.
 - `dev/archive/6eb585bc-completion-report.md:7-15` records completion of core
   maintenance; its cross-epic findings at

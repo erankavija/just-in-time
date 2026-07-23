@@ -1,5 +1,7 @@
 # Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 8
 
+Status: archived after epic completion on 2026-07-23.
+
 **Date:** 2026-07-19T18:10:00+03:00
 **Session number:** 8
 **Prior handoffs:** `dev/active/cdc840ad-handoff.md` … `dev/active/cdc840ad-handoff-7.md`
@@ -53,7 +55,7 @@ None.
 
 - Epic: `jit issue show cdc840ad --json`; active issue: `jit issue show 49adf23b --json` (delivery model reconciled in `9bef65a7`)
 - Progress: `dev/active/cdc840ad-progress.json`
-- Plan: `dev/active/cdc840ad-plan.md` (§2 contracts incl. D14 two-phase capture; §3 package ownership; D16/D17/D18)
+- Plan: `dev/archive/cdc840ad-plan.md` (§2 contracts incl. D14 two-phase capture; §3 package ownership; D16/D17/D18)
 - Wave-5 worker A's scoped increment plan and blocker evidence: session-8 transcript (store split, closure-planner gap) — summarized in "What to do next"
 - Gate evidence: `.jit/gate-runs/` (latest passing: 44d318ab cargo-ci + code-review at `916606ee`; a6a9b964 both at `d01298d2`)
 - Installer worktree: `.agents/worktrees/lead-install-clean` (currently at `916606ee`)

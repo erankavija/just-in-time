@@ -1,5 +1,7 @@
 # Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 2
 
+Status: archived after epic completion on 2026-07-23.
+
 **Date:** 2026-07-18T22:10:30+03:00
 **Session number:** 2
 **Prior handoffs:** `dev/active/cdc840ad-handoff.md`
@@ -41,7 +43,7 @@
 ## Traps — do not repeat these
 
 - **Do not overwrite an earlier handoff.** Session 2 initially replaced `dev/active/cdc840ad-handoff.md`, violating Section 9b. The earlier file is restored; all later sessions must use the next numbered path.
-- **Do not move ambient loading from declarations into validation.** `dev/active/cdc840ad-plan.md` §2 explicitly says storage retains the non-mutation read-only loader while validation evaluates. Move the loader to storage.
+- **Do not move ambient loading from declarations into validation.** `dev/archive/cdc840ad-plan.md` §2 explicitly says storage retains the non-mutation read-only loader while validation evaluates. Move the loader to storage.
 - **Do not expose a helper that combines captured rules bytes with live schema reads.** `validation::rule_loader::parse_ruleset_with_filesystem_schemas` creates the mixed snapshot rejected by plan D14. Captured flows must supply every byte from one closed image.
 - **Do not force the later consumer cutover into this narrow repair.** `validation::repository` and `profile::snapshot` remain direct predecessors whose final consumers migrate in packages B–E. Track their deletion debt without adding adapters; delete them before integration issue `661d6be2` passes.
 - **Do not run full workspace builds into `/tmp`.** The full workspace link exhausted the temporary quota. Use a disk-backed target under the repository and prune per-issue targets after verification.
@@ -58,7 +60,7 @@
 ## Reference artefacts
 
 - Epic: `jit issue show cdc840ad`
-- Design docs: `dev/active/cdc840ad-plan.md`
+- Design docs: `dev/archive/cdc840ad-plan.md`
 - Planning docs: `dev/active/cdc840ad-research.md`, `dev/active/cdc840ad-investigation.md`
 - Benchmark/result artefacts: code-review run `33a0056f-b249-4a9f-9b81-9ebd3fdb28f9`; implementation commit `cc72431b`; escalation/progress commit `f06d4b34`
 - External references: None.

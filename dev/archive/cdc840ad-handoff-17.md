@@ -1,5 +1,7 @@
 # Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 17
 
+Status: archived after epic completion on 2026-07-23.
+
 **Date:** 2026-07-23T05:42:41+03:00
 **Session number:** 17
 **Prior handoffs:** `dev/active/cdc840ad-handoff.md` through `dev/active/cdc840ad-handoff-16.md`
@@ -51,7 +53,7 @@
 
 ## Reference artefacts
 
-- Plan: `dev/active/cdc840ad-plan.md`
+- Plan: `dev/archive/cdc840ad-plan.md`
 - Progress ledger: `dev/active/cdc840ad-progress.json`
 - Consolidation commit: `c5b35092`
 - Transaction security commit: `94e1ae60`

@@ -1,5 +1,7 @@
 # Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 5
 
+Status: archived after epic completion on 2026-07-23.
+
 **Date:** 2026-07-19T14:55:00+03:00
 **Session number:** 5
 **Prior handoffs:** `dev/active/cdc840ad-handoff.md`, `dev/active/cdc840ad-handoff-2.md`, `dev/active/cdc840ad-handoff-3.md`, `dev/active/cdc840ad-handoff-4.md`
@@ -53,7 +55,7 @@ None. The wave-3 gate finding has a concrete, gate-named fix and rework budget (
 
 - Epic: `jit issue show cdc840ad`
 - Active issue: `jit issue show a6a9b964` (includes the wave-3 scope amendment)
-- Design docs: `dev/active/cdc840ad-plan.md` (§2 binding)
+- Design docs: `dev/archive/cdc840ad-plan.md` (§2 binding)
 - Planning docs: `dev/active/cdc840ad-research.md`, `dev/active/cdc840ad-investigation.md`
 - Progress: `dev/active/cdc840ad-progress.json`
 - Gate runs: wave-2 final passes cargo-ci + code-review at `1aa0cd4e`; wave-3 cargo-ci PASS and code-review FAIL `af64bdba` at `59f535a3`

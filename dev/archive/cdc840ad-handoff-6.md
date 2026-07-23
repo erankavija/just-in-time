@@ -1,5 +1,7 @@
 # Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 6
 
+Status: archived after epic completion on 2026-07-23.
+
 **Date:** 2026-07-19T16:18:29+03:00
 **Session number:** 6
 **Prior handoffs:** `dev/active/cdc840ad-handoff.md`, `dev/active/cdc840ad-handoff-2.md`, `dev/active/cdc840ad-handoff-3.md`, `dev/active/cdc840ad-handoff-4.md`, `dev/active/cdc840ad-handoff-5.md`
@@ -51,7 +53,7 @@
 
 - Epic: `jit issue show cdc840ad`
 - Active issue: `jit issue show a6a9b964`
-- Design docs: `dev/active/cdc840ad-plan.md` (§2 binding)
+- Design docs: `dev/archive/cdc840ad-plan.md` (§2 binding)
 - Progress: `dev/active/cdc840ad-progress.json`
 - Failed gate evidence being repaired: code-review run `27ea23d0-82ba-48ae-8377-b05cc909496a`
 - Current uncommitted diff: `git diff HEAD -- crates/jit/src/commands/claim.rs crates/jit/src/repository_state/mod.rs crates/jit/src/repository_state/mutation.rs crates/jit/src/storage/file_transaction.rs crates/jit/src/storage/repository_state_store.rs`

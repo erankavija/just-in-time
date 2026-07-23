@@ -1,5 +1,7 @@
 # Handoff — Transactional repository materialization and derived-state coherence (cdc840ad) — session 1
 
+Status: archived after epic completion on 2026-07-23.
+
 **Date:** 2026-07-18T20:43:55+03:00
 **Session number:** 1
 **Prior handoffs:** None.
@@ -51,7 +53,7 @@
 ## Reference artefacts
 
 - Epic: `jit issue show cdc840ad`
-- Design docs: `dev/active/cdc840ad-plan.md`
+- Design docs: `dev/archive/cdc840ad-plan.md`
 - Planning docs: `dev/active/cdc840ad-research.md`, `dev/active/cdc840ad-investigation.md`
 - Benchmark/result artefacts: Cargo CI gate run `d17e2460-d512-47d1-aece-7fa2eb937b74`; code-review runs `1b332a0e-5060-448a-9417-089b168b16c3` and `acd90fcb-ef67-4070-97cc-8bd9bb13f9cd`
 - External references: None.
