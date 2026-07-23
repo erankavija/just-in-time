@@ -20,9 +20,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_at": "2026-07-23T18:11:28.753153980Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-07-23T19:51:25.789908869Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "02dc4bac-52e5-4810-9e87-8384e34eabc7",
@@ -34,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "planning: Repository-state quality hardening",
-  "updated_at": "2026-07-23T19:45:22.692554858Z"
+  "updated_at": "2026-07-23T19:51:25.789908869Z"
 }

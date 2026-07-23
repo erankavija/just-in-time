@@ -1,0 +1,107 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "27ffbd2dc799907132d3dcbf857e88079afda2ac",
+  "completed_at": "2026-07-23T19:51:25.523242199Z",
+  "duration_ms": 262760,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F1",
+        "line": 75,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The lock-hygiene decision is deferred until after fan-out despite epic D-7 requiring a profile-backed decision during planning."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F2",
+        "line": 64,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The mutation-session combinator lacks a design for existing multi-session attempts, cached prechecks, claim coordination, and typed retry termination."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F3",
+        "line": 63,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "REQ-10 specifies only a budget test and omits the eligibility prefilter, authoritative recheck, and expected session bound."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F4",
+        "line": 93,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The benchmark and per-session profiling contract omits the stable artifact schema, scenarios, sample count, cache procedure, and profiling method."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F5",
+        "line": 101,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The test-support feature plan does not explain how integration recovery tests remain compiled while the API is absent from the default library surface."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F6",
+        "line": 84,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Implementation children and internal dependencies are deferred, concealing task scopes and an S3/S4 conflict over the failure-injection probe."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F7",
+        "line": 79,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Gate assignment omits mcp-ci even though clearing advisory debt modifies mcp-server/lib/tool-generator.js."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F8",
+        "line": 75,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The lazy lock-file proposal does not define a race-safe replacement for shared issue reads that currently create every lock file."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F9",
+        "line": 64,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The typed-error work does not explicitly replace Producer(String), runtime downcasts, and the corresponding exit-code mapping boundary."
+      }
+    ],
+    "summary": "The plan covers the criterion inventory but leaves the lock decision, central mutation API, performance contract, feature-gated testing, and task decomposition unresolved.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "02dc4bac-52e5-4810-9e87-8384e34eabc7",
+  "message": null,
+  "run_id": "54bfdf3f-f45c-4e40-84d5-678f895ffcf6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T19:47:02.762844783Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5802 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9084-6613-78d2-bdd9-c659fafa5bcc\n--------\nuser\n--- 5789 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "## Plan document present and linked\n\nThe 102-line plan exists at the required `dev/active/1cc809de-plan.md` location and is linked through `issue.documents`. It is substantive and reproduces all 16 parent-epic hard criteria.\n\n## Completeness against the criteria\n\nThe criteria inventory is complete, but the proposed execution does not fully address REQ-02, REQ-09, REQ-10, REQ-11, and REQ-12. Several sections restate required outcomes without defining the implementation or verification contract needed to achieve them.\n\n## Technical soundness and architectural fit\n\nThe plan identifies the correct subsystems and generally respects the command/repository-state/storage boundaries. However, its central combinator, typed-error, and lock-hygiene designs do not account for important properties of the existing code.\n\n## Decomposition and dependencies\n\nThe five-story ordering is directionally sensible, but child tasks and internal edges are deferred to the breakdown node. This conceals cross-story overlap and leaves several large work clusters without independently executable scopes.\n\n## Risks and actionability\n\nThe load-bearing lock decision is explicitly provisional despite the parent decision requiring it before fan-out. Benchmark methodology, feature-gated test execution, and workspace-specific quality gates also remain unresolved.\n\n## Prior review feedback\n\n`run_history` is empty; there is no prior feedback to reassess.\n\n## Findings\n\n1. **High — blocking:** The plan contradicts epic decision D-7. The plan itself says the lock-hygiene design must be chosen from profiling data before fan-out (`dev/active/1cc809de-plan.md:71`), but PD-1 is only provisional and schedules profiling and possible amendment in S3 after breakdown and fan-out (`:63`, `:75`, `:83-85`, `:98`). Either the profile and final decision must be produced during planning, or the parent decision must be explicitly changed before this plan can pass.\n\n2. **High — blocking:** The proposed `with_mutation_session(layout, |session| …)` design is not executable against important existing callers. Lifecycle mutation opens a preflight session, executes/caches external gate work, coordinates claims, then opens a second publication session and retries on semantic evidence changes (`crates/jit/src/commands/mod.rs:2353-2373`, `:2407-2444`, `:2475-2521`); dependency mutation has a similar two-session attempt (`crates/jit/src/commands/dependency.rs:260-320`). The plan names only a single-session closure (`dev/active/1cc809de-plan.md:64`) and does not define the attempt result/control-flow type, multi-session orchestration, cached state lifetime, or typed terminal-conflict error needed for REQ-01.\n\n3. **High — blocking:** REQ-10 has a test plan but no implementation plan or definition of “eligible.” S3 merely says to mirror an existing budget test (`dev/active/1cc809de-plan.md:63`, `:92`), while `apply_bulk_update` currently invokes captured publication for every filter match and discovers no-op updates only afterward (`crates/jit/src/commands/bulk_update.rs:171-195`, `:220-229`). The plan must specify the cheap prefilter, the authoritative in-session recheck preserving TOCTOU safety, and the expected session budget.\n\n4. **High — blocking:** The benchmark and profiling work is not actionable enough for hard REQ-09/REQ-11. “A new scripts entry,” “a stable repository path,” and `n>1` (`dev/active/1cc809de-plan.md:63`, `:93`) leave the artifact path and schema, scenarios, sample count, cold/warm reset procedure, profiler/tooling, cache metadata, and timing-claim citation mechanism undefined. These choices materially determine whether results are reproducible and whether the session-cost profile can support the lock decision.\n\n5. **High — blocking:** The REQ-12 feature-gating design does not preserve the required test coverage. The CLI recovery integration test imports `TransactionFailureInjector` and `TransactionFailurePoint` from the default public library (`crates/jit/tests/cli_issue/recover_command_tests.rs:9-12`, `:67-84`), while `crates/jit/Cargo.toml:68-74` has no `test-support` feature. The existing `cargo-ci-features` gate enables only `html,xml` (`.jit/gates.toml:45-56`). The plan only says the gates “must be checked” (`dev/active/1cc809de-plan.md:101`); it must decide how integration targets enable the new feature and which authoritative CI gate compiles and runs them while confirming the default export is absent.\n\n6. **High — blocking:** The proposed decomposition stops at broad story clusters and defers all implementation-child design to the breakdown node (`dev/active/1cc809de-plan.md:46`, `:63-67`, `:84`). There are no child task scopes, acceptance evidence, touched surfaces, or within-story dependencies for the multiple independent changes in S1 and S4. This also hides a concrete cross-story conflict: S3 plans tests using the failure-injection probe (`:92`) while S4 changes that probe’s feature/export boundary (`:66`), yet S4 has no dependency on S3 (`:51-57`). The plan therefore cannot yet be judged conflict-free or directly decomposed without re-deriving design.\n\n7. **High — blocking:** Gate assignment omits the MCP workspace gate. REQ-15 includes repairing warnings in `mcp-server/lib/tool-generator.js` (audit `dev/studies/cdc840ad-audit-2026-07-23.md:160`, `:316`), but the plan assigns only Rust and documentation baselines (`dev/active/1cc809de-plan.md:79`). `mcp-ci` is the repository’s explicit authoritative check for that workspace and is not covered by Cargo or web npm gates (`.jit/gates.toml:251-263`). The relevant child and containing story need `mcp-ci`.\n\n8. **High — blocking:** PD-1 does not explain how lazy creation solves the observed lock mechanism while preserving concurrency semantics. Every existing issue load acquires a shared per-issue lock (`crates/jit/src/storage/json.rs:914-920`), and shared acquisition immediately calls `open_or_create` (`crates/jit/src/storage/lock.rs:138-150`). Thus a read of an otherwise idle issue currently “needs” the lock and creates the file—the exact accumulation being remediated. The assertion that lazy creation makes idle issue locks disappear (`dev/active/1cc809de-plan.md:75`) needs a concrete replacement protocol, race argument, and bounded-accumulation test.\n\n9. **High — blocking:** The typed-error plan does not cover the existing stringify/downcast boundary precisely enough to guarantee REQ-02. The plan mentions typed signatures (`dev/active/1cc809de-plan.md:64`) but does not specify replacing `RepositoryStateError::Producer(String)`, its `anyhow` stringification helper, or the runtime `ProjectionError`/`ManagedDocumentError` downcast chain (`crates/jit/src/repository_state/mod.rs:570-616`). It also omits the resulting typed exit-code mapping contract. Merely changing producer function signatures can leave the prohibited round trip intact.\n\nTotal findings: 9\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan covers the criterion inventory but leaves the lock decision, central mutation API, performance contract, feature-gated testing, and task decomposition unresolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The lock-hygiene decision is deferred until after fan-out despite epic D-7 requiring a profile-backed decision during planning.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":75},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The mutation-session combinator lacks a design for existing multi-session attempts, cached prechecks, claim coordination, and typed retry termination.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":64},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-10 specifies only a budget test and omits the eligibility prefilter, authoritative recheck, and expected session bound.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":63},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The benchmark and per-session profiling contract omits the stable artifact schema, scenarios, sample count, cache procedure, and profiling method.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":93},{\"id\":\"F5\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The test-support feature plan does not explain how integration recovery tests remain compiled while the API is absent from the default library surface.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":101},{\"id\":\"F6\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Implementation children and internal dependencies are deferred, concealing task scopes and an S3/S4 conflict over the failure-injection probe.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":84},{\"id\":\"F7\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Gate assignment omits mcp-ci even though clearing advisory debt modifies mcp-server/lib/tool-generator.js.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":79},{\"id\":\"F8\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The lazy lock-file proposal does not define a race-safe replacement for shared issue reads that currently create every lock file.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":75},{\"id\":\"F9\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The typed-error work does not explicitly replace Producer(String), runtime downcasts, and the corresponding exit-code mapping boundary.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":64}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
