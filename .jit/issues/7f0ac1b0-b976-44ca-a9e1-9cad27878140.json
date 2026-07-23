@@ -1,20 +1,19 @@
 {
-  "id": "7f0ac1b0-b976-44ca-a9e1-9cad27878140",
-  "title": "Coherence and release assurance",
-  "description": "Rollup for Group B: the independent assurance layer on top of the landed repository-state architecture. The sole engine diagnoses and repairs drift, projects the project-local invariant, documents stable public contracts, and carries exhaustive v1.0 source-freeze evidence.\n\n## Background\n\nAfter the direct cutover lands the repository-state architecture on main, Group B supplies release assurance without introducing any second implementation. This story groups that assurance outcome; its child tasks carry the drift/repair validation, invariant, and documentation/evidence work. This rollup holds the no-second-engine and complete-evidence outcome for the v1.0 source freeze.\n\n## What to build\n\n- The complete Group B outcome: derived-state drift diagnosis and ownership-safe transactional repair; the registry-first `derived-state-coherence` project invariant and its projection into guidance; updated canonical human/JSON/schema/MCP documentation for recoverable multi-target publication, drift diagnosis and repair, managed-region semantics, and absent-root publication (claim and lease surface documented unchanged); and comprehensive behavioral and structural release evidence — all on the sole repository-state engine.\n- Assert the assurance discipline: add no alternate renderer, serializer, capture path, publisher, or compatibility layer, and ensure v1.0 source-freeze evidence is complete and canonical.\n\nDistilled §2 contracts: REQ-06/07/08 coverage, the repair ownership-source matrix, and project-local invariant and public fit. See `dev/active/cdc840ad-plan.md` §2, §3 (Group B), and plan decision D1 (freeze scope) for full detail. This is the assurance that unblocks the v1.0 source freeze (`@/charter/D-8` context) without reopening the completed core-maintenance epic.\n\n## Success Criteria\n\n- [hard] REQ-01: Assurance adds no alternate renderer, serializer, capture path, publisher, or compatibility layer.\n- [hard] REQ-02: All assurance suites pass on main, repository validation reports no derived-state drift on the release-candidate tree, and the documented public contracts match the landed behavior.\n\n## Constraints\n\n- Sole engine only: no alternate renderer, serializer, capture path, publisher, or compatibility layer is added during assurance.\n- v1.0 source-freeze evidence must be complete and canonical.\n- Out of scope (plan D19/D20): lease credential/claim-log/claim-command redesign and worktree/data-root binding redesign.\n\nBlast radius: validate/fix, the project invariant/projection, public docs/schema/MCP/scripts, and the comprehensive conformance/recovery/structural suites.",
-  "state": "backlog",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-18T14:38:31.959223509Z",
   "dependencies": [
     "c73c7618-0b79-422b-9227-bfcc99e6f345"
   ],
+  "description": "Rollup for Group B: the independent assurance layer on top of the landed repository-state architecture. The sole engine diagnoses and repairs drift, projects the project-local invariant, documents stable public contracts, and carries exhaustive v1.0 source-freeze evidence.\n\n## Background\n\nAfter the direct cutover lands the repository-state architecture on main, Group B supplies release assurance without introducing any second implementation. This story groups that assurance outcome; its child tasks carry the drift/repair validation, invariant, and documentation/evidence work. This rollup holds the no-second-engine and complete-evidence outcome for the v1.0 source freeze.\n\n## What to build\n\n- The complete Group B outcome: derived-state drift diagnosis and ownership-safe transactional repair; the registry-first `derived-state-coherence` project invariant and its projection into guidance; updated canonical human/JSON/schema/MCP documentation for recoverable multi-target publication, drift diagnosis and repair, managed-region semantics, and absent-root publication (claim and lease surface documented unchanged); and comprehensive behavioral and structural release evidence — all on the sole repository-state engine.\n- Assert the assurance discipline: add no alternate renderer, serializer, capture path, publisher, or compatibility layer, and ensure v1.0 source-freeze evidence is complete and canonical.\n\nDistilled §2 contracts: REQ-06/07/08 coverage, the repair ownership-source matrix, and project-local invariant and public fit. See `dev/active/cdc840ad-plan.md` §2, §3 (Group B), and plan decision D1 (freeze scope) for full detail. This is the assurance that unblocks the v1.0 source freeze (`@/charter/D-8` context) without reopening the completed core-maintenance epic.\n\n## Success Criteria\n\n- [hard] REQ-01: Assurance adds no alternate renderer, serializer, capture path, publisher, or compatibility layer.\n- [hard] REQ-02: All assurance suites pass on main, repository validation reports no derived-state drift on the release-candidate tree, and the documented public contracts match the landed behavior.\n\n## Constraints\n\n- Sole engine only: no alternate renderer, serializer, capture path, publisher, or compatibility layer is added during assurance.\n- v1.0 source-freeze evidence must be complete and canonical.\n- Out of scope (plan D19/D20): lease credential/claim-log/claim-command redesign and worktree/data-root binding redesign.\n\nBlast radius: validate/fix, the project invariant/projection, public docs/schema/MCP/scripts, and the comprehensive conformance/recovery/structural suites.",
+  "documents": [],
+  "first_ready_at": "2026-07-18T14:38:31.959224269Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "7f0ac1b0-b976-44ca-a9e1-9cad27878140",
   "labels": [
     "type:story",
     "epic:repository-materialization",
@@ -22,7 +21,8 @@
     "component:validation",
     "component:cli"
   ],
-  "created_at": "2026-07-18T14:38:31.959223509Z",
-  "updated_at": "2026-07-18T15:06:44.270916108Z",
-  "first_ready_at": "2026-07-18T14:38:31.959224269Z"
+  "priority": "normal",
+  "state": "ready",
+  "title": "Coherence and release assurance",
+  "updated_at": "2026-07-23T13:42:08.343677835Z"
 }
