@@ -4,11 +4,11 @@
 //! file also carries hand-authored content — custom rules, comments, the header,
 //! block order, and the editable policy fields (`severity`/`enforce`/selector) of
 //! generated rules. These primitives edit ONLY the generated spans and preserve
-//! every other byte: [`rewrite_header`] republishes the leading generated comment
-//! region, and [`splice_default_membership`] appends newly generated
-//! `namespace-unique-*` blocks and drops obsolete `origin = "default"` ones. Both
-//! are pure `&str -> String` transforms consumed directly by the mutation derive
-//! pipeline.
+//! every other byte: [`rewrite_default_assertions`] replaces assertion values in
+//! proven `origin = "default"` blocks, and [`splice_default_membership`] appends
+//! newly generated `namespace-unique-*` blocks and drops obsolete default ones.
+//! Both are pure `&str -> String` transforms consumed directly by the mutation
+//! derive pipeline.
 
 use crate::declarations::rules::DEFAULT_ORIGIN;
 use anyhow::{Context, Result};
@@ -86,16 +86,6 @@ fn item_prefix(item: &toml_edit::Item) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// The key of the first top-level item that is NOT the (possibly empty) `rules`
-/// array, in document order. This is the file's TOP — where the leading
-/// header/comments belong once no `[[rules]]` block remains to carry them.
-fn first_non_rules_key(doc: &toml_edit::DocumentMut) -> Option<String> {
-    doc.as_table()
-        .iter()
-        .find(|(key, _)| *key != RULES_ARRAY_KEY)
-        .map(|(key, _)| key.to_owned())
-}
-
 /// The key of the top-level item immediately FOLLOWING the `rules` array in
 /// document order, or `None` when `rules` is last (or absent). This is where the
 /// emptied array's orphaned leading trivia is relocated.
@@ -107,41 +97,56 @@ fn key_after_rules(doc: &toml_edit::DocumentMut) -> Option<String> {
         .map(|(key, _)| key.to_owned())
 }
 
-/// Rewrite the leading header region of `content` to `header`, preserving every
-/// `[[rules]]` block below it (and any comments authored inside them) and all
-/// other non-generated content.
+/// Replace only the generated `assert` value of each proven default-origin rule.
 ///
-/// The header region is the leading trivia before the first `[[rules]]` table,
-/// modelled as the prefix decoration of the first `rules` entry. A ruleset with
-/// no `[[rules]]` block but other content republishes the header onto the first
-/// surviving top-level item's prefix, never by replacing the whole file. Only a
-/// document with no top-level item at all becomes `header` alone. Returns the
-/// rewritten bytes; the caller compares against `content` to decide whether to
-/// persist.
-pub fn rewrite_header(content: &str, header: &str) -> Result<String> {
+/// `expected` is the canonical default-only rules document produced by the one
+/// rules serializer. The existing value's decoration is retained, preserving
+/// whitespace and comments around the generated value; every other source byte
+/// (including the file header, block order, and editable policy fields) remains
+/// under authored ownership.
+pub(super) fn rewrite_default_assertions(content: &str, expected: &str) -> Result<String> {
     let mut doc = content
         .parse::<toml_edit::DocumentMut>()
         .context("parsing rules.toml as TOML")?;
-    let rebuilt = match doc
+    let expected = expected
+        .parse::<toml_edit::DocumentMut>()
+        .context("parsing derived default rules.toml")?;
+    let expected_rules = expected
+        .get(RULES_ARRAY_KEY)
+        .and_then(toml_edit::Item::as_array_of_tables)
+        .context("derived default rules.toml has no rules array")?;
+    let Some(rules) = doc
         .get_mut(RULES_ARRAY_KEY)
         .and_then(toml_edit::Item::as_array_of_tables_mut)
-        .and_then(|rules| rules.get_mut(0))
-    {
-        Some(first) => {
-            first.decor_mut().set_prefix(header);
-            doc.to_string()
-        }
-        None => match first_non_rules_key(&doc) {
-            Some(key) => {
-                if let Some(item) = doc.get_mut(&key) {
-                    set_item_prefix(item, header);
-                }
-                doc.to_string()
-            }
-            None => header.to_string(),
-        },
+    else {
+        return Ok(content.to_string());
     };
-    Ok(rebuilt)
+    for table in rules.iter_mut() {
+        if table.get("origin").and_then(toml_edit::Item::as_str) != Some(DEFAULT_ORIGIN) {
+            continue;
+        }
+        let Some(name) = table.get("name").and_then(toml_edit::Item::as_str) else {
+            continue;
+        };
+        let Some(mut replacement) = expected_rules
+            .iter()
+            .find(|expected| expected.get("name").and_then(toml_edit::Item::as_str) == Some(name))
+            .and_then(|expected| expected.get("assert"))
+            .cloned()
+        else {
+            continue;
+        };
+        let current = table
+            .get("assert")
+            .and_then(toml_edit::Item::as_value)
+            .context("default-origin rule has no assertion value")?;
+        let replacement_value = replacement
+            .as_value_mut()
+            .context("derived default rule has no assertion value")?;
+        *replacement_value.decor_mut() = current.decor().clone();
+        table["assert"] = replacement;
+    }
+    Ok(doc.to_string())
 }
 
 /// Apply a `namespace-unique-*` DEFAULT-rule membership delta to `content`:
@@ -268,24 +273,6 @@ assert = { require-label = { label = \"squad:*\", min = 0, max = 1 } }\n\n";
             parse_rule_identities(content).unwrap(),
             vec![("broken".to_string(), Some("custom".to_string()))]
         );
-    }
-
-    #[test]
-    fn test_rewrite_header_preserves_rules_and_other_content() {
-        let content = "# old\n\n[[rules]]\nname = \"keep\"\n# authored\n\
-                       assert = { require-section = { heading = \"H\" } }\n";
-        let updated = rewrite_header(content, "# new\n\n").unwrap();
-        assert!(updated.starts_with("# new\n\n"));
-        assert!(!updated.contains("# old"));
-        assert!(updated.contains("name = \"keep\"\n# authored"));
-        assert_eq!(rewrite_header(&updated, "# new\n\n").unwrap(), updated);
-
-        let no_rules = "# old\n\n[extra]\nnote = \"keep\"\n";
-        assert_eq!(
-            rewrite_header(no_rules, "# new\n\n").unwrap(),
-            "# new\n\n[extra]\nnote = \"keep\"\n"
-        );
-        assert_eq!(rewrite_header("\n\n", "# new\n\n").unwrap(), "# new\n\n");
     }
 
     #[test]

@@ -9,12 +9,12 @@
 //! set of exact [`RepositoryAction`]s for every target whose bytes differ from the
 //! captured occupant; an unchanged target contributes no action.
 
+use super::rules_document::rewrite_default_assertions;
 use super::{
     compose_managed_documents, default_ruleset, parse_rule_identities, render_projection_body,
-    render_rule_block, rewrite_header, rules_file_header, serialize_ruleset,
-    splice_default_membership, ExpectedPreimage, FileMode, ManagedDocumentClaim, ProjectionInputs,
-    RegionPlacement, RepositoryAction, RepositoryDeclarations, RepositoryEntry, RepositoryImage,
-    RepositoryStateError, VirtualPath,
+    render_rule_block, serialize_ruleset, splice_default_membership, ExpectedPreimage, FileMode,
+    ManagedDocumentClaim, ProjectionInputs, RegionPlacement, RepositoryAction,
+    RepositoryDeclarations, RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
 };
 use crate::config::{JitConfig, ProjectionMode};
 use crate::declarations::invariants::InvariantRegistry;
@@ -370,10 +370,10 @@ pub(crate) fn compose_configured_projections(
 /// from the captured registry, obeying the rules.toml ownership matrix.
 ///
 /// `rules.toml` is the authored file: the default-family membership (the
-/// `namespace-unique-*` rows the registry generates) and the generated header are
-/// spliced in place — via the one span-level
-/// [`splice_default_membership`]/[`rewrite_header`] primitive — while custom rows,
-/// comments, block order, and the editable policy fields of default rules are
+/// `namespace-unique-*` rows the registry generates) and each default assertion
+/// are spliced in place — via the span-level [`splice_default_membership`] and
+/// [`rewrite_default_assertions`] primitives — while the authored header, custom
+/// rows, comments, block order, and editable policy fields of default rules are
 /// preserved unconditionally. Config owns the default schema CONTENT
 /// (`schemas/default-*.json`), whose expected bytes are written to each captured
 /// target. An absent `rules.toml` is the in-memory-defaults case: nothing is
@@ -420,14 +420,15 @@ pub(crate) fn compose_default_ruleset(
         )));
     }
 
-    // rules.toml: splice only the generated default-family membership + header,
+    // rules.toml: splice only the generated default-family membership + assertions,
     // preserving every authored byte outside those proven-generated spans.
     let diff = default_rule_membership_diff_from_identities(&identities, &namespaces);
     let rendered_add: Vec<String> = diff.to_add.iter().map(render_rule_block).collect();
     let spliced = splice_default_membership(&current_rules, &rendered_add, &diff.to_drop)
         .map_err(RepositoryStateError::producer)?;
-    let expected_rules =
-        rewrite_header(&spliced, rules_file_header()).map_err(RepositoryStateError::producer)?;
+    let serialized = serialized_default_ruleset(config);
+    let expected_rules = rewrite_default_assertions(&spliced, &serialized.rules_toml)
+        .map_err(RepositoryStateError::producer)?;
     if expected_rules != current_rules {
         actions.push(RepositoryAction::WriteFile {
             path: rules_path.clone(),
@@ -441,7 +442,6 @@ pub(crate) fn compose_default_ruleset(
     // schemas/default-*.json: config/default-rule generator owns the content.
     // Write each expected target the image actually captured (a target outside
     // the closure is not owned here and never fabricated).
-    let serialized = serialized_default_ruleset(config);
     let expected_names: std::collections::BTreeSet<&str> = serialized
         .schema_files
         .iter()

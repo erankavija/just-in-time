@@ -2501,6 +2501,26 @@ mod tests {
     use crate::storage::JsonFileStorage;
     use chrono::Duration;
 
+    const DEFAULT_LABEL_ASSERTION: &str =
+        "assert = { json-schema = \"schemas/default-label-format.json\" }";
+    const STALE_LABEL_ASSERTION: &str =
+        "assert = { require-label = { label = \"authored:*\", min = 99 } }";
+
+    fn drift_default_assertion(rules: &str) -> (String, String) {
+        let stale = format!(
+            "# authored header remains byte-exact\n{}",
+            rules
+                .replacen(
+                    "severity = \"error\"",
+                    "severity = \"error\" # authored policy",
+                    1,
+                )
+                .replacen(DEFAULT_LABEL_ASSERTION, STALE_LABEL_ASSERTION, 1)
+        );
+        let repaired = stale.replacen(STALE_LABEL_ASSERTION, DEFAULT_LABEL_ASSERTION, 1);
+        (stale, repaired)
+    }
+
     fn profiled_memory_fixture() -> crate::storage::InMemoryStorage {
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
 
@@ -2653,7 +2673,7 @@ mod tests {
             "AGENTS.md",
             ".agents/skills/jit-manage/SKILL.md",
         ];
-        let baseline = owned
+        let mut baseline = owned
             .iter()
             .map(|path| (*path, std::fs::read(repo.path().join(path)).unwrap()))
             .collect::<std::collections::BTreeMap<_, _>>();
@@ -2661,11 +2681,9 @@ mod tests {
         std::fs::write(&unowned, b"{}\n").unwrap();
 
         let rules = String::from_utf8(baseline[".jit/rules.toml"].clone()).unwrap();
-        std::fs::write(
-            repo.path().join(".jit/rules.toml"),
-            rules.replacen('#', "# stale ", 1),
-        )
-        .unwrap();
+        let (stale_rules, repaired_rules) = drift_default_assertion(&rules);
+        std::fs::write(repo.path().join(".jit/rules.toml"), stale_rules).unwrap();
+        baseline.insert(".jit/rules.toml", repaired_rules.into_bytes());
         let mut schema = baseline[".jit/schemas/default-type-hierarchy-known.json"].clone();
         schema.push(b' ');
         std::fs::write(
@@ -2739,13 +2757,9 @@ mod tests {
 
         let rules_path = repo.path().join(".jit/rules.toml");
         let agents_path = repo.path().join("AGENTS.md");
-        let rules = std::fs::read(&rules_path).unwrap();
+        let rules = std::fs::read_to_string(&rules_path).unwrap();
         let agents = std::fs::read_to_string(&agents_path).unwrap();
-        std::fs::write(
-            &rules_path,
-            String::from_utf8(rules.clone()).unwrap() + "\n",
-        )
-        .unwrap();
+        std::fs::write(&rules_path, drift_default_assertion(&rules).0).unwrap();
         std::fs::write(
             &agents_path,
             agents.replacen(
@@ -2783,7 +2797,7 @@ mod tests {
             "AGENTS.md",
             ".agents/skills/jit-manage/SKILL.md",
         ];
-        let baseline = owned
+        let mut baseline = owned
             .iter()
             .map(|path| {
                 (
@@ -2793,11 +2807,9 @@ mod tests {
             })
             .collect::<std::collections::BTreeMap<_, _>>();
         seed_repo_file(&storage, ".jit/schemas/default-unowned.json", "{}\n");
-        seed_repo_file(
-            &storage,
-            ".jit/rules.toml",
-            &baseline[".jit/rules.toml"].replacen('#', "# stale ", 1),
-        );
+        let (stale_rules, repaired_rules) = drift_default_assertion(&baseline[".jit/rules.toml"]);
+        seed_repo_file(&storage, ".jit/rules.toml", &stale_rules);
+        baseline.insert(".jit/rules.toml", repaired_rules);
         seed_repo_file(
             &storage,
             ".jit/schemas/default-type-hierarchy-known.json",
@@ -2845,7 +2857,8 @@ mod tests {
         use crate::storage::IssueStore;
 
         let storage = profiled_memory_fixture();
-        let rules = storage.read_repo_file(".jit/rules.toml").unwrap().unwrap() + "\n";
+        let rules =
+            drift_default_assertion(&storage.read_repo_file(".jit/rules.toml").unwrap().unwrap()).0;
         let agents = storage
             .read_repo_file("AGENTS.md")
             .unwrap()

@@ -127,7 +127,7 @@ pub(crate) use projection_render::{render_projection_body, ProjectionInputs};
 pub use rule_serialize::{
     render_rule_block, rules_file_header, serialize_ruleset, SchemaFile, SerializedRuleSet,
 };
-pub use rules_document::{parse_rule_identities, rewrite_header, splice_default_membership};
+pub use rules_document::{parse_rule_identities, splice_default_membership};
 pub use rules_gates_projection::render_rules_and_gates_markdown;
 
 use crate::declarations::rules::RuleSet;
