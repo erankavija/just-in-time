@@ -8735,3 +8735,4 @@
 {"from":"ready","id":"e57c8056-5afa-4f34-a9ee-9a19d036e797","issue_id":"7f0ac1b0-b976-44ca-a9e1-9cad27878140","timestamp":"2026-07-23T13:44:48.831573182Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"655dff7c-3a06-498b-99bb-63a8e3321e90","issue_id":"7f0ac1b0-b976-44ca-a9e1-9cad27878140","timestamp":"2026-07-23T13:44:48.831573182Z","type":"issue_claimed"}
 {"gate_key":"cargo-ci","id":"57a910eb-52eb-4db2-bce1-92d5ce04a91a","issue_id":"7f0ac1b0-b976-44ca-a9e1-9cad27878140","timestamp":"2026-07-23T13:51:31.530171734Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"7b6ad9e3-9757-468d-877a-af4a68131479","issue_id":"7f0ac1b0-b976-44ca-a9e1-9cad27878140","timestamp":"2026-07-23T13:58:09.576909599Z","type":"gate_failed","updated_by":"auto:executor"}

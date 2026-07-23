@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-23T13:51:31.530171734Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-23T13:58:09.576909599Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "7f0ac1b0-b976-44ca-a9e1-9cad27878140",
@@ -31,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Coherence and release assurance",
-  "updated_at": "2026-07-23T13:51:31.530171734Z"
+  "updated_at": "2026-07-23T13:58:09.576909599Z"
 }
