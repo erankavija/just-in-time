@@ -54,13 +54,21 @@ struct FileState {
 }
 
 fn file_snapshot(root: &Path) -> BTreeMap<PathBuf, FileState> {
+    const MACHINE_LOCAL_LOCKS: [&str; 5] = [
+        ".jit-bootstrap.lock",
+        ".jit/.events.lock",
+        ".jit/.gates.lock",
+        ".jit/.index.lock",
+        ".jit/.repo-write.lock",
+    ];
+
     fn visit(root: &Path, current: &Path, files: &mut BTreeMap<PathBuf, FileState>) {
         for entry in fs::read_dir(current).unwrap() {
             let path = entry.unwrap().path();
             let relative = path.strip_prefix(root).unwrap();
-            if relative
-                .extension()
-                .is_some_and(|extension| extension == "lock")
+            if MACHINE_LOCAL_LOCKS
+                .iter()
+                .any(|lock| relative == Path::new(lock))
             {
                 continue;
             }
@@ -260,7 +268,9 @@ fn test_cli_validate_fix_rejects_ambiguous_ownership_transactionally() {
         ),
     )
     .unwrap();
+    fs::write(repo.path().join("authored.lock"), b"authored lock file\n").unwrap();
     let before = file_snapshot(repo.path());
+    assert!(before.contains_key(Path::new("authored.lock")));
 
     let output = run(repo.path(), &["validate", "--fix", "--json"]);
     assert!(!output.status.success());
