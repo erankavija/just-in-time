@@ -1,0 +1,38 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-23T18:11:28.753153980Z",
+  "dependencies": [
+    "02dc4bac-52e5-4810-9e87-8384e34eabc7"
+  ],
+  "description": "Breakdown node bracketing Repository-state quality hardening (1cc809de). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria.",
+  "documents": [],
+  "first_ready_at": "2026-07-23T18:11:28.753153980Z",
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-07-23T18:11:28.753153980Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-07-23T18:11:28.753153980Z",
+      "updated_by": null
+    }
+  },
+  "id": "24bab642-6f1d-438a-aae5-5c327dceaff6",
+  "labels": [
+    "epic:repository-state-quality",
+    "milestone:v1.0",
+    "type:breakdown",
+    "brackets:1cc809de"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "breakdown: Repository-state quality hardening",
+  "updated_at": "2026-07-23T18:11:28.753153980Z"
+}

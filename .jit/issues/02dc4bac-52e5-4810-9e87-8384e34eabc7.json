@@ -1,0 +1,37 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-23T18:11:28.753153980Z",
+  "dependencies": [],
+  "description": "Planning node for Repository-state quality hardening (1cc809de). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/1cc809de-plan.md and link it to this node once written.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic Plan",
+      "path": "dev/active/1cc809de-plan.md"
+    }
+  ],
+  "first_ready_at": "2026-07-23T18:11:28.753153980Z",
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_at": "2026-07-23T18:11:28.753153980Z",
+      "updated_by": null
+    }
+  },
+  "id": "02dc4bac-52e5-4810-9e87-8384e34eabc7",
+  "labels": [
+    "epic:repository-state-quality",
+    "milestone:v1.0",
+    "type:planning"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "planning: Repository-state quality hardening",
+  "updated_at": "2026-07-23T18:13:04.399440126Z"
+}
