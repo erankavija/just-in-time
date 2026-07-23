@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "66ae926989711b1f95a3e63c30a42375bd8314fb",
+  "completed_at": "2026-07-23T08:02:51.942156353Z",
+  "duration_ms": 197968,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/repository_state/rule_serialize.rs",
+        "id": "F1",
+        "line": 130,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "rules_file_header documentation still says materialization republishes the header, although repair now preserves authored headers."
+      }
+    ],
+    "summary": "The repair meets the hard criteria; one advisory documentation contract is stale.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8f1c2595-242e-4cf4-b810-22c6b55fb1f3",
+  "message": null,
+  "run_id": "ee1bed1d-5029-4bae-989e-b2cb9f598717",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T07:59:33.973915168Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a7655105, 6f804afa, 303d93e, bd969e31, dadc5d28, c485d765, 66ae9269 (jit:8f1c2595)\nPolicy sources: AGENTS.md; dev/active/cdc840ad-plan.md §2 ownership matrix and D7\nResolved items: @/invariant/semantic-test-assertions, @/invariant/atomic-writes, @/invariant/derived-state-coherence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-23T07:58:28Z); prior code-review passed (exit 0, 2026-07-23T07:51:25Z)\nTruncation recovery: narrowed reads of the ownership matrix, repair path, JSON/InMemory regressions, ambiguity coverage, and registry sources.\n\n1. [advisory][issue-impact] `crates/jit/src/repository_state/rule_serialize.rs:130` still says materialization republishes the generated header, but repair now correctly preserves an authored header. Update this API documentation to match the new ownership contract.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The repair meets the hard criteria; one advisory documentation contract is stale.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"rules_file_header documentation still says materialization republishes the header, although repair now preserves authored headers.\",\"file\":\"crates/jit/src/repository_state/rule_serialize.rs\",\"line\":130,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
