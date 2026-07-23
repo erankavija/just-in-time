@@ -11,7 +11,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-23T22:15:34.455693554Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "129f3fad-0688-426b-9bfd-9f013f72ac71",
   "labels": [
     "type:enhancement",
@@ -20,5 +26,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Scope the stale-binary provenance guard to build-input changes",
-  "updated_at": "2026-07-23T21:39:12.850846307Z"
+  "updated_at": "2026-07-23T22:15:34.455693554Z"
 }

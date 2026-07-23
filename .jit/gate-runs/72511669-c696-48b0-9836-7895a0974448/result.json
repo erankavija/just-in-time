@@ -1,0 +1,20 @@
+{
+  "branch": "feat/129f3fad-provenance-build-inputs",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "c44bc61cf566f389452c1b6fbd3b8f9df7710aba",
+  "completed_at": "2026-07-23T22:10:15.617678960Z",
+  "duration_ms": 316998,
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "issue_id": "129f3fad-0688-426b-9bfd-9f013f72ac71",
+  "message": null,
+  "run_id": "72511669-c696-48b0-9836-7895a0974448",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T22:04:58.619142148Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "  ✓ fmt: ok\n  ✓ clippy: ok\n  ✓ test: 3790 passed, 0 failed, 14 ignored\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1183 bytes=20621612)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1258825456/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": true
+}
