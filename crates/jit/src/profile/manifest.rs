@@ -1,9 +1,7 @@
 use schemars::{schema::RootSchema, schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 
-pub use crate::repository_state::{
-    CompleteProjectionConfig, Contribution, KeyedArrayTarget, MapEntryTarget, SetStringTarget,
-};
+use crate::repository_state::Contribution;
 
 /// The only manifest filename recognized at the root of an embedded package.
 pub const MANIFEST_FILE_NAME: &str = "manifest.toml";

@@ -1,7 +1,8 @@
 //! Embedded production package for jit's repository-neutral dogfood workflow.
 
-use super::{Contribution, EmbeddedProfilePackage, KeyedArrayTarget, ProfilePackageError};
+use super::{EmbeddedProfilePackage, ProfilePackageError};
 use crate::declarations::GateDefinition;
+use crate::repository_state::{Contribution, KeyedArrayTarget};
 use include_dir::{include_dir, Dir};
 
 static JIT_DOGFOOD_DIRECTORY: Dir<'_> =
@@ -73,8 +74,8 @@ pub fn jit_dogfood_planning_gate_keys() -> Result<Vec<String>, DogfoodProfileErr
         .contributions
         .iter()
         .find_map(|contribution| match contribution {
-            super::Contribution::KeyedArray {
-                target: super::KeyedArrayTarget::Templates,
+            Contribution::KeyedArray {
+                target: KeyedArrayTarget::Templates,
                 identity,
                 value,
             } if identity == "plan" => Some(value),
@@ -122,8 +123,9 @@ mod tests {
     use crate::config::ProjectionStyle;
     use crate::declarations::GateRegistry;
     use crate::hierarchy_templates::HierarchyTemplate;
-    use crate::profile::{Contribution, KeyedArrayTarget, MapEntryTarget};
-    use crate::repository_state::render_rules_and_gates_markdown;
+    use crate::repository_state::{
+        render_rules_and_gates_markdown, Contribution, KeyedArrayTarget, MapEntryTarget,
+    };
     use crate::storage::{IssueStore, JsonFileStorage};
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
