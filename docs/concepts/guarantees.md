@@ -599,7 +599,8 @@ jit validate --leases
 
 # Auto-fix what is mechanically fixable
 jit validate --fix
-# ✓ Applies type-hierarchy, transitive-reduction, and pending-state-transition fixes
+# ✓ Applies repairable rule/graph/state fixes and provenance-proven derived-state repairs
+# ✓ Publishes derived repairs recoverably; ambiguous ownership/provenance writes nothing
 ```
 
 ## See Also

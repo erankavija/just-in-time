@@ -247,6 +247,48 @@ fn test_cli_validate_fix_repairs_mode_only_profile_drift() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn test_cli_validate_fix_preserves_permission_error_classification() {
+    use std::os::unix::fs::PermissionsExt;
+
+    for json_mode in [false, true] {
+        let repo = profiled_repo();
+        let schema = repo
+            .path()
+            .join(".jit/schemas/default-type-hierarchy-known.json");
+        let mut stale = fs::read(&schema).unwrap();
+        stale.extend_from_slice(b" stale");
+        fs::write(&schema, stale).unwrap();
+
+        let parent = schema.parent().unwrap();
+        let original_mode = fs::metadata(parent).unwrap().permissions().mode();
+        fs::set_permissions(parent, fs::Permissions::from_mode(0o500)).unwrap();
+        let args = if json_mode {
+            ["validate", "--fix", "--json"].as_slice()
+        } else {
+            ["validate", "--fix"].as_slice()
+        };
+        let output = run(repo.path(), args);
+        fs::set_permissions(parent, fs::Permissions::from_mode(original_mode)).unwrap();
+
+        assert_eq!(output.status.code(), Some(5));
+        if json_mode {
+            let error = json(&output);
+            assert_eq!(error["error"]["code"], "IO_ERROR");
+            assert!(error["error"]["message"]
+                .as_str()
+                .unwrap()
+                .to_ascii_lowercase()
+                .contains("permission denied"));
+        } else {
+            assert!(String::from_utf8_lossy(&output.stderr)
+                .to_ascii_lowercase()
+                .contains("permission denied"));
+        }
+    }
+}
+
 #[test]
 fn test_cli_validate_fix_rejects_ambiguous_ownership_transactionally() {
     let repo = profiled_repo();

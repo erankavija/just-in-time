@@ -38,7 +38,7 @@ jobs:
         run: cargo install cargo-audit
       
       - name: Run Rust security audit
-        run: cargo audit
+        run: cargo audit -D warnings
       
       - name: Setup Node.js
         uses: actions/setup-node@v4

@@ -303,8 +303,9 @@ Runs the coordination-recovery routines under `.git/jit/` in sequence:
 4. Remove leftover temporary files
 
 This repairs multi-agent coordination state. It is a different repair set from
-`jit validate --fix`, which fixes rule/graph findings (type-hierarchy labels,
-transitive-reduction violations, pending state transitions).
+`jit validate --fix`, which fixes repairable rule/graph/state findings and
+provenance-proven derived-state drift. Derived repairs use one recoverable
+transaction; ambiguous ownership or provenance fails without writes.
 
 ### Options
 

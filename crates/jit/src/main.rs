@@ -146,8 +146,12 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         return ExitCode::ExternalError;
     }
 
-    // Check root cause for IO errors
-    if let Some(io_error) = error.downcast_ref::<std::io::Error>() {
+    // Check the complete source chain for I/O errors. Transaction/session
+    // boundaries wrap the original I/O error without changing its exit class.
+    if let Some(io_error) = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<std::io::Error>())
+    {
         return match io_error.kind() {
             std::io::ErrorKind::NotFound => ExitCode::NotFound,
             std::io::ErrorKind::PermissionDenied => ExitCode::PermissionDenied,
@@ -467,14 +471,20 @@ fn claim_json_error(
     JsonError::new(code, error.to_string(), command)
 }
 
-/// Preserve the complete actionable cause chain for repository validation
-/// failures while using the CLI's standard machine-readable error envelope.
-fn validate_json_error(error: &anyhow::Error) -> jit::output::JsonError {
-    jit::output::JsonError::new(
-        jit::output::ErrorCode::VALIDATION_FAILED,
-        format!("{error:#}"),
-        "validate",
-    )
+/// Preserve a `validate --fix` failure's complete cause chain while selecting
+/// the standard JSON code for its typed exit class.
+fn validate_fix_json_error(error: &anyhow::Error, exit_code: ExitCode) -> jit::output::JsonError {
+    use jit::output::ErrorCode;
+
+    let code = match exit_code {
+        ExitCode::ValidationFailed => ErrorCode::VALIDATION_FAILED,
+        ExitCode::InvalidArgument => ErrorCode::INVALID_ARGUMENT,
+        ExitCode::NotFound => ErrorCode::REPOSITORY_NOT_FOUND,
+        ExitCode::AlreadyExists => ErrorCode::ALREADY_EXISTS,
+        ExitCode::PermissionDenied | ExitCode::ExternalError => ErrorCode::IO_ERROR,
+        ExitCode::Success | ExitCode::GenericError | ExitCode::BrokenPipe => ErrorCode::IO_ERROR,
+    };
+    jit::output::JsonError::new(code, format!("{error:#}"), "validate")
 }
 
 /// Render a failed `gate evaluate` / `gate evaluate-all` outcome and terminate appropriately.
@@ -6713,15 +6723,17 @@ fn run() -> Result<()> {
                 let (fixes_applied, messages) = match executor.validate_with_fix(true, dry_run) {
                     Ok(result) => result,
                     Err(error) if json => {
-                        let json_error = validate_json_error(&error);
+                        let exit_code = error_to_exit_code(&error);
+                        let json_error = validate_fix_json_error(&error, exit_code);
                         println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
+                        std::process::exit(exit_code.code());
                     }
-                    Err(error) => {
+                    Err(error) if error_to_exit_code(&error) == ExitCode::ValidationFailed => {
                         return Err(anyhow::Error::new(jit::errors::ValidationFailedError::new(
                             format!("{error:#}"),
                         )));
                     }
+                    Err(error) => return Err(error),
                 };
 
                 // Print messages unless in JSON mode

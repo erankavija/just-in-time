@@ -479,7 +479,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             let Some(derived) = self.capture_repair_plan(session.as_mut(), &seed, &package)? else {
                 continue;
             };
-            let mut captured = derived.map_err(|failure| failure.into_error())?;
+            let mut captured = derived.map_err(|failure| {
+                crate::errors::ValidationFailedError::new(failure.to_string())
+            })?;
             if let Some(error) = captured.declarations.take_rules_load_error() {
                 return Err(error);
             }

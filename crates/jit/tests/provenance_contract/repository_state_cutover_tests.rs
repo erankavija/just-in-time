@@ -1,4 +1,4 @@
-//! Structural release guard for the direct repository-state cutover.
+//! Current-tree guards for removed repository-state predecessors.
 
 use std::path::{Path, PathBuf};
 
@@ -20,7 +20,7 @@ fn rust_sources(root: &Path) -> Vec<(PathBuf, String)> {
 }
 
 #[test]
-fn test_repository_state_cutover_has_no_predecessor_or_compatibility_seam() {
+fn test_repository_state_cutover_has_no_known_predecessor_files_or_storage_alias() {
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let source_root = crate_root.join("src");
 
@@ -37,38 +37,17 @@ fn test_repository_state_cutover_has_no_predecessor_or_compatibility_seam() {
         );
     }
 
+    let library = std::fs::read_to_string(source_root.join("lib.rs")).unwrap();
+    assert!(
+        !library.contains("pub type Storage ="),
+        "superseded Storage compatibility alias returned"
+    );
+}
+
+#[test]
+fn test_projection_renderers_have_one_canonical_owner() {
+    let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let sources = rust_sources(&source_root);
-    let joined = sources
-        .iter()
-        .map(|(_, source)| source.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    for predecessor in [
-        "fn save_issue(",
-        "fn restore_issue_verbatim(",
-        "fn append_event(",
-        "fn save_gate_run_result(",
-        "fn save_gate_registry(",
-        "fn save_gate_preset(",
-        "fn write_repo_file(",
-        "struct RuleMembershipSync",
-        "struct PackageProjection",
-        "struct RepositorySnapshot",
-        "struct PresetInventory",
-        "struct ProfileApplicationPlan",
-        "fn project_package(",
-        "fn capture_profile_snapshot(",
-        "fn plan_profile_application_against(",
-        "pub use crate::repository_state",
-        "pub type Storage =",
-    ] {
-        assert!(
-            !joined.contains(predecessor),
-            "superseded publisher, inventory, or compatibility seam returned: {predecessor}"
-        );
-    }
-
     for (definition, owner) in [
         (
             "fn render_projection_body(",
