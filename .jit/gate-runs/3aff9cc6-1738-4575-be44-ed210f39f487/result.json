@@ -1,0 +1,25 @@
+{
+  "branch": "feat/129f3fad-provenance-build-inputs",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "2380e6358756e2da440a794a2b68ff1b303e3c77",
+  "completed_at": "2026-07-23T22:18:32.056928411Z",
+  "duration_ms": 174433,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared provenance guard now scopes staleness to committed and working-tree build-input changes while preserving dirty-build, identity, silent-fallback, message, and exit-code behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "129f3fad-0688-426b-9bfd-9f013f72ac71",
+  "message": null,
+  "run_id": "3aff9cc6-1738-4575-be44-ed210f39f487",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T22:15:37.623535952Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c44bc61c (implementation), edd847a8 (issue record)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-test-assertions and @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-23T22:10:31Z); code-review unrun\nTruncation recovery: recovered build-input inventory, guard, Git resolver, install wrapper, and affected tests with path-specific reads after one combined read truncated.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared provenance guard now scopes staleness to committed and working-tree build-input changes while preserving dirty-build, identity, silent-fallback, message, and exit-code behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

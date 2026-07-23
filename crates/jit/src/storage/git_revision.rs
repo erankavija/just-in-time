@@ -34,6 +34,10 @@ pub enum GitRevisionError {
         path: String,
         stderr: String,
     },
+    /// Git could not enumerate paths changed between the build and review
+    /// trees, or in the current working tree.
+    #[error("git changed-path query failed for {operation}: {stderr}")]
+    ChangedPathsFailed { operation: String, stderr: String },
     /// The artifact path violates the repository-relative storage contract.
     #[error(transparent)]
     InvalidPath(#[from] crate::storage::PathReadError),
@@ -148,6 +152,43 @@ impl GitRevisionResolver {
         })
     }
 
+    /// Return paths changed between two revisions, using NUL-delimited Git
+    /// output so unusual but valid repository paths cannot be confused with
+    /// record separators.
+    pub fn changed_paths_between(
+        &self,
+        from: &str,
+        to: &str,
+    ) -> Result<Vec<String>, GitRevisionError> {
+        let output = self.run(["diff", "--name-only", "--no-renames", "-z", from, to])?;
+        parse_changed_paths(output, format!("{from}..{to}"))
+    }
+
+    /// Return tracked and untracked paths that differ from `HEAD` in the
+    /// working tree. Ignored paths are included because a compile-time input
+    /// can be locally ignored while still changing the produced binary.
+    pub fn changed_worktree_paths(&self) -> Result<Vec<String>, GitRevisionError> {
+        let tracked = self.run(["diff", "--name-only", "--no-renames", "-z", "HEAD"])?;
+        let untracked = self.run(["ls-files", "--others", "--exclude-standard", "-z"])?;
+        let ignored = self.run([
+            "ls-files",
+            "--others",
+            "--ignored",
+            "--exclude-standard",
+            "-z",
+        ])?;
+        let mut paths = parse_changed_paths(tracked, "working tree".to_string())?;
+        paths.extend(parse_changed_paths(
+            untracked,
+            "untracked working tree".to_string(),
+        )?);
+        paths.extend(parse_changed_paths(
+            ignored,
+            "ignored working tree".to_string(),
+        )?);
+        Ok(paths)
+    }
+
     fn run<'a>(
         &self,
         arguments: impl IntoIterator<Item = &'a str>,
@@ -161,6 +202,22 @@ impl GitRevisionResolver {
                 source,
             })
     }
+}
+
+fn parse_changed_paths(output: Output, operation: String) -> Result<Vec<String>, GitRevisionError> {
+    if !output.status.success() {
+        return Err(GitRevisionError::ChangedPathsFailed {
+            operation,
+            stderr: stderr(&output),
+        });
+    }
+
+    Ok(output
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|path| !path.is_empty())
+        .map(|path| String::from_utf8_lossy(path).into_owned())
+        .collect())
 }
 
 fn stderr(output: &Output) -> String {

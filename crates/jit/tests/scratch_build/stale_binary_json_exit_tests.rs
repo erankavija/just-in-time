@@ -104,6 +104,31 @@ fn build_stale_binary(workspace_root: &Path, ancestor: &str) -> Option<PathBuf> 
 /// repo — no ref in the real workspace is read, moved, or written. Returns
 /// `None` (skip) if any local git step fails.
 fn scratch_repo_stale_for(workspace_root: &Path, ancestor: &str) -> Option<TempDir> {
+    scratch_repo_advanced_with_change(
+        workspace_root,
+        ancestor,
+        "crates/jit/src/main.rs",
+        b"\n// build-input change for stale-binary coverage\n",
+    )
+}
+
+/// Build the same scratch repository shape while changing only metadata that
+/// cannot affect the compiled binary.
+fn scratch_repo_metadata_only_for(workspace_root: &Path, ancestor: &str) -> Option<TempDir> {
+    scratch_repo_advanced_with_change(
+        workspace_root,
+        ancestor,
+        "docs/stale-binary-metadata.md",
+        b"metadata-only change for stale-binary coverage\n",
+    )
+}
+
+fn scratch_repo_advanced_with_change(
+    workspace_root: &Path,
+    ancestor: &str,
+    changed_path: &str,
+    change: &[u8],
+) -> Option<TempDir> {
     let temp = TempDir::new().ok()?;
     let run = |args: &[&str]| {
         Command::new("git")
@@ -122,13 +147,20 @@ fn scratch_repo_stale_for(workspace_root: &Path, ancestor: &str) -> Option<TempD
     if !run(&["checkout", "-q", "FETCH_HEAD"]) {
         return None;
     }
+    let path = temp.path().join(changed_path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok()?;
+    }
+    std::fs::write(path, change).ok()?;
+    if !run(&["add", changed_path]) {
+        return None;
+    }
     if !run(&[
         "-c",
         "user.name=Test",
         "-c",
         "user.email=test@example.com",
         "commit",
-        "--allow-empty",
         "-q",
         "-m",
         "advance past the build commit",
@@ -288,5 +320,38 @@ fn test_gate_evaluate_stale_binary_exits_10_in_text_and_json_modes() {
             .unwrap_or_default()
             .contains("cargo install --path crates/jit")),
         "suggestions should include the reinstall hint: {suggestions:?}"
+    );
+}
+
+#[test]
+fn test_gate_evaluate_metadata_only_commit_does_not_refuse_stale_binary() {
+    let workspace_root = workspace_root();
+    let Some(ancestor) = ancestor_commit(&workspace_root) else {
+        eprintln!("SKIP: workspace does not have 9+ commits to pick a safe ancestor from");
+        return;
+    };
+    let Some(stale_binary) = build_stale_binary(&workspace_root, &ancestor) else {
+        eprintln!("SKIP: could not build the stale binary (cargo unavailable?)");
+        return;
+    };
+    let Some(scratch) = scratch_repo_metadata_only_for(&workspace_root, &ancestor) else {
+        eprintln!("SKIP: could not construct the scratch repo (git unavailable?)");
+        return;
+    };
+    let issue_id = setup_gated_issue(scratch.path());
+
+    let mut cmd = Command::new(&stale_binary);
+    scrub_gate_context(&mut cmd);
+    let output = cmd
+        .current_dir(scratch.path())
+        .args(["gate", "evaluate", &issue_id, "g"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "metadata-only changes must not refuse the gate: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
     );
 }

@@ -1,0 +1,54 @@
+{
+  "branch": "feat/129f3fad-provenance-build-inputs",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "0cff32b6a4201497e8f5cdc61eb7f83cd4929aa4",
+  "completed_at": "2026-07-23T22:19:23.666308338Z",
+  "duration_ms": 156484,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F1",
+        "line": 117,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/02dc4bac/requirement/REQ-P2",
+          "@/issue/1cc809de/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "S1.c does not cover all repository_state anyhow signatures or format-constructed errors required by REQ-P2."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F2",
+        "line": 151,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/02dc4bac/requirement/REQ-P1",
+          "@/issue/1cc809de/requirement/REQ-03",
+          "@/inv/atomic-writes",
+          "@/inv/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "The proposed SetMode journal mismatch bypasses cleanup because journal construction occurs before the prepare-loop error handler."
+      }
+    ],
+    "summary": "The plan leaves REQ-P2 structurally incomplete and routes a total journal mismatch around transaction cleanup.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "02dc4bac-52e5-4810-9e87-8384e34eabc7",
+  "message": null,
+  "run_id": "7981d73e-92ca-4f95-8a06-30a98e8e39ee",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T22:16:47.181807064Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6213 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f910d-7a3e-74a3-9d7e-dc8a6158d16d\n--------\nuser\n--- 6200 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "## Plan document present and linked\n\nPass. The linked plan exists at `dev/active/1cc809de-plan.md` and is non-empty; it is linked in the planning issue’s `documents`.\n\n## Completeness against criteria\n\nFail. The plan does not provide implementable coverage for the full structural acceptance criterion required by REQ-P2 / REQ-02.\n\n## Technical soundness and architectural fit\n\nFail. The proposed journal-mismatch propagation path bypasses the transaction cleanup boundary.\n\n## Decomposition and dependencies\n\nThe prior bulk-eligibility, journal-payload, cutover-decision, property-generator, and test-module-sequencing findings are addressed at plan lines 139, 151, 121, 156, and 158 respectively. However, S1.c lacks ownership for required typed-error cleanup, and S1.d’s stated error path is incorrect.\n\n## Risks and actionability\n\nFail. The unhandled pre-journal failure path is not surfaced as a risk or given a mitigation.\n\n## Prior review feedback\n\nThe five prior blocking findings are resolved, but the new blocking gaps above remain.\n\n## Findings\n\n1. **[high, blocking]** The typed-error plan cannot satisfy REQ-P2’s stated structural acceptance criterion. `Typed-error boundary` says no `repository_state` signature may carry `anyhow` and no error may be constructed with `format!` outside `Display` implementations ([dev/active/1cc809de-plan.md:117](dev/active/1cc809de-plan.md:117)), while S1.c only owns the listed producer/finalizer conversions ([dev/active/1cc809de-plan.md:150](dev/active/1cc809de-plan.md:150)). It leaves the publicly re-exported `parse_rule_identities` returning `anyhow::Result` at `crates/jit/src/repository_state/rules_document.rs:41`, declaration loading retaining and exposing `anyhow::Error` at `crates/jit/src/repository_state/mod.rs:153` and `:196-222`, and `InitializationError::UnexpectedOccupant` constructing its error field with `format!` at `crates/jit/src/repository_state/initialize.rs:685-687`. S1.e addresses plan identity, not these errors. The plan needs explicit typed-error ownership and migration for these remaining surfaces, plus a precise structural check.\n\n2. **[high, blocking]** S1.d’s recovery design is incorrect for the `SetMode` mismatch it names. The plan says the retyped failure at `file_transaction.rs:759` propagates through the prepare-loop cleanup path ([dev/active/1cc809de-plan.md:151](dev/active/1cc809de-plan.md:151)), but `initial_repository_journal` executes after `create_repository_control` and before both journal publication and the `prepare_repository_actions` error handler (`crates/jit/src/storage/file_transaction.rs:856-866`). A `?` replacing the `unreachable!` at `:759` returns before the cleanup at `:875`, leaving the newly created control directory behind. The plan must either derive the journal before creating control state or specify a separate cleanup path for journal-construction failures.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan leaves REQ-P2 structurally incomplete and routes a total journal mismatch around transaction cleanup.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"S1.c does not cover all repository_state anyhow signatures or format-constructed errors required by REQ-P2.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":117,\"references\":[\"@/issue/02dc4bac/requirement/REQ-P2\",\"@/issue/1cc809de/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The proposed SetMode journal mismatch bypasses cleanup because journal construction occurs before the prepare-loop error handler.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":151,\"references\":[\"@/issue/02dc4bac/requirement/REQ-P1\",\"@/issue/1cc809de/requirement/REQ-03\",\"@/inv/atomic-writes\",\"@/inv/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
