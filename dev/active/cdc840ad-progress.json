@@ -434,6 +434,14 @@
       "resolution": "Invoker approved the recommended narrow lead take-over and reset the rework counter.",
       "situation": "The initial release-evidence implementation plus two rework attempts closed profile-source drift, permission and operational error classification, fail-closed audit warnings, stale public docs, and an overbroad structural test. Final independent review still reproduced one bounded validation-source mismatch: malformed .jit/rules.toml yields exit 4 for jit validate --json but exit 1 with IO_ERROR for jit validate --fix --json because take_rules_load_error remains untyped. The first cargo-ci gate attempt also failed independently when accumulated temporary test repositories exhausted the filesystem quota; the exact cargo-ci cache and inactive user-owned /tmp/jit-test-* fixtures were removed afterward.",
       "recommendation": "Authorize a narrow lead take-over and counter reset: classify the captured rules-load error as ValidationFailedError while retaining its full cause, add one malformed-rules human/JSON parity regression, rerun independent review and every c73c7618 gate, and make no broader error-framework changes."
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
+      "status": "open",
+      "opened_at": "2026-07-23T16:04:40+03:00",
+      "situation": "After the invoker-approved reset, two structural-review rework attempts closed REQ-03 and the final cargo-ci, code-review, docs-mechanical, mcp-ci, and jit-validate gates pass. The approved doc-review gate found one new blocking issue-authored documentation defect: docs/reference/profiles.md and generated CLI schema prose claim every safe validate --fix repair is published in one recoverable transaction, while hierarchy, reduction, and pending-transition repairs are sequential and only derived-state repair has that transaction scope. It also reported one pre-existing advisory project-render error-code discrepancy.",
+      "recommendation": "Authorize one narrow documentation-only correction with a counter reset: qualify the profiles reference and validate CLI schema prose so the one-transaction guarantee applies only to derived-state repairs; optionally correct the adjacent pre-existing project-render JSON error-code sentence while already in the public contract; regenerate projections if required; rerun documentation/mechanical validation and the authoritative issue gates. Do not broaden validate implementation transactionality."
     }
   ],
   "rework_counts": {
