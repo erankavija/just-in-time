@@ -28,6 +28,14 @@ fn definition_owners(root: &Path, definition: &str) -> Vec<PathBuf> {
     owners
 }
 
+fn contains_cargo_manifest(root: &Path) -> bool {
+    std::fs::read_dir(root).unwrap().any(|entry| {
+        let path = entry.unwrap().path();
+        path.file_name().is_some_and(|name| name == "Cargo.toml")
+            || path.is_dir() && contains_cargo_manifest(&path)
+    })
+}
+
 #[test]
 fn test_plan_named_cutover_consumers_do_not_call_known_legacy_publishers() {
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
@@ -41,6 +49,14 @@ fn test_plan_named_cutover_consumers_do_not_call_known_legacy_publishers() {
             "save_gate_registry(",
             "save_gate_preset(",
             "write_repo_file(",
+            "std::fs::write(",
+            "fs::write(",
+            "std::fs::rename(",
+            "fs::rename(",
+            "File::create(",
+            "OpenOptions::new(",
+            "FileTransactionKernel",
+            "atomic_write",
         ] {
             assert!(
                 !source.contains(publisher),
@@ -79,6 +95,17 @@ fn test_cutover_has_no_known_predecessor_or_compatibility_module() {
     ] {
         assert!(!library.contains(alias), "alias returned: {alias}");
     }
+    for facade in ["profile/mod.rs", "storage/mod.rs", "validation/mod.rs"] {
+        let source = production_source(&source_root.join(facade));
+        for seam in [
+            "pub use crate::repository_state",
+            "pub use crate::declarations",
+            "pub type Storage =",
+            "pub type Gate =",
+        ] {
+            assert!(!source.contains(seam), "facade seam in {facade}: {seam}");
+        }
+    }
 
     let workspace = std::fs::read_to_string(crate_root.join("../../Cargo.toml")).unwrap();
     for package in ["crates/repository-state", "crates/declarations"] {
@@ -88,7 +115,7 @@ fn test_cutover_has_no_known_predecessor_or_compatibility_module() {
         );
     }
     for module in ["repository_state", "declarations"] {
-        assert!(!source_root.join(module).join("Cargo.toml").exists());
+        assert!(!contains_cargo_manifest(&source_root.join(module)));
     }
 
     for (scope, wrapper) in [
@@ -115,12 +142,15 @@ fn test_cutover_has_no_known_predecessor_or_compatibility_module() {
 fn test_known_projection_renderer_definitions_keep_canonical_owners() {
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     for (definition, file) in [
+        ("fn render_managed_document(", "managed_document.rs"),
         ("fn render_projection_body(", "projection_render.rs"),
         ("fn render_invariants_markdown(", "projection.rs"),
         (
             "fn render_rules_and_gates_markdown(",
             "rules_gates_projection.rs",
         ),
+        ("fn serialize_ruleset(", "rule_serialize.rs"),
+        ("fn render_repo_config(", "initialize.rs"),
     ] {
         assert_eq!(
             definition_owners(&source_root, definition),
