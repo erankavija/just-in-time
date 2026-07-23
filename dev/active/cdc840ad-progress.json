@@ -428,8 +428,10 @@
     {
       "category": "rework-exceeded",
       "issue_id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-23T13:29:40+03:00",
+      "resolved_at": "2026-07-23T13:58:51+03:00",
+      "resolution": "Invoker approved the recommended narrow lead take-over and reset the rework counter.",
       "situation": "The initial release-evidence implementation plus two rework attempts closed profile-source drift, permission and operational error classification, fail-closed audit warnings, stale public docs, and an overbroad structural test. Final independent review still reproduced one bounded validation-source mismatch: malformed .jit/rules.toml yields exit 4 for jit validate --json but exit 1 with IO_ERROR for jit validate --fix --json because take_rules_load_error remains untyped. The first cargo-ci gate attempt also failed independently when accumulated temporary test repositories exhausted the filesystem quota; the exact cargo-ci cache and inactive user-owned /tmp/jit-test-* fixtures were removed afterward.",
       "recommendation": "Authorize a narrow lead take-over and counter reset: classify the captured rules-load error as ValidationFailedError while retaining its full cause, add one malformed-rules human/JSON parity regression, rerun independent review and every c73c7618 gate, and make no broader error-framework changes."
     }
@@ -442,7 +444,7 @@
     "49adf23b": 1,
     "661d6be2": 2,
     "a3a788f3": 2,
-    "c73c7618": 2
+    "c73c7618": 0
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
