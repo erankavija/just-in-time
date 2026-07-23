@@ -8693,3 +8693,4 @@
 {"gate_key":"code-review","id":"c0b63de9-5b0c-40b4-8214-33e02b68e173","issue_id":"a3a788f3-39c2-4218-adaa-1cc5112b30f4","timestamp":"2026-07-23T09:03:46.170019656Z","type":"gate_failed","updated_by":"auto:executor"}
 {"from":"done","id":"848f52e5-e5ba-440c-8400-e0f7d36d3a79","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:05:17.280625632Z","to":"in_progress","type":"issue_state_changed"}
 {"fields":["description"],"id":"af2594d2-1d14-4f96-90c7-b0d71866fa78","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:05:17.280625632Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"cargo-ci","id":"7e8bf283-61a1-4a57-b601-894989113e8b","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:13:39.722097972Z","type":"gate_passed","updated_by":"auto:executor"}

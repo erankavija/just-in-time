@@ -26,7 +26,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:31:30.227567666Z",
+      "updated_at": "2026-07-23T09:13:39.722097972Z",
       "updated_by": "auto:executor"
     },
     "cargo-ci-features": {
@@ -97,5 +97,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Integrate repository-state cutover",
-  "updated_at": "2026-07-23T09:05:17.280625632Z"
+  "updated_at": "2026-07-23T09:13:39.722097972Z"
 }
