@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-23T13:51:31.530171734Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7f0ac1b0-b976-44ca-a9e1-9cad27878140",
   "labels": [
     "type:story",
@@ -25,5 +31,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Coherence and release assurance",
-  "updated_at": "2026-07-23T13:44:48.831573182Z"
+  "updated_at": "2026-07-23T13:51:31.530171734Z"
 }
