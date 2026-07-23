@@ -1,0 +1,63 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "f345358d6216a9902f8fc3bbb4d40235e1552fde",
+  "completed_at": "2026-07-23T20:55:08.846355651Z",
+  "duration_ms": 474302,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F1",
+        "line": 111,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "The typed-error design omits live captured-declaration anyhow paths and initialization/profile stringification bridges, so producer failures are not guaranteed to reach exit mapping through typed variants."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F2",
+        "line": 125,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-08",
+          "@/inv/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "The repair-target helper lacks profile claims, derives from drift-only actions, and conflates repair outputs with required fixture inputs, so it cannot be the planner's shared target authority."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F3",
+        "line": 170,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-12"
+        ],
+        "severity": "medium",
+        "summary": "SerializedRuleSet and SchemaFile remain public solely for repository integration tests without an identified adopter-facing contract."
+      }
+    ],
+    "summary": "The revised plan fixes publisher visibility, leaf wiring, and presentation scope, but typed-error and repair-target designs remain incomplete and non-executable.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "02dc4bac-52e5-4810-9e87-8384e34eabc7",
+  "message": null,
+  "run_id": "0b2ed100-249f-42c1-85ff-da8892f8995b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T20:47:14.543972955Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 13257 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f90bb-7f23-71b1-813c-8d33678a78b9\n--------\nuser\n--- 13244 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "## Plan document present and linked\n\nThe required plan exists at [dev/active/1cc809de-plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/1cc809de-plan.md:1), is non-empty, and is linked through `issue.documents` at the required path.\n\n## Completeness against the criteria\n\nThe plan materially addresses REQ-01 through REQ-16, but two hard criteria remain incomplete:\n\n- REQ-02’s typed-error design omits live stringifying producer paths.\n- REQ-08’s proposed repair-target authority lacks required inputs and conflates repair outputs with fixture inputs.\n\nREQ-12 is otherwise covered, but its decision to retain two audit-identified public types solely for integration tests is weakly justified.\n\n## Technical soundness and architectural fit\n\nThe mutation-session split, publisher visibility boundary, lock-hygiene decision, feature-gating mechanism, and benchmark design fit the existing command/storage/repository-state boundaries.\n\nThe typed-error inventory at [plan line 111](/home/vkaskivuo/Projects/just-in-time/dev/active/1cc809de-plan.md:111) is not complete. `CapturedRepositoryDeclarations` stores `Option<anyhow::Error>`, while `declarations_from_image` and `validation_declarations_from_image` return `anyhow::Result` at [repository_state/mod.rs line 153](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mod.rs:153), [line 206](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mod.rs:206), and [line 220](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mod.rs:220). That path also introduces unlisted `TemplateConfigError`, `GateDeclarationError`, `Utf8Error`, and rules/schema failures. Profile and initialization planning further stringify producer failures into `InitializationError::RuleMaterialization(String)` at [initialize.rs line 126](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/initialize.rs:126), including profile composition at [line 936](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/initialize.rs:936). These paths are absent from S1.c and are not necessarily removed by the independent S1.e identity-tail task.\n\nThe repair API at [plan line 125](/home/vkaskivuo/Projects/just-in-time/dev/active/1cc809de-plan.md:125) is also unsound. It declares `repair_target_paths(image, declarations)`, while `derive_repair` additionally requires `Vec<ProfileClaims>` at [repository_state/mod.rs line 660](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mod.rs:660). Moreover, `compose_complete` returns only actions for currently divergent targets, not the complete owned target declaration. The current test helper also includes authority and fixture inputs such as the profile record, index, and event log at [derived_state_repair_tests.rs line 85](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/fast_rules/derived_state_repair_tests.rs:85); those are not repair output targets and cannot simply be replaced by an output-target list.\n\n## Decomposition and dependencies\n\nThe revised leaf-wiring rule at [plan line 145](/home/vkaskivuo/Projects/just-in-time/dev/active/1cc809de-plan.md:145) resolves the prior dependency blocker: implementation sources are explicitly gated by the breakdown node or upstream story checkpoints. Story sinks and intra-story dependencies are coherent, with no remaining ordering inversion identified.\n\nThe task grouping is generally independently testable. S1.c and S2.d must be expanded to cover the blocking design omissions below before breakdown.\n\n## Risks and actionability\n\nThe major lock, benchmark, merge-conflict, feature-gating, and machine-specific timing risks have decisions or mitigations.\n\nThe typed-error section’s assertion that its inventory “cannot silently miss a class” is contradicted by the unlisted live `anyhow` and initialization bridges. The repair-target task likewise requires substantial design re-derivation: it does not specify how profile claims reach the helper or how complete owned targets are declared independently of drift actions.\n\n## Prior review feedback\n\n- Prior F1 remains unresolved: profile handling was added, but captured-declaration and initialization/profile string bridges remain outside the typed-error design.\n- Prior F2 is resolved: `rename_noreplace_cap` remains storage-private behind external-publish wrappers.\n- Prior F3 remains unresolved: the proposed repair-target API is still declarations-only and cannot enumerate profile-derived targets.\n- Prior F4 is resolved by the explicit leaf-wiring rule.\n- Prior F5 is resolved: S5 removes KaTeX and vendors all presentation assets for air-gapped use.\n\n## Findings\n\n1. **F1 — High, blocking:** The typed-error design omits the live `anyhow` captured-declaration pipeline and `InitializationError::RuleMaterialization(String)` bridges used by initialization and profile application. Consequently, following S1.c as written does not guarantee that every producer failure reaches exit mapping through typed variants, and the claimed exhaustive inventory is stale.\n\n2. **F2 — High, blocking:** `repair_target_paths(image, declarations)` does not take the profile claims required by `derive_repair`, while `compose_complete` exposes only changed actions rather than all declared repair targets. It also cannot replace the current fixture list, which includes authority inputs that are not repair outputs. The proposed API therefore cannot become the repair planner’s shared authority or support the promised exact coverage test.\n\n3. **F3 — Medium, advisory:** S4.b retains `SerializedRuleSet` and `SchemaFile` publicly solely because repository integration tests consume `serialize_ruleset`. Integration tests are not an adopter-facing contract; the plan should identify a real public API requirement or co-demote the serializer/types and adjust those tests, consistent with the audit’s public-surface reduction objective.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The revised plan fixes publisher visibility, leaf wiring, and presentation scope, but typed-error and repair-target designs remain incomplete and non-executable.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The typed-error design omits live captured-declaration anyhow paths and initialization/profile stringification bridges, so producer failures are not guaranteed to reach exit mapping through typed variants.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":111,\"references\":[\"@/issue/1cc809de/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The repair-target helper lacks profile claims, derives from drift-only actions, and conflates repair outputs with required fixture inputs, so it cannot be the planner's shared target authority.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":125,\"references\":[\"@/issue/1cc809de/requirement/REQ-08\",\"@/inv/single-source-prose\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"SerializedRuleSet and SchemaFile remain public solely for repository integration tests without an identified adopter-facing contract.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":170,\"references\":[\"@/issue/1cc809de/requirement/REQ-12\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
