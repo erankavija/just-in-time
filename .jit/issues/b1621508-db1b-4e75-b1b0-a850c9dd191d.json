@@ -19,6 +19,11 @@
       "status": "passed",
       "updated_at": "2026-07-23T08:44:41.717057521Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-23T08:49:05.985393534Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "b1621508-db1b-4e75-b1b0-a850c9dd191d",
@@ -31,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Validate drift diagnosis and transactional repair",
-  "updated_at": "2026-07-23T08:44:41.717057521Z"
+  "updated_at": "2026-07-23T08:49:05.985393534Z"
 }

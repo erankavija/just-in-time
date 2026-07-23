@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "8204884921ff99c0115661a1f561adc04e7d1328",
+  "completed_at": "2026-07-23T08:49:05.752462869Z",
+  "duration_ms": 189640,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Acceptance coverage satisfies the issue criteria; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b1621508-db1b-4e75-b1b0-a850c9dd191d",
+  "message": null,
+  "run_id": "e65bb39b-3f34-47b4-8552-820b384d509b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T08:45:56.111496926Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 03d76def, d14cfd98, 82048849 (`jit:b1621508`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/cdc840ad/requirement/REQ-06 (issue description); @/gate/jit-validate (.jit/gates.toml); @/invariant/semantic-test-assertions and @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-23T08:39:37Z); code-review unrun\nTruncation recovery: reread bounded test, plan, validation, and attribution ranges after aggregate output truncation\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Acceptance coverage satisfies the issue criteria; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
