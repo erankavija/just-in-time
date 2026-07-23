@@ -76,7 +76,7 @@
     },
     "security-review": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:34:29.899351496Z",
+      "updated_at": "2026-07-23T09:35:18.064132564Z",
       "updated_by": "agent:jit-execution-lead"
     }
   },
@@ -97,5 +97,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Integrate repository-state cutover",
-  "updated_at": "2026-07-23T09:33:43.286665906Z"
+  "updated_at": "2026-07-23T09:35:18.064132564Z"
 }
