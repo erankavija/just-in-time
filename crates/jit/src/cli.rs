@@ -374,7 +374,8 @@ pub enum Commands {
         #[arg(long, value_name = "ID")]
         scope: Option<String>,
 
-        /// Transactionally repair safe findings and provenance-proven derived state
+        /// Repair safe findings; provenance-proven derived-state repairs use one
+        /// recoverable transaction
         #[arg(long)]
         fix: bool,
 

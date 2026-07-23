@@ -89,10 +89,10 @@ Declared configuration, registries, and applied-profile provenance are the
 authorities for generated schemas, default-rule assertions, configured
 projections, and installed profile targets. `jit validate` reports an owned
 target that is missing, stale, has the wrong executable mode, or is unexpected.
-`jit validate --fix` recomputes the same complete final-state plan and publishes
-all safe repairs in one recoverable transaction. It preserves authored rule
-comments, order, policy, and all unmanaged document bytes; it never treats a
-conventional filename as proof of ownership.
+For provenance-proven derived-state repairs, `jit validate --fix` recomputes
+the complete final-state plan and publishes it in one recoverable transaction.
+It preserves authored rule comments, order, policy, and all unmanaged document
+bytes; it never treats a conventional filename as proof of ownership.
 
 Managed regions replace only the package- or projection-owned marked region.
 Distinct regions may nest, but delimiters must form one unambiguous containment

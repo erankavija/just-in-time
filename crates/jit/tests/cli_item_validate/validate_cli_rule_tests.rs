@@ -704,7 +704,7 @@ fn test_schema_exposes_validate_positional_and_explain_flag() {
         fix["description"]
             .as_str()
             .unwrap()
-            .contains("provenance-proven derived state"),
+            .contains("provenance-proven derived-state repairs use one recoverable transaction"),
         "schema must document the repair contract: {fix}"
     );
 }
@@ -741,7 +741,7 @@ process.stdin.on('end', () => {
   const props = tool.inputSchema.properties || {};
   if (!props.id) { console.error('missing id property'); process.exit(3); }
   if (!props.explain) { console.error('missing explain property'); process.exit(4); }
-  if (!props.fix?.description?.includes('provenance-proven derived state')) {
+  if (!props.fix?.description?.includes('provenance-proven derived-state repairs use one recoverable transaction')) {
     console.error('missing fix repair contract'); process.exit(5);
   }
   console.log('ok');
