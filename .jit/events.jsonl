@@ -8709,3 +8709,4 @@
 {"gate_key":"code-review","id":"b19a13c7-81de-4522-89b2-f87a7e4e6ad6","issue_id":"a3a788f3-39c2-4218-adaa-1cc5112b30f4","timestamp":"2026-07-23T09:43:35.065017679Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"e583615f-03bf-46bf-84f2-f38fbf412743","issue_id":"a3a788f3-39c2-4218-adaa-1cc5112b30f4","timestamp":"2026-07-23T09:44:47.460041366Z","to":"done","type":"issue_state_changed"}
 {"id":"357d6f33-1474-4eb7-8b54-67835080e1da","issue_id":"a3a788f3-39c2-4218-adaa-1cc5112b30f4","timestamp":"2026-07-23T09:44:47.460041366Z","type":"issue_completed"}
+{"fields":["description"],"id":"859ecd42-53b6-4c81-8426-c49bfebe9845","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T09:48:34.009800457Z","type":"issue_updated","updated_by":"issue-update"}
