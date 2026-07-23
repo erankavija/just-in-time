@@ -41,7 +41,7 @@
     },
     "dependency-audit": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:33:56.001243873Z",
+      "updated_at": "2026-07-23T09:26:05.451573972Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -97,5 +97,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Integrate repository-state cutover",
-  "updated_at": "2026-07-23T09:24:37.211635635Z"
+  "updated_at": "2026-07-23T09:26:05.451573972Z"
 }
