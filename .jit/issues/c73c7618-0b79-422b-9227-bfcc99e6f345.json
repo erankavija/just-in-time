@@ -20,8 +20,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-07-23T10:26:11.964913576Z",
+      "status": "passed",
+      "updated_at": "2026-07-23T11:08:47.270675248Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document public contracts and complete release evidence",
-  "updated_at": "2026-07-23T10:26:11.964913576Z"
+  "updated_at": "2026-07-23T11:08:47.270675248Z"
 }

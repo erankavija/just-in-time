@@ -8713,3 +8713,4 @@
 {"from":"ready","id":"fb2a2344-0b5a-4e6a-97a4-d78db14518f4","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T09:49:35.097383197Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker-c73","id":"ee6a31dd-87e6-4bf2-846c-440e1a0e0a98","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T09:49:35.097383197Z","type":"issue_claimed"}
 {"gate_key":"cargo-ci","id":"ba9863f8-fcaf-42fe-b6ce-a694a4eb9f0c","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T10:26:11.964913576Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"8ea19725-5b7d-4b9c-bcde-8d9c56ee2f9c","issue_id":"c73c7618-0b79-422b-9227-bfcc99e6f345","timestamp":"2026-07-23T11:08:47.270675248Z","type":"gate_passed","updated_by":"auto:executor"}
