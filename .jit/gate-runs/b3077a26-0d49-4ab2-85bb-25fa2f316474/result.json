@@ -1,0 +1,54 @@
+{
+  "branch": "feat/129f3fad-provenance-build-inputs",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "b5f41572c3ce3a39bd5732006db30fd7c0eba5e9",
+  "completed_at": "2026-07-23T22:24:45.245541102Z",
+  "duration_ms": 131045,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F1",
+        "line": 151,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/02dc4bac/requirement/REQ-P1",
+          "@/issue/1cc809de/requirement/REQ-03",
+          "@/inv/atomic-writes",
+          "@/inv/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "S1.d lacks a defined journal-free cleanup path for mismatch after transaction control creation."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F2",
+        "line": 135,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/02dc4bac/requirement/REQ-P1",
+          "@/issue/1cc809de/requirement/REQ-12"
+        ],
+        "severity": "high",
+        "summary": "S4.a incorrectly relies on a self dev-dependency to enable test-support without changing test invocation."
+      }
+    ],
+    "summary": "The plan leaves journal-free transaction-control cleanup and test-support feature activation unresolved.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "02dc4bac-52e5-4810-9e87-8384e34eabc7",
+  "message": null,
+  "run_id": "b3077a26-0d49-4ab2-85bb-25fa2f316474",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T22:22:34.200216118Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7368 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9112-c60f-7b53-8be6-082b1b562009\n--------\nuser\n--- 7355 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "## Plan document present and linked\n\nPass. The linked plan exists at `dev/active/1cc809de-plan.md` and is non-empty.\n\n## Completeness against criteria\n\nREQ-12 is not executable as planned: its feature-gating mechanism cannot enable `test-support` for JIT’s own integration tests under the stated unchanged CI commands.\n\n## Technical soundness and architectural fit\n\nThe prior S1.d cleanup issue remains under-specified. The proposed “widened” cleanup cannot directly reuse the current cleanup path before a journal exists.\n\n## Decomposition and dependencies\n\nThe story ordering is coherent, but S4.a needs an explicit test-invocation/gate dependency decision before its dependent S4.b work can be safely implemented.\n\n## Risks and actionability\n\nThe plan incorrectly treats the self-dev-dependency as a no-config-change solution, rather than recording the required Cargo test feature selection. This leaves a load-bearing build and test decision unresolved.\n\n## Prior review feedback\n\nThe prior blocking feedback concerned journal construction after transaction control creation. Plan §S1.d acknowledges the location, but does not specify a journal-free cleanup path or its failure-injection coverage; the current helper requires a constructed journal.\n\n1. **F1 — High, blocking:** S1.d still does not design a safe immediate cleanup path for an `initial_repository_journal` mismatch. The plan says to widen the existing cleanup-then-error handling ([plan §S1.d](dev/active/1cc809de-plan.md:151)), but control is created before journal construction ([file_transaction.rs](crates/jit/src/storage/file_transaction.rs:856)) and the current handler starts only after successful journal construction ([file_transaction.rs](crates/jit/src/storage/file_transaction.rs:859), [file_transaction.rs](crates/jit/src/storage/file_transaction.rs:865)). Further, `cleanup_repository_control` requires `&RepositoryTransactionJournal` to decide stage cleanup ([file_transaction.rs](crates/jit/src/storage/file_transaction.rs:1991)). The task must explicitly define a journal-free, pre-publication control cleanup routine and failure-injection test; otherwise the prior blocking defect can remain.\n\n2. **F2 — High, blocking:** The S4.a feature-gating plan relies on an invalid/self-referential Cargo setup. It proposes adding `jit = { path = \".\", features = [\"test-support\"] }` as JIT’s own dev-dependency and claims this enables the feature for `cargo test --workspace` without CI changes ([plan §Test-support feature gating](dev/active/1cc809de-plan.md:135)). JIT currently has no such feature or self-dependency ([Cargo.toml](crates/jit/Cargo.toml:68), [Cargo.toml](crates/jit/Cargo.toml:76)); a package cannot depend on itself to activate its own feature. Yet external JIT integration tests directly require the public fault-injection API ([recover_command_tests.rs](crates/jit/tests/cli_issue/recover_command_tests.rs:9), [recover_command_tests.rs](crates/jit/tests/cli_issue/recover_command_tests.rs:84)), and the server’s unit tests require it too ([lib.rs](crates/server/src/lib.rs:85)). The actual gate invokes plain `cargo test --workspace` ([cargo-ci.sh](scripts/cargo-ci.sh:239)), so the feature-on tests would fail to compile or be skipped. The plan must choose and specify a valid mechanism—such as feature-enabled test commands/targets and the corresponding gate update—before S4.a can meet REQ-12.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan leaves journal-free transaction-control cleanup and test-support feature activation unresolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"S1.d lacks a defined journal-free cleanup path for mismatch after transaction control creation.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":151,\"references\":[\"@/issue/02dc4bac/requirement/REQ-P1\",\"@/issue/1cc809de/requirement/REQ-03\",\"@/inv/atomic-writes\",\"@/inv/derived-state-coherence\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"S4.a incorrectly relies on a self dev-dependency to enable test-support without changing test invocation.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":135,\"references\":[\"@/issue/02dc4bac/requirement/REQ-P1\",\"@/issue/1cc809de/requirement/REQ-12\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
