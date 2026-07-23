@@ -1,0 +1,25 @@
+{
+  "assignee": "agent:worker-b162",
+  "claimed_at": "2026-07-23T06:58:18.213329703Z",
+  "context": {},
+  "created_at": "2026-07-23T06:58:00.304716792Z",
+  "dependencies": [],
+  "description": "Fix the confirmed repair bug exposed by the post-integration acceptance suite: when a default-origin rule's derived assertion is stale, `jit validate --fix` must restore the config-derived assertion without removing authored `rules.toml` bytes such as the file header or editable policy fields.\n\n## Background\n\nThe acceptance work for `b1621508` reproduces the same failure on JSON and InMemory backends. The repair currently drops an authored first-line header and leaves the stale default-origin assertion unchanged. The approved ownership matrix in `dev/active/cdc840ad-plan.md` §2/D7 requires authored rule content to be preserved while generated default-rule fragments are repaired from declared configuration.\n\n## Success Criteria\n\n- [hard] REQ-01: On both JSON and InMemory backends, repairing a stale default-origin assertion restores the exact assertion derived from declared configuration while preserving the authored `rules.toml` header, comments, ordering, and editable policy fields byte-for-byte.\n- [hard] REQ-02: The correction uses the existing rules-document span ownership and repository-state transaction path; it adds no alternate renderer, whole-file fallback rewrite, compatibility seam, or second publisher.\n- [hard] REQ-03: Focused regressions prove the repair and a second fix is a no-op; ambiguous ownership remains non-repairable and zero-write.\n\n## Constraints\n\n- Keep the change narrow to the existing rules materializer/repair path and its cohesive tests.\n- Preserve all authored rule policy unconditionally; filename or default-origin convention alone never authorizes a whole-file rewrite.\n- Do not broaden into the remaining acceptance matrix owned by `b1621508`.",
+  "documents": [],
+  "first_ready_at": "2026-07-23T06:58:00.304716792Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "8f1c2595-242e-4cf4-b810-22c6b55fb1f3",
+  "labels": [
+    "type:bug",
+    "epic:repository-materialization",
+    "component:validation"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Preserve authored rules while repairing derived assertions",
+  "updated_at": "2026-07-23T06:58:18.213329703Z"
+}
