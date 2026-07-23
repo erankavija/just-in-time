@@ -36,4 +36,4 @@ jit gate define ai-review \
   --timeout 120
 ```
 
-See [How-To: Custom Gates](docs/how-to/custom-gates.md) for full documentation.
+See [How-To: Custom Gates](../docs/how-to/custom-gates.md) for full documentation.
