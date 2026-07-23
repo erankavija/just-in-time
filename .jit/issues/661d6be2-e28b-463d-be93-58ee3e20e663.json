@@ -71,7 +71,7 @@
     },
     "secret-detection": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:34:03.698553691Z",
+      "updated_at": "2026-07-23T09:27:38.861959099Z",
       "updated_by": "auto:executor"
     },
     "security-review": {
@@ -97,5 +97,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Integrate repository-state cutover",
-  "updated_at": "2026-07-23T09:26:05.451573972Z"
+  "updated_at": "2026-07-23T09:27:38.861959099Z"
 }
