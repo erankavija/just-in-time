@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "bd969e31e3289cb82c56f74cf4db12c651522281",
+  "completed_at": "2026-07-23T07:51:24.965133935Z",
+  "duration_ms": 148358,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable repair preserves authored rules content while restoring config-derived default assertions, with JSON and in-memory regression coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8f1c2595-242e-4cf4-b810-22c6b55fb1f3",
+  "message": null,
+  "run_id": "cfb185b5-8e6c-422d-8fec-26a737afba15",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T07:48:56.606222678Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a7655105, 6f804afa, 303d93e, bd969e31 (jit:8f1c2595)\nPolicy sources: AGENTS.md; dev/active/cdc840ad-plan.md §2\nResolved items: @/gate/jit-validate (.jit/gates.toml); @/invariant/atomic-writes and @/invariant/derived-state-coherence (.jit/invariants.toml); @/charter/D-7 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed, exit 0, 2026-07-23T07:22:07.774724099+00:00\nTruncation recovery: narrowed reads of the ownership matrix, rules repair path, regression tests, and ambiguity tests\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable repair preserves authored rules content while restoring config-derived default assertions, with JSON and in-memory regression coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
