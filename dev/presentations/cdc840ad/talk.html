@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>One repository, one truth — JIT epic cdc840ad</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- ── 1 · TITLE ───────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>One repository, one truth</h1>
+  <p class="tagline">Transactional materialization and derived-state coherence in JIT</p>
+  <p>Epic cdc840ad &nbsp;·&nbsp; just-in-time &nbsp;·&nbsp; 2026-07-23</p>
+  <p class="caption">9 hard criteria · 15 dependencies · 3,784 Rust tests · 100s lifecycle regression removed</p>
+</section>
+
+<!-- ── 2 · FEATURE INTRO ───────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Feature introduction <span class="num">· 2 / 22</span></span>
+  <h2>What this feature is</h2>
+  <div class="def">
+    Repository materialization turns JIT's declared semantic state into every
+    coupled persisted file through one captured final view, one pure plan, and
+    one recoverable publication.
+  </div>
+  <p>Configuration, registries, issues, projections, schemas, managed prose,
+     provenance, and audit state can no longer be updated by unrelated
+     command-specific write paths.</p>
+  <div class="note">For users, commands become atomic and repairable. For agents, the repository becomes a coherent input rather than a collection of files that may disagree.</div>
+</section>
+
+<!-- ── 3 · OLD FAILURE MODE ────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Motivation <span class="num">· 3 / 22</span></span>
+  <h2>Before: valid inputs could leave stale outputs</h2>
+  <ul>
+    <li>Profile apply validated a merged view without materializing every coupled default.</li>
+    <li>Configuration could persist before schemas, rules, or projections refreshed.</li>
+    <li><code>project render</code> published targets one at a time.</li>
+    <li>Profile regions and registry projections used separate marker engines.</li>
+    <li>Validation could derive correct behavior while persisted addressable state remained stale.</li>
+  </ul>
+  <div class="warning">Each local operation looked reasonable. Their composition was not a transaction.</div>
+</section>
+
+<!-- ── 4 · BENEFITS ────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Why it matters <span class="num">· 4 / 22</span></span>
+  <h2>What JIT gains</h2>
+  <div class="three-col">
+    <div>
+      <h3>Correctness</h3>
+      <p>Declared and derived state agree after every successful mutation—or nothing changes.</p>
+    </div>
+    <div>
+      <h3>Operations</h3>
+      <p>Crashes, conflicts, and interruption have one recovery story instead of command-specific cleanup.</p>
+    </div>
+    <div>
+      <h3>Agentability</h3>
+      <p>Plans are deterministic, errors are typed, and repository evidence is safe to inspect and retry.</p>
+    </div>
+  </div>
+  <div class="note">The feature strengthens JIT's core promise: plain JSON in Git, without accepting partially coherent JSON.</div>
+</section>
+
+<!-- ── 5 · PIPELINE ────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Mental model <span class="num">· 5 / 22</span></span>
+  <h2>The entire contract in one pipeline</h2>
+  <div class="item-decl">CaptureSpec → RepositoryImage → pure MaterializationPlan → validate → recoverable apply</div>
+  <ol>
+    <li>Bound exactly which repository evidence the operation may read.</li>
+    <li>Capture an immutable, closed image of that evidence.</li>
+    <li>Derive one deterministic delta without filesystem I/O.</li>
+    <li>Revalidate preimages and publish the complete delta atomically.</li>
+  </ol>
+  <div class="note">Reads define the plan; the plan owns its captured image; storage publishes but does not invent semantics.</div>
+</section>
+
+<!-- ── 6 · CAPTURE ─────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Capture <span class="num">· 6 / 22</span></span>
+  <h2>A closed final repository view</h2>
+<pre><code class="language-rust" data-trim>pub struct CaptureSpec { /* bounded paths + listings */ }
+
+pub struct RepositoryImage {
+    entries: BTreeMap&lt;VirtualPath, RepositoryEntry&gt;,
+    evidence: RepositoryRootEvidence,
+}</code></pre>
+  <ul>
+    <li>Virtual paths separate semantic identity from physical layout and custom data roots.</li>
+    <li>Directory listings, linked worktrees, documents, and pinned evidence are explicit.</li>
+    <li>An undiscovered read is a defect—not a fallback to ambient filesystem access.</li>
+  </ul>
+</section>
+
+<!-- ── 7 · PURE PLAN ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Planning <span class="num">· 7 / 22</span></span>
+  <h2>Planning is pure, deterministic, and inspectable</h2>
+  <div class="item-decl">fn derive(image: &amp;RepositoryImage, declarations: &amp;RepositoryDeclarations) -&gt; MaterializationPlan</div>
+<pre><code class="language-json" data-trim>{
+  "plan_hash": "sha256:…",
+  "actions": [
+    { "path": ".jit/rules.toml", "expected": "…", "write": "…" }
+  ]
+}</code></pre>
+  <p>Equal semantic inputs produce the same ordered delta and plan identity.
+     Planning publishes nothing.</p>
+</section>
+
+<!-- ── 8 · PUBLICATION ─────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Publication <span class="num">· 8 / 22</span></span>
+  <h2>Publication has one failure model</h2>
+  <table>
+    <thead><tr><th>Stage</th><th>Responsibility</th><th>Failure result</th></tr></thead>
+    <tbody>
+      <tr><td>Capture</td><td>record exact preimages and root identity</td><td>no writes</td></tr>
+      <tr><td>Prepare</td><td>stage every target and durable journal</td><td>recover old state</td></tr>
+      <tr><td>Publish</td><td>replace the complete validated file set</td><td>finish or roll back</td></tr>
+      <tr><td>Commit</td><td>make publication irreversible, clean journal</td><td>complete new state</td></tr>
+    </tbody>
+  </table>
+  <div class="note">The observable contract is all-old or all-new—even across interruption and process restart.</div>
+</section>
+
+<!-- ── 9 · CONSUMERS ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Adoption <span class="num">· 9 / 22</span></span>
+  <h2>One path now serves the mutation surface</h2>
+  <table>
+    <thead><tr><th>Consumer</th><th>Coupled state planned together</th></tr></thead>
+    <tbody>
+      <tr><td>init / re-init</td><td>config, rules, schemas, attributes, projections</td></tr>
+      <tr><td>profile apply</td><td>contributions, assets, regions, provenance, audit</td></tr>
+      <tr><td>config / gate / template edits</td><td>declaration plus every affected materialization</td></tr>
+      <tr><td>project render</td><td>all selected targets, including shared targets</td></tr>
+      <tr><td>issue / dependency / claim / docs</td><td>records, index, events, and coupled outputs</td></tr>
+      <tr><td>archive / snapshot / export</td><td>source mutation and external publication evidence</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── 10 · MANAGED PROSE ──────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Managed prose <span class="num">· 10 / 22</span></span>
+  <h2>One marker engine, multiple policies</h2>
+  <div class="two-col">
+    <div>
+      <h3>Mechanics are shared</h3>
+      <ul>
+        <li>strict marker parsing</li>
+        <li>nested-region support</li>
+        <li>crossing and duplicate rejection</li>
+        <li>byte-preserving splice</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Semantics stay separate</h3>
+      <ul>
+        <li>profile ownership</li>
+        <li>projection ownership</li>
+        <li>placement policy</li>
+        <li>rendering policy</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note">Sharing the primitive removed duplicate marker logic without pretending every producer owns prose in the same way.</div>
+</section>
+
+<!-- ── 11 · VALIDATION AND REPAIR ──────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Validation <span class="num">· 11 / 22</span></span>
+  <h2>Repair derived state—never redefine authority</h2>
+<pre><code class="language-bash" data-trim>jit validate          # diagnose missing or stale materializations
+jit validate --fix    # recompute from declarations; publish one plan
+jit validate          # exact, idempotent clean result</code></pre>
+  <ul>
+    <li>Expected bytes are always recomputed from declared configuration and registries.</li>
+    <li>Unrelated content and authored rule prose remain byte-for-byte intact.</li>
+    <li>Malformed or ambiguous ownership fails before publication.</li>
+  </ul>
+  <div class="warning">A projection may repair derived assertions. It must not silently become authority over authored semantics.</div>
+</section>
+
+<!-- ── 12 · AUTHORITY ──────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Authority <span class="num">· 12 / 22</span></span>
+  <h2>The source-of-truth hierarchy is explicit</h2>
+  <table>
+    <thead><tr><th>State</th><th>Role</th><th>May override declarations?</th></tr></thead>
+    <tbody>
+      <tr><td>config + registries</td><td>semantic authority</td><td><span class="badge green">yes—by authorship</span></td></tr>
+      <tr><td>schemas + projections + managed regions</td><td>derived materialization</td><td><span class="badge gray">no</span></td></tr>
+      <tr><td>profile records</td><td>provenance and ownership</td><td><span class="badge gray">no</span></td></tr>
+      <tr><td>transaction journals</td><td>recovery state</td><td><span class="badge gray">no</span></td></tr>
+    </tbody>
+  </table>
+  <div class="item-decl">derived-state-coherence: derive coupled state from one final view; publish it recoverably</div>
+</section>
+
+<!-- ── 13 · BEFORE / AFTER ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Architecture <span class="num">· 13 / 22</span></span>
+  <h2>Simpler ownership, not a smaller problem</h2>
+  <div class="two-col">
+    <div>
+      <h3>Before</h3>
+      <ul>
+        <li>command-local planners</li>
+        <li>multiple marker engines</li>
+        <li>per-file publishers</li>
+        <li>ambient validation reads</li>
+        <li>consumer-specific recovery</li>
+      </ul>
+    </div>
+    <div>
+      <h3>After</h3>
+      <ul>
+        <li>one closed image model</li>
+        <li>one pure derivation boundary</li>
+        <li>one delta vocabulary</li>
+        <li>one transaction session</li>
+        <li>one recovery protocol</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note">The simplification is architectural: fewer authorities and fewer ways to publish—not fewer requirements.</div>
+</section>
+
+<!-- ── 14 · LINE COUNT ─────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Complexity accounting <span class="num">· 14 / 22</span></span>
+  <h2>The honest line-count result</h2>
+  <table>
+    <thead><tr><th>Measured scope</th><th>Added</th><th>Deleted</th><th>Net</th></tr></thead>
+    <tbody>
+      <tr><td><code>crates/jit</code></td><td>48,806</td><td>23,843</td><td><strong>+24,963</strong></td></tr>
+      <tr><td><code>crates/jit/src</code></td><td>44,799</td><td>21,690</td><td><strong>+23,109</strong></td></tr>
+      <tr><td>product + public docs</td><td>48,974</td><td>23,996</td><td><strong>+24,978</strong></td></tr>
+    </tbody>
+  </table>
+  <p class="small">Baseline: parent of the first implementation commit
+     (<code>82a8cf3f</code>) through completion (<code>46ed1b94</code>).
+     Excludes <code>.jit</code> gate evidence and <code>dev/</code> execution documents;
+     includes inline Rust tests.</p>
+  <div class="warning">This epic is net additive. Its simplicity claim is structural, not a claim that 25k lines disappeared.</div>
+</section>
+
+<!-- ── 15 · DELETION ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Complexity accounting <span class="num">· 15 / 22</span></span>
+  <h2>Nearly 24k deleted lines still mattered</h2>
+  <div class="two-col">
+    <div>
+      <h3>Deleted profile engines</h3>
+      <ul>
+        <li><code>planner.rs</code></li>
+        <li><code>snapshot.rs</code></li>
+        <li><code>render.rs</code></li>
+        <li><code>drift.rs</code></li>
+        <li><code>preset.rs</code></li>
+      </ul>
+    </div>
+    <div>
+      <h3>Deleted storage predecessors</h3>
+      <ul>
+        <li><code>artifact_mutation.rs</code></li>
+        <li><code>transaction_action.rs</code></li>
+        <li><code>recovery_coordinator.rs</code></li>
+        <li><code>config_store.rs</code></li>
+        <li><code>gitattributes.rs</code></li>
+      </ul>
+    </div>
+  </div>
+  <div class="note">Source-tree movement: 20 files added, 10 deleted, 7 renamed, 90 modified. The new code centralizes contracts and exhaustive tests that were previously absent.</div>
+</section>
+
+<!-- ── 16 · PERFORMANCE BLOCKER ────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Performance <span class="num">· 16 / 22</span></span>
+  <h2>Completion exposed a 100-second lifecycle path</h2>
+  <p>A terminal issue update scanned every Backlog issue, then opened a full
+     repository mutation session for each—even when dependencies still blocked it.</p>
+  <div class="item-decl">48 Backlog issues × preflight + publication capture ≈ 100 seconds</div>
+  <ul>
+    <li>Work scaled with total Backlog count, not eligible transitions.</li>
+    <li>The current repository produced 130 session opens in the deterministic model.</li>
+    <li><code>jit validate</code> itself took only about 1.5 seconds, ruling out repository size as the explanation.</li>
+  </ul>
+  <div class="warning">The epic was deliberately held open. Correctness with pathological lifecycle latency was not accepted as complete.</div>
+</section>
+
+<!-- ── 17 · PERFORMANCE FIX ────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Performance <span class="num">· 17 / 22</span></span>
+  <h2>The fix was deliberately small</h2>
+<pre><code class="language-rust" data-trim>let issues = self.storage.list_issues()?;
+let resolved = build_issue_map(&amp;issues);
+let candidates = issues.iter()
+    .filter(|issue| issue.should_auto_transition_to_ready(&amp;resolved))
+    .map(|issue| issue.id.clone())
+    .collect::&lt;Vec&lt;_&gt;&gt;();
+for id in candidates { self.auto_transition_to_ready(&amp;id)?; }</code></pre>
+  <p>Production change: <strong>+2 / −1 lines</strong>. Existing retry, event,
+     timestamp, and atomic-publication paths remain unchanged. No cache,
+     worker, compatibility path, or second engine was introduced.</p>
+</section>
+
+<!-- ── 18 · PERFORMANCE RESULTS ────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Performance <span class="num">· 18 / 22</span></span>
+  <h2>Measured lifecycle results</h2>
+  <table>
+    <thead><tr><th>Measurement</th><th>Before</th><th>After</th></tr></thead>
+    <tbody>
+      <tr><td>no-op terminal retry</td><td>≈90–100s</td><td><strong>2.337s</strong></td></tr>
+      <tr><td>deterministic session opens</td><td>130</td><td><strong>2</strong></td></tr>
+      <tr><td>blocker Done + epic auto-promotion</td><td>not acceptable</td><td><strong>7.499s</strong></td></tr>
+      <tr><td>final epic transition</td><td>not attempted</td><td><strong>3.747s</strong></td></tr>
+      <tr><td>whole-repository validation</td><td>—</td><td><strong>1.538s</strong></td></tr>
+    </tbody>
+  </table>
+  <p>The no-op retry left tracked <code>.jit</code> bytes and lifecycle timestamps unchanged.
+     Work now scales with eligible transitions.</p>
+</section>
+
+<!-- ── 19 · QUALITY AND DEBT ───────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Quality <span class="num">· 19 / 22</span></span>
+  <h2>Strong evidence, with visible debt</h2>
+  <div class="two-col">
+    <div>
+      <h3>Completion evidence</h3>
+      <ul>
+        <li>15 / 15 dependencies Done</li>
+        <li>3,784 Rust tests passed</li>
+        <li>full cargo, feature, npm, MCP, docs, audit, security, and review gates</li>
+        <li>independent holistic PASS</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Advisory debt</h3>
+      <ul>
+        <li>hundreds of ignored empty lock files</li>
+        <li>stale <code>JsonError::_command</code> parameter</li>
+        <li>noisy MCP schema-reference warnings</li>
+        <li>one error-code docs mismatch</li>
+        <li>fail-open manual audit script</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ── 20 · FUTURE ─────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Future development <span class="num">· 20 / 22</span></span>
+  <h2>Next: make performance a maintained contract</h2>
+  <ol>
+    <li><strong>Performance budgets:</strong> add repository-scale lifecycle benchmarks and session-open telemetry to catch scaling regressions before completion.</li>
+    <li><strong>Lock hygiene:</strong> consolidate or lazily create per-record locks, preserving concurrency tests and advisory semantics.</li>
+    <li><strong>Incremental work:</strong> optimize capture or dependency indexing only when measurements justify it; keep full revalidation at publication.</li>
+  </ol>
+  <div class="note">Measure session opens and elapsed time together: latency alone does not reveal an accidental O(backlog) recapture loop.</div>
+</section>
+
+<!-- ── 21 · FUTURE PRODUCT ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Future development <span class="num">· 21 / 22</span></span>
+  <h2>Next: extend the shared engine, not around it</h2>
+  <ol>
+    <li><strong>Explainability:</strong> expose plan/delta previews and repair explanations from the existing pure planner.</li>
+    <li><strong>Profile lifecycle:</strong> build safe upgrade and removal on captured ownership and provenance—without a second planner.</li>
+    <li><strong>Typed integrations:</strong> let new consumers contribute typed intent rather than acquire private publication logic.</li>
+    <li><strong>API cleanup:</strong> remove compatibility scars and fix generator/documentation debt while the architecture is still greenfield.</li>
+  </ol>
+  <div class="note">The long-term guardrail: one image, one planner, one transaction boundary—even as the product surface grows.</div>
+</section>
+
+<!-- ── 22 · CLOSING ────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>Takeaways</h1>
+  <p class="tagline">One final view · one deterministic plan · one recoverable publication</p>
+  <p>JIT gained stronger correctness and simpler authority boundaries—not a small diff.</p>
+  <p class="caption">Epic cdc840ad · net +24,978 product/public-doc lines · 100s lifecycle path reduced to 2.337s</p>
+</section>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+  window.__deckReady = false;
+  window.__mathReady = false;
+
+  function initDeck() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+    window.__mathReady = true;
+
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>
