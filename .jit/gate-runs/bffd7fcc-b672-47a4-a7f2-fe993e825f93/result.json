@@ -1,0 +1,88 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "4e80c4dcbfd9db5d3e209508ad3131d2e8c7dd83",
+  "completed_at": "2026-07-23T20:44:25.550591230Z",
+  "duration_ms": 469258,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F1",
+        "line": 107,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "The typed-error inventory omits live profile/rules producer classes and leaves profile JSON exit mapping without a replacement."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F2",
+        "line": 121,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-06",
+          "@/inv/atomic-writes"
+        ],
+        "severity": "high",
+        "summary": "The cutover design exposes the repository transaction primitive rename_noreplace_cap as a crate-wide external publisher."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F3",
+        "line": 125,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-08",
+          "@/inv/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "The declarations-only repair_target_paths API cannot enumerate image- and profile-derived repair targets or serve as the planner's shared authority."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F4",
+        "line": 143,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/dag-acyclic"
+        ],
+        "severity": "high",
+        "summary": "Story-level prerequisite edges do not block their leaf tasks behind the breakdown gate or upstream story checkpoints."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F5",
+        "line": 175,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-16"
+        ],
+        "severity": "high",
+        "summary": "The successor-deck task omits required KaTeX removal and leaves the audit's offline-asset decision unresolved."
+      }
+    ],
+    "summary": "The revised plan fixes several prior defects but remains non-executable around typed errors, publisher visibility, repair-target authority, leaf dependency wiring, and presentation scope.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "02dc4bac-52e5-4810-9e87-8384e34eabc7",
+  "message": null,
+  "run_id": "bffd7fcc-b672-47a4-a7f2-fe993e825f93",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T20:36:36.292382132Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10270 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f90b1-c32a-7cb3-983c-25af2379e686\n--------\nuser\n--- 10257 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at `dev/active/1cc809de-plan.md`, is non-empty, and is linked from planning issue `02dc4bac` as a design document. The planning issue has no unmet dependencies.\n\n## Completeness against the criteria\n\nFail. The plan reproduces all sixteen hard requirements, but its designs for REQ-02 and REQ-08 remain incomplete, and the presentation task narrows the audit-backed REQ-16 scope. See F1, F3, and F5.\n\n## Technical soundness and architectural fit\n\nFail.\n\nThe typed-error design does not cover all current producer failures or both exit-mapping paths (F1). The cutover design exposes an internal transaction primitive to command modules (F2). The repair-target API lacks inputs required to enumerate the targets the repair planner actually handles (F3).\n\n## Decomposition and dependencies\n\nFail. The high-level arrow direction is now consistent, and the S3.a/S3.b and S4.a/S4.b ordering defects from the prior review are corrected. However, dependencies attached only to story nodes do not block their task dependencies. This permits implementation leaves to become ready before the breakdown gate and before upstream stories complete (F4).\n\n## Risks and actionability\n\nFail. The plan asserts compile-time totality instead of designing the missing error mappings, and leaves the audit’s offline-presentation decision unresolved. These require implementers to re-derive material parts of the design rather than execute it directly.\n\n## Prior review feedback\n\nThe revision resolves the previous multi-session combinator, failure-injection constructor/gate, benchmark reset/order, and public `Contribution` payload findings. It does not fully resolve the prior typed-error, visibility, repair-target, dependency-wiring, or presentation-correction findings; their remaining concrete forms are enumerated below.\n\n## Findings\n\n1. **F1 — Blocking, high: The typed-error boundary remains incomplete.** The proposed `ProducerError` inventory in `dev/active/1cc809de-plan.md:107-117` covers the six `materialize.rs` signatures and two internal leaves, but production still constructs string producers for profile-registry occupant, parse, and contribution-conflict failures at `crates/jit/src/repository_state/profile_apply.rs:397`, `:435`, `:468-469`, and `:678`. The rules-document producers also still expose unrelated `anyhow` classes at `crates/jit/src/repository_state/rules_document.rs:41-43`, `:107-145`, and `:167-177`; no typed replacement is specified. Additionally, the plan deletes `is_profile_target_conflict` but only redesigns `error_to_exit_code`, while `profile_json_error` independently calls that method at `crates/jit/src/main.rs:770-786`. Compilation can reveal these omissions, but it cannot select their variants or exit-code semantics. This leaves prior F2 and hard REQ-02 unresolved.\n\n2. **F2 — Blocking, high: The visibility cutover misclassifies an internal repository publisher as an external-export API.** `dev/active/1cc809de-plan.md:119-121` moves `rename_noreplace_cap` into a `pub(crate)` external-publish module. In reality, the transaction kernel imports it at `crates/jit/src/storage/file_transaction.rs:7` and uses it for repository transaction recovery and publication at `:355` and `:1259-1264`, among other sites. Unlike the three external wrappers, it accepts raw directory capabilities rather than `ExternalExportPath`. Exposing it crate-wide would let command modules bypass the intended storage-only boundary. It must remain storage-restricted while only the `ExternalExportPath`-guarded wrappers are exposed. Prior F3 and hard REQ-06 therefore remain unresolved.\n\n3. **F3 — Blocking, high: The proposed repair-target declaration cannot represent the repair planner’s actual target set.** `dev/active/1cc809de-plan.md:123-125` specifies `repair_target_paths(&RepositoryDeclarations)`, but `derive_repair` additionally consumes `RepositoryImage` and `Vec<ProfileClaims>` at `crates/jit/src/repository_state/mod.rs:660-683`. The existing coverage fixture derives profile targets from `jit_dogfood_package().hashes().targets` and includes the applied-profile record at `crates/jit/tests/fast_rules/derived_state_repair_tests.rs:85-109`. A declarations-only function cannot enumerate those profile targets or image-dependent repair ownership. Nor does the plan make the repair planner consume this new declaration, so it risks creating another mirror rather than a shared authority. Prior F4 and hard REQ-08 remain unresolved.\n\n4. **F4 — Blocking, high: Story-level dependencies do not gate the leaf tasks that perform the work.** The graph in `dev/active/1cc809de-plan.md:48-61` wires stories S1 and S3 to breakdown node B, and the decomposition at `:145-176` places tasks beneath those stories while expressing later prerequisites only between story nodes. JIT readiness follows each issue’s own dependency edges; parent dependencies do not propagate to child tasks. Consequently S1.a/S1.c/S1.d/S1.e and S3.a/S3.c can become ready without depending on B, while S2 and S4 tasks can run before S1 completes and S5.a can run before S2/S3/S4 complete. The repository’s bracket contract explicitly requires every implementation source to depend on B in `.agents/skills/jit-breakdown/references/bracket-spine.md:25-32`. Dependencies must be wired to each source leaf, using upstream stories as checkpoints for downstream leaves. Prior F7 is therefore only superficially resolved.\n\n5. **F5 — Blocking, high: The successor-presentation task drops an explicit audit correction and leaves its decision unresolved.** `dev/active/1cc809de-plan.md:175` requires a general correction inventory but does not require removal of dead KaTeX or decide whether the successor must work offline. The epic’s stated full Part-C scope includes both actions explicitly at `dev/studies/cdc840ad-audit-2026-07-23.md:281-290`, with the underlying defects documented at `:177-185`. An inventory mapping is not an implementation or a decision. S5.a must require KaTeX removal and record a concrete vendor-or-online-only decision, including the resulting asset policy. Hard REQ-16 and epic decision D-1 are otherwise narrowed.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The revised plan fixes several prior defects but remains non-executable around typed errors, publisher visibility, repair-target authority, leaf dependency wiring, and presentation scope.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The typed-error inventory omits live profile/rules producer classes and leaves profile JSON exit mapping without a replacement.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":107,\"references\":[\"@/issue/1cc809de/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The cutover design exposes the repository transaction primitive rename_noreplace_cap as a crate-wide external publisher.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":121,\"references\":[\"@/issue/1cc809de/requirement/REQ-06\",\"@/inv/atomic-writes\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The declarations-only repair_target_paths API cannot enumerate image- and profile-derived repair targets or serve as the planner's shared authority.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":125,\"references\":[\"@/issue/1cc809de/requirement/REQ-08\",\"@/inv/single-source-prose\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Story-level prerequisite edges do not block their leaf tasks behind the breakdown gate or upstream story checkpoints.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":143,\"references\":[\"@/inv/dag-acyclic\"]},{\"id\":\"F5\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The successor-deck task omits required KaTeX removal and leaves the audit's offline-asset decision unresolved.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":175,\"references\":[\"@/issue/1cc809de/requirement/REQ-16\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
