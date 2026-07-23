@@ -11,7 +11,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-07-23T07:19:59.340285276Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8f1c2595-242e-4cf4-b810-22c6b55fb1f3",
   "labels": [
     "type:bug",
@@ -21,5 +27,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Preserve authored rules while repairing derived assertions",
-  "updated_at": "2026-07-23T06:58:18.213329703Z"
+  "updated_at": "2026-07-23T07:19:59.340285276Z"
 }

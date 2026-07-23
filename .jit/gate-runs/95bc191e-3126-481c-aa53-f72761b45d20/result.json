@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "a76551058b881a9bfb590d94ded90c2f394dd6ed",
+  "completed_at": "2026-07-23T07:19:59.330780681Z",
+  "duration_ms": 146092,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "8f1c2595-242e-4cf4-b810-22c6b55fb1f3",
+  "message": null,
+  "run_id": "95bc191e-3126-481c-aa53-f72761b45d20",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T07:17:33.238403021Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest commands::init::tests::test_reinit_refreshes_default_rule_membership_header_and_type_schema ... FAILED\ntest result: FAILED. 2033 passed; 1 failed; 4 ignored; 0 measured; 0 filtered out; finished in 41.37s\n---- commands::init::tests::test_reinit_refreshes_default_rule_membership_header_and_type_schema stdout ----\n\nthread 'commands::init::tests::test_reinit_refreshes_default_rule_membership_header_and_type_schema' (2865517) panicked at crates/jit/src/commands/init.rs:765:9:\nassertion failed: refreshed.starts_with(crate::repository_state::rules_file_header())\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n--- incremental-state output ---\nnon-empty incremental directories under /home/vkaskivuo/Projects/just-in-time/target:\n/home/vkaskivuo/Projects/just-in-time/target/debug/incremental\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1170 bytes=20413268)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1256835216/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✗ incremental-state: FAILED (exit 1)\n\n",
+  "tree_dirty": false
+}
