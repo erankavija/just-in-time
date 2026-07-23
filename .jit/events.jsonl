@@ -8746,3 +8746,5 @@
 {"id":"50d44481-9ef6-4d6b-ad57-da716a3a6f7a","issue_id":"e10ba548-c146-491e-a313-2f807933995f","priority":"high","timestamp":"2026-07-23T14:17:42.078914294Z","title":"Bound terminal-transition readiness work","type":"issue_created"}
 {"from":"ready","id":"c7dc065b-7d9f-4482-b510-cf9e9e2e3b7e","issue_id":"cdc840ad-9332-4936-9381-772318967f0f","timestamp":"2026-07-23T14:17:59.974448963Z","to":"backlog","type":"issue_state_changed"}
 {"fields":["dependencies"],"id":"a41bb9e1-282e-43e4-8175-afc744877693","issue_id":"cdc840ad-9332-4936-9381-772318967f0f","timestamp":"2026-07-23T14:17:59.974448963Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"9071d31f-a361-4161-a2f4-c37687622463","issue_id":"e10ba548-c146-491e-a313-2f807933995f","timestamp":"2026-07-23T14:19:49.541340002Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker-perf","id":"3df8e1f4-a957-48d3-a6cb-42e7fae09741","issue_id":"e10ba548-c146-491e-a313-2f807933995f","timestamp":"2026-07-23T14:19:49.541340002Z","type":"issue_claimed"}
