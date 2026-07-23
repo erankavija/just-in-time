@@ -95,7 +95,7 @@
     "component:validation"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Integrate repository-state cutover",
-  "updated_at": "2026-07-23T09:35:18.064132564Z"
+  "updated_at": "2026-07-23T09:36:37.631108133Z"
 }

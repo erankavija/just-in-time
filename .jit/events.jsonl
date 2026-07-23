@@ -8704,3 +8704,5 @@
 {"gate_key":"secret-detection","id":"508525ae-57eb-4ff5-89de-0586d24b0549","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:27:38.861959099Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"cd92017c-dd40-431a-85e2-9f83fee95f13","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:33:43.286665906Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"security-review","id":"91fa26f4-2f35-473c-a5f6-dda5f4b6a8ce","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:35:18.064132564Z","type":"gate_passed","updated_by":"agent:jit-execution-lead"}
+{"from":"in_progress","id":"b99f5308-8227-4efb-b1b3-09cf17c76ff7","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:36:37.631108133Z","to":"done","type":"issue_state_changed"}
+{"id":"9e61d278-b498-46a8-a401-eec12a3af161","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:36:37.631108133Z","type":"issue_completed"}
