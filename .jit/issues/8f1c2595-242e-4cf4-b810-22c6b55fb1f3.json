@@ -13,8 +13,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-07-23T07:19:59.340285276Z",
+      "status": "passed",
+      "updated_at": "2026-07-23T07:27:57.034402Z",
       "updated_by": "auto:executor"
     }
   },
@@ -27,5 +27,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Preserve authored rules while repairing derived assertions",
-  "updated_at": "2026-07-23T07:19:59.340285276Z"
+  "updated_at": "2026-07-23T07:27:57.034402Z"
 }
