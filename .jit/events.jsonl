@@ -8695,3 +8695,4 @@
 {"fields":["description"],"id":"af2594d2-1d14-4f96-90c7-b0d71866fa78","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:05:17.280625632Z","type":"issue_updated","updated_by":"issue-update"}
 {"gate_key":"cargo-ci","id":"7e8bf283-61a1-4a57-b601-894989113e8b","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:13:39.722097972Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci-features","id":"3ecc6811-9227-4769-b0e2-5fd40c51f1f0","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:16:55.550910174Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"npm-ci","id":"e735f475-9024-43bf-8e62-1e3558d12662","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-23T09:18:54.747382950Z","type":"gate_passed","updated_by":"auto:executor"}
