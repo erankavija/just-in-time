@@ -777,9 +777,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         let issues = self.storage.list_issues()?;
+        let resolved = crate::domain::queries::build_issue_map(&issues);
         let backlog_issues: Vec<_> = issues
             .iter()
-            .filter(|i| i.state == State::Backlog)
+            .filter(|issue| issue.should_auto_transition_to_ready(&resolved))
             .map(|i| i.id.clone())
             .collect();
 
@@ -799,6 +800,21 @@ mod tests {
     use crate::domain::State;
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    struct SessionOpenCounter(AtomicUsize);
+
+    impl crate::storage::TransactionFailureInjector for SessionOpenCounter {
+        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+            if point == &crate::storage::TransactionFailurePoint::RepositoryRecoveryExternal {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(())
+        }
+    }
 
     struct DeleteFailure(std::sync::Mutex<Option<crate::storage::TransactionFailurePoint>>);
 
@@ -845,6 +861,62 @@ enforce_leases = "off"
         crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
 
         crate::commands::test_helpers::memory_executor(storage)
+    }
+
+    #[test]
+    fn test_check_auto_transitions_opens_sessions_only_for_eligible_backlog_issues() {
+        let counter = Arc::new(SessionOpenCounter(AtomicUsize::new(0)));
+        let storage = InMemoryStorage::new().with_repository_state_failure_view(counter.clone());
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+
+        let eligible =
+            crate::domain::types::fixture_issue("Eligible backlog".into(), String::new());
+        let eligible_id = eligible.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, eligible);
+
+        let mut blocker =
+            crate::domain::types::fixture_issue("Open dependency".into(), String::new());
+        blocker.state = State::InProgress;
+        let blocker_id = blocker.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, blocker);
+
+        let blocked_ids = (0..64)
+            .map(|index| {
+                let mut blocked = crate::domain::types::fixture_issue(
+                    format!("Blocked dependent {index}"),
+                    String::new(),
+                );
+                blocked.dependencies.push(blocker_id.clone());
+                let id = blocked.id.clone();
+                crate::commands::test_helpers::seed_issue(&executor.storage, blocked);
+                id
+            })
+            .collect::<Vec<_>>();
+
+        executor.check_auto_transitions().unwrap();
+
+        assert_eq!(
+            counter.0.load(Ordering::SeqCst),
+            2,
+            "one eligible transition uses its existing preflight and publication sessions; blocked backlog must add none"
+        );
+        let transitioned = executor.storage.load_issue(&eligible_id).unwrap();
+        assert_eq!(transitioned.state, State::Ready);
+        assert!(transitioned.first_ready_at.is_some());
+        assert_eq!(
+            executor
+                .storage
+                .read_events()
+                .unwrap()
+                .into_iter()
+                .filter(|event| event.get_type() == "issue_state_changed")
+                .count(),
+            1
+        );
+        assert!(blocked_ids.into_iter().all(|id| executor
+            .storage
+            .load_issue(&id)
+            .is_ok_and(|issue| issue.state == State::Backlog)));
     }
 
     #[test]
