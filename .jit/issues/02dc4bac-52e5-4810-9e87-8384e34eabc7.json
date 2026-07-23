@@ -4,7 +4,7 @@
   "context": {},
   "created_at": "2026-07-23T18:11:28.753153980Z",
   "dependencies": [],
-  "description": "Planning node for Repository-state quality hardening (1cc809de). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/1cc809de-plan.md and link it to this node once written.",
+  "description": "Planning node for Repository-state quality hardening (1cc809de). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/1cc809de-plan.md and link it to this node once written.\n\n## Success Criteria\n\n- [hard] REQ-P1: The linked plan addresses every epic [hard] criterion (REQ-01..REQ-16) with design depth sufficient for implementers to proceed without re-deriving decisions.\n- [hard] REQ-P2: Typed-error completeness (epic REQ-02) is verified by the plan's structural acceptance criterion — after the boundary work, no `repository_state` signature carries an `anyhow` type and no error is constructed via `format!` outside `Display` implementations, with completeness compiler-enforced by the removal of `Producer(String)` and the blanket `From` conversions. The plan's variant inventory is representative by owner decision (2026-07-24); exhaustive plan-document class enumeration is explicitly not a requirement of this plan.\n- [hard] REQ-P3: `repair_target_paths` is a declarative, drift-independent target authority whose relationship to `derive_repair` is enforced by a subset assertion over the same inputs. By owner decision (2026-07-24, code-verified: the planner composes bytes, which a path set cannot supply, so consumption would duplicate composition), `derive_repair` intentionally does not consume this function; a consumption refactor is explicitly not a requirement of this plan.\n- [hard] REQ-P4: `repair_target_paths` is an ordinary public API of `repository_state`, so tests exercise it without test-only gating and without dependence on the feature-gating work.\n",
   "documents": [
     {
       "commit": null,
@@ -21,7 +21,7 @@
   "gates_status": {
     "plan-review": {
       "status": "failed",
-      "updated_at": "2026-07-23T20:55:09.110897046Z",
+      "updated_at": "2026-07-23T21:08:50.188038884Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "planning: Repository-state quality hardening",
-  "updated_at": "2026-07-23T20:55:09.110897046Z"
+  "updated_at": "2026-07-23T21:16:10.890398547Z"
 }

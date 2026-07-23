@@ -1,0 +1,64 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "a3b402d7b9401c99c78a3cd535c35c0f86a0dfb1",
+  "completed_at": "2026-07-23T21:08:49.915307246Z",
+  "duration_ms": 356985,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F1",
+        "line": 117,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "The typed-error design leaves live anyhow and stringify paths without specified variants or mappings, so S1.c is not executable without re-deriving the error model."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F2",
+        "line": 125,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-08",
+          "@/inv/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "repair_target_paths remains a parallel enumeration not consumed by derive_repair, so it cannot serve as the repair planner's shared target authority."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F3",
+        "line": 159,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-08",
+          "@/issue/1cc809de/requirement/REQ-12"
+        ],
+        "severity": "medium",
+        "summary": "S2.d does not define how the integration test accesses repair_target_paths without either exposing test-only default API or depending on the parallel S4.a feature-gating task."
+      }
+    ],
+    "summary": "Typed-error coverage is still delegated to rediscovery, while repair targets lack both a true shared planner authority and a coherent test visibility/dependency design.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "02dc4bac-52e5-4810-9e87-8384e34eabc7",
+  "message": null,
+  "run_id": "af37cb74-8cbf-4d94-89df-83c2486080dc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T21:02:52.929925101Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 13968 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f90c9-d0ce-7eb0-9bad-1663e6a450ee\n--------\nuser\n--- 13955 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "## Plan document present and linked\n\nPass. `dev/active/1cc809de-plan.md` exists, is substantive, and is linked to planning issue `02dc4bac` as its design document. The live document listing confirms the required path and label.\n\n## Completeness against the criteria\n\nThe plan preserves all sixteen hard epic requirements and assigns each to S1–S5. Most criteria have concrete designs and task ownership.\n\nREQ-02 and REQ-08 remain blocking, however. Their acceptance checks are stated, but the implementation authority and typed-error model required to achieve them are incomplete, as detailed in F1–F3.\n\n## Technical soundness and architectural fit\n\nThe mutation combinator, capability-typed external publishing, feature-gated test support, lock-hygiene decision, bulk-update prefilter, and presentation succession generally fit the current architecture.\n\nF1 is blocking because the typed-error section calls its variant inventory “representative” and delegates the remaining design to compilation and grep. The actual surface includes stored `anyhow::Error` values in `crates/jit/src/repository_state/mod.rs:153,196-200`, additional `anyhow::Result` call graphs in `archive.rs`, `projection_render.rs`, and `rules_document.rs`, and stringify bridges in `initialize.rs:397-399,446,601-605,933-939`. Nothing about deleting `Producer(String)` makes those paths fail compilation automatically.\n\nF2 is blocking because `repair_target_paths` is expressly not consumed by `derive_repair`. It therefore duplicates the target-family logic presently spread across `compose_default_ruleset`, `compose_configured_projections`, and `compose_profile_targets`. Fixture equality tests cannot make this second implementation the repair planner’s declaration.\n\n## Decomposition and dependencies\n\nThe story DAG and wave ordering are coherent: S1 and S3 follow the breakdown checkpoint, S2/S4 follow S1, and S5 waits for S2–S4. Task ownership for the sixteen requirements is otherwise clear.\n\nF3 is a blocking decomposition gap. The existing repair test is an integration-test crate, but the plan neither exposes `repair_target_paths` through `test-support` nor orders S2.d after S4.a. Leaving it public by default would itself conflict with REQ-12’s removal of test-only public API.\n\n## Risks and actionability\n\nThe lock, timing, feature-gating, and boundary-refactor risks have concrete mitigations. REQ-04’s possible exemption is explicitly permitted by the epic criterion and requires a recorded decision.\n\nThe critical S1.c and S2.d tasks are not yet executable without re-deriving design choices: S1.c must invent the missing error variants and preservation strategy, while S2.d must choose both a real shared target authority and a viable visibility boundary.\n\n## Prior review feedback\n\nPrior F3 is addressed: `SerializedRuleSet`, `SchemaFile`, and `serialize_ruleset` are now planned behind `test-support`.\n\nPrior F1 remains unresolved in substance: the revision acknowledges the omitted captured-declaration and initialization paths but replaces their design with a broad structural acceptance statement.\n\nPrior F2 remains unresolved in substance: profile claims and fixture-only inputs are now recognized, but the revised helper is still explicitly parallel to the planner instead of being its source of truth.\n\n## Findings\n\n1. **F1 — High, blocking:** The typed-error design remains incomplete and non-executable. `dev/active/1cc809de-plan.md:117` declares its variant inventory representative and relies on grep/compiler totality, but current stringly and `anyhow` paths in `repository_state/mod.rs:153,196-222`, `initialize.rs:397-399,446,601-605,933-939`, `archive.rs`, `projection_render.rs`, and `rules_document.rs` will not become compile failures merely by replacing `RepositoryStateError::Producer(String)`. S1.c therefore still requires the implementer to discover failure classes, design typed variants, and determine exit mappings.\n\n2. **F2 — High, blocking:** The proposed repair-target helper is not the repair planner’s declaration. `dev/active/1cc809de-plan.md:125` explicitly leaves `derive_repair` independent and reimplements target enumeration from the same inputs. Tests asserting membership or equality for selected fixtures cannot prevent a future target family in `derive_repair` from being omitted when that family is absent from those fixtures, so REQ-08 and `@/inv/single-source-prose` remain unmet by design.\n\n3. **F3 — Medium, blocking:** S2.d has no viable visibility/dependency design for `repair_target_paths`. The planned consumer is the external integration test at `crates/jit/tests/fast_rules/derived_state_repair_tests.rs:85`, which cannot access a crate-private helper. Making the helper default-public conflicts with REQ-12; gating it behind `test-support` requires S4.a, but S2 and S4 are parallel with no S2.d → S4.a prerequisite.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Typed-error coverage is still delegated to rediscovery, while repair targets lack both a true shared planner authority and a coherent test visibility/dependency design.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The typed-error design leaves live anyhow and stringify paths without specified variants or mappings, so S1.c is not executable without re-deriving the error model.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":117,\"references\":[\"@/issue/1cc809de/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"repair_target_paths remains a parallel enumeration not consumed by derive_repair, so it cannot serve as the repair planner's shared target authority.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":125,\"references\":[\"@/issue/1cc809de/requirement/REQ-08\",\"@/inv/single-source-prose\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"S2.d does not define how the integration test accesses repair_target_paths without either exposing test-only default API or depending on the parallel S4.a feature-gating task.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":159,\"references\":[\"@/issue/1cc809de/requirement/REQ-08\",\"@/issue/1cc809de/requirement/REQ-12\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
