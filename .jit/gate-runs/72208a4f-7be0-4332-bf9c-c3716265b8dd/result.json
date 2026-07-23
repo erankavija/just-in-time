@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "c06b58e7ac1280ea3470ea056ee7963ac630c970",
+  "completed_at": "2026-07-23T11:48:19.349556499Z",
+  "duration_ms": 196750,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/provenance_contract/repository_state_cutover_tests.rs",
+        "id": "F1",
+        "line": 32,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "Structural guards no longer prove absence of all command-local publishers, duplicate materializers, compatibility seams, and independently delivered intermediate packages required by REQ-03."
+      }
+    ],
+    "summary": "REQ-03 structural evidence remains incomplete after the guard was narrowed.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
+  "message": null,
+  "run_id": "72208a4f-7be0-4332-bf9c-c3716265b8dd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T11:45:02.598992803Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6151 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f8ecb-19cc-7113-8cdc-f3df87a92dd6\n--------\nuser\n--- 6138 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 50dbf3af, 93372680, b98870ed, 537e9ed, a96d9f18, ade6a221, d48b0a69, 8abff357, 94e3a9f1, c06b58e7 (`jit:c73c7618`)\nPolicy sources: AGENTS.md; dev/active/cdc840ad-plan.md\nResolved items: @/charter/D-4 and @/charter/D-11 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes and @/invariant/derived-state-coherence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review pending; docs-mechanical pending; mcp-ci pending; jit-validate pending\nTruncation recovery: narrowed reads of individual tagged patches, current structural guard, public-contract docs, and relevant release tests\n\n1. **[blocking][issue-impact] REQ-03 remains insufficiently guarded.** [repository_state_cutover_tests.rs:32](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/provenance_contract/repository_state_cutover_tests.rs:32) checks only seven legacy publisher spellings, while [line 115](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/provenance_contract/repository_state_cutover_tests.rs:115) checks only three renderer definitions. The guard no longer prevents direct command-local filesystem/kernel publication, duplicate managed-document/ruleset/config materializers, broader compatibility façades, or nested intermediate packages. Those broader assertions were removed by tagged commit `94e3a9f1`, so the prior blocking structural-evidence finding remains unresolved. References: @/invariant/derived-state-coherence.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-03 structural evidence remains incomplete after the guard was narrowed.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Structural guards no longer prove absence of all command-local publishers, duplicate materializers, compatibility seams, and independently delivered intermediate packages required by REQ-03.\",\"file\":\"crates/jit/tests/provenance_contract/repository_state_cutover_tests.rs\",\"line\":32,\"references\":[\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
