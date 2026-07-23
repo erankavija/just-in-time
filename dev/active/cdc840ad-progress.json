@@ -444,6 +444,14 @@
       "resolution": "Invoker approved the recommended narrow documentation-only correction and reset the rework counter.",
       "situation": "After the invoker-approved reset, two structural-review rework attempts closed REQ-03 and the final cargo-ci, code-review, docs-mechanical, mcp-ci, and jit-validate gates pass. The approved doc-review gate found one new blocking issue-authored documentation defect: docs/reference/profiles.md and generated CLI schema prose claim every safe validate --fix repair is published in one recoverable transaction, while hierarchy, reduction, and pending-transition repairs are sequential and only derived-state repair has that transaction scope. It also reported one pre-existing advisory project-render error-code discrepancy.",
       "recommendation": "Authorize one narrow documentation-only correction with a counter reset: qualify the profiles reference and validate CLI schema prose so the one-transaction guarantee applies only to derived-state repairs; optionally correct the adjacent pre-existing project-render JSON error-code sentence while already in the public contract; regenerate projections if required; rerun documentation/mechanical validation and the authoritative issue gates. Do not broaden validate implementation transactionality."
+    },
+    {
+      "category": "issue-scope-change",
+      "issue_id": "7f0ac1b0-b976-44ca-a9e1-9cad27878140",
+      "status": "open",
+      "opened_at": "2026-07-23T16:59:31+03:00",
+      "situation": "The final rollup cargo-ci gate passes and a direct whole-repository `jit validate --json` on clean candidate 1cd76057 reports valid=true with zero errors, warnings, divergences, or integrity error. Independent holistic audit and code-review nevertheless require durable gate evidence for hard REQ-02. The rollup currently requires only cargo-ci and code-review; its only recorded jit-validate result belongs to c73c7618 and runs issue-scoped validation. JIT rejects evaluating repo-validate unless it is required by the issue.",
+      "recommendation": "Authorize adding the existing repo-validate gate to 7f0ac1b0, run it on a clean provenance-matched candidate, then rerun code-review. This changes only the rollup's evidence requirements; it adds no implementation or new gate definition."
     }
   ],
   "rework_counts": {
