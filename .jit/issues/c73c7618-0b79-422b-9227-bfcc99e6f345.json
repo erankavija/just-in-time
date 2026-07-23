@@ -26,7 +26,7 @@
     },
     "code-review": {
       "status": "passed",
-      "updated_at": "2026-07-23T12:05:05.075943967Z",
+      "updated_at": "2026-07-23T13:35:16.226954236Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
@@ -61,5 +61,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document public contracts and complete release evidence",
-  "updated_at": "2026-07-23T13:30:50.246759568Z"
+  "updated_at": "2026-07-23T13:35:16.226954236Z"
 }

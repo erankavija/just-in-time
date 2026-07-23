@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "137f43adb99a03483eef23756245c12b2cce9c55",
+  "completed_at": "2026-07-23T13:35:15.994149771Z",
+  "duration_ms": 187345,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable public-contract, fail-closed audit, validation-error, release-evidence, and final structural-guard changes satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
+  "message": null,
+  "run_id": "aa39051c-e621-412a-ac0d-53510570a34a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T13:32:08.649143493Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 50dbf3af, 93372680, b98870ed, 537e9ed, a96d9f18, ade6a221, d48b0a69, 8abff357, 94e3a9f1, c06b58e7, b7a08e08, 1ee72515, 950e5927, cb1e934d, 0eb59fd2, 0818d90c, c5af920e, b99947f7, 3aff82b3, 8cc71db1, 137f43ad (`jit:c73c7618`)\nPolicy sources: AGENTS.md; dev/active/cdc840ad-plan.md\nResolved items: @/charter/D-4, @/charter/D-11 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/derived-state-coherence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-23T13:22:34Z); doc-review passed (exit 0, 2026-07-23T13:28:53Z); docs-mechanical passed (exit 0, 2026-07-23T12:07:03Z); mcp-ci passed (exit 0, 2026-07-23T12:08:01Z); jit-validate passed (exit 0, 2026-07-23T12:09:13Z)\nTruncation recovery: narrowed current-source, plan, documentation, structural-guard, and representative release-test reads; broad test-name search output outside the impact cone was not used.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable public-contract, fail-closed audit, validation-error, release-evidence, and final structural-guard changes satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
