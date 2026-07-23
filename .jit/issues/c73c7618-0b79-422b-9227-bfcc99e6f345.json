@@ -28,6 +28,11 @@
       "status": "passed",
       "updated_at": "2026-07-23T12:05:05.075943967Z",
       "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-23T12:07:04.238175838Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
@@ -41,5 +46,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document public contracts and complete release evidence",
-  "updated_at": "2026-07-23T12:05:05.075943967Z"
+  "updated_at": "2026-07-23T12:07:04.238175838Z"
 }
