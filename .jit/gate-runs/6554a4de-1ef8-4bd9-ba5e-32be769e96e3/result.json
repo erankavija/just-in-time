@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "4e578b9d39b7c815a08fcf30ea0a6d2af27a14a7",
+  "completed_at": "2026-07-23T14:07:14.372730432Z",
+  "duration_ms": 95207,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The whole-repository validation now supplies the previously missing release-candidate drift evidence, and the issue-attributed assurance changes introduce no alternate engine.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7f0ac1b0-b976-44ca-a9e1-9cad27878140",
+  "message": null,
+  "run_id": "6554a4de-1ef8-4bd9-ba5e-32be769e96e3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T14:05:39.164745751Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4e578b9d, 80c33d37, 9a56a333, 1cd76057, 6449a4e6 (`jit:7f0ac1b0`)\nPolicy sources: AGENTS.md; dev/active/cdc840ad-plan.md; .jit/gates.toml\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/derived-state-coherence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-23T13:51:31Z); repo-validate passed (exit 0, 2026-07-23T14:04:25Z); code-review previously failed (exit 1, 2026-07-23T13:58:09Z), and its sole F1 is addressed by the newer whole-repository validation\nTruncation recovery: Re-read tagged patches individually; narrowed plan, registry, gate, issue, result, ancestry, and public-contract reads\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The whole-repository validation now supplies the previously missing release-candidate drift evidence, and the issue-attributed assurance changes introduce no alternate engine.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
