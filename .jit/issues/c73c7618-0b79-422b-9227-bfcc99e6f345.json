@@ -18,7 +18,13 @@
     "mcp-ci",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-07-23T10:26:11.964913576Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
   "labels": [
     "type:task",
@@ -30,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document public contracts and complete release evidence",
-  "updated_at": "2026-07-23T09:49:35.097383197Z"
+  "updated_at": "2026-07-23T10:26:11.964913576Z"
 }
