@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-23T08:59:03.488898690Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-23T09:03:46.170019656Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "a3a788f3-39c2-4218-adaa-1cc5112b30f4",
@@ -32,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Direct repository-state cutover",
-  "updated_at": "2026-07-23T08:59:03.488898690Z"
+  "updated_at": "2026-07-23T09:03:46.170019656Z"
 }
