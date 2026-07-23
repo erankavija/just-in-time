@@ -29,6 +29,11 @@
       "updated_at": "2026-07-23T12:05:05.075943967Z",
       "updated_by": "auto:executor"
     },
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-07-23T13:03:44.854214687Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-07-23T12:07:04.238175838Z",
@@ -56,5 +61,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document public contracts and complete release evidence",
-  "updated_at": "2026-07-23T12:09:15.139122169Z"
+  "updated_at": "2026-07-23T13:03:44.854214687Z"
 }
