@@ -1,0 +1,103 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "49cd874ab466d36d5369dd751b1e7f1392f59317",
+  "completed_at": "2026-07-23T21:25:49.026076634Z",
+  "duration_ms": 526732,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F1",
+        "line": 117,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/02dc4bac/requirement/REQ-P2",
+          "@/issue/1cc809de/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "The typed-error design retains string-backed error variants currently constructed with format!, so removing Producer(String) cannot compiler-enforce the structural acceptance rule."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F2",
+        "line": 139,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-10",
+          "@/issue/02dc4bac/requirement/REQ-P1"
+        ],
+        "severity": "high",
+        "summary": "The bulk-update prefilter equates a differing field with eligibility, so blocked or invalid updates still open sessions and the proposed test does not enforce REQ-10."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F3",
+        "line": 151,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-03",
+          "@/issue/02dc4bac/requirement/REQ-P1"
+        ],
+        "severity": "medium",
+        "summary": "The journal-action task does not specify the paired representation, mismatch error, or recovery behavior needed to remove five post-journal panic sites."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F4",
+        "line": 156,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-05",
+          "@/issue/02dc4bac/requirement/REQ-P1"
+        ],
+        "severity": "medium",
+        "summary": "The managed-document property-test task defines neither a valid-input generator nor a round-trip oracle, while the current API exposes no parse operation."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F5",
+        "line": 153,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/02dc4bac/requirement/REQ-P1"
+        ],
+        "severity": "low",
+        "summary": "S1.a and S1.c are parallel despite admitted overlap in central files, without a concrete ownership split or dependency edge."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F6",
+        "line": 177,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/requirement/REQ-16",
+          "@/issue/02dc4bac/requirement/REQ-P1"
+        ],
+        "severity": "low",
+        "summary": "The requested nine-finding A1/A2/A4 correction inventory does not correspond to the audit's enumerated counts and needs explicit finding IDs."
+      }
+    ],
+    "summary": "Typed-error totality and bulk-update eligibility remain technically unsound, while journal extraction and managed-document property testing are not actionable enough for fan-out.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "02dc4bac-52e5-4810-9e87-8384e34eabc7",
+  "message": null,
+  "run_id": "6ef5dc6b-0498-486c-8c6b-a68fd26cfe72",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T21:17:02.293493281Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8369 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f90d6-c8a6-7dd2-b2ce-9492ee577c26\n--------\nuser\n--- 8356 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "## Plan document present and linked\n\nPass. `dev/active/1cc809de-plan.md` exists at the required location, is substantive, and is linked through `issue.documents`. The planning issue has no dependencies requiring additional validation.\n\n## Completeness against the criteria\n\nBlocking gaps remain:\n\n- REQ-P2/REQ-02 is internally contradictory. The plan promises that no error is constructed through `format!` and claims compiler enforcement after removing `Producer(String)` ([plan line 117](dev/active/1cc809de-plan.md:117)). However, it retains `AmbiguousOwnership(String)` in its exit-code design ([plan line 115](dev/active/1cc809de-plan.md:115)); current constructors use `format!` in `materialize.rs:417` and `repository_state/mod.rs:670`. `MutationError::InvalidGatePreset(String)` is likewise constructed with `format!` at `mutation.rs:972,989`. Removing `Producer(String)` does not make these compile errors.\n- REQ-10 is not met by `UpdateOperations::would_modify(&Issue)`. A differing target state can still be dependency-, gate-, or rule-blocked. Current bulk-update behavior records such cases as errors (`crates/jit/src/commands/bulk_update.rs:211-219`), while the existing preview already requires repository-level `transition_blockers` (`:252-258`). The proposed issue-only predicate and its no-op-versus-change fixture ([plan line 139](dev/active/1cc809de-plan.md:139)) will still open sessions for ineligible work.\n- REQ-03 and the managed-document portion of REQ-05 lack sufficient design depth, detailed below.\n\nThe remaining hard criteria are represented in the decomposition without an obvious scope omission.\n\n## Technical soundness and architectural fit\n\nSeveral revised designs fit the codebase well:\n\n- The repair-target decision now satisfies the owner-approved model: a public, drift-independent declaration plus same-input subset and full-drift exactness assertions ([plan line 125](dev/active/1cc809de-plan.md:125)). This resolves prior findings F2 and F3.\n- The visibility cutover respects the existing `ExternalExportPath` capability accepted by external publishers in `crates/jit/src/storage/atomic_write.rs:47-50,105-108,169-174`.\n- The feature-on public/feature-off crate-visible twin design is compatible with the current failure-injection surface.\n\nTwo technical blockers remain:\n\n- The typed-error totality argument is unsound for retained string-backed error variants, as described above.\n- S1.d merely says to “replace the `unreachable!` bridge with total extraction” ([plan line 151](dev/active/1cc809de-plan.md:151)). It does not specify the paired action representation, mismatch error, or recovery behavior for the five sites at `crates/jit/src/storage/file_transaction.rs:759,1079,1088,1097,1104`. These failures occur after journal creation, so the omitted behavior is load-bearing.\n\n## Decomposition and dependencies\n\nThe five-story wave structure is coherent: S1 and S3 can start after breakdown, S2/S4 correctly follow S1, and S5 waits for all implementation/evidence stories.\n\nAdvisory: S1.a and S1.c are declared parallel even though the plan acknowledges that both edit `commands/mod.rs` and `repository_state/mod.rs` ([plan line 153](dev/active/1cc809de-plan.md:153)). “Coordinate merge order” does not provide a concrete ownership split or dependency edge.\n\n## Risks and actionability\n\nThe lock-hygiene, feature-gating, timing-environment, and large-refactor risks have reasonable mitigations.\n\nThe managed-document property test remains non-actionable: S2.a repeats “splice round-trip” without defining generated valid inputs or the equality oracle ([plan line 156](dev/active/1cc809de-plan.md:156)). The current subsystem exposes rendering/composition, not a parse-and-splice round trip (`crates/jit/src/repository_state/managed_document.rs:65-109`), so an implementer must invent the intended property.\n\nAdvisory: S5.a requests an inventory of “nine” findings from A1/A2/A4 ([plan line 177](dev/active/1cc809de-plan.md:177)), while the audit enumerates six A1 findings, fifteen A2 findings, and three A4 findings. Stable finding IDs or an explicit subset are needed.\n\n## Prior review feedback\n\n- Prior F1: partially addressed. The owner-approved representative inventory is now explicit, but the replacement structural acceptance mechanism is not actually compiler-enforced and contradicts retained error construction.\n- Prior F2: addressed by the owner-approved declarative authority plus subset and full-drift assertions.\n- Prior F3: addressed by making `repair_target_paths` ordinary public API independent of `test-support`.\n\n## Findings\n\n1. **F1 — High, blocking:** The typed-error design retains string-backed error variants currently constructed with `format!`, so removing `Producer(String)` cannot compiler-enforce REQ-P2’s structural acceptance rule.\n2. **F2 — High, blocking:** The bulk-update prefilter equates “a field differs” with eligibility; blocked or invalid updates still open sessions, and the proposed test excludes those cases, so REQ-10 is not achieved.\n3. **F3 — Medium, blocking:** S1.d names total journal-action extraction without specifying the paired representation, mismatch error, or recovery behavior needed to remove five post-journal panic sites.\n4. **F4 — Medium, blocking:** S2.a does not define the managed-document property-test generator or round-trip oracle, and the current API has no parse operation from which that meaning can be inferred.\n5. **F5 — Low, advisory:** S1.a and S1.c are parallel despite admitted overlap in central files, without a concrete ownership split or dependency edge.\n6. **F6 — Low, advisory:** S5.a’s “nine findings from A1/A2/A4” correction inventory does not correspond to the audit’s enumerated finding counts and needs explicit IDs.\n\nTotal findings: 6\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Typed-error totality and bulk-update eligibility remain technically unsound, while journal extraction and managed-document property testing are not actionable enough for fan-out.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The typed-error design retains string-backed error variants currently constructed with format!, so removing Producer(String) cannot compiler-enforce the structural acceptance rule.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":117,\"references\":[\"@/issue/02dc4bac/requirement/REQ-P2\",\"@/issue/1cc809de/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The bulk-update prefilter equates a differing field with eligibility, so blocked or invalid updates still open sessions and the proposed test does not enforce REQ-10.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":139,\"references\":[\"@/issue/1cc809de/requirement/REQ-10\",\"@/issue/02dc4bac/requirement/REQ-P1\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The journal-action task does not specify the paired representation, mismatch error, or recovery behavior needed to remove five post-journal panic sites.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":151,\"references\":[\"@/issue/1cc809de/requirement/REQ-03\",\"@/issue/02dc4bac/requirement/REQ-P1\"]},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The managed-document property-test task defines neither a valid-input generator nor a round-trip oracle, while the current API exposes no parse operation.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":156,\"references\":[\"@/issue/1cc809de/requirement/REQ-05\",\"@/issue/02dc4bac/requirement/REQ-P1\"]},{\"id\":\"F5\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"S1.a and S1.c are parallel despite admitted overlap in central files, without a concrete ownership split or dependency edge.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":153,\"references\":[\"@/issue/02dc4bac/requirement/REQ-P1\"]},{\"id\":\"F6\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The requested nine-finding A1/A2/A4 correction inventory does not correspond to the audit's enumerated counts and needs explicit finding IDs.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":177,\"references\":[\"@/issue/1cc809de/requirement/REQ-16\",\"@/issue/02dc4bac/requirement/REQ-P1\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
