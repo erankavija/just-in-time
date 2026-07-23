@@ -8779,3 +8779,6 @@
 {"from":"ready","id":"3d64ea28-1b31-49f8-9678-dcfca1956286","issue_id":"24bab642-6f1d-438a-aae5-5c327dceaff6","timestamp":"2026-07-23T19:44:26.386687543Z","to":"backlog","type":"issue_state_changed"}
 {"from":"ready","id":"427e11e9-2f01-4e85-91d3-d512f7039a25","issue_id":"02dc4bac-52e5-4810-9e87-8384e34eabc7","timestamp":"2026-07-23T19:45:22.692554858Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:breakdown-lead","id":"4d88f12c-e849-4ca6-88a8-2e91d0a9838c","issue_id":"02dc4bac-52e5-4810-9e87-8384e34eabc7","timestamp":"2026-07-23T19:45:22.692554858Z","type":"issue_claimed"}
+{"gate_key":"plan-review","id":"9e988cbe-c1e1-4f04-9da9-34fc9a3079ef","issue_id":"02dc4bac-52e5-4810-9e87-8384e34eabc7","timestamp":"2026-07-23T19:51:25.789908869Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"2f549d2f-77a3-4954-a5c5-ca11849aee0e","issue_id":"129f3fad-0688-426b-9bfd-9f013f72ac71","priority":"normal","timestamp":"2026-07-23T19:58:23.148035713Z","title":"Scope the stale-binary provenance guard to build-input changes","type":"issue_created"}
+{"fields":["dependencies"],"id":"b8df5ad4-342f-4502-9c7d-841264f477ab","issue_id":"8b05a612-91e6-43c8-b36e-557e2417c88e","timestamp":"2026-07-23T19:58:34.834953171Z","type":"issue_updated","updated_by":"dependency-add"}
