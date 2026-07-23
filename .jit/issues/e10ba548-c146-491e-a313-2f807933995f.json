@@ -16,6 +16,11 @@
       "status": "passed",
       "updated_at": "2026-07-23T14:45:03.639100104Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-23T14:49:19.903479456Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "e10ba548-c146-491e-a313-2f807933995f",
@@ -27,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Bound terminal-transition readiness work",
-  "updated_at": "2026-07-23T14:45:03.639100104Z"
+  "updated_at": "2026-07-23T14:49:19.903479456Z"
 }

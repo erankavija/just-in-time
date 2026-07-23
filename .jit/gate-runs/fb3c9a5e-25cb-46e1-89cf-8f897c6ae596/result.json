@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "48522f6e96c673fe052d84bcfc8d1a4fa8210b12",
+  "completed_at": "2026-07-23T14:49:19.669657230Z",
+  "duration_ms": 168380,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The one-map readiness prefilter avoids blocked-issue mutation sessions while retaining the captured, retrying transition path and its lifecycle effects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e10ba548-c146-491e-a313-2f807933995f",
+  "message": null,
+  "run_id": "fb3c9a5e-25cb-46e1-89cf-8f897c6ae596",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T14:46:31.289582632Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 31d9b7f3, 623a0b4e, 3725228e, f19c3261, 3dd32960, 48522f6e\nPolicy sources: AGENTS.md\nResolved items: @/invariant/gate-semantics, @/invariant/event-log, @/invariant/atomic-writes, @/invariant/derived-state-coherence, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml); @/charter/D-1, @/charter/D-4 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-07-23T14:39:23Z); code-review unrun\nTruncation recovery: narrowed the truncated registry search to direct reads of .jit/invariants.toml, .jit/config.toml, .jit/gates.toml, and bounded lifecycle source slices\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The one-map readiness prefilter avoids blocked-issue mutation sessions while retaining the captured, retrying transition path and its lifecycle effects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
