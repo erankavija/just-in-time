@@ -1,0 +1,24 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-23T14:17:42.078914294Z",
+  "dependencies": [],
+  "description": "Terminal issue updates currently scan every Backlog issue and open a full repository mutation session for each one, even when its dependencies still block readiness. In this repository, 47 Backlog issues turn a state transition into roughly 100 seconds while whole-repository validation takes about 1.5 seconds.\n\n## Background\n\nAfter publishing a terminal issue update, check_auto_transitions loads the issue set, collects every Backlog id, and calls auto_transition_to_ready separately for each. Each call recaptures repository state before discovering that most candidates remain blocked. The cost therefore scales with total Backlog count instead of the number of issues that can actually transition.\n\n## Success Criteria\n\n- [hard] REQ-01: Terminal issue updates derive readiness candidates once from the loaded issue graph and avoid opening mutation sessions for Backlog issues that remain blocked.\n- [hard] REQ-02: Automatic Ready transitions retain existing dependency, lifecycle timestamp, event-log, retry, and atomic-publication semantics for every eligible issue.\n- [hard] REQ-03: Deterministic regression coverage with many blocked Backlog issues proves expensive recapture work is bounded by eligible transitions rather than total Backlog count.\n- [hard] REQ-04: An end-to-end terminal-state retry in the current repository completes in seconds rather than roughly 100 seconds and leaves repository state unchanged.\n\n## Notes\n\nKeep the correction within the existing lifecycle orchestration. Do not add caches, background workers, compatibility paths, or a second transition engine. Prefer filtering before recapture and net deletion.",
+  "documents": [],
+  "first_ready_at": "2026-07-23T14:17:42.078914294Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "e10ba548-c146-491e-a313-2f807933995f",
+  "labels": [
+    "epic:repository-materialization",
+    "component:cli",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Bound terminal-transition readiness work",
+  "updated_at": "2026-07-23T14:17:42.078914294Z"
+}
