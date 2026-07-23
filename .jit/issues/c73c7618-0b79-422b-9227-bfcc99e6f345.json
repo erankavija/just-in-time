@@ -30,8 +30,8 @@
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-07-23T13:03:44.854214687Z",
+      "status": "passed",
+      "updated_at": "2026-07-23T13:30:50.246759568Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -61,5 +61,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document public contracts and complete release evidence",
-  "updated_at": "2026-07-23T13:27:42.086707778Z"
+  "updated_at": "2026-07-23T13:30:50.246759568Z"
 }

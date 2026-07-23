@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "8cc71db1a07c47ac5b3acfa4d0076197be0f43d8",
+  "completed_at": "2026-07-23T13:30:50.013694333Z",
+  "duration_ms": 116262,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 3143,
+        "origin": "pre-existing",
+        "severity": "medium",
+        "summary": "The project render reference says all JSON failures use PROJECT_COMMAND_FAILED, but typed projection and managed-region failures use VALIDATION_FAILED."
+      }
+    ],
+    "summary": "Issue-impact documentation is accurate; one pre-existing advisory error-code discrepancy remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
+  "message": null,
+  "run_id": "b531c3db-9fd8-413c-b927-edc8e0b972fd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T13:28:53.751571270Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task; reviewed 20 individually tagged `jit:c73c7618` commits. The prior transaction-scope blocker is corrected in the current tree. Current docs, CLI schema, and MCP contract agree on the issue’s derived-state repair behavior.\n\n1. [advisory, pre-existing, medium] `jit project render` documentation says all JSON failures use `PROJECT_COMMAND_FAILED`, but typed projection/managed-region failures use `VALIDATION_FAILED`. Update [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3143) to distinguish those cases.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Issue-impact documentation is accurate; one pre-existing advisory error-code discrepancy remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The project render reference says all JSON failures use PROJECT_COMMAND_FAILED, but typed projection and managed-region failures use VALIDATION_FAILED.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3143}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
