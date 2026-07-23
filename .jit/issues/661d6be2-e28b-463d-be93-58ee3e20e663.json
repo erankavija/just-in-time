@@ -24,14 +24,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-07-22T22:55:58.367336859Z",
+      "status": "passed",
+      "updated_at": "2026-07-22T23:29:39.691574502Z",
       "updated_by": "auto:executor"
     },
     "cargo-ci-features": {
-      "status": "pending",
-      "updated_at": "2026-07-22T19:53:08.076500739Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-07-22T23:30:11.773080531Z",
+      "updated_by": "auto:executor"
     },
     "dependency-audit": {
       "status": "pending",
@@ -86,5 +86,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Integrate repository-state cutover",
-  "updated_at": "2026-07-22T22:55:58.367336859Z"
+  "updated_at": "2026-07-22T23:30:11.773080531Z"
 }

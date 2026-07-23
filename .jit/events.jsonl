@@ -8626,3 +8626,5 @@
 {"gate_key":"secret-detection","id":"d9f2dd80-686d-464a-ab51-e2821778e215","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:53:08.076500739Z","type":"gate_added"}
 {"gate_key":"security-review","id":"e1ee1424-9807-4b53-a34c-b07c03bef227","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T19:53:08.076500739Z","type":"gate_added"}
 {"gate_key":"cargo-ci","id":"2f2a8645-a53e-4518-a342-7de00fb3fbc1","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T22:55:58.367336859Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"5730125f-54a5-4777-9d86-813677681adc","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T23:29:39.691574502Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci-features","id":"735013bb-5cc0-4cae-9c1a-f7608fb3cba1","issue_id":"661d6be2-e28b-463d-be93-58ee3e20e663","timestamp":"2026-07-22T23:30:11.773080531Z","type":"gate_failed","updated_by":"auto:executor"}
