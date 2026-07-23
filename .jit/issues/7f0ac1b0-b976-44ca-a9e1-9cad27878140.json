@@ -11,7 +11,8 @@
   "first_ready_at": "2026-07-18T14:38:31.959224269Z",
   "gates_required": [
     "cargo-ci",
-    "code-review"
+    "code-review",
+    "repo-validate"
   ],
   "gates_status": {
     "cargo-ci": {
@@ -23,6 +24,11 @@
       "status": "failed",
       "updated_at": "2026-07-23T13:58:09.576909599Z",
       "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "pending",
+      "updated_at": "2026-07-23T14:02:46.737419550Z",
+      "updated_by": null
     }
   },
   "id": "7f0ac1b0-b976-44ca-a9e1-9cad27878140",
@@ -36,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Coherence and release assurance",
-  "updated_at": "2026-07-23T13:58:09.576909599Z"
+  "updated_at": "2026-07-23T14:02:46.737419550Z"
 }

@@ -448,8 +448,10 @@
     {
       "category": "issue-scope-change",
       "issue_id": "7f0ac1b0-b976-44ca-a9e1-9cad27878140",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-23T16:59:31+03:00",
+      "resolved_at": "2026-07-23T17:03:01+03:00",
+      "resolution": "Invoker approved adding the existing repo-validate gate to the final rollup for durable whole-repository drift evidence.",
       "situation": "The final rollup cargo-ci gate passes and a direct whole-repository `jit validate --json` on clean candidate 1cd76057 reports valid=true with zero errors, warnings, divergences, or integrity error. Independent holistic audit and code-review nevertheless require durable gate evidence for hard REQ-02. The rollup currently requires only cargo-ci and code-review; its only recorded jit-validate result belongs to c73c7618 and runs issue-scoped validation. JIT rejects evaluating repo-validate unless it is required by the issue.",
       "recommendation": "Authorize adding the existing repo-validate gate to 7f0ac1b0, run it on a clean provenance-matched candidate, then rerun code-review. This changes only the rollup's evidence requirements; it adds no implementation or new gate definition."
     }
