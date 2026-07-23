@@ -8,6 +8,7 @@
   ],
   "description": "Rebase the complete Group A staging stack on current main, resolve conflicts only with the final architecture, run the full gate and structural-scan suite on the exact merge candidate, and merge the entire stack to main as one clean transition from the old to the complete new architecture. This is the sole product transition for the repository-materialization consolidation.\n\n## Background\n\nGroup A's work packages accumulate cumulative, final-form code on branch `integration/cdc840ad` and are never merged to main individually, so main retains the old architecture until this leaf lands the whole stack at once. This integration leaf carries sole accountability for the container criteria REQ-01 through REQ-05 and REQ-09.\n\n## What to build\n\n- Rebase the complete staging stack on current main and resolve every conflict only with the final architecture — no adapter, feature flag, re-export, temporary API, old publisher, alias, partial-root path, or deferred cleanup may be reintroduced during conflict resolution.\n- Run full Rust, web, MCP, docs, schema, and security gates plus every §2 structural absence scan on the exact merge candidate (predecessor deletion, no command-local publisher or duplicate renderer, no compatibility seam, no independently merged staging package).\n- Merge the entire stack to main as one clean transition: main observes exactly one change from the old architecture to the complete new architecture (shared materialization planner, canonical layout/image/capture, typed mutation and audit, storage/kernel and recovery, materializers, drift, and every migrated consumer with all predecessors deleted). No package commit was merged or released independently.\n\nThe landed architecture must satisfy the container's accountable criteria: a domain-agnostic side-effect-free materialization planner producing one deterministic delta without publishing it (REQ-01); profile init/apply through the shared planner (REQ-02); ordinary init/config through one recoverable transaction leaving complete old or new state (REQ-03); `jit project render` planning every target against one snapshot with deterministic shared-target composition (REQ-04); one strict marker parser/splice primitive (REQ-05); and direct same-change cutover with no adapter, dual-write, fallback engine, temporary compatibility surface, or duplicated source-of-truth inventory remaining (REQ-09).\n\nDistilled §2 contracts: research-to-final vocabulary and the staged one-landing execution discipline; the complete cumulative stack and final main integration. See `dev/active/cdc840ad-plan.md` §2 and §4, and plan decisions D1, D10, D16 for full detail.\n\n## Success Criteria\n\n- [hard] REQ-01: The rebased stack contains no adapter/flag/re-export/temporary API, old publisher, alias, partial-root path, or deferred cleanup.\n- [hard] REQ-02: Full Rust/web/MCP/docs/schema/security gates and all §2 structural scans pass on the exact merge candidate.\n- [hard] REQ-03: Main observes one transition from old to complete new architecture; no package commit was merged or released independently.\n\n## Constraints\n\n- Rebase on current main; one clean transition. No Group A package is merged or released independently.\n- Full gates and all §2 structural scans pass on the exact merge candidate.\n- This leaf alone carries accountability for container criteria REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, and REQ-09.\n- Out of scope (plan D19/D20): lease credential/claim-log/claim-command redesign and worktree/data-root binding redesign — the claim and lease surface lands unchanged apart from repository-side issue/event synchronization.\n\nBlast radius: the complete cumulative stack and final main integration; this leaf alone owns REQ-01..05/09 accountability.\n\n## Scope amendment (invoker-approved, 2026-07-19)\n\nThe cumulative delivery model changed after wave 1 because the long-lived integration worktree split repository-owned JIT state from main. The invoker retired the integration branch and directed every subsequent final-form package to land directly on main.\n\nThis leaf therefore performs integration assurance over the exact cumulative main candidate that contains the completed declaration, storage, mutation, materialization, and consumer-cutover packages. It does not rebase or merge the retired branch. The “one clean transition” requirement now means the live tree exposes only the complete final architecture: no adapter, feature flag, compatibility re-export, dual path, temporary API, old publisher, duplicate renderer, partial-root path, or deferred cleanup survives.\n\nThe leaf remains accountable for the complete Group A criteria and for current-main Rust, web, MCP, documentation, schema, security, repository validation, and structural-absence evidence. It may add only evidence or minimal corrections required to make that cumulative candidate satisfy those contracts; it must not recreate integration-only machinery.\n",
   "documents": [],
+  "done_at": "2026-07-23T02:39:12.532411154Z",
   "first_ready_at": "2026-07-18T14:38:31.957279398Z",
   "gates_required": [
     "cargo-ci",
@@ -25,53 +26,58 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:19:00.114545402Z",
+      "updated_at": "2026-07-23T02:31:30.227567666Z",
       "updated_by": "auto:executor"
     },
     "cargo-ci-features": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:20:28.582890366Z",
+      "updated_at": "2026-07-23T02:32:54.530712667Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-23T02:38:43.185943366Z",
       "updated_by": "auto:executor"
     },
     "dependency-audit": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:22:19.410825444Z",
+      "updated_at": "2026-07-23T02:33:56.001243873Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:21:23.561586265Z",
+      "updated_at": "2026-07-23T02:33:39.994616393Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:21:48.963652025Z",
+      "updated_at": "2026-07-23T02:33:44.610665512Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:21:11.089234083Z",
+      "updated_at": "2026-07-23T02:33:35.507022941Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:20:57.382117384Z",
+      "updated_at": "2026-07-23T02:33:29.706721627Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:22:01.801972756Z",
+      "updated_at": "2026-07-23T02:33:49.480308939Z",
       "updated_by": "auto:executor"
     },
     "secret-detection": {
-      "status": "failed",
-      "updated_at": "2026-07-23T02:23:02.433305141Z",
+      "status": "passed",
+      "updated_at": "2026-07-23T02:34:03.698553691Z",
       "updated_by": "auto:executor"
     },
     "security-review": {
-      "status": "pending",
-      "updated_at": "2026-07-22T19:53:08.076500739Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-23T02:34:29.899351496Z",
+      "updated_by": "agent:jit-execution-lead"
     }
   },
   "id": "661d6be2-e28b-463d-be93-58ee3e20e663",
@@ -89,7 +95,7 @@
     "component:validation"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Integrate repository-state cutover",
-  "updated_at": "2026-07-23T02:23:02.433305141Z"
+  "updated_at": "2026-07-23T02:39:12.532411154Z"
 }

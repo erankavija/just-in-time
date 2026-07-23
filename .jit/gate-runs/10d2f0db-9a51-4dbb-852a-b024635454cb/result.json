@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/secret-scan.sh",
+  "commit": "f8d7518160ff72d853220f1f6eafae02e8c6a7af",
+  "completed_at": "2026-07-23T02:34:03.690908668Z",
+  "duration_ms": 2339,
+  "exit_code": 0,
+  "gate_key": "secret-detection",
+  "issue_id": "661d6be2-e28b-463d-be93-58ee3e20e663",
+  "message": null,
+  "run_id": "10d2f0db-9a51-4dbb-852a-b024635454cb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T02:34:01.351866414Z",
+  "status": "passed",
+  "stderr": "\n    ○\n    │╲\n    │ ○\n    ○ ░\n    ░    gitleaks\n\n5:34AM INF scanned ~35099739 bytes (35.10 MB) in 1.71s\n5:34AM INF no leaks found\n",
+  "stdout": "",
+  "tree_dirty": true
+}

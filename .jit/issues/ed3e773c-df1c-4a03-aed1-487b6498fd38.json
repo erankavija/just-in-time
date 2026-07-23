@@ -1,28 +1,28 @@
 {
-  "id": "ed3e773c-df1c-4a03-aed1-487b6498fd38",
-  "title": "Author the derived-state-coherence project invariant",
-  "description": "Author the registry-first `derived-state-coherence` invariant in this repository's invariant registry and render it through the existing project projection into guidance, leaving every adopter-facing surface untouched. This is the sole leaf accountable for container criterion REQ-07.\n\n## Background\n\nDerived-state coherence receives its own invariant rather than broadening `single-source-prose`: each semantic mutation derives coupled materializations from one final repository view and publishes them recoverably. The invariant is project-local architecture guidance, registry-first per `@/charter/D-6`.\n\n## What to build\n\n- Author `derived-state-coherence` in this repository's `.jit/invariants.toml` with advisory classification, stating that each semantic mutation derives coupled materializations from one final view and publishes them recoverably.\n- Render it through the existing `[projection.*]` project projection into project guidance via `jit project render`.\n- Leave `single-source-prose` unchanged and focused on prose authority and projection/citation. Do not add the new invariant to generated init scaffolding or the dogfood profile's adopter-owned invariant registry.\n\n## Success Criteria\n\n- [hard] REQ-01: derived-state-coherence exists in this repository's .jit/invariants.toml with advisory classification and renders through the existing project projection into guidance.\n- [hard] REQ-02: single-source-prose is unchanged and the new invariant is absent from generated init scaffolding and the dogfood profile's adopter-owned invariant registry.\n\n## Constraints\n\n- Registry-first per `@/charter/D-6`; advisory classification unless a real resolvable enforcement binding is added.\n- Project-local only: adopter scaffolding and profile-installed registries remain byte-identical.\n\nBlast radius: this repository's invariant registry and its rendered projection. See `dev/active/cdc840ad-plan.md` §2 (project-local invariant and public fit).",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-18T15:06:44.316611201Z",
   "dependencies": [
     "661d6be2-e28b-463d-be93-58ee3e20e663"
   ],
+  "description": "Author the registry-first `derived-state-coherence` invariant in this repository's invariant registry and render it through the existing project projection into guidance, leaving every adopter-facing surface untouched. This is the sole leaf accountable for container criterion REQ-07.\n\n## Background\n\nDerived-state coherence receives its own invariant rather than broadening `single-source-prose`: each semantic mutation derives coupled materializations from one final repository view and publishes them recoverably. The invariant is project-local architecture guidance, registry-first per `@/charter/D-6`.\n\n## What to build\n\n- Author `derived-state-coherence` in this repository's `.jit/invariants.toml` with advisory classification, stating that each semantic mutation derives coupled materializations from one final view and publishes them recoverably.\n- Render it through the existing `[projection.*]` project projection into project guidance via `jit project render`.\n- Leave `single-source-prose` unchanged and focused on prose authority and projection/citation. Do not add the new invariant to generated init scaffolding or the dogfood profile's adopter-owned invariant registry.\n\n## Success Criteria\n\n- [hard] REQ-01: derived-state-coherence exists in this repository's .jit/invariants.toml with advisory classification and renders through the existing project projection into guidance.\n- [hard] REQ-02: single-source-prose is unchanged and the new invariant is absent from generated init scaffolding and the dogfood profile's adopter-owned invariant registry.\n\n## Constraints\n\n- Registry-first per `@/charter/D-6`; advisory classification unless a real resolvable enforcement binding is added.\n- Project-local only: adopter scaffolding and profile-installed registries remain byte-identical.\n\nBlast radius: this repository's invariant registry and its rendered projection. See `dev/active/cdc840ad-plan.md` §2 (project-local invariant and public fit).",
+  "documents": [],
+  "first_ready_at": "2026-07-18T15:06:44.316612861Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "ed3e773c-df1c-4a03-aed1-487b6498fd38",
   "labels": [
     "type:task",
     "epic:repository-materialization",
     "satisfies:REQ-07",
     "component:validation"
   ],
-  "created_at": "2026-07-18T15:06:44.316611201Z",
-  "updated_at": "2026-07-18T15:07:08.835363661Z",
-  "first_ready_at": "2026-07-18T15:06:44.316612861Z"
+  "priority": "high",
+  "state": "ready",
+  "title": "Author the derived-state-coherence project invariant",
+  "updated_at": "2026-07-23T02:41:15.061169012Z"
 }

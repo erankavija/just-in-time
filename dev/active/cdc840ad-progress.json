@@ -1,8 +1,8 @@
 {
   "epic_id": "cdc840ad-9332-4936-9381-772318967f0f",
   "epic_short_id": "cdc840ad",
-  "last_handoff": "dev/active/cdc840ad-handoff-16.md",
-  "current_wave": 6,
+  "last_handoff": "dev/active/cdc840ad-handoff-17.md",
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -78,9 +78,10 @@
           "short_id": "661d6be2",
           "title": "Integrate repository-state cutover",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "increment_status": {
-            "1": "REWORK 1 \u2014 direct-main scope amendment applied. Integration audit found five parallel-authority violations: project-render dual snapshots; surviving second marker engine/pending map; profile-specific planner/hash beside the canonical planner; duplicated declaration parsing; repeated .jit prefix/path adapters. Batch correction is split by subsystem and must prefer deletion. Existing whole-repo, feature, dependency, secret, and manual security gates were added; exact-candidate Node audits and full-surface docs checks remain explicit evidence."
+            "1": "REWORK 1 \u2014 direct-main scope amendment applied. Integration audit found five parallel-authority violations: project-render dual snapshots; surviving second marker engine/pending map; profile-specific planner/hash beside the canonical planner; duplicated declaration parsing; repeated .jit prefix/path adapters. The final-form correction centralized planning, declaration parsing, profile composition, validation/repair, and repository publication while deleting the predecessor transaction-action module.",
+            "2": "REWORK 2 \u2014 full-suite and security assurance closed gate-context repository discovery, mutable hard-link rollback backups, SetMode alias escape, pre/post-binding root replacement races, weak Windows object identity, malformed-journal panic paths, feature-only lint drift, a broken contrib link, and one secret-scan prose false positive. Frozen candidate f8d75181 passed cargo-ci, cargo-ci-features, npm-ci, mcp-ci, docs-mechanical plus the full adopter-facing docs sweep, jit-validate, repo-validate, dependency-audit, secret-detection, manual security-review, and external code-review with zero findings. Issue 661d6be2 is Done; wave 7 was not started."
           }
         }
       ]
@@ -420,7 +421,8 @@
     "bacf2cd4": 2,
     "a6a9b964": 1,
     "44d318ab": 1,
-    "49adf23b": 1
+    "49adf23b": 1,
+    "661d6be2": 2
   },
   "started_at": "2026-07-18T16:22:26Z"
 }

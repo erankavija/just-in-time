@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "f8d7518160ff72d853220f1f6eafae02e8c6a7af",
+  "completed_at": "2026-07-23T02:38:42.954698964Z",
+  "duration_ms": 237661,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All scoped criteria are supported by the current tree, structural scans, and latest gate evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "661d6be2-e28b-463d-be93-58ee3e20e663",
+  "message": null,
+  "run_id": "aee5b723-8284-4ecd-b093-56ce631240b3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T02:34:45.293386780Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 12 reachable `jit:661d6be2` commits: 126fcb52, bd6cd9c2, 656b9a13, c5b35092, 94e1ae60, cbed3101, fa3b0549, 0eb65476, 92bb653f, 3fbfe974, a7fffe45, f8d75181\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1 and @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/gate-semantics, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci, npm-ci, mcp-ci, docs-mechanical, jit-validate, repo-validate, cargo-ci-features, dependency-audit, secret-detection passed (exit 0); security-review passed (manual, no exit code)\nTruncation recovery: narrowed large per-commit patches into repository-state, transaction, gate-record, current-caller, and structural-absence reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All scoped criteria are supported by the current tree, structural scans, and latest gate evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
