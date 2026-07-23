@@ -483,7 +483,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 crate::errors::ValidationFailedError::new(failure.to_string())
             })?;
             if let Some(error) = captured.declarations.take_rules_load_error() {
-                return Err(error);
+                return Err(crate::errors::ValidationFailedError::new(format!("{error:#}")).into());
             }
             let plan = captured.plan.ok_or_else(|| {
                 anyhow!("derived-state repair has no plan for loadable declarations")

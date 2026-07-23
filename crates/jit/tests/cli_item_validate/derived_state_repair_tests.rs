@@ -247,6 +247,34 @@ fn test_cli_validate_fix_repairs_mode_only_profile_drift() {
     );
 }
 
+#[test]
+fn test_cli_validate_fix_preserves_malformed_rules_validation_classification() {
+    for json_mode in [false, true] {
+        let repo = profiled_repo();
+        fs::write(repo.path().join(".jit/rules.toml"), "[[rules]\n").unwrap();
+        let before = file_snapshot(repo.path());
+        let args = if json_mode {
+            ["validate", "--fix", "--json"].as_slice()
+        } else {
+            ["validate", "--fix"].as_slice()
+        };
+        let output = run(repo.path(), args);
+
+        assert_eq!(output.status.code(), Some(4));
+        if json_mode {
+            let error = json(&output);
+            assert_eq!(error["error"]["code"], "VALIDATION_FAILED");
+            assert!(error["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("TOML parse error"));
+        } else {
+            assert!(String::from_utf8_lossy(&output.stderr).contains("TOML parse error"));
+        }
+        assert_snapshot_unchanged(repo.path(), &before);
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn test_cli_validate_fix_preserves_permission_error_classification() {
