@@ -90,6 +90,13 @@
       "wave_number": 7,
       "issues": [
         {
+          "id": "8f1c2595-242e-4cf4-b810-22c6b55fb1f3",
+          "short_id": "8f1c2595",
+          "title": "Preserve authored rules while repairing derived assertions",
+          "classification": "implementation",
+          "status": "in_progress"
+        },
+        {
           "id": "a3a788f3-39c2-4218-adaa-1cc5112b30f4",
           "short_id": "a3a788f3",
           "title": "Direct repository-state cutover",
@@ -101,7 +108,7 @@
           "short_id": "b1621508",
           "title": "Validate drift diagnosis and transactional repair",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "blocked_on_8f1c2595"
         },
         {
           "id": "ed3e773c-df1c-4a03-aed1-487b6498fd38",
@@ -137,7 +144,9 @@
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    "8f1c2595-242e-4cf4-b810-22c6b55fb1f3"
+  ],
   "escalations": [
     {
       "category": "rework-exceeded",
