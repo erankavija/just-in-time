@@ -127,6 +127,7 @@ The v1.0 vision charter's decision log is projected from `dev/vision/9db27a3a-ch
 - **gate-semantics** — An issue cannot reach Done with pending or failed gates; unpassed gates divert completion to Gated.
 - **event-log** — Every state change appends an event to events.jsonl.
 - **atomic-writes** — All file replacements use the temp-file + atomic-rename pattern; new-file publication uses verified staging plus atomic no-replace publication, so an occupied destination is never overwritten.
+- **derived-state-coherence** — Every semantic mutation derives its coupled materializations from one final repository view and publishes the resulting state recoverably.
 - **pid-safety** — Process-signaling code rejects sentinel or lossy PID conversions before invoking the operating system, including the `u32::MAX as i32 == -1` case that would turn a targeted signal into `kill(-1, sig)`.
 - **assignee-format** — Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
 - **domain-agnostic** — Engine logic is domain-agnostic: type names, label vocabularies, gate keys, templates, and workflow shapes come from repository configuration (.jit/), never from hardcoded domain assumptions. The one sanctioned exception is the planning-bracket preset trio (plan-review, coverage-preview, breakdown-review): it encodes jit's own plan-before-fan-out workflow (@/charter/D-3), not an adopter domain, so it is retained as the single binary-shipped preset bundle.

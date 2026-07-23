@@ -44,6 +44,11 @@ statement = "All file replacements use the temp-file + atomic-rename pattern; ne
 kind = "advisory"
 
 [[invariants]]
+id = "derived-state-coherence"
+statement = "Every semantic mutation derives its coupled materializations from one final repository view and publishes the resulting state recoverably."
+kind = "advisory"
+
+[[invariants]]
 id = "pid-safety"
 statement = "Process-signaling code rejects sentinel or lossy PID conversions before invoking the operating system, including the `u32::MAX as i32 == -1` case that would turn a targeted signal into `kill(-1, sig)`."
 kind = "advisory"
