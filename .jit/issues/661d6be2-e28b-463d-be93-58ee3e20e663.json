@@ -25,48 +25,48 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:08:30.452550493Z",
+      "updated_at": "2026-07-23T02:19:00.114545402Z",
       "updated_by": "auto:executor"
     },
     "cargo-ci-features": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:10:14.685529807Z",
+      "updated_at": "2026-07-23T02:20:28.582890366Z",
       "updated_by": "auto:executor"
     },
     "dependency-audit": {
-      "status": "pending",
-      "updated_at": "2026-07-22T19:53:08.076500739Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-23T02:22:19.410825444Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:11:39.699776373Z",
+      "updated_at": "2026-07-23T02:21:23.561586265Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
       "status": "passed",
-      "updated_at": "2026-07-22T19:49:53.341067217Z",
+      "updated_at": "2026-07-23T02:21:48.963652025Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:11:26.749837342Z",
+      "updated_at": "2026-07-23T02:21:11.089234083Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
       "status": "passed",
-      "updated_at": "2026-07-23T02:11:14.228281901Z",
+      "updated_at": "2026-07-23T02:20:57.382117384Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
-      "status": "pending",
-      "updated_at": "2026-07-22T19:53:08.076500739Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-23T02:22:01.801972756Z",
+      "updated_by": "auto:executor"
     },
     "secret-detection": {
-      "status": "pending",
-      "updated_at": "2026-07-22T19:53:08.076500739Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-07-23T02:23:02.433305141Z",
+      "updated_by": "auto:executor"
     },
     "security-review": {
       "status": "pending",
@@ -91,5 +91,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Integrate repository-state cutover",
-  "updated_at": "2026-07-23T02:11:39.699776373Z"
+  "updated_at": "2026-07-23T02:23:02.433305141Z"
 }
