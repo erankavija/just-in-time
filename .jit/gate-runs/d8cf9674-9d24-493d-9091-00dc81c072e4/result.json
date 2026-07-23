@@ -1,0 +1,126 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "b38c5b94a416c1cd68ac2a5641deede1ece370d4",
+  "completed_at": "2026-07-23T20:20:29.439443214Z",
+  "duration_ms": 625840,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F1",
+        "line": 71,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-4"
+        ],
+        "severity": "high",
+        "summary": "The mutation-session combinator cannot represent claim-coordinated, external-checker, and other multi-session retry protocols while holding the passed session."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F2",
+        "line": 102,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The proposed typed error enums omit many current producer and archive failure classes, so the stringly boundary cannot be removed as designed."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F3",
+        "line": 135,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/atomic-writes"
+        ],
+        "severity": "high",
+        "summary": "The visibility-enforced cutover guard does not identify restricted APIs or separate repository-owned publishers from legitimate external publishers."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F4",
+        "line": 137,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "VirtualPath cannot hold non-empty compile-time constants with its current String-backed representation, and no repair-target declaration is designed."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F5",
+        "line": 113,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/bounded-rust-build-footprint"
+        ],
+        "severity": "high",
+        "summary": "Feature gating omits the public JsonFileStorage failure-injection constructor and does not assign the feature-off clippy gate it relies on."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F6",
+        "line": 109,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/single-source-prose",
+          "@/inv/semantic-test-assertions"
+        ],
+        "severity": "high",
+        "summary": "Mutable benchmark samples have no reset protocol, and the bulk benchmark artifact is sequenced in parallel with the fix it must measure."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F7",
+        "line": 61,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/dag-acyclic"
+        ],
+        "severity": "high",
+        "summary": "The plan gives conflicting arrow semantics, reverses the S4.a/S4.b edge, and proposes transitively redundant epic dependencies."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F8",
+        "line": 148,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The proposed public-type demotions conflict with ProfileManifest's public Contribution field and do not define a coherent replacement API."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F9",
+        "line": 150,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The architecture document and successor presentation need pinned paths and an explicit correction inventory."
+      }
+    ],
+    "summary": "The revised plan resolves the lock, bulk-budget, and MCP-gate questions but remains non-executable around session orchestration, typed errors, visibility, path constants, feature gating, benchmark repeatability, and dependency wiring.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "02dc4bac-52e5-4810-9e87-8384e34eabc7",
+  "message": null,
+  "run_id": "d8cf9674-9d24-493d-9091-00dc81c072e4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T20:10:03.598573944Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9946 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9099-75a4-7840-83db-468eb12855f7\n--------\nuser\n--- 9933 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "## Plan document present and linked\n\nThe required plan exists at `dev/active/1cc809de-plan.md`, is non-empty, and is linked through `issue.documents`. This area passes.\n\nThe planning node has no dependencies, so there are no unmet prerequisite assumptions to assess.\n\n## Completeness against the criteria\n\nAll sixteen hard criteria are reproduced in the plan. However, the proposed implementations for REQ-01, REQ-02, REQ-06, REQ-08, REQ-09, and REQ-12 still contain blocking gaps described in F1–F6 and F8. REQ-14 and REQ-16 are covered but lack pinned output locations, noted advisorially in F9.\n\n## Technical soundness and architectural fit\n\nThe profile-backed lock decision in PD-1 is now concrete and fits the current implementation: `load_issue` creates per-issue sidecars at `crates/jit/src/storage/json.rs:914-920`, while publication already uses repository-scoped serialization and atomic replacement. The bulk-update prefilter and self-dev-dependency feature strategy are also directionally sound.\n\nThe central mutation combinator, typed-error boundary, visibility guard, path-constant design, feature surface, and public-API demotion remain technically incomplete or contradicted by current code. See F1–F5 and F8.\n\n## Decomposition and dependencies\n\nThe five-story clustering is coherent at a high level, and `mcp-ci` is now correctly assigned to the advisory-debt work touching `mcp-server/`.\n\nThe task DAG is not executable as written: benchmark work has an undeclared dependency, arrow semantics conflict, one edge is explicitly reversed, and the proposed epic edges conflict with transitive-reduction policy. See F6–F7.\n\n## Risks and actionability\n\nThe lock-hygiene risk is surfaced with a reasonable mitigation, and REQ-04’s possible exemption is explicitly allowed by the criterion.\n\nMaterial risks around session/claim lock ordering, feature-off verification, mutable benchmark sampling, and profile public-API coherence are not acknowledged. The successor presentation and architecture-document destinations also remain unpinned. See F1, F5–F6, F8–F9.\n\n## Prior review feedback\n\nPrior F1, F3, F7, and F8 are addressed: the lock decision is made, bulk eligibility has a prefilter and authoritative recheck, `mcp-ci` is assigned, and lazy sidecar creation was replaced by elimination.\n\nPrior F2 and F9 remain blocking through F1–F2 below. Prior F4 is only partially resolved because mutable benchmark samples lack reset semantics. Prior F5 is partially resolved but omits a public injection constructor and the required feature-off gate. Prior F6 is improved by task-level decomposition but remains blocked by contradictory and missing edges.\n\n## Findings\n\n1. **F1 — Blocking, high:** The proposed mutation-session combinator cannot represent the actual protocols it claims to migrate. The plan recognizes only single-session, template two-phase, and lifecycle-precheck variants (`dev/active/1cc809de-plan.md:71-96`), but `commands/gate_check.rs:909-965` drops a preflight session before executing an external checker and opening the publication session, while `commands/mod.rs:2353-2480` drops preflight before claim coordination. A closure passed a live `RepositoryMutationSession` would still hold `RepositoryOrderGuard`; `storage/guard_order.rs:49-63` then rejects claim coordination. Direct capture conflicts also remain outside the claimed helpers, for example `commands/mod.rs:1782-1787`. The design needs an attempt API that explicitly separates preflight/external coordination/publication phases while centrally classifying capture and apply conflicts.\n\n2. **F2 — Blocking, high:** The typed-error design does not cover the current producer or archive failure set. The proposed `ProducerError` variants at `dev/active/1cc809de-plan.md:102-105` omit typed configuration parsing, image reads, overlays, rule parsing, and profile-registry errors still produced at `repository_state/mod.rs:499-520` and `repository_state/profile_apply.rs:347-469`. The proposed three archive variants likewise do not represent the many distinct preconditions and composition failures in `repository_state/archive.rs:26-327`. Consequently, removing `Producer(String)` and the downcast chain cannot be implemented as described without either compilation gaps or another opaque catch-all.\n\n3. **F3 — Blocking, high:** REQ-06 remains a label rather than a visibility design. S2.b merely says “visibility-enforced cutover guard” (`dev/active/1cc809de-plan.md:133-138`) without naming the restricted publisher APIs or the compile-time assertion. The current guard bans both internal publishers and direct `std::fs` calls in `tests/provenance_contract/repository_state_cutover_tests.rs:39-66`, while legitimate external-destination publishing still crosses from commands into `storage::atomic_write` at `commands/snapshot.rs:730-756` and `commands/graph.rs:95-110`. The plan must split repository-owned publishers from legitimate external publishers and specify which modules become inaccessible; visibility alone cannot prohibit direct standard-library writes.\n\n4. **F4 — Blocking, high:** The `VirtualPath` associated-constant proposal cannot work with the current owned representation without an unplanned type redesign. `VirtualPath` contains `RootRelativePath::Descendant(String)` at `repository_state/path.rs:13-18,106-124`, so non-empty `VirtualPath` values cannot simply become compile-time constants. Associated string constants would retain the fallible construction the audit is meant to remove. The plan also does not define the production declaration from which repair coverage will be derived; current repair targets emerge dynamically from `derive_repair` and profile claims, while the test hand-list is at `tests/fast_rules/derived_state_repair_tests.rs:85-109`.\n\n5. **F5 — Blocking, high:** The feature-gating scope omits a public failure-injection entry point and does not assign the gate on which feature-off verification relies. `JsonFileStorage::with_repository_state_failures` remains public at `storage/json.rs:312-321`, but the plan gates only re-exports, fixture modules, and the memory conflict branch (`dev/active/1cc809de-plan.md:111-115`). Additionally, the plan relies on the `clippy` gate’s feature-off `cargo clippy --lib` command, yet its gate assignment gives Rust children only `cargo-ci` and `code-review` (`dev/active/1cc809de-plan.md:166-168`). Because `cargo-ci` enables `test-support` through the self-dev-dependency, it cannot substitute for that feature-off check.\n\n6. **F6 — Blocking, high:** The benchmark contract lacks repeatable-state semantics and its tasks omit a real dependency. Repeated `issue update --priority` and bulk-update samples mutate the fixture; without an explicit reset or alternating-value procedure, later samples become no-ops and the median does not measure mutation (`dev/active/1cc809de-plan.md:107-109`). The harness also promises a post-fix bulk scenario, but S3.a and S3.b are declared parallel with no dependency (`dev/active/1cc809de-plan.md:140-144`). The plan must define per-sample corpus restoration and sequence artifact generation after the bulk fix.\n\n7. **F7 — Blocking, high:** Dependency notation and edges are internally contradictory. The diagram uses arrows from prerequisite to dependent, while the task section says the left-hand item “depends on” the right (`dev/active/1cc809de-plan.md:48-61,121-123`). S4.b is stated to depend on S4.a at line 148, but line 152 reverses the edge. Line 61 also says the epic depends on every story even though the reduced diagram gives it only S5; adding every story edge would create transitive-reduction violations because S5 already depends on S2–S4 and those depend on S1.\n\n8. **F8 — Blocking, high:** The public-surface reduction is not coherent with the exported profile contract. The plan proposes demoting a fixed set of repository-state types (`dev/active/1cc809de-plan.md:66,146-152`), but public `ProfileManifest::contributions` exposes `Vec<Contribution>` at `profile/manifest.rs:18-23`, and `Contribution` variants expose `CompleteProjectionConfig`, `MapEntryTarget`, `SetStringTarget`, and `KeyedArrayTarget` at `repository_state/profile_apply.rs:29-50`. The plan must decide whether these types move to and remain public through `profile`, or whether the encompassing profile API is also demoted. It also repeats an inaccurate count of 13 over-broad exports while the audit’s named list contains 14.\n\n9. **F9 — Advisory, medium:** Pin the output locations for S4.d and S5.a. The plan names neither the contributor architecture document path nor the successor presentation path (`dev/active/1cc809de-plan.md:150,154-156`), and S5.a does not bind the audit’s slide-level correction inventory. Stable paths and an explicit audit-section reference would let breakdown produce standalone child issues without reopening design choices.\n\nTotal findings: 9\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The revised plan resolves the lock, bulk-budget, and MCP-gate questions but remains non-executable around session orchestration, typed errors, visibility, path constants, feature gating, benchmark repeatability, and dependency wiring.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The mutation-session combinator cannot represent claim-coordinated, external-checker, and other multi-session retry protocols while holding the passed session.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":71,\"references\":[\"@/charter/D-4\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The proposed typed error enums omit many current producer and archive failure classes, so the stringly boundary cannot be removed as designed.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":102},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The visibility-enforced cutover guard does not identify restricted APIs or separate repository-owned publishers from legitimate external publishers.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":135,\"references\":[\"@/inv/atomic-writes\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"VirtualPath cannot hold non-empty compile-time constants with its current String-backed representation, and no repair-target declaration is designed.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":137},{\"id\":\"F5\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Feature gating omits the public JsonFileStorage failure-injection constructor and does not assign the feature-off clippy gate it relies on.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":113,\"references\":[\"@/inv/bounded-rust-build-footprint\"]},{\"id\":\"F6\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Mutable benchmark samples have no reset protocol, and the bulk benchmark artifact is sequenced in parallel with the fix it must measure.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":109,\"references\":[\"@/inv/single-source-prose\",\"@/inv/semantic-test-assertions\"]},{\"id\":\"F7\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan gives conflicting arrow semantics, reverses the S4.a/S4.b edge, and proposes transitively redundant epic dependencies.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":61,\"references\":[\"@/inv/dag-acyclic\"]},{\"id\":\"F8\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The proposed public-type demotions conflict with ProfileManifest's public Contribution field and do not define a coherent replacement API.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":148},{\"id\":\"F9\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The architecture document and successor presentation need pinned paths and an explicit correction inventory.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":150,\"references\":[\"@/inv/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

@@ -47,30 +47,30 @@ Five stories, each a checkpoint for its criterion cluster per the story-as-check
 
 ```mermaid
 graph TD
-    P[planning 02dc4bac] --> B[breakdown 24bab642]
-    B --> S3[S3 Performance contract<br/>REQ-09..11]
-    B --> S1[S1 Planning-boundary collapse<br/>REQ-01..04]
-    S1 --> S2[S2 Testable guarantees<br/>REQ-05..08]
-    S1 --> S4[S4 Hygiene and docs<br/>REQ-12..15]
-    S3 --> S5[S5 Presentation succession<br/>REQ-16]
-    S2 --> S5
-    S4 --> S5
-    S5 --> E[epic 1cc809de]
+    B[breakdown 24bab642] --> P[planning 02dc4bac]
+    S3[S3 Performance contract<br/>REQ-09..11] --> B
+    S1[S1 Planning-boundary collapse<br/>REQ-01..04] --> B
+    S2[S2 Testable guarantees<br/>REQ-05..08] --> S1
+    S4[S4 Hygiene and docs<br/>REQ-12..15] --> S1
+    S5[S5 Presentation succession<br/>REQ-16] --> S3
+    S5 --> S2
+    S5 --> S4
+    E[epic 1cc809de] --> S5
 ```
 
-*(Arrows read "is prerequisite work for"; in jit the DAG encodes them as the downstream issue depending on the upstream one, with the epic depending on every story.)*
+*(Every arrow in this document — mermaid and prose "→" alike — reads "depends on", matching the direction of a jit dependency edge. The epic depends only on the sink story S5; the graph stays transitively reduced, which jit enforces on edge insertion.)*
 
 - **S3 Performance contract** starts immediately and in parallel with S1: the lock-hygiene decision is already made from the planning-time profile (PD-1, epic D-7), so S3 implements it, builds the benchmark harness, and fixes the bulk-update session budget. The benchmark harness (REQ-09) is a new `scripts/` entry with artifacts under a stable repository path; budget tests (REQ-10) mirror `test_check_auto_transitions_opens_sessions_only_for_eligible_backlog_issues`.
-- **S1 Planning-boundary collapse** is the highest-leverage change: a `with_mutation_session` combinator in `crates/jit/src/commands/mod.rs` retiring the 29 copy-paste retry loops; typed errors for the two `anyhow` plan producers (`finalize_gate_registry_edit`, `finalize_archive_execution`) and the six `anyhow` producer signatures in `materialize.rs`; total journal-action extraction in `file_transaction.rs`; folding `Initialize`/`ApplyProfile` into the shared plan-identity tail or recording the exemption decision. The combinator and error designs are pinned in the two subsections below.
+- **S1 Planning-boundary collapse** is the highest-leverage change: a mutation-session retry contract in `crates/jit/src/commands/mod.rs` retiring the 30 copy-paste retry loops; typed errors for the two `anyhow` plan producers (`finalize_gate_registry_edit`, `finalize_archive_execution`) and the six `anyhow` producer signatures in `materialize.rs`; total journal-action extraction in `file_transaction.rs`; folding `Initialize`/`ApplyProfile` into the shared plan-identity tail or recording the exemption decision. The combinator and error designs are pinned in the two subsections below.
 - **S2 Testable guarantees** follows S1 so property tests and contention tests target the settled surface: proptest for `plan_hash` reorder-invariance and splice round-trip, visibility-based cutover guard, contention tests over `open_mutation_session` and `ActiveLayoutTracker`, `VirtualPath` associated consts with `repair_paths()` derived from the repair planner's declaration.
 - **S4 Hygiene and docs** follows S1 because the public-surface demotions (REQ-12) must not race the boundary refactor: feature-gate `FailurePoint`/`TransactionFailureInjector`/`test_support`, delete `issue_draft`, demote the 13 over-broad exports, split the store's inline test module, rename review-round tests, write the contributor architecture doc, sweep `core-system-design.md`, clear the four non-lock advisory-debt items (the zero-byte-lock item is cleared by S3's lock-hygiene implementation).
 - **S5 Presentation succession** is last: the corrected retelling deck re-derives its figures from S3's artifacts and the final tree, and the predecessor deck moves to the archive with a tombstone.
 
 ### Mutation-session combinator (S1)
 
-The audited surface is 29 hand-copied retry loops (`for _ in 0..8`) across 16 command files plus `template.rs:176` (`TEMPLATE_RETRY_LIMIT`), 65 `RetryableConflict` match arms, and 30 bespoke "did not converge" messages. Three protocol variants exist: single-session capture/derive/finalize/apply (~24 sites); two-phase capture-recompute-revalidate (`template.rs:176-261`, which re-checks lease mode and lease targets across reopen); and the precheck-cache lifecycle (`commands/mod.rs:2339-2820`, which caches `CapturedPrecheckExecution` keyed on `(target_id, PrecheckEvidence)` and revalidates the resolved target after reopening).
+The audited surface is 30 hand-copied retry loops across 16 command files (29 `for _ in 0..8` plus `template.rs:176` under `TEMPLATE_RETRY_LIMIT`), 65 `RetryableConflict` match arms, and 30 bespoke "did not converge" messages. The sites split into **22 pure single-session** loops and **8 self-managed multi-session** loops that, within one attempt, release a preflight session and then acquire a `.git/jit` claims guard, run an external checker subprocess, or revalidate a cross-reopen invariant before opening the apply session (`dependency.rs:260,396`; `issue.rs:552`; `gate.rs:1357`; `mod.rs:2141,2353`; `gate_check.rs:909`; `template.rs:176`). A combinator-held session cannot serve the second group: it would hold `.repo-write.lock` across `claims_mutation_guard` (inverting today's lock order into a deadlock hazard) and across multi-second subprocess runs.
 
-One free function plus two types in `commands/mod.rs` owns the protocol:
+Resolution: one owner of the retry contract, two entry points that share it, and a session never held across between-session work:
 
 ```rust
 const MUTATION_SESSION_RETRY_LIMIT: usize = 8;
@@ -79,38 +79,58 @@ const MUTATION_SESSION_RETRY_LIMIT: usize = 8;
 #[error("{operation} did not converge after {attempts} capture conflicts")]
 pub struct MutationSessionExhausted { operation: &'static str, attempts: usize }
 
-enum SessionStep<T> {
-    Apply(MaterializationPlan, T), // publish, retry on apply conflict
-    Done(T),                       // converged without a write
-    Retry,                         // capture conflict or cross-reopen invariant changed
-}
+enum AttemptOutcome<T> { Done(T), Retry }
+
+// The single apply-conflict classifier — the only place a RetryableConflict on
+// apply is interpreted; no command module writes an arm.
+fn classify_apply<T>(outcome: Result<impl Sized, RepositoryStateStoreError>, value: T)
+    -> Result<AttemptOutcome<T>>;
+
+// Retry driver: owns the bound and terminal error, holds NO session, so a
+// closure may open/release sessions, take a claims guard, and run a subprocess
+// between them exactly as today.
+fn with_mutation_attempts<T>(operation: &'static str,
+    attempt: impl FnMut() -> Result<AttemptOutcome<T>>) -> Result<T>;
+
+// Session-passed convenience for the 22 pure single-session sites: opens one
+// fresh recovered session per attempt, applies Apply(plan) via classify_apply.
+enum SessionStep<T> { Apply(MaterializationPlan, T), Done(T), Retry }
 
 fn with_mutation_session<S: RepositoryStateStore, T>(
-    store: &S,
-    layout: &RepositoryLayout,
-    operation: &'static str,
+    store: &S, layout: &RepositoryLayout, operation: &'static str,
     attempt: impl FnMut(&mut dyn RepositoryMutationSession) -> Result<SessionStep<T>>,
-) -> Result<T>
+) -> Result<T>;  // implemented on top of with_mutation_attempts + classify_apply
 ```
 
-The combinator owns the retry bound (one named constant replacing every literal `8`), the apply-arm conflict classification, and the typed terminal error `MutationSessionExhausted` (replacing all 30 bespoke bails; mapped to the generic exit code in `main.rs` to preserve today's behavior). It deliberately does **not** own claim/lease coordination (`.git/jit`-scoped, charter D-4) or cross-reopen revalidation — both stay inside the call-site closure, so no site's semantics weaken: the two-phase and precheck-cache variants carry their expectation state as `FnMut` locals, open their preflight session inside the closure, and return `SessionStep::Retry` on the same equality checks they perform today (`template.rs:217-227`, `mod.rs:2430-2444,2491`). Capture conflicts ride the existing `capture_*` helpers that already fold `RetryableConflict` into `Ok(None)`. `claim.rs:212` is a free function, which is why the combinator is a free `fn` generic over the store rather than a `CommandExecutor` method. No call site needs an exemption. The refactor is behavior-preserving: the 35 failure-injection points and ~20 interruption tests must pass unchanged, and conflict-classification unit tests move to the combinator.
+`with_mutation_attempts` owns the bound (one named constant replacing every literal `8`) and the typed terminal `MutationSessionExhausted` (replacing all 30 bespoke bails; mapped to today's generic exit code in `main.rs`). `classify_apply` owns apply-conflict classification. Capture-conflict classification stays centralized in the existing `capture_*` helpers that already fold `RetryableConflict` into `Ok(None)`; the few sites with inline capture arms (`gate_check.rs:746,770`; `claim.rs:214`; `config.rs:317`) adopt a shared `capture_or_retry` helper. The 22 single-session sites use `with_mutation_session` (read-only sites return `Done`); `claim.rs:212` is a free function, which is why the entry points are free `fn`s generic over the store. The 8 self-managed sites use `with_mutation_attempts` directly, keeping their present structure — preflight, release, guard/subprocess, the same cross-reopen equality checks as today (`template.rs:217-227`, `mod.rs:2430-2444,2491`, `gate_check.rs:997`) returning `Retry`, then apply via `classify_apply`; guards are closure locals whose `Drop` runs after apply, preserving lock ordering byte-for-byte. Result: no `for _ in 0..8` and no per-site conflict arm anywhere in command modules — REQ-01 holds for all 30 sites with no exemptions. The refactor is behavior-preserving: the 35 failure-injection points and ~20 interruption tests pass unchanged, and conflict-classification unit tests move onto `classify_apply`/`with_mutation_attempts`.
 
 ### Typed-error boundary (S1)
 
-Producer failures currently stringify through `RepositoryStateError::Producer(String)` (34 sites; sink at `repository_state/mod.rs:583` via `format!("{error:#}")`) and are re-typed by the runtime downcast chain `projection_producer` (`mod.rs:590-598`). The exit-code boundary (`main.rs::error_to_exit_code`) sees typed variants only for profile-target conflicts. The design:
+Producer failures currently stringify through `RepositoryStateError::Producer(String)` (34 sites; sink at `repository_state/mod.rs:583` via `format!("{error:#}")`) and are re-typed by the runtime downcast chain `projection_producer` (`mod.rs:590-598`); the exit-code boundary (`main.rs:104,783`) probes with `downcast_ref` + `is_profile_target_conflict`. The design removes every string and every downcast:
 
-1. New `ProducerError` (thiserror) with variants `MissingCapture`, `MalformedBytes`, `UnknownProjection` plus transparent `#[from]` `Projection`/`ManagedDocument`/`Layout`; the six `anyhow` producer signatures in `materialize.rs` (`read_text`, `assemble_config`, `assemble_config_from_declarations`, `render_capture_closure`, `validate_capture_closure`, `compose_configured_projections`) return `Result<_, ProducerError>`.
-2. `RepositoryStateError::Producer(String)` becomes `Producer(#[from] ProducerError)`; `fn producer` and the downcast chain are deleted; `compose_complete` propagates with `?`.
-3. `finalize_gate_registry_edit` returns `Result<_, RepositoryStateError>` via a new `GateRegistryEditError { MissingEdit, MultipleEdits, DeclarationMismatch }`; `finalize_archive_execution` returns a new `ArchiveExecutionError` (`MissingDestination`, `MissingContentIdentity`, `NonFileSource`, plus `#[from]` composition).
-4. `main.rs::error_to_exit_code` gains one full `match` over `RepositoryStateError`: projection/managed-document/profile-conflict/ambiguous-ownership variants → validation-failed exit; capture/parse producer variants → generic exit; layout variants → invalid-argument exit; the two new finalizer errors map per variant. No `format!`-then-`downcast` round-trip remains anywhere on the producer path.
+1. New `ProducerError` (thiserror), each variant carrying its typed source: `MissingCapture(&'static str)`, `MalformedUtf8(#[from] FromUtf8Error)`, `UnknownProjection(String)`, `UnknownKind { projection, kind }`, plus transparent `#[from]` for `CaptureError`, `RepositoryLayoutError`, `ConfigurationDeclarationError`, `InvariantConfigError`, `ItemError`, `RuleConfigError`, `ProjectionError`, `ManagedDocumentError`. The six `materialize.rs` producers (`read_text`, `assemble_config`, `assemble_config_from_declarations`, `render_capture_closure`, `validate_capture_closure`, `compose_configured_projections`) **and** the two internal `anyhow` leaves — `render_projection_body` (`projection_render.rs:62`, whose injected read-closure becomes `FnMut(&str) -> Result<Option<String>, ProducerError>`) and `validate_proposed_layout` (`artifact_classifier.rs:515`) — change to `Result<_, ProducerError>`.
+2. `RepositoryStateError::Producer(String)` becomes `Producer(#[from] ProducerError)`. `fn producer`, `fn projection_producer`, `fn is_profile_target_conflict`, and the twelve `.map_err(…producer…)` sites (`mod.rs:405,415,428,431,436,520,612,617,645,648,678,683`) are deleted in favor of `?`. The inline `Producer(format!)` sites (`mod.rs:501,508`) become `ProducerError::ConfigParse` and a new `RepositoryStateError::Overlay(#[from] OverlayError)`.
+3. `finalize_gate_registry_edit` returns `Result<_, RepositoryStateError>` via a new `GateRegistryEditError { MissingEdit, MultipleEdits, DeclarationMismatch }` variant, with `#[from]` variants added for its eight `?`-propagated leaf classes (`MutationError`, `GateDeclarationError`, `OverlayError`, `SeedError` join the existing `Delta`/`PlanHash`/`Layout`).
+4. `finalize_archive_execution` returns `Result<_, RepositoryStateError>` via a new `ArchiveExecutionError` enumerating the archive-specific classes found at their construction sites — `MissingDestination`, `MissingContentIdentity`, `ContentIdentityChanged`, `NonFileSource{role}`, `UnsafeOccupant{role}`, `MissingPlannedDocument`, `RelinkTargetsPinned`, `RelinkStale`, `MissingCapturedIssue`, `MalformedIssueJson(#[source] serde_json::Error)`, `IssueIdMismatch`, `CapturedIssueCacheLost`, `MissingChangedIssue` — plus `#[from]` for its typed leaves (`EventLogError`, `PlanError`, the retyped `validate_proposed_layout`); shared leaves reach exit mapping via the `RepositoryStateError` `#[from]` variants.
+5. `main.rs::error_to_exit_code` replaces the two downcast probes with one **exhaustive** match over `RepositoryStateError` (no `_ =>` arm): projection/managed-document/profile-conflict/ambiguous-ownership/gate-registry-edit/archive-execution variants → validation-failed exit; capture/parse producer variants → generic exit; layout variants → invalid-argument exit.
+
+**Totality mechanism:** deleting `Producer(String)` and the sink/downcast functions removes anyhow's blanket `From<E: Error>` from every producer signature, so each `?` must resolve to a concrete `#[from]` variant — an unmapped failure class is a compile error, not a silent stringification; and the exhaustive `main.rs` match means a future variant cannot default to the wrong exit code. The inventory above cannot silently miss a class because the build fails until it is complete.
+
+### Cutover guard (S2)
+
+The current guard is the substring test `tests/provenance_contract/repository_state_cutover_tests.rs:39-67`, which greps the production halves of the four cutover command modules for 14 forbidden substrings — defeated by reformatting or by moving a raw write one file over. The property it approximates: only the mutation-session API may publish into repository roots. The visibility replacement: `FileTransactionKernel` (+ `TransactionControlLocation`) and the in-repository writers `write_file_atomic`/`write_file_atomic_bytes` tighten from `pub(crate)` to `pub(in crate::storage)` — their only callers (`repository_state_store.rs`, `user_config_store.rs`, `file_transaction.rs`) live in `crate::storage`, so repository-owned publishers compile unchanged while `crate::commands` can no longer name them. The four external-export publishers (`write_external_export_atomic`, `publish_external_file_noreplace`, `publish_external_directory_noreplace`, `rename_noreplace_cap`) move to a `storage::external_publish` submodule re-exported `pub(crate)`: their legitimate callers (`commands/snapshot.rs`, `commands/graph.rs`) publish to caller-chosen paths outside repository roots (charter D-4), and the module name now states that intent. The deleted-module and renderer-owner tests (`:69-139`, `:141-161`) are retained verbatim; only the substring test is deleted. Residual raw `std::fs` publishing, which visibility cannot restrict, keeps one narrow retained assertion (or a `clippy.toml` disallowed-methods entry) instead of the 14-string list.
+
+### Path constants and repair targets (S2)
+
+`VirtualPath` is `String`-backed through `RootRelativePath::Descendant(String)` (`path.rs:13-19`), which blocks `const`. The design changes the payload to `Cow<'static, str>`: `Cow::Borrowed` is const-constructible, so well-known paths become `pub const` associated items (`VirtualPath::GATES`, `EVENTS`, `CONFIG`, `INDEX`, `RULES`, …) and the ~100 fallible `VirtualPath::data("literal")?` sites become infallible const references. Parsing/deserialization produce `Cow::Owned`; `Ord`/`Hash`/`Eq` semantics are unchanged (`Borrowed("x") == Owned("x")`), so const and parsed keys collide correctly in the `BTreeMap`-keyed image. Because consts bypass the reserved-path `checked()` guard (`path.rs:173-186`), one test iterates every associated const (`VirtualPath::ALL_KNOWN`) asserting round-trip equality through the fallible constructor, proving each const canonical and non-reserved. Repair-target coverage stops mirroring by hand: a new `repository_state::repair_target_paths(&RepositoryDeclarations) -> Result<Vec<VirtualPath>>` exposes the same enumeration `derive_repair`/`compose_complete` walk (`repository_state/mod.rs:660-668`); the repair test (`derived_state_repair_tests.rs:85-110`) drops its 11 hand-typed literals and its loose `count >= 5` becomes exact set-equality against the declaration, so a new derived target either gains coverage or fails the test.
 
 ### Performance contract (S3)
 
-A new `scripts/benchmark-session-cost.sh` (naming after `scripts/benchmark-rust-build.sh`) builds the release binary, generates a fixture repository of a recorded issue count, and times each scenario with ≥3 warmup and ≥20 measured runs, emitting one JSON artifact at the stable path `dev/studies/perf/session-cost-<jit-commit>.json` (commit in the filename so history accumulates; the planning-time profile `session-cost-27ffbd2d.json` is the first instance and the schema template). Schema fields: `schema_version`; `jit{version,commit,dirty,profile}`; `machine{cpu_model,logical_cpus,ram_kb,kernel,measurement_fs,repo_real_fs}`; `corpus{issue_count}`; `method{samples_per_command,warmup_runs,warm,cache_state,timing_clock}`; `commands[]{name,argv,class,n,min_ms,median_ms,p95_ms,max_ms,lock_files_created}`; `mutation_syscall_summary{task_clock_ms,user_s,sys_s,page_faults,context_switches}`. Scenarios: baseline (`--version`), single read (`issue show`), read-all (`query available`, `issue list`), mutation (`issue update --priority`), and bulk mutation once the bulk-update budget fix lands. Cache-state contract: warm-only (cold needs root to drop the page cache and is not assumed); warm = page cache primed by the warmup runs; timings are comparable only across artifacts sharing `measurement_fs`. Citation rule: every published timing cites artifact path + command name + stat (e.g. `session-cost-<commit>.json › issue_update_mutation › median_ms`); an uncited number is a staleness defect per `@/inv/single-source-prose`. The planning profile also pins the optimization target: a title-only mutation costs ~3.7 s median, dominated by system time and ~545k minor page faults (memory materialization of two full captures), not lock I/O and not subprocesses.
+A new `scripts/benchmark-session-cost.sh` (naming after `scripts/benchmark-rust-build.sh`) builds the release binary, generates a fixture repository of a recorded issue count, and times each scenario with ≥3 warmup and ≥20 measured runs, emitting one JSON artifact at the stable path `dev/studies/perf/session-cost-<jit-commit>.json` (commit in the filename so history accumulates; the planning-time profile `session-cost-27ffbd2d.json` is the first instance and the schema template). Schema fields: `schema_version`; `jit{version,commit,dirty,profile}`; `machine{cpu_model,logical_cpus,ram_kb,kernel,measurement_fs,repo_real_fs}`; `corpus{issue_count}`; `method{samples_per_command,warmup_runs,warm,cache_state,timing_clock}`; `commands[]{name,argv,class,n,min_ms,median_ms,p95_ms,max_ms,lock_files_created}`; `mutation_syscall_summary{task_clock_ms,user_s,sys_s,page_faults,context_switches}`. Scenarios: baseline (`--version`), single read (`issue show`), read-all (`query available`, `issue list`), and mutation (`issue update --priority`); the bulk-mutation scenario is added by the bulk-update task after its fix lands, so its numbers measure the fixed behavior. Mutable scenarios have a reset protocol: the harness materializes a fresh fixture repository per measured sample (regenerate or restore from a pristine copy), so no sample observes a prior sample's mutations, and warmup runs use throwaway fixtures of the same shape. Cache-state contract: warm-only (cold needs root to drop the page cache and is not assumed); warm = page cache primed by the warmup runs against the pristine copy; timings are comparable only across artifacts sharing `measurement_fs`. Citation rule: every published timing cites artifact path + command name + stat (e.g. `session-cost-<commit>.json › issue_update_mutation › median_ms`); an uncited number is a staleness defect per `@/inv/single-source-prose`. The planning profile also pins the optimization target: a title-only mutation costs ~3.7 s median, dominated by system time and ~545k minor page faults (memory materialization of two full captures), not lock I/O and not subprocesses.
 
 ### Test-support feature gating (S4)
 
-The injection seam is production code — `file_transaction.rs` threads `&dyn TransactionFailureInjector` through ~121 `repository_check` sites and both storage backends hold an `Arc<dyn TransactionFailureInjector>` defaulting to `NoTransactionFailures` — so the definitions stay unconditional; what gets feature-gated is the *public exposure*. A `test-support` feature in `crates/jit/Cargo.toml` gates: the sole public re-export of `TransactionFailurePoint`/`TransactionFailureInjector`/`NoTransactionFailures` (`storage/mod.rs:66-68`, with a `#[cfg(not(feature))] pub(crate) use` twin so internal resolution never changes), `mod test_support` (`seed_issue_fixture`), `pub mod test_helpers` (`commands/mod.rs:64`), and the conflict-injection branch at `repository_state_store.rs:527-532` plus its `memory.rs` backing machinery (from `#[cfg(test)]` to `#[cfg(feature = "test-support")]`).
+The injection seam is production code — `file_transaction.rs` threads `&dyn TransactionFailureInjector` through ~121 `repository_check` sites and both storage backends hold an `Arc<dyn TransactionFailureInjector>` defaulting to `NoTransactionFailures` — so the definitions stay unconditional; what gets feature-gated is the *public exposure*. A `test-support` feature in `crates/jit/Cargo.toml` gates: the sole public re-export of `TransactionFailurePoint`/`TransactionFailureInjector`/`NoTransactionFailures` (`storage/mod.rs:66-68`, with a `#[cfg(not(feature))] pub(crate) use` twin so internal resolution never changes), `mod test_support` (`seed_issue_fixture`), `pub mod test_helpers` (`commands/mod.rs:64`), the conflict-injection branch at `repository_state_store.rs:527-532` plus its `memory.rs` backing machinery (from `#[cfg(test)]` to `#[cfg(feature = "test-support")]`), and the file backend's only public fault-injection path, `JsonFileStorage::with_repository_state_failures` (`storage/json.rs:314`), with the same feature-on-`pub` / feature-off-`pub(crate)` twin pattern (the memory backend's injection twins are already `#[cfg(test)] pub(crate)` and need no change).
 
 Tests keep compiling through a self dev-dependency — `[dev-dependencies] jit = { path = ".", features = ["test-support"] }` in `crates/jit`, and the same feature on `crates/server`'s dev-dependency — so `cargo test --workspace` unifies the feature into test builds while `cargo build`/release drops the surface. This adds zero integration-test targets and requires **no CI or gate-config changes**: `cargo-ci.sh` picks the feature up via the dev-dependency, and the standalone `clippy --lib` gate keeps verifying the feature-off public surface. It also dissolves the S3/S4 ordering conflict over the failure-injection probe: in-crate tests (including the S3 budget test) compile with the feature regardless of which story lands first.
 
@@ -123,8 +143,8 @@ REQ-10 is a behavior fix plus its locking test. Today `apply_bulk_update` (`comm
 Types and edges below bind the breakdown (story children are `type:task` unless marked). "→" reads "depends on".
 
 **S1 Planning-boundary collapse** (rust tier)
-- **S1.a** Mutation-session combinator and single-session migration — add `with_mutation_session` + `MutationSessionExhausted` per the combinator design; migrate the ~24 single-session sites; move conflict-classification unit tests to the combinator. (REQ-01 part)
-- **S1.b** Two-phase and precheck-cache migration — migrate `template.rs` and the precheck-cache lifecycle publisher onto the combinator with their revalidation semantics unchanged. → S1.a. (REQ-01 rest)
+- **S1.a** Retry-contract combinators and single-session migration — add `with_mutation_attempts`/`classify_apply`/`with_mutation_session` + `MutationSessionExhausted` per the combinator design; migrate the 22 single-session sites and the inline capture arms onto `capture_or_retry`; move conflict-classification unit tests onto the combinators. (REQ-01 part)
+- **S1.b** Self-managed multi-session migration — move the 8 preflight/guard/subprocess sites onto `with_mutation_attempts` with their cross-reopen revalidation and lock ordering unchanged. → S1.a. (REQ-01 rest)
 - **S1.c** Typed producer and finalizer errors — `ProducerError`, `Producer(#[from])`, the two finalizer error types, exit-code match, per the typed-error design. (REQ-02)
 - **S1.d** Total journal-action extraction — replace the `unreachable!` bridge in `file_transaction.rs` with total extraction. (REQ-03)
 - **S1.e** Plan-identity tail for initialize and profile application — fold `Initialize`/`ApplyProfile` into the shared tail or record the exemption decision item. (REQ-04)
@@ -132,28 +152,28 @@ Types and edges below bind the breakdown (story children are `type:task` unless 
 
 **S2 Testable guarantees** (rust tier; story → S1)
 - **S2.a** Property tests: plan-hash reorder-invariance and managed-document splice round-trip. (REQ-05)
-- **S2.b** Visibility-enforced cutover guard, retaining deleted-module assertions. (REQ-06)
+- **S2.b** Visibility-enforced cutover guard per the cutover-guard design, retaining the deleted-module and renderer-owner assertions. (REQ-06)
 - **S2.c** Contention tests: concurrent `open_mutation_session` and active-layout reentry rejection over a shared store with real threads. (REQ-07)
-- **S2.d** Path constants and derived repair-path coverage: `VirtualPath` associated consts; repair-path tests derive from the repair planner's declaration. (REQ-08)
+- **S2.d** Path constants and derived repair-path coverage per the path-constant and repair-target design. (REQ-08)
 - All four parallel.
 
 **S3 Performance contract** (rust tier; story parallel with S1)
 - **S3.a** Benchmark harness and first artifact per the performance-contract design. (REQ-09)
-- **S3.b** Bulk-update eligibility prefilter and session-budget test per the bulk-update design. (REQ-10)
+- **S3.b** Bulk-update eligibility prefilter and session-budget test per the bulk-update design; after the fix, extends the harness with the bulk-mutation scenario and records the artifact. → S3.a. (REQ-10)
 - **S3.c** Lock-hygiene implementation per PD-1: remove the sidecar read lock, keep the O(1) fixed lock set, one-time orphan-sidecar cleanup — this clears the zero-byte-lock advisory-debt item (its clearance is S3's, not S4's, so no cross-story task edge is needed). (REQ-11; the profile artifact half of REQ-11 is already committed at `dev/studies/perf/session-cost-27ffbd2d.json`)
-- All three parallel. S3.b's test derives the per-mutation session constant from a single-issue baseline, so S1's combinator cannot invalidate it; the probe stays compilable regardless of S4's feature gating via the self dev-dependency.
+- S3.a ∥ S3.c; S3.b follows the harness so its bulk scenario measures the fixed behavior. S3.b's test derives the per-mutation session constant from a single-issue baseline, so S1's combinator cannot invalidate it; the probe stays compilable regardless of S4's feature gating via the self dev-dependency.
 
 **S4 Hygiene and docs** (story → S1; story gates: rust ∪ docs ∪ mcp-ci)
-- **S4.a** Test-support feature gating per the feature-gating design. (REQ-12 part)
-- **S4.b** Public-surface reduction: delete dead exports (`issue_draft`), demote the over-broad exports to crate visibility. → S4.a (same files; gating first fixes the visibility baseline). (REQ-12 rest)
+- **S4.a** Test-support feature gating per the feature-gating design. Carries the standalone `clippy` gate (which runs `cargo clippy --lib`, i.e. the feature-off surface) in addition to the rust tier, so the feature-off build is verified by a required gate rather than relied on implicitly. (REQ-12 part)
+- **S4.b** Public-surface reduction per the audited disposition: delete `issue_draft` (zero callers); demote to `pub(crate)` the five clean items (`compose_managed_documents`, `finalize_audit_append`, `profile_applied_event`, `FixedMutationClock`, `default_rule_membership_diff_from_identities`) and the three items requiring co-demotion of their non-candidate producers (`ValidationCaptureClosure` + `validate_capture_closure`, `DefaultRuleMembershipDiff` + `default_rule_membership_diff`, `InjectivityProof` + `RepositoryLayout::injectivity_proof`); keep public the six items pinned by external contracts — the four `Contribution` variant payload types (`ProfileManifest.contributions` is a public JsonSchema wire contract) and `SerializedRuleSet`/`SchemaFile` (returned by `serialize_ruleset`, consumed from integration-test crates). This narrows the audit's 13/14-item list to 8 demotions + 6 justified keeps + 1 deletion, which is REQ-12's "no external consumer" clause applied literally. → S4.a (same files; gating first fixes the visibility baseline). (REQ-12 rest)
 - **S4.c** Store test split and test renames: inline store test module to a sibling file; review-round test names to `test_<function>_<scenario>`. (REQ-13)
-- **S4.d** Contributor architecture document for the repository-state/materialization subsystem plus the stale storage-abstraction pointer sweep in the core system design document. Docs tier. (REQ-14)
+- **S4.d** Contributor architecture document for the repository-state/materialization subsystem at `dev/architecture/repository-state-materialization.md`, plus the stale storage-abstraction pointer sweep in `dev/architecture/core-system-design.md`. Docs tier. (REQ-14)
 - **S4.e** Advisory-debt clearance of the four non-lock items: `output.rs:433,476`, `mcp-server/lib/tool-generator.js:161,173,179`, `docs/reference/cli-commands.md:3144`, `scripts/test-ci-manual.sh:66-90`. Gates: cargo-ci, code-review, doc-review, docs-mechanical, mcp-ci. (REQ-15)
-- S4.a → S4.b; S4.c ∥ S4.d ∥ S4.e parallel with the pair.
+- S4.b → S4.a; S4.c ∥ S4.d ∥ S4.e parallel with the pair.
 
 **S5 Presentation succession** (docs tier; story → S2, S3, S4)
-- **S5.a** Corrected successor deck: every falsifiable claim traces to a repository artifact; timings cite S3 artifacts per the citation rule. (REQ-16 part)
-- **S5.b** Predecessor deck archived with tombstone pointing to the successor and the audit. → S5.a. (REQ-16 rest)
+- **S5.a** Corrected successor deck at `dev/presentations/1cc809de/`: every falsifiable claim traces to a repository artifact; timings cite S3 artifacts per the citation rule; includes an explicit correction inventory mapping each of the audit's nine falsifiable predecessor-deck errors (A1, A2, A4) to its corrected claim and evidence. (REQ-16 part)
+- **S5.b** Predecessor deck moves from `dev/presentations/cdc840ad/` to the archive (`dev/archive/features/cdc840ad/showcase`, the established archive shape), leaving a tombstone at the original path pointing to the successor deck and the audit. → S5.a. (REQ-16 rest)
 
 ### Decisions pinned at epic creation
 
