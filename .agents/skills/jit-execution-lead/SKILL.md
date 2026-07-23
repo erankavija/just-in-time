@@ -28,6 +28,7 @@ All 8 invariants from jit-manage are inherited and apply without modification. I
 7. **Rework before escalation.** Retry failed work with specific feedback up to MAX_REWORK_ATTEMPTS (`references/escalation-policy.md`) before escalating.
 8. **Resumable state.** Persist progress to `dev/active/<short-id>-progress.json` (`references/progress-file.md`) so execution can resume across sessions.
 9. **Project discovery.** All conventions, gates, documentation standards, and type hierarchies are discovered from the project's own configuration. Assume nothing about language, domain, or tooling.
+10. **Direct-main delivery.** Dependency-ordered waves land reviewed final-form changes on `main`. Per-issue worktree branches are temporary isolation only; do not create or treat a long-lived epic integration branch as the delivery authority.
 
 ## Section 1: Project Discovery
 

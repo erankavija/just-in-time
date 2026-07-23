@@ -134,6 +134,10 @@ mcp-server/
 The CLI is the source of truth for the command schema. The server invokes `jit --schema` once at
 startup and fails fast when the binary is absent from `PATH`. Its MCP surface matches that loaded
 schema; after rebuilding or replacing `jit`, restart the MCP server to load the changed schema.
+The generated `jit_profile_apply`, `jit_project_render`, and `jit_validate` tools therefore expose
+the same recoverable publication, managed-region, drift-repair, and actionable JSON error contracts
+documented in the CLI's [Repository Profiles reference](../docs/reference/profiles.md); MCP does not
+maintain a second transaction or error model.
 
 ### Dynamic Tool Generation with Nested Subcommands
 

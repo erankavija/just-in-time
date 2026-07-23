@@ -5,4 +5,5 @@
 mod build_provenance_metadata_stability_tests;
 mod repository_inventory;
 mod repository_inventory_tests;
+mod repository_state_cutover_tests;
 mod version_cli_tests;

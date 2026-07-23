@@ -81,8 +81,26 @@ The profile changes configuration and installs files, but it never creates Git
 commits, rewrites existing issues, or treats the dogfood vocabulary as engine
 behavior. A semantic registry entry or one-to-one asset that collides with
 differing repository-owned content is a conflict; that content is not silently
-overwritten. Managed regions replace only the package-owned marked region and
-preserve all prose outside its markers.
+overwritten.
+
+## Derived state and managed regions
+
+Declared configuration, registries, and applied-profile provenance are the
+authorities for generated schemas, default-rule assertions, configured
+projections, and installed profile targets. `jit validate` reports an owned
+target that is missing, stale, has the wrong executable mode, or is unexpected.
+`jit validate --fix` recomputes the same complete final-state plan and publishes
+all safe repairs in one recoverable transaction. It preserves authored rule
+comments, order, policy, and all unmanaged document bytes; it never treats a
+conventional filename as proof of ownership.
+
+Managed regions replace only the package- or projection-owned marked region.
+Distinct regions may nest, but delimiters must form one unambiguous containment
+tree. Duplicate, partial, reversed, crossing, or multiply owned regions fail
+before publication. Unresolvable provenance and ambiguous ownership are likewise
+non-repairable and leave every target unchanged. Human output and the standard
+JSON `VALIDATION_FAILED` error envelope retain the underlying target, delimiter,
+or provenance cause so an operator can repair the authority rather than guess.
 
 ## Publication, rollback, and recovery
 
@@ -103,6 +121,12 @@ areas:
   `transaction-protocol-v1`, for initialization when `.jit/` did not yet exist;
 - `.jit/tmp/transactions/` for an existing repository.
 
+When the selected data root does not exist, JIT assembles the complete root in a
+verified sibling staging directory while the external bootstrap journal remains
+outside it. One atomic no-replace rename publishes that complete root. An
+occupied destination is never overwritten; the losing operation fails and a
+retry treats the now-existing root through the ordinary existing-root path.
+
 Every later mutating JIT command runs mandatory recovery before normal
 repository services start. A prepared journal is rolled back to the old state; a
 committed journal verifies the new state and completes cleanup. Recovery
@@ -120,6 +144,12 @@ Successful application writes a minimal provenance record at
 matching filename) and appends the repository-scoped `profile_applied` audit
 event. The record stores the profile ID, version, embedded origin, package hash,
 and per-target hashes used to recognize an exact reapplication.
+
+These repository-state guarantees do not change Git requirements. Core commands,
+including init, profile application, project rendering, and validation, work
+without Git. Claim leases remain the documented exception: their shared
+coordination state lives under `.git/jit/`, so claim acquire/renew/release require
+a Git repository. Profiles do not add or alter that lease surface.
 
 ## V1.0 lifecycle boundary
 

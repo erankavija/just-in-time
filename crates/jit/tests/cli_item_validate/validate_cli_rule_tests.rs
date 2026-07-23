@@ -699,6 +699,14 @@ fn test_schema_exposes_validate_positional_and_explain_flag() {
         flags.iter().any(|f| f["name"] == "json"),
         "validate must expose --json flag"
     );
+    let fix = flags.iter().find(|flag| flag["name"] == "fix").unwrap();
+    assert!(
+        fix["description"]
+            .as_str()
+            .unwrap()
+            .contains("provenance-proven derived state"),
+        "schema must document the repair contract: {fix}"
+    );
 }
 
 #[test]
@@ -733,6 +741,9 @@ process.stdin.on('end', () => {
   const props = tool.inputSchema.properties || {};
   if (!props.id) { console.error('missing id property'); process.exit(3); }
   if (!props.explain) { console.error('missing explain property'); process.exit(4); }
+  if (!props.fix?.description?.includes('provenance-proven derived state')) {
+    console.error('missing fix repair contract'); process.exit(5);
+  }
   console.log('ok');
 });
 "#;

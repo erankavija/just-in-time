@@ -35,11 +35,10 @@ jobs:
           key: ${{ runner.os }}-cargo-audit
       
       - name: Install cargo-audit
-        run: cargo install cargo-audit || true
+        run: cargo install cargo-audit
       
       - name: Run Rust security audit
         run: cargo audit
-        continue-on-error: true
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -49,9 +48,7 @@ jobs:
       - name: Audit MCP server dependencies
         working-directory: mcp-server
         run: npm audit --production
-        continue-on-error: true
       
       - name: Audit Web UI dependencies
         working-directory: web
         run: npm audit --production
-        continue-on-error: true

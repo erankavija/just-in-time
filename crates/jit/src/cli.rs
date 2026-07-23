@@ -38,7 +38,8 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Initialize the issue tracker in the current directory
+    /// Initialize through one recoverable publication; an absent data root is
+    /// staged complete and published without replacing an occupied destination
     Init {
         /// Hierarchy template to use (default, extended, agile, minimal)
         #[arg(long)]
@@ -297,9 +298,10 @@ pub enum Commands {
     /// Render documentation projections declared in `[projection.*]`
     ///
     /// Each `[projection.<name>]` config table projects an addressable item kind
-    /// (or kinds) into a documentation target. `render` writes every declared
-    /// projection, or a single named one, atomically; in region mode only the
-    /// delimited block changes. Targets and delimiters come only from config.
+    /// (or kinds) into a documentation target. `render` publishes every declared
+    /// projection, or a single named one, in one recoverable transaction; in
+    /// region mode only the delimited block changes. Targets and delimiters come
+    /// only from config.
     #[command(subcommand)]
     Project(ProjectCommands),
 
@@ -348,7 +350,7 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Validate repository integrity
+    /// Validate repository integrity and diagnose declared derived-state drift
     Validate {
         /// Issue id to validate (runs local + graph rules for this issue only).
         /// When omitted, validates the whole repository.
@@ -372,7 +374,7 @@ pub enum Commands {
         #[arg(long, value_name = "ID")]
         scope: Option<String>,
 
-        /// Attempt to automatically fix validation issues
+        /// Transactionally repair safe findings and provenance-proven derived state
         #[arg(long)]
         fix: bool,
 
@@ -586,7 +588,8 @@ pub enum InvariantCommands {
 pub enum ProjectCommands {
     /// Render declared documentation projections into their configured targets
     ///
-    /// Writes every `[projection.*]` table, or a single `--name`d one, atomically.
+    /// Publishes every `[projection.*]` table, or a single `--name`d one, through
+    /// one recoverable transaction.
     /// In region mode only the delimited block is rewritten; everything outside is
     /// byte-preserved. A missing target/source, an unknown kind, or an absent
     /// region marker is a typed error and nothing is written.
@@ -2833,7 +2836,7 @@ pub enum ProfileCommands {
         json: bool,
     },
 
-    /// Apply an embedded profile to the current repository
+    /// Apply an embedded profile through one recoverable multi-target transaction
     Apply {
         /// Stable embedded profile ID
         id: String,

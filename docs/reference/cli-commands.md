@@ -484,8 +484,10 @@ jit init [--hierarchy-template <name>] [--profile <profile-id>] [--json]
 initialization. `jit init --profile jit-dogfood` is the preferred setup for
 JIT's portable workflow; plain init remains methodology-neutral. For a fresh
 repository, the neutral scaffold and profile projection are planned, validated,
-and published together. The same flag can complete and apply the profile to an
-existing partial repository. See
+and published together. If the data root is absent, JIT stages the complete root
+beside its destination and publishes it with an atomic no-replace rename; an
+occupied destination is never overwritten. The same flag can complete and apply
+the profile to an existing partial repository. See
 [Repository Profiles](profiles.md) for the canonical package, conflict,
 transaction, recovery, and lifecycle contract.
 
@@ -599,7 +601,9 @@ jit profile apply <PROFILE_ID> [--dry-run] [--json]
 Without `--dry-run`, JSON returns `ProfileApplyResult`: profile identity,
 `status` (`applied` or `unchanged`), `plan_hash`, an optional
 `transaction_id`, and non-fatal cleanup warnings. Exact reapplication is a
-successful no-op.
+successful no-op. Application and all coupled derived targets use the canonical
+recoverable multi-target transaction described in
+[Repository Profiles](profiles.md), including strict managed-region composition.
 
 Unknown IDs are not-found errors (exit `3`). Conflicts, invalid package state,
 final-state validation failures, filesystem failures, and recovery-required
@@ -2931,7 +2935,7 @@ jit validate --branch-drift [--leases] [--json]
 | `<ID>` | The local and graph rules for that issue only. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
 | `--scope <ID>` | Evaluates the rules matching each issue in a container's transitive dependency closure, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
-| `--fix` | Apply the automatic fixes (e.g. dropping transitively redundant edges). `--dry-run` reports what would be fixed and writes nothing. |
+| `--fix` | Apply automatic rule/graph/state fixes and provenance-proven derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. |
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
 | `--leases` | Check that active leases are consistent and not stale. |
 
@@ -2970,6 +2974,12 @@ one object:
 [`jit query divergence`](#membership-divergence-jit-query-divergence). They are
 advisory and never change the exit status; resolve them with `jit query
 divergence` when a membership label claims what the DAG does not back.
+
+`validate --fix --json` returns the standard error envelope with code
+`VALIDATION_FAILED` when a repair is unsafe. Its `error.message` retains the
+complete actionable cause chain, including ambiguous managed-region delimiters
+or mismatched profile provenance. The human error reports the same cause, and no
+repair target is written.
 
 ### `jit recover`
 
@@ -3126,10 +3136,10 @@ registry kind's store, under either style), an issue-scoped kind, an unknown kin
 region marker is a typed error (exit `4`) raised before any file is written — a
 missing registry store is never rendered as an empty block. Rendering is
 two-phase: every projection is rendered and its target's final bytes materialized
-in memory before any file is written, so any such failure — even in a later
-projection of a whole-`[projection.*]` run — leaves every target byte-identical;
-the per-target writes that do happen are each individually atomic. JSON uses the
-list envelope `{"count": N, "projections": [...]}`, each entry `{name, target,
+in memory before publication, so any such failure — even in a later projection
+of a whole-`[projection.*]` run — leaves every target byte-identical. All changed
+targets then publish through one recoverable repository transaction. JSON uses
+the list envelope `{"count": N, "projections": [...]}`, each entry `{name, target,
 mode, style, kinds, count}`. A failing command under `--json` returns the error
 envelope with code `PROJECT_COMMAND_FAILED`.
 

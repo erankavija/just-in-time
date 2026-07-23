@@ -50,6 +50,3 @@ pub use domain::queries::{
 
 // Re-export key domain operations for library consumers
 pub use domain::{DependencyGraph, GraphError, GraphNode};
-
-// Backwards compatibility alias
-pub type Storage = JsonFileStorage;

@@ -272,11 +272,29 @@ fn test_cli_validate_fix_rejects_ambiguous_ownership_transactionally() {
     let before = file_snapshot(repo.path());
     assert!(before.contains_key(Path::new("authored.lock")));
 
+    let human = run(repo.path(), &["validate", "--fix"]);
+    assert!(!human.status.success());
+    assert_eq!(human.status.code(), Some(4));
+    let human_error = String::from_utf8_lossy(&human.stderr);
+    assert!(
+        human_error.contains("derived-materialization validation pass"),
+        "{human_error}"
+    );
+    assert!(
+        human_error.contains("duplicate delimiters"),
+        "{human_error}"
+    );
+    assert!(human_error.contains("invariants"), "{human_error}");
+
     let output = run(repo.path(), &["validate", "--fix", "--json"]);
     assert!(!output.status.success());
-    assert!(
-        String::from_utf8_lossy(&output.stderr).contains("derived-materialization validation pass")
-    );
+    assert_eq!(output.status.code(), Some(4));
+    let error = json(&output);
+    assert_eq!(error["error"]["code"], "VALIDATION_FAILED");
+    let message = error["error"]["message"].as_str().unwrap();
+    assert!(message.contains("derived-materialization validation pass"));
+    assert!(message.contains("duplicate delimiters"));
+    assert!(message.contains("invariants"));
     assert_snapshot_unchanged(repo.path(), &before);
 }
 
@@ -299,12 +317,26 @@ fn test_cli_validate_fix_profile_provenance_failures_are_zero_write() {
         }
         let before = file_snapshot(repo.path());
 
+        let human = run(repo.path(), &["validate", "--fix"]);
         let output = run(repo.path(), &["validate", "--fix", "--json"]);
         if mismatch {
+            assert!(!human.status.success());
+            assert_eq!(human.status.code(), Some(4));
+            let human_error = String::from_utf8_lossy(&human.stderr);
+            assert!(
+                human_error.contains("applied profile provenance"),
+                "{human_error}"
+            );
+            assert!(human_error.contains("does not match"), "{human_error}");
             assert!(!output.status.success());
-            assert!(String::from_utf8_lossy(&output.stderr)
-                .contains("derived-materialization validation pass"));
+            assert_eq!(output.status.code(), Some(4));
+            let error = json(&output);
+            assert_eq!(error["error"]["code"], "VALIDATION_FAILED");
+            let message = error["error"]["message"].as_str().unwrap();
+            assert!(message.contains("applied profile provenance"));
+            assert!(message.contains("does not match"));
         } else {
+            assert!(human.status.success());
             assert!(output.status.success());
             assert_eq!(json(&output)["fixes_applied"], 0);
         }

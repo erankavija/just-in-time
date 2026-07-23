@@ -467,6 +467,16 @@ fn claim_json_error(
     JsonError::new(code, error.to_string(), command)
 }
 
+/// Preserve the complete actionable cause chain for repository validation
+/// failures while using the CLI's standard machine-readable error envelope.
+fn validate_json_error(error: &anyhow::Error) -> jit::output::JsonError {
+    jit::output::JsonError::new(
+        jit::output::ErrorCode::VALIDATION_FAILED,
+        format!("{error:#}"),
+        "validate",
+    )
+}
+
 /// Render a failed `gate evaluate` / `gate evaluate-all` outcome and terminate appropriately.
 ///
 /// Shared by the `gate evaluate` and `gate evaluate-all` handlers so both classify the
@@ -6700,7 +6710,19 @@ fn run() -> Result<()> {
             // Standard repository validation (existing code)
             if fix {
                 // Use auto-fix mode
-                let (fixes_applied, messages) = executor.validate_with_fix(true, dry_run)?;
+                let (fixes_applied, messages) = match executor.validate_with_fix(true, dry_run) {
+                    Ok(result) => result,
+                    Err(error) if json => {
+                        let json_error = validate_json_error(&error);
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(json_error.exit_code().code());
+                    }
+                    Err(error) => {
+                        return Err(anyhow::Error::new(jit::errors::ValidationFailedError::new(
+                            format!("{error:#}"),
+                        )));
+                    }
+                };
 
                 // Print messages unless in JSON mode
                 if !json {

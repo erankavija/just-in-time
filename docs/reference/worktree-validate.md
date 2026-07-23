@@ -181,8 +181,12 @@ behavior depends on the arguments.
   issue. The id accepts a full UUID, 8-char short id, or unique prefix.
 
 `--fix` additionally repairs the auto-fixable findings (type-hierarchy label
-fixes, transitive-reduction violations, pending state transitions). Coordination
-state — stale locks, the claims index, expired leases — is repaired by
+fixes, transitive-reduction violations, pending state transitions) and owned
+derived-state drift (default rules and schemas, configured projections, and
+provenance-proven profile targets). Derived repairs use one recoverable
+transaction and preserve authored or unmanaged bytes. Ambiguous ownership and
+unresolvable provenance are reported without writes. Coordination state — stale
+locks, the claims index, expired leases — is repaired by
 [`jit recover`](#jit-recover), not by `jit validate`.
 
 ### Options
@@ -192,7 +196,7 @@ state — stale locks, the claims index, expired leases — is repaired by
 | `[ID]` | Positional. Validate this one issue's rules; omit to validate the whole repository |
 | `--explain` | Report which rules matched the issue and whether each passed (requires an `[ID]`) |
 | `--scope <ID>` | Evaluate a container's bracket subtree as a deterministic gate checker (the rules whose selector matches each issue in the container's dependency closure). Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, and `--explain` |
-| `--fix` | Auto-fix the repairable findings (type-hierarchy, transitive reduction, pending transitions) |
+| `--fix` | Auto-fix repairable rule/graph/state findings and provenance-proven derived-state drift |
 | `--dry-run` | Show what `--fix` would change without applying it (requires `--fix`) |
 | `--branch-drift` | Validate that git's `origin/main` is an ancestor of the current branch (requires git) |
 | `--leases` | Report active leases that are inconsistent or stale |
@@ -244,6 +248,11 @@ Warnings: 1
 
 Error-severity rule findings print with a leading `❌ [<rule>]`, warnings with
 `⚠ [<rule>]`.
+
+If `--fix` cannot prove ownership, human output includes the complete actionable
+cause chain. With `--json`, the same failure is a standard error object whose
+code is `VALIDATION_FAILED` and whose message retains that chain (for example,
+the target and duplicate delimiter or the mismatched profile provenance).
 
 ### Failure modes
 

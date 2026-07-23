@@ -520,6 +520,10 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
     let commands = schema["commands"]["profile"]["subcommands"]
         .as_object()
         .unwrap();
+    assert!(commands["apply"]["description"]
+        .as_str()
+        .unwrap()
+        .contains("recoverable multi-target transaction"));
     assert_eq!(
         commands.keys().cloned().collect::<BTreeSet<_>>(),
         expected_keys(&["apply", "list", "show"])
