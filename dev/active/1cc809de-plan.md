@@ -60,7 +60,7 @@ graph TD
 
 *(Arrows read "is prerequisite work for"; in jit the DAG encodes them as the downstream issue depending on the upstream one, with the epic depending on every story.)*
 
-- **S3 Performance contract** starts immediately and in parallel with S1: its first task profiles the per-session cost, which feeds the lock-hygiene decision (epic D-7). The benchmark harness (REQ-09) is a new `scripts/` entry with artifacts under a stable repository path; budget tests (REQ-10) mirror `test_check_auto_transitions_opens_sessions_only_for_eligible_backlog_issues`.
+- **S3 Performance contract** starts immediately and in parallel with S1: its first task profiles the per-session cost, whose artifact confirms or amends the provisional lock-hygiene decision (PD-1, epic D-7) before the lock-hygiene implementation task. The benchmark harness (REQ-09) is a new `scripts/` entry with artifacts under a stable repository path; budget tests (REQ-10) mirror `test_check_auto_transitions_opens_sessions_only_for_eligible_backlog_issues`.
 - **S1 Planning-boundary collapse** is the highest-leverage change: a `with_mutation_session` combinator in `crates/jit/src/commands/mod.rs` retiring the 29 copy-paste retry loops; typed errors for the two `anyhow` plan producers (`finalize_gate_registry_edit`, `finalize_archive_execution`) and the six `anyhow` producer signatures in `materialize.rs`; total journal-action extraction in `file_transaction.rs`; folding `Initialize`/`ApplyProfile` into the shared plan-identity tail or recording the exemption decision.
 - **S2 Testable guarantees** follows S1 so property tests and contention tests target the settled surface: proptest for `plan_hash` reorder-invariance and splice round-trip, visibility-based cutover guard, contention tests over `open_mutation_session` and `ActiveLayoutTracker`, `VirtualPath` associated consts with `repair_paths()` derived from the repair planner's declaration.
 - **S4 Hygiene and docs** follows S1 because the public-surface demotions (REQ-12) must not race the boundary refactor: feature-gate `FailurePoint`/`TransactionFailureInjector`/`test_support`, delete `issue_draft`, demote the 13 over-broad exports, split the store's inline test module, rename review-round tests, write the contributor architecture doc, sweep `core-system-design.md`, clear the five advisory-debt items.
@@ -70,13 +70,17 @@ graph TD
 
 Recorded in the epic description (D-1…D-7): single-epic scope, milestone v1.0 with the production-readiness epic depending on this one, deck succession (corrected retelling only, predecessor archived with tombstone), audit imported as the evidence source, independent holistic review as a required epic gate, benchmark harness as a maintained contract, and lock-hygiene design chosen from profiling data before fan-out.
 
+### Plan decisions
+
+- **PD-1 (lock hygiene, satisfies epic D-7): lazy lock-file creation, amendable.** Lock files are created only when a session actually needs to take the lock, so idle issues stop accumulating zero-byte lock files; the 693 zero-byte locks recorded by the audit (C2-3) indicate eager creation is the pathology. The decision is recorded provisionally: S3's first task produces the per-session cost-profile artifact, and its second task confirms this choice against that artifact or amends it to lock consolidation before implementing (an amendment is a plan-document update citing the artifact, not silent drift).
+
 ### Gate assignment
 
 Per repository convention, gates are need-based per footprint: Rust-touching children carry `cargo-ci` and `code-review`; documentation children carry `doc-review`; stories carry the same baseline as their children's footprint. The epic carries `repo-validate` and `holistic-review` (independent reviewer distinct from the building agent, epic D-5).
 
 ## Implementation Steps
 
-1. **Planning node 02dc4bac** — finalize this document, including the lock-hygiene decision once S3's profiling task design is settled (the decision itself may be recorded as amendable pending the first profile artifact); pass plan review.
+1. **Planning node 02dc4bac** — finalize this document, including the provisional lock-hygiene decision (PD-1); pass plan review.
 2. **Breakdown node 24bab642** — decompose into the five stories and their children with `satisfies:REQ-NN` coverage labels; pass coverage preview and breakdown review.
 3. **Fan-out** — S3 and S1 in parallel; S2 and S4 after S1; S5 after S2, S3, S4.
 4. **Epic completion** — all stories done, `repo-validate` and the independent holistic review pass.
@@ -91,7 +95,7 @@ Per repository convention, gates are need-based per footprint: Rust-touching chi
 
 ## Risks and Open Questions
 
-- **Lock-hygiene design is deliberately open** until the profile artifact exists (epic D-7); the breakdown encodes it as a decision-then-implement pair inside S3.
+- **Lock-hygiene design is provisionally decided** (PD-1: lazy creation, amendable); S3 encodes a confirm-or-amend step against the profile artifact before the implementation task, so a consolidation outcome reshapes one task, not the story structure.
 - **REQ-04 may end in a recorded exemption** if `Initialize`/`ApplyProfile` genuinely cannot share the plan-identity tail; the exit is a decision item, not silent scope drift.
 - **Boundary refactor blast radius** — the combinator touches 16 command files; mitigated by landing it as mechanical per-file conversions behind an unchanged public behavior contract, verified by the untouched interruption suite.
 - **Feature-gating test support** (REQ-12) changes how CI invokes tests; `cargo-ci` and `cargo-ci-features` gate configurations must be checked against the new feature before the change lands.
