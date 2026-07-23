@@ -8,6 +8,7 @@ mod harness;
 mod cli_warnings_integration_tests;
 mod config_loading_tests;
 mod default_rules_registry_derivation_tests;
+mod derived_state_repair_tests;
 mod effective_rules_tests;
 mod example_rulesets_tests;
 mod label_membership_validation_tests;

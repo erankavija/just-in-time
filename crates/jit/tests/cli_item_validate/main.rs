@@ -4,6 +4,7 @@
 
 mod decision_kind_tests;
 mod decision_risk_story_tests;
+mod derived_state_repair_tests;
 mod invariant_check_cli_tests;
 mod invariant_registry_story_tests;
 mod item_cli_tests;
