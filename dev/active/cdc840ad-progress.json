@@ -438,8 +438,10 @@
     {
       "category": "rework-exceeded",
       "issue_id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-23T16:04:40+03:00",
+      "resolved_at": "2026-07-23T16:15:38+03:00",
+      "resolution": "Invoker approved the recommended narrow documentation-only correction and reset the rework counter.",
       "situation": "After the invoker-approved reset, two structural-review rework attempts closed REQ-03 and the final cargo-ci, code-review, docs-mechanical, mcp-ci, and jit-validate gates pass. The approved doc-review gate found one new blocking issue-authored documentation defect: docs/reference/profiles.md and generated CLI schema prose claim every safe validate --fix repair is published in one recoverable transaction, while hierarchy, reduction, and pending-transition repairs are sequential and only derived-state repair has that transaction scope. It also reported one pre-existing advisory project-render error-code discrepancy.",
       "recommendation": "Authorize one narrow documentation-only correction with a counter reset: qualify the profiles reference and validate CLI schema prose so the one-transaction guarantee applies only to derived-state repairs; optionally correct the adjacent pre-existing project-render JSON error-code sentence while already in the public contract; regenerate projections if required; rerun documentation/mechanical validation and the authoritative issue gates. Do not broaden validate implementation transactionality."
     }
@@ -452,7 +454,7 @@
     "49adf23b": 1,
     "661d6be2": 2,
     "a3a788f3": 2,
-    "c73c7618": 2
+    "c73c7618": 1
   },
   "started_at": "2026-07-18T16:22:26Z"
 }
