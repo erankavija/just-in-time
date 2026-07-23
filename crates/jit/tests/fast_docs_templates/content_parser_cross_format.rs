@@ -14,7 +14,7 @@ use jit::declarations::rules::{Assertion, Rule, RuleScope, SchemaSource, Selecto
 use jit::document::{
     ContentParser, HtmlContentParser, MarkdownContentParser, ParsedContent, XmlContentParser,
 };
-use jit::domain::{project, Issue};
+use jit::domain::project;
 use jit::validation::engine::{Finding, SchemaEngine};
 use serde_json::Value;
 use std::path::PathBuf;
