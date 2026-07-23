@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "950e59275daf34f35bc9d784ea54dd1aaf2c7564",
+  "completed_at": "2026-07-23T12:05:04.842875292Z",
+  "duration_ms": 181298,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable release-contract, fail-closed audit, actionable validation-error, and structural-guard changes meet the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
+  "message": null,
+  "run_id": "acb2823c-2e28-4ebb-8e42-634a141262ce",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-23T12:02:03.544132714Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 50dbf3af, 93372680, b98870ed, 537e9ed, a96d9f18, ade6a221, d48b0a69, 8abff357, 94e3a9f1, c06b58e7, b7a08e08, 1ee72515, 950e5927 (`jit:c73c7618`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4, @/charter/D-11 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/derived-state-coherence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review pending; docs-mechanical pending; mcp-ci pending; jit-validate pending\nTruncation recovery: narrowed reread of the final structural-guard patch; individual tagged patches and current affected files inspected\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable release-contract, fail-closed audit, actionable validation-error, and structural-guard changes meet the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
