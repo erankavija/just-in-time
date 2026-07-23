@@ -1,14 +1,14 @@
 {
-  "id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
-  "title": "Document public contracts and complete release evidence",
-  "description": "Encode the consolidated transaction surface in the canonical public contracts and complete the comprehensive behavioral and structural release evidence on the sole repository-state engine. This is the sole leaf accountable for container criterion REQ-08 and completes Group B for the v1.0 source freeze.\n\n## Background\n\nWith the repository-state architecture landed on main, the drift/repair validation and the project invariant land in sibling assurance tasks; this task supplies the public documentation and the release evidence that the v1.0 source freeze consumes. No second implementation may appear during assurance.\n\n## What to build\n\n- Public contract updates: canonical human/JSON/schema/MCP docs encode recoverable multi-target publication, drift diagnosis and repair, managed-region semantics, and absent-root publication. The claim and lease surface is documented unchanged. Contributor docs retain integration-only staging; Git evidence stays orchestration-only with core Git-optional and claims Git-required (`@/charter/D-4`). Existing projection/schema consumers remain covered.\n- Comprehensive behavioral evidence: in-process and CLI/MCP/schema tests cover profile/config integration, multi-target rendering, shared-target composition, marker failures, manual derived-state drift, transactional repair, idempotence, concurrent mutation serialization, interruption recovery (external and internal journals), Git-free operation, root-publication races, and stable human and JSON result contracts.\n- Structural evidence: guards prove predecessor deletion, no command-local publisher or duplicate renderer, no compatibility seam, and no independently merged staging package.\n\n## Success Criteria\n\n- [hard] REQ-01: Human/JSON/schema/MCP docs encode recoverable multi-target publication, drift diagnosis and repair, managed-region semantics, and absent-root publication; the claim and lease surface is documented unchanged.\n- [hard] REQ-02: In-process and CLI/MCP/schema tests cover profile/config integration, multi-target rendering, shared-target composition, marker failures, manual derived-state drift, transactional repair, idempotence, concurrent mutation serialization, interruption recovery, Git-free operation, root-publication races, and stable human and JSON contracts.\n- [hard] REQ-03: Structural guards prove predecessor deletion, no command-local publisher or duplicate renderer, no compatibility seam, and no independently merged staging package.\n\n## Constraints\n\n- Sole engine only: add no alternate renderer, serializer, capture path, publisher, or compatibility layer.\n- Docs state current behavior only; before/after narration belongs in the CHANGELOG.\n- Out of scope (plan D19/D20): lease credential/claim-log/claim-command redesign and worktree/data-root binding redesign — the claim and lease surface is documented unchanged.\n\nBlast radius: canonical docs and public adapters, all cohesive release suites, and source-tree absence checks. See `dev/active/cdc840ad-plan.md` §2 (project-local invariant and public fit; complete evidence) and plan decisions D12 and D16.",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-18T14:38:31.958619709Z",
   "dependencies": [
     "ed3e773c-df1c-4a03-aed1-487b6498fd38",
     "b1621508-db1b-4e75-b1b0-a850c9dd191d"
   ],
+  "description": "Encode the consolidated transaction surface in the canonical public contracts and complete the comprehensive behavioral and structural release evidence on the sole repository-state engine. This is the sole leaf accountable for container criterion REQ-08 and completes Group B for the v1.0 source freeze.\n\n## Background\n\nWith the repository-state architecture landed on main, the drift/repair validation and the project invariant land in sibling assurance tasks; this task supplies the public documentation and the release evidence that the v1.0 source freeze consumes. No second implementation may appear during assurance.\n\n## What to build\n\n- Public contract updates: canonical human/JSON/schema/MCP docs encode recoverable multi-target publication, drift diagnosis and repair, managed-region semantics, and absent-root publication. The claim and lease surface is documented unchanged. Contributor docs retain integration-only staging; Git evidence stays orchestration-only with core Git-optional and claims Git-required (`@/charter/D-4`). Existing projection/schema consumers remain covered.\n- Comprehensive behavioral evidence: in-process and CLI/MCP/schema tests cover profile/config integration, multi-target rendering, shared-target composition, marker failures, manual derived-state drift, transactional repair, idempotence, concurrent mutation serialization, interruption recovery (external and internal journals), Git-free operation, root-publication races, and stable human and JSON result contracts.\n- Structural evidence: guards prove predecessor deletion, no command-local publisher or duplicate renderer, no compatibility seam, and no independently merged staging package.\n\n## Success Criteria\n\n- [hard] REQ-01: Human/JSON/schema/MCP docs encode recoverable multi-target publication, drift diagnosis and repair, managed-region semantics, and absent-root publication; the claim and lease surface is documented unchanged.\n- [hard] REQ-02: In-process and CLI/MCP/schema tests cover profile/config integration, multi-target rendering, shared-target composition, marker failures, manual derived-state drift, transactional repair, idempotence, concurrent mutation serialization, interruption recovery, Git-free operation, root-publication races, and stable human and JSON contracts.\n- [hard] REQ-03: Structural guards prove predecessor deletion, no command-local publisher or duplicate renderer, no compatibility seam, and no independently merged staging package.\n\n## Constraints\n\n- Sole engine only: add no alternate renderer, serializer, capture path, publisher, or compatibility layer.\n- Docs state current behavior only; before/after narration belongs in the CHANGELOG.\n- Out of scope (plan D19/D20): lease credential/claim-log/claim-command redesign and worktree/data-root binding redesign — the claim and lease surface is documented unchanged.\n\nBlast radius: canonical docs and public adapters, all cohesive release suites, and source-tree absence checks. See `dev/active/cdc840ad-plan.md` §2 (project-local invariant and public fit; complete evidence) and plan decisions D12 and D16.",
+  "documents": [],
+  "first_ready_at": "2026-07-18T14:38:31.958620089Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -18,8 +18,7 @@
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "c73c7618-0b79-422b-9227-bfcc99e6f345",
   "labels": [
     "type:task",
     "epic:repository-materialization",
@@ -27,7 +26,8 @@
     "component:validation",
     "component:cli"
   ],
-  "created_at": "2026-07-18T14:38:31.958619709Z",
-  "updated_at": "2026-07-18T15:07:08.869766256Z",
-  "first_ready_at": "2026-07-18T14:38:31.958620089Z"
+  "priority": "high",
+  "state": "ready",
+  "title": "Document public contracts and complete release evidence",
+  "updated_at": "2026-07-23T08:51:46.478576240Z"
 }

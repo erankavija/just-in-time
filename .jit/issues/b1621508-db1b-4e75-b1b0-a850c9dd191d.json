@@ -9,6 +9,7 @@
   ],
   "description": "Prove the landed drift diagnosis and transactional repair with post-integration acceptance evidence on main. The complete mechanism — drift comparison, validation errors, and ownership-safe `--fix` — is implemented and unit/harness-tested by Group A's materializers package; this task adds the end-to-end acceptance layer and changes no production drift/repair code. This is the sole leaf accountable for container criterion REQ-06.\n\n## Background\n\nPersisted derived state (default rule membership, default schemas, rendered projections, managed regions) is reproducible materialization, never authority. The container requires proof that `jit validate` reports missing or stale persisted derived state as an error without treating it as authoritative and that `jit validate --fix` transactionally restores the exact derived state from declared configuration while preserving unrelated content. That proof is delivered here as acceptance evidence against the landed engine.\n\n## What to build\n\n- Acceptance scenarios on main — end-to-end through the CLI on the JSON backend and through the in-process `TestHarness` on the memory backend — that inject manual drift into each ownership class of the repair ownership-source matrix (generated default-rule fragments, default schemas, full-file projections, region projections, profile assets/regions) and prove: `jit validate` reports deterministic drift errors while effective rules remain declaration-derived, and `jit validate --fix` restores exact derived state while preserving every authored byte outside proven generated spans, with equivalent coverage on both storage backends through their respective drivers.\n- Negative acceptance scenarios: ambiguous ownership yields a non-repairable error and never a whole-file rewrite; a conventionally named but unowned file is never deleted.\n- Idempotence acceptance: a second `--fix` after a clean repair is a no-op.\n\n## Success Criteria\n\n- [hard] REQ-01: Acceptance scenarios on main inject manual drift into each ownership class of the repair matrix and prove that validate reports deterministic errors and validate --fix restores exact derived state while preserving authored content — end-to-end through the CLI on the JSON backend and through the in-process harness on the memory backend.\n- [hard] REQ-02: The acceptance suite proves --fix idempotence (a second run is a no-op) and non-repairable ambiguous-ownership behavior, and changes no production drift/repair code.\n\n## Constraints\n\n- Acceptance evidence only: no change to production drift/repair code; the mechanism belongs to Group A's materializers package.\n- Sole engine only: no alternate renderer, serializer, capture path, or publisher.\n- Out of scope (plan D19/D20): lease credential/claim-log/claim-command redesign and worktree/data-root binding redesign.\n\nBlast radius: post-integration acceptance suites over validate/fix; no production mechanism change. See `dev/active/cdc840ad-plan.md` §2 (drift error and transactional repair; repair ownership-source matrix) and plan decisions D7 and D16.",
   "documents": [],
+  "done_at": "2026-07-23T08:50:09.590578796Z",
   "first_ready_at": "2026-07-18T15:06:44.274972391Z",
   "gates_required": [
     "cargo-ci",
@@ -34,7 +35,7 @@
     "component:validation"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Validate drift diagnosis and transactional repair",
-  "updated_at": "2026-07-23T08:49:05.985393534Z"
+  "updated_at": "2026-07-23T08:50:09.590578796Z"
 }
