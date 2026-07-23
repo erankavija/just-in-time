@@ -14,7 +14,13 @@
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-07-23T06:40:36.969718660Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ed3e773c-df1c-4a03-aed1-487b6498fd38",
   "labels": [
     "type:task",
@@ -25,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Author the derived-state-coherence project invariant",
-  "updated_at": "2026-07-23T06:31:40.679927236Z"
+  "updated_at": "2026-07-23T06:40:36.969718660Z"
 }
