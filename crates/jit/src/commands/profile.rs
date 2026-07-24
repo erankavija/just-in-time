@@ -377,7 +377,7 @@ pub(super) fn embedded_profile(id: &str) -> Result<EmbeddedProfilePackage<'stati
 pub(super) fn repo_string(path: &VirtualPath) -> String {
     let rel = match path.relative() {
         RootRelativePath::Root => String::new(),
-        RootRelativePath::Descendant(text) => text.clone(),
+        RootRelativePath::Descendant(text) => text.to_string(),
     };
     match path.root_class() {
         RepositoryRootClass::Data => format!(".jit/{rel}"),

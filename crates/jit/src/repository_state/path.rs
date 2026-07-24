@@ -1,6 +1,7 @@
 //! Canonical repository-root and virtual-path identities.
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::borrow::Cow;
 use std::path::{Component, Path, PathBuf};
 
 /// A normalized path relative to one selected repository root.
@@ -10,12 +11,18 @@ use std::path::{Component, Path, PathBuf};
 /// path strictly below it (no parent, prefix, control, or alternate-separator
 /// component). The root is a distinct variant, never an empty-string sentinel,
 /// so root-vs-descendant is a type-level distinction rather than a value test.
+///
+/// The descendant payload is [`Cow<'static, str>`] so well-known paths can be
+/// `Cow::Borrowed` const associated items of [`VirtualPath`], while parsing and
+/// deserialization mint `Cow::Owned`. `Cow`'s `Eq`/`Ord`/`Hash` compare and
+/// hash by `str` content, so a borrowed const and an owned parse of the same
+/// path unify as one map key.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RootRelativePath {
     /// The selected repository root itself.
     Root,
     /// A normalized, non-empty path strictly below the selected root.
-    Descendant(String),
+    Descendant(Cow<'static, str>),
 }
 
 impl RootRelativePath {
@@ -46,7 +53,7 @@ impl RootRelativePath {
         {
             return Err(RepositoryLayoutError::LexicalEscape(text.to_owned()));
         }
-        Ok(Self::Descendant(text.to_owned()))
+        Ok(Self::Descendant(Cow::Owned(text.to_owned())))
     }
 
     /// Return this identity as a relative filesystem path (empty for the root).
@@ -187,6 +194,80 @@ impl VirtualPath {
 
     pub(crate) fn ensure_semantic(&self) -> Result<(), RepositoryLayoutError> {
         self.clone().checked().map(drop)
+    }
+}
+
+/// Well-known repository paths as `Cow::Borrowed`-backed const identities.
+///
+/// These consts bypass the fallible [`new`](VirtualPath::new)/`checked` guard, so
+/// canonicality and non-reservation are proven instead by a round-trip test that
+/// reconstructs every [`ALL_KNOWN`](VirtualPath::ALL_KNOWN) entry through the
+/// fallible constructor for its root class and asserts equality with the const.
+impl VirtualPath {
+    /// The issue index under the data root (`.jit/index.json`).
+    pub const INDEX: Self = Self::data_const("index.json");
+    /// Repository configuration under the data root (`.jit/config.toml`).
+    pub const CONFIG: Self = Self::data_const("config.toml");
+    /// Gate registry definitions under the data root (`.jit/gates.toml`).
+    pub const GATES: Self = Self::data_const("gates.toml");
+    /// Graph template registry under the data root (`.jit/templates.toml`).
+    pub const TEMPLATES: Self = Self::data_const("templates.toml");
+    /// Validation rules under the data root (`.jit/rules.toml`).
+    pub const RULES: Self = Self::data_const("rules.toml");
+    /// Invariants registry under the data root (`.jit/invariants.toml`).
+    pub const INVARIANTS: Self = Self::data_const("invariants.toml");
+    /// Append-only event log under the data root (`.jit/events.jsonl`).
+    pub const EVENTS: Self = Self::data_const("events.jsonl");
+    /// Per-issue record directory under the data root (`.jit/issues`).
+    pub const ISSUES: Self = Self::data_const("issues");
+    /// Recorded gate-run directory under the data root (`.jit/gate-runs`).
+    pub const GATE_RUNS: Self = Self::data_const("gate-runs");
+    /// Applied-profile provenance directory under the data root (`.jit/profiles`).
+    pub const PROFILES: Self = Self::data_const("profiles");
+    /// JSON Schema directory under the data root (`.jit/schemas`).
+    pub const SCHEMAS: Self = Self::data_const("schemas");
+    /// Managed gitattributes file at the worktree root (`.gitattributes`).
+    pub const GITATTRIBUTES: Self = Self::worktree_const(".gitattributes");
+
+    /// Every well-known associated-const path, in declaration order.
+    ///
+    /// The exhaustive enumeration lets one test iterate all consts and prove each
+    /// canonical and non-reserved by round-tripping it through the fallible
+    /// constructor. Adding a new const without listing it here leaves it unproven.
+    pub const ALL_KNOWN: &'static [Self] = &[
+        Self::INDEX,
+        Self::CONFIG,
+        Self::GATES,
+        Self::TEMPLATES,
+        Self::RULES,
+        Self::INVARIANTS,
+        Self::EVENTS,
+        Self::ISSUES,
+        Self::GATE_RUNS,
+        Self::PROFILES,
+        Self::SCHEMAS,
+        Self::GITATTRIBUTES,
+    ];
+
+    /// Const-construct a data-root descendant from a `'static` literal.
+    ///
+    /// Bypasses `checked`; callers must supply a canonical, non-reserved path.
+    /// The associated consts do, which the round-trip test proves.
+    const fn data_const(relative: &'static str) -> Self {
+        Self {
+            root: RepositoryRootClass::Data,
+            relative: RootRelativePath::Descendant(Cow::Borrowed(relative)),
+        }
+    }
+
+    /// Const-construct a worktree-root descendant from a `'static` literal.
+    ///
+    /// Bypasses `checked`; callers must supply a canonical, non-reserved path.
+    const fn worktree_const(relative: &'static str) -> Self {
+        Self {
+            root: RepositoryRootClass::Worktree,
+            relative: RootRelativePath::Descendant(Cow::Borrowed(relative)),
+        }
     }
 }
 
@@ -682,7 +763,7 @@ mod tests {
         assert_eq!(RootRelativePath::parse("").unwrap(), RootRelativePath::Root);
         assert!(RootRelativePath::parse("").unwrap().is_root());
         match RootRelativePath::parse("issues/one.json").unwrap() {
-            RootRelativePath::Descendant(text) => assert_eq!(text, "issues/one.json"),
+            RootRelativePath::Descendant(text) => assert_eq!(&*text, "issues/one.json"),
             RootRelativePath::Root => panic!("a non-empty path must be a descendant"),
         }
         assert!(!RootRelativePath::parse("issues/one.json")
@@ -700,5 +781,79 @@ mod tests {
             serde_json::from_str::<RootRelativePath>("\"\"").unwrap(),
             RootRelativePath::Root
         );
+    }
+
+    fn hash_of<T: std::hash::Hash>(value: &T) -> u64 {
+        use std::hash::Hasher;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    #[test]
+    fn test_all_known_consts_round_trip_through_fallible_constructor() {
+        // Each const is a `Cow::Borrowed` identity built without the `checked`
+        // guard. Reconstructing it through the fallible constructor for its root
+        // class proves it canonical and non-reserved (the constructor errors on
+        // either), and the borrowed const must equal its owned reconstruction.
+        assert!(
+            !VirtualPath::ALL_KNOWN.is_empty(),
+            "the well-known set must be enumerated"
+        );
+        for known in VirtualPath::ALL_KNOWN {
+            let relative = known.relative().as_str();
+            let rebuilt = match known.root_class() {
+                RepositoryRootClass::Data => VirtualPath::data(relative),
+                RepositoryRootClass::Worktree => VirtualPath::worktree(relative),
+            }
+            .unwrap_or_else(|error| {
+                panic!("well-known path {relative:?} is not canonical/non-reserved: {error}")
+            });
+            assert_eq!(&rebuilt, known, "const {relative:?} is not canonical");
+        }
+    }
+
+    #[test]
+    fn test_borrowed_const_and_owned_parse_unify_as_one_key() {
+        use std::collections::{BTreeMap, HashMap};
+
+        // A const is `Cow::Borrowed`; the parsed twin is `Cow::Owned`. Preserved
+        // `Eq`/`Ord`/`Hash` semantics must make them one key in both an ordered
+        // and a hashed map, so const and parsed keys collide in the image.
+        let borrowed = VirtualPath::GATES;
+        let owned = VirtualPath::data("gates.toml").unwrap();
+        assert!(
+            matches!(
+                borrowed.relative(),
+                RootRelativePath::Descendant(Cow::Borrowed(_))
+            ),
+            "the const must carry a borrowed payload"
+        );
+        assert!(
+            matches!(
+                owned.relative(),
+                RootRelativePath::Descendant(Cow::Owned(_))
+            ),
+            "the parse must carry an owned payload"
+        );
+
+        assert_eq!(borrowed, owned);
+        assert_eq!(hash_of(&borrowed), hash_of(&owned));
+
+        let mut ordered = BTreeMap::new();
+        ordered.insert(borrowed.clone(), 1);
+        assert_eq!(ordered.get(&owned), Some(&1));
+        ordered.insert(owned.clone(), 2);
+        assert_eq!(
+            ordered.len(),
+            1,
+            "owned twin must overwrite, not add a slot"
+        );
+
+        let mut hashed = HashMap::new();
+        hashed.insert(borrowed, 1);
+        assert_eq!(hashed.get(&owned), Some(&1));
+        hashed.insert(owned, 2);
+        assert_eq!(hashed.len(), 1, "owned twin must overwrite, not add a slot");
     }
 }
