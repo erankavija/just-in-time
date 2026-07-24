@@ -750,7 +750,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
-        use crate::storage::RepositoryStateStoreError;
 
         let normalized = requested.to_lowercase().replace('-', "");
         if normalized.len() < crate::storage::MIN_ID_PREFIX_LENGTH {
@@ -762,13 +761,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             max_bytes: 512 * 1024 * 1024,
             max_depth: 32,
         };
-        for _ in 0..8 {
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
+        with_mutation_session(&self.storage, layout, "gate target binding", |session| {
             let mut spec = CaptureSpec::phase_one([VirtualPath::data("index.json")?], budget)?;
-            let index_image = match session.capture(spec.clone()) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            let Some(index_image) = capture_or_retry(session.capture(spec.clone()))? else {
+                return Ok(SessionStep::Retry);
             };
             let index = captured_repository_index(&index_image)?;
             let candidates = index
@@ -789,10 +785,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .map(|id| VirtualPath::data(format!("issues/{id}.json")))
                     .collect::<std::result::Result<Vec<_>, _>>()?,
             )?;
-            let image = match session.capture(spec) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            let Some(image) = capture_or_retry(session.capture(spec))? else {
+                return Ok(SessionStep::Retry);
             };
             let issues = candidates
                 .iter()
@@ -801,11 +795,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .ok_or_else(|| crate::storage::IssueNotFoundError::new(id).into())
                 })
                 .collect::<Result<Vec<_>>>()?;
-            return super::resolve_issue_from_capture(&issues, requested);
-        }
-        Err(anyhow!(
-            "gate target binding did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Done(super::resolve_issue_from_capture(
+                &issues, requested,
+            )?))
+        })
     }
 
     fn capture_gate_evaluation_image(
