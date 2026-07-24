@@ -167,14 +167,17 @@ pub use rule_serialize::{render_rule_block, rules_file_header};
 // crate public API is gated behind `test-support`. The `pub(crate)` twin
 // keeps every internal caller's resolution
 // (`crate::repository_state::SerializedRuleSet`, etc.) identical in both
-// feature states. `SchemaFile` itself has no by-name crate-internal caller
-// (it's only reached as the element type of `SerializedRuleSet::schema_files`),
-// so its feature-off twin is allowed unused.
+// feature states.
 #[cfg(feature = "test-support")]
 pub use rule_serialize::{serialize_ruleset, SchemaFile, SerializedRuleSet};
 #[cfg(not(feature = "test-support"))]
+pub(crate) use rule_serialize::{serialize_ruleset, SerializedRuleSet};
+// `SchemaFile` itself has no by-name crate-internal caller (it's only
+// reached as the element type of `SerializedRuleSet::schema_files`), so its
+// feature-off twin alone is allowed unused.
+#[cfg(not(feature = "test-support"))]
 #[allow(unused_imports)]
-pub(crate) use rule_serialize::{serialize_ruleset, SchemaFile, SerializedRuleSet};
+pub(crate) use rule_serialize::SchemaFile;
 pub use rules_document::{parse_rule_identities, splice_default_membership, RulesDocumentError};
 pub use rules_gates_projection::render_rules_and_gates_markdown;
 
