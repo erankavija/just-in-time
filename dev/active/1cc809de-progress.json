@@ -174,7 +174,7 @@
           "title": "Plan-hash reorder-invariance property test",
           "story": "S2",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "done",
           "agent": "worker-5b121c3f",
           "model": "sonnet"
         },
@@ -232,7 +232,7 @@
           "title": "Clean up MCP schema-generator warnings",
           "story": "S4",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "done",
           "agent": "worker-27c8256a",
           "model": "sonnet"
         },
@@ -252,7 +252,7 @@
           "title": "Make manual CI script fail closed on skipped audits",
           "story": "S4",
           "classification": "implementation",
-          "status": "rework-1",
+          "status": "rework-2",
           "agent": "worker-531ce80d",
           "model": "sonnet"
         },
@@ -262,7 +262,7 @@
           "title": "Remove the dead _command output parameter",
           "story": "S4",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "done",
           "agent": "worker-9503c8b4",
           "model": "sonnet"
         },
@@ -282,7 +282,7 @@
           "title": "Correct CLI project-render error-code documentation",
           "story": "S4",
           "classification": "documentation",
-          "status": "dispatched",
+          "status": "done",
           "agent": "worker-eb4be05c",
           "model": "sonnet"
         }
@@ -402,7 +402,7 @@
     "fc744df6": 1,
     "412925b9": 4,
     "d159f9d4": 1,
-    "531ce80d": 1
+    "531ce80d": 2
   },
   "surfaced_pitfalls": [
     "28254964 (test-support-feature-gating) satisfies REQ-12 (an S4/hygiene criterion) but is DAG-parented under story 2958105e (S2/enforced-guarantees). Membership label (story:hygiene-and-docs) disagrees with hierarchy parent. Structurally harmless (breakdown gates passed, DAG ordering correct: it is a shared foundation consumed by S2's cutover guard and S4's demotions) but a labeling/parent inconsistency worth noting."
