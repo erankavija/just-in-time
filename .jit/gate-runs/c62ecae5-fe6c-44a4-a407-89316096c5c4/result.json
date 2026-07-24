@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "ba13702e9cb72a461f831a16afc061fe02ef9fea",
+  "completed_at": "2026-07-24T20:51:57.852492421Z",
+  "duration_ms": 146208,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are implemented and covered; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8becd4a1-707b-44ef-bc59-e870f565a40c",
+  "message": null,
+  "run_id": "c62ecae5-fe6c-44a4-a407-89316096c5c4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T20:49:31.643738414Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 532e9465, 569a5f77, d25db1a, ba13702e  \nPolicy sources: AGENTS.md  \nResolved items: @/invariant/gate-semantics, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml); @/charter/D-1, @/charter/D-3, @/charter/D-4, @/charter/D-15 (dev/vision/9db27a3a-charter.md)  \nGate evidence: cargo-ci passed (exit 0, 2026-07-24T20:44:01Z); code-review pending (current review)  \nTruncation recovery: recovered bounded per-path patches and current line ranges for repository_state/mod.rs, materialize.rs, and derived_state_repair_tests.rs  \n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented and covered; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

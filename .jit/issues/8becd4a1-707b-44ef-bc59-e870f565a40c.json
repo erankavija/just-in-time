@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T20:48:54.510836325Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T20:51:58.095172342Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "8becd4a1-707b-44ef-bc59-e870f565a40c",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derived repair-target coverage authority",
-  "updated_at": "2026-07-24T20:48:54.510836325Z"
+  "updated_at": "2026-07-24T20:51:58.095172342Z"
 }
