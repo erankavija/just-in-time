@@ -16,7 +16,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-24T19:40:32.623161944Z",
+      "updated_at": "2026-07-24T20:07:11.523368151Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -35,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Make the manual CI script fail closed on skipped audits",
-  "updated_at": "2026-07-24T19:44:09.434715404Z"
+  "updated_at": "2026-07-24T20:07:11.523368151Z"
 }
