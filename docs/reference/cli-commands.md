@@ -3147,8 +3147,10 @@ in memory before publication, so any such failure — even in a later projection
 of a whole-`[projection.*]` run — leaves every target byte-identical. All changed
 targets then publish through one recoverable repository transaction. JSON uses
 the list envelope `{"count": N, "projections": [...]}`, each entry `{name, target,
-mode, style, kinds, count}`. A failing command under `--json` returns the error
-envelope with code `PROJECT_COMMAND_FAILED`.
+mode, style, kinds, count}`. Under `--json` the pre-write guards above surface the
+`VALIDATION_FAILED` envelope; any other command failure (for example, an
+unrecognized `--name`) returns the error envelope with code
+`PROJECT_COMMAND_FAILED`.
 
 ### `jit invariant check`
 
