@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T05:40:18.741830414Z",
+  "dependencies": [
+    "603b5c5b-d76a-4b0c-bbdb-af8aa806ada9"
+  ],
+  "description": "Resolve the four non-lock advisory-debt items recorded at the predecessor epic's completion: a dead output parameter, noisy MCP schema-generator warnings, a mismatched CLI error-code doc, and a fail-open manual CI script.\n\n## Background\n\nThe predecessor epic's completion report recorded five advisory-debt items. Four of them, none touching lock files, are cleared here (the fifth, unbounded zero-byte lock files, is cleared by the performance-contract lock-hygiene work and needs no change here).\n\n1. **Dead output parameter.** `JsonOutput::success` (`crates/jit/src/output.rs:433`) and `JsonError::new` (`crates/jit/src/output.rs:476`) each accept an unused `_command: impl Into<String>` parameter explicitly \"kept for API compatibility.\" This is a greenfield repository where compatibility is not required, so the parameter and the argument passed at every call site are stale ceremony to remove.\n\n2. **Noisy MCP schema generator.** The `$ref` resolver in `mcp-server/lib/tool-generator.js` emits `console.error` warnings for circular references (line 161), missing definitions (line 173), and unrecognized `$ref` formats (line 179). MCP schema tests pass but emit numerous unresolved-definition and circular-reference warnings; their volume can hide new regressions. Fix the cause at the generator boundary so generation resolves cleanly rather than suppressing the warning calls.\n\n3. **Mismatched CLI error-code doc.** `docs/reference/cli-commands.md:3144` states that a failing `project render` under `--json` returns code `PROJECT_COMMAND_FAILED`, while typed validation and projection failures actually surface `VALIDATION_FAILED` (as documented elsewhere in the same file). The reference must describe the typed error-code split as implemented instead of claiming one blanket code.\n\n4. **Fail-open manual CI script.** `scripts/test-ci-manual.sh:66-90` skips the Cargo security audit when `cargo-audit` is absent and converts npm-audit failures into warnings, yet the script still ends by printing \"All CI checks complete.\" It is fail-open and must not resolve to a success outcome while a security audit is skipped or failing.\n\n## Success Criteria\n\n- [hard] REQ-01: The unused `_command` parameter is removed from `JsonOutput::success` and `JsonError::new` in `crates/jit/src/output.rs` and from every call site; the JSON output types build and produce identical output.\n- [hard] REQ-02: MCP schema generation through `mcp-server/lib/tool-generator.js` completes without emitting circular-reference, missing-definition, or unrecognized-`$ref` warnings, with the cause fixed at the generator boundary rather than the warning calls suppressed, and `npm test` in `mcp-server/` passes.\n- [hard] REQ-03: `docs/reference/cli-commands.md` describes the typed error-code split for `project render` under `--json` - validation/projection failures surface `VALIDATION_FAILED` - instead of stating a single `PROJECT_COMMAND_FAILED` at line 3144, matching the code's actual behavior.\n- [hard] REQ-04: `scripts/test-ci-manual.sh` no longer reports success while a security audit is skipped or failing: a missing `cargo-audit` tool or a non-clean `cargo audit` or `npm audit` no longer resolves to the \"All CI checks complete\" outcome.\n\n## Notes\n\nThe four items span Rust, the MCP server, and documentation, so this task carries the union of those footprints' gates.",
+  "documents": [],
+  "first_ready_at": "2026-07-24T05:40:18.741830414Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical",
+    "mcp-ci"
+  ],
+  "gates_status": {},
+  "id": "24dbdaf6-4ece-4c42-87a4-d76484ee15b6",
+  "labels": [
+    "type:task",
+    "epic:repository-state-quality",
+    "story:hygiene-and-docs",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Clear the four non-lock advisory-debt items",
+  "updated_at": "2026-07-24T05:43:15.806783939Z"
+}

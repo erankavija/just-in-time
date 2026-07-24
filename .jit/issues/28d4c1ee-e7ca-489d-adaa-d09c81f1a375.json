@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T05:39:39.091625754Z",
+  "dependencies": [
+    "24bab642-6f1d-438a-aae5-5c327dceaff6"
+  ],
+  "description": "A single mutation-session retry contract replaces the hand-copied capture/plan/apply/retry loops at the pure single-session command sites in the transactional repository-materialization subsystem.\n\n## Background\n\nThe command layer hand-copies a capture/plan/apply/retry protocol across 16 command files: 29 `for _ in 0..8` loops plus one `template.rs:176` loop under `TEMPLATE_RETRY_LIMIT`, 65 `Err(RetryableConflict{..}) => continue` match arms, and 30 distinct \"did not converge\" bail messages. The sites split into 22 pure single-session loops (open one session, capture, plan, apply, retry on conflict) and 8 self-managed multi-session loops that release a preflight session and then take a `.git/jit` claims guard or run an external subprocess before opening the apply session. This task owns the retry-contract combinators and migrates the 22 pure single-session sites plus the inline capture-conflict arms; the 8 self-managed multi-session sites are out of scope.\n\nAdd the following to `crates/jit/src/commands/mod.rs`:\n\n```rust\nconst MUTATION_SESSION_RETRY_LIMIT: usize = 8;\n\n#[derive(Debug, thiserror::Error)]\n#[error(\"{operation} did not converge after {attempts} capture conflicts\")]\npub struct MutationSessionExhausted { operation: &'static str, attempts: usize }\n\nenum AttemptOutcome<T> { Done(T), Retry }\n\n// The single apply-conflict classifier - the only place a RetryableConflict on\n// apply is interpreted; no command module writes an arm.\nfn classify_apply<T>(outcome: Result<impl Sized, RepositoryStateStoreError>, value: T)\n    -> Result<AttemptOutcome<T>>;\n\n// Retry driver: owns the bound and terminal error, holds NO session.\nfn with_mutation_attempts<T>(operation: &'static str,\n    attempt: impl FnMut() -> Result<AttemptOutcome<T>>) -> Result<T>;\n\n// Session-passed convenience for the 22 pure single-session sites: opens one\n// fresh recovered session per attempt, applies Apply(plan) via classify_apply.\nenum SessionStep<T> { Apply(MaterializationPlan, T), Done(T), Retry }\n\nfn with_mutation_session<S: RepositoryStateStore, T>(\n    store: &S, layout: &RepositoryLayout, operation: &'static str,\n    attempt: impl FnMut(&mut dyn RepositoryMutationSession) -> Result<SessionStep<T>>,\n) -> Result<T>;  // implemented on top of with_mutation_attempts + classify_apply\n```\n\n`with_mutation_attempts` owns the single retry bound (one named constant replacing every literal `8`) and the typed terminal `MutationSessionExhausted` (replacing all 30 bespoke bails). `classify_apply` owns apply-conflict classification. Capture-conflict classification stays centralized in the existing `capture_*` helpers that fold `RetryableConflict` into `Ok(None)`; the four sites with inline capture arms (`gate_check.rs:746,770`; `claim.rs:214`; `config.rs:317`) adopt a shared `capture_or_retry` helper. The 22 single-session sites move onto `with_mutation_session` (read-only sites return `Done`). `claim.rs:212` is a free function, which is why the entry points are free `fn`s generic over the store. Conflict-classification unit tests move onto `classify_apply`/`with_mutation_attempts`.\n\n## Success Criteria\n\n- [hard] REQ-01: `MUTATION_SESSION_RETRY_LIMIT`, `MutationSessionExhausted`, `AttemptOutcome`, `classify_apply`, `with_mutation_attempts`, `SessionStep`, `with_mutation_session`, and `capture_or_retry` exist in the command layer with the signatures above; the retry bound, apply-conflict classification, and terminal conflict error each live in exactly one place.\n- [hard] REQ-02: The 22 pure single-session retry loops are migrated onto `with_mutation_session`, and the four inline capture-conflict arms (`gate_check.rs:746,770`; `claim.rs:214`; `config.rs:317`) adopt `capture_or_retry`; none of these sites retains a `for _ in 0..8` loop, a `RetryableConflict` arm, or a bespoke convergence message.\n- [hard] REQ-03: Conflict-classification unit tests exercise `classify_apply`/`with_mutation_attempts` rather than per-site loops.\n- [hard] REQ-04: The existing failure-injection and interruption tests pass unchanged; behavior is preserved.\n\n## Notes\n\nFile ownership for this task is `crates/jit/src/commands/` and `crates/jit/src/storage/repository_state_store.rs`. `MutationSessionExhausted` maps to today's generic exit code in `main.rs`; contribute only that single arm to the exit-mapping match. The 8 self-managed multi-session sites (`dependency.rs:260,396`; `issue.rs:552`; `gate.rs:1357`; `mod.rs:2141,2353`; `gate_check.rs:909`; `template.rs:176`) are excluded from this task's scope.",
+  "documents": [],
+  "first_ready_at": "2026-07-24T05:39:39.091625754Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "28d4c1ee-e7ca-489d-adaa-d09c81f1a375",
+  "labels": [
+    "type:task",
+    "epic:repository-state-quality",
+    "story:planning-boundary-collapse",
+    "milestone:v1.0"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Mutation-session retry combinators and single-session migration",
+  "updated_at": "2026-07-24T05:41:13.304448643Z"
+}

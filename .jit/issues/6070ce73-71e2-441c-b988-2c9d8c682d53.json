@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T05:40:08.812515625Z",
+  "dependencies": [
+    "603b5c5b-d76a-4b0c-bbdb-af8aa806ada9"
+  ],
+  "description": "Introduce a `test-support` Cargo feature that removes test-only failure-injection and fixture APIs from the default library surface while leaving their definitions and all internal resolution unchanged.\n\n## Background\n\nThe fault-injection seam is production code, not test scaffolding: `storage/file_transaction.rs` threads `&dyn TransactionFailureInjector` through ~121 `repository_check` sites, and both storage backends hold an `Arc<dyn TransactionFailureInjector>` that defaults to `NoTransactionFailures`. The definitions therefore stay unconditional; only their *public exposure* is gated.\n\nA `test-support` feature in `crates/jit/Cargo.toml` gates each of these public exposures, in every case keeping a feature-off twin so nothing inside the crate changes how it resolves the symbol:\n\n- The sole public re-export of `FailurePoint as TransactionFailurePoint`, `TransactionFailureInjector`, and `NoTransactionFailures` at `crates/jit/src/storage/mod.rs:66-68`. Under the feature it stays `pub use`; without it, a `#[cfg(not(feature = \"test-support\"))] pub(crate) use` twin exposes the same names crate-internally so internal callers resolve identically.\n- `mod test_support` (the `seed_issue_fixture` helper, which uses `.expect()` calls unfit for shipped library code).\n- `pub mod test_helpers`, currently `#[cfg(test)]` at `crates/jit/src/commands/mod.rs:64`, widened to `#[cfg(any(test, feature = \"test-support\"))]`.\n- The conflict-injection branch at `crates/jit/src/storage/repository_state_store.rs:527-532` plus its `memory.rs` backing machinery: change `#[cfg(test)]` to `#[cfg(feature = \"test-support\")]`.\n- The file backend's only public fault-injection path, `JsonFileStorage::with_repository_state_failures` at `crates/jit/src/storage/json.rs:314`, with the same feature-on-`pub` / feature-off-`pub(crate)` twin.\n\nThe memory backend's injection twins are already `#[cfg(test)] pub(crate)` and need no change.\n\nTests keep compiling through a self dev-dependency: add `[dev-dependencies] jit = { path = \".\", features = [\"test-support\"] }` to `crates/jit/Cargo.toml`, and enable the same feature on `crates/server`'s `jit` dev-dependency. This unifies the feature into `cargo test --workspace` while `cargo build` and release builds drop the surface. No integration-test target is added, and no CI or gate configuration changes.\n\n## Success Criteria\n\n- [hard] REQ-01: A `test-support` feature is declared in `crates/jit/Cargo.toml`. With the feature disabled, none of `TransactionFailurePoint`, `TransactionFailureInjector`, `NoTransactionFailures`, `seed_issue_fixture`/`test_support`, `test_helpers`, or `JsonFileStorage::with_repository_state_failures` is reachable from the crate's public API (each is `pub(crate)`, `#[cfg]`-excluded, or otherwise non-`pub`).\n- [hard] REQ-02: With the feature enabled, those same items are public exactly as before, and the injection-seam definitions compile unconditionally in both feature states.\n- [hard] REQ-03: Crate-internal resolution of every gated symbol is identical whether or not the feature is on (the feature-off twins preserve `pub(crate)` visibility for internal callers).\n- [hard] REQ-04: `cargo test --workspace` compiles and passes with no added `--features` argument, because the self dev-dependency and the `crates/server` dev-dependency enable `test-support` for test builds.\n- [hard] REQ-05: `cargo clippy --lib` on the default (feature-off) surface reports zero warnings, and no new integration-test target is introduced.\n\n## Notes\n\nThe feature is designed to require no CI or gate-config change: `cargo-ci.sh` picks it up through the dev-dependency, and the standalone `clippy --lib` gate verifies the feature-off public surface. The three integration-test-only publics `SerializedRuleSet`/`SchemaFile`/`serialize_ruleset` are moved behind this feature by the public-surface-reduction task, which builds on the feature established here.",
+  "documents": [],
+  "first_ready_at": "2026-07-24T05:40:08.812515625Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "clippy"
+  ],
+  "gates_status": {},
+  "id": "6070ce73-71e2-441c-b988-2c9d8c682d53",
+  "labels": [
+    "type:task",
+    "epic:repository-state-quality",
+    "story:hygiene-and-docs",
+    "milestone:v1.0"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Feature-gate the test-support library surface",
+  "updated_at": "2026-07-24T05:43:01.008857504Z"
+}
