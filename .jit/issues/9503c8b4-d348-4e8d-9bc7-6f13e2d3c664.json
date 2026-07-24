@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T17:47:22.077853504Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9503c8b4-d348-4e8d-9bc7-6f13e2d3c664",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove the dead _command output parameter",
-  "updated_at": "2026-07-24T16:55:42.444710834Z"
+  "updated_at": "2026-07-24T17:47:22.077853504Z"
 }
