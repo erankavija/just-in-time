@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T23:10:18.754553182Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T23:13:06.463925531Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "42ee0dd5-0cc9-4c5d-852c-224fcefd3523",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate the test-only rule-serialization publics behind test-support",
-  "updated_at": "2026-07-24T23:10:18.754553182Z"
+  "updated_at": "2026-07-24T23:13:06.463925531Z"
 }

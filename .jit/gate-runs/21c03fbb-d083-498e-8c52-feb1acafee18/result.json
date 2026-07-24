@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "1a136eb1700728363de6d9694952a2766ff0be4d",
+  "completed_at": "2026-07-24T23:13:06.222336092Z",
+  "duration_ms": 135083,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three hard requirements are satisfied; the recorded cargo-ci gate passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "42ee0dd5-0cc9-4c5d-852c-224fcefd3523",
+  "message": null,
+  "run_id": "21c03fbb-d083-498e-8c52-feb1acafee18",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T23:10:51.138762939Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:42ee0dd5 commits a3e60a7e, cd00a2de, 2107935f, 4d8715a9, 1a136eb1\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml; .jit/invariants.toml\nResolved items: @/issue/42ee0dd5/requirement/REQ-01, REQ-02, REQ-03 (issue description); @/gate/cargo-ci (.jit/gates.toml); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T23:03:13Z)\nTruncation recovery: narrowed the merge’s parent comparisons and reread affected paths, callers, feature declaration, and test consumers\n\n1. No findings. The feature-on public and feature-off `pub(crate)` twins at `crates/jit/src/repository_state/mod.rs:171-180` satisfy REQ-01/02; existing integration consumers retain the same path with `test-support`, while the recorded required gate supports REQ-03.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three hard requirements are satisfied; the recorded cargo-ci gate passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
