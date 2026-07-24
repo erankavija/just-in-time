@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T16:31:30.495450699Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T16:36:25.344107676Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "d752293b-2b28-4df0-9c11-75f5a35a3caf",
@@ -33,5 +38,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Establish an artifact-backed performance contract",
-  "updated_at": "2026-07-24T16:31:30.495450699Z"
+  "updated_at": "2026-07-24T16:36:25.344107676Z"
 }
