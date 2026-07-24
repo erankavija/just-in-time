@@ -6,7 +6,7 @@
   "incident_log": [
     "Session 1: stale-worktree prune force-removed the 6 active wave-1 worktrees due to a zsh word-splitting bug in the exclusion filter (for p in $UNQUOTED does not split under zsh). No committed work lost (0 commits); no leak into main (verified). Recovery: stopped agents, deleted 6 anchor-only branches, recreated worktrees at a95dd58a, RESUMED all 6 agents from transcript (context preserved). Genuinely-stale worktrees (50) successfully pruned. See handoff Traps."
   ],
-  "worker_worktree_base": "5aeadb2f",
+  "worker_worktree_base": "2c6a56a1",
   "waves": [
     {
       "wave_number": 1,
@@ -174,7 +174,9 @@
           "title": "Plan-hash reorder-invariance property test",
           "story": "S2",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-5b121c3f",
+          "model": "sonnet"
         },
         {
           "id": "ab69a4ef",
@@ -182,7 +184,9 @@
           "title": "Managed-document splice round-trip property test",
           "story": "S2",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-ab69a4ef",
+          "model": "sonnet"
         },
         {
           "id": "7ab27a9b",
@@ -190,7 +194,9 @@
           "title": "Cow-backed VirtualPath with well-known path constants",
           "story": "S2",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-7ab27a9b",
+          "model": "opus"
         },
         {
           "id": "8becd4a1",
@@ -198,7 +204,9 @@
           "title": "Derived repair-target coverage authority",
           "story": "S2",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-8becd4a1",
+          "model": "sonnet"
         },
         {
           "id": "dd5b43b6",
@@ -206,7 +214,8 @@
           "title": "Multi-threaded contention tests",
           "story": "S2",
           "classification": "implementation",
-          "status": "pending"
+          "status": "pending-subwave",
+          "note": "serialized on repository_state_store.rs: e6d5e440 -> 28254964 -> dd5b43b6"
         },
         {
           "id": "28254964",
@@ -214,7 +223,8 @@
           "title": "Feature-gate the test-support library surface",
           "story": "S2/S4-shared",
           "classification": "implementation",
-          "status": "pending"
+          "status": "pending-subwave",
+          "note": "serialized on repository_state_store.rs: e6d5e440 -> 28254964 -> dd5b43b6"
         },
         {
           "id": "27c8256a",
@@ -222,7 +232,9 @@
           "title": "Clean up MCP schema-generator warnings",
           "story": "S4",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-27c8256a",
+          "model": "sonnet"
         },
         {
           "id": "39e1c091",
@@ -230,7 +242,9 @@
           "title": "Repository-state architecture doc + stale pointer sweep",
           "story": "S4",
           "classification": "documentation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-39e1c091",
+          "model": "opus"
         },
         {
           "id": "531ce80d",
@@ -238,7 +252,9 @@
           "title": "Make manual CI script fail closed on skipped audits",
           "story": "S4",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-531ce80d",
+          "model": "sonnet"
         },
         {
           "id": "9503c8b4",
@@ -246,7 +262,9 @@
           "title": "Remove the dead _command output parameter",
           "story": "S4",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-9503c8b4",
+          "model": "sonnet"
         },
         {
           "id": "e6d5e440",
@@ -254,7 +272,9 @@
           "title": "Split store test module + fix review-round test names",
           "story": "S4",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-e6d5e440",
+          "model": "sonnet"
         },
         {
           "id": "eb4be05c",
@@ -262,7 +282,9 @@
           "title": "Correct CLI project-render error-code documentation",
           "story": "S4",
           "classification": "documentation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-eb4be05c",
+          "model": "sonnet"
         }
       ]
     },
