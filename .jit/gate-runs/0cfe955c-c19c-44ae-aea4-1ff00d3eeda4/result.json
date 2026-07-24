@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "c6df74a78b8592df0eef63e31ad7161a2e5ebe83",
+  "completed_at": "2026-07-24T22:49:45.891187547Z",
+  "duration_ms": 219414,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable production well-known-path construction sites use VirtualPath constants; recorded cargo-ci passed on current source.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1781aec2-e4da-49b1-acbd-8c3947987125",
+  "message": null,
+  "run_id": "0cfe955c-c19c-44ae-aea4-1ff00d3eeda4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T22:46:06.476388048Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:1781aec2 commits 591c1cd0, cbf37538, c6df74a\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/gate/jit-validate (.jit/gates.toml); @/invariant/atomic-writes, @/invariant/derived-state-coherence, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: reread individual patch groups and used bounded changed-path/test-boundary scans\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable production well-known-path construction sites use VirtualPath constants; recorded cargo-ci passed on current source.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
