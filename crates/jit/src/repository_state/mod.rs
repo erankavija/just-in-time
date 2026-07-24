@@ -24,7 +24,7 @@ mod rules_document;
 mod rules_gates_projection;
 
 pub(crate) use archive::captured_archive_events;
-pub use archive::finalize_archive_execution;
+pub use archive::{finalize_archive_execution, ArchiveExecutionError};
 pub use default_rules::{
     default_rule_membership_diff, default_rule_membership_diff_from_identities, default_ruleset,
     hierarchy_config, reconcile_default_rules_with_config, type_hierarchy_known_schema,
@@ -74,40 +74,76 @@ pub fn finalize_gate_registry_edit(
     context: &MutationContext,
     intents: &[MutationIntent],
     declarations: RepositoryDeclarations<'_>,
-) -> anyhow::Result<MaterializationPlan> {
+) -> Result<MaterializationPlan, RepositoryStateError> {
     let registry = intents
         .iter()
         .find_map(|intent| match intent {
             MutationIntent::EditGateRegistry { registry } => Some(&**registry),
             _ => None,
         })
-        .ok_or_else(|| anyhow::anyhow!("gate registry finalization requires one typed edit"))?;
+        .ok_or(GateRegistryEditError::MissingEdit)?;
     if intents
         .iter()
         .filter(|intent| matches!(intent, MutationIntent::EditGateRegistry { .. }))
         .count()
         != 1
     {
-        anyhow::bail!("gate registry finalization requires exactly one typed edit");
+        return Err(GateRegistryEditError::MultipleEdits.into());
     }
     if declarations.gates != registry {
-        anyhow::bail!("gate registry edit and projection declarations disagree");
+        return Err(GateRegistryEditError::DeclarationMismatch.into());
     }
 
-    let record_plan = finalize(layout, base, context, intents)?;
+    let record_plan =
+        finalize(layout, base, context, intents).map_err(GateRegistryEditError::Mutation)?;
     let gate_path = VirtualPath::data("gates.toml")?;
-    let gate_bytes = crate::declarations::serialize_gate_registry(registry)?;
-    let overlaid = apply_overlay(base, std::iter::once((gate_path, Some(gate_bytes))))?;
+    let gate_bytes = crate::declarations::serialize_gate_registry(registry)
+        .map_err(GateRegistryEditError::GateDeclaration)?;
+    let overlaid = apply_overlay(base, std::iter::once((gate_path, Some(gate_bytes))))
+        .map_err(GateRegistryEditError::Overlay)?;
     let mut actions = record_plan.delta().actions().to_vec();
     actions.extend(compose_complete(&overlaid, &declarations)?);
     let delta = RepositoryDelta::new(layout, actions)?;
-    let seed = context.repository_seed(intents)?;
+    let seed = context
+        .repository_seed(intents)
+        .map_err(GateRegistryEditError::Mutation)?;
     Ok(MaterializationPlan::new(
         base,
         &seed,
         &MaterializationIntent::SemanticMutation,
         delta,
     )?)
+}
+
+/// A typed failure raised while finalizing a gate-registry edit.
+///
+/// Composed into [`RepositoryStateError::GateRegistryEdit`]. The three
+/// invariant-shaped variants carry no message text of their own beyond their
+/// `Display` impl; every propagated leaf retains its concrete source so
+/// rendering stays in `Display` rather than at the call site.
+#[derive(Debug, thiserror::Error)]
+pub enum GateRegistryEditError {
+    /// No typed `EditGateRegistry` intent was present among the finalized intents.
+    #[error("gate registry finalization requires one typed edit")]
+    MissingEdit,
+    /// More than one typed `EditGateRegistry` intent was present.
+    #[error("gate registry finalization requires exactly one typed edit")]
+    MultipleEdits,
+    /// The typed edit's registry disagreed with the projection declarations.
+    #[error("gate registry edit and projection declarations disagree")]
+    DeclarationMismatch,
+    /// The record finalizer or seed derivation failed.
+    #[error(transparent)]
+    Mutation(#[from] MutationError),
+    /// The edited registry could not be serialized canonically.
+    #[error(transparent)]
+    GateDeclaration(#[from] crate::declarations::GateDeclarationError),
+    /// The proposed-state overlay could not be closed.
+    #[error(transparent)]
+    Overlay(#[from] OverlayError),
+    /// The closed semantic seed was invalid.
+    #[error(transparent)]
+    Seed(#[from] SeedError),
 }
 pub use overlay::{apply_overlay, OverlayError};
 pub use path::{
@@ -718,6 +754,12 @@ pub enum RepositoryStateError {
     /// A producer read an uncaptured path or malformed captured bytes.
     #[error("materialization producer failed: {0}")]
     Producer(#[from] ProducerError),
+    /// A gate-registry edit finalization failed.
+    #[error(transparent)]
+    GateRegistryEdit(#[from] GateRegistryEditError),
+    /// An archive execution finalization failed.
+    #[error(transparent)]
+    ArchiveExecution(#[from] ArchiveExecutionError),
     /// Ownership of a materialization boundary cannot be proven, so repair is
     /// refused before publication rather than risk rewriting or deleting authored
     /// content (ownership matrix: "never rewrites an authored boundary it cannot
