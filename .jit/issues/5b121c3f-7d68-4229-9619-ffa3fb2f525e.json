@@ -7,6 +7,7 @@
   ],
   "description": "A property-based test, with a contract-valid generator, asserts that `plan_hash` is invariant under permutation of a delta's action-set input order.\n\n## Background\n\nThe plan-derivation core of the repository-materialization subsystem has no property-based coverage of `plan_hash` determinism (`crates/jit/src/repository_state/image.rs`). Because `RepositoryDelta::new` sorts its input and rejects duplicates, reordering is a boundary phenomenon that a property test can pin.\n\nThe generator produces distinct-path action sets: a `btree_set` of `VirtualPath` mapped to actions whose preimage matches the kind per `validate_action`, with a path-derived unique `EntryIdentity` so the physical-alias check is cleared. The oracle permutes the input order, builds two deltas through `RepositoryDelta::new`, and asserts `plan_hash` equality across the permutations. A discriminating half of the generator asserts that `plan_hash` equality holds if and only if the two normalized deltas are equal, so the test cannot pass by collapsing distinct inputs.\n\n## Success Criteria\n\n- [hard] REQ-01: A `proptest` generator produces only contract-valid action sets (action preimages matching their kind, with unique `EntryIdentity`).\n- [hard] REQ-02: A property test asserts `plan_hash` is invariant under permutation of the action-set input order, built through `RepositoryDelta::new`.\n- [hard] REQ-03: A discriminating case ties `plan_hash` equality to normalized-delta equality, so collapsing distinct inputs cannot make the test pass.\n\n## Notes\n\nAssert observable semantic properties rather than exact hash values or copied constants. The test lives in an in-crate test module and adds no integration-test target.",
   "documents": [],
+  "first_ready_at": "2026-07-24T16:53:11.340554699Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -20,7 +21,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Plan-hash reorder-invariance property test",
-  "updated_at": "2026-07-24T07:19:49.615370967Z"
+  "updated_at": "2026-07-24T16:53:11.340554699Z"
 }

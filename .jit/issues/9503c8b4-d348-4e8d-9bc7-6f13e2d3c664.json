@@ -7,6 +7,7 @@
   ],
   "description": "The unused `_command` parameter is removed from the JSON output constructors and every site that passes it.\n\n## Background\n\n`JsonOutput::success` (`crates/jit/src/output.rs`) and `JsonError::new` accept an unused `_command: impl Into<String>` parameter kept for API compatibility. This is a greenfield repository where that compatibility is not required, so the parameter is stale ceremony. The output macros in `crates/jit/src/output_macros.rs` thread a `$command` argument into those constructors, and the constructors are also called directly, so removing the parameter also removes the macro argument and updates the invocation sites across the command layer and `main.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The `_command` parameter is removed from `JsonOutput::success` and `JsonError::new`, and the output macros no longer take or forward a command argument.\n- [hard] REQ-02: Every call site that passed a command argument is updated, and the JSON output types build and produce identical output.\n\n## Notes\n\nThe change is output-preserving: only the removed parameter and its arguments change, not the emitted JSON.",
   "documents": [],
+  "first_ready_at": "2026-07-24T16:53:21.918562962Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -20,7 +21,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove the dead _command output parameter",
-  "updated_at": "2026-07-24T07:19:49.615370967Z"
+  "updated_at": "2026-07-24T16:53:21.918562962Z"
 }

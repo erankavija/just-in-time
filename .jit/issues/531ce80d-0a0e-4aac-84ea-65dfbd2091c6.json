@@ -7,6 +7,7 @@
   ],
   "description": "The manual CI script no longer resolves to a success outcome while a security audit is skipped or failing.\n\n## Background\n\n`scripts/test-ci-manual.sh` skips the Cargo security audit when `cargo-audit` is absent and converts npm-audit failures into warnings, yet still ends by printing \"All CI checks complete.\" It is fail-open. A missing audit tool or a failing audit must not resolve to a success outcome.\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/test-ci-manual.sh` does not print its success outcome when a required security audit is skipped or failing.\n- [hard] REQ-02: A missing `cargo-audit` tool, a non-clean `cargo audit`, or a non-clean `npm audit` resolves to a non-success outcome rather than the \"All CI checks complete\" message.\n\n## Notes\n\nThe script should fail closed: an unavailable or failing audit is a failure, not a warning.",
   "documents": [],
+  "first_ready_at": "2026-07-24T16:53:07.818950881Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -20,7 +21,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Make the manual CI script fail closed on skipped audits",
-  "updated_at": "2026-07-24T07:19:49.615370967Z"
+  "updated_at": "2026-07-24T16:53:07.818950881Z"
 }
