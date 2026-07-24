@@ -302,7 +302,10 @@
           "title": "Migrate well-known path sites to VirtualPath constants",
           "story": "S2",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "agent": "worker-1781aec2",
+          "model": "opus",
+          "note": "99 production sites across 21 files; 5 fallible alias helpers deleted as being themselves the construction sites. Both gates passed first round."
         },
         {
           "id": "67a77503",
@@ -310,7 +313,10 @@
           "title": "Visibility-enforced cutover guard",
           "story": "S2",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "agent": "worker-67a77503",
+          "model": "opus",
+          "note": "REQ-03 proven by a reverted compiler probe: six E0603 errors, one per tightened item. Both gates passed first round."
         },
         {
           "id": "73d9070f",
@@ -318,7 +324,10 @@
           "title": "Delete dead export + demote repository-state public surface",
           "story": "S4",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "agent": "worker-73d9070f",
+          "model": "sonnet",
+          "note": "Two REQ-02 pairs had external consumers the spec premise missed; invoker approved the test-support twin. injectivity_proof deleted rather than demoted (documented deviation). Both gates passed."
         },
         {
           "id": "42ee0dd5",
@@ -326,7 +335,10 @@
           "title": "Gate test-only rule-serialization publics behind test-support",
           "story": "S4",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "agent": "worker-42ee0dd5",
+          "model": "sonnet",
+          "note": "Worker swept the whole intra-doc-link class, catching a second broken link beyond the one the lead named. Both gates passed."
         },
         {
           "id": "2958105e",
@@ -408,6 +420,12 @@
       "issue": "531ce80d",
       "status": "resolved_guidance_reset",
       "summary": "Round-5 review: npm vectors resolved; cargo audit lacks -D warnings. Invoker authorized whole-surface fail-closed rework (fix all remaining fail-open vectors in one pass) instead of another single-finding patch."
+    },
+    {
+      "category": "issue-scope-change",
+      "issue": "73d9070f",
+      "status": "resolved_authorized",
+      "summary": "REQ-02 named ValidationCaptureClosure/validate_capture_closure for demotion on the stated premise that they have no consumer outside repository_state. False: tests/fast_rules/derived_state_repair_tests.rs is an external-crate consumer. Invoker chose the test-support twin (pub under the feature, pub(crate) without), satisfying REQ-02 on the default surface with no criteria amendment. The lead then applied the same approved resolution to DefaultRuleMembershipDiff/default_rule_membership_diff, which the worker showed has the same conflict via its own doctest."
     }
   ],
   "rework_counts": {
@@ -421,7 +439,17 @@
     "531ce80d": 4
   },
   "surfaced_pitfalls": [
-    "28254964 (test-support-feature-gating) satisfies REQ-12 (an S4/hygiene criterion) but is DAG-parented under story 2958105e (S2/enforced-guarantees). Membership label (story:hygiene-and-docs) disagrees with hierarchy parent. Structurally harmless (breakdown gates passed, DAG ordering correct: it is a shared foundation consumed by S2's cutover guard and S4's demotions) but a labeling/parent inconsistency worth noting."
+    "28254964 (test-support-feature-gating) satisfies REQ-12 (an S4/hygiene criterion) but is DAG-parented under story 2958105e (S2/enforced-guarantees). Membership label (story:hygiene-and-docs) disagrees with hierarchy parent. Structurally harmless (breakdown gates passed, DAG ordering correct: it is a shared foundation consumed by S2's cutover guard and S4's demotions) but a labeling/parent inconsistency worth noting.",
+    "VirtualPath::ALL_KNOWN (repository_state/path.rs:237) is a HAND-MAINTAINED mirror of the const set, and its own doc comment admits it. This is the same defect class REQ-08 just fixed for repair paths by deriving coverage from the repair planner's declaration: the epic replaced one hand-maintained mirror while leaving another in the very type it introduced. A const omitted from ALL_KNOWN is never round-tripped by test_all_known_consts_round_trip_through_fallible_constructor, so its canonicality goes unproven while it still bypasses the checked guard. Tension with @/inv/single-source-prose. Raised by worker-1781aec2.",
+    "config/gate-presets is a well-known repository path in practice — duplicated as a literal at commands/gate.rs:246,301 and commands/template.rs:405,707, and rebuilt as a format! prefix at repository_state/mutation.rs:991 — but it is absent from the VirtualPath const set and from ALL_KNOWN. Deliberately NOT added in wave 6: the plan enumerated the const set and breakdown-review held the plan authoritative, so extending it mid-wave would rewire against an approved plan. Natural follow-up.",
+    "VirtualPath has no join/child API (path.rs declares only worktree, data, from_root, ancestor_directories). Consequence: ~78 composite production sites keep the fallible constructor, and two of them degrade it to a latent panic in library code — storage/memory.rs:334 and :346 use .expect(\"issue record path is canonical\") on VirtualPath::data(format!(\"issues/{id}.json\")), which aborts on an id containing '/', '..', or a control character. This violates the repo's no-panics-in-library-code convention. A Result-returning composite helper (VirtualPath::ISSUES.child(id)) would close both. Raised by worker-1781aec2.",
+    "repository_state/mutation.rs:501 discards a layout error with .ok()? inside an Option-returning path, so a malformed run_id surfaces as 'no such gate run' rather than the real cause. Behaviour-preserving to leave, but it is masked error information.",
+    "The test-support twin pattern has NO rustdoc guard. Gating an item flips it to pub(crate) on the default surface, which silently breaks any intra-doc link to it from a public module — and no configured gate runs cargo doc, so nothing catches the class. It bit 42ee0dd5 twice in one issue (validation/mod.rs:33 and rule_serialize.rs:85). Related: cargo doc -p jit --no-deps currently emits ~93 PRE-EXISTING warnings, most of them 'public documentation links to private item', so the signal is already buried. Adding a rustdoc step to cargo-ci would require clearing that backlog first.",
+    "default_rule_membership_diff and DefaultRuleMembershipDiff::is_empty (repository_state/default_rules.rs) have NO production caller anywhere in the crate — measured, not inferred. Their only consumers are the module's own cfg(test) unit tests and the function's own doctest. Wave 6 shipped them behind the test-support twin with scoped #[allow(dead_code)] whose comments record that measurement, rather than deleting them, because deletion would also destroy five unit tests and a doctest covering real diff semantics and that exceeds REQ-02's 'demote' wording. Genuinely dead API kept alive by its own tests: a follow-up deletion-plus-coverage-migration candidate. The adversarial code-review gate accepted the annotated form.",
+    "storage/atomic_write.rs:23 and storage/external_publish.rs:31 each hold an independent process-local AtomicU64 minting temp names of the same shape .{leaf}.{pid}.{seq}.tmp. Collision needs the same directory, leaf, and sequence drawn from two separate counters — reachable only if an export destination coincides with a write_file_atomic target. The external publishers use create_new(true) and fail loudly, but write_file_atomic_bytes_with_permissions uses raw fs::write on its temp and would silently overwrite. A single shared sequence source removes the class. Adjacent to @/inv/atomic-writes. Raised by worker-67a77503.",
+    "The provenance-contract suite's production_source helper still splits source text on the literal \"\\n#[cfg(test)]\\nmod \" (repository_state_cutover_tests.rs:14-20). All three retained tests depend on it, so a rustfmt change or a differently spelled test-module attribute silently widens or narrows what they see. It is load-bearing for less than before the visibility cutover, but it carries the same brittleness that cutover was aimed at.",
+    "write_external_export_atomic (storage/external_publish.rs:60-63) open-codes the temp name that external_temp_name(leaf) at :236-243 produces identically; moved verbatim during relocation to keep that diff reviewable. Free follow-up dedup.",
+    "FileTransactionKernel's inherent methods remain declared pub(crate) on a type that is now pub(in crate::storage). Legal and lint-free since effective visibility is capped by the type's, but the declared visibility overstates reach and can mislead a later reader about the boundary."
   ],
   "started_at": "2026-07-24T00:00:00Z"
 }
