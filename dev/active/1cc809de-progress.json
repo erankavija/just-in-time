@@ -114,7 +114,7 @@
           "title": "Exhaustive exit-code mapping and residual error-string sweep",
           "story": "S1",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "done",
           "agent": "worker-58c2f0e9",
           "model": "opus"
         },
@@ -124,7 +124,7 @@
           "title": "Bulk-update eligibility prefilter and session budget",
           "story": "S3",
           "classification": "implementation",
-          "status": "rework-1",
+          "status": "rework-2",
           "agent": "worker-412925b9",
           "model": "sonnet"
         }
@@ -368,7 +368,7 @@
     "9fda1f86": 1,
     "73981310": 1,
     "fc744df6": 1,
-    "412925b9": 1
+    "412925b9": 2
   },
   "surfaced_pitfalls": [
     "28254964 (test-support-feature-gating) satisfies REQ-12 (an S4/hygiene criterion) but is DAG-parented under story 2958105e (S2/enforced-guarantees). Membership label (story:hygiene-and-docs) disagrees with hierarchy parent. Structurally harmless (breakdown gates passed, DAG ordering correct: it is a shared foundation consumed by S2's cutover guard and S4's demotions) but a labeling/parent inconsistency worth noting."

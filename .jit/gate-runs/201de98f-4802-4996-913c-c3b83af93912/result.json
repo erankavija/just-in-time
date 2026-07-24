@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "9f4e0c2362b94cca2e9c5b4b7657924a04bc58ca",
+  "completed_at": "2026-07-24T14:40:50.665846640Z",
+  "duration_ms": 231345,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/bulk_update.rs",
+        "id": "F1",
+        "line": 341,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/gate-semantics"
+        ],
+        "severity": "high",
+        "summary": "The shared verifier confirms a Done-state no-op without reproducing the per-issue unpassed-gate check, so it skips an update that must return a gate error."
+      }
+    ],
+    "summary": "Shared no-op verification suppresses the authoritative gate error for an already-Done issue with unpassed gates.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "412925b9-874c-4679-909c-95afe31f9287",
+  "message": null,
+  "run_id": "201de98f-4802-4996-913c-c3b83af93912",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T14:36:59.320407080Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4975 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f948e-e12a-7b02-9130-acfef762dccc\n--------\nuser\n--- 4962 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2ac7b230, 61eb2d41, 1337381a, f911f11d, 0cbe8763, 5c9c363d, 9f4e0c23 (`jit:412925b9`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/gate-semantics (.jit/invariants.toml); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T14:31:12Z); code-review failed (exit 1, 2026-07-24T13:57:30Z; prior finding addressed)\nTruncation recovery: none (all relevant bounded patch and source reads completed)\n\n1. [blocking][issue-impact] The shared verifier confirms a `state: Done` candidate based only on gate registration and local-rule cleanliness at `crates/jit/src/commands/bulk_update.rs:341`. A stored Done issue with an unpassed required gate therefore becomes “No changes needed,” although the normal per-issue path checks `Some(State::Done) if issue.has_unpassed_gates()` regardless of its current state and returns the gate error after diverting to Gated (`crates/jit/src/commands/mod.rs:1102`). This suppresses the required authoritative result for a potentially invalid no-op and violates REQ-03 and gate semantics. [`@/invariant/gate-semantics`]\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Shared no-op verification suppresses the authoritative gate error for an already-Done issue with unpassed gates.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The shared verifier confirms a Done-state no-op without reproducing the per-issue unpassed-gate check, so it skips an update that must return a gate error.\",\"file\":\"crates/jit/src/commands/bulk_update.rs\",\"line\":341,\"references\":[\"@/invariant/gate-semantics\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
