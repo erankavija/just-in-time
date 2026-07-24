@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T13:08:53.837413492Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a4e5ca3d-c851-4cc0-904a-599df7617312",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Single-session retry call-site migration",
-  "updated_at": "2026-07-24T11:59:51.193971571Z"
+  "updated_at": "2026-07-24T13:08:53.837413492Z"
 }
