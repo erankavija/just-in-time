@@ -214,6 +214,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// skipped, so repository-dependent validity is decided only inside a
     /// session — the shared one, or the normal per-issue one for anything the
     /// shared session does not confirm.
+    ///
+    /// A verification-session failure (a capture or declaration error, not a
+    /// candidate-level rejection) confirms NOTHING rather than aborting the
+    /// whole command: every candidate falls through to its own per-issue
+    /// session, so best-effort semantics survive exactly as they did before
+    /// this prefilter existed -- each issue's own session failure lands in
+    /// `errors` and the loop continues (jit 412925b9, round 3). This means
+    /// the `C * J + 1` session-open bound holds on the non-failing path; a
+    /// failed verification session instead costs one open (the failed shared
+    /// session, still counted by the once-per-session-open probe) plus `C`
+    /// per candidate, since every candidate demotes rather than only the
+    /// ones requiring a change.
     pub fn apply_bulk_update(
         &mut self,
         filter: &QueryFilter,
@@ -237,7 +249,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         let confirmed_skips = if candidates.is_empty() {
             std::collections::HashSet::new()
         } else {
-            self.confirm_bulk_noop_candidates(&candidates, operations, force)?
+            // Best-effort, not fail-fast: a verification error confirms no
+            // candidate, so every one of them is demoted to the per-issue
+            // path below instead of aborting the entire bulk command.
+            self.confirm_bulk_noop_candidates(&candidates, operations, force)
+                .unwrap_or_default()
         };
 
         for issue in matched {
@@ -584,6 +600,33 @@ impl<S: IssueStore> CommandExecutor<S> {
 mod tests {
     use super::*;
     use crate::domain::{Issue, Priority, State};
+
+    /// Fails the FIRST session open at the once-per-session-open failure
+    /// point `SessionOpenCounter` also observes
+    /// (`TransactionFailurePoint::RepositoryRecoveryExternal`), then lets
+    /// every later open through. `apply_bulk_update` always attempts the
+    /// shared verification session before any per-issue session, so this
+    /// injects exactly one failure into that shared session, isolating its
+    /// effect from the per-issue sessions that must still succeed.
+    struct FailFirstSessionOpen {
+        opens: std::sync::atomic::AtomicUsize,
+        failed_once: std::sync::atomic::AtomicBool,
+    }
+
+    impl crate::storage::TransactionFailureInjector for FailFirstSessionOpen {
+        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+            use std::sync::atomic::Ordering;
+            if point == &crate::storage::TransactionFailurePoint::RepositoryRecoveryExternal {
+                self.opens.fetch_add(1, Ordering::SeqCst);
+                if !self.failed_once.swap(true, Ordering::SeqCst) {
+                    return Err(std::io::Error::other(
+                        "injected verification-session capture failure",
+                    ));
+                }
+            }
+            Ok(())
+        }
+    }
 
     fn create_test_issue(id: &str, state: State, labels: Vec<&str>) -> Issue {
         Issue {
@@ -1748,6 +1791,73 @@ mod tests {
             bulk.get_issue("aaaa1111").unwrap().state,
             direct_final_state,
             "the divert-to-Gated write must happen identically through the bulk path"
+        );
+    }
+
+    /// REQ-03 (round 3 regression): a shared-verification-session failure
+    /// (a capture or declaration error, distinct from a per-candidate
+    /// rejection) must demote every candidate to the normal per-issue path,
+    /// not abort the whole command -- the pre-change contract was per-issue
+    /// best-effort, and this prefilter must not regress it.
+    ///
+    /// Seeds one provable no-op candidate (priority already holds) and one
+    /// issue that genuinely needs the change, both matched. Injects a
+    /// failure into the FIRST session open -- always the shared verification
+    /// session, since `apply_bulk_update` attempts it before any per-issue
+    /// session -- and asserts the command still succeeds, with both issues
+    /// reaching their own per-issue session and landing in the exact same
+    /// result bucket (`skipped` for the no-op, `modified` for the real
+    /// change) that the per-issue path alone would have produced.
+    #[test]
+    fn test_apply_bulk_update_verification_session_failure_demotes_all_candidates() {
+        use crate::query_engine::QueryFilter;
+        use crate::storage::InMemoryStorage;
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let injector = Arc::new(FailFirstSessionOpen {
+            opens: AtomicUsize::new(0),
+            failed_once: AtomicBool::new(false),
+        });
+        let storage = InMemoryStorage::new().with_repository_state_failure_view(injector.clone());
+
+        let mut noop_issue = create_test_issue("noop", State::Ready, vec![]);
+        noop_issue.priority = Priority::High;
+        crate::commands::test_helpers::seed_issue(&storage, noop_issue);
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("changer", State::Ready, vec![]),
+        );
+
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            priority: Some(Priority::High),
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops, false).expect(
+            "a verification-session failure must degrade to per-issue best-effort, not abort the command",
+        );
+
+        assert_eq!(result.summary.total_matched, 2);
+        assert_eq!(result.summary.total_errors, 0);
+        assert_eq!(
+            result.summary.total_skipped, 1,
+            "the no-op candidate is demoted (not confirmed), but the per-issue path still reports it as unchanged"
+        );
+        assert_eq!(
+            result.summary.total_modified, 1,
+            "the genuinely changing issue still reaches its per-issue session and succeeds there"
+        );
+        assert!(
+            injector.opens.load(Ordering::SeqCst) > 1,
+            "per-issue sessions must still have opened after the failed shared verification session"
+        );
+        assert_eq!(executor.get_issue("noop").unwrap().priority, Priority::High);
+        assert_eq!(
+            executor.get_issue("changer").unwrap().priority,
+            Priority::High
         );
     }
 }
