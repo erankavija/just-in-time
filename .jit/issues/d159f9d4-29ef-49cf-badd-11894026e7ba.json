@@ -21,8 +21,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-24T16:09:46.502447463Z",
+      "status": "passed",
+      "updated_at": "2026-07-24T16:52:27.441650981Z",
       "updated_by": "auto:executor"
     }
   },
@@ -40,5 +40,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Collapse the planning boundary to a single mutation-session contract",
-  "updated_at": "2026-07-24T16:44:47.963080002Z"
+  "updated_at": "2026-07-24T16:52:27.441650981Z"
 }

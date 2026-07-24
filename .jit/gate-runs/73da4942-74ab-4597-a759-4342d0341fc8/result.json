@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "5536c0f9bc63c4e55ca8c31e55fd34adc89170ff",
+  "completed_at": "2026-07-24T16:52:27.199113671Z",
+  "duration_ms": 242539,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard requirements are satisfied; the prior REQ-01 finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d159f9d4-29ef-49cf-badd-11894026e7ba",
+  "message": null,
+  "run_id": "73da4942-74ab-4597-a759-4342d0341fc8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T16:48:24.659775707Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b1d251f9, c493af1e, 02d8563b, 5536c0f9 (`jit:d159f9d4`; clean current tree)\nPolicy sources: AGENTS.md\nResolved items: @/issue/d159f9d4/requirement/REQ-01, REQ-02, REQ-03, REQ-04 (issue Markdown); @/invariant/shared-test-contracts, semantic-test-assertions, gate-semantics (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T16:38:32Z); prior code-review failed (exit 1) before the conflict-arm fold\nTruncation recovery: re-read per-file patches and bounded current-source ranges after combined-output truncation; excluded merge second-parent performance work outside this issue’s impact cone\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard requirements are satisfied; the prior REQ-01 finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
