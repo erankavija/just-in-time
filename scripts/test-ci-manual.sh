@@ -73,7 +73,11 @@ if ! command -v cargo-audit &> /dev/null; then
     echo "❌ cargo-audit not installed (required for security audit)"
     echo "   Install with: cargo install cargo-audit"
     AUDIT_FAILED=1
-elif cargo audit; then
+# --deny warnings fails the exit code on unmaintained/unsound/yanked
+# advisories too, not just CVSS vulnerabilities; the CLI flag also
+# overrides any deny/informational_warnings set in an ambient
+# .cargo/audit.toml, so it can't be silently weakened.
+elif cargo audit --deny warnings; then
     echo "✅ Cargo audit OK"
 else
     echo "❌ Cargo audit found issues"
