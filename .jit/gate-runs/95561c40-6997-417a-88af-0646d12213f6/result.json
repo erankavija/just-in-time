@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "f5bec455222197b362810561555953b4baeb58ae",
+  "completed_at": "2026-07-24T21:47:44.294223826Z",
+  "duration_ms": 141498,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard requirements are satisfied by the attributable feature-gating implementation and recorded validation evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "28254964-d14b-4565-9ca4-cc226475e4e6",
+  "message": null,
+  "run_id": "95561c40-6997-417a-88af-0646d12213f6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T21:45:22.795669550Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1bbdb426, cf1c7db, ced7c2e, f5bec455 (`jit:28254964`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/28254964/requirement/REQ-01–REQ-05 (.jit/issues/28254964-d14b-4565-9ca4-cc226475e4e6.json); @/invariant/gate-semantics, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0, 2026-07-24T21:38:28Z); clippy passed (0, 2026-07-24T21:37:46Z); code-review pending\nTruncation recovery: recovered the truncated broad symbol scan with targeted reads of every affected declaration, feature gate, and direct server caller\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard requirements are satisfied by the attributable feature-gating implementation and recorded validation evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
