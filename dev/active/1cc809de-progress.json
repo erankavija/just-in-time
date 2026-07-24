@@ -1,0 +1,98 @@
+{
+  "epic_id": "1cc809de-4669-45d4-960f-f881e716663d",
+  "epic_short_id": "1cc809de",
+  "current_wave": 1,
+  "notes": "Bracket (planning 02dc4bac, breakdown 24bab642) done. Waves plan over the impl interior only. Fan-out order per plan: S1+S3 parallel first, S2+S4 after S1 story done, S5 last. Story checkpoints (d159f9d4 S1, 2958105e S2, d752293b S3, 755cf453 S4, 9ee14023 S5) complete when their subtree tasks+deps are done.",
+  "waves": [
+    {
+      "wave_number": 1,
+      "rationale": "S1+S3 foundations, all Ready (dep only on breakdown node). File overlap: eefbfe84 & fee3c528 both touch repository_state/mod.rs -> worktree isolation, resolve on merge.",
+      "issues": [
+        {"id": "4b2005fe", "short_id": "4b2005fe", "title": "Mutation-session retry combinator foundation", "story": "S1", "classification": "implementation", "status": "pending"},
+        {"id": "9fda1f86", "short_id": "9fda1f86", "title": "Total journal-action extraction in the transaction kernel", "story": "S1", "classification": "implementation", "status": "pending"},
+        {"id": "eefbfe84", "short_id": "eefbfe84", "title": "Typed producer error family for repository-state", "story": "S1", "classification": "implementation", "status": "pending"},
+        {"id": "fee3c528", "short_id": "fee3c528", "title": "Plan-identity tail for initialize and profile-application requests", "story": "S1", "classification": "implementation", "status": "pending"},
+        {"id": "73981310", "short_id": "73981310", "title": "Benchmark harness and first session-cost artifact", "story": "S3", "classification": "implementation", "status": "pending"},
+        {"id": "fc744df6", "short_id": "fc744df6", "title": "Lock-hygiene: eliminate the per-issue sidecar read lock", "story": "S3", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "rationale": "S1 mid-layer. a4e5ca3d touches ~15 command files (big mechanical); a6ee4e23 touches repository_state/{mod,archive}.rs. No overlap.",
+      "issues": [
+        {"id": "a4e5ca3d", "short_id": "a4e5ca3d", "title": "Single-session retry call-site migration", "story": "S1", "classification": "implementation", "status": "pending"},
+        {"id": "a6ee4e23", "short_id": "a6ee4e23", "title": "Typed finalizer errors for gate-registry edit and archive execution", "story": "S1", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "rationale": "S1 sinks + S3 bulk prefilter. 9298b912 (self-managed multi-session, command files), 58c2f0e9 (exit-mapping, main.rs+repository_state), 412925b9 (bulk_update.rs). Watch main.rs overlap between 58c2f0e9 and any other; sequence merges.",
+      "issues": [
+        {"id": "9298b912", "short_id": "9298b912", "title": "Self-managed multi-session retry migration", "story": "S1", "classification": "implementation", "status": "pending"},
+        {"id": "58c2f0e9", "short_id": "58c2f0e9", "title": "Exhaustive exit-code mapping and residual error-string sweep", "story": "S1", "classification": "implementation", "status": "pending"},
+        {"id": "412925b9", "short_id": "412925b9", "title": "Bulk-update eligibility prefilter and session budget", "story": "S3", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 4,
+      "rationale": "S3 sink (bulk-mutation benchmark scenario), then complete story checkpoints S1 (d159f9d4) and S3 (d752293b).",
+      "issues": [
+        {"id": "a4b0fadf", "short_id": "a4b0fadf", "title": "Bulk-mutation benchmark scenario", "story": "S3", "classification": "implementation", "status": "pending"},
+        {"id": "d159f9d4", "short_id": "d159f9d4", "title": "STORY S1: Collapse the planning boundary", "story": "S1", "classification": "story-checkpoint", "status": "pending"},
+        {"id": "d752293b", "short_id": "d752293b", "title": "STORY S3: Artifact-backed performance contract", "story": "S3", "classification": "story-checkpoint", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 5,
+      "rationale": "S2+S4 first layer, all dep on S1 story (d159f9d4). 12 tasks. Heavy file overlap in repository_state/ and commands/ -> careful worktree grouping/serialization.",
+      "issues": [
+        {"id": "5b121c3f", "short_id": "5b121c3f", "title": "Plan-hash reorder-invariance property test", "story": "S2", "classification": "implementation", "status": "pending"},
+        {"id": "ab69a4ef", "short_id": "ab69a4ef", "title": "Managed-document splice round-trip property test", "story": "S2", "classification": "implementation", "status": "pending"},
+        {"id": "7ab27a9b", "short_id": "7ab27a9b", "title": "Cow-backed VirtualPath with well-known path constants", "story": "S2", "classification": "implementation", "status": "pending"},
+        {"id": "8becd4a1", "short_id": "8becd4a1", "title": "Derived repair-target coverage authority", "story": "S2", "classification": "implementation", "status": "pending"},
+        {"id": "dd5b43b6", "short_id": "dd5b43b6", "title": "Multi-threaded contention tests", "story": "S2", "classification": "implementation", "status": "pending"},
+        {"id": "28254964", "short_id": "28254964", "title": "Feature-gate the test-support library surface", "story": "S2/S4-shared", "classification": "implementation", "status": "pending"},
+        {"id": "27c8256a", "short_id": "27c8256a", "title": "Clean up MCP schema-generator warnings", "story": "S4", "classification": "implementation", "status": "pending"},
+        {"id": "39e1c091", "short_id": "39e1c091", "title": "Repository-state architecture doc + stale pointer sweep", "story": "S4", "classification": "documentation", "status": "pending"},
+        {"id": "531ce80d", "short_id": "531ce80d", "title": "Make manual CI script fail closed on skipped audits", "story": "S4", "classification": "implementation", "status": "pending"},
+        {"id": "9503c8b4", "short_id": "9503c8b4", "title": "Remove the dead _command output parameter", "story": "S4", "classification": "implementation", "status": "pending"},
+        {"id": "e6d5e440", "short_id": "e6d5e440", "title": "Split store test module + fix review-round test names", "story": "S4", "classification": "implementation", "status": "pending"},
+        {"id": "eb4be05c", "short_id": "eb4be05c", "title": "Correct CLI project-render error-code documentation", "story": "S4", "classification": "documentation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 6,
+      "rationale": "S2+S4 sinks (dep on wave-5 tasks), then complete stories S2 (2958105e) and S4 (755cf453).",
+      "issues": [
+        {"id": "1781aec2", "short_id": "1781aec2", "title": "Migrate well-known path sites to VirtualPath constants", "story": "S2", "classification": "implementation", "status": "pending"},
+        {"id": "67a77503", "short_id": "67a77503", "title": "Visibility-enforced cutover guard", "story": "S2", "classification": "implementation", "status": "pending"},
+        {"id": "73d9070f", "short_id": "73d9070f", "title": "Delete dead export + demote repository-state public surface", "story": "S4", "classification": "implementation", "status": "pending"},
+        {"id": "42ee0dd5", "short_id": "42ee0dd5", "title": "Gate test-only rule-serialization publics behind test-support", "story": "S4", "classification": "implementation", "status": "pending"},
+        {"id": "2958105e", "short_id": "2958105e", "title": "STORY S2: Enforced guarantees", "story": "S2", "classification": "story-checkpoint", "status": "pending"},
+        {"id": "755cf453", "short_id": "755cf453", "title": "STORY S4: Hygiene and docs", "story": "S4", "classification": "story-checkpoint", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 7,
+      "rationale": "S5 successor deck, dep on S2+S3+S4 stories done.",
+      "issues": [
+        {"id": "f87e3273", "short_id": "f87e3273", "title": "Corrected successor deck for the repository-materialization story", "story": "S5", "classification": "documentation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 8,
+      "rationale": "S5 tombstone, then complete story S5 (9ee14023), then complete epic 1cc809de.",
+      "issues": [
+        {"id": "cba48167", "short_id": "cba48167", "title": "Archive predecessor deck behind a tombstone", "story": "S5", "classification": "documentation", "status": "pending"},
+        {"id": "9ee14023", "short_id": "9ee14023", "title": "STORY S5: Presentation succession", "story": "S5", "classification": "story-checkpoint", "status": "pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "surfaced_pitfalls": [
+    "28254964 (test-support-feature-gating) satisfies REQ-12 (an S4/hygiene criterion) but is DAG-parented under story 2958105e (S2/enforced-guarantees). Membership label (story:hygiene-and-docs) disagrees with hierarchy parent. Structurally harmless (breakdown gates passed, DAG ordering correct: it is a shared foundation consumed by S2's cutover guard and S4's demotions) but a labeling/parent inconsistency worth noting."
+  ],
+  "started_at": "2026-07-24T00:00:00Z"
+}
