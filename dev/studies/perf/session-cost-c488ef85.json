@@ -1,0 +1,172 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_kind": "jit-session-cost-profile",
+  "generated_at": "2026-07-24T16:11:17Z",
+  "jit": {
+    "version": "0.2.1",
+    "commit": "c488ef85",
+    "dirty": false,
+    "profile": "release"
+  },
+  "machine": {
+    "cpu_model": "AMD Ryzen 9 5900X 12-Core Processor",
+    "logical_cpus": 24,
+    "ram_kb": 32756920,
+    "kernel": "Linux 7.1.3-arch1-3",
+    "repo_real_fs": "ext4",
+    "measurement_fs": "tmpfs",
+    "fs_caveat": "Timings were taken on a tmpfs measurement copy; the real repository lives on ext4. Filesystem-metadata costs (lock-file creation, fsync, atomic rename) are understated when measurement_fs is faster than repo_real_fs. The dominant cost (minor page faults / memory materialization) is filesystem-independent and reproduces on any backing store."
+  },
+  "corpus": {
+    "issue_count": 665,
+    "bulk_group": {
+      "label": "component:bulk-target",
+      "matched_count": 30,
+      "change_count": 15,
+      "noop_count": 15
+    },
+    "source": "freshly generated fixture: `jit init` then `jit issue create` x issue_count, each a leaf task; corpus.bulk_group.matched_count of them carry label corpus.bulk_group.label for the bulk-mutation scenario (corpus.bulk_group.noop_count created already at the target priority, confirmed no-ops; corpus.bulk_group.change_count created off-target so they genuinely change); both mutable scenarios re-copy this pristine tree before every measured sample"
+  },
+  "method": {
+    "tool": "python3 time.perf_counter around subprocess.run, wall-clock milliseconds",
+    "warm": true,
+    "warmup_runs": 3,
+    "samples_per_command": 20,
+    "cache_state": "warm (page cache primed by warmup runs); cold-cache not measured because dropping the page cache needs root",
+    "timing_clock": "time.perf_counter around subprocess.run, wall-clock milliseconds",
+    "syscall_profile_tool": "perf stat -e task-clock,context-switches,page-faults,minor-faults"
+  },
+  "commands": [
+    {
+      "name": "version",
+      "argv": [
+        "jit",
+        "--version"
+      ],
+      "class": "baseline",
+      "n": 20,
+      "warm": true,
+      "min_ms": 2.32,
+      "median_ms": 2.75,
+      "p95_ms": 3.24,
+      "max_ms": 4.0,
+      "lock_files_created": 0
+    },
+    {
+      "name": "issue_show_single_read",
+      "argv": [
+        "jit",
+        "issue",
+        "show",
+        "<id>",
+        "--json"
+      ],
+      "class": "pure_read_single",
+      "n": 20,
+      "warm": true,
+      "min_ms": 4.32,
+      "median_ms": 4.55,
+      "p95_ms": 4.89,
+      "max_ms": 5.13,
+      "lock_files_created": 0,
+      "note": "reads one issue without creating a per-issue sidecar lock"
+    },
+    {
+      "name": "query_available",
+      "argv": [
+        "jit",
+        "query",
+        "available",
+        "--json"
+      ],
+      "class": "pure_read_all",
+      "n": 20,
+      "warm": true,
+      "min_ms": 15.85,
+      "median_ms": 17.41,
+      "p95_ms": 18.11,
+      "max_ms": 18.42,
+      "lock_files_created": 1,
+      "note": "reads all issues without creating per-issue sidecar locks"
+    },
+    {
+      "name": "issue_list",
+      "argv": [
+        "jit",
+        "issue",
+        "list",
+        "--json"
+      ],
+      "class": "pure_read_all",
+      "n": 20,
+      "warm": true,
+      "min_ms": 16.04,
+      "median_ms": 17.08,
+      "p95_ms": 17.93,
+      "max_ms": 18.02,
+      "lock_files_created": 1
+    },
+    {
+      "name": "issue_update_mutation",
+      "argv": [
+        "jit",
+        "issue",
+        "update",
+        "<id>",
+        "--priority",
+        "high",
+        "--json"
+      ],
+      "class": "mutation",
+      "n": 20,
+      "warm": true,
+      "min_ms": 109.73,
+      "median_ms": 113.47,
+      "p95_ms": 116.41,
+      "max_ms": 118.92,
+      "lock_files_created": 0,
+      "note": "fresh fixture materialized before every measured sample so no sample observes a prior mutation"
+    },
+    {
+      "name": "issue_update_bulk_mutation_k30_j15",
+      "argv": [
+        "jit",
+        "issue",
+        "update",
+        "--filter",
+        "label:component:bulk-target",
+        "--priority",
+        "high",
+        "--json"
+      ],
+      "class": "mutation",
+      "n": 20,
+      "warm": true,
+      "min_ms": 1545.2,
+      "median_ms": 1583.22,
+      "p95_ms": 1597.04,
+      "max_ms": 1603.12,
+      "lock_files_created": 1,
+      "note": "fresh fixture materialized before every measured sample so no sample observes a prior mutation (same reset protocol as issue_update_mutation); 30 issues match --filter \"label:component:bulk-target\" (K), of which 15 already hold the target priority and are confirmed no-ops by the eligibility prefilter's shared verification session, and 15 (J) genuinely change and each open their own preflight+publication session"
+    }
+  ],
+  "mutation_syscall_summary": {
+    "command": "jit issue update <id> --priority high --json",
+    "task_clock_ms": 118.31,
+    "user_s": 0.061668,
+    "sys_s": 0.057733,
+    "page_faults": 2440.0,
+    "minor_faults": 2440.0,
+    "context_switches": 0.0,
+    "interpretation": "perf stat fields recorded for one freshly materialized single-issue mutation"
+  },
+  "lock_mechanism": {
+    "per_issue_lock_site": "none (the measured commit has no per-issue sidecar read lock)",
+    "creator": "not applicable; load_issue creates no per-issue sidecar",
+    "never_removed": "not applicable; no per-issue sidecar is created",
+    "cleanup_scope": "legacy per-issue sidecars are removed once by the read-all path",
+    "current_count_in_repo": 0,
+    "gitignored": ".jit/**/*.lock",
+    "writes_are_atomic": "issue JSON is published by temp-file plus atomic rename; repository mutations serialize on .jit/.repo-write.lock"
+  }
+}

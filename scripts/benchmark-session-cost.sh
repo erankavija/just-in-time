@@ -19,13 +19,19 @@ set -euo pipefail
 #       read-all        jit query available --json
 #       read-all        jit issue list --json
 #       single mutation jit issue update <id> --priority <p> --json
-#     The bulk-mutation scenario is intentionally EXCLUDED (added later, once the
-#     bulk-update fix lands, so its numbers measure the fixed behavior).
-#   - Reset protocol for the mutable scenario: a fresh fixture is materialized
-#     (copied from the pristine template) before EVERY measured sample, so no
-#     sample observes a prior sample's mutation. Warmup runs use throwaway
-#     fixtures of the same shape. Read scenarios share one warm copy whose page
-#     cache and fixed, repository-scoped locks are primed by the warmup runs.
+#       bulk mutation   jit issue update --filter <label> --priority <p> --json
+#     The bulk-mutation scenario targets a fixed-size labeled group (K matched
+#     issues, of which J already hold the target priority and are confirmed
+#     no-ops by the eligibility prefilter's shared verification session while
+#     the remaining K-J genuinely change), so its numbers measure the
+#     post-prefilter bounded-session behavior (jit:412925b9) rather than the
+#     earlier O(matched) session cost.
+#   - Reset protocol for the mutable scenarios (single and bulk mutation): a
+#     fresh fixture is materialized (copied from the pristine template) before
+#     EVERY measured sample, so no sample observes a prior sample's mutation.
+#     Warmup runs use throwaway fixtures of the same shape. Read scenarios
+#     share one warm copy whose page cache and fixed, repository-scoped locks
+#     are primed by the warmup runs.
 #   - Cache-state is warm-only: cold-cache measurement needs root to drop the
 #     page cache and is not attempted. Timings are comparable only across
 #     artifacts that share the same `measurement_fs`.
@@ -207,15 +213,44 @@ KERNEL=$(uname -sr)
 REPO_REAL_FS=$(df --output=fstype "$repo_root" 2>/dev/null | tail -1 | tr -d ' ' || echo unknown)
 MEASUREMENT_FS=$(df --output=fstype "$WORK_BASE" 2>/dev/null | tail -1 | tr -d ' ' || echo unknown)
 
+# --- bulk-mutation fixture shape ----------------------------------------------
+# K issues (BULK_MATCH_COUNT) carry BULK_LABEL and are matched by the bulk
+# scenario's --filter. Of those, J (BULK_CHANGE_COUNT) are created at priority
+# "normal" and genuinely change to "high" when the scenario runs; the
+# remaining K-J are created already at "high" and are confirmed no-ops by the
+# eligibility prefilter's shared verification session (jit:412925b9), so the
+# scenario exercises both the skip path and the change path. Clamped to fit
+# ISSUE_COUNT since issue 1 is reserved for TARGET_ID.
+BULK_LABEL="component:bulk-target"
+BULK_MATCH_COUNT=30
+BULK_CHANGE_COUNT=15
+[[ "$BULK_MATCH_COUNT" -le "$((ISSUE_COUNT - 1))" ]] || BULK_MATCH_COUNT=$((ISSUE_COUNT - 1))
+[[ "$BULK_CHANGE_COUNT" -le "$BULK_MATCH_COUNT" ]] || BULK_CHANGE_COUNT=$((BULK_MATCH_COUNT / 2))
+BULK_NOOP_COUNT=$((BULK_MATCH_COUNT - BULK_CHANGE_COUNT))
+BULK_FILTER="label:$BULK_LABEL"
+
 # --- pristine fixture ---------------------------------------------------------
 PRISTINE="$WORK_BASE/pristine"
 mkdir -p "$PRISTINE"
-echo "[session-bench] generating pristine fixture of $ISSUE_COUNT issues at $PRISTINE ($MEASUREMENT_FS)" >&2
+echo "[session-bench] generating pristine fixture of $ISSUE_COUNT issues ($BULK_MATCH_COUNT bulk-labeled, $BULK_CHANGE_COUNT of those needing change) at $PRISTINE ($MEASUREMENT_FS)" >&2
 (
   cd "$PRISTINE"
   "$BIN" init --quiet >/dev/null
   TARGET_ID=$("$BIN" issue create "Fixture issue 1" --type task --priority normal --orphan --quiet)
-  for i in $(seq 2 "$ISSUE_COUNT"); do
+  change_end=$((1 + BULK_CHANGE_COUNT))
+  match_end=$((1 + BULK_MATCH_COUNT))
+  # Bulk-labeled issues that need an actual priority change (normal -> high).
+  for i in $(seq 2 "$change_end"); do
+    "$BIN" issue create "Fixture issue $i" --type task --priority normal \
+      --label "$BULK_LABEL" --orphan --quiet >/dev/null
+  done
+  # Bulk-labeled issues already at the target priority (confirmed no-ops).
+  for i in $(seq "$((change_end + 1))" "$match_end"); do
+    "$BIN" issue create "Fixture issue $i" --type task --priority high \
+      --label "$BULK_LABEL" --orphan --quiet >/dev/null
+  done
+  # Unlabeled issues, outside the bulk filter's match set.
+  for i in $(seq "$((match_end + 1))" "$ISSUE_COUNT"); do
     "$BIN" issue create "Fixture issue $i" --type task --priority normal --orphan --quiet >/dev/null
   done
   printf '%s\n' "$TARGET_ID" >"$WORK_BASE/target-id"
@@ -231,6 +266,10 @@ cp -a "$PRISTINE" "$READ_COPY"
 
 # Fixed path the mutation scenario re-materializes fresh before every sample.
 MUT_COPY="$WORK_BASE/mutation"
+
+# Fixed path the bulk-mutation scenario re-materializes fresh before every
+# sample (same reset protocol as MUT_COPY, reused rather than reinvented).
+BULK_COPY="$WORK_BASE/bulk-mutation"
 
 # count_locks <dir> — number of .lock files under <dir>/.jit.
 count_locks() {
@@ -357,12 +396,14 @@ SHOW_STATS=$(scenario_stats "$READ_COPY" "" "$BIN" issue show "$TARGET_ID" --jso
 QUERY_STATS=$(scenario_stats "$READ_COPY" "" "$BIN" query available --json)
 LIST_STATS=$(scenario_stats "$READ_COPY" "" "$BIN" issue list --json)
 UPDATE_STATS=$(scenario_stats "$MUT_COPY" "$PRISTINE" "$BIN" issue update "$TARGET_ID" --priority high --json)
+BULK_STATS=$(scenario_stats "$BULK_COPY" "$PRISTINE" "$BIN" issue update --filter "$BULK_FILTER" --priority high --json)
 
 VERSION_LOCKS=$(probe_lock_delta "$BIN" --version)
 SHOW_LOCKS=$(probe_lock_delta "$BIN" issue show "$TARGET_ID" --json)
 QUERY_LOCKS=$(probe_lock_delta "$BIN" query available --json)
 LIST_LOCKS=$(probe_lock_delta "$BIN" issue list --json)
 UPDATE_LOCKS=$(probe_lock_delta "$BIN" issue update "$TARGET_ID" --priority high --json)
+BULK_LOCKS=$(probe_lock_delta "$BIN" issue update --filter "$BULK_FILTER" --priority high --json)
 
 # --- mutation syscall summary (perf stat over one mutation) -------------------
 SYSCALL_JSON='null'
@@ -449,6 +490,10 @@ CMD_SHOW=$(with_stat issue_show_single_read '["jit","issue","show","<id>","--jso
 CMD_QUERY=$(with_stat query_available '["jit","query","available","--json"]' pure_read_all "$QUERY_STATS" "$QUERY_LOCKS" "$QUERY_NOTE")
 CMD_LIST=$(with_stat issue_list '["jit","issue","list","--json"]' pure_read_all "$LIST_STATS" "$LIST_LOCKS")
 CMD_UPDATE=$(with_stat issue_update_mutation '["jit","issue","update","<id>","--priority","high","--json"]' mutation "$UPDATE_STATS" "$UPDATE_LOCKS" "fresh fixture materialized before every measured sample so no sample observes a prior mutation")
+BULK_NAME="issue_update_bulk_mutation_k${BULK_MATCH_COUNT}_j${BULK_CHANGE_COUNT}"
+BULK_ARGV_JSON=$(argv_to_json jit issue update --filter "$BULK_FILTER" --priority high --json)
+BULK_NOTE="fresh fixture materialized before every measured sample so no sample observes a prior mutation (same reset protocol as issue_update_mutation); $BULK_MATCH_COUNT issues match --filter \"$BULK_FILTER\" (K), of which $BULK_NOOP_COUNT already hold the target priority and are confirmed no-ops by the eligibility prefilter's shared verification session, and $BULK_CHANGE_COUNT (J) genuinely change and each open their own preflight+publication session"
+CMD_BULK=$(with_stat "$BULK_NAME" "$BULK_ARGV_JSON" mutation "$BULK_STATS" "$BULK_LOCKS" "$BULK_NOTE")
 
 ARTIFACT_TMP=$(mktemp "$OUT_DIR/.session-cost.json.XXXXXX")
 jq -n \
@@ -464,7 +509,9 @@ jq -n \
   --arg cache_state "$CACHE_STATE" \
   --argjson cmd_version "$CMD_VERSION" --argjson cmd_show "$CMD_SHOW" \
   --argjson cmd_query "$CMD_QUERY" --argjson cmd_list "$CMD_LIST" \
-  --argjson cmd_update "$CMD_UPDATE" \
+  --argjson cmd_update "$CMD_UPDATE" --argjson cmd_bulk "$CMD_BULK" \
+  --arg bulk_label "$BULK_LABEL" --argjson bulk_match_count "$BULK_MATCH_COUNT" \
+  --argjson bulk_change_count "$BULK_CHANGE_COUNT" --argjson bulk_noop_count "$BULK_NOOP_COUNT" \
   --argjson syscall "$SYSCALL_JSON" \
   --arg lock_site "$LOCK_SITE" --arg lock_creator "$LOCK_CREATOR" \
   --arg lock_lifetime "$LOCK_LIFETIME" --arg lock_cleanup "$LOCK_CLEANUP" \
@@ -481,7 +528,9 @@ jq -n \
     },
     corpus: {
       issue_count:$issue_count,
-      source:"freshly generated fixture: `jit init` then `jit issue create` x issue_count, each a leaf task; the mutable scenario re-copies this pristine tree before every measured sample"
+      bulk_group: {label:$bulk_label, matched_count:$bulk_match_count,
+        change_count:$bulk_change_count, noop_count:$bulk_noop_count},
+      source:"freshly generated fixture: `jit init` then `jit issue create` x issue_count, each a leaf task; corpus.bulk_group.matched_count of them carry label corpus.bulk_group.label for the bulk-mutation scenario (corpus.bulk_group.noop_count created already at the target priority, confirmed no-ops; corpus.bulk_group.change_count created off-target so they genuinely change); both mutable scenarios re-copy this pristine tree before every measured sample"
     },
     method: {
       tool:"python3 time.perf_counter around subprocess.run, wall-clock milliseconds",
@@ -492,7 +541,7 @@ jq -n \
       timing_clock:"time.perf_counter around subprocess.run, wall-clock milliseconds",
       syscall_profile_tool:"perf stat -e task-clock,context-switches,page-faults,minor-faults"
     },
-    commands: [$cmd_version, $cmd_show, $cmd_query, $cmd_list, $cmd_update],
+    commands: [$cmd_version, $cmd_show, $cmd_query, $cmd_list, $cmd_update, $cmd_bulk],
     mutation_syscall_summary: $syscall,
     lock_mechanism: {
       per_issue_lock_site:$lock_site,
