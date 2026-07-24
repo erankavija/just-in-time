@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "0f876cf55be3ee20af07aefe8bd676f26093822b",
+  "completed_at": "2026-07-24T23:00:44.436872660Z",
+  "duration_ms": 192425,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard requirements are satisfied, and the recorded cargo-ci gate passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "67a77503-d512-4522-b408-c80ac3cc32e0",
+  "message": null,
+  "run_id": "6382612d-8a2a-4bc7-b486-a548715feb5e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T22:57:32.011054455Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:67a77503 commits 6594a2e3, 84961a3e (merge), 0f876cf5\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0; 2026-07-24T22:50:27Z); code-review pending (exit none)\nTruncation recovery: narrowed per-commit/merge patches, final storage and test ranges, and registry-source reads\n\n1. No findings. The storage-only visibility boundary, external export module, four-call residual assertion, preserved cutover assertions, and existing test target layout satisfy all hard requirements.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard requirements are satisfied, and the recorded cargo-ci gate passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
