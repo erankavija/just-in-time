@@ -27,7 +27,7 @@ use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::ThreadId;
 use std::time::Duration;
@@ -262,6 +262,9 @@ pub struct JsonFileStorage {
     active_mutation_layout: Arc<crate::storage::repository_state_store::ActiveLayoutTracker>,
     /// Explicit worktree/data-root authority for repository-relative readers.
     repository_layout: Arc<Mutex<Option<RepositoryLayout>>>,
+    /// Guards the one-time sweep of orphaned per-issue read-lock sidecars, shared
+    /// by every clone so the cleanup runs at most once per storage lifetime.
+    sidecars_swept: Arc<AtomicBool>,
 }
 
 /// The configured storage-lock acquisition timeout (`JIT_LOCK_TIMEOUT` seconds,
@@ -304,6 +307,7 @@ impl JsonFileStorage {
             repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
             active_mutation_layout: Arc::new(Default::default()),
             repository_layout: Arc::new(Mutex::new(None)),
+            sidecars_swept: Arc::new(AtomicBool::new(false)),
             root,
             locker: FileLocker::new(timeout),
         }
@@ -915,8 +919,19 @@ impl IssueStore for JsonFileStorage {
         // Try local .jit/issues/ first (current behavior)
         let issue_path = self.issue_path(id);
         if issue_path.exists() {
-            let issue_lock_path = issue_path.with_extension("lock");
-            let _lock = self.locker.lock_shared(&issue_lock_path)?;
+            // Read directly, taking no per-issue lock. Issue JSON is published by
+            // atomic temp-file-plus-rename (see atomic_write), so a reader can never
+            // observe a torn file; writers serialize on `.repo-write.lock`, and
+            // `list_issues` holds the repo-scoped `.index.lock` shared around its
+            // load loop. A `<id>.lock` sidecar was therefore redundant and, created
+            // once per issue ever read, grew the lock-file set without bound.
+            //
+            // Caller audit (fc744df6): production consumers use the returned owned
+            // value for display, resolution, validation, or as a mutation snapshot.
+            // Mutations publish through `RepositoryStateStore`, which revalidates
+            // that snapshot under the repository write lock. The old `_lock` guard
+            // was local and dropped before this method returned, so no caller ever
+            // inherited serialization from it.
             return self.read_json(&issue_path);
         }
 
@@ -1028,6 +1043,21 @@ impl IssueStore for JsonFileStorage {
     fn list_issues(&self) -> Result<Vec<Issue>> {
         let index_lock_path = self.root.join(".index.lock");
         let _lock = self.locker.lock_shared(&index_lock_path)?;
+
+        // One-time index-maintenance cleanup: remove any orphaned per-issue
+        // `<id>.lock` sidecars left behind by the retired shared read lock. The
+        // `swap` guard runs the sweep at most once per storage lifetime (shared by
+        // every clone), under the `.index.lock` already held here, so it is a
+        // single directory sweep — not a per-read unlink. This is the read-all path
+        // (`jit query available`) that historically leaked the sidecars, so it now
+        // clears them. Best-effort: any enumerate/unlink failure is ignored, since
+        // the sidecars are inert and the retained fixed locks live outside
+        // `issues/`.
+        if !self.sidecars_swept.swap(true, Ordering::Relaxed) {
+            let _ = crate::storage::lock::remove_orphaned_issue_read_sidecars(
+                &self.root.join(ISSUES_DIR),
+            );
+        }
 
         // Use aggregated index to see all issues across sources
         let index = self.load_aggregated_index()?;
@@ -1961,6 +1991,109 @@ mod tests {
             // Should read from local storage
             let loaded = storage.load_issue(&issue_id).unwrap();
             assert_eq!(loaded.title, "Local Issue");
+        }
+
+        /// Count `*.lock` files anywhere under a directory tree.
+        fn count_lock_files(root: &Path) -> usize {
+            fn walk(dir: &Path, acc: &mut usize) {
+                let Ok(entries) = fs::read_dir(dir) else {
+                    return;
+                };
+                for entry in entries.filter_map(Result::ok) {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        walk(&path, acc);
+                    } else if path.extension().is_some_and(|ext| ext == "lock") {
+                        *acc += 1;
+                    }
+                }
+            }
+            let mut acc = 0;
+            walk(root, &mut acc);
+            acc
+        }
+
+        #[test]
+        fn test_load_issue_creates_no_per_issue_sidecar_lock() {
+            // REQ-01: reading an issue must not create a `<id>.lock` sidecar.
+            let (_temp, storage) = setup_storage();
+            let issue = crate::domain::types::fixture_issue(
+                "Sidecar-free".to_string(),
+                "Description".to_string(),
+            );
+            let issue_id = issue.id.clone();
+            seed_issue_preimage(&storage, &issue);
+
+            let _ = storage.load_issue(&issue_id).unwrap();
+
+            let sidecar = storage
+                .root
+                .join(ISSUES_DIR)
+                .join(format!("{issue_id}.lock"));
+            assert!(
+                !sidecar.exists(),
+                "load_issue must not create a per-issue sidecar lock at {}",
+                sidecar.display()
+            );
+        }
+
+        #[test]
+        fn test_read_all_lock_file_count_is_independent_of_issue_count() {
+            // REQ-02: after a read-all, the number of lock files is O(1) in the
+            // issue count — the surviving fixed lock set does not grow with N.
+            fn lock_count_after_reading_all(issue_count: usize) -> usize {
+                let (temp, storage) = setup_storage();
+                for i in 0..issue_count {
+                    let issue = crate::domain::types::fixture_issue(
+                        format!("Issue {i}"),
+                        "Description".to_string(),
+                    );
+                    seed_issue_preimage(&storage, &issue);
+                }
+
+                let loaded = storage.list_issues().unwrap();
+                assert_eq!(loaded.len(), issue_count, "every seeded issue must load");
+
+                // Count over the whole worktree so any per-issue sidecar would be
+                // caught wherever it is written.
+                count_lock_files(temp.path())
+            }
+
+            let few = lock_count_after_reading_all(3);
+            let many = lock_count_after_reading_all(12);
+            assert_eq!(
+                few, many,
+                "lock-file count must be independent of issue count \
+                 (got {few} for 3 issues, {many} for 12)"
+            );
+        }
+
+        #[test]
+        fn test_list_issues_cleans_orphaned_sidecars_once_per_storage_lifetime() {
+            // REQ-03: the first read-all sweep removes inert legacy sidecars, but
+            // repeated reads through the same storage do not turn cleanup into a
+            // per-command-path directory scan.
+            let (_temp, storage) = setup_storage();
+            let issue = crate::domain::types::fixture_issue(
+                "Cleanup target".to_string(),
+                "Description".to_string(),
+            );
+            seed_issue_preimage(&storage, &issue);
+            let sidecar = storage
+                .root
+                .join(ISSUES_DIR)
+                .join(format!("{}.lock", issue.id));
+            fs::write(&sidecar, "").unwrap();
+
+            let _ = storage.list_issues().unwrap();
+            assert!(!sidecar.exists(), "the first read-all must remove sidecars");
+
+            fs::write(&sidecar, "").unwrap();
+            let _ = storage.list_issues().unwrap();
+            assert!(
+                sidecar.exists(),
+                "cleanup must run only once for a storage and its clones"
+            );
         }
 
         #[test]
