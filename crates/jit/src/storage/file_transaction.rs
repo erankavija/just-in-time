@@ -7,9 +7,9 @@
 use super::atomic_write::rename_noreplace_cap;
 use super::repo_lock::RepoWriteGuard;
 use super::transaction_journal::{
-    ControlName, RepositoryActionProgress, RepositoryFinalIdentity, RepositoryJournalAction,
-    RepositoryJournalActionKind, RepositoryJournalPath, RepositoryTransactionJournal,
-    TransactionDecision, JOURNAL_FILE, REPOSITORY_JOURNAL_VERSION,
+    ActionTag, ControlName, RepositoryActionProgress, RepositoryFinalIdentity,
+    RepositoryJournalAction, RepositoryJournalActionKind, RepositoryJournalPath,
+    RepositoryTransactionJournal, TransactionDecision, JOURNAL_FILE, REPOSITORY_JOURNAL_VERSION,
 };
 use super::transaction_recovery::{
     FailurePoint, FileTransactionError, RecoveryRequiredError, RecoveryState,
@@ -755,9 +755,7 @@ fn initial_repository_journal(
                     },
                 ),
                 RepositoryAction::SetMode { expected, mode, .. } => {
-                    let ExpectedPreimage::File { identity, .. } = expected else {
-                        unreachable!("RepositoryDelta validates SetMode preimages")
-                    };
+                    let identity = set_mode_final_file_identity(expected, index)?;
                     (
                         RepositoryJournalActionKind::SetMode {
                             mode: *mode,
@@ -767,7 +765,7 @@ fn initial_repository_journal(
                                 .map_err(anyhow::Error::msg)?,
                         },
                         RepositoryFinalIdentity::File {
-                            identity: identity.clone(),
+                            identity,
                             mode: *mode,
                         },
                     )
@@ -856,7 +854,19 @@ fn execute_repository_delta(
     let control =
         create_repository_control(roots, id, location, needs_worktree_companion, injector)?;
     repository_check(injector, FailurePoint::RepositoryCreateControl)?;
-    let mut journal = initial_repository_journal(roots, id, delta, plan_hash)?;
+    // Journal construction runs after control exists but before a complete
+    // journal exists. A `JournalActionMismatch` (or any construction error) here
+    // must tear the created control down immediately through the control-only
+    // teardown, which skips the journal-dependent data-stage steps (no stage has
+    // been created yet, so they would be no-ops), rather than leaking control for
+    // later recovery.
+    let mut journal = match initial_repository_journal(roots, id, delta, plan_hash) {
+        Ok(journal) => journal,
+        Err(error) => {
+            cleanup_repository_control_only(roots, control, location, id, injector)?;
+            return Err(error);
+        }
+    };
     repository_check(injector, FailurePoint::RepositoryBeforeInitialJournal)?;
     write_repository_journal(&control.transaction, &journal)?;
     repository_check(injector, FailurePoint::RepositorySyncInitialJournal)?;
@@ -972,7 +982,7 @@ fn prepare_repository_actions(
             let backups = backup_authority(control, path.root_class());
             match action {
                 RepositoryAction::CreateDirectory { .. } => {
-                    let stage = create_directory_stage_name(&journal.actions[index].action);
+                    let stage = create_directory_stage_name(&journal.actions[index].action, index)?;
                     stages.create_dir(stage.as_str())?;
                     sync_directory(stages)?;
                     let staged = open_existing_dir(stages, stage.as_str())?;
@@ -981,7 +991,8 @@ fn prepare_repository_actions(
                     journal.actions[index].progress = RepositoryActionProgress::Prepared;
                 }
                 RepositoryAction::WriteFile { bytes, mode, .. } => {
-                    let (stage, backup) = write_file_control_names(&journal.actions[index].action);
+                    let (stage, backup) =
+                        write_file_control_names(&journal.actions[index].action, index)?;
                     stage_bytes(stages, stage.as_str(), bytes)?;
                     set_mode(stages, stage.as_str(), repository_unix_mode(*mode))?;
                     sync_directory(stages)?;
@@ -1010,7 +1021,8 @@ fn prepare_repository_actions(
                     };
                 }
                 RepositoryAction::SetMode { mode, .. } => {
-                    let (stage, backup) = set_mode_control_names(&journal.actions[index].action);
+                    let (stage, backup) =
+                        set_mode_control_names(&journal.actions[index].action, index)?;
                     let (parent, leaf) = open_parent(root, &relative, false)?;
                     let current = inspect_repository_leaf(&parent, &leaf)?;
                     ensure_repository_expected(&path, &journal.actions[index].expected, &current)?;
@@ -1038,7 +1050,7 @@ fn prepare_repository_actions(
                     journal.actions[index].progress = RepositoryActionProgress::BackupReady;
                 }
                 RepositoryAction::DeleteFile { .. } => {
-                    let backup = delete_file_backup_name(&journal.actions[index].action);
+                    let backup = delete_file_backup_name(&journal.actions[index].action, index)?;
                     let (parent, leaf) = open_parent(root, &relative, false)?;
                     prepare_repository_backup(
                         &parent,
@@ -1073,35 +1085,111 @@ fn prepare_repository_actions(
     Ok(())
 }
 
-fn create_directory_stage_name(kind: &RepositoryJournalActionKind) -> ControlName {
-    match kind {
-        RepositoryJournalActionKind::CreateDirectory { stage, .. } => stage.clone(),
-        _ => unreachable!("journal and normalized delta stay aligned"),
+/// Extract the file identity a `SetMode` action pins as its final identity. A
+/// well-formed `SetMode` action carries a `File` preimage (enforced by
+/// `validate_action` at `RepositoryDelta::new`); a non-file preimage means the
+/// semantic delta and the journal action being constructed drifted, so
+/// extraction fails with a typed [`FileTransactionError::JournalActionMismatch`]
+/// instead of panicking mid-construction. The mismatch propagates into the
+/// created-control teardown, so no partial write is left behind.
+fn set_mode_final_file_identity(
+    expected: &ExpectedPreimage,
+    index: usize,
+) -> Result<EntryIdentity, FileTransactionError> {
+    match expected {
+        ExpectedPreimage::File { identity, .. } => Ok(identity.clone()),
+        _ => Err(FileTransactionError::JournalActionMismatch {
+            index,
+            expected: ActionTag::SetMode,
+            found: action_tag_of_preimage(expected),
+        }),
     }
 }
 
-fn write_file_control_names(kind: &RepositoryJournalActionKind) -> (ControlName, ControlName) {
+/// Classify a preimage's occupant to the action tag that natively targets that
+/// occupant category, for diagnostics when a required preimage invariant is
+/// violated: a directory occupant is a `CreateDirectory` target, an absent
+/// occupant is a `WriteFile` (create) target, and a foreign occupant would have
+/// to be removed. Defensive only — `validate_action` guarantees a `SetMode`
+/// preimage is `File`, so this classifies only drifted journal/delta input.
+fn action_tag_of_preimage(preimage: &ExpectedPreimage) -> ActionTag {
+    match preimage {
+        ExpectedPreimage::File { .. } => ActionTag::SetMode,
+        ExpectedPreimage::Directory { .. } => ActionTag::CreateDirectory,
+        ExpectedPreimage::Absent => ActionTag::WriteFile,
+        ExpectedPreimage::Symlink { .. } | ExpectedPreimage::Unsupported { .. } => {
+            ActionTag::DeleteFile
+        }
+    }
+}
+
+/// Extract the staging control-name a `CreateDirectory` journal action pins.
+/// Total: a journal action whose kind does not match the semantic action at
+/// `index` aborts with [`FileTransactionError::JournalActionMismatch`] instead
+/// of panicking.
+fn create_directory_stage_name(
+    kind: &RepositoryJournalActionKind,
+    index: usize,
+) -> Result<ControlName, FileTransactionError> {
+    match kind {
+        RepositoryJournalActionKind::CreateDirectory { stage, .. } => Ok(stage.clone()),
+        _ => Err(FileTransactionError::JournalActionMismatch {
+            index,
+            expected: ActionTag::CreateDirectory,
+            found: kind.tag(),
+        }),
+    }
+}
+
+/// Extract the stage and backup control-names a `WriteFile` journal action pins.
+/// Total: see [`create_directory_stage_name`].
+fn write_file_control_names(
+    kind: &RepositoryJournalActionKind,
+    index: usize,
+) -> Result<(ControlName, ControlName), FileTransactionError> {
     match kind {
         RepositoryJournalActionKind::WriteFile { stage, backup, .. } => {
-            (stage.clone(), backup.clone())
+            Ok((stage.clone(), backup.clone()))
         }
-        _ => unreachable!("journal and normalized delta stay aligned"),
+        _ => Err(FileTransactionError::JournalActionMismatch {
+            index,
+            expected: ActionTag::WriteFile,
+            found: kind.tag(),
+        }),
     }
 }
 
-fn set_mode_control_names(kind: &RepositoryJournalActionKind) -> (ControlName, ControlName) {
+/// Extract the stage and backup control-names a `SetMode` journal action pins.
+/// Total: see [`create_directory_stage_name`].
+fn set_mode_control_names(
+    kind: &RepositoryJournalActionKind,
+    index: usize,
+) -> Result<(ControlName, ControlName), FileTransactionError> {
     match kind {
         RepositoryJournalActionKind::SetMode { stage, backup, .. } => {
-            (stage.clone(), backup.clone())
+            Ok((stage.clone(), backup.clone()))
         }
-        _ => unreachable!("journal and normalized delta stay aligned"),
+        _ => Err(FileTransactionError::JournalActionMismatch {
+            index,
+            expected: ActionTag::SetMode,
+            found: kind.tag(),
+        }),
     }
 }
 
-fn delete_file_backup_name(kind: &RepositoryJournalActionKind) -> ControlName {
+/// Extract the backup control-name a `DeleteFile` journal action pins. Total:
+/// see [`create_directory_stage_name`].
+fn delete_file_backup_name(
+    kind: &RepositoryJournalActionKind,
+    index: usize,
+) -> Result<ControlName, FileTransactionError> {
     match kind {
-        RepositoryJournalActionKind::DeleteFile { backup } => backup.clone(),
-        _ => unreachable!("journal and normalized delta stay aligned"),
+        RepositoryJournalActionKind::DeleteFile { backup } => Ok(backup.clone()),
+        _ => Err(FileTransactionError::JournalActionMismatch {
+            index,
+            expected: ActionTag::DeleteFile,
+            found: kind.tag(),
+        }),
     }
 }
 
@@ -2000,6 +2088,21 @@ fn cleanup_repository_control(
         repository_check(injector, FailurePoint::RepositoryBeforeStageCleanup)?;
         remove_data_stage_if_owned(roots, journal)?;
     }
+    cleanup_repository_control_only(roots, control, location, id, injector)
+}
+
+/// Tear down a created transaction control (companion, then primary, then empty
+/// protocol roots), skipping the journal-dependent data-stage steps. Called
+/// directly when a mismatch or other error aborts before any data stage exists
+/// (the data-stage steps would be provable no-ops); `cleanup_repository_control`
+/// wraps it with those steps for the post-prepare paths.
+fn cleanup_repository_control_only(
+    roots: &RepositoryKernelRoots,
+    control: ControlDirs,
+    location: TransactionControlLocation,
+    id: &str,
+    injector: &dyn TransactionFailureInjector,
+) -> Result<()> {
     let ControlDirs {
         base,
         transactions,
@@ -2841,6 +2944,121 @@ mod tests {
             mode: FileMode::Executable,
         };
         assert!(validate_repository_journal(&valid, "txn").is_ok());
+    }
+
+    fn journal_kind(tag: ActionTag) -> RepositoryJournalActionKind {
+        let stage = ControlName::new("stage").unwrap();
+        let backup = ControlName::new("backup").unwrap();
+        match tag {
+            ActionTag::CreateDirectory => RepositoryJournalActionKind::CreateDirectory {
+                mode: FileMode::Executable,
+                stage,
+            },
+            ActionTag::WriteFile => RepositoryJournalActionKind::WriteFile {
+                mode: FileMode::Regular,
+                stage,
+                backup,
+            },
+            ActionTag::SetMode => RepositoryJournalActionKind::SetMode {
+                mode: FileMode::Executable,
+                stage,
+                backup,
+            },
+            ActionTag::DeleteFile => RepositoryJournalActionKind::DeleteFile { backup },
+        }
+    }
+
+    fn assert_journal_action_mismatch(
+        error: FileTransactionError,
+        wanted_index: usize,
+        wanted_expected: ActionTag,
+        wanted_found: ActionTag,
+    ) {
+        match error {
+            FileTransactionError::JournalActionMismatch {
+                index,
+                expected,
+                found,
+            } => {
+                assert_eq!(index, wanted_index);
+                assert_eq!(expected, wanted_expected);
+                assert_eq!(found, wanted_found);
+            }
+            other => panic!("expected JournalActionMismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_journal_action_extractors_reject_mismatched_kind() {
+        // Each control-name extractor is total: a journal action whose kind
+        // disagrees with the semantic action at its index aborts with a typed
+        // JournalActionMismatch carrying the expected and found tags, never a
+        // panic. Drift is structurally unreachable through RepositoryDelta::new,
+        // so these functions are exercised directly.
+        assert_journal_action_mismatch(
+            create_directory_stage_name(&journal_kind(ActionTag::WriteFile), 3).unwrap_err(),
+            3,
+            ActionTag::CreateDirectory,
+            ActionTag::WriteFile,
+        );
+        assert_journal_action_mismatch(
+            write_file_control_names(&journal_kind(ActionTag::DeleteFile), 1).unwrap_err(),
+            1,
+            ActionTag::WriteFile,
+            ActionTag::DeleteFile,
+        );
+        assert_journal_action_mismatch(
+            set_mode_control_names(&journal_kind(ActionTag::CreateDirectory), 0).unwrap_err(),
+            0,
+            ActionTag::SetMode,
+            ActionTag::CreateDirectory,
+        );
+        assert_journal_action_mismatch(
+            delete_file_backup_name(&journal_kind(ActionTag::SetMode), 7).unwrap_err(),
+            7,
+            ActionTag::DeleteFile,
+            ActionTag::SetMode,
+        );
+
+        // The matching kind extracts its control-names cleanly.
+        assert!(create_directory_stage_name(&journal_kind(ActionTag::CreateDirectory), 0).is_ok());
+        assert!(write_file_control_names(&journal_kind(ActionTag::WriteFile), 0).is_ok());
+        assert!(set_mode_control_names(&journal_kind(ActionTag::SetMode), 0).is_ok());
+        assert!(delete_file_backup_name(&journal_kind(ActionTag::DeleteFile), 0).is_ok());
+    }
+
+    #[test]
+    fn test_set_mode_final_file_identity_rejects_non_file_preimage() {
+        // The former :759 destructure: a SetMode action must carry a File
+        // preimage. A non-file preimage aborts journal construction with a typed
+        // JournalActionMismatch (routed to control-only teardown in the kernel)
+        // instead of an unreachable! panic.
+        let identity = EntryIdentity::for_bytes("7:1", b"file").unwrap();
+        let file = ExpectedPreimage::File {
+            identity: identity.clone(),
+            mode: FileMode::Regular,
+        };
+        assert_eq!(set_mode_final_file_identity(&file, 2).unwrap(), identity);
+
+        assert_journal_action_mismatch(
+            set_mode_final_file_identity(&ExpectedPreimage::Absent, 4).unwrap_err(),
+            4,
+            ActionTag::SetMode,
+            ActionTag::WriteFile,
+        );
+        assert_journal_action_mismatch(
+            set_mode_final_file_identity(
+                &ExpectedPreimage::Directory {
+                    identity: EntryIdentity::for_bytes("7:2", b"dir").unwrap(),
+                    mode: FileMode::Executable,
+                },
+                5,
+            )
+            .unwrap_err(),
+            5,
+            ActionTag::SetMode,
+            ActionTag::CreateDirectory,
+        );
     }
 
     #[test]
