@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "ebe9a3e7bb80776079efb57c99900e662e8f92e9",
+  "completed_at": "2026-07-24T15:57:21.002179643Z",
+  "duration_ms": 232855,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; shared authoritative verification and apply-time conflict retry remediate the prior stale-skip finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "412925b9-874c-4679-909c-95afe31f9287",
+  "message": null,
+  "run_id": "cbd6d53d-d81d-4df4-8440-207d2e1d2685",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T15:53:28.146537173Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2ac7b230, 61eb2d41, 1337381a, f911f11d, 0cbe8763, 5c9c363d, 9f4e0c23, f3ff8ad7, 3992a65a, 031218bb, c3d12d6c, 7229afdc, 8e738c43, bae6aa64, ebe9a3e7 (`jit:412925b9`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/gate-semantics, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T15:47:28Z); prior code-review failed (exit 1, e09399ed) and its stale-confirmation finding is remediated\nTruncation recovery: per-commit patch slices, combined merge diffs, focused current command/session/test reads, and individual metadata-patch reads\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; shared authoritative verification and apply-time conflict retry remediate the prior stale-skip finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
