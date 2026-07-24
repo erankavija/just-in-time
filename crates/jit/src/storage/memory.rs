@@ -43,7 +43,7 @@ pub struct InMemoryStorage {
     /// reentry is admitted only for the same selected roots.
     pub(crate) active_mutation_layout:
         Arc<crate::storage::repository_state_store::ActiveLayoutTracker>,
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     repository_state_apply_conflicts: Arc<std::sync::atomic::AtomicUsize>,
 }
 
@@ -92,7 +92,7 @@ impl InMemoryStorage {
             repository_state: Arc::new(Mutex::new(MemoryRepositoryState::default())),
             repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
             active_mutation_layout: Arc::new(Default::default()),
-            #[cfg(test)]
+            #[cfg(feature = "test-support")]
             repository_state_apply_conflicts: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }
     }
@@ -138,7 +138,18 @@ impl InMemoryStorage {
         }
     }
 
-    #[cfg(test)]
+    /// Reachable under `feature = "test-support"` in addition to `cfg(test)`:
+    /// `commands::test_helpers::with_open_race` calls it, and `test_helpers`
+    /// itself is reachable independent of `cfg(test)` when the feature is
+    /// enabled without a test build (e.g. `cargo clippy --features
+    /// test-support`). `with_repository_state_failures` and
+    /// `without_repository_state_failures` stay `cfg(test)`-only: every other
+    /// caller lives inside `#[cfg(test)]` test modules, which always compile
+    /// with `test-support` active via the crate's own dev-dependency. Unused
+    /// in the `feature`-on/`cfg(test)`-off configuration itself, since its
+    /// only non-`cfg(test)` caller (`with_open_race`) is unreached there too.
+    #[cfg(any(test, feature = "test-support"))]
+    #[allow(dead_code)]
     pub(crate) fn with_repository_state_failure_view(
         &self,
         failures: Arc<dyn crate::storage::TransactionFailureInjector>,
@@ -149,13 +160,18 @@ impl InMemoryStorage {
         }
     }
 
-    #[cfg(test)]
+    /// Setter half of the conflict-injection pair below `consume_...`, called
+    /// only from `#[cfg(test)]` test modules (e.g. `bulk_update`'s), so it is
+    /// unused in a `feature`-on/`cfg(test)`-off build such as `jit` linked
+    /// into `crates/server`'s test binary.
+    #[cfg(feature = "test-support")]
+    #[allow(dead_code)]
     pub(crate) fn inject_repository_state_apply_conflicts(&self, count: usize) {
         self.repository_state_apply_conflicts
             .store(count, std::sync::atomic::Ordering::Relaxed);
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn consume_repository_state_apply_conflict(&self) -> bool {
         self.repository_state_apply_conflicts
             .fetch_update(

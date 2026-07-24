@@ -13,6 +13,14 @@ pub(crate) enum RecoveryState {
 }
 
 /// Stable injection points covering every durability boundary and action edge.
+///
+/// The shared `Repository` prefix is intentional: every variant names a step
+/// of the one repository-write transaction kernel, not an accidental
+/// collision. `test-support`-off builds narrow this type's own exposure to
+/// `pub(crate)` (see `storage::mod`), which lets clippy's default
+/// `avoid-breaking-exported-api` guard stop suppressing `enum_variant_names`
+/// for it; silence that lint explicitly rather than rename call sites.
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FailurePoint {
     RepositoryRecoveryExternal,

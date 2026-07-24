@@ -72,8 +72,23 @@ html = ["dep:tl"]
 # XML content parser (document/parser/xml.rs). Pulls the `quick-xml` reader.
 # OFF by default.
 xml = ["dep:quick-xml"]
+# Exposes the test-only failure-injection and fixture surface (transaction
+# failure points/injectors, `InMemoryStorage::seed_issue_fixture`,
+# `commands::test_helpers`, `JsonFileStorage::with_repository_state_failures`)
+# as part of the crate's public API. The definitions compile unconditionally
+# either way — this feature only widens their visibility from `pub(crate)` to
+# `pub` — so `cargo build` and release builds drop the surface while the self
+# dev-dependency below (and `crates/server`'s) turns it on for `cargo test`.
+# OFF by default.
+test-support = []
 
 [dev-dependencies]
+# Enables `test-support` for this crate's own test builds (inline `#[cfg(test)]`
+# modules and the `tests/` integration binaries) without making the feature
+# part of the default build. Cargo unifies this self-edge's requested features
+# onto the same package instance whenever dev-dependencies are active, i.e.
+# whenever a test target is being built.
+jit = { path = ".", features = ["test-support"] }
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
 proptest = { workspace = true }

@@ -32,6 +32,7 @@ pub mod repo_lock;
 pub mod repository_state_store;
 pub mod ruleset_store;
 pub mod temp_cleanup;
+#[cfg(feature = "test-support")]
 mod test_support;
 mod transaction_journal;
 mod transaction_recovery;
@@ -63,7 +64,18 @@ pub use repository_state_store::{
     RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
 };
 pub(crate) use transaction_recovery::FileTransactionError;
+// Failure-injection seam: the definitions in `transaction_recovery` compile
+// unconditionally (production code threads them through every
+// `repository_check` site), but their exposure as crate public API is gated
+// behind `test-support`. The `pub(crate)` twin keeps every internal caller's
+// resolution (`crate::storage::TransactionFailurePoint`, etc.) identical in
+// both feature states.
+#[cfg(feature = "test-support")]
 pub use transaction_recovery::{
+    FailurePoint as TransactionFailurePoint, NoTransactionFailures, TransactionFailureInjector,
+};
+#[cfg(not(feature = "test-support"))]
+pub(crate) use transaction_recovery::{
     FailurePoint as TransactionFailurePoint, NoTransactionFailures, TransactionFailureInjector,
 };
 pub use warnings::StorageWarning;

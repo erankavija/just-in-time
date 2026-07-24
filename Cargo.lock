@@ -1271,6 +1271,7 @@ dependencies = [
  "fs4",
  "git2",
  "include_dir",
+ "jit",
  "jsonschema",
  "nix",
  "predicates",

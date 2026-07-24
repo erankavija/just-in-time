@@ -97,6 +97,7 @@ impl RepositoryIndex {
     /// Add one issue to active membership and remove it from deleted membership.
     ///
     /// The canonical active order is lexical and repeated insertion is a no-op.
+    #[allow(dead_code)] // Only called from the test-support-gated fixture seam.
     pub(crate) fn upsert_active(&mut self, id: String) {
         if !self.all_ids.contains(&id) {
             self.all_ids.push(id.clone());
@@ -106,7 +107,15 @@ impl RepositoryIndex {
     }
 
     /// Move one issue from active to deleted membership idempotently.
-    #[cfg(test)]
+    ///
+    /// Reachable under `feature = "test-support"` in addition to `cfg(test)`:
+    /// `commands::test_helpers::with_open_race`'s delete-race fixture calls it,
+    /// and `test_helpers` itself is reachable independent of `cfg(test)` when
+    /// the feature is enabled without a test build (e.g. `cargo clippy
+    /// --features test-support`), a configuration where this method is itself
+    /// unreached.
+    #[cfg(any(test, feature = "test-support"))]
+    #[allow(dead_code)]
     pub(crate) fn mark_deleted(&mut self, id: String) {
         self.all_ids.retain(|active| active != &id);
         if !self.deleted_ids.contains(&id) {
