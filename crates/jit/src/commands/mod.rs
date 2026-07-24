@@ -60,7 +60,14 @@ pub mod template_expand;
 mod validate;
 pub mod worktree;
 
-#[cfg(test)]
+// Every item inside is called only from #[cfg(test)] code within this crate.
+// When `jit` is compiled as a plain `test-support` dependency without
+// `cfg(test)` (e.g. crates/server's own test build, which links this crate's
+// TransactionFailureInjector surface but never calls into this module), the
+// module stays reachable but every item in it goes genuinely uncalled in that
+// one configuration.
+#[cfg(any(test, feature = "test-support"))]
+#[allow(dead_code)]
 pub mod test_helpers;
 
 pub use batch_create::{

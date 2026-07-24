@@ -525,7 +525,7 @@ impl RepositoryMutationSession for MemoryMutationSession {
         let delta = plan.delta();
         ensure_session_image(&self.layout, self.captured.as_ref(), image)?;
         ensure_delta_is_captured(image, delta)?;
-        #[cfg(test)]
+        #[cfg(feature = "test-support")]
         if self.storage.consume_repository_state_apply_conflict() {
             return Err(RepositoryStateStoreError::RetryableConflict {
                 path: "injected memory read-set conflict".into(),

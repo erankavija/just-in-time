@@ -314,8 +314,28 @@ impl JsonFileStorage {
     }
 
     /// Construct storage with deterministic recovered-session failure injection.
+    #[cfg(feature = "test-support")]
     #[doc(hidden)]
     pub fn with_repository_state_failures<P: AsRef<Path>>(
+        root: P,
+        failures: Arc<dyn crate::storage::TransactionFailureInjector>,
+    ) -> Self {
+        let mut storage = Self::new(root);
+        storage.repository_state_failures = failures;
+        storage
+    }
+
+    /// Construct storage with deterministic recovered-session failure injection.
+    ///
+    /// Crate-internal twin of the `test-support`-gated public constructor
+    /// above: same body, `pub(crate)` visibility, so internal callers resolve
+    /// identically whether or not the feature is enabled. Its only callers are
+    /// `#[cfg(test)]` code, which activates `test-support` via the crate's own
+    /// dev-dependency and so compiles the `pub` twin above instead; unused in
+    /// an ordinary non-test build with the feature off.
+    #[cfg(not(feature = "test-support"))]
+    #[allow(dead_code)]
+    pub(crate) fn with_repository_state_failures<P: AsRef<Path>>(
         root: P,
         failures: Arc<dyn crate::storage::TransactionFailureInjector>,
     ) -> Self {

@@ -43,5 +43,9 @@ rust-embed = { version = "8", optional = true }
 mime_guess = { version = "2", optional = true }
 
 [dev-dependencies]
+# Enables jit's test-support feature so this crate's own #[cfg(test)] modules
+# can reach jit's failure-injection surface (e.g. TransactionFailureInjector)
+# the same way the jit crate's own tests do.
+jit = { path = "../jit", features = ["test-support"] }
 axum-test = "14.0"
 tempfile = "3.8"
