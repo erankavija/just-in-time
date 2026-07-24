@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "ec47e5f1c656f7ad5e3c9519caa1599ce6d55029",
+  "completed_at": "2026-07-24T13:46:18.414463531Z",
+  "duration_ms": 131835,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All eight retry sites use the shared session-free driver while preserving their preflight, guard/subprocess, revalidation, and apply structure.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9298b912-175f-4ac6-9489-1fbc82fb3ad6",
+  "message": null,
+  "run_id": "26f1cc42-c92a-4557-896e-5ae1946c6e86",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T13:44:06.578501364Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 385b1c6d, ca57ca31 (first-parent merge patch), ec47e5f1 (`jit:9298b912`)\nPolicy sources: AGENTS.md; .jit/gates.toml\nResolved items: @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T13:43:20Z)\nTruncation recovery: Narrowed the gate-registry read after a broad historical `.jit` search truncated; affected source and patch ranges were read separately.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All eight retry sites use the shared session-free driver while preserving their preflight, guard/subprocess, revalidation, and apply structure.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
