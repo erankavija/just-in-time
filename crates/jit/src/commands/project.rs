@@ -70,6 +70,35 @@ fn style_token(style: ProjectionStyle) -> String {
     .to_string()
 }
 
+/// Preserve validation-class producer sources at the command's anyhow transport
+/// boundary so callers can downcast the concrete typed error.
+fn project_producer_error(error: crate::repository_state::ProducerError) -> anyhow::Error {
+    match error {
+        crate::repository_state::ProducerError::Projection(source) => anyhow::Error::new(source),
+        crate::repository_state::ProducerError::ManagedDocument(source) => {
+            anyhow::Error::new(source)
+        }
+        other => anyhow::Error::new(other),
+    }
+}
+
+fn project_repository_state_error(
+    error: crate::repository_state::RepositoryStateError,
+) -> anyhow::Error {
+    match error {
+        crate::repository_state::RepositoryStateError::Producer(source) => {
+            project_producer_error(source)
+        }
+        crate::repository_state::RepositoryStateError::Projection(source) => {
+            anyhow::Error::new(source)
+        }
+        crate::repository_state::RepositoryStateError::ManagedDocument(source) => {
+            anyhow::Error::new(source)
+        }
+        other => anyhow::Error::new(other),
+    }
+}
+
 /// Select projection names from the configuration captured for this attempt.
 fn selected_projection_names(config: &JitConfig, name: Option<&str>) -> Result<Vec<String>> {
     let registry = config.projection.as_ref();
@@ -154,7 +183,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 &config_one,
                 &selected_names,
                 rules_text.as_deref(),
-            )?;
+            )
+            .map_err(project_producer_error)?;
             let mut phase_two = CaptureSpec::phase_one(registries()?, budget)?;
             phase_two.discover_paths(closure)?;
             let image = match session.capture(phase_two) {
@@ -174,7 +204,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 config,
                 &selected_names,
                 final_rules.as_deref(),
-            )?;
+            )
+            .map_err(project_producer_error)?;
             let captured = image
                 .capture_spec()
                 .paths()
@@ -198,21 +229,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             )
             // Keep projection and managed-region failures typed so the command
             // preserves their validation exit-code mapping.
-            .map_err(|error| match error {
-                crate::repository_state::RepositoryStateError::Producer(
-                    crate::repository_state::ProducerError::Projection(projection),
-                ) => anyhow::Error::new(projection),
-                crate::repository_state::RepositoryStateError::Producer(
-                    crate::repository_state::ProducerError::ManagedDocument(managed),
-                ) => anyhow::Error::new(managed),
-                crate::repository_state::RepositoryStateError::Projection(projection) => {
-                    anyhow::Error::new(projection)
-                }
-                crate::repository_state::RepositoryStateError::ManagedDocument(managed) => {
-                    anyhow::Error::new(managed)
-                }
-                other => anyhow::Error::new(other),
-            })?;
+            .map_err(project_repository_state_error)?;
 
             let registry = config.projection.as_ref();
             let projections = selected_names
@@ -250,5 +267,25 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         Err(anyhow!(
             "project render did not converge after repeated capture conflicts"
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_project_producer_error_preserves_projection_source_for_downcast() {
+        let error = project_producer_error(crate::repository_state::ProducerError::Projection(
+            crate::repository_state::ProjectionError::MissingTarget {
+                projection: "invariants".to_string(),
+            },
+        ));
+
+        assert!(matches!(
+            error.downcast_ref::<crate::repository_state::ProjectionError>(),
+            Some(crate::repository_state::ProjectionError::MissingTarget { projection })
+                if projection == "invariants"
+        ));
     }
 }
