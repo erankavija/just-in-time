@@ -1,6 +1,7 @@
 //! Unified dependency-aware archive planning and coordinated execution.
 
 use super::CommandExecutor;
+use super::{with_mutation_session, SessionStep};
 use crate::domain::artifact_classifier::{
     artifact_destination_root, artifact_mirror_destination, classification_facts_from_evidence,
     classify_artifacts, preferred_container_destination_root,
@@ -27,9 +28,9 @@ use crate::domain::{Event, Issue};
 use crate::storage::{
     collect_artifact_classification_facts, discover_archive_artifacts,
     resolve_container_destination, validate_repo_relative_path, GitRevisionResolver, IssueStore,
-    JsonFileStorage, RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
+    JsonFileStorage, RepositoryMutationSession, RepositoryStateStoreError,
 };
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy)]
@@ -852,10 +853,9 @@ impl CommandExecutor<JsonFileStorage> {
     ) -> Result<ArchiveExecutionResult> {
         let layout = self.require_layout()?;
         let context = crate::repository_state::MutationContext::production();
-        for _ in 0..8 {
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some((image, plan)) = self.capture_archive_plan(session.as_mut(), target)? else {
-                continue;
+        with_mutation_session(&self.storage, &layout, "archive execution", |session| {
+            let Some((image, plan)) = self.capture_archive_plan(session, target)? else {
+                return Ok(SessionStep::Retry);
             };
             if let Some((code, guidance)) = plan
                 .blockers()
@@ -877,17 +877,10 @@ impl CommandExecutor<JsonFileStorage> {
             let (materialization, result) =
                 crate::repository_state::finalize_archive_execution(&image, &context, &plan)?;
             if materialization.delta().actions().is_empty() {
-                return Ok(result);
+                return Ok(SessionStep::Done(result));
             }
-            match session.apply(&materialization) {
-                Ok(_) => return Ok(result),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "archive execution did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Apply(materialization, result))
+        })
     }
 }
 

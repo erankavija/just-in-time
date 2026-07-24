@@ -40,7 +40,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{
             finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, VirtualPath,
         };
-        use crate::storage::RepositoryStateStoreError;
         let layout = self.require_layout()?;
         let index_path = VirtualPath::data("index.json")?;
         let events_path = VirtualPath::data("events.jsonl")?;
@@ -53,15 +52,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Operation-scoped so the repair and audit event keep one identity/time
         // authority across fresh-session conflict retries.
         let context = MutationContext::production();
-        for _ in 0..8 {
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let first = match session.capture(CaptureSpec::phase_one(
+        with_mutation_session(&self.storage, &layout, "lifecycle migration", |session| {
+            let Some(first) = capture_or_retry(session.capture(CaptureSpec::phase_one(
                 [index_path.clone(), events_path.clone()],
                 budget,
-            )?) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            )?))?
+            else {
+                return Ok(SessionStep::Retry);
             };
             let discovery_index = crate::storage::json::parse_repository_index(
                 first
@@ -77,10 +74,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .map(|id| VirtualPath::data(format!("issues/{id}.json")))
                     .collect::<Result<Vec<_>, _>>()?,
             )?;
-            let image = match session.capture(spec) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            let Some(image) = capture_or_retry(session.capture(spec))? else {
+                return Ok(SessionStep::Retry);
             };
             let index = crate::storage::json::parse_repository_index(
                 image
@@ -89,7 +84,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             )?;
             let ids = index.all_ids;
             if ids != discovered_ids {
-                continue;
+                return Ok(SessionStep::Retry);
             }
             let event_text = std::str::from_utf8(image.file_bytes(&events_path)?.unwrap_or(&[]))?;
             let events = crate::domain::parse_known_events(event_text)?;
@@ -151,19 +146,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }))
                 .collect::<Vec<_>>();
             let plan = finalize(&layout, &image, &context, &intents)?;
-            match session.apply(&plan) {
-                Ok(_) => {
-                    return Ok(LifecycleBackfillResult {
-                        issues_scanned,
-                        issues_updated,
-                    })
-                }
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "lifecycle migration did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Apply(
+                plan,
+                LifecycleBackfillResult {
+                    issues_scanned,
+                    issues_updated,
+                },
+            ))
+        })
     }
 }
