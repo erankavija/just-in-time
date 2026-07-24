@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T23:10:18.754553182Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "42ee0dd5-0cc9-4c5d-852c-224fcefd3523",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate the test-only rule-serialization publics behind test-support",
-  "updated_at": "2026-07-24T22:17:46.463281198Z"
+  "updated_at": "2026-07-24T23:10:18.754553182Z"
 }
