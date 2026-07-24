@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T17:17:14.790777276Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-24T17:20:30.594119177Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "531ce80d-0a0e-4aac-84ea-65dfbd2091c6",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Make the manual CI script fail closed on skipped audits",
-  "updated_at": "2026-07-24T17:17:14.790777276Z"
+  "updated_at": "2026-07-24T17:20:30.594119177Z"
 }
