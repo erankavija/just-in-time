@@ -25,7 +25,7 @@ set -euo pipefail
 #     (copied from the pristine template) before EVERY measured sample, so no
 #     sample observes a prior sample's mutation. Warmup runs use throwaway
 #     fixtures of the same shape. Read scenarios share one warm copy whose page
-#     cache and per-issue sidecar locks are primed by the warmup runs.
+#     cache and fixed, repository-scoped locks are primed by the warmup runs.
 #   - Cache-state is warm-only: cold-cache measurement needs root to drop the
 #     page cache and is not attempted. Timings are comparable only across
 #     artifacts that share the same `measurement_fs`.
@@ -224,23 +224,24 @@ TARGET_ID=$(<"$WORK_BASE/target-id")
 [[ -n "$TARGET_ID" && "$TARGET_ID" != null ]] || { echo "ERROR: could not resolve a fixture target id." >&2; exit 1; }
 echo "[session-bench] fixture target id: $TARGET_ID" >&2
 
-# Warm working copy shared by the read scenarios (its page cache and sidecar
-# locks are primed by each scenario's warmup runs).
+# Warm working copy shared by the read scenarios (its page cache and fixed
+# repository-scoped locks are primed by each scenario's warmup runs).
 READ_COPY="$WORK_BASE/read"
 cp -a "$PRISTINE" "$READ_COPY"
 
 # Fixed path the mutation scenario re-materializes fresh before every sample.
 MUT_COPY="$WORK_BASE/mutation"
 
-# count_locks <dir> — number of per-issue sidecar .lock files under <dir>/.jit.
+# count_locks <dir> — number of .lock files under <dir>/.jit.
 count_locks() {
   find "$1/.jit" -name '*.lock' 2>/dev/null | wc -l | tr -d ' '
 }
 
 # probe_lock_delta <argv...>
-# Materialize a fresh copy, count sidecar locks before and after ONE run of the
-# command, and print the delta (lock_files_created for that scenario). Not part
-# of any timing.
+# Materialize a fresh copy, count lock files before and after ONE run of the
+# command, and print the delta (lock_files_created for that scenario). For a
+# current binary this is the fixed repository-scoped set; historical binaries
+# may also create per-issue sidecars. Not part of any timing.
 probe_lock_delta() {
   local probe="$WORK_BASE/lockprobe"
   rm -rf "$probe"
@@ -419,7 +420,7 @@ else
   LOCK_SITE="none (the measured commit has no per-issue sidecar read lock)"
   LOCK_CREATOR="not applicable; load_issue creates no per-issue sidecar"
   LOCK_LIFETIME="not applicable; no per-issue sidecar is created"
-  LOCK_CLEANUP="legacy per-issue sidecars are removed during repository recovery"
+  LOCK_CLEANUP="legacy per-issue sidecars are removed once by the read-all path"
   SHOW_NOTE="reads one issue without creating a per-issue sidecar lock"
   QUERY_NOTE="reads all issues without creating per-issue sidecar locks"
 fi

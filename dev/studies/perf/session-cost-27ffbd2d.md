@@ -4,6 +4,12 @@ Companion summary for `dev/studies/perf/session-cost-27ffbd2d.json`. That
 artifact is the schema template for subsequent harness runs. Every timing below
 cites its artifact path, command name, and statistic.
 
+> **Historical profile:** These measurements describe commit `27ffbd2d` before
+> the lock-hygiene change. Issue `fc744df6` resolved the sidecar finding on
+> 2026-07-24: current issue reads create no per-issue locks, the surviving lock
+> set is repository-scoped and constant in issue count, and `list_issues`
+> performs a one-time cleanup of legacy empty UUID sidecars.
+
 ## Machine and corpus
 
 - jit 0.2.1, commit 27ffbd2d, release
