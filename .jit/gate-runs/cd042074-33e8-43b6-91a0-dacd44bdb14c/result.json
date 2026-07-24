@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "0ff498de17185def5ef12d1c93462cabce376ebb",
+  "completed_at": "2026-07-24T10:41:33.943693679Z",
+  "duration_ms": 204592,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are satisfied; the prior atomic-publication finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "73981310-4173-4224-82bf-f38a9d5222fd",
+  "message": null,
+  "run_id": "cd042074-33e8-43b6-91a0-dacd44bdb14c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T10:38:09.350890763Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c3a31ff, b1606dd, ed983b98, 051bf759, 11533eb, 0ff498de\nPolicy sources: AGENTS.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T10:22:24Z); code-review failed (exit 1, 2026-07-24T10:27:29Z; prior F1 addressed)\nTruncation recovery: inspected each tagged commit separately, bounded current-file ranges, and isolated exact published timing literals; broader unrelated prose results were outside the attributable impact cone.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied; the prior atomic-publication finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
