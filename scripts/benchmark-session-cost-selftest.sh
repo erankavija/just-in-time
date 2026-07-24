@@ -91,36 +91,44 @@ jq -e --slurpfile template "$template" '
   (keys == ($template[0] | keys)) and
   ((.jit | keys) == ($template[0].jit | keys)) and
   ((.machine | keys) == ($template[0].machine | keys)) and
-  ((.corpus | keys) == ($template[0].corpus | keys)) and
+  ((.corpus | keys) == ["bulk_group", "issue_count", "source"]) and
+  ((.corpus.bulk_group | keys) ==
+    ["change_count", "label", "matched_count", "noop_count"]) and
   ((.method | keys) == ($template[0].method | keys)) and
   ((.mutation_syscall_summary | keys) ==
     ($template[0].mutation_syscall_summary | keys)) and
   ((.lock_mechanism | keys) == ($template[0].lock_mechanism | keys)) and
-  ([.commands[] | keys] == [$template[0].commands[] | keys]) and
+  (all(.commands[]; (keys - ["note"]) ==
+    ($template[0].commands[0] | keys - ["note"]))) and
   (.schema_version == "1.0.0") and
   (.artifact_kind == "jit-session-cost-profile") and
   (.corpus.issue_count == 2) and
   (.method.warm == true) and
   (.method.warmup_runs == 3) and
   (.method.samples_per_command == 20) and
-  (.commands | length == 5) and
-  ([.commands[].name] == [
+  (.commands | length == 6) and
+  (([.commands[].name][0:5]) == [
     "version", "issue_show_single_read", "query_available", "issue_list",
     "issue_update_mutation"
   ]) and
+  (.commands[5].name | startswith("issue_update_bulk_mutation_k")) and
+  (.commands[5].argv | contains(["--filter"])) and
+  (.commands[5].class == "mutation") and
+  ((.commands | map(select(.name | contains("bulk"))) | length) == 1) and
   (all(.commands[];
     .n == 20 and .warm == true and
     (has("name") and has("argv") and has("class") and has("n") and
      has("min_ms") and has("median_ms") and has("p95_ms") and
-     has("max_ms") and has("lock_files_created")))) and
-  (all(.commands[].name; contains("bulk") | not))
+     has("max_ms") and has("lock_files_created"))))
 ' "$artifact" >/dev/null
 
 # Three warmups and twenty measured updates all succeed only when the harness
 # restores a pristine copy before each invocation; the mock exits 9 on reuse.
+# Both mutation-class scenarios (single and bulk) run this loop, so the floor
+# is 2 * 23; each also runs one untimed lock-delta probe on top.
 update_count=$(grep -c '^issue update ' "$MOCK_JIT_LOG")
-[[ "$update_count" -ge 23 ]] || {
-  echo "selftest: expected at least 23 mutation invocations, got $update_count" >&2
+[[ "$update_count" -ge 46 ]] || {
+  echo "selftest: expected at least 46 mutation invocations, got $update_count" >&2
   exit 1
 }
 
