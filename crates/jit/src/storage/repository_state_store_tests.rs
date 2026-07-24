@@ -2407,7 +2407,7 @@ fn fabricate_companion(worktree: &std::path::Path, id: &str, owner: &str) {
 }
 
 #[test]
-fn test_finding1_foreign_owner_companion_is_not_swept() {
+fn test_session_foreign_owner_companion_is_not_swept() {
     let worktree = TempDir::new().unwrap();
     let data = worktree.path().join(".jit");
     std::fs::create_dir(&data).unwrap();
@@ -2438,7 +2438,7 @@ fn test_finding1_foreign_owner_companion_is_not_swept() {
 }
 
 #[test]
-fn test_finding1_foreign_owner_external_journal_is_skipped_not_failed() {
+fn test_session_foreign_owner_external_journal_is_skipped_not_failed() {
     let worktree = TempDir::new().unwrap();
     let data = worktree.path().join(".jit");
     std::fs::create_dir(&data).unwrap();
@@ -2481,7 +2481,7 @@ fn test_finding1_foreign_owner_external_journal_is_skipped_not_failed() {
 }
 
 #[test]
-fn test_finding1_disjoint_sessions_serialize_on_worktree_bootstrap() {
+fn test_session_disjoint_sessions_serialize_on_worktree_bootstrap() {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Barrier;
 
