@@ -229,7 +229,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, VirtualPath,
         };
-        use crate::storage::RepositoryStateStoreError;
 
         let budget = CaptureBudget {
             max_paths: 1 << 16,
@@ -259,10 +258,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 None => super::image_repo_bytes(image, repo_rel),
             }
         };
-        let image_one = match session.capture(CaptureSpec::phase_one(registries()?, budget)?) {
-            Ok(image) => image,
-            Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-            Err(error) => return Err(error.into()),
+        let Some(image_one) =
+            capture_or_retry(session.capture(CaptureSpec::phase_one(registries()?, budget)?))?
+        else {
+            return Ok(None);
         };
         // Closure planning is best-effort: a malformed registry cannot fail the
         // capture, because validation itself is the authority that reports it.
@@ -287,11 +286,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             spec.discover_listing(listing.clone())?;
         }
         let mut phase_three = spec.clone();
-        let image_two = match session.capture(spec) {
-            Ok(image) if image.has_stable_overlap(&image_one) => image,
-            Ok(_) => return Ok(None),
-            Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-            Err(error) => return Err(error.into()),
+        let image_two = match capture_or_retry(session.capture(spec))? {
+            Some(image) if image.has_stable_overlap(&image_one) => image,
+            Some(_) | None => return Ok(None),
         };
 
         let issues = effective_issues(&image_two, &all_ids, &effective)?;
@@ -365,11 +362,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         for (revision, path) in pinned {
             phase_three.discover_pinned(revision, path)?;
         }
-        let image_three = match session.capture(phase_three.clone()) {
-            Ok(base) if base.has_stable_overlap(&image_two) => base,
-            Ok(_) => return Ok(None),
-            Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-            Err(error) => return Err(error.into()),
+        let image_three = match capture_or_retry(session.capture(phase_three.clone()))? {
+            Some(base) if base.has_stable_overlap(&image_two) => base,
+            Some(_) | None => return Ok(None),
         };
         if !capture_precheck_history {
             return Ok(Some(image_three));

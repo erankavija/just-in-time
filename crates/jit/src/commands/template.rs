@@ -21,8 +21,7 @@ use crate::repository_state::{
     MutationContext, MutationIntent, RepositoryEntry, RepositoryImage, VirtualPath,
 };
 use crate::storage::{
-    AmbiguousIdError, InvalidIdPrefixError, IssueNotFoundError, RepositoryStateStoreError,
-    MIN_ID_PREFIX_LENGTH,
+    AmbiguousIdError, InvalidIdPrefixError, IssueNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
 use crate::templates::{GraphTemplate, RoleBindings};
 use serde::Serialize;
@@ -411,10 +410,8 @@ fn capture_template_image(
     let issues_dir = VirtualPath::data("issues")?;
     let mut first_spec = CaptureSpec::phase_one(template_fixed_paths()?, TEMPLATE_CAPTURE_BUDGET)?;
     first_spec.discover_listing(presets_dir.clone())?;
-    let first = match session.capture(first_spec) {
-        Ok(image) => image,
-        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-        Err(error) => return Err(error.into()),
+    let Some(first) = capture_or_retry(session.capture(first_spec))? else {
+        return Ok(None);
     };
     let discovered_index = parse_template_index(&first)?;
     let discovered_presets = listed_json_paths(&first, &presets_dir)?;
@@ -431,10 +428,8 @@ fn capture_template_image(
     spec.discover_paths(discovered_paths)?;
     spec.discover_listing(issues_dir)?;
     spec.discover_listing(presets_dir.clone())?;
-    let mut image = match session.capture(spec.clone()) {
-        Ok(image) => image,
-        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-        Err(error) => return Err(error.into()),
+    let Some(mut image) = capture_or_retry(session.capture(spec.clone()))? else {
+        return Ok(None);
     };
     if !template_static_capture_matches(
         &image,
@@ -454,11 +449,10 @@ fn capture_template_image(
         return Ok(Some(image));
     }
     spec.discover_paths(derived.iter().cloned())?;
-    image = match session.capture(spec) {
-        Ok(image) => image,
-        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-        Err(error) => return Err(error.into()),
+    let Some(next_image) = capture_or_retry(session.capture(spec))? else {
+        return Ok(None);
     };
+    image = next_image;
     if !template_static_capture_matches(
         &image,
         &discovered_index,

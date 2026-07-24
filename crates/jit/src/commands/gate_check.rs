@@ -813,7 +813,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::declarations::GateChecker;
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
-        use crate::storage::RepositoryStateStoreError;
         use std::collections::BTreeMap;
 
         let budget = CaptureBudget {
@@ -831,10 +830,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         ];
         paths.extend(run_paths.iter().cloned());
         let mut spec = CaptureSpec::phase_one(paths, budget)?;
-        let initial = match session.capture(spec.clone()) {
-            Ok(image) => image,
-            Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-            Err(error) => return Err(error.into()),
+        let Some(initial) = capture_or_retry(session.capture(spec.clone()))? else {
+            return Ok(None);
         };
         let issue = captured_bound_issue(&initial, target_id)?;
         let registry = captured_gate_registry(&initial)?;
@@ -882,13 +879,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .map_err(|_| anyhow!("prompt_file '{}' resolves outside the repository", path))?;
             spec.discover_paths([prompt])?;
         }
-        match session.capture(spec) {
-            Ok(image) if super::checker_consumes_run_history(checker) => {
+        match capture_or_retry(session.capture(spec))? {
+            Some(image) if super::checker_consumes_run_history(checker) => {
                 super::capture_gate_run_results(session, image)
             }
-            Ok(image) => Ok(Some(image)),
-            Err(RepositoryStateStoreError::RetryableConflict { .. }) => Ok(None),
-            Err(error) => Err(error.into()),
+            Some(image) => Ok(Some(image)),
+            None => Ok(None),
         }
     }
 
