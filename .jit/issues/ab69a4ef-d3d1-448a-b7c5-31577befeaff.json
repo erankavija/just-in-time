@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T21:01:29.301696548Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ab69a4ef-d3d1-448a-b7c5-31577befeaff",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Managed-document splice round-trip property test",
-  "updated_at": "2026-07-24T16:55:17.107436018Z"
+  "updated_at": "2026-07-24T21:01:29.301696548Z"
 }
