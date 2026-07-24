@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "292f0ac71b06586d397bd2aacbc8a53eb6d029f2",
+  "completed_at": "2026-07-24T10:51:16.093812907Z",
+  "duration_ms": 163077,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/storage-format.md",
+        "id": "F1",
+        "line": 30,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Canonical storage documentation still lists the eliminated per-issue lock file."
+      }
+    ],
+    "summary": "The implementation removes the sidecar lock, but the canonical storage-format reference still documents it as part of the issue format.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fc744df6-fa90-49e0-a145-54d91ad322b7",
+  "message": null,
+  "run_id": "b79e451a-80ca-40ec-9969-2b94259808f3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T10:48:33.016636003Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5256 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f93bd-bcfb-7421-86c3-0fb83abb77f6\n--------\nuser\n--- 5243 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e4635d26, 11c09872, 292f0ac7 (`jit:fc744df6`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; docs/reference/storage-format.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/invariant/derived-state-coherence (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/charter/D-13 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T10:43:13Z; implementation is an ancestor of the validated commit); code-review pending\nTruncation recovery: narrowed reads of affected storage code, lock inventory, query path, policy registries, documentation, and gate ancestry after combined-output truncation\n\n1. F1 — blocking, issue-impact (medium): [docs/reference/storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:30) still declares `<uuid>.lock` as an issue-directory lock file. The attributed change eliminates this format (`load_issue` now reads directly), but does not update the canonical storage reference, leaving an adopter-facing fact stale. This violates @/invariant/single-source-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The implementation removes the sidecar lock, but the canonical storage-format reference still documents it as part of the issue format.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Canonical storage documentation still lists the eliminated per-issue lock file.\",\"file\":\"docs/reference/storage-format.md\",\"line\":30,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

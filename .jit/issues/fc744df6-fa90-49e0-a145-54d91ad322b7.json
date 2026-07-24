@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T10:47:29.061556218Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-24T10:51:16.330369227Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "fc744df6-fa90-49e0-a145-54d91ad322b7",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Lock-hygiene: eliminate the per-issue sidecar read lock",
-  "updated_at": "2026-07-24T10:47:29.061556218Z"
+  "updated_at": "2026-07-24T10:51:16.330369227Z"
 }
