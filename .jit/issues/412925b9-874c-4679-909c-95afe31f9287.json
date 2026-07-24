@@ -16,7 +16,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-24T13:56:46.256712292Z",
+      "updated_at": "2026-07-24T14:36:06.011530519Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -35,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bulk-update eligibility prefilter and session budget",
-  "updated_at": "2026-07-24T14:16:50.014156546Z"
+  "updated_at": "2026-07-24T14:36:06.011530519Z"
 }
