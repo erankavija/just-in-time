@@ -294,6 +294,60 @@ impl FileLocker {
     }
 }
 
+/// Remove orphaned per-issue read-lock sidecar files from an issues directory.
+///
+/// `load_issue` historically took a shared lock on a `<id>.lock` sidecar next to
+/// every issue file it read. That lock was redundant — issue JSON is published by
+/// atomic temp-file-plus-rename, so a reader can never observe a torn file, and
+/// writers serialize on `.repo-write.lock` — yet it created one zero-byte sidecar
+/// per issue ever read, growing without bound. The read lock is gone; this removes
+/// the inert leftovers it left behind.
+///
+/// Only empty `<uuid>.lock` regular files directly inside `issues_dir` are
+/// removed, so unrelated, non-empty, and symlink files are never touched. The
+/// retained fixed locks (`.repo-write`, `.index`, `.gates`, `.events`, the
+/// bootstrap lock, and the claims lock) live outside this directory and are
+/// unaffected. Removal is best-effort cleanup rather than a correctness
+/// mechanism: a file that cannot be removed is skipped instead of raising an
+/// error.
+///
+/// Returns the number of sidecar files removed.
+///
+/// # Errors
+///
+/// Returns an error only if `issues_dir` exists but cannot be enumerated.
+pub(crate) fn remove_orphaned_issue_read_sidecars(issues_dir: &Path) -> Result<usize> {
+    use std::fs;
+
+    if !issues_dir.exists() {
+        return Ok(0);
+    }
+
+    let removed = fs::read_dir(issues_dir)
+        .with_context(|| {
+            format!(
+                "Failed to read issues directory for sidecar cleanup: {}",
+                issues_dir.display()
+            )
+        })?
+        .filter_map(std::result::Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "lock"))
+        .filter(|path| {
+            path.file_stem()
+                .and_then(|stem| stem.to_str())
+                .is_some_and(|stem| uuid::Uuid::parse_str(stem).is_ok())
+        })
+        .filter(|path| {
+            fs::symlink_metadata(path)
+                .is_ok_and(|meta| meta.file_type().is_file() && meta.len() == 0)
+        })
+        .filter(|path| fs::remove_file(path).is_ok())
+        .count();
+
+    Ok(removed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,6 +510,74 @@ mod tests {
 
         assert_eq!(metadata.agent_id, "agent:test-1");
         assert_eq!(metadata.pid, std::process::id());
+    }
+
+    #[test]
+    fn test_remove_orphaned_issue_read_sidecars_removes_empty_lock_files_and_counts_them() {
+        let temp_dir = TempDir::new().unwrap();
+        let issues_dir = temp_dir.path().join("issues");
+        std::fs::create_dir(&issues_dir).unwrap();
+
+        // Two zero-byte per-issue sidecars, as the retired read lock created them.
+        let sidecar_a = issues_dir.join(format!("{}.lock", uuid::Uuid::new_v4()));
+        let sidecar_b = issues_dir.join(format!("{}.lock", uuid::Uuid::new_v4()));
+        std::fs::write(&sidecar_a, "").unwrap();
+        std::fs::write(&sidecar_b, "").unwrap();
+
+        let removed = remove_orphaned_issue_read_sidecars(&issues_dir).unwrap();
+
+        assert_eq!(
+            removed, 2,
+            "Both empty sidecars should be removed and counted"
+        );
+        assert!(!sidecar_a.exists(), "Empty sidecar should be gone");
+        assert!(!sidecar_b.exists(), "Empty sidecar should be gone");
+    }
+
+    #[test]
+    fn test_remove_orphaned_issue_read_sidecars_preserves_issue_json_and_nonempty_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let issues_dir = temp_dir.path().join("issues");
+        std::fs::create_dir(&issues_dir).unwrap();
+
+        // Issue payloads must survive; only empty `.lock` sidecars are cleaned.
+        let issue_json = issues_dir.join("issue-a.json");
+        std::fs::write(&issue_json, "{}").unwrap();
+        // A UUID-shaped lock carrying content is not one of the inert sidecars.
+        let nonempty_lock = issues_dir.join(format!("{}.lock", uuid::Uuid::new_v4()));
+        std::fs::write(&nonempty_lock, "not-empty").unwrap();
+        // An empty lock without an issue UUID is unrelated and must also survive.
+        let unrelated_lock = issues_dir.join("held.lock");
+        std::fs::write(&unrelated_lock, "").unwrap();
+        let empty_sidecar = issues_dir.join(format!("{}.lock", uuid::Uuid::new_v4()));
+        std::fs::write(&empty_sidecar, "").unwrap();
+
+        let removed = remove_orphaned_issue_read_sidecars(&issues_dir).unwrap();
+
+        assert_eq!(
+            removed, 1,
+            "Only the single empty sidecar should be removed"
+        );
+        assert!(issue_json.exists(), "Issue JSON must be preserved");
+        assert!(
+            nonempty_lock.exists(),
+            "Non-empty .lock file must be preserved"
+        );
+        assert!(
+            unrelated_lock.exists(),
+            "Empty non-issue .lock file must be preserved"
+        );
+        assert!(!empty_sidecar.exists(), "Empty sidecar should be removed");
+    }
+
+    #[test]
+    fn test_remove_orphaned_issue_read_sidecars_tolerates_absent_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let missing = temp_dir.path().join("issues");
+
+        let removed = remove_orphaned_issue_read_sidecars(&missing).unwrap();
+
+        assert_eq!(removed, 0, "An absent issues directory removes nothing");
     }
 
     #[test]
