@@ -191,6 +191,97 @@ Recorded in the epic description (D-1…D-7): single-epic scope, milestone v1.0 
 
 Per repository convention, gates are need-based per footprint: Rust-touching children carry `cargo-ci` and `code-review`; documentation children carry `doc-review` and `docs-mechanical`; children touching `mcp-server/` carry `mcp-ci` — the REQ-15 advisory-debt sweep edits `mcp-server/lib/tool-generator.js:161,173,179`, so the S4 child owning that item carries it. Stories carry the union of their children's footprint baselines. The epic carries `repo-validate` and `holistic-review` (independent reviewer distinct from the building agent, epic D-5).
 
+### Breakdown overview
+
+Generated from `dev/active/1cc809de-breakdown.json`; do not edit by hand.
+
+<!-- jit:breakdown-overview:begin -->
+| Key | Title | Type | Outcome | Contracts | Sources | Footprint | Landing | Depends on |
+|---|---|---|---|---|---|---|---|---|
+| planning-boundary-collapse | Collapse the planning boundary to a single mutation-session contract | story | A single mutation-session contract and a fully typed error boundary collapse the copy-pasted planning surface. | — | plan-story-structure, plan-task-decomposition-sketch, dev/studies/cdc840ad-audit-2026-07-23.md | — | — | self-managed-multi-session, typed-producer-finalizer-errors, total-journal-action-extraction, plan-identity-tail |
+| enforced-guarantees | Convert narrated materialization guarantees into enforced tests | story | Property, contention, visibility, and path tests convert narrated materialization guarantees into enforced checks. | — | plan-story-structure, plan-task-decomposition-sketch | — | — | contention-tests, property-tests-plan-hash-splice, visibility-cutover-guard, path-constants-repair-coverage |
+| performance-contract | Establish an artifact-backed performance contract | story | A checked-in benchmark harness, a bounded session budget, and lock-hygiene make performance claims artifact-backed. | — | plan-story-structure, plan-task-decomposition-sketch | — | — | lock-hygiene-sidecar, bulk-update-session-budget |
+| hygiene-and-docs | Clear repository-state hygiene debt and document the subsystem | story | Feature-gating, surface reduction, test-module hygiene, docs, and debt clearance harden the repository-state subsystem. | — | plan-story-structure, plan-task-decomposition-sketch | — | — | advisory-debt-clearance, store-test-split-renames, architecture-doc-sweep, public-surface-reduction |
+| presentation-succession | Replace the repository-materialization showcase with a corrected successor | story | A corrected successor deck traces every falsifiable claim to an artifact and the predecessor deck retires behind a tombstone. | — | plan-story-structure, plan-task-decomposition-sketch | — | — | predecessor-deck-tombstone |
+| retry-combinators-single-session | Mutation-session retry combinators and single-session migration | task | One retry-contract combinator API replaces the copy-pasted single-session capture/plan/apply/retry loops. | — | plan-mutation-session-combinator, plan-task-decomposition-sketch | touches crates/jit/src/commands/mod.rs; touches crates/jit/src/commands/dependency.rs; touches crates/jit/src/commands/issue.rs; touches crates/jit/src/commands/gate.rs; touches crates/jit/src/commands/gate_check.rs; touches crates/jit/src/commands/claim.rs; touches crates/jit/src/commands/config.rs; touches crates/jit/src/storage/repository_state_store.rs | — | — |
+| self-managed-multi-session | Self-managed multi-session retry migration | task | The eight self-managed multi-session sites move onto the shared retry driver with lock ordering preserved. | — | plan-mutation-session-combinator, plan-task-decomposition-sketch | touches crates/jit/src/commands/dependency.rs; touches crates/jit/src/commands/issue.rs; touches crates/jit/src/commands/gate.rs; touches crates/jit/src/commands/mod.rs; touches crates/jit/src/commands/gate_check.rs; touches crates/jit/src/commands/template.rs | — | retry-combinators-single-session |
+| typed-producer-finalizer-errors | Typed producer and finalizer errors for the repository-state module | task | Producer and finalizer failures become typed, so exit-code mapping needs no stringify-then-downcast round-trip. | — | plan-typed-error-boundary, plan-task-decomposition-sketch | touches crates/jit/src/repository_state/mod.rs; touches crates/jit/src/repository_state/materialize.rs; touches crates/jit/src/repository_state/projection_render.rs; touches crates/jit/src/repository_state/artifact_classifier.rs; touches crates/jit/src/repository_state/profile_apply.rs; touches crates/jit/src/main.rs | — | — |
+| total-journal-action-extraction | Total journal-action extraction in the transaction kernel | task | Journal-action extraction returns a typed mismatch error instead of unreachable panics on the publication path. | — | plan-task-decomposition-sketch, dev/studies/cdc840ad-audit-2026-07-23.md | touches crates/jit/src/storage/file_transaction.rs; touches crates/jit/src/storage/transaction_journal.rs | — | — |
+| plan-identity-tail | Plan-identity tail for initialize and profile-application requests | task | Initialize and profile-application requests share the plan-identity tail, or a recorded decision states the exemption. | — | plan-task-decomposition-sketch | touches crates/jit/src/repository_state/mod.rs; uncertain: REQ-04 may resolve as a recorded exemption decision item on the issue rather than a code change to the plan-identity tail | — | — |
+| property-tests-plan-hash-splice | Property tests for plan-hash determinism and managed-document splice | task | Property tests pin plan-hash determinism under action reordering and managed-document splice round-trip. | — | plan-task-decomposition-sketch | touches crates/jit/src/repository_state/image.rs; uncertain: property tests land in a new in-crate test module whose exact placement (sibling file or gated inline module) is implementer discretion | — | planning-boundary-collapse |
+| visibility-cutover-guard | Visibility-enforced cutover guard | task | Compile-time publisher visibility, not source-text substring matching, enforces the repository-root cutover guard. | — | plan-cutover-guard, plan-task-decomposition-sketch | creates crates/jit/src/storage/external_publish.rs; touches crates/jit/src/storage/mod.rs; touches crates/jit/src/storage/file_transaction.rs; touches crates/jit/tests/provenance_contract/repository_state_cutover_tests.rs | — | planning-boundary-collapse |
+| contention-tests | Multi-threaded contention tests for mutation sessions and layout reentry | task | Real-thread contention tests exercise concurrent session opening and layout-reentry rejection over the shared store. | — | plan-task-decomposition-sketch | creates crates/jit/src/storage/repository_state_store_contention_tests.rs; touches crates/jit/src/storage/repository_state_store.rs | — | planning-boundary-collapse |
+| path-constants-repair-coverage | Compile-time path constants and derived repair-path coverage | task | Well-known paths become compile-time constants and repair coverage derives from the repair planner's declaration. | — | plan-path-constants-repair-targets, plan-task-decomposition-sketch | touches crates/jit/src/repository_state/path.rs; touches crates/jit/src/repository_state/mod.rs; touches crates/jit/tests/fast_rules/derived_state_repair_tests.rs | — | planning-boundary-collapse |
+| benchmark-harness | Benchmark harness and first session-cost artifact | task | A checked-in harness records repeated timed runs as JSON artifacts at a stable per-commit path. | — | plan-performance-contract, plan-task-decomposition-sketch | creates scripts/benchmark-session-cost.sh; creates dev/studies/perf/session-cost-<jit-commit>.json | — | — |
+| bulk-update-session-budget | Bulk-update eligibility prefilter and session-budget test | task | Bulk update opens sessions only for matched issues that are not provable no-ops, with a session-budget test. | — | plan-bulk-update-session-budget, plan-task-decomposition-sketch | touches crates/jit/src/commands/bulk_update.rs; touches crates/jit/src/commands/issue.rs; touches scripts/benchmark-session-cost.sh | — | benchmark-harness |
+| lock-hygiene-sidecar | Lock-hygiene: eliminate the per-issue sidecar read lock | task | Removing the per-issue sidecar read lock keeps the surviving fixed lock set O(1) in issue count. | — | plan-pd1-lock-hygiene, plan-task-decomposition-sketch | touches crates/jit/src/storage/json.rs; touches crates/jit/src/storage/lock.rs | — | — |
+| test-support-feature-gating | Feature-gate the test-support library surface | task | A test-support Cargo feature drops the failure-injection and fixture APIs from the default public surface. | — | plan-test-support-feature-gating, plan-task-decomposition-sketch | touches crates/jit/Cargo.toml; touches crates/jit/src/storage/mod.rs; touches crates/jit/src/storage/json.rs; touches crates/jit/src/storage/repository_state_store.rs; touches crates/jit/src/commands/mod.rs | — | planning-boundary-collapse |
+| public-surface-reduction | Reduce the repository-state public surface to its external consumers | task | The repository-state public surface reduces to items with an external consumer via demotions and one deletion. | — | plan-task-decomposition-sketch | touches crates/jit/src/repository_state/mod.rs; touches crates/jit/src/repository_state/mutation.rs | — | test-support-feature-gating |
+| store-test-split-renames | Split the store test module to a sibling file and fix review-round test names | task | The oversized inline store test module moves to a sibling file and review-round test names follow the convention. | — | plan-task-decomposition-sketch | creates crates/jit/src/storage/repository_state_store_tests.rs; touches crates/jit/src/storage/repository_state_store.rs | — | planning-boundary-collapse |
+| architecture-doc-sweep | Write the repository-state architecture doc and sweep the stale storage pointer | task | A contributor architecture document covers the repository-state subsystem and the stale storage pointer is swept. | — | plan-task-decomposition-sketch | creates dev/architecture/repository-state-materialization.md; touches dev/architecture/core-system-design.md | — | planning-boundary-collapse |
+| advisory-debt-clearance | Clear the four non-lock advisory-debt items | task | Four recorded advisory-debt items are cleared across the CLI output, MCP generator, CLI docs, and a CI script. | — | plan-task-decomposition-sketch, dev/studies/cdc840ad-audit-2026-07-23.md | touches crates/jit/src/output.rs; touches mcp-server/lib/tool-generator.js; touches docs/reference/cli-commands.md; touches scripts/test-ci-manual.sh | — | planning-boundary-collapse |
+| successor-deck | Corrected successor deck for the repository-materialization story | task | One vendored successor deck re-derives its figures from repository artifacts and the final issue tree. | — | plan-pd2-deck-assets, plan-task-decomposition-sketch | creates dev/presentations/1cc809de/ | — | enforced-guarantees, performance-contract, hygiene-and-docs |
+| predecessor-deck-tombstone | Archive the predecessor deck behind a tombstone | task | The predecessor deck moves into the feature archive and a tombstone remains at its original path. | — | plan-task-decomposition-sketch | creates dev/archive/features/cdc840ad/showcase/; touches dev/presentations/cdc840ad/ | — | successor-deck |
+
+```mermaid
+flowchart LR
+    N0["planning-boundary-collapse: Collapse the planning boundary to a single mutation-session contract"]
+    N1["enforced-guarantees: Convert narrated materialization guarantees into enforced tests"]
+    N2["performance-contract: Establish an artifact-backed performance contract"]
+    N3["hygiene-and-docs: Clear repository-state hygiene debt and document the subsystem"]
+    N4["presentation-succession: Replace the repository-materialization showcase with a corrected successor"]
+    N5["retry-combinators-single-session: Mutation-session retry combinators and single-session migration"]
+    N6["self-managed-multi-session: Self-managed multi-session retry migration"]
+    N7["typed-producer-finalizer-errors: Typed producer and finalizer errors for the repository-state module"]
+    N8["total-journal-action-extraction: Total journal-action extraction in the transaction kernel"]
+    N9["plan-identity-tail: Plan-identity tail for initialize and profile-application requests"]
+    N10["property-tests-plan-hash-splice: Property tests for plan-hash determinism and managed-document splice"]
+    N11["visibility-cutover-guard: Visibility-enforced cutover guard"]
+    N12["contention-tests: Multi-threaded contention tests for mutation sessions and layout reentry"]
+    N13["path-constants-repair-coverage: Compile-time path constants and derived repair-path coverage"]
+    N14["benchmark-harness: Benchmark harness and first session-cost artifact"]
+    N15["bulk-update-session-budget: Bulk-update eligibility prefilter and session-budget test"]
+    N16["lock-hygiene-sidecar: Lock-hygiene: eliminate the per-issue sidecar read lock"]
+    N17["test-support-feature-gating: Feature-gate the test-support library surface"]
+    N18["public-surface-reduction: Reduce the repository-state public surface to its external consumers"]
+    N19["store-test-split-renames: Split the store test module to a sibling file and fix review-round test names"]
+    N20["architecture-doc-sweep: Write the repository-state architecture doc and sweep the stale storage pointer"]
+    N21["advisory-debt-clearance: Clear the four non-lock advisory-debt items"]
+    N22["successor-deck: Corrected successor deck for the repository-materialization story"]
+    N23["predecessor-deck-tombstone: Archive the predecessor deck behind a tombstone"]
+    N6 --> N0
+    N7 --> N0
+    N8 --> N0
+    N9 --> N0
+    N12 --> N1
+    N10 --> N1
+    N11 --> N1
+    N13 --> N1
+    N16 --> N2
+    N15 --> N2
+    N21 --> N3
+    N19 --> N3
+    N20 --> N3
+    N18 --> N3
+    N23 --> N4
+    N5 --> N6
+    N0 --> N10
+    N0 --> N11
+    N0 --> N12
+    N0 --> N13
+    N14 --> N15
+    N0 --> N17
+    N17 --> N18
+    N0 --> N19
+    N0 --> N20
+    N0 --> N21
+    N1 --> N22
+    N2 --> N22
+    N3 --> N22
+    N22 --> N23
+```
+<!-- jit:breakdown-overview:end -->
+
 ## Implementation Steps
 
 1. **Planning node 02dc4bac** — finalize this document, including the profile-backed lock-hygiene decision (PD-1); pass plan review.
