@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T19:28:05.548321109Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T19:31:05.172466543Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "7ab27a9b-802b-4d6e-86de-079f09d06a5e",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Cow-backed VirtualPath with well-known path constants",
-  "updated_at": "2026-07-24T19:28:05.548321109Z"
+  "updated_at": "2026-07-24T19:31:05.172466543Z"
 }

@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "d456d73c9b57cac36bd4d29e5b0c90236c7c037f",
+  "completed_at": "2026-07-24T19:31:04.932716417Z",
+  "duration_ms": 145188,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are met; no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7ab27a9b-802b-4d6e-86de-079f09d06a5e",
+  "message": null,
+  "run_id": "924afe96-aa26-4f18-837b-7b1f03b29b9a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T19:28:39.743745261Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 32e29df0, 217b2694, d456d73c (`jit:7ab27a9b`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending (no exit code)\nTruncation recovery: separate combined merge and first-parent affected-path diffs, plus current implementation/test line ranges; unrelated second-parent history excluded after name-status inspection.\n\n1. No findings. REQ-01 through REQ-03 are met by the Cow representation, public constant enumeration, and focused canonicality/key-collision tests.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
