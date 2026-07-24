@@ -15,8 +15,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-07-24T20:16:35.189785522Z",
+      "status": "passed",
+      "updated_at": "2026-07-24T20:48:54.510836325Z",
       "updated_by": "auto:executor"
     }
   },
@@ -30,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derived repair-target coverage authority",
-  "updated_at": "2026-07-24T20:16:35.189785522Z"
+  "updated_at": "2026-07-24T20:48:54.510836325Z"
 }
