@@ -4140,3 +4140,189 @@ enforce_leases = "strict"
             .unwrap());
     }
 }
+
+#[cfg(test)]
+mod mutation_session_contract_tests {
+    use super::*;
+    use crate::storage::RepositoryStateStoreError;
+
+    fn retryable() -> RepositoryStateStoreError {
+        RepositoryStateStoreError::RetryableConflict {
+            path: "issues/x.json".to_string(),
+        }
+    }
+
+    fn non_retryable() -> RepositoryStateStoreError {
+        RepositoryStateStoreError::UnsafeTarget("escaping/target".to_string())
+    }
+
+    #[test]
+    fn test_classify_apply_converges_on_apply_success() {
+        let outcome: std::result::Result<(), RepositoryStateStoreError> = Ok(());
+        match classify_apply(outcome, 42).unwrap() {
+            AttemptOutcome::Done(value) => assert_eq!(value, 42),
+            AttemptOutcome::Retry => panic!("a successful apply must converge, not retry"),
+        }
+    }
+
+    #[test]
+    fn test_classify_apply_retries_on_retryable_conflict() {
+        let outcome: std::result::Result<(), RepositoryStateStoreError> = Err(retryable());
+        assert!(matches!(
+            classify_apply(outcome, 42).unwrap(),
+            AttemptOutcome::Retry
+        ));
+    }
+
+    #[test]
+    fn test_classify_apply_propagates_non_retryable_error() {
+        let outcome: std::result::Result<(), RepositoryStateStoreError> = Err(non_retryable());
+        assert!(
+            classify_apply(outcome, 42).is_err(),
+            "a non-retryable storage error must abort, not fold into a retry"
+        );
+    }
+
+    #[test]
+    fn test_capture_or_retry_returns_image_on_success() {
+        use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
+        use crate::storage::{InMemoryStorage, RepositoryStateStore};
+
+        let storage = InMemoryStorage::new();
+        storage.add_data_file("config.toml", "");
+        let layout = storage.repository_layout();
+        let mut session = storage.open_mutation_session(layout).unwrap();
+        let budget = CaptureBudget {
+            max_paths: 4,
+            max_listings: 0,
+            max_bytes: 1024,
+            max_depth: 6,
+        };
+        let image = session
+            .capture(
+                CaptureSpec::phase_one([VirtualPath::data("config.toml").unwrap()], budget)
+                    .unwrap(),
+            )
+            .unwrap();
+        assert!(capture_or_retry(Ok(image)).unwrap().is_some());
+    }
+
+    #[test]
+    fn test_capture_or_retry_folds_retryable_conflict_into_none() {
+        let outcome: std::result::Result<crate::repository_state::RepositoryImage, _> =
+            Err(retryable());
+        assert!(
+            capture_or_retry(outcome).unwrap().is_none(),
+            "a retryable capture conflict must signal retry via None"
+        );
+    }
+
+    #[test]
+    fn test_capture_or_retry_propagates_non_retryable_error() {
+        let outcome: std::result::Result<crate::repository_state::RepositoryImage, _> =
+            Err(non_retryable());
+        assert!(capture_or_retry(outcome).is_err());
+    }
+
+    #[test]
+    fn test_with_mutation_attempts_returns_value_on_first_success() {
+        let mut calls = 0usize;
+        let value = with_mutation_attempts("first-success", || {
+            calls += 1;
+            Ok(AttemptOutcome::Done(7))
+        })
+        .unwrap();
+        assert_eq!(value, 7);
+        assert_eq!(calls, 1, "a first-attempt success must not retry");
+    }
+
+    #[test]
+    fn test_with_mutation_attempts_retries_until_convergence() {
+        let mut calls = 0usize;
+        let value = with_mutation_attempts("eventual-success", || {
+            calls += 1;
+            if calls < 3 {
+                Ok(AttemptOutcome::Retry)
+            } else {
+                Ok(AttemptOutcome::Done(calls))
+            }
+        })
+        .unwrap();
+        assert_eq!(value, 3);
+        assert_eq!(calls, 3);
+    }
+
+    #[test]
+    fn test_with_mutation_attempts_reports_exhaustion_after_retry_limit() {
+        let mut calls = 0usize;
+        let result: Result<()> = with_mutation_attempts("never-converges", || {
+            calls += 1;
+            Ok(AttemptOutcome::Retry)
+        });
+        assert_eq!(
+            calls, MUTATION_SESSION_RETRY_LIMIT,
+            "the driver must attempt exactly the shared retry bound before giving up"
+        );
+        let error = result.unwrap_err();
+        assert!(
+            error.downcast_ref::<MutationSessionExhausted>().is_some(),
+            "exhaustion must surface the typed terminal error"
+        );
+    }
+
+    #[test]
+    fn test_with_mutation_attempts_propagates_closure_error_without_retry() {
+        let mut calls = 0usize;
+        let result: Result<()> = with_mutation_attempts("aborting", || {
+            calls += 1;
+            Err(anyhow!("fatal"))
+        });
+        assert!(result.is_err());
+        assert_eq!(calls, 1, "a fatal closure error must abort immediately");
+    }
+
+    #[test]
+    fn test_with_mutation_session_opens_fresh_session_per_attempt_until_done() {
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        let layout = storage.repository_layout();
+        let mut attempts = 0usize;
+        let value = with_mutation_session(&storage, &layout, "session-retry", |_session| {
+            attempts += 1;
+            if attempts < 3 {
+                Ok(SessionStep::Retry)
+            } else {
+                Ok(SessionStep::Done(attempts))
+            }
+        })
+        .unwrap();
+        assert_eq!(value, 3);
+        assert_eq!(
+            attempts, 3,
+            "each attempt opens one fresh recovered session"
+        );
+    }
+
+    #[test]
+    fn test_with_mutation_session_reports_exhaustion_through_shared_bound() {
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        let layout = storage.repository_layout();
+        let mut attempts = 0usize;
+        let result: Result<()> =
+            with_mutation_session(&storage, &layout, "session-stuck", |_session| {
+                attempts += 1;
+                Ok(SessionStep::Retry)
+            });
+        assert_eq!(
+            attempts, MUTATION_SESSION_RETRY_LIMIT,
+            "the session path shares the single retry bound"
+        );
+        assert!(result
+            .unwrap_err()
+            .downcast_ref::<MutationSessionExhausted>()
+            .is_some());
+    }
+}
