@@ -16,6 +16,7 @@
       "path": "dev/studies/perf/session-cost-c488ef85.json"
     }
   ],
+  "done_at": "2026-07-24T16:24:31.697176787Z",
   "first_ready_at": "2026-07-24T15:58:04.166950159Z",
   "gates_required": [
     "cargo-ci",
@@ -41,7 +42,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Bulk-mutation benchmark scenario",
-  "updated_at": "2026-07-24T16:24:01.406375690Z"
+  "updated_at": "2026-07-24T16:24:31.697176787Z"
 }
