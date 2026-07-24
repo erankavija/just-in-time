@@ -15,6 +15,11 @@
     "clippy"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T21:44:46.648099236Z",
+      "updated_by": "auto:executor"
+    },
     "clippy": {
       "status": "passed",
       "updated_at": "2026-07-24T21:37:57.747631444Z",
@@ -31,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Feature-gate the test-support library surface",
-  "updated_at": "2026-07-24T21:37:57.747631444Z"
+  "updated_at": "2026-07-24T21:44:46.648099236Z"
 }
