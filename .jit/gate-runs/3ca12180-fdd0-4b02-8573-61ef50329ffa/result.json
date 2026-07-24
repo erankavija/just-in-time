@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "9fb266356434bd790464a35bad47f2ef5c2627a9",
+  "completed_at": "2026-07-24T15:01:13.892505456Z",
+  "duration_ms": 185653,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/bulk_update.rs",
+        "id": "F1",
+        "line": 240,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Shared verification propagates capture or declaration errors before the per-issue loop, losing the prior best-effort per-issue error results."
+      }
+    ],
+    "summary": "Shared no-op verification can abort bulk updates instead of preserving per-issue errors.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "412925b9-874c-4679-909c-95afe31f9287",
+  "message": null,
+  "run_id": "3ca12180-fdd0-4b02-8573-61ef50329ffa",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T14:58:08.239260450Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9305 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f94a2-3ddf-76a1-b957-35c81acef6a3\n--------\nuser\n--- 9292 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2ac7b230, 61eb2d41, 1337381a, f911f11d, 0cbe8763, 5c9c363d, 9f4e0c23, 3992a65a, f3ff8ad7, 9fb26635 (`jit:412925b9`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/gate-semantics, @/invariant/label-format, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T14:52:18Z); code-review failed (exit 1, 2026-07-24T14:36:59Z; prior gate-semantics finding is addressed)\nTruncation recovery: narrowed merge-parent patches to affected command paths and inspected the current verification and per-issue mutation paths\n\n1. [blocking][issue-impact] The shared verifier can abort the entire bulk operation instead of demoting candidates to normal per-issue handling. At `crates/jit/src/commands/bulk_update.rs:240`, an error parsing captured declarations or plan content (`:331-334`) propagates with `?` before the per-issue loop. Previously, the identical error from `apply_operations_to_issue` was recorded in `BulkUpdateResult.errors` for each matched issue and processing continued. A clean no-op candidate with malformed repository declarations therefore loses its required per-issue error result, violating REQ-03.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Shared no-op verification can abort bulk updates instead of preserving per-issue errors.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Shared verification propagates capture or declaration errors before the per-issue loop, losing the prior best-effort per-issue error results.\",\"file\":\"crates/jit/src/commands/bulk_update.rs\",\"line\":240,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
