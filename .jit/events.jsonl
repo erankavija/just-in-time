@@ -9130,3 +9130,4 @@
 {"assignee":"agent:worker","id":"37c25a29-d6c5-4ce3-ba88-8e944735d06e","issue_id":"58c2f0e9-9d6f-445a-9d6f-7a08bdff26db","timestamp":"2026-07-24T13:14:52.420972359Z","type":"issue_claimed"}
 {"from":"ready","id":"21ae746b-c839-4c44-af11-56a94928b5c5","issue_id":"412925b9-874c-4679-909c-95afe31f9287","timestamp":"2026-07-24T13:14:56.056797720Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"238dedb9-2a35-40d7-9689-dc17a6a75a5d","issue_id":"412925b9-874c-4679-909c-95afe31f9287","timestamp":"2026-07-24T13:14:56.056797720Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"ad7ea45a-a045-4305-901e-d20ada0e35e5","issue_id":"9298b912-175f-4ac6-9489-1fbc82fb3ad6","timestamp":"2026-07-24T13:43:20.455482357Z","type":"gate_passed","updated_by":"auto:executor"}
