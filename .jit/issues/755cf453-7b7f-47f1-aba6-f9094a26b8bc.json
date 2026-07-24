@@ -33,6 +33,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T23:53:12.338269909Z",
       "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T23:55:12.768150150Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "755cf453-7b7f-47f1-aba6-f9094a26b8bc",
@@ -49,5 +54,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Clear repository-state hygiene debt and document the subsystem",
-  "updated_at": "2026-07-24T23:53:12.338269909Z"
+  "updated_at": "2026-07-24T23:55:12.768150150Z"
 }
