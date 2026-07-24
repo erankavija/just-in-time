@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "a9191984b8c3ce3812e69c33430cb63e4a4f60dc",
+  "completed_at": "2026-07-24T17:51:28.062829164Z",
+  "duration_ms": 212047,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Both hard requirements are met; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9503c8b4-d348-4e8d-9bc7-6f13e2d3c664",
+  "message": null,
+  "run_id": "5e0b1199-4e03-4e12-b155-991618da53a2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T17:47:56.015140791Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d841342c, 970508c4 (first-parent duplicate), a9191984 (gate record)\nPolicy sources: AGENTS.md\nResolved items: @/issue/9503c8b4/requirement/REQ-01–REQ-02 and @/issue/d159f9d4/requirement/REQ-01–REQ-04 (issue descriptions, markdown-first); @/gate/jit-validate (.jit/gates.toml); @/invariant/semantic-test-assertions and @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending (no prior recorded run)\nTruncation recovery: reread patches by affected file and main.rs line ranges; reread gate registry by key\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Both hard requirements are met; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

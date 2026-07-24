@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T17:47:22.077853504Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T17:51:28.307947588Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "9503c8b4-d348-4e8d-9bc7-6f13e2d3c664",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove the dead _command output parameter",
-  "updated_at": "2026-07-24T17:47:22.077853504Z"
+  "updated_at": "2026-07-24T17:51:28.307947588Z"
 }
