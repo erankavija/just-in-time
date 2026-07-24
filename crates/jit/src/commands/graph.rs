@@ -94,7 +94,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         match classify_repository_export(&layout, invocation_dir, requested)? {
             RepositoryExportDestination::External(path) => {
-                crate::storage::atomic_write::write_external_export_atomic(&path, bytes)
+                crate::storage::external_publish::write_external_export_atomic(&path, bytes)
             }
             RepositoryExportDestination::Repository(target) => {
                 let intent = RepositoryExportIntent::new(target, bytes.to_vec());
