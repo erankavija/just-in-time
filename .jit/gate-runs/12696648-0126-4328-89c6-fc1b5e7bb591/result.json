@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "de8ff82ac3f815af03a4c1fc5276fb09ea67d3cf",
+  "completed_at": "2026-07-24T11:02:23.960519060Z",
+  "duration_ms": 197460,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard lock-hygiene criteria and the prior documentation finding are satisfied by the attributable current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fc744df6-fa90-49e0-a145-54d91ad322b7",
+  "message": null,
+  "run_id": "12696648-0126-4328-89c6-fc1b5e7bb591",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T10:59:06.500362903Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e4635d26, 11c09872, 292f0ac7, 4f02e9f1, cb21330c, de8ff82a (`jit:fc744df6`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md; docs/reference/storage-format.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/invariant/derived-state-coherence (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/charter/D-1, @/charter/D-4, @/charter/D-13 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T10:43:13Z); prior code-review failed on F1, which is remediated in the attributed documentation commit\nTruncation recovery: narrowed reads of policy sources, current storage and documentation sections, lock implementation, and `load_issue` caller inventory after aggregate-output truncation\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard lock-hygiene criteria and the prior documentation finding are satisfied by the attributable current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
