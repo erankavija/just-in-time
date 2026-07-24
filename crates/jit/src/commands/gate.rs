@@ -1349,15 +1349,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, finalize_gate_registry_edit, MutationContext};
-        use crate::storage::RepositoryStateStoreError;
 
         let layout = self.require_layout()?;
         let context = MutationContext::production();
-        for _ in 0..8 {
+        with_mutation_attempts("gate preset application", || {
             let (expected_target, expected_mode) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
                 let Some(image) = capture_gate_preset_image(&mut *preflight, false, None)? else {
-                    continue;
+                    return Ok(AttemptOutcome::Retry);
                 };
                 let issues = super::captured_active_issues(&image)?;
                 let target = super::resolve_issue_from_capture(&issues, issue_id)?;
@@ -1373,14 +1372,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some(image) = capture_gate_preset_image(&mut *session, true, None)? else {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             };
             let issues = super::captured_active_issues(&image)?;
             let target = super::resolve_issue_from_capture(&issues, issue_id)?;
             let config = crate::repository_state::assemble_config(&image)?;
             let mode = self.config_manager.enforcement_mode_from_config(&config)?;
             if target != expected_target || mode != expected_mode {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             }
             let warnings = super::captured_lease_warnings(
                 mode,
@@ -1402,7 +1401,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 except_gates,
             )?;
             if derived.intents.is_empty() {
-                return Ok((derived.result, warnings));
+                return Ok(AttemptOutcome::Done((derived.result, warnings)));
             }
             let plan = if derived.edits_registry {
                 let mut declarations = crate::repository_state::declarations_from_image(&image)?;
@@ -1417,15 +1416,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             } else {
                 finalize(&layout, &image, &context, &derived.intents)?
             };
-            match session.apply(&plan) {
-                Ok(_) => return Ok((derived.result, warnings)),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "gate preset application did not converge after repeated capture conflicts"
-        ))
+            classify_apply(session.apply(&plan), (derived.result, warnings))
+        })
     }
 
     /// List all gate run results for an issue, optionally filtered by gate key.

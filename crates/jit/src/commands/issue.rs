@@ -545,11 +545,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationContext};
-        use crate::storage::RepositoryStateStoreError;
 
         let layout = self.require_layout()?;
         let context = MutationContext::production();
-        for _ in 0..8 {
+        with_mutation_attempts("issue deletion", || {
             let (expected_target, expected_mode) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
                 let Some(image) = self.capture_proposed_base(
@@ -559,7 +558,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     None,
                 )?
                 else {
-                    continue;
+                    return Ok(AttemptOutcome::Retry);
                 };
                 let issues = captured_active_issues(&image)?;
                 let target = resolve_issue_from_capture(&issues, id)?;
@@ -583,14 +582,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                 None,
             )?
             else {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             };
             let issues = captured_active_issues(&image)?;
             let target_id = resolve_issue_from_capture(&issues, id)?;
             let config = crate::repository_state::assemble_config(&image)?;
             let current_mode = self.config_manager.enforcement_mode_from_config(&config)?;
             if target_id != expected_target || current_mode != expected_mode {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             }
             let warnings = captured_lease_warnings(
                 current_mode,
@@ -600,20 +599,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             )?;
             let derived = derive_issue_deletion(&image, &context, &issues, &target_id)?;
             let plan = finalize(&layout, &image, &context, &derived.intents)?;
-            match session.apply(&plan) {
-                Ok(_) => {
-                    if let Some(error) = derived.error_after_apply {
-                        return Err(error.into());
-                    }
-                    return Ok(warnings);
-                }
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
+                return Ok(AttemptOutcome::Retry);
             }
-        }
-        Err(anyhow!(
-            "issue deletion did not converge after repeated capture conflicts"
-        ))
+            if let Some(error) = derived.error_after_apply {
+                return Err(error.into());
+            }
+            Ok(AttemptOutcome::Done(warnings))
+        })
     }
 
     /// Update issue state with precheck/postcheck hooks

@@ -113,10 +113,10 @@ use std::sync::OnceLock;
 //
 // One owner of the command-layer capture/plan/apply/retry protocol: the retry
 // bound, the apply-conflict classification, and the terminal "did not converge"
-// error each live here exactly once. Command sites adopt these combinators in
-// place of the hand-copied `for _ in 0..MUTATION_SESSION_RETRY_LIMIT` loops and
-// per-site `RetryableConflict => continue` arms. Migrating those sites is
-// separate work; this module only establishes the contract they consume.
+// error each live here exactly once. Every command site drives its retry
+// through these combinators rather than a hand-copied
+// `for _ in 0..MUTATION_SESSION_RETRY_LIMIT` loop or a per-site
+// `RetryableConflict => continue` arm.
 //
 // Two entry points share the same bound and terminal error:
 //
@@ -2269,18 +2269,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationContext};
-        use crate::storage::RepositoryStateStoreError;
         use std::collections::BTreeMap;
 
         let layout = self.require_layout()?;
         let context = MutationContext::production();
-        for _ in 0..8 {
+        with_mutation_attempts("issue update", || {
             let (expected_target, expected_lease_mode) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
                 let Some(image) =
                     self.capture_proposed_base(preflight.as_mut(), &BTreeMap::new(), &[], None)?
                 else {
-                    continue;
+                    return Ok(AttemptOutcome::Retry);
                 };
                 let issues = captured_active_issues(&image)?;
                 let target = resolve_issue_from_capture(&issues, &request.issue_id)?;
@@ -2300,11 +2299,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             let Some(image) =
                 self.capture_proposed_base(session.as_mut(), &BTreeMap::new(), &[], None)?
             else {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             };
             let issues = captured_active_issues(&image)?;
             if resolve_issue_from_capture(&issues, &request.issue_id)? != expected_target {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             }
             let issue = issues
                 .iter()
@@ -2319,7 +2318,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .enforcement_mode_from_config(declarations.config())?
                     != expected_lease_mode
             {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             }
             let lease_warnings = if request.enforce_lease {
                 captured_lease_warnings(
@@ -2351,30 +2350,24 @@ impl<S: IssueStore> CommandExecutor<S> {
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.with_warnings(derived.warnings).into()),
-                    None => Ok(CapturedFieldUpdateOutcome {
+                    None => Ok(AttemptOutcome::Done(CapturedFieldUpdateOutcome {
                         changed: derived.changed,
                         warnings: derived.warnings,
-                    }),
+                    })),
                 };
             }
             let plan = finalize(&layout, &image, &context, &derived.intents)?;
-            match session.apply(&plan) {
-                Ok(_) => {
-                    return match derived.error_after_apply {
-                        Some(error) => Err(error.with_warnings(derived.warnings).into()),
-                        None => Ok(CapturedFieldUpdateOutcome {
-                            changed: derived.changed,
-                            warnings: derived.warnings,
-                        }),
-                    }
-                }
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
+                return Ok(AttemptOutcome::Retry);
             }
-        }
-        Err(anyhow!(
-            "issue update did not converge after repeated capture conflicts"
-        ))
+            match derived.error_after_apply {
+                Some(error) => Err(error.with_warnings(derived.warnings).into()),
+                None => Ok(AttemptOutcome::Done(CapturedFieldUpdateOutcome {
+                    changed: derived.changed,
+                    warnings: derived.warnings,
+                })),
+            }
+        })
     }
 
     fn publish_captured_bulk_update(
@@ -2480,13 +2473,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationContext, MutationIntent};
-        use crate::storage::RepositoryStateStoreError;
         use std::collections::BTreeMap;
 
         let layout = self.require_layout()?;
         let context = MutationContext::production();
         let mut cached_precheck = None::<CachedPrecheckExecution>;
-        for _ in 0..8 {
+        with_mutation_attempts("lifecycle mutation", || {
             let (
                 expected_target,
                 expected_precheck_required,
@@ -2505,7 +2497,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     Some(request.issue_id()),
                 )?
                 else {
-                    continue;
+                    return Ok(AttemptOutcome::Retry);
                 };
                 let issues = captured_active_issues(&image)?;
                 let target_id = resolve_issue_from_capture(&issues, request.issue_id())?;
@@ -2621,11 +2613,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Some(request.issue_id()),
             )?
             else {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             };
             let issues = captured_active_issues(&image)?;
             if resolve_issue_from_capture(&issues, request.issue_id())? != expected_target {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             }
             let mut issue = issues
                 .iter()
@@ -2639,11 +2631,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .enforcement_mode_from_config(declarations.config())?
                     != expected_lease_mode
             {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             }
             let current_precheck_required = lifecycle_requires_prechecks(&request, &issue);
             if current_precheck_required != expected_precheck_required {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             }
             if let Some(expected) = &expected_precheck {
                 let evidence_matches = if expected.evidence.validation_view.is_some() {
@@ -2653,7 +2645,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         == expected.evidence
                 };
                 if !evidence_matches {
-                    continue;
+                    return Ok(AttemptOutcome::Retry);
                 }
             }
             let mut external_warnings = if enforce_lease {
@@ -2714,17 +2706,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }))
                 .collect::<Vec<_>>();
                 let plan = finalize(&layout, &image, &context, &intents)?;
-                match session.apply(&plan) {
-                    Ok(_) => {
-                        let error = cached_precheck
-                            .take()
-                            .and_then(|cached| cached.execution.error)
-                            .ok_or_else(|| anyhow!("precheck execution lost its recorded error"))?;
-                        return Err(error);
-                    }
-                    Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                    Err(apply_error) => return Err(apply_error.into()),
+                if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
+                    return Ok(AttemptOutcome::Retry);
                 }
+                let error = cached_precheck
+                    .take()
+                    .and_then(|cached| cached.execution.error)
+                    .ok_or_else(|| anyhow!("precheck execution lost its recorded error"))?;
+                return Err(error);
             }
             let prechecks_changed = !precheck_runs.is_empty();
             let (target, force, divert) = match &request {
@@ -2744,12 +2733,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                             ));
                         }
                         if issue.state == State::InProgress {
-                            return Ok(CapturedLifecycleOutcome {
+                            return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                                 target_id: expected_target.clone(),
                                 changed: false,
                                 warnings: Vec::new(),
                                 storage_warnings,
-                            });
+                            }));
                         }
                     }
                     if issue.state == State::Backlog {
@@ -2789,23 +2778,23 @@ impl<S: IssueStore> CommandExecutor<S> {
                 CapturedLifecycleMutation::AutoReady { .. } => {
                     let resolved = crate::domain::queries::build_issue_map(&issues);
                     if !issue.should_auto_transition_to_ready(&resolved) {
-                        return Ok(CapturedLifecycleOutcome {
+                        return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                             target_id: expected_target.clone(),
                             changed: false,
                             warnings: Vec::new(),
                             storage_warnings,
-                        });
+                        }));
                     }
                     (State::Ready, false, false)
                 }
                 CapturedLifecycleMutation::AutoDone { .. } => {
                     if !issue.should_auto_transition_to_done() {
-                        return Ok(CapturedLifecycleOutcome {
+                        return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                             target_id: expected_target.clone(),
                             changed: false,
                             warnings: Vec::new(),
                             storage_warnings,
-                        });
+                        }));
                     }
                     (State::Done, false, false)
                 }
@@ -2927,34 +2916,28 @@ impl<S: IssueStore> CommandExecutor<S> {
             if intents.is_empty() {
                 return match after_apply_error {
                     Some(error) => Err(error.into()),
-                    None => Ok(CapturedLifecycleOutcome {
+                    None => Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                         target_id: expected_target.clone(),
                         changed,
                         warnings,
                         storage_warnings,
-                    }),
+                    })),
                 };
             }
             let plan = finalize(&layout, &image, &context, &intents)?;
-            match session.apply(&plan) {
-                Ok(_) => {
-                    if let Some(error) = blocked.or(after_apply_error) {
-                        return Err(error.with_warnings(std::mem::take(&mut warnings)).into());
-                    }
-                    return Ok(CapturedLifecycleOutcome {
-                        target_id: expected_target.clone(),
-                        changed,
-                        warnings,
-                        storage_warnings,
-                    });
-                }
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
+                return Ok(AttemptOutcome::Retry);
             }
-        }
-        Err(anyhow!(
-            "lifecycle mutation did not converge after repeated capture conflicts"
-        ))
+            if let Some(error) = blocked.or(after_apply_error) {
+                return Err(error.with_warnings(std::mem::take(&mut warnings)).into());
+            }
+            Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
+                target_id: expected_target.clone(),
+                changed,
+                warnings,
+                storage_warnings,
+            }))
+        })
     }
 
     /// The dependency and gate guards a transition must clear, evaluated against

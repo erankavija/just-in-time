@@ -37,8 +37,6 @@ const TEMPLATE_CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
     max_depth: 16,
 };
 
-const TEMPLATE_RETRY_LIMIT: usize = 8;
-
 /// How a template node/anchor gate NAME resolves: a registered gate PRESET
 /// bundle, or a single gate KEY declared in the gate registry (`.jit/gates.toml`).
 ///
@@ -173,13 +171,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let layout = self.require_layout()?;
         let context = MutationContext::production();
-        for _ in 0..TEMPLATE_RETRY_LIMIT {
+        with_mutation_attempts("template apply", || {
             let (lease_targets, lease_mode) = {
                 let mut session = self.storage.open_mutation_session(layout.clone())?;
                 let Some(image) =
                     capture_template_image(&mut *session, &context, &request, container_id)?
                 else {
-                    continue;
+                    return Ok(AttemptOutcome::Retry);
                 };
                 let captured = derive_captured_template_apply(
                     &image,
@@ -204,7 +202,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let Some(image) =
                 capture_template_image(&mut *session, &context, &request, container_id)?
             else {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             };
             let mut captured = derive_captured_template_apply(
                 &image,
@@ -223,10 +221,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                     &captured.derived.lease_targets,
                 ) != lease_targets
             {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             }
             if captured.derived.intents.is_empty() {
-                return Ok((captured.derived.result, warnings));
+                return Ok(AttemptOutcome::Done((captured.derived.result, warnings)));
             }
             captured.declarations.gates = captured.derived.registry;
             let edits_gate_registry = captured
@@ -253,15 +251,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // declaration, and event byte.
                 finalize(&layout, &image, &context, &captured.derived.intents)?
             };
-            match session.apply(&plan) {
-                Ok(_) => return Ok((captured.derived.result, warnings)),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "template apply did not converge after repeated capture conflicts"
-        ))
+            classify_apply(session.apply(&plan), (captured.derived.result, warnings))
+        })
     }
 }
 

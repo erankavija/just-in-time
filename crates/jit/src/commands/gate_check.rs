@@ -904,7 +904,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
-        use crate::storage::RepositoryStateStoreError;
 
         let layout = self.require_layout()?;
         let target_id = self.bind_gate_target(&layout, issue_id)?;
@@ -921,7 +920,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             VirtualPath::data(run_dir)?,
             VirtualPath::data(result_path.as_path())?,
         ];
-        for _ in 0..8 {
+        with_mutation_attempts("gate evaluation", || {
             let (image, issue, issues, registry, runs, captured) = {
                 let mut session = self.storage.open_mutation_session(layout.clone())?;
                 let Some(image) = self.capture_gate_evaluation_image(
@@ -931,7 +930,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     &run_paths,
                 )?
                 else {
-                    continue;
+                    return Ok(AttemptOutcome::Retry);
                 };
                 let issue = captured_bound_issue(&image, &target_id)?;
                 let registry = captured_gate_registry(&image)?;
@@ -985,7 +984,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 &run_paths,
             )?
             else {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             };
             let mut final_issue = captured_bound_issue(&final_image, &target_id)?;
             let final_registry = captured_gate_registry(&final_image)?;
@@ -1007,10 +1006,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 &final_runs,
             )?;
             let Some(cached) = cached.as_ref() else {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             };
             if cached.evidence != final_captured.evidence {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             }
 
             let (state, by) = gate_state_from_run(&cached.result)?;
@@ -1033,19 +1032,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                 },
             ];
             let plan = finalize(&layout, &final_image, &mutation, &intents)?;
-            match session.apply(&plan) {
-                Ok(_) => {
-                    let mut result = cached.result.clone();
-                    result.run_id = run_id;
-                    return Ok(result);
-                }
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
+                return Ok(AttemptOutcome::Retry);
             }
-        }
-        Err(anyhow!(
-            "gate evaluation did not converge after repeated capture conflicts"
-        ))
+            let mut result = cached.result.clone();
+            result.run_id = run_id.clone();
+            Ok(AttemptOutcome::Done(result))
+        })
     }
 
     /// Execute a built-in checker against one exact repository image.
