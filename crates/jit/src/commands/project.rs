@@ -155,10 +155,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         )?;
         let registries = || -> Result<[VirtualPath; 4]> {
             Ok([
-                VirtualPath::data("config.toml")?,
-                VirtualPath::data("invariants.toml")?,
-                VirtualPath::data("rules.toml")?,
-                VirtualPath::data("gates.toml")?,
+                VirtualPath::CONFIG,
+                VirtualPath::INVARIANTS,
+                VirtualPath::RULES,
+                VirtualPath::GATES,
             ])
         };
 

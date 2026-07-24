@@ -265,7 +265,7 @@ pub(crate) fn profile_capture_closure(
     )?;
     let config = super::materialize::assemble_config(&proposed)?;
     let rules = proposed
-        .file_bytes(&VirtualPath::data("rules.toml")?)
+        .file_bytes(&VirtualPath::RULES)
         .map_err(ProducerError::from)?
         .map(|bytes| String::from_utf8(bytes.to_vec()))
         .transpose()
@@ -413,7 +413,7 @@ fn configured_projection_targets(
     base: &RepositoryImage,
     registries: &BTreeMap<VirtualPath, (Vec<u8>, FileMode)>,
 ) -> Result<BTreeSet<VirtualPath>, RepositoryStateError> {
-    let config_path = VirtualPath::data("config.toml")?;
+    let config_path = VirtualPath::CONFIG;
     let bytes = match registries.get(&config_path) {
         Some((bytes, _)) => Some(bytes.as_slice()),
         None => base.file_bytes(&config_path).map_err(ProducerError::from)?,

@@ -107,7 +107,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         validate_repo_relative_path(path)?;
         let layout = self.require_layout()?;
         let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
-        let events_path = VirtualPath::data("events.jsonl")?;
+        let events_path = VirtualPath::EVENTS;
         let document_path = VirtualPath::worktree(path)
             .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
         let source = match commit {
@@ -187,7 +187,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let layout = self.require_layout()?;
         let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
-        let events_path = VirtualPath::data("events.jsonl")?;
+        let events_path = VirtualPath::EVENTS;
         let context = MutationContext::production();
         with_mutation_session(&self.storage, &layout, "document removal", |session| {
             let paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
@@ -769,7 +769,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
         let document_path = VirtualPath::worktree(path)?;
-        let events_path = VirtualPath::data("events.jsonl")?;
+        let events_path = VirtualPath::EVENTS;
         let source = DocumentScanSource::Worktree(document_path);
 
         // Operation-scoped so a fresh-session retry cannot resample the update

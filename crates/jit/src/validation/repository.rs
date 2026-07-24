@@ -394,7 +394,7 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
     // The complete `.jit/issues` listing is captured into the image; reconcile the
     // JSON issue files it contains against the index ids exactly as the recursive
     // filesystem walk did, but from the closed listing fingerprint.
-    let issues_dir = crate::repository_state::VirtualPath::data("issues")?;
+    let issues_dir = crate::repository_state::VirtualPath::ISSUES;
     let listing = image
         .listing_fingerprints()
         .get(&issues_dir)

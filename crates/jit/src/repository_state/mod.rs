@@ -96,7 +96,7 @@ pub fn finalize_gate_registry_edit(
 
     let record_plan =
         finalize(layout, base, context, intents).map_err(GateRegistryEditError::Mutation)?;
-    let gate_path = VirtualPath::data("gates.toml")?;
+    let gate_path = VirtualPath::GATES;
     let gate_bytes = crate::declarations::serialize_gate_registry(registry)
         .map_err(GateRegistryEditError::GateDeclaration)?;
     let overlaid = apply_overlay(base, std::iter::once((gate_path, Some(gate_bytes))))
@@ -418,7 +418,7 @@ pub(crate) fn validation_declarations_from_image(
     image: &RepositoryImage,
 ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
     let config_bytes = image
-        .file_bytes(&VirtualPath::data("config.toml")?)?
+        .file_bytes(&VirtualPath::CONFIG)?
         .ok_or_else(|| DeclarationParseError::MissingCapture(".jit/config.toml".to_string()))?;
     let configuration = crate::declarations::parse_configuration(config_bytes)?;
     let mut config = materialize::assemble_config_from_declarations(image, &configuration)?;
@@ -433,7 +433,7 @@ pub(crate) fn validation_declarations_from_image(
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    config.templates = match image.file_bytes(&VirtualPath::data("templates.toml")?) {
+    config.templates = match image.file_bytes(&VirtualPath::TEMPLATES) {
         Ok(Some(bytes)) => crate::templates::TemplateRegistry::from_toml_str(
             std::str::from_utf8(bytes)?,
             &hierarchy_types,
@@ -444,11 +444,11 @@ pub(crate) fn validation_declarations_from_image(
         Err(error) => return Err(error.into()),
     };
     let namespaces = crate::config_manager::namespaces_from_config(&config);
-    let gates = match image.file_bytes(&VirtualPath::data("gates.toml")?)? {
+    let gates = match image.file_bytes(&VirtualPath::GATES)? {
         Some(bytes) => crate::declarations::parse_gate_registry(bytes)?,
         None => GateRegistry::default(),
     };
-    let rules = match image.file_bytes(&VirtualPath::data("rules.toml")?)? {
+    let rules = match image.file_bytes(&VirtualPath::RULES)? {
         Some(bytes) => (|| -> Result<RuleSet, DeclarationParseError> {
             let content = std::str::from_utf8(bytes)?;
             let schemas = RuleSet::schema_requests(content)?
@@ -735,7 +735,7 @@ pub fn finalize_config_edit(
     let edited_configuration = crate::declarations::parse_configuration(edited_config_bytes)
         .map_err(ProducerError::ConfigParse)?;
 
-    let config_path = VirtualPath::data("config.toml")?;
+    let config_path = VirtualPath::CONFIG;
     let overlay = std::iter::once((config_path.clone(), Some(edited_config_bytes.to_vec())))
         .collect::<std::collections::BTreeMap<_, _>>();
     let overlaid = apply_overlay(base, overlay)?;
@@ -959,7 +959,7 @@ pub fn repair_target_paths(
     // Default-ruleset family: rules.toml, guarded by capture-spec containment and
     // presence; its baked schema files, each individually guarded by capture-spec
     // containment.
-    let rules_path = VirtualPath::data("rules.toml")?;
+    let rules_path = VirtualPath::RULES;
     if image.capture_spec().contains_path(&rules_path)
         && image
             .file_bytes(&rules_path)

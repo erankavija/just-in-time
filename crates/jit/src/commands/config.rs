@@ -261,8 +261,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         let layout = self.require_layout()?;
-        let config_path =
-            layout.resolve(&crate::repository_state::VirtualPath::data("config.toml")?)?;
+        let config_path = layout.resolve(&crate::repository_state::VirtualPath::CONFIG)?;
         self.set_repo_config(key, value)?;
         Ok(ConfigSetOutcome {
             key: key.to_string(),
@@ -299,7 +298,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             std::collections::BTreeMap::new(),
             std::collections::BTreeMap::new(),
         )?;
-        let config_vpath = VirtualPath::data("config.toml")?;
+        let config_vpath = VirtualPath::CONFIG;
         let budget = CaptureBudget {
             max_paths: 16,
             max_listings: 0,

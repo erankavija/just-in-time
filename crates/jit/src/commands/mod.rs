@@ -465,7 +465,7 @@ fn captured_precheck_plan(
     } else {
         BTreeSet::from([
             VirtualPath::data(format!("issues/{}.json", issue.id))?,
-            VirtualPath::data("gates.toml")?,
+            VirtualPath::GATES,
         ])
     };
     if !broad_builtin {
@@ -1753,7 +1753,7 @@ pub(crate) fn validation_overlay(
 fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> Result<Vec<Issue>> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
 
-    let index_path = VirtualPath::data("index.json")?;
+    let index_path = VirtualPath::INDEX;
     let index_bytes = image
         .file_bytes(&index_path)?
         .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
@@ -1794,7 +1794,7 @@ fn capture_gate_run_results(
 ) -> Result<Option<crate::repository_state::RepositoryImage>> {
     use crate::repository_state::VirtualPath;
 
-    let root = VirtualPath::data("gate-runs")?;
+    let root = VirtualPath::GATE_RUNS;
     let mut spec = image.capture_spec().clone();
     let image = if image.listing_fingerprints().contains_key(&root) {
         image
@@ -2002,10 +2002,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             |session| {
                 let mut paths = BTreeSet::from([
                     VirtualPath::data(format!("issues/{}.json", request.issue_id()))?,
-                    VirtualPath::data("events.jsonl")?,
+                    VirtualPath::EVENTS,
                 ]);
                 if request.captures_gate_registry() {
-                    paths.insert(VirtualPath::data("gates.toml")?);
+                    paths.insert(VirtualPath::GATES);
                 }
                 let spec = CaptureSpec::phase_one(
                     paths.clone(),
@@ -2040,7 +2040,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     ));
                 }
                 let registry = if request.captures_gate_registry() {
-                    let path = VirtualPath::data("gates.toml")?;
+                    let path = VirtualPath::GATES;
                     match image.entry(&path)? {
                         RepositoryEntry::File { bytes, .. } => {
                             crate::declarations::parse_gate_registry(bytes)
@@ -2083,7 +2083,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 session,
                 &BTreeMap::new(),
                 &[
-                    VirtualPath::data("issues")?,
+                    VirtualPath::ISSUES,
                     VirtualPath::data(format!("issues/{issue_id}.json"))?,
                 ],
                 None,
@@ -2591,8 +2591,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .as_ref()
                 .filter(|_| expected_precheck.is_some())
                 .is_some_and(|cached| cached.execution.error.is_some());
-            let mut precheck_run_paths =
-                vec![crate::repository_state::VirtualPath::data("gate-runs")?];
+            let mut precheck_run_paths = vec![crate::repository_state::VirtualPath::GATE_RUNS];
             precheck_run_paths.extend(
                 (0..precheck_runs.len())
                     .map(|index| {

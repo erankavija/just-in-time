@@ -41,8 +41,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, VirtualPath,
         };
         let layout = self.require_layout()?;
-        let index_path = VirtualPath::data("index.json")?;
-        let events_path = VirtualPath::data("events.jsonl")?;
+        let index_path = VirtualPath::INDEX;
+        let events_path = VirtualPath::EVENTS;
         let budget = CaptureBudget {
             max_paths: 1 << 16,
             max_listings: 1,

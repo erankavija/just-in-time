@@ -230,7 +230,7 @@ pub fn validate_capture_closure(
     for id in all_ids {
         paths.push(layout.classify_repository_relative(format!(".jit/issues/{id}.json"))?);
     }
-    let listings = vec![VirtualPath::data("issues")?];
+    let listings = vec![VirtualPath::ISSUES];
 
     // Every declared projection's target and projected-kind sources: the
     // projections pass re-renders each projection from these and compares.

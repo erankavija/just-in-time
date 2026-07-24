@@ -202,7 +202,7 @@ where
         Ok(CaptureSpec::phase_one(
             [
                 VirtualPath::data(format!("issues/{full_id}.json"))?,
-                VirtualPath::data("events.jsonl")?,
+                VirtualPath::EVENTS,
             ],
             budget,
         )?)

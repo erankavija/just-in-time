@@ -465,16 +465,6 @@ fn sentinel_time() -> DateTime<Utc> {
     DateTime::from_timestamp(0, 0).expect("epoch is representable")
 }
 
-/// The canonical audit log path.
-fn events_path() -> Result<VirtualPath, RepositoryLayoutError> {
-    VirtualPath::data("events.jsonl")
-}
-
-/// The canonical membership index path.
-fn index_path() -> Result<VirtualPath, RepositoryLayoutError> {
-    VirtualPath::data("index.json")
-}
-
 /// The canonical path for one issue record.
 fn issue_path(id: &str) -> Result<VirtualPath, RepositoryLayoutError> {
     VirtualPath::data(format!("issues/{id}.json"))
@@ -500,7 +490,7 @@ pub fn gate_run_result_relative_path(
 pub(crate) fn captured_gate_run_result_paths(
     image: &RepositoryImage,
 ) -> Result<Option<Vec<VirtualPath>>, RepositoryLayoutError> {
-    let root = VirtualPath::data("gate-runs")?;
+    let root = VirtualPath::GATE_RUNS;
     let Some(listing) = image.listing_fingerprints().get(&root) else {
         return Ok(None);
     };
@@ -630,7 +620,7 @@ fn captured_issue(image: &RepositoryImage, id: &str) -> Result<Option<Issue>, Mu
 /// Parse the captured event-log prefix into known events (tolerating one
 /// certified torn tail, matching the read path).
 fn captured_events(image: &RepositoryImage) -> Result<Vec<Event>, MutationError> {
-    let path = events_path()?;
+    let path = VirtualPath::EVENTS;
     let Some(bytes) = captured_file_bytes(image, &path)? else {
         return Ok(Vec::new());
     };
@@ -710,7 +700,7 @@ pub(super) fn finalize_delta(
             MutationIntent::CreateIssue { .. } | MutationIntent::CreateIssueBatch { .. }
         )
     }) {
-        let parent = VirtualPath::data("issues")?;
+        let parent = VirtualPath::ISSUES;
         if matches!(
             image.entry(&parent)?,
             crate::repository_state::RepositoryEntry::Absent
@@ -942,7 +932,7 @@ pub(super) fn finalize_delta(
     // command cannot smuggle arbitrary repository bytes through this finalizer.
     for intent in intents {
         if let MutationIntent::EditGateRegistry { registry } = intent {
-            let path = VirtualPath::data("gates.toml")?;
+            let path = VirtualPath::GATES;
             let bytes = crate::declarations::serialize_gate_registry(registry)?;
             let current = image.entry(&path)?;
             if !matches!(
@@ -1029,7 +1019,7 @@ pub(super) fn finalize_delta(
             .cmp(&(right.issue_id.as_str(), right.gate_key.as_str()))
     });
     if !gate_runs.is_empty() {
-        let parent = VirtualPath::data("gate-runs")?;
+        let parent = VirtualPath::GATE_RUNS;
         if matches!(
             image.entry(&parent)?,
             crate::repository_state::RepositoryEntry::Absent
@@ -1115,7 +1105,7 @@ fn compose_event_action(
     if pending_events.is_empty() {
         return Ok(None);
     }
-    let path = events_path()?;
+    let path = VirtualPath::EVENTS;
     let prefix = captured_file_bytes(image, &path)?.unwrap_or(&[]).to_vec();
     // The finalizer owns torn-tail evidence. The reader (parse_known_events) accepts
     // a malformed, unterminated partial line only when the line IMMEDIATELY following
@@ -1265,7 +1255,7 @@ fn index_membership_action(
     created_ids: &[String],
     deleted_ids: &[String],
 ) -> Result<RepositoryAction, MutationError> {
-    let path = index_path()?;
+    let path = VirtualPath::INDEX;
     let expected = expected_of(image, &path)?;
     let mut index = match captured_file_bytes(image, &path)? {
         Some(bytes) => super::RepositoryIndex::parse(bytes).map_err(|error| {
@@ -1469,8 +1459,8 @@ mod tests {
                 VirtualPath::data("issues").unwrap(),
                 RepositoryEntry::Absent,
             ),
-            (index_path().unwrap(), file_entry(&index_bytes)),
-            (events_path().unwrap(), RepositoryEntry::Absent),
+            (VirtualPath::INDEX, file_entry(&index_bytes)),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
             (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
         ]);
         let first = finalize(
@@ -1524,8 +1514,8 @@ mod tests {
                 VirtualPath::data("issues").unwrap(),
                 RepositoryEntry::Absent,
             ),
-            (index_path().unwrap(), file_entry(&index_bytes)),
-            (events_path().unwrap(), RepositoryEntry::Absent),
+            (VirtualPath::INDEX, file_entry(&index_bytes)),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
             (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
         ]);
 
@@ -1690,7 +1680,7 @@ mod tests {
         let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (events_path().unwrap(), file_entry(&events_bytes)),
+            (VirtualPath::EVENTS, file_entry(&events_bytes)),
         ]);
         // A clock that panics on use proves the no-op samples no time.
         struct PanicClock;
@@ -1733,7 +1723,7 @@ mod tests {
         let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (events_path().unwrap(), file_entry(&events_bytes)),
+            (VirtualPath::EVENTS, file_entry(&events_bytes)),
         ]);
         struct PanicClock;
         impl MutationClock for PanicClock {
@@ -1770,7 +1760,7 @@ mod tests {
         let issue_bytes = serialize_issue(&issue).unwrap();
         let image = image_with(vec![
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (events_path().unwrap(), RepositoryEntry::Absent),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
         ]);
         let delta = finalize(
             &layout(),
@@ -1785,7 +1775,7 @@ mod tests {
         // Exactly one action: the missing events.jsonl append. No issue rewrite.
         assert_eq!(delta.delta().actions().len(), 1);
         let action = &delta.delta().actions()[0];
-        assert_eq!(action.path(), &events_path().unwrap());
+        assert_eq!(action.path(), &VirtualPath::EVENTS);
     }
 
     #[test]
@@ -1795,7 +1785,7 @@ mod tests {
         let issue_bytes = serialize_issue(&issue).unwrap();
         let image = image_with(vec![
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (events_path().unwrap(), RepositoryEntry::Absent),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
         ]);
         let delta = finalize(
             &layout(),
@@ -1843,8 +1833,8 @@ mod tests {
                 VirtualPath::data("issues").unwrap(),
                 RepositoryEntry::Absent,
             ),
-            (index_path().unwrap(), file_entry(&index_bytes)),
-            (events_path().unwrap(), RepositoryEntry::Absent),
+            (VirtualPath::INDEX, file_entry(&index_bytes)),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
             // The new id is deterministic; precompute it to seed its absent slot.
             (
                 issue_path(&IdAuthority::from_seed([7u8; 32]).uuid_at(0)).unwrap(),
@@ -1879,7 +1869,7 @@ mod tests {
             .delta()
             .actions()
             .iter()
-            .find(|action| action.path() == &index_path().unwrap())
+            .find(|action| action.path() == &VirtualPath::INDEX)
             .expect("index write present");
         let RepositoryAction::WriteFile { bytes, .. } = index_action else {
             panic!("expected index write");
@@ -1903,7 +1893,7 @@ mod tests {
         .unwrap();
         let image = image_with(vec![
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (index_path().unwrap(), file_entry(&index_bytes)),
+            (VirtualPath::INDEX, file_entry(&index_bytes)),
         ]);
 
         let plan = finalize(
@@ -1924,7 +1914,7 @@ mod tests {
             .delta()
             .actions()
             .iter()
-            .find(|action| action.path() == &index_path().unwrap())
+            .find(|action| action.path() == &VirtualPath::INDEX)
             .expect("index write present");
         let RepositoryAction::WriteFile { bytes, .. } = index_action else {
             panic!("expected index write");
@@ -1949,8 +1939,8 @@ mod tests {
                 VirtualPath::data("issues").unwrap(),
                 RepositoryEntry::Absent,
             ),
-            (index_path().unwrap(), file_entry(&index_bytes)),
-            (events_path().unwrap(), RepositoryEntry::Absent),
+            (VirtualPath::INDEX, file_entry(&index_bytes)),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
             (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
         ]);
 
@@ -1980,7 +1970,7 @@ mod tests {
         .unwrap();
         let image = image_with(vec![
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (index_path().unwrap(), file_entry(&index_bytes)),
+            (VirtualPath::INDEX, file_entry(&index_bytes)),
         ]);
 
         let error = finalize(
@@ -2120,7 +2110,7 @@ mod tests {
     /// A captured events.jsonl whose final line is a malformed, unterminated tail.
     fn torn_tail_image() -> RepositoryImage {
         let torn = b"{\"type\":\"issue_completed\",\"id\":\"e0\",\"issue_id\":\"i\",\"timestamp\":\"2020-01-01T00:00:00Z\"}\n{\"parti".to_vec();
-        image_with(vec![(events_path().unwrap(), file_entry(&torn))])
+        image_with(vec![(VirtualPath::EVENTS, file_entry(&torn))])
     }
 
     #[test]
@@ -2165,7 +2155,7 @@ mod tests {
             .delta()
             .actions()
             .iter()
-            .find(|action| action.path() == &events_path().unwrap())
+            .find(|action| action.path() == &VirtualPath::EVENTS)
             .expect("events.jsonl write present");
         let RepositoryAction::WriteFile { bytes, .. } = action else {
             panic!("expected events write");
