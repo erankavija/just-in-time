@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T09:49:53.513683066Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T10:13:26.439174120Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "9fda1f86-d76b-42c3-80e8-9cb6bc069aa5",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Total journal-action extraction in the transaction kernel",
-  "updated_at": "2026-07-24T09:49:53.513683066Z"
+  "updated_at": "2026-07-24T10:13:26.439174120Z"
 }

@@ -13,7 +13,7 @@
       "rationale": "S1+S3 foundations, all Ready (dep only on breakdown node). File overlap: eefbfe84 & fee3c528 both touch repository_state/mod.rs -> worktree isolation, resolve on merge.",
       "issues": [
         {"id": "4b2005fe", "short_id": "4b2005fe", "title": "Mutation-session retry combinator foundation", "story": "S1", "classification": "implementation", "status": "integrated_pending_review", "agent": "a47904c2abe5eb2c7"},
-        {"id": "9fda1f86", "short_id": "9fda1f86", "title": "Total journal-action extraction in the transaction kernel", "story": "S1", "classification": "implementation", "status": "integrated_cargo_ci_passed", "agent": "a3997b30440e4c766"},
+        {"id": "9fda1f86", "short_id": "9fda1f86", "title": "Total journal-action extraction in the transaction kernel", "story": "S1", "classification": "implementation", "status": "integrated_rework_1_stale_narrative", "agent": "a3997b30440e4c766"},
         {"id": "eefbfe84", "short_id": "eefbfe84", "title": "Typed producer error family for repository-state", "story": "S1", "classification": "implementation", "status": "integrated_rework_1_pending_review", "agent": "a153a21640ca7b6c1"},
         {"id": "fee3c528", "short_id": "fee3c528", "title": "Plan-identity tail for initialize and profile-application requests", "story": "S1", "classification": "implementation", "status": "integrated_pending_review", "agent": "adacec6613c17bc6f"},
         {"id": "73981310", "short_id": "73981310", "title": "Benchmark harness and first session-cost artifact", "story": "S3", "classification": "implementation", "status": "integrated_pending_review", "agent": "a906fc9be44c1a1cf"},
@@ -102,7 +102,8 @@
     }
   ],
   "rework_counts": {
-    "eefbfe84": 1
+    "eefbfe84": 1,
+    "9fda1f86": 1
   },
   "surfaced_pitfalls": [
     "28254964 (test-support-feature-gating) satisfies REQ-12 (an S4/hygiene criterion) but is DAG-parented under story 2958105e (S2/enforced-guarantees). Membership label (story:hygiene-and-docs) disagrees with hierarchy parent. Structurally harmless (breakdown gates passed, DAG ordering correct: it is a shared foundation consumed by S2's cutover guard and S4's demotions) but a labeling/parent inconsistency worth noting."
