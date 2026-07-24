@@ -7,7 +7,10 @@ use crate::declarations::GateRegistry;
 use crate::domain::Issue;
 use crate::repository_state::RepositoryIndex;
 use crate::storage::{InMemoryStorage, IssueStore};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
 
 /// Seed one exact repository-file precondition in the aggregate memory image.
 pub(crate) fn seed_repo_file(storage: &InMemoryStorage, path: &str, content: &str) {
@@ -40,6 +43,30 @@ pub(crate) fn seed_gate_registry(storage: &InMemoryStorage, registry: &GateRegis
         ".jit/gates.toml",
         std::str::from_utf8(&bytes).expect("gate registry TOML is UTF-8"),
     );
+}
+
+/// Count session opens via the once-per-session-open failure-point probe
+/// (`TransactionFailurePoint::RepositoryRecoveryExternal`), injecting no
+/// failure. Shared by tests that assert a session-open budget.
+pub(crate) struct SessionOpenCounter(AtomicUsize);
+
+impl SessionOpenCounter {
+    pub(crate) fn new() -> Arc<Self> {
+        Arc::new(Self(AtomicUsize::new(0)))
+    }
+
+    pub(crate) fn count(&self) -> usize {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+impl crate::storage::TransactionFailureInjector for SessionOpenCounter {
+    fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+        if point == &crate::storage::TransactionFailurePoint::RepositoryRecoveryExternal {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+        Ok(())
+    }
 }
 
 pub(crate) enum OpenRaceAction {
