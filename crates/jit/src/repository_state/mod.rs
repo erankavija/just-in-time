@@ -160,9 +160,24 @@ pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,
 };
 pub(crate) use projection_render::{render_projection_body, ProjectionInputs};
-pub use rule_serialize::{
-    render_rule_block, rules_file_header, serialize_ruleset, SchemaFile, SerializedRuleSet,
-};
+pub use rule_serialize::{render_rule_block, rules_file_header};
+// Rule-serialization seam: `serialize_ruleset`, `SchemaFile`, and
+// `SerializedRuleSet` are `pub` only for integration-test crates (no
+// production consumer outside `repository_state`), so their exposure as
+// crate public API is gated behind `test-support`. The `pub(crate)` twin
+// keeps every internal caller's resolution
+// (`crate::repository_state::SerializedRuleSet`, etc.) identical in both
+// feature states.
+#[cfg(feature = "test-support")]
+pub use rule_serialize::{serialize_ruleset, SchemaFile, SerializedRuleSet};
+#[cfg(not(feature = "test-support"))]
+pub(crate) use rule_serialize::{serialize_ruleset, SerializedRuleSet};
+// `SchemaFile` itself has no by-name crate-internal caller (it's only
+// reached as the element type of `SerializedRuleSet::schema_files`), so its
+// feature-off twin alone is allowed unused.
+#[cfg(not(feature = "test-support"))]
+#[allow(unused_imports)]
+pub(crate) use rule_serialize::SchemaFile;
 pub use rules_document::{parse_rule_identities, splice_default_membership, RulesDocumentError};
 pub use rules_gates_projection::render_rules_and_gates_markdown;
 

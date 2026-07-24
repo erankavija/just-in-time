@@ -29,10 +29,9 @@
 //! - [`report`] — structured rule reports for `jit validate [--explain]`.
 //!
 //! Rendering a [`RuleSet`](crate::declarations::rules::RuleSet) to `rules.toml` +
-//! schema file CONTENT (no I/O) is
-//! [`serialize_ruleset`](crate::repository_state::serialize_ruleset) in
-//! [`crate::repository_state`]; the storage layer
-//! ([`crate::storage::ruleset_store`]) persists it for `jit init`.
+//! schema file CONTENT (no I/O) is `serialize_ruleset` in
+//! [`crate::repository_state`] (test-support only outside this crate); the
+//! storage layer ([`crate::storage::ruleset_store`]) persists it for `jit init`.
 
 pub mod desugar;
 pub mod drift;
