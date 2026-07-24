@@ -560,11 +560,12 @@ mod tests {
     use crate::declarations::GateRegistry;
     use crate::domain::ProfileOrigin;
     use crate::repository_state::{
-        compare_materializations, derive_materialization, CaptureBudget, CaptureSpec,
-        EntryIdentity, InitializationScaffold, MaterializationDriftKind, MaterializationIntent,
-        MaterializationPlan, MaterializationRequest, MutationContext, ProfileApplicationInput,
-        ProfileClaims, RepositoryImage, RepositoryLayout, RepositoryRootEvidence, RepositorySeed,
-        RepositorySeedKind,
+        compare_materializations, derive_materialization, repair_target_paths, CaptureBudget,
+        CaptureSpec, Contribution, EntryIdentity, InitializationScaffold, MapEntryTarget,
+        MaterializationDriftKind, MaterializationIntent, MaterializationPlan,
+        MaterializationRequest, MutationContext, ProfileApplicationInput, ProfileAssetClaim,
+        ProfileClaims, ProfileRegionClaim, RepositoryImage, RepositoryLayout,
+        RepositoryRootEvidence, RepositorySeed, RepositorySeedKind, TargetClaim,
     };
     use std::collections::BTreeMap;
 
@@ -1532,5 +1533,237 @@ kind = "advisory"
             matches!(err, RepositoryStateError::Producer(_)),
             "expected a typed non-repairable producer error, got {err:?}"
         );
+    }
+
+    /// A config declaring both namespaces and a region projection, so a fixture can
+    /// drift both the default-ruleset family (a missing namespace-unique row) and
+    /// the configured-projection family (a stale region) in one image.
+    fn ns_and_projection_config(namespaces: &[&str]) -> String {
+        let mut out = String::from(
+            "[project]\nname = \"repair-target-paths-test\"\n\n\
+             [item_kinds.invariant]\nscope = \"project\"\n\
+             source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
+             source-of-truth = \"registry-first\"\n\n\
+             [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n\n",
+        );
+        for ns in namespaces {
+            out.push_str(&format!(
+                "[namespaces.{ns}]\ndescription = \"{ns}\"\nunique = true\n"
+            ));
+        }
+        out
+    }
+
+    /// `repair_target_paths` is the coverage authority for `derive_repair`'s own
+    /// action targets (@/charter/D-15 pattern: bind coverage to the planner's own
+    /// declaration, never a hand-written mirror). A fixture drifting the
+    /// default-ruleset family (missing "team" membership + its schema) AND the
+    /// configured-projection family (stale AGENTS.md region) in one image exercises
+    /// both families in a single `derive_repair` call; every non-delete action
+    /// target it emits must be a member of `repair_target_paths` computed over the
+    /// same image, declarations, and profiles.
+    #[test]
+    fn test_repair_target_paths_covers_every_derive_repair_action_target() {
+        let config_partial = ns_and_projection_config(&["component"]);
+        let config_full = ns_and_projection_config(&["component", "team"]);
+        let jc_partial: JitConfig = toml::from_str(&config_partial).unwrap();
+        let ns_partial = crate::config_manager::namespaces_from_config(&jc_partial);
+        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial));
+        let schema_paths: Vec<(String, String)> = scaffold
+            .schema_files
+            .iter()
+            .map(|f| (format!(".jit/schemas/{}", f.name), f.content.clone()))
+            .collect();
+        let stale_agents = agents_with_region("invariants", "STALE");
+        let mut files: Vec<(&str, Option<&str>)> = vec![
+            (".jit/config.toml", Some(&config_full)),
+            (".jit/rules.toml", Some(&scaffold.rules_toml)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            ("AGENTS.md", Some(&stale_agents)),
+        ];
+        for (p, c) in &schema_paths {
+            files.push((p.as_str(), Some(c.as_str())));
+        }
+        let img = image(&files);
+        let cfg = config_decls(&config_full);
+        let (g, r) = (gates(), rules());
+        let plan = derive_declared(
+            &img,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RepairDerivedState,
+        )
+        .unwrap();
+        let non_delete: Vec<&RepositoryAction> = plan
+            .delta()
+            .actions()
+            .iter()
+            .filter(|action| !matches!(action, RepositoryAction::DeleteFile { .. }))
+            .collect();
+        assert!(
+            non_delete.len() >= 2,
+            "fixture must drift across both the default-ruleset and \
+             configured-projection families: {:?}",
+            plan.delta().actions()
+        );
+
+        let allowed = repair_target_paths(&img, declarations(&cfg, &g, &r), Vec::new()).unwrap();
+        for action in non_delete {
+            assert!(
+                allowed.contains(action.path()),
+                "derive_repair action target {:?} is missing from repair_target_paths: {allowed:?}",
+                action.path()
+            );
+        }
+    }
+
+    /// Full-drift coverage: every family `repair_target_paths` enumerates (default
+    /// ruleset, configured projection, and profile-owned contribution/asset/region)
+    /// is seeded stale in one image, so `derive_repair` emits a write for every
+    /// member. The delta's write/set-mode target set must then equal
+    /// `repair_target_paths(...)` exactly — not merely a subset (REQ-02's
+    /// authority direction), but the complete space with nothing left over.
+    #[test]
+    fn test_repair_full_drift_write_and_set_mode_targets_equal_repair_target_paths() {
+        const RULE_ASSERTION: &str =
+            "assert = { json-schema = \"schemas/default-label-format.json\" }";
+        const STALE_RULE_ASSERTION: &str =
+            "assert = { require-label = { label = \"authored:*\", min = 99 } }";
+
+        let config = ns_and_projection_config(&["component"]);
+        let jc: JitConfig = toml::from_str(&config).unwrap();
+        let ns = crate::config_manager::namespaces_from_config(&jc);
+        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+
+        // Default-ruleset family: a syntax-preserving targeted swap of one baked
+        // assertion (rules.toml must stay parseable — the producer needs to splice
+        // it, not merely detect it as opaque bytes).
+        assert!(
+            scaffold.rules_toml.contains(RULE_ASSERTION),
+            "fixture assumption: the scaffold references the label-format schema"
+        );
+        let stale_rules = scaffold
+            .rules_toml
+            .replacen(RULE_ASSERTION, STALE_RULE_ASSERTION, 1);
+        // Schema bytes are never re-parsed by declaration loading (only compared or
+        // regenerated), so raw corruption is safe and drifts every baked schema.
+        let stale_schema_paths: Vec<(String, String)> = scaffold
+            .schema_files
+            .iter()
+            .map(|f| {
+                (
+                    format!(".jit/schemas/{}", f.name),
+                    format!("{} stale", f.content),
+                )
+            })
+            .collect();
+
+        // Configured-projection family: a stale region interior.
+        let stale_agents = agents_with_region("invariants", "STALE");
+
+        // Profile family: one synthetic contribution (config.toml), one asset, and
+        // one region, each seeded with bytes that differ from what the claims
+        // declare.
+        let asset_target = "profile-asset.md";
+        let region_target = "profile-region.md";
+        let region_id = "profile-region";
+        let stale_region_doc = format!(
+            "# Doc\n\n<!-- jit:{region_id}:begin -->\nSTALE\n<!-- jit:{region_id}:end -->\n"
+        );
+
+        let mut files: Vec<(&str, Option<&str>)> = vec![
+            (".jit/config.toml", Some(&config)),
+            (".jit/gates.toml", None),
+            (".jit/rules.toml", Some(&stale_rules)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            ("AGENTS.md", Some(&stale_agents)),
+            (asset_target, Some("STALE ASSET\n")),
+            (region_target, Some(&stale_region_doc)),
+        ];
+        for (p, c) in &stale_schema_paths {
+            files.push((p.as_str(), Some(c.as_str())));
+        }
+        let img = image(&files);
+        let cfg = config_decls(&config);
+        let (g, r) = (gates(), rules());
+
+        let test_layout = layout();
+        let profile_claims = ProfileClaims {
+            contributions: vec![Contribution::MapEntry {
+                target: MapEntryTarget::Namespaces,
+                identity: "profile-owned".to_string(),
+                value: serde_json::json!({
+                    "description": "profile-owned namespace",
+                    "unique": false,
+                }),
+            }],
+            assets: vec![ProfileAssetClaim {
+                claim: TargetClaim::new(
+                    &test_layout,
+                    VirtualPath::worktree(asset_target).unwrap(),
+                    "profile-asset:test",
+                )
+                .unwrap(),
+                bytes: b"CORRECT ASSET\n".to_vec(),
+                mode: FileMode::Regular,
+                replace_owned: true,
+            }],
+            regions: vec![ProfileRegionClaim {
+                claim: TargetClaim::new(
+                    &test_layout,
+                    VirtualPath::worktree(region_target).unwrap(),
+                    "profile-region:test",
+                )
+                .unwrap(),
+                region_id: region_id.to_string(),
+                content: b"CORRECT REGION CONTENT".to_vec(),
+            }],
+        };
+
+        let plan = derive_materialization(
+            &img,
+            MaterializationRequest::RepairDerivedState {
+                declarations: declarations(&cfg, &g, &r),
+                profiles: vec![profile_claims.clone()],
+                seed: &seed(),
+            },
+        )
+        .unwrap();
+
+        let actual: std::collections::BTreeSet<VirtualPath> =
+            plan.delta()
+                .actions()
+                .iter()
+                .filter_map(|action| match action {
+                    RepositoryAction::WriteFile { path, .. }
+                    | RepositoryAction::SetMode { path, .. } => Some(path.clone()),
+                    RepositoryAction::CreateDirectory { .. }
+                    | RepositoryAction::DeleteFile { .. } => None,
+                })
+                .collect();
+        let expected =
+            repair_target_paths(&img, declarations(&cfg, &g, &r), vec![profile_claims]).unwrap();
+
+        assert_eq!(
+            actual, expected,
+            "the full-drift write/set-mode target set must equal repair_target_paths exactly"
+        );
+        // Not a degenerate empty comparison: every family the fixture drifted is
+        // represented (default-ruleset rules.toml and its baked schemas, the
+        // configured-projection region, and the profile-owned
+        // contribution/asset/region).
+        for path in [
+            VirtualPath::data("config.toml").unwrap(),
+            VirtualPath::data("rules.toml").unwrap(),
+            VirtualPath::worktree("AGENTS.md").unwrap(),
+            VirtualPath::worktree(asset_target).unwrap(),
+            VirtualPath::worktree(region_target).unwrap(),
+        ] {
+            assert!(actual.contains(&path), "expected {path:?} in {actual:?}");
+        }
+        for schema in &scaffold.schema_files {
+            let path = VirtualPath::data(format!("schemas/{}", schema.name)).unwrap();
+            assert!(actual.contains(&path), "expected {path:?} in {actual:?}");
+        }
     }
 }

@@ -913,6 +913,86 @@ fn derive_repair(
     Ok(RepositoryDelta::new(image.layout(), actions)?)
 }
 
+/// Enumerate the drift-independent set of paths `derive_repair` may materialize.
+///
+/// The returned set names every target repair could write, independent of whether
+/// `image` currently drifts from it — unlike `derive_repair`, which is drift-
+/// filtered at every family (a projection skips when its composed bytes already
+/// match the captured occupant, the default ruleset writes only on diff, a profile
+/// target pushes only when its entry differs). Walking `derive_repair`'s own
+/// actions therefore enumerates only the paths currently drifting, not the
+/// complete target space; this function enumerates the target space directly, so a
+/// coverage test can hold it independent of current repository state.
+///
+/// Three families compose the result:
+/// - Default-ruleset targets: `rules.toml` is a member exactly when the capture
+///   spec captured it AND it is present (an absent `rules.toml` is the
+///   in-memory-defaults case `derive_repair` never materializes anything for); its
+///   baked schema files (`schemas/default-*.json`, derived from `declarations`'
+///   configuration) are members exactly when the capture spec captured that exact
+///   schema path. This mirrors the presence guards `derive_repair`'s default-rule
+///   producer applies before ever comparing bytes, never the byte-diff itself.
+/// - Configured-projection targets: every projection declared in `declarations`'
+///   configuration contributes its own target unconditionally, since a declared
+///   projection's target is always part of the operation's capture closure.
+/// - Profile targets: the keys of `compose_profile_targets` for each installed
+///   profile's claims (its composed bytes and mode are irrelevant to a path-only
+///   authority).
+///
+/// Obsolete-schema deletions are deliberately excluded: they are occupant-proven
+/// repair actions (a captured schema file whose sole default-rule reference is
+/// gone), not declared targets, so naming them here would require reading occupant
+/// state this function does not otherwise need.
+///
+/// `derive_repair` is not refactored to consume this set — it needs each target's
+/// composed bytes, which a path set cannot supply — so a caller needing both the
+/// target set and the composed delta invokes this function and `derive_repair`
+/// separately over the same `image`, `declarations`, and `profiles`.
+pub fn repair_target_paths(
+    image: &RepositoryImage,
+    declarations: RepositoryDeclarations<'_>,
+    profiles: Vec<ProfileClaims>,
+) -> Result<std::collections::BTreeSet<VirtualPath>, RepositoryStateError> {
+    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)?;
+    let mut targets = std::collections::BTreeSet::new();
+
+    // Default-ruleset family: rules.toml, guarded by capture-spec containment and
+    // presence; its baked schema files, each individually guarded by capture-spec
+    // containment.
+    let rules_path = VirtualPath::data("rules.toml")?;
+    if image.capture_spec().contains_path(&rules_path)
+        && image
+            .file_bytes(&rules_path)
+            .map_err(ProducerError::from)?
+            .is_some()
+    {
+        targets.insert(rules_path);
+        for schema in materialize::serialized_default_ruleset(&config).schema_files {
+            let vpath = VirtualPath::data(format!("schemas/{}", schema.name))?;
+            if image.capture_spec().contains_path(&vpath) {
+                targets.insert(vpath);
+            }
+        }
+    }
+
+    // Configured-projection targets: every declared projection's own target,
+    // computed purely from declared configuration.
+    if let Some(projections) = config.projection.as_ref() {
+        for (name, projection) in projections {
+            let target = require_target(projection, name)?;
+            targets.insert(image.layout().classify_repository_relative(target)?);
+        }
+    }
+
+    // Profile targets: the exact keys of each installed profile's composed target
+    // set.
+    for claims in profiles {
+        targets.extend(profile_apply::compose_profile_targets(image, claims)?.into_keys());
+    }
+
+    Ok(targets)
+}
+
 /// Kind of mismatch between a captured image and expected materialization.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MaterializationDriftKind {
