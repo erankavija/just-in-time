@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "c3a78c802d0af62155e6706a6ad1c18a3c0f05be",
+  "completed_at": "2026-07-24T12:59:05.194203375Z",
+  "duration_ms": 207725,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are satisfied by the attributable implementation and recorded cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a6ee4e23-f2ae-4430-b35d-e583352dcde6",
+  "message": null,
+  "run_id": "e4775496-7142-4444-b0bb-937192952664",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T12:55:37.468498247Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a2d9b7ec, 67396c44, bb362b1c, c3a78c80\nPolicy sources: AGENTS.md\nResolved items: @/invariant/derived-state-coherence (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T12:49:22Z); code-review pending (no run)\nTruncation recovery: re-read affected patches, finalizer/helper definitions, tests, callers, and exit mapping in bounded path and line ranges\n\n1. No findings. The attributable implementation satisfies the typed-error, raw-identifier rendering, and integration requirements; existing tests were not modified, and the latest cargo-ci projection passed.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are satisfied by the attributable implementation and recorded cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
