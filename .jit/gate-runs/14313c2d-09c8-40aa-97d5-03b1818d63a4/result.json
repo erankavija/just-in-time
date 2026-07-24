@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "710df7c733614445360cf5f32ecc1a977c43203e",
+  "completed_at": "2026-07-24T09:35:18.302370609Z",
+  "duration_ms": 344958,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "9fda1f86-d76b-42c3-80e8-9cb6bc069aa5",
+  "message": null,
+  "run_id": "14313c2d-09c8-40aa-97d5-03b1818d63a4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T09:29:33.343725929Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest project_render_harness_tests::test_missing_target_is_typed_error_naming_projection ... FAILED\ntest result: FAILED. 171 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.70s\n---- project_render_harness_tests::test_missing_target_is_typed_error_naming_projection stdout ----\n\nthread 'project_render_harness_tests::test_missing_target_is_typed_error_naming_projection' (1324977) panicked at crates/jit/tests/fast_rules/project_render_harness_tests.rs:341:5:\nexpected MissingTarget naming the projection, got projection 'invariants' declares no target (a projection must set `target`)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n--- incremental-state output ---\nnon-empty incremental directories under /home/vkaskivuo/Projects/just-in-time/target:\n/home/vkaskivuo/Projects/just-in-time/target/debug/incremental\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1212 bytes=20800843)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1259790352/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✗ incremental-state: FAILED (exit 1)\n\n",
+  "tree_dirty": true
+}

@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-07-24T09:35:18.308276738Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9fda1f86-d76b-42c3-80e8-9cb6bc069aa5",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Total journal-action extraction in the transaction kernel",
-  "updated_at": "2026-07-24T08:15:57.400356101Z"
+  "updated_at": "2026-07-24T09:35:18.308276738Z"
 }
