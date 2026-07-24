@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T07:19:49.615370967Z",
+  "dependencies": [
+    "d159f9d4-29ef-49cf-badd-11894026e7ba"
+  ],
+  "description": "The unused `_command` parameter is removed from the JSON output constructors and every site that passes it.\n\n## Background\n\n`JsonOutput::success` (`crates/jit/src/output.rs`) and `JsonError::new` accept an unused `_command: impl Into<String>` parameter kept for API compatibility. This is a greenfield repository where that compatibility is not required, so the parameter is stale ceremony. The output macros in `crates/jit/src/output_macros.rs` thread a `$command` argument into those constructors, and the constructors are also called directly, so removing the parameter also removes the macro argument and updates the invocation sites across the command layer and `main.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The `_command` parameter is removed from `JsonOutput::success` and `JsonError::new`, and the output macros no longer take or forward a command argument.\n- [hard] REQ-02: Every call site that passed a command argument is updated, and the JSON output types build and produce identical output.\n\n## Notes\n\nThe change is output-preserving: only the removed parameter and its arguments change, not the emitted JSON.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "9503c8b4-d348-4e8d-9bc7-6f13e2d3c664",
+  "labels": [
+    "type:task",
+    "epic:repository-state-quality",
+    "story:hygiene-and-docs",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Remove the dead _command output parameter",
+  "updated_at": "2026-07-24T07:19:49.615370967Z"
+}

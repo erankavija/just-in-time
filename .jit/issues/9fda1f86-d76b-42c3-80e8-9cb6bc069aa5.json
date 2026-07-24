@@ -1,19 +1,19 @@
 {
   "assignee": null,
   "context": {},
-  "created_at": "2026-07-24T05:39:46.539803981Z",
+  "created_at": "2026-07-24T07:19:49.615370967Z",
   "dependencies": [
     "24bab642-6f1d-438a-aae5-5c327dceaff6"
   ],
   "description": "Journal-action extraction in the transaction kernel becomes total: the five `unreachable!` panic sites in the publication path return a typed action-mismatch error that propagates into the existing non-interruption abort with no partial write.\n\n## Background\n\nThe transaction kernel bridges two hand-aligned 4-variant action enums - `RepositoryAction` (semantic intent) and `RepositoryJournalActionKind` (staging control-names) - with five `unreachable!` panic sites in `crates/jit/src/storage/file_transaction.rs` (`:759,1079,1088,1097,1104`) that fire mid-publication, after a journal exists. The two enums carry genuinely disjoint payloads, so they stay separate types. Retype the four alignment extractors and the `SetMode`-preimage destructure (`:1079,1088,1097,1104` and `:759`) to return a new `FileTransactionError::JournalActionMismatch { index, expected, found }` over a shared 4-value `ActionTag`, instead of `unreachable!`.\n\nAll five sites propagate with `?` into the existing non-interruption abort (cleanup then error, no partial write, `file_transaction.rs:866-876`):\n- The four extractor sites (`:1079-:1104`) already sit inside the prepare loop that the abort handler wraps, so `?` reaches the abort directly.\n- The `:759` journal-construction site runs after transaction control has been created but before a complete journal exists, so it routes through a control-only teardown: factor the `ControlDirs` removal tail of `cleanup_repository_control` into its own function that skips the journal-dependent data-stage steps (provably no-ops before prepare stages anything), so a mismatch tears down the created control immediately instead of leaving it for later recovery.\n\nDurable journal decode corruption stays with the existing serde and `ControlName` validation paths.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/storage/file_transaction.rs` contains no `unreachable!` in the publication path; the five sites (`:759,1079,1088,1097,1104`) return `FileTransactionError::JournalActionMismatch { index, expected, found }` over a shared `ActionTag`.\n- [hard] REQ-02: All five sites propagate with `?` into the existing non-interruption abort, leaving no partial write; the `:759` site tears down created control through the factored control-only teardown that skips journal-dependent data-stage steps.\n- [hard] REQ-03: `RepositoryAction` and `RepositoryJournalActionKind` remain separate types with their disjoint payloads.\n- [hard] REQ-04: The existing interruption tests pass unchanged; behavior is preserved.\n\n## Notes\n\nFile ownership for this task is `crates/jit/src/storage/file_transaction.rs` and `crates/jit/src/storage/transaction_journal.rs`.",
   "documents": [],
-  "first_ready_at": "2026-07-24T05:39:46.539803981Z",
+  "first_ready_at": "2026-07-24T07:19:49.615370967Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {},
-  "id": "7f3dc29a-28dd-4271-ac52-a9b7218da05a",
+  "id": "9fda1f86-d76b-42c3-80e8-9cb6bc069aa5",
   "labels": [
     "type:task",
     "epic:repository-state-quality",
@@ -23,5 +23,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Total journal-action extraction in the transaction kernel",
-  "updated_at": "2026-07-24T05:41:20.611969763Z"
+  "updated_at": "2026-07-24T07:20:18.946338900Z"
 }

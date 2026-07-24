@@ -1,19 +1,19 @@
 {
   "assignee": null,
   "context": {},
-  "created_at": "2026-07-24T05:40:01.376233048Z",
+  "created_at": "2026-07-24T07:19:49.615370967Z",
   "dependencies": [
     "24bab642-6f1d-438a-aae5-5c327dceaff6"
   ],
   "description": "Add a checked-in benchmark harness that records repeated timing runs as JSON artifacts at a stable repository path, so every published performance figure traces to an artifact instead of a single self-attested measurement.\n\n## Background\n\nToday every published timing is a lone, un-artifacted measurement. This task adds `scripts/benchmark-session-cost.sh`, modeled on the existing `scripts/benchmark-rust-build.sh`. The script builds the release binary, generates a fixture repository of a recorded issue count, and times each scenario with at least 3 warmup runs and at least 20 measured runs, emitting one JSON artifact at the stable path `dev/studies/perf/session-cost-<jit-commit>.json` — the jit commit in the filename so history accumulates. The committed `dev/studies/perf/session-cost-27ffbd2d.json` is the first instance and the schema template the harness must reproduce.\n\nArtifact schema (top-level keys): `schema_version`; `jit{version,commit,dirty,profile}`; `machine{cpu_model,logical_cpus,ram_kb,kernel,measurement_fs,repo_real_fs}`; `corpus{issue_count}`; `method{samples_per_command,warmup_runs,warm,cache_state,timing_clock}`; `commands[]{name,argv,class,n,min_ms,median_ms,p95_ms,max_ms,lock_files_created}`; and `mutation_syscall_summary{task_clock_ms,user_s,sys_s,page_faults,context_switches}`.\n\nScenarios in the `commands` array: baseline (`--version`), single read (`issue show`), read-all (`query available` and `issue list`), and single mutation (`issue update --priority`). The bulk-mutation scenario is intentionally excluded here; it is added later, once the bulk-update fix lands, so its numbers measure the fixed behavior.\n\nMutable scenarios need a reset protocol: the harness materializes a fresh fixture repository per measured sample (regenerate, or restore from a pristine copy) so no sample observes a prior sample's mutations; warmup runs use throwaway fixtures of the same shape.\n\nCache-state contract is warm-only: cold-cache measurement needs root to drop the page cache and is not assumed; warm means the page cache is primed by warmup runs against the pristine copy. Timings are comparable only across artifacts sharing the same `measurement_fs`.\n\nCitation rule: every published timing must cite artifact path, command name, and stat (for example `session-cost-<commit>.json > issue_update_mutation > median_ms`); an uncited number is a staleness defect.\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/benchmark-session-cost.sh` is checked in, builds the release binary, generates a fixture repository of a recorded issue count, and for each scenario runs at least 3 warmup and at least 20 measured runs, emitting one JSON artifact at `dev/studies/perf/session-cost-<jit-commit>.json`.\n- [hard] REQ-02: The emitted artifact conforms to the schema of `dev/studies/perf/session-cost-27ffbd2d.json`: the same top-level keys (`schema_version`, `jit`, `machine`, `corpus`, `method`, `commands`) and the same per-command stat fields (`name`, `argv`, `class`, `n`, `min_ms`, `median_ms`, `p95_ms`, `max_ms`, `lock_files_created`).\n- [hard] REQ-03: The `commands` array covers the baseline (`--version`), single-read (`issue show`), read-all (`query available` and `issue list`), and single-mutation (`issue update --priority`) scenarios, and contains no bulk-mutation scenario.\n- [hard] REQ-04: Each mutable scenario runs against a freshly materialized fixture per measured sample so no sample observes a prior sample's mutation, and warmup runs use throwaway fixtures of the same shape.\n- [hard] REQ-05: The artifact records machine identity (cpu model, logical cpus, ram, kernel, measurement filesystem, real-repo filesystem) and a warm-only cache-state field.\n- [hard] REQ-06: Any performance timing stated in repository prose or documentation cites artifact path, command name, and stat.\n\n## Notes\n\nModel the script structure on `scripts/benchmark-rust-build.sh`. Timing figures are machine-specific; record machine identity rather than asserting portability. Do not hardcode expected millisecond values in tests — the artifact is the contract, not any single number.",
   "documents": [],
-  "first_ready_at": "2026-07-24T05:40:01.376233048Z",
+  "first_ready_at": "2026-07-24T07:19:49.615370967Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {},
-  "id": "e421329a-9772-497a-bbd9-9a87329982f5",
+  "id": "73981310-4173-4224-82bf-f38a9d5222fd",
   "labels": [
     "type:task",
     "epic:repository-state-quality",
@@ -23,5 +23,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Benchmark harness and first session-cost artifact",
-  "updated_at": "2026-07-24T05:42:49.889026479Z"
+  "updated_at": "2026-07-24T07:20:26.080026471Z"
 }

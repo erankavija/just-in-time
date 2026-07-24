@@ -1,19 +1,19 @@
 {
   "assignee": null,
   "context": {},
-  "created_at": "2026-07-24T05:40:06.330233380Z",
+  "created_at": "2026-07-24T07:19:49.615370967Z",
   "dependencies": [
     "24bab642-6f1d-438a-aae5-5c327dceaff6"
   ],
   "description": "Eliminate the per-issue sidecar read lock so zero-byte `.lock` files no longer accumulate without bound, keep the surviving fixed lock set O(1) in issue count, and clean up orphaned sidecars once.\n\n## Background\n\nZero-byte `.lock` sidecar files accumulate without bound. `load_issue` takes a shared lock on a `<id>.lock` sidecar on every read (`crates/jit/src/storage/json.rs`, around lines 918-919), created with `O_CREAT` at `crates/jit/src/storage/lock.rs` (around lines 286-294) and never removed. A read-all command such as `jit query available` therefore creates one sidecar per issue read (692 sidecars observed for 665 issues).\n\nThe pinned decision (PD-1) is to eliminate the per-issue sidecar read lock. It is redundant: issue JSON is published by atomic temp-file-plus-rename, so a reader can never observe a torn file; writers serialize on `.jit/.repo-write.lock`; and `list_issues` already holds the repo-scoped `.index.lock` shared around its load loop. `load_issue` can therefore read directly, or, as defense-in-depth, take the shared lock on the existing repo-scoped `.index.lock` instead of a per-issue sidecar. The surviving fixed lock set is O(1) — roughly six files independent of issue count (`.repo-write`, `.index`, `.gates`, `.events`, the per-worktree bootstrap lock, and the claims lock). Retained fixed locks stay `O_CREAT` without `O_EXCL` and are never unlinked, so flock coordination remains race-safe. Orphaned sidecars are deleted once as cleanup, not correctness.\n\nEvery existing `load_issue` caller must be checked before removing the lock: a reader that relied on the sidecar for more than torn-read protection would be a regression, and atomic temp-plus-rename already prevents torn reads.\n\n## Success Criteria\n\n- [hard] REQ-01: The per-issue sidecar read lock in `load_issue` is eliminated; no read path creates a per-`<id>.lock` sidecar file.\n- [hard] REQ-02: After a command that reads every issue, the number of lock files that exist is O(1) in issue count — the surviving fixed lock set is independent of the number of issues.\n- [hard] REQ-03: Orphaned zero-byte sidecar `.lock` files are removed once as a cleanup step.\n- [hard] REQ-04: Every existing `load_issue` caller is confirmed not to depend on the sidecar lock for anything beyond torn-read protection, which atomic temp-file-plus-rename already provides.\n- [hard] REQ-05: This clears the outstanding zero-byte-lock advisory-debt item.\n\n## Notes\n\nThe per-session cost profile artifact half of this contract is already committed at `dev/studies/perf/session-cost-27ffbd2d.json`; do not regenerate or duplicate it here. Retained fixed locks must keep their current `O_CREAT`-without-`O_EXCL` creation and must not be unlinked, so flock coordination stays race-safe.",
   "documents": [],
-  "first_ready_at": "2026-07-24T05:40:06.330233380Z",
+  "first_ready_at": "2026-07-24T07:19:49.615370967Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {},
-  "id": "eaf59d88-7dc1-4ffe-8e44-b9294d38070e",
+  "id": "fc744df6-fa90-49e0-a145-54d91ad322b7",
   "labels": [
     "type:task",
     "epic:repository-state-quality",
@@ -23,5 +23,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Lock-hygiene: eliminate the per-issue sidecar read lock",
-  "updated_at": "2026-07-24T05:42:57.315016930Z"
+  "updated_at": "2026-07-24T07:20:33.212953600Z"
 }

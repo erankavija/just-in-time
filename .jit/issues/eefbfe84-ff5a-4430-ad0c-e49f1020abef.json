@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T07:19:49.615370967Z",
+  "dependencies": [
+    "24bab642-6f1d-438a-aae5-5c327dceaff6"
+  ],
+  "description": "Every plan-producing entry point in the repository-materialization module returns a typed `ProducerError`, so producer failures no longer stringify through `RepositoryStateError::Producer(String)`.\n\n## Background\n\nProducer failures currently stringify through `RepositoryStateError::Producer(String)` and are re-typed by a runtime downcast chain, so exit-code correctness depends on a downcast that silently degrades when a new producer error type appears. This task introduces the typed producer family and retypes the producer surfaces; the exhaustive exit-code match and the module-wide sweep of residual untyped errors are separate work.\n\n1. New `ProducerError` (thiserror), each variant carrying its typed source: `MissingCapture(&'static str)`, `MalformedUtf8(#[from] FromUtf8Error)`, `UnknownProjection(String)`, `UnknownKind { projection, kind }`, plus transparent `#[from]` for `CaptureError`, `RepositoryLayoutError`, `ConfigurationDeclarationError`, `InvariantConfigError`, `ItemError`, `RuleConfigError`, `ProjectionError`, `ManagedDocumentError`. The six `materialize.rs` producers (`read_text`, `assemble_config`, `assemble_config_from_declarations`, `render_capture_closure`, `validate_capture_closure`, `compose_configured_projections`) and the two internal `anyhow` leaves - `render_projection_body` in `projection_render.rs` (whose injected read-closure becomes `FnMut(&str) -> Result<Option<String>, ProducerError>`) and `validate_proposed_layout` in `artifact_classifier.rs` - return `Result<_, ProducerError>`.\n2. `RepositoryStateError::Producer(String)` becomes `Producer(#[from] ProducerError)`. The stringifying `producer`/`projection_producer` sink helpers and the `.map_err(...producer...)` sites in `mod.rs` are replaced with `?`. The inline `Producer(format!)` sites become `ProducerError::ConfigParse` and a new `RepositoryStateError::Overlay(#[from] OverlayError)`. The profile-application producers in `profile_apply.rs` retype with profile-specific variants - `ProfileRegistryNotFile { target }`, `ProfileRegistryParse { target, #[source] source }`, `ProfileContributionConflict { identity, registry }`.\n\nThe exit-code boundary in `main.rs` is left unchanged; the profile-target-conflict predicate keeps returning the same boolean against the typed representation so the binary still compiles. Rewriting that boundary into an exhaustive match is out of scope here.\n\n## Success Criteria\n\n- [hard] REQ-01: `ProducerError` exists with the variants above, and `RepositoryStateError::Producer` carries `#[from] ProducerError`.\n- [hard] REQ-02: The six `materialize.rs` producers, `render_projection_body`, and `validate_proposed_layout` return `Result<_, ProducerError>`; the stringifying producer sink helpers and their `.map_err` sites are replaced with `?`.\n- [hard] REQ-03: The profile-application producers in `profile_apply.rs` return typed profile-specific variants rather than `Producer(String)`.\n- [hard] REQ-04: For the surfaces retyped here, `String`-typed variant fields hold raw identifiers and message rendering lives in `Display` impls rather than `format!`-constructed values.\n- [hard] REQ-05: Existing behavior and exit codes are preserved; the failure-path tests pass unchanged.\n\n## Notes\n\nRetyping the two finalizers and the exhaustive exit-code mapping are separate work. The profile-target-conflict predicate is retained here, adapted to the typed variant, so the exit boundary continues to compile.",
+  "documents": [],
+  "first_ready_at": "2026-07-24T07:19:49.615370967Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "eefbfe84-ff5a-4430-ad0c-e49f1020abef",
+  "labels": [
+    "type:task",
+    "epic:repository-state-quality",
+    "story:planning-boundary-collapse",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Typed producer error family for repository-state",
+  "updated_at": "2026-07-24T07:20:15.384172708Z"
+}

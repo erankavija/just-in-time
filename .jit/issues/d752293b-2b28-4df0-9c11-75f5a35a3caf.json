@@ -1,20 +1,19 @@
 {
   "assignee": null,
   "context": {},
-  "created_at": "2026-07-24T05:26:31.940255924Z",
+  "created_at": "2026-07-24T07:19:49.615370967Z",
   "dependencies": [
-    "eaf59d88-7dc1-4ffe-8e44-b9294d38070e",
-    "fbb16ceb-c2bc-47a0-85da-f65d28816098"
+    "a4b0fadf-ccbe-4f47-a41d-676f7a947f85",
+    "fc744df6-fa90-49e0-a145-54d91ad322b7"
   ],
   "description": "A checked-in benchmark harness, a bulk-update session-budget fix, and the profile-backed lock-hygiene change turn every published performance figure into an artifact-backed contract.\n\n## Background\n\nThe adversarial audit in `dev/studies/cdc840ad-audit-2026-07-23.md` found every published timing to be a single self-attested measurement with no artifact. `apply_bulk_update` (`commands/bulk_update.rs:161-197`) retains the O(n)-sessions pathology — it opens preflight and publication sessions for every filter-matched issue before knowing whether anything changes (cost 2·|matched|) — while `check_auto_transitions` already demonstrates the correct shape: a cheap Issue-local eligibility prefilter that can only skip, never authorize, plus an authoritative recheck inside the session. Meanwhile zero-byte `.lock` sidecar files accumulate without bound: `load_issue` shared-locks a `<id>.lock` sidecar on every read (`storage/json.rs:918-919`, created O_CREAT at `storage/lock.rs:286-294`, never removed), so a read-all command such as `jit query available` creates one per issue read (692 sidecars observed for 665 issues).\n\nThe lock-hygiene design was decided during planning from the committed session-cost profile `dev/studies/perf/session-cost-27ffbd2d.json`: the sidecar originates on the shared read path, so even lazy creation still grows O(issues), and the sidecar read lock is therefore eliminated. Issue JSON is published by atomic temp+rename, writers serialize on `.jit/.repo-write.lock`, and `list_issues` already holds `.index.lock` shared around its load loop, so `load_issue` can read directly (or, as defense-in-depth, take the shared lock on the existing repo-scoped `.index.lock`). The surviving fixed lock set is O(1) — roughly six files independent of issue count — and orphaned sidecars are deleted once as cleanup, not correctness.\n\nThe benchmark harness `scripts/benchmark-session-cost.sh` builds the release binary, generates a fixture repository, and times each scenario with warmup and repeated measured runs, emitting one JSON artifact at the stable path `dev/studies/perf/session-cost-<jit-commit>.json` with machine, cache-state, and corpus metadata; `session-cost-27ffbd2d.json` is the first instance and the schema template. Every published timing must cite artifact path, command name, and stat.\n\n## Success Criteria\n\n- [hard] REQ-09: A checked-in benchmark harness records repeated runs with machine and cache-state metadata as artifacts at a stable path, and every published timing claim traces to such an artifact.\n- [hard] REQ-10: Session-open budget tests bound bulk update to eligible work, matching the guarantee already tested for automatic transitions. The bound is C·|matched issues that are not provable no-ops|, with C derived from a single-issue baseline run rather than hardcoded.\n- [hard] REQ-11: The per-session cost profile is recorded as an artifact, and the lock-hygiene approach chosen from that profile is implemented so zero-byte lock files no longer accumulate without bound. The per-issue sidecar read lock is eliminated, the surviving lock set is O(1) in issue count, and orphaned sidecars are cleaned up once.\n\n## Notes\n\nThe lock-hygiene decision is pinned by plan decision PD-1: eliminate the per-issue sidecar read lock, keep the O(1) fixed lock set, decided from `dev/studies/perf/session-cost-27ffbd2d.json`. Every `load_issue` caller must be checked before removing the sidecar lock, since a reader relying on it for more than torn-read protection would be a regression; atomic temp+rename already prevents torn reads. Budget tests count session opens via the existing `TransactionFailurePoint` probe, deterministic and machine-independent. Cache-state contract is warm-only; timings are comparable only across artifacts sharing the same measurement filesystem.",
   "documents": [],
-  "first_ready_at": "2026-07-24T05:26:31.940255924Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {},
-  "id": "201c2456-1982-4d4d-a95d-e8b399090efb",
+  "id": "d752293b-2b28-4df0-9c11-75f5a35a3caf",
   "labels": [
     "type:story",
     "epic:repository-state-quality",
@@ -27,5 +26,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Establish an artifact-backed performance contract",
-  "updated_at": "2026-07-24T05:41:27.877336116Z"
+  "updated_at": "2026-07-24T07:19:49.615370967Z"
 }

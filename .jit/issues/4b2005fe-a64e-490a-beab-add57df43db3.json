@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T07:19:49.615370967Z",
+  "dependencies": [
+    "24bab642-6f1d-438a-aae5-5c327dceaff6"
+  ],
+  "description": "A single mutation-session retry contract lives in the command layer: the retry bound, apply-conflict classification, and the terminal conflict error each in one place, ready for command sites to adopt.\n\n## Background\n\nThe command layer hand-copies a capture/plan/apply/retry protocol across sixteen command files: `for _ in 0..8` loops, `Err(RetryableConflict{..}) => continue` match arms, and bespoke \"did not converge\" bail messages. This task builds the shared contract that retires that duplication; migrating the individual call sites is separate work.\n\nAdd to `crates/jit/src/commands/mod.rs`:\n\n```rust\nconst MUTATION_SESSION_RETRY_LIMIT: usize = 8;\n\n#[derive(Debug, thiserror::Error)]\n#[error(\"{operation} did not converge after {attempts} capture conflicts\")]\npub struct MutationSessionExhausted { operation: &'static str, attempts: usize }\n\nenum AttemptOutcome<T> { Done(T), Retry }\n\n// The single apply-conflict classifier - the only place a RetryableConflict on\n// apply is interpreted.\nfn classify_apply<T>(outcome: Result<impl Sized, RepositoryStateStoreError>, value: T)\n    -> Result<AttemptOutcome<T>>;\n\n// Retry driver: owns the bound and terminal error, holds NO session, so a\n// closure may open/release sessions, take a claims guard, and run a subprocess\n// between them.\nfn with_mutation_attempts<T>(operation: &'static str,\n    attempt: impl FnMut() -> Result<AttemptOutcome<T>>) -> Result<T>;\n\n// Session-passed convenience: opens one fresh recovered session per attempt and\n// applies Apply(plan) via classify_apply.\nenum SessionStep<T> { Apply(MaterializationPlan, T), Done(T), Retry }\n\nfn with_mutation_session<S: RepositoryStateStore, T>(\n    store: &S, layout: &RepositoryLayout, operation: &'static str,\n    attempt: impl FnMut(&mut dyn RepositoryMutationSession) -> Result<SessionStep<T>>,\n) -> Result<T>;\n```\n\n`with_mutation_attempts` owns the single retry bound (one named constant) and the typed terminal `MutationSessionExhausted`. `classify_apply` owns apply-conflict classification. A shared `capture_or_retry` helper folds a capture `RetryableConflict` into a retry signal for sites that classify capture conflicts inline. The entry points are free `fn`s generic over the store because at least one call site is a free function rather than a method. `MutationSessionExhausted` maps to the generic exit code through a single arm contributed to the exit-code mapping in `crates/jit/src/main.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: `MUTATION_SESSION_RETRY_LIMIT`, `MutationSessionExhausted`, `AttemptOutcome`, `classify_apply`, `with_mutation_attempts`, `SessionStep`, `with_mutation_session`, and `capture_or_retry` exist in the command layer with the signatures above; the retry bound, apply-conflict classification, and terminal conflict error each live in exactly one place.\n- [hard] REQ-02: Conflict-classification unit tests exercise `classify_apply` and `with_mutation_attempts` directly.\n- [hard] REQ-03: `MutationSessionExhausted` is mapped to its exit code by a single arm in the `crates/jit/src/main.rs` exit-code mapping.\n- [hard] REQ-04: The existing failure-injection and interruption tests continue to pass; the contract is behavior-preserving.\n\n## Notes\n\nMigrating the individual retry loops onto these combinators is out of this task's scope. `with_mutation_attempts` deliberately holds no session so a caller can release a preflight session, take a claims guard, and run an external subprocess between attempts without inverting lock ordering.",
+  "documents": [],
+  "first_ready_at": "2026-07-24T07:19:49.615370967Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "4b2005fe-a64e-490a-beab-add57df43db3",
+  "labels": [
+    "type:task",
+    "epic:repository-state-quality",
+    "story:planning-boundary-collapse",
+    "milestone:v1.0"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Mutation-session retry combinator foundation",
+  "updated_at": "2026-07-24T07:20:11.830222048Z"
+}

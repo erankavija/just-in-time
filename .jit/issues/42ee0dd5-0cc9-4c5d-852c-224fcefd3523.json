@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T07:19:49.615370967Z",
+  "dependencies": [
+    "28254964-d14b-4565-9ca4-cc226475e4e6"
+  ],
+  "description": "The three integration-test-only rule-serialization publics move behind the `test-support` feature so they leave the default public surface.\n\n## Background\n\n`SerializedRuleSet`, `SchemaFile`, and `serialize_ruleset` (`crates/jit/src/repository_state/rule_serialize.rs`) are `pub` solely for integration-test crates; they have no production consumer outside `repository_state`. Rather than leaving them on the default surface, they adopt the established `test-support` feature twin pattern: public under the feature, `pub(crate)` without it, so internal callers resolve identically in both feature states.\n\n## Success Criteria\n\n- [hard] REQ-01: `SerializedRuleSet`, `SchemaFile`, and `serialize_ruleset` are exposed only under the `test-support` feature - public with the feature, `pub(crate)` without - and are absent from the default public surface.\n- [hard] REQ-02: Crate-internal callers of these items resolve identically whether or not the feature is enabled.\n- [hard] REQ-03: The workspace builds, `cargo test --workspace` passes, and `cargo clippy --lib` on the default surface reports zero warnings.\n\n## Notes\n\nThe items adopt the same feature-on-`pub` / feature-off-`pub(crate)` twin pattern used for the other test-support surfaces.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "42ee0dd5-0cc9-4c5d-852c-224fcefd3523",
+  "labels": [
+    "type:task",
+    "epic:repository-state-quality",
+    "story:hygiene-and-docs",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Gate the test-only rule-serialization publics behind test-support",
+  "updated_at": "2026-07-24T07:19:49.615370967Z"
+}

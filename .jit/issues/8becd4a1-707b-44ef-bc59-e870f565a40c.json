@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T07:19:49.615370967Z",
+  "dependencies": [
+    "d159f9d4-29ef-49cf-badd-11894026e7ba"
+  ],
+  "description": "A new public `repair_target_paths` introspection API supplies the drift-independent set of paths that repair may materialize, and the repair-path test derives its coverage from that authority instead of a hand-maintained list.\n\n## Background\n\nThe repair test at `crates/jit/tests/fast_rules/derived_state_repair_tests.rs` re-lists eleven repair paths by hand paired with a loose `assert!(count >= 5)`, so a new derived target silently under-covers. Every family in `derive_repair` (`crates/jit/src/repository_state/mod.rs`) is drift-filtered - projections skip when bytes already match, the default ruleset writes only on diff, profile targets push only when the entry differs - so a set derived from walked actions would enumerate only currently-drifting paths. The eleven literals also mix repair write-targets with three fixture-input-only paths (`index.json`, `events.jsonl`, the profile record) that `derive_repair` never writes.\n\nAdd `repository_state::repair_target_paths(image, declarations, profiles) -> Result<BTreeSet<VirtualPath>>` enumerating the complete drift-independent set of paths repair may materialize: default-ruleset targets guarded by the capture spec, configured-projection targets, and the keys of `compose_profile_targets` per claims. Obsolete-schema deletions stay excluded by definition, since their targets are occupant-proven paths deliberately outside the declared set. `derive_repair` is not refactored to consume it - it needs composed bytes per target, which a path set cannot supply - so the authority relationship is enforced by a unit test asserting every non-delete `derive_repair` action target is a member of `repair_target_paths` on the same inputs.\n\nThe repair test replaces its hand-list with `repair_target_paths(...)` plus the three explicit fixture-input paths, and gains a full-drift coverage assertion: seed every target stale and assert the repair delta's write/set-mode target set equals `repair_target_paths(...)` exactly. `repair_target_paths` is an ordinary public introspection API, so both the subset unit test and the full-drift coverage test call it without any test-only feature gating.\n\n## Success Criteria\n\n- [hard] REQ-01: A public `repository_state::repair_target_paths(image, declarations, profiles) -> Result<BTreeSet<VirtualPath>>` enumerates the drift-independent repair-target set (default-ruleset targets, configured-projection targets, profile-target keys; obsolete-schema deletions excluded).\n- [hard] REQ-02: A unit test asserts every non-delete `derive_repair` action target is a member of `repair_target_paths` on the same inputs.\n- [hard] REQ-03: The repair test replaces its hand-maintained list with `repair_target_paths(...)` plus the three explicit fixture-input paths (`index.json`, `events.jsonl`, the profile record).\n- [hard] REQ-04: A full-drift coverage test seeds every target stale and asserts the repair delta's write/set-mode target set equals `repair_target_paths(...)` exactly.\n\n## Notes\n\nThe tests call `repair_target_paths` with no test-only feature gating. The suite adds no integration-test target.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "8becd4a1-707b-44ef-bc59-e870f565a40c",
+  "labels": [
+    "type:task",
+    "epic:repository-state-quality",
+    "story:enforced-guarantees",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Derived repair-target coverage authority",
+  "updated_at": "2026-07-24T07:19:49.615370967Z"
+}

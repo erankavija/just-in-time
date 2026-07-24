@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T07:19:49.615370967Z",
+  "dependencies": [
+    "d159f9d4-29ef-49cf-badd-11894026e7ba"
+  ],
+  "description": "MCP schema generation completes cleanly, with the `$ref` resolver's warning cause fixed at the generator boundary rather than the warning calls suppressed.\n\n## Background\n\nThe `$ref` resolver in `mcp-server/lib/tool-generator.js` emits `console.error` warnings for circular references, missing definitions, and unrecognized `$ref` formats. The MCP schema tests pass but emit numerous unresolved-definition and circular-reference warnings, whose volume can hide new regressions. The fix addresses the cause at the generator boundary so generation resolves cleanly, rather than silencing the warning calls.\n\n## Success Criteria\n\n- [hard] REQ-01: MCP schema generation through `mcp-server/lib/tool-generator.js` completes without emitting circular-reference, missing-definition, or unrecognized-`$ref` warnings.\n- [hard] REQ-02: The cause is fixed at the generator boundary rather than by suppressing the warning calls.\n- [hard] REQ-03: `npm test` in `mcp-server/` passes.\n\n## Notes\n\nFix the resolution boundary so the warnings do not arise, rather than removing the diagnostic calls.",
+  "documents": [],
+  "gates_required": [
+    "mcp-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "27c8256a-be51-4561-a9b8-3fc7648bf801",
+  "labels": [
+    "type:task",
+    "epic:repository-state-quality",
+    "story:hygiene-and-docs",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Clean up MCP schema-generator warnings",
+  "updated_at": "2026-07-24T07:19:49.615370967Z"
+}

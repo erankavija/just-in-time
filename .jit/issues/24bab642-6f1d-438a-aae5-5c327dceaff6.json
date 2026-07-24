@@ -21,7 +21,7 @@
     },
     "coverage-preview": {
       "status": "passed",
-      "updated_at": "2026-07-24T05:27:19.294471772Z",
+      "updated_at": "2026-07-24T07:20:53.292893525Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "breakdown: Repository-state quality hardening",
-  "updated_at": "2026-07-24T06:39:15.834132328Z"
+  "updated_at": "2026-07-24T07:20:53.292893525Z"
 }

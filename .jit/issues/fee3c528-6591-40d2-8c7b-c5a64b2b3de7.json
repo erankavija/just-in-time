@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T07:19:49.615370967Z",
+  "dependencies": [
+    "24bab642-6f1d-438a-aae5-5c327dceaff6"
+  ],
+  "description": "The `Initialize` and `ApplyProfile` materialization request variants flow through the shared plan-identity tail that the other request variants already reach.\n\n## Background\n\nThe transaction kernel routes `MaterializationRequest` variants through a shared plan-identity tail, but two of them - `Initialize` and `ApplyProfile` - return early and never reach that tail. This task folds both variants into the shared tail so plan identity is derived uniformly for every request variant.\n\n## Success Criteria\n\n- [hard] REQ-01: The `Initialize` and `ApplyProfile` request variants flow through the shared plan-identity tail rather than returning early.\n- [hard] REQ-02: A test asserts that a plan identity is produced for all five `MaterializationRequest` variants (`SemanticMutation`, `RenderConfiguredProjections`, `RepairDerivedState`, `Initialize`, `ApplyProfile`).\n- [hard] REQ-03: Existing behavior is preserved for every request variant; the materialization tests pass unchanged.\n\n## Notes\n\nIf folding a variant into the shared tail proves genuinely impossible, that is resolved by a formal amendment to the plan, not by an in-task exemption.",
+  "documents": [],
+  "first_ready_at": "2026-07-24T07:19:49.615370967Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "fee3c528-6591-40d2-8c7b-c5a64b2b3de7",
+  "labels": [
+    "type:task",
+    "epic:repository-state-quality",
+    "story:planning-boundary-collapse",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Plan-identity tail for initialize and profile-application requests",
+  "updated_at": "2026-07-24T07:20:22.518669229Z"
+}

@@ -1,19 +1,18 @@
 {
   "assignee": null,
   "context": {},
-  "created_at": "2026-07-24T05:40:13.773904219Z",
+  "created_at": "2026-07-24T07:19:49.615370967Z",
   "dependencies": [
-    "603b5c5b-d76a-4b0c-bbdb-af8aa806ada9"
+    "d159f9d4-29ef-49cf-badd-11894026e7ba"
   ],
   "description": "Move the repository-state store's oversized inline test module into a sibling file and rename tests that are named after review rounds to the scenario-describing convention.\n\n## Background\n\n`crates/jit/src/storage/repository_state_store.rs` carries 1,805 lines of production code followed by a ~3,900-line inline `#[cfg(test)] mod tests` (starting at line 1806) holding 66 tests. The module must move to a sibling test file so the production file carries only production code. The relocated module stays a `#[cfg(test)]` unit-test module compiled into the `jit` library (for example via a `#[path]`-declared or child-module sibling file), not a new integration-test crate: `@/inv/bounded-rust-build-footprint` constrains integration-test *target count*, not file count, so the split must add zero integration-test targets.\n\nSeven tests in that module are named after review rounds rather than the behavior under test, which is meaningless without the review transcript and violates the `test_<function>_<scenario>` convention:\n\n- `test_finding2_worktree_companion_is_worktree_colocated_and_cleaned` (line 4022)\n- `test_finding2_rollback_restores_worktree_action_from_companion_backup` (line 4090)\n- `test_finding2_companion_creation_failure_recovers_clean` (line 4138)\n- `test_finding2_orphan_companion_is_swept_on_open` (line 4180)\n- `test_f2_committed_recovery_tolerates_edited_worktree_target` (line 4350)\n- `test_a1_rolledback_recovery_tolerates_edited_worktree_target` (line 4624)\n- `test_a5_prepared_delete_recovery_restores_original` (line 4737)\n\nEach must be renamed to `test_<function>_<scenario>` describing the function and scenario it exercises; the existing scenario suffixes already indicate the behavior and can seed the new names.\n\n## Success Criteria\n\n- [hard] REQ-01: The inline `#[cfg(test)] mod tests` is relocated out of `storage/repository_state_store.rs` into a sibling test file compiled as the same unit-test module, and the production file retains only production code.\n- [hard] REQ-02: The relocated module remains a `#[cfg(test)]` unit-test module of the `jit` library and adds no integration-test target, keeping the Rust build footprint within its enforced budgets.\n- [hard] REQ-03: No test name in the module retains a `test_finding2_`, `test_f2_`, `test_a1_`, or `test_a5_` review-round prefix; each such test is renamed to a `test_<function>_<scenario>` name describing the behavior under test.\n- [hard] REQ-04: The full store test suite compiles and passes after the move and renames, with the same set of tests as before (none dropped or skipped).\n\n## Notes\n\nThe contention-test task adds its own separate in-crate sibling test module, so this relocation and that addition are disjoint and need no coordination.",
   "documents": [],
-  "first_ready_at": "2026-07-24T05:40:13.773904219Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {},
-  "id": "65199b21-6930-44d4-9549-c5ac1253ad4d",
+  "id": "e6d5e440-ad70-4303-8329-db518efbf595",
   "labels": [
     "type:task",
     "epic:repository-state-quality",
@@ -23,5 +22,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Split the store test module to a sibling file and fix review-round test names",
-  "updated_at": "2026-07-24T05:43:08.402685023Z"
+  "updated_at": "2026-07-24T07:19:49.615370967Z"
 }

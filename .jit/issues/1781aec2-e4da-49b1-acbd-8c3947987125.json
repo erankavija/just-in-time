@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T07:19:49.615370967Z",
+  "dependencies": [
+    "7ab27a9b-802b-4d6e-86de-079f09d06a5e"
+  ],
+  "description": "The fallible `VirtualPath::data(\"literal\")` construction sites for well-known repository paths are rewritten to infallible references to the `VirtualPath` path constants.\n\n## Background\n\nWell-known repository paths (for example `gates.toml`, `events.jsonl`, `config.toml`, `index.json`, `rules.toml`, `invariants.toml`, `templates.toml`) are constructed at many fallible `VirtualPath::data(\"literal\")?` call sites across the crate - in the repository-state module, the storage layer, the command layer, and validation. With the well-known paths available as `pub const` associated items on `VirtualPath`, each such site becomes an infallible const reference (`VirtualPath::GATES` and the rest), removing the `?` and its unreachable error path.\n\nTest-fixture sites that construct arbitrary non-well-known paths (for example scratch names in unit tests) keep using the fallible constructor and are out of scope.\n\n## Success Criteria\n\n- [hard] REQ-01: The fallible well-known-path `VirtualPath::data(\"literal\")?` production sites are rewritten to infallible references to the corresponding `VirtualPath` path constants.\n- [hard] REQ-02: No well-known repository path is constructed through the fallible constructor on a production path after the migration.\n- [hard] REQ-03: The workspace builds and the existing tests pass unchanged.\n\n## Notes\n\nTest-fixture construction of arbitrary non-well-known paths is unchanged.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "1781aec2-e4da-49b1-acbd-8c3947987125",
+  "labels": [
+    "type:task",
+    "epic:repository-state-quality",
+    "story:enforced-guarantees",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Migrate well-known path sites to VirtualPath constants",
+  "updated_at": "2026-07-24T07:19:49.615370967Z"
+}
