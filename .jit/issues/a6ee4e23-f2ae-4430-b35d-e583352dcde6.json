@@ -8,6 +8,7 @@
   ],
   "description": "The two finalizers in the repository-materialization module - gate-registry edit and archive execution - return typed `RepositoryStateError` values through dedicated error types instead of stringified producer errors.\n\n## Background\n\n`finalize_gate_registry_edit` (`crates/jit/src/repository_state/mod.rs`) and `finalize_archive_execution` (`crates/jit/src/repository_state/archive.rs`) reach exit mapping through untyped error values. This task gives each a typed error family composed into `RepositoryStateError`.\n\n1. `finalize_gate_registry_edit` returns `Result<_, RepositoryStateError>` via a new `GateRegistryEditError { MissingEdit, MultipleEdits, DeclarationMismatch }` variant, with `#[from]` variants for its `?`-propagated leaf classes (`MutationError`, `GateDeclarationError`, `OverlayError`, `SeedError` join the existing `Delta`/`PlanHash`/`Layout`).\n2. `finalize_archive_execution` returns `Result<_, RepositoryStateError>` via a new `ArchiveExecutionError` enumerating the archive-specific classes at their construction sites - `MissingDestination`, `MissingContentIdentity`, `ContentIdentityChanged`, `NonFileSource { role }`, `UnsafeOccupant { role }`, `MissingPlannedDocument`, `RelinkTargetsPinned`, `RelinkStale`, `MissingCapturedIssue`, `MalformedIssueJson(#[source] serde_json::Error)`, `IssueIdMismatch`, `CapturedIssueCacheLost`, `MissingChangedIssue` - plus `#[from]` for its typed leaves (`EventLogError`, `PlanError`, and the typed `validate_proposed_layout`).\n\n`String`-typed variant fields carry raw identifiers, not pre-rendered messages; all rendering lives in `Display` impls.\n\n## Success Criteria\n\n- [hard] REQ-01: `finalize_gate_registry_edit` returns a typed `RepositoryStateError` via a `GateRegistryEditError` variant with the classes above and `#[from]` compositions for its propagated leaves.\n- [hard] REQ-02: `finalize_archive_execution` returns a typed `RepositoryStateError` via an `ArchiveExecutionError` variant enumerating the archive-specific classes and `#[from]` for its typed leaves.\n- [hard] REQ-03: No error value in these two finalizers is constructed with `format!`; `String`-typed fields hold raw identifiers and rendering lives in `Display` impls.\n- [hard] REQ-04: Existing behavior and exit codes are preserved; the finalizer failure-path tests pass unchanged.\n\n## Notes\n\nThis work composes on the typed producer error family, since `ArchiveExecutionError` embeds the typed `validate_proposed_layout` result. The exhaustive exit-code match over `RepositoryStateError` is separate work.",
   "documents": [],
+  "done_at": "2026-07-24T13:00:33.524007146Z",
   "first_ready_at": "2026-07-24T11:26:31.233538699Z",
   "gates_required": [
     "cargo-ci",
@@ -33,7 +34,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Typed finalizer errors for gate-registry edit and archive execution",
-  "updated_at": "2026-07-24T12:59:05.441486533Z"
+  "updated_at": "2026-07-24T13:00:33.524007146Z"
 }

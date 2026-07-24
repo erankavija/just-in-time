@@ -9,6 +9,7 @@
   ],
   "description": "The binary's exit-code mapping matches `RepositoryStateError` exhaustively with no fallback arm, and the remaining untyped error signatures across the repository-materialization module are retired.\n\n## Background\n\nWith producer and finalizer failures typed, the exit-code boundary can stop probing by downcast. This task closes the boundary and sweeps the residual untyped surfaces module-wide.\n\n1. `main.rs::error_to_exit_code` becomes one exhaustive match over `RepositoryStateError` with no `_ =>` arm: projection, managed-document, profile-conflict, ambiguous-ownership, gate-registry-edit, and archive-execution variants map to the validation-failed exit; capture and parse producer variants to the generic exit; layout variants to the invalid-argument exit. The profile `--json` boundary keeps its single sanctioned `downcast_ref::<RepositoryStateError>` on the anyhow CLI transport, but `profile_json_error` matches the `ProfileTargetConflict` variant (and the profile producer variants map to the profile conflict and profile error codes explicitly) instead of a boolean predicate, which is deleted.\n2. The residual sweep retires the remaining `anyhow`-typed signatures and `format!`-constructed error values elsewhere in `crates/jit/src/repository_state/`, including the export, initialization, and profile-application paths, so no function in the module carries an `anyhow` type in its signature and no error value is built with `format!`.\n\n## Success Criteria\n\n- [hard] REQ-01: `main.rs::error_to_exit_code` maps `RepositoryStateError` through an exhaustive match with no fallback (`_ =>`) arm.\n- [hard] REQ-02: `profile_json_error` matches the `ProfileTargetConflict` variant and the profile producer variants map to explicit profile exit codes; the former boolean profile-target-conflict predicate is deleted.\n- [hard] REQ-03: No function in `crates/jit/src/repository_state/` carries an `anyhow` type in its signature.\n- [hard] REQ-04: No error value in `crates/jit/src/repository_state/` is constructed with `format!`; `String`-typed error-variant fields hold raw identifiers and rendering lives in `Display` impls.\n- [hard] REQ-05: Existing exit codes and behavior are preserved; the failure-path and exit-code tests pass unchanged.\n\n## Notes\n\nThis work depends on the typed producer and finalizer error families being in place so the exhaustive match can cover every variant.",
   "documents": [],
+  "first_ready_at": "2026-07-24T13:00:37.206350632Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Exhaustive exit-code mapping and residual error-string sweep",
-  "updated_at": "2026-07-24T07:35:00.151305044Z"
+  "updated_at": "2026-07-24T13:00:37.206350632Z"
 }
