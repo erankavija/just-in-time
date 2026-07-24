@@ -433,6 +433,30 @@ pub(crate) struct ProfileTargetMaterialization {
     pub(crate) mode: FileMode,
 }
 
+/// Complete producer output awaiting the shared plan-identity tail.
+struct MaterializationDerivation {
+    delta: RepositoryDelta,
+    seed: RepositorySeed,
+    intent: MaterializationIntent,
+    profile_targets: Vec<ProfileTargetMaterialization>,
+}
+
+impl MaterializationDerivation {
+    fn new(delta: RepositoryDelta, seed: RepositorySeed, intent: MaterializationIntent) -> Self {
+        Self {
+            delta,
+            seed,
+            intent,
+            profile_targets: Vec::new(),
+        }
+    }
+
+    fn with_profile_targets(mut self, targets: Vec<ProfileTargetMaterialization>) -> Self {
+        self.profile_targets = targets;
+        self
+    }
+}
+
 impl MaterializationPlan {
     /// The exact bounded repository image closed into this plan.
     pub fn image(&self) -> &RepositoryImage {
@@ -544,14 +568,16 @@ pub fn derive_materialization(
     image: &RepositoryImage,
     request: MaterializationRequest<'_>,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
-    let (delta, projection_counts, seed, intent) = match request {
+    let (derivation, projection_counts) = match request {
         MaterializationRequest::SemanticMutation { declarations, seed } => {
             let delta = derive_semantic_mutation(image, &declarations)?;
             (
-                delta,
+                MaterializationDerivation::new(
+                    delta,
+                    (*seed).clone(),
+                    MaterializationIntent::SemanticMutation,
+                ),
                 Default::default(),
-                seed,
-                MaterializationIntent::SemanticMutation,
             )
         }
         MaterializationRequest::RenderConfiguredProjections {
@@ -561,10 +587,12 @@ pub fn derive_materialization(
         } => {
             let (delta, counts) = derive_project_render(image, &declarations, selected.as_ref())?;
             (
-                delta,
+                MaterializationDerivation::new(
+                    delta,
+                    (*seed).clone(),
+                    MaterializationIntent::RenderConfiguredProjections { selected },
+                ),
                 counts,
-                seed,
-                MaterializationIntent::RenderConfiguredProjections { selected },
             )
         }
         MaterializationRequest::RepairDerivedState {
@@ -574,23 +602,34 @@ pub fn derive_materialization(
         } => {
             let delta = derive_repair(image, &declarations, profiles)?;
             (
-                delta,
+                MaterializationDerivation::new(
+                    delta,
+                    (*seed).clone(),
+                    MaterializationIntent::RepairDerivedState,
+                ),
                 Default::default(),
-                seed,
-                MaterializationIntent::RepairDerivedState,
             )
         }
-        MaterializationRequest::Initialize { scaffold, context } => {
-            return initialize::derive_initialization_plan(image, scaffold, context)
-                .map_err(Into::into);
-        }
-        MaterializationRequest::ApplyProfile { profile, context } => {
-            return initialize::derive_profile_application_plan(image, &profile, context)
-                .map_err(Into::into);
-        }
+        MaterializationRequest::Initialize { scaffold, context } => (
+            initialize::derive_initialization(image, scaffold, context)?,
+            Default::default(),
+        ),
+        MaterializationRequest::ApplyProfile { profile, context } => (
+            initialize::derive_profile_application(image, &profile, context)?,
+            Default::default(),
+        ),
     };
-    MaterializationPlan::new(image, seed, &intent, delta)
-        .map(|plan| plan.with_projection_counts(projection_counts))
+    let MaterializationDerivation {
+        delta,
+        seed,
+        intent,
+        profile_targets,
+    } = derivation;
+    MaterializationPlan::new(image, &seed, &intent, delta)
+        .map(|plan| {
+            plan.with_projection_counts(projection_counts)
+                .with_profile_targets(profile_targets)
+        })
         .map_err(Into::into)
 }
 
