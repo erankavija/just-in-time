@@ -512,7 +512,9 @@ pub fn classify_artifacts(
 }
 
 /// Verify that every supported edge still resolves to an available path after execution.
-pub fn validate_proposed_layout(plan: &ArtifactPlan) -> anyhow::Result<()> {
+pub fn validate_proposed_layout(
+    plan: &ArtifactPlan,
+) -> Result<(), crate::repository_state::ProducerError> {
     let by_source = plan
         .artifacts()
         .iter()
@@ -534,7 +536,9 @@ pub fn validate_proposed_layout(plan: &ArtifactPlan) -> anyhow::Result<()> {
                 continue;
             }
             let target = by_source.get(target_source).ok_or_else(|| {
-                anyhow!("supported archive edge target is absent from plan: {target_source}")
+                crate::repository_state::ProducerError::ProposedLayoutTargetAbsent {
+                    target: target_source.to_string(),
+                }
             })?;
             let available = proposed_available_paths(target);
             for parent_path in proposed_available_paths(parent) {
@@ -549,12 +553,13 @@ pub fn validate_proposed_layout(plan: &ArtifactPlan) -> anyhow::Result<()> {
                     EdgeResolutionMode::External => continue,
                 };
                 if !available.contains(&resolved) {
-                    bail!(
-                        "supported edge {} from {} resolves to {} in the proposed layout, not an available target location ({})",
-                        edge.reference,
-                        parent.source(),
-                        resolved,
-                        available.iter().cloned().collect::<Vec<_>>().join(", ")
+                    return Err(
+                        crate::repository_state::ProducerError::ProposedLayoutEdgeUnavailable {
+                            reference: edge.reference.clone(),
+                            parent: parent.source().to_string(),
+                            resolved,
+                            available: available.iter().cloned().collect(),
+                        },
                     );
                 }
             }
@@ -1443,7 +1448,18 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        assert!(validate_proposed_layout(&plan).is_err());
+        let error = validate_proposed_layout(&plan).expect_err("broken edge must be rejected");
+        assert!(matches!(
+            error,
+            crate::repository_state::ProducerError::ProposedLayoutEdgeUnavailable {
+                ref reference,
+                ref parent,
+                ref resolved,
+                ..
+            } if reference == "target.png"
+                && parent == "fixtures/root.md"
+                && resolved == "archive/fixtures/target.png"
+        ));
     }
 
     fn locations(

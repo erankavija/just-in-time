@@ -16,8 +16,9 @@ use super::materialize::{
 };
 use super::{
     apply_overlay, compose_managed_documents, declarations_from_image, FileMode,
-    ManagedDocumentClaim, RegionPlacement, RepositoryAction, RepositoryEntry, RepositoryImage,
-    RepositoryStateError, TargetClaim, VirtualPath,
+    ManagedDocumentClaim, ProducerError, ProfileRegistryParseError, RegionPlacement,
+    RepositoryAction, RepositoryEntry, RepositoryImage, RepositoryStateError, TargetClaim,
+    VirtualPath,
 };
 use crate::config::{ProjectionKinds, ProjectionMode, ProjectionStyle};
 use crate::domain::ProfileOrigin;
@@ -261,18 +262,20 @@ pub(crate) fn profile_capture_closure(
         registries
             .into_iter()
             .map(|(path, (bytes, _))| (path, Some(bytes))),
-    )
-    .map_err(|error| RepositoryStateError::producer(error.into()))?;
-    let config =
-        super::materialize::assemble_config(&proposed).map_err(RepositoryStateError::producer)?;
+    )?;
+    let config = super::materialize::assemble_config(&proposed)?;
     let rules = proposed
         .file_bytes(&VirtualPath::data("rules.toml")?)
-        .map_err(|error| RepositoryStateError::producer(error.into()))?
-        .map(std::str::from_utf8)
+        .map_err(ProducerError::from)?
+        .map(|bytes| String::from_utf8(bytes.to_vec()))
         .transpose()
-        .map_err(|error| RepositoryStateError::producer(error.into()))?;
-    super::materialize::render_capture_closure(proposed.layout(), &config, &[], rules)
-        .map_err(RepositoryStateError::producer)
+        .map_err(ProducerError::from)?;
+    Ok(super::materialize::render_capture_closure(
+        proposed.layout(),
+        &config,
+        &[],
+        rules.as_deref(),
+    )?)
 }
 
 /// Derive every profile-owned target's exact final bytes and mode from a captured
@@ -300,9 +303,8 @@ pub(super) fn compose_profile_targets(
     for asset in claims.assets {
         let path = asset.claim.target().clone();
         if !asset.replace_owned && !projection_targets.contains(&path) {
-            if let RepositoryEntry::File { bytes, .. } = base
-                .entry(&path)
-                .map_err(|error| RepositoryStateError::producer(error.into()))?
+            if let RepositoryEntry::File { bytes, .. } =
+                base.entry(&path).map_err(ProducerError::from)?
             {
                 if bytes != &asset.bytes {
                     return Err(RepositoryStateError::ProfileTargetConflict(
@@ -343,9 +345,8 @@ pub(super) fn compose_profile_targets(
     let overlay = targets
         .iter()
         .map(|(path, (bytes, _))| (path.clone(), Some(bytes.clone())));
-    let proposed = apply_overlay(base, overlay)
-        .map_err(|error| RepositoryStateError::producer(error.into()))?;
-    let config = assemble_config(&proposed).map_err(RepositoryStateError::producer)?;
+    let proposed = apply_overlay(base, overlay)?;
+    let config = assemble_config(&proposed)?;
     let schema_overlay = serialized_default_ruleset(&config)
         .schema_files
         .into_iter()
@@ -356,17 +357,15 @@ pub(super) fn compose_profile_targets(
             ))
         })
         .collect::<Result<Vec<_>, super::RepositoryLayoutError>>()?;
-    let proposed = apply_overlay(&proposed, schema_overlay)
-        .map_err(|error| RepositoryStateError::producer(error.into()))?;
+    let proposed = apply_overlay(&proposed, schema_overlay)?;
     let declarations =
-        declarations_from_image(&proposed).map_err(RepositoryStateError::producer)?;
+        declarations_from_image(&proposed).map_err(ProducerError::DeclarationAssembly)?;
     let projection_actions = compose_configured_projections(
         &proposed,
         declarations.config(),
         &declarations.borrowed(),
         None,
-    )
-    .map_err(RepositoryStateError::projection_producer)?
+    )?
     .actions;
     for action in projection_actions {
         if let RepositoryAction::WriteFile { path, bytes, .. } = action {
@@ -387,17 +386,10 @@ fn merge_semantic_contributions(
         let target = contribution.registry_path().to_string();
         if !documents.contains_key(&target) {
             let path = base.layout().classify_repository_relative(&target)?;
-            let existing = match base
-                .entry(&path)
-                .map_err(|error| RepositoryStateError::producer(error.into()))?
-            {
+            let existing = match base.entry(&path).map_err(ProducerError::from)? {
                 RepositoryEntry::File { bytes, mode, .. } => Some((bytes.clone(), *mode)),
                 RepositoryEntry::Absent => None,
-                _ => {
-                    return Err(RepositoryStateError::Producer(format!(
-                        "profile registry '{target}' is not a regular file"
-                    )))
-                }
+                _ => return Err(ProducerError::ProfileRegistryNotFile { target }.into()),
             };
             documents.insert(target.clone(), MergeDocument::load(&target, existing)?);
         }
@@ -424,15 +416,13 @@ fn configured_projection_targets(
     let config_path = VirtualPath::data("config.toml")?;
     let bytes = match registries.get(&config_path) {
         Some((bytes, _)) => Some(bytes.as_slice()),
-        None => base
-            .file_bytes(&config_path)
-            .map_err(|error| RepositoryStateError::producer(error.into()))?,
+        None => base.file_bytes(&config_path).map_err(ProducerError::from)?,
     };
     let Some(bytes) = bytes else {
         return Ok(BTreeSet::new());
     };
-    let declarations = crate::declarations::parse_configuration(bytes)
-        .map_err(|error| RepositoryStateError::Producer(error.to_string()))?;
+    let declarations =
+        crate::declarations::parse_configuration(bytes).map_err(ProducerError::from)?;
     declarations
         .projections
         .values()
@@ -456,17 +446,21 @@ impl MergeDocument {
         existing: Option<(Vec<u8>, FileMode)>,
     ) -> Result<Self, RepositoryStateError> {
         let (bytes, mode) = existing.unwrap_or_else(|| (Vec::new(), FileMode::Regular));
-        let text =
-            std::str::from_utf8(&bytes).map_err(|error| profile_registry_error(target, error))?;
+        let text = std::str::from_utf8(&bytes)
+            .map_err(|error| profile_registry_error(target, error.into()))?;
         let document = text
             .parse::<DocumentMut>()
-            .map_err(|error| profile_registry_error(target, error))?;
+            .map_err(|error| profile_registry_error(target, error.into()))?;
         Ok(Self { document, mode })
     }
 }
 
-fn profile_registry_error(target: &str, error: impl std::fmt::Display) -> RepositoryStateError {
-    RepositoryStateError::Producer(format!("invalid profile registry '{target}': {error}"))
+fn profile_registry_error(target: &str, source: ProfileRegistryParseError) -> RepositoryStateError {
+    ProducerError::ProfileRegistryParse {
+        target: target.to_string(),
+        source: Box::new(source),
+    }
+    .into()
 }
 
 fn merge_contribution(
@@ -575,13 +569,13 @@ fn merge_set_string(
         SetStringTarget::StrategicTypes => semantic.pointer("/type_hierarchy/strategic_types"),
     };
     if let Some(values) = values {
-        let values = values
-            .as_array()
-            .ok_or_else(|| profile_registry_error(registry, "set target is not an array"))?;
+        let values = values.as_array().ok_or_else(|| {
+            profile_registry_error(registry, ProfileRegistryParseError::SetTargetNotArray)
+        })?;
         if values.iter().any(|value| !value.is_string()) {
             return Err(profile_registry_error(
                 registry,
-                "set target contains a non-string member",
+                ProfileRegistryParseError::SetTargetNonStringMember,
             ));
         }
         if values.iter().any(|value| value.as_str() == Some(candidate)) {
@@ -613,13 +607,17 @@ fn merge_keyed_array(
         let Some(actual) = table.get(field).and_then(Item::as_str) else {
             return Err(profile_registry_error(
                 registry,
-                format!("entry lacks '{field}' identity"),
+                ProfileRegistryParseError::MissingIdentity {
+                    field: field.to_string(),
+                },
             ));
         };
         if !identities.insert(actual.to_string()) {
             return Err(profile_registry_error(
                 registry,
-                format!("duplicate '{field}' identity"),
+                ProfileRegistryParseError::DuplicateIdentity {
+                    field: field.to_string(),
+                },
             ));
         }
         if actual == identity {
@@ -663,7 +661,7 @@ fn semantic_document(
     document: &DocumentMut,
 ) -> Result<JsonValue, RepositoryStateError> {
     toml_edit::de::from_str(&document.to_string())
-        .map_err(|error| profile_registry_error(registry, error))
+        .map_err(|error| profile_registry_error(registry, error.into()))
 }
 
 fn equal_or_conflict(
@@ -675,9 +673,11 @@ fn equal_or_conflict(
     if existing == candidate {
         Ok(())
     } else {
-        Err(RepositoryStateError::Producer(format!(
-            "profile contribution '{identity}' conflicts in '{registry}'"
-        )))
+        Err(ProducerError::ProfileContributionConflict {
+            identity: identity.to_string(),
+            registry: registry.to_string(),
+        }
+        .into())
     }
 }
 
@@ -692,7 +692,14 @@ fn ensure_table<'a>(
     parent
         .get_mut(key)
         .and_then(Item::as_table_mut)
-        .ok_or_else(|| profile_registry_error(registry, format!("'{key}' is not a table")))
+        .ok_or_else(|| {
+            profile_registry_error(
+                registry,
+                ProfileRegistryParseError::NotTable {
+                    key: key.to_string(),
+                },
+            )
+        })
 }
 
 fn ensure_inline_table<'a>(
@@ -706,7 +713,14 @@ fn ensure_inline_table<'a>(
     parent
         .get_mut(key)
         .and_then(Item::as_inline_table_mut)
-        .ok_or_else(|| profile_registry_error(registry, format!("'{key}' is not an inline table")))
+        .ok_or_else(|| {
+            profile_registry_error(
+                registry,
+                ProfileRegistryParseError::NotInlineTable {
+                    key: key.to_string(),
+                },
+            )
+        })
 }
 
 fn ensure_array<'a>(
@@ -720,7 +734,14 @@ fn ensure_array<'a>(
     parent
         .get_mut(key)
         .and_then(Item::as_array_mut)
-        .ok_or_else(|| profile_registry_error(registry, format!("'{key}' is not an array")))
+        .ok_or_else(|| {
+            profile_registry_error(
+                registry,
+                ProfileRegistryParseError::NotArray {
+                    key: key.to_string(),
+                },
+            )
+        })
 }
 
 fn ensure_array_of_tables<'a>(
@@ -741,7 +762,12 @@ fn ensure_array_of_tables<'a>(
         .get_mut(key)
         .and_then(Item::as_array_of_tables_mut)
         .ok_or_else(|| {
-            profile_registry_error(registry, format!("'{key}' is not an array of tables"))
+            profile_registry_error(
+                registry,
+                ProfileRegistryParseError::NotArrayOfTables {
+                    key: key.to_string(),
+                },
+            )
         })?;
     Ok((array, preserved_comment))
 }
@@ -773,7 +799,9 @@ fn comment_fragment(raw: Option<&toml_edit::RawString>) -> Option<String> {
 fn json_object_to_table(value: &JsonValue, registry: &str) -> Result<Table, RepositoryStateError> {
     value
         .as_object()
-        .ok_or_else(|| profile_registry_error(registry, "contribution value is not a table"))?
+        .ok_or_else(|| {
+            profile_registry_error(registry, ProfileRegistryParseError::ContributionNotTable)
+        })?
         .iter()
         .try_fold(Table::new(), |mut table, (key, value)| {
             table.insert(key, json_to_item(value, registry)?);
@@ -792,13 +820,18 @@ fn json_to_item(value: &JsonValue, registry: &str) -> Result<Item, RepositorySta
 
 fn json_to_edit_value(value: &JsonValue, registry: &str) -> Result<Value, RepositoryStateError> {
     match value {
-        JsonValue::Null => Err(profile_registry_error(registry, "null is not a TOML value")),
+        JsonValue::Null => Err(profile_registry_error(
+            registry,
+            ProfileRegistryParseError::NullValue,
+        )),
         JsonValue::Bool(value) => Ok(Value::from(*value)),
         JsonValue::Number(value) => value
             .as_i64()
             .map(Value::from)
             .or_else(|| value.as_f64().map(Value::from))
-            .ok_or_else(|| profile_registry_error(registry, "unsupported numeric value")),
+            .ok_or_else(|| {
+                profile_registry_error(registry, ProfileRegistryParseError::UnsupportedNumericValue)
+            }),
         JsonValue::String(value) => Ok(Value::from(value.clone())),
         JsonValue::Array(values) => values
             .iter()
@@ -817,7 +850,7 @@ fn json_to_inline_table(
 ) -> Result<InlineTable, RepositoryStateError> {
     value
         .as_object()
-        .ok_or_else(|| profile_registry_error(registry, "value is not a table"))?
+        .ok_or_else(|| profile_registry_error(registry, ProfileRegistryParseError::ValueNotTable))?
         .iter()
         .try_fold(InlineTable::new(), |mut table, (key, value)| {
             table.insert(key, json_to_edit_value(value, registry)?);
@@ -827,7 +860,7 @@ fn json_to_inline_table(
 
 fn table_to_json(table: &Table, registry: &str) -> Result<JsonValue, RepositoryStateError> {
     toml_edit::de::from_str(&table.to_string())
-        .map_err(|error| profile_registry_error(registry, error))
+        .map_err(|error| profile_registry_error(registry, error.into()))
 }
 
 /// The captured file mode at `path`, or `Regular` for an absent or non-file entry.
@@ -835,11 +868,51 @@ fn existing_file_mode(
     base: &RepositoryImage,
     path: &VirtualPath,
 ) -> Result<FileMode, RepositoryStateError> {
-    match base
-        .entry(path)
-        .map_err(|error| RepositoryStateError::producer(error.into()))?
-    {
+    match base.entry(path).map_err(ProducerError::from)? {
         RepositoryEntry::File { mode, .. } => Ok(*mode),
         _ => Ok(FileMode::Regular),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_equal_or_conflict_preserves_raw_profile_identifiers() {
+        let error = equal_or_conflict(
+            ".jit/config.toml",
+            "task",
+            &serde_json::json!({"level": 3}),
+            &serde_json::json!({"level": 4}),
+        )
+        .expect_err("different contribution values must conflict");
+
+        assert!(matches!(
+            error,
+            RepositoryStateError::Producer(
+                ProducerError::ProfileContributionConflict { identity, registry }
+            ) if identity == "task" && registry == ".jit/config.toml"
+        ));
+    }
+
+    #[test]
+    fn test_profile_registry_error_preserves_raw_target_and_typed_source() {
+        let error = profile_registry_error(
+            ".jit/config.toml",
+            ProfileRegistryParseError::NotArray {
+                key: "strategic_types".to_string(),
+            },
+        );
+
+        assert!(matches!(
+            error,
+            RepositoryStateError::Producer(ProducerError::ProfileRegistryParse {
+                target,
+                source,
+            }) if target == ".jit/config.toml"
+                && matches!(*source, ProfileRegistryParseError::NotArray { ref key }
+                    if key == "strategic_types")
+        ));
     }
 }
