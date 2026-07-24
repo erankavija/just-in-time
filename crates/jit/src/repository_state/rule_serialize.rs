@@ -82,9 +82,9 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
 }
 
 /// Render a single rule as a standalone, reloadable `[[rules]]` block (with
-/// the same trailing blank line [`serialize_ruleset`] puts between rules) —
-/// the single-rule analogue used to append one newly-derived default rule
-/// without re-serializing the rest of the file.
+/// the same trailing blank line `serialize_ruleset` (this module) puts
+/// between rules) — the single-rule analogue used to append one
+/// newly-derived default rule without re-serializing the rest of the file.
 ///
 /// `rule.assert` must not be an [`Assertion::JsonSchema`] variant: that kind
 /// needs a companion `schemas/<name>.json` file, and this function renders
