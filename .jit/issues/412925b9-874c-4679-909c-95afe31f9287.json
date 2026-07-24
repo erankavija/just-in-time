@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T13:56:46.256712292Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "412925b9-874c-4679-909c-95afe31f9287",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bulk-update eligibility prefilter and session budget",
-  "updated_at": "2026-07-24T13:14:56.056797720Z"
+  "updated_at": "2026-07-24T13:56:46.256712292Z"
 }
