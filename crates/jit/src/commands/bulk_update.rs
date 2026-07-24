@@ -209,11 +209,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// that are not confirmed no-ops. [`UpdateOperations::is_provable_noop`]
     /// nominates skip CANDIDATES from the unlocked `matched` snapshot, but
     /// never authorizes a skip by itself; every candidate is confirmed inside
-    /// one shared, read-only verification session
+    /// one shared verification session
     /// ([`Self::confirm_bulk_noop_candidates`]) before being recorded as
     /// skipped, so repository-dependent validity is decided only inside a
     /// session — the shared one, or the normal per-issue one for anything the
-    /// shared session does not confirm.
+    /// shared session does not confirm. The shared session's own apply
+    /// carries no mutation, but still replays the same optimistic-concurrency
+    /// check a real mutation gets, so a confirmed skip is atomic with the
+    /// capture instant, not merely read against it (jit 412925b9, round 4).
     ///
     /// A verification-session failure (a capture or declaration error, not a
     /// candidate-level rejection) confirms NOTHING rather than aborting the
@@ -287,8 +290,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Confirm skip candidates nominated by
-    /// [`UpdateOperations::is_provable_noop`] inside one shared, read-only
-    /// verification session, returning the ids safe to record as skipped.
+    /// [`UpdateOperations::is_provable_noop`] inside one shared verification
+    /// session, returning the ids safe to record as skipped.
     ///
     /// `is_provable_noop` nominates candidates from the unlocked outer
     /// snapshot and never authorizes a skip on its own. Rather than
@@ -314,8 +317,26 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// rewrites `state` to `Gated` even when the request's target state
     /// already equalled the issue's current state -- is left for the caller
     /// to route through the normal per-issue session, exactly like a
-    /// non-candidate. This session never applies a plan, so an uncontended
-    /// run opens exactly one.
+    /// non-candidate.
+    ///
+    /// The confirmed set is not returned straight from this read: the
+    /// closure finalizes an EMPTY-delta [`MaterializationPlan`] over the
+    /// exact captured `image` and returns [`SessionStep::Apply`], so the
+    /// driver's `session.apply` still replays the same optimistic-concurrency
+    /// check a real mutation's apply gets -- a concurrent change to anything
+    /// within the captured footprint (the same footprint the per-issue
+    /// publication session captures, since both call
+    /// [`Self::capture_proposed_base`] identically) raises a retryable
+    /// conflict and the driver re-runs this whole closure against a fresh
+    /// capture, so a confirmed candidate is never stale by more than one
+    /// failed apply attempt -- the same guarantee any pre-change per-issue
+    /// outcome had. A zero-action delta is a kernel-level no-op short-
+    /// circuited before any journal, control-directory, or event-log write
+    /// (`execute_repository_delta`'s `if delta.actions().is_empty()` guard,
+    /// mirrored by `MemoryMutationSession::apply`), so a successful
+    /// confirmation leaves no observable trace and still counts as exactly
+    /// one session open, matching the `C * J + 1` budget (jit 412925b9,
+    /// round 4).
     fn confirm_bulk_noop_candidates(
         &self,
         candidates: &[&Issue],
@@ -325,7 +346,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{declarations_from_image, MutationContext};
+        use crate::repository_state::{declarations_from_image, finalize, MutationContext};
         use std::collections::HashSet;
 
         let layout = self.require_layout()?;
@@ -375,7 +396,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                     })
                     .collect::<HashSet<_>>();
 
-                Ok(SessionStep::Done(confirmed))
+                // Confirmation is atomic with the capture instant, not merely
+                // read against it: an empty-delta plan over this exact image
+                // carries no mutation, but `session.apply` still replays the
+                // same optimistic-concurrency check every real mutation gets
+                // -- if anything within the captured footprint changed since
+                // capture, apply raises a retryable conflict and the driver
+                // re-runs this whole closure against a fresh capture, so a
+                // confirmed candidate is never stale by more than one failed
+                // apply attempt. The kernel short-circuits a zero-action
+                // delta before any journal, control, or event write (see
+                // `execute_repository_delta` / `MemoryMutationSession::apply`),
+                // so a successful confirmation leaves no observable trace.
+                let plan = finalize(&layout, &image, &context, &[])?;
+                Ok(SessionStep::Apply(plan, confirmed))
             },
         )
     }
@@ -1859,5 +1893,63 @@ mod tests {
             executor.get_issue("changer").unwrap().priority,
             Priority::High
         );
+    }
+
+    /// REQ-03 (round 4 regression): a confirmed skip is atomic with the
+    /// verification session's capture instant, not merely read against it --
+    /// a change landing after the capture but before the (empty-delta) apply
+    /// must not be silently missed.
+    ///
+    /// Forces exactly one retry by injecting a single apply-time conflict via
+    /// `InMemoryStorage::inject_repository_state_apply_conflicts` (the
+    /// existing test seam `MemoryMutationSession::apply` consumes before its
+    /// own natural optimistic-concurrency check) -- this fires on the shared
+    /// verification session's FIRST apply, the very first apply anywhere in
+    /// this call. Combines it with the `OpenRace` probe infrastructure,
+    /// triggered on the SECOND session open (the retry that follows), to
+    /// mutate the sole candidate's priority away from the requested target
+    /// right as that retry begins -- strictly before its own capture reads
+    /// storage. The retry's capture therefore observes the changed value, so
+    /// the candidate must fail re-confirmation and demote to its own
+    /// per-issue session instead of being confirmed as a stale skip.
+    #[test]
+    fn test_apply_bulk_update_verification_apply_conflict_forces_fresh_recapture_not_stale_skip() {
+        use crate::commands::test_helpers::{with_open_race, OpenRaceAction};
+        use crate::query_engine::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        let mut noop_issue = create_test_issue("noop", State::Ready, vec![]);
+        noop_issue.priority = Priority::High; // matches the requested target
+        crate::commands::test_helpers::seed_issue(&storage, noop_issue.clone());
+
+        // Fires when the SECOND session opens -- the retry after the
+        // injected apply conflict below -- mutating "noop" away from the
+        // requested target before that retry's own capture reads it.
+        let mut changed = noop_issue;
+        changed.priority = Priority::Low;
+        let storage = with_open_race(storage, 2, OpenRaceAction::Save(Box::new(changed)));
+        // Force exactly one retry on the shared verification session's own
+        // (empty-delta) apply, as if its natural optimistic check had itself
+        // found the concurrent mutation.
+        storage.inject_repository_state_apply_conflicts(1);
+
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            priority: Some(Priority::High),
+            ..Default::default()
+        };
+
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+
+        assert_eq!(result.summary.total_matched, 1);
+        assert_eq!(
+            result.summary.total_skipped, 0,
+            "the candidate changed before the retry's capture, so it must not be confirmed as a stale skip"
+        );
+        assert_eq!(result.summary.total_modified, 1);
+        assert_eq!(result.summary.total_errors, 0);
+        assert_eq!(executor.get_issue("noop").unwrap().priority, Priority::High);
     }
 }
