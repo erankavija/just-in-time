@@ -184,7 +184,7 @@
           "title": "Managed-document splice round-trip property test",
           "story": "S2",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "done",
           "agent": "worker-ab69a4ef",
           "model": "sonnet"
         },
@@ -204,7 +204,7 @@
           "title": "Derived repair-target coverage authority",
           "story": "S2",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "done",
           "agent": "worker-8becd4a1",
           "model": "sonnet"
         },
@@ -223,8 +223,10 @@
           "title": "Feature-gate the test-support library surface",
           "story": "S2/S4-shared",
           "classification": "implementation",
-          "status": "pending-subwave",
-          "note": "serialized on repository_state_store.rs: e6d5e440 -> 28254964 -> dd5b43b6"
+          "status": "dispatched",
+          "note": "serialized on repository_state_store.rs: e6d5e440 -> 28254964 -> dd5b43b6",
+          "agent": "worker-28254964",
+          "model": "sonnet"
         },
         {
           "id": "27c8256a",
@@ -252,7 +254,7 @@
           "title": "Make manual CI script fail closed on skipped audits",
           "story": "S4",
           "classification": "implementation",
-          "status": "rework-4-whole-surface",
+          "status": "done",
           "agent": "worker-531ce80d",
           "model": "sonnet"
         },
@@ -272,7 +274,7 @@
           "title": "Split store test module + fix review-round test names",
           "story": "S4",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "done",
           "agent": "worker-e6d5e440",
           "model": "sonnet"
         },
