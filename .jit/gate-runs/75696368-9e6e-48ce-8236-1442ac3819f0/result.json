@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "deaf464408f4ed27d49384cc5ae6571f1e7fed50",
+  "completed_at": "2026-07-24T18:01:46.215605731Z",
+  "duration_ms": 113716,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/test-ci-manual.sh",
+        "id": "F1",
+        "line": 87,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-11"
+        ],
+        "severity": "high",
+        "summary": "The low audit threshold allows info-level npm advisories to reach the success outcome."
+      }
+    ],
+    "summary": "The low npm audit threshold still permits info-level advisories to reach the success outcome.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "531ce80d-0a0e-4aac-84ea-65dfbd2091c6",
+  "message": null,
+  "run_id": "75696368-9e6e-48ce-8236-1442ac3819f0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T17:59:52.499100685Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 964 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9548-a0aa-7a82-81d9-aacb73f387d7\n--------\nuser\n--- 951 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7fbfeb52, ef8e35fe, ade9111f, dfcc790f, c7d523b0, 55b01ae1, deaf4644 (all `jit:531ce80d`)\nPolicy sources: AGENTS.md; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/charter/D-11 — dev/vision/9db27a3a-charter.md; @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T17:54:08Z); code-review failed (exit 1, prior run 2026-07-24T17:20:30Z)\nTruncation recovery: script-only `git show -m` reads for ef8e35fe and 55b01ae1 after broad merge output truncated\n\n1. [blocking, issue-impact] Both npm audits use `--audit-level=low` at `scripts/test-ci-manual.sh:87` and `:99`. npm defines this option as the minimum severity that produces a non-zero exit; its valid lower `info` level can therefore report an advisory without setting `AUDIT_FAILED`, allowing “All CI checks complete.” This only partially addresses the prior moderate-threshold finding and still violates the non-clean-audit criterion and the requirement to resolve every reported advisory. References: `@/charter/D-11`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The low npm audit threshold still permits info-level advisories to reach the success outcome.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The low audit threshold allows info-level npm advisories to reach the success outcome.\",\"file\":\"scripts/test-ci-manual.sh\",\"line\":87,\"references\":[\"@/charter/D-11\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

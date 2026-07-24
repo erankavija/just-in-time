@@ -9224,3 +9224,4 @@
 {"from":"in_progress","id":"00d412d2-2160-4b5a-bbdd-c64407c94b8a","issue_id":"9503c8b4-d348-4e8d-9bc7-6f13e2d3c664","timestamp":"2026-07-24T17:52:50.235925677Z","to":"done","type":"issue_state_changed"}
 {"id":"722a0e77-921f-4527-90a4-518b394073e5","issue_id":"9503c8b4-d348-4e8d-9bc7-6f13e2d3c664","timestamp":"2026-07-24T17:52:50.235925677Z","type":"issue_completed"}
 {"gate_key":"cargo-ci","id":"55643c4c-34c4-4c49-a150-7ef5e190f77a","issue_id":"531ce80d-0a0e-4aac-84ea-65dfbd2091c6","timestamp":"2026-07-24T17:59:17.181927978Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"3dbe45bb-6660-43bc-a305-3bec85f35d15","issue_id":"531ce80d-0a0e-4aac-84ea-65dfbd2091c6","timestamp":"2026-07-24T18:01:46.456881499Z","type":"gate_failed","updated_by":"auto:executor"}
