@@ -823,6 +823,7 @@ generated IDs through follow-up commands.
 ```bash
 jit issue batch-create --from-json plan.json
 jit issue batch-create --from-json plan.json --json
+jit issue batch-create --from-json plan.json --dry-run --json
 ```
 
 **File schema** — a JSON array of objects:
@@ -837,6 +838,7 @@ jit issue batch-create --from-json plan.json --json
 | `labels`      | no       | `[]`                 | Each must be `namespace:value`                     |
 | `gates`       | no       | `[]`                 | Each must be a registered gate key                 |
 | `depends_on`  | no       | `[]`                 | Symbolic `key`s of other entries in the same file  |
+| `planning`    | no       | —                    | Opaque authoring metadata; accepted but not stored or exported |
 
 Example `plan.json`:
 
@@ -861,11 +863,16 @@ at the first) and, on any failure, creates **zero** issues and exits with code
 - labels that are not `namespace:value`,
 - gates not present in the gate registry.
 
-**Atomicity caveat.** Pre-validation is atomic: a malformed file changes
-nothing. The **write phase is NOT atomic** — once creation begins, a failure
-partway through reports the partial `{key: id}` map produced so far plus the
-failing step and exits non-zero. There is no rollback; recover manually (inspect
-or delete the partially-created issues, fix the file, and re-run).
+On success, issues, index membership, events, and dependency edges publish as one
+recoverable repository mutation.
+
+**Dry-run.** `--dry-run` performs the same native validation and preserves exit
+code `2` for validation errors, but allocates no ids and writes no issues, index,
+events, or edges. Human output reports counts. JSON returns:
+
+```json
+{"valid":true,"dry_run":true,"issue_count":3,"dependency_count":2,"keys":["spec","impl","test"]}
+```
 
 **Output.** On success the command returns the `{key: full_id}` map. With
 `--json` the output is EXACTLY that map as the top-level JSON object — every

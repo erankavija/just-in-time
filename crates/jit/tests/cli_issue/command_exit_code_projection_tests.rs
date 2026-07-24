@@ -626,9 +626,7 @@ fn test_command_exit_codes_issue_delete_unconfirmed_emits_2() {
 
 /// `jit issue batch-create` exits 2 when pre-validation rejects the file (here an
 /// entry depending on a key the file never defines) — matching
-/// `issue batch-create`/2. The companion `/10` row (a write that fails after some
-/// issues were created) is pinned by the classifier test in `main.rs`, which runs
-/// the `BatchWriteError` that path raises through `error_to_exit_code`.
+/// `issue batch-create`/2.
 #[test]
 fn test_command_exit_codes_batch_create_prevalidation_emits_2() {
     let temp = setup();
@@ -765,7 +763,6 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("*", Some(5)),
         ("*", Some(10)),
         ("any command that writes an issue", Some(4)),
-        ("issue batch-create", Some(10)),
         ("gate evaluate, gate evaluate-all", Some(4)),
         ("gate evaluate, gate evaluate-all", Some(10)),
         // Pinned by the subprocess tests in this file.

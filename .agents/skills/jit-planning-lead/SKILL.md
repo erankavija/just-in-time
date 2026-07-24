@@ -1,286 +1,127 @@
 ---
 name: jit-planning-lead
 description: >
-  Turn a vague idea, external document, or existing container into a fully
-  planned, broken-down jit work tree ready to execute. Planning and breakdown
-  only; jit-execution-lead runs the planned container.
+  Turn a vague idea, imported document, or existing container into a reviewed
+  concise design plus an authoritative, worker-sized JIT issue manifest. Planning
+  and breakdown only; jit-execution-lead executes the resulting graph.
 ---
 
 # JIT Planning Lead
 
-Lead planning from various initial states to a complete plan + breakdown.
-The outcome of your work is the full and self-contained jit issue structure for
-the work that is ready for implementation.
+Deliver two linked artifacts for each breakable container `C`:
 
-## Success criteria
+- `dev/active/<C-short-id>-plan.md`: shared design, decisions, risks, and a generated overview.
+- `dev/active/<C-short-id>-breakdown.json`: the complete authoritative issue graph, directly consumable by `jit issue batch-create`.
 
-JIT planning is done when:
-- Container issue exists, its description aligns to jit content standards and it has verifiable success criteria that cover all of the planned work
-- Plan and Breakdown issues created by the planning bracket are both done
-- Each issue created in the breakdown is self-contained for the work that it carries
-- Each issue follows the JIT issue content standards
-- All the planning artifacts are linked to the corresponding JIT issues
-- All additional context from (optional) research and **all required external knowledge** is referenced in the planning documents
+Planning is complete only when `P` and `B` are done, both artifacts are linked,
+every manifest issue/edge was created exactly, and every finest-tier issue is
+worker-sized. Never implement the planned work.
 
-## Execution Steps
+## 1. Pre-flight and intake
 
-### Step 1: Pre-flight
+1. Run `jit recover` and `jit validate`; read `.jit/config.toml`,
+   `.jit/templates.toml`, `.jit/rules.toml`, gate presets, and
+   `.jit/reference/content-standards.md`. Derive all types, labels, criterion
+   syntax, gates, and paths from live configuration.
+2. Select `research-and-plan`, `plan-from-existing`, or `plan-from-import`.
+   Read inputs before interviewing. Resolve owner decisions one at a time and
+   record chosen and rejected options. Autonomous callers may choose conservative
+   defaults but must record them.
+3. Create or reconcile `C`. Its description must have atomic, observable marked
+   criteria such as `[hard] REQ-NN`. Verify input claims against the live system.
+4. Run `jit apply plan <C>` once. Record planning node `P`, breakdown node `B`,
+   their configured gates, and P's plan path. Commit JIT state.
 
-1. **Sync jit state.** Run `jit recover`, then `jit validate`. Resolve any reported
-   corruption before planning on top of it.
+Read [interview-protocol.md](references/interview-protocol.md) when eliciting intent.
 
-2. **Read the planning vocabulary from the live config.** Every name this skill uses
-   below is the **default ruleset's**; substitute whatever the live config declares.
-   - `.jit/templates.toml` → the `plan` template: `applies_to` (which container types
-     are **breakable**), the planning- and breakdown-role node `type`s, the planning
-     node's `doc` (plan-doc location, a `{container.id}`-templated path), and the
-     `gates` each node carries. The container anchor itself also carries a gate
-     (`repo-validate` in the default ruleset).
-   - `.jit/rules.toml` → the coverage rule: `criteria-section`, `marker`, `id-pattern`,
-     `satisfies-namespace`. These fix the exact criterion shape the plan must emit
-     (`[hard]`, `REQ-NN`, `satisfies:` by default).
+## 2. Investigate
 
-3. **Pick the entry path.** Match the start state to one of three modes, and decide
-   whether top-level intake is interactive (a requester to interview) or autonomous:
-   - **[research-and-plan]** — only a vague idea; refine it into the `container` issue
-     before planning behind it.
-   - **[plan-from-existing]** — a container already exists with success criteria and
-     enough content to seed a plan; fetch it (`jit issue show <id>`).
-   - **[plan-from-import]** — a planning document exists from outside this jit repo;
-     reconcile it into a container.
+Dispatch the investigator with
+[investigator-prompt.md](references/investigator-prompt.md). It writes and links
+`dev/active/<C-short-id>-investigation.md` to `P`. Consumer and file inventories
+live there; the plan only cites them. Dispatch
+[researcher-prompt.md](references/researcher-prompt.md) only for external
+dependencies, real option selection, or unfamiliar architectural work.
 
-4. **Treat jit state as your durable ledger.** A full plan can span many levels and
-   outlive a context compaction. jit's own state is the record: issue states, gate
-   verdicts (`jit gate check`), and the `C → impl → B → P` spine show exactly which
-   levels are planned, gated, and broken down. On resume or after compaction, **read
-   jit state and trust it over recollection** — a done P whose `plan-review` passed is
-   planned; a B whose `breakdown-review` passed is fanned out. Never re-dispatch a level
-   the graph already shows complete. Commit jit state after each level so the ledger is
-   durable in git.
+## 3. Author manifest first
 
-### Step 2: Intent extraction
+Dispatch the synthesizer with
+[synthesizer-prompt.md](references/synthesizer-prompt.md) and
+[plan-doc-template.md](references/plan-doc-template.md). It writes the manifest
+first, then the concise plan. The manifest contract is
+[breakdown-manifest.schema.json](references/breakdown-manifest.schema.json); use
+the deterministic helper rather than retyping its rules:
 
-1. **Ingest before interrogating.** Read every referenced artifact (article, doc, code,
-   ticket) with generic tools. Extract the candidate menu (results, components,
-   constraints) so questions are grounded.
-2. **Interview to extract intent**, one question at a time. Converge on a **testable
-   definition of done**: which outcomes count, at what fidelity, what is out of scope.
-3. **Elicit owner-owned decisions.** Distinguish defaults you may pick from forks the
-   owner owns (how far a breaking change goes, which alternative to drop, where a
-   responsibility belongs). Ask the latter; record each answer **and the rejected
-   options with reasons** — this seeds the plan's decision log.
-4. **Hold off on capturing the container while the abstraction is still moving.** If the
-   shape changes across turns, keep eliciting; capture at the right altitude only after
-   convergence, and let the owner set the tier.
-5. **Converge to criteria.** Confirmed outcomes become atomic `[hard] REQ-NN` lines (one
-   observable outcome each, marker starting the bullet — never checkbox-prefixed `- [ ]`,
-   or coverage-preview reads zero criteria; see `references/interview-protocol.md`), in a
-   `## Success Criteria` section. **Floor:** at least one confirmed `[hard]` criterion
-   before advancing.
+```bash
+.agents/skills/jit-planning-lead/scripts/breakdown_manifest.py validate \
+  dev/active/<C>-breakdown.json --config .jit/config.toml \
+  --plan dev/active/<C>-plan.md --known-source <every-valid-source-id> ... \
+  --required-source <mandatory-source-id> ... \
+  --required-criterion <criterion-id> ... --deny-warnings
+.agents/skills/jit-planning-lead/scripts/breakdown_manifest.py render \
+  dev/active/<C>-breakdown.json dev/active/<C>-plan.md --write
+.agents/skills/jit-planning-lead/scripts/breakdown_manifest.py render \
+  dev/active/<C>-breakdown.json dev/active/<C>-plan.md --check
+jit issue batch-create --from-json dev/active/<C>-breakdown.json --dry-run --json
+```
 
-### Step 3: Container creation or reconciliation
+Link both artifacts to `P`. The plan contains only outcome/criterion approach,
+named shared contracts, the generated overview, material risks, owner decisions,
+and investigation links. Never copy issue bodies, exhaustive inventories,
+acceptance criteria, DAG prose, or review history into it.
 
-1. **If the container does not exist, create it.** `jit issue create` with the breakable
-   `type:` that best fits the work scope unless already specified. The issue description must follow the jit
-   content standards at `.jit/reference/content-standards.md` from the repository root. The `Success Criteria` section holds
-   all the criteria for the work to be complete that were extracted previously.
-2. **If the container already exists, reconcile it first**: verify each
-   criterion against the live system, **sweep prior study/decision docs first** (a known
-   inaccuracy is often already recorded), and fix stale, unsatisfiable, or
-   already-satisfied criteria before planning behind them.
-   **Ground in the current state of the work, not the input.** The request and a
-   container's own criteria are untrusted input. Verify every factual claim against the
-   live system and split it into already-done / valid-and-open / invalid-as-stated
-   before specifying anything.
-3. **Scaffold the bracket.** `jit apply plan <C>` instantiates the whole bracket in one
-   operation: it creates **P** (planning node, `plan-review` gate, plan-doc location) and
-   **B** (breakdown node, `coverage-preview` + `breakdown-review` gates), wires `B → P`
-   and `C → B`, moves `C`'s upstream deps onto `P`, and puts the `repo-validate` gate on
-   `C`. Do not hand-wire. Commit JIT state. Record P's plan-doc path (interpolated from
-   the template) — the plan goes there.
+### Terminal invariant
 
-### Step 4: Plan creation
+Iteratively split oversized finest-tier work into horizontal siblings until each
+terminal issue has exactly one primary outcome, one bounded consumer family, one
+observable test boundary, and work one agent can implement and review in one
+focused cycle without another decomposition. A terminal must not combine
+independently testable foundation, migration, deletion, documentation, or release
+deliverables. It must disclose non-empty footprint `creates`/`touches`, or concrete
+uncertainty. A shared `landing_group` is integration metadata, never permission to
+merge work. No finer configured type is required to split an oversized task.
 
-Turn the container's success criteria into a plan an engineering team can execute
-behind. The plan is built by three dispatched sub-agents — **investigate**,
-**synthesize**, **review** — then driven through the `plan-review` gate. All three
-are read-and-report roles; you stay the planning lead that integrates their output
-and owns the gate.
+Mark every plan contract `plan-fixed` or `implementation-produced`. The latter
+has exactly one `produces_contracts` owner transitively reachable from every
+consumer; a plan-fixed contract has none.
 
-**Dispatch hygiene** (every sub-agent this skill dispatches). Hand work over as
-**files, not pasted prose**: give the agent the paths to read and have it return a
-short status plus the path it wrote — a pasted artifact stays resident in your
-context for the rest of the session. **Route output by whether the plan cites it.**
-An artifact the plan cites as grounding — an investigation or research report the
-`plan-review` gate resolves as an authoritative source — is **repo-resident under the
-managed active-docs directory** (`dev/active/`, the `[documentation]` `managed_paths`
-in `.jit/config.toml`) and **linked to P with `jit doc add`**, so the gate reaches it.
-An intermediate artifact no reviewed document cites stays in the **session
-scratchpad**. **Pick the model per role:** a cheap model for
-mechanical reads (investigator), a capable one where judgment drives quality
-(synthesizer, adversarial reviewer). State the model on every dispatch; an omitted
-model inherits this session's, usually the most expensive.
+Every non-finest manifest entry must depend transitively on a strictly finer
+entry; relabeling executable work never suppresses terminal checks. Sizing
+heuristics warn on broad quantifiers, independent verbs, multiple consumer
+families, three or more acceptance clusters, mixed deliverable classes, and
+implementation plus release. Split the task or add a reason under that warning's
+stable `warning_overrides` code. Overrides remain visible and require reviewer
+approval; `worker_sized_reason` is not an escape hatch.
 
-#### Step 4b — Investigate
+## 4. Review and approve P
 
-Dispatch a `general-purpose` sub-agent with
-**[references/investigator-prompt.md](references/investigator-prompt.md)**, directing
-it to write its findings report to a **repo-resident path derived from the container
-id** under the managed active-docs directory —
-`dev/active/{container.short_id}-investigation.md` (the `[documentation]`
-`managed_paths` in `.jit/config.toml`). The plan cites this report as grounding, so it
-is repo-resident from the start.
-Investigation is **mandatory** — the `plan-review` area "technical soundness +
-architectural fit" fails any ungrounded plan. The investigator:
+Dispatch [reviewer-prompt.md](references/reviewer-prompt.md). It checks both
+artifacts, current code, readability, deterministic validation, and simulates one
+assignment per leaf. Fix every finding by replacing the defective contract/task,
+removing superseded prose, regenerating the plan, and rerunning all four commands.
+Append-only correction sections fail.
 
-- Classifies every input claim into **already-done / valid-and-open / invalid-as-stated**
-  against the actual code.
-- For any **remove / rename / migrate X** intent, runs an **exhaustive consumer sweep**
-  up front (whole tree, including example/fixture dirs). The partial-grounding failure
-  mode is a *different* missed file surfacing each review round.
-- **Verifies named primitives deliver claimed properties** (if the plan will say "atomic"
-  / "validated-first" / "transactional", confirm the cited operations actually support
-  it; do not paraphrase intent into fact).
+Audit upstream dependencies moved from `C` to `P`. Keep planning-required edges.
+For implementation-consumed edges, remove them from `P` and record the external
+dependency plus its target manifest key in Decisions for breakdown to re-home.
 
-Returns cited findings (`file:line`) keyed to the criteria they bear on. **Link the
-report to P before the `plan-review` gate runs:** `jit doc add <P>
-<investigation-doc-path> --doc-type study`, so the gate resolves the source the plan
-cites as grounding.
+Run the configured plan-review gate. Count recorded failures; after the third
+failure stop and escalate. On pass, mark `P` done and commit.
 
-**Research (conditional).** Only when a signal fires — a **new external dependency**, a
-**"choose/evaluate"** decision, or **architectural-scope** work — dispatch
-**[references/researcher-prompt.md](references/researcher-prompt.md)**. It produces a
-**cited research doc, linked to P, separate from the plan**, feeding the decisions.
-Small, well-understood work **skips** this — keep effort proportional.
+## 5. Instantiate and approve B
 
-#### Step 4c — Synthesize
+Invoke `jit-breakdown` on `C`. Bracketed work must consume the linked manifest
+directly; a Markdown-only plan is an actionable hard failure with no fallback or
+backfill. Plain breakdown analysis produces the same manifest before creation.
 
-Dispatch a `general-purpose` sub-agent with
-**[references/synthesizer-prompt.md](references/synthesizer-prompt.md)** and
-**[references/plan-doc-template.md](references/plan-doc-template.md)**. It writes the
-plan at P's plan-doc location, structured to the **four `plan-review` areas** (which are
-both the plan's sections and the self-check):
+After creation, require exact manifest-to-issue and manifest-to-edge fidelity,
+correct bracket/external wiring, and passing coverage and breakdown-review gates.
+Repeat the terminal assignment simulation. Correct the manifest first, reconcile
+the graph, regenerate, and re-review; a shared-contract change also reruns
+plan-review. Escalate after the third recorded breakdown-review failure.
 
-1. **Completeness vs criteria** — every `[hard]` criterion addressed; no silent scope
-   narrowing.
-2. **Technical soundness + architectural fit** — grounded in Step 4b findings, citing real
-   files; reuses the right primitives; no stale assumptions.
-3. **Decomposition + dependencies** — a **near-ready sketch**: intermediate groupings
-   sized to the work (not a flat list), each group **independently landable** (no broken
-   intermediate state), each item right-sized to one coherent change with **blast radius
-   bounded** and ripple-handling stated, carrying its `type` tier, `[hard]` markers,
-   `satisfies:REQ-NN` mapping, and dependency ordering. Items are **standalone-readable**
-   but express relationships **through the graph, not prose**. This sketch is what
-   `jit-breakdown` consumes in Step 5.
-4. **Risks + actionability** — every open question carries a mitigation or a decision; an
-   engineer can execute each item without re-deriving the design.
+## 6. Report
 
-Plus a first-class **Decisions** section (each decision, the chosen option, the rejected
-ones with reasons). Decisions are **provisional** — if Step 4b or 4d invalidates a premise,
-surface it (escalate at the top level, flag below) and re-decide.
-
-#### Step 4d — Review
-
-Before running the gate, dispatch a `general-purpose` reviewer with
-**[references/reviewer-prompt.md](references/reviewer-prompt.md)**. It tries to
-**fail** the plan against the four areas in the reviewer prompt. **Address
-every finding** before proceeding to planning issue closure through the jit
-plan review gate.
-
-#### Step 4e — Completion
-
-**Audit P's inherited upstream dependencies before completing the plan.** Step 3's
-`jit apply plan` moved `C`'s pre-existing upstream deps onto `P`. Classify each as
-**planning-required** (the plan authoring itself depends on it) or
-**implementation-consumed** (only a future implementation child consumes it). An
-implementation-consumed dep left on `P` deadlocks the bracket: `P` can never close
-until it completes, so `B` never releases. Re-home each implementation-consumed edge
-in two steps. Now, during the audit, **remove** it from `P` so `P` is free to
-complete, and record the removal, its intended consuming child, and the rationale in
-the plan's **Decisions** section — that record carries the obligation forward. At
-breakdown time (Step 5), once the consuming child exists, **attach** the edge to it,
-completing the re-home. Escalate a planning-required dep that cannot complete to the
-requester rather than dropping the edge or forcing the plan through.
-
-Ensure that the plan document is linked to the plan issue P with `jit doc add
-<P> <plan-doc-path> --doc-type design` and that all the findings uncovered in
-the review have been addressed. Proceed then through the quality gates by
-invoking them using `jit gate pass`. Read the plan review gate verdict with
-`jit gate check <P> plan-review`. Address all the plan review findings and
-escalate if you fail the review gate three times. Rerun gates only on failure.
-When all the quality gates pass, mark the planning issue done. Commit jit
-state.
-
-### Step 5: Breakdown and recursion
-
-Fan this level out with `jit-breakdown`, then recurse into any breakable child until
-the frontier is empty — every leaf a non-breakable, right-sized task. High- vs
-low-level requirements are the recursion axis, not a role split: the same subroutine
-plans an epic and plans a story; only the altitude changes. Stop at full breakdown and
-hand the tree to execution; do not start implementing the work.
-
-1. **Fan out this level.** The plan is approved and P is done, so B is released.
-   **Invoke the `jit-breakdown` skill** on `C` (read its `SKILL.md`; do not reimplement
-   its logic). It splices the spine `C → impl → B → P` and creates the impl children
-   from the plan's §3 sketch, each carrying its `type`, `[hard]` criteria, and
-   `satisfies:REQ-NN` labels.
-
-2. **Drive B's gates to a recorded pass**, the way you drove P's:
-   `coverage-preview` (jit-breakdown runs it inline) and `breakdown-review`
-   (`jit gate pass <B> breakdown-review`, looping on FAIL as in Step 4e). A gated
-   fan-out is not fully broken down. Commit jit state.
-
-3. **Cross-sibling coherence.** When a level breaks down **two or more** sibling
-   containers through independent analysis dispatches — each recursed sibling (item 5)
-   runs its own `jit-breakdown` analysis agent — a coherence pass over their combined
-   task set is **mandatory** once those breakdowns return. The containers are not
-   bracketed, so their fan-outs get no `breakdown-review`; this pass is the only review
-   those independently authored task sets receive. Dispatch a read-and-report reviewer
-   over the sibling set to check consumed-vs-promised contracts across story boundaries —
-   the names, shapes, and deletions one sibling relies on and another must honor —
-   alongside interface mismatch, boundary overlap, duplicated responsibility, and
-   dependency direction.
-
-   **The approved plan's decomposition sketch is the contract.** Its intended
-   parallelism and its per-item tiers bind the fan-out. Instruct the reviewer to test
-   every graph edge or type-tier change a finding would imply against the sketch and to
-   **mark each sketch conflict explicitly** in its findings, naming the sanctioned
-   resolution: a **child-criterion or description rewording** that respects the sketch's
-   boundaries, or, where the sketch itself is wrong, a **plan-document amendment**. A
-   finding that contradicts the sketch is folded in through one of those two paths and
-   **never lands as a direct graph edit against the sketch**. Fold each fix back into the
-   affected task. Skip only for a single recursed container, or a level authored in one
-   dispatch.
-
-   **Re-review a material plan amendment before the fan-out proceeds.** When a finding
-   rises to a plan-document amendment — the material path, changing the sketch's
-   parallelism or tiers — re-run the affected plan's `plan-review` gate on the amendment
-   and reconcile the fan-out to the amended sketch before treating the level as broken
-   down. Loop as in Step 4e; escalate the subtree (Step 5's non-convergence path) after
-   three rounds. A criterion or description rewording stays within the approved sketch and
-   needs no plan re-review.
-
-4. **Collect the new breakable children.** Of the children just created, any whose
-   `type` is a breakable container type (it appears in some template's `applies_to`,
-   Step 1) goes onto the frontier. Non-breakable, right-sized leaves are done — they
-   are the fan-out-ready work.
-
-5. **Recurse.** For each breakable child on the frontier, re-enter Step 2 (its intent
-   derived autonomously, per the Step 2 autonomous preamble) through Step 5. Push any
-   new breakable grandchildren onto the frontier. Continue until the frontier is empty.
-   When this level recursed two or more sibling containers, run item 3's coherence pass
-   over their combined task set before treating them as broken down.
-
-If a level stops converging (repeated gate pathology, an unresolvable owner fork, or
-intent that the artifacts cannot support), **escalate that subtree** to the requester
-rather than forcing it, and continue the others.
-
-Commit final jit state.
-
-### Summary report
-
-End with: the top container (`C`) and its `[hard]` criteria count; the number of levels
-planned and breakable containers processed; per level, its `P` (`plan-review`: passed in
-N rounds) and `B` (`breakdown-review`: passed); the count of fan-out-ready leaves; any
-escalated subtrees or open assumptions; and the explicit next step ("`<C>` is fully
-broken down — hand to jit-execution-lead to execute").
+Report `C`, criterion count, both artifact paths, manifest issue/edge/terminal
+counts, P/B gate rounds, re-homed dependencies, and any escalations. State that
+the container is ready for `jit-execution-lead`.

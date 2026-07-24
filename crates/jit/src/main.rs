@@ -2324,7 +2324,11 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                IssueCommands::BatchCreate { from_json, json } => {
+                IssueCommands::BatchCreate {
+                    from_json,
+                    dry_run,
+                    json,
+                } => {
                     use jit::commands::BatchIssueDef;
 
                     // Read + parse the file (both fallible I/O paths carry context).
@@ -2339,9 +2343,19 @@ fn run() -> Result<()> {
                             )
                         })?;
 
-                    // The method does FULL pre-validation before any write and
-                    // returns a typed error (validation list or partial-write map)
-                    // on failure, which the top-level handler maps to an exit code.
+                    if dry_run {
+                        let outcome = executor.validate_batch_from_json(&defs)?;
+                        if json {
+                            println!("{}", serde_json::to_string_pretty(&outcome)?);
+                        } else {
+                            println!(
+                                "Valid batch: {} issue(s), {} dependency edge(s); no changes made.",
+                                outcome.issue_count, outcome.dependency_count
+                            );
+                        }
+                        return Ok(());
+                    }
+
                     let outcome = executor.batch_create_from_json(defs)?;
 
                     if json {

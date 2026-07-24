@@ -1,0 +1,23 @@
+[
+  {
+    "key": "define-contract",
+    "title": "Define manifest contract",
+    "description": "Define the shared manifest shape.\n\n## Success Criteria\n\n- The schema rejects invalid entries.",
+    "type": "task",
+    "priority": "high",
+    "labels": ["component:planning", "satisfies:REQ-01"],
+    "gates": ["cargo-ci"],
+    "depends_on": [],
+    "planning": {
+      "outcome": "One validated manifest contract",
+      "contract_refs": ["manifest-contract"],
+      "source_refs": ["REQ-01"],
+      "terminal": {
+        "consumer_family": "planning skill resources",
+        "test_boundary": "manifest fixture validation",
+        "worker_sized_reason": "One schema and its focused validator tests.",
+        "footprint": {"touches": ["breakdown-manifest.schema.json"]}
+      }
+    }
+  }
+]

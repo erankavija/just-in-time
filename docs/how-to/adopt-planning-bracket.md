@@ -262,29 +262,50 @@ jit graph deps epic-123
 
 ## Step 6 — Write and review the plan
 
-Author the plan document at the configured location (e.g.
-`dev/active/<C-id>-plan.md`), then drive `P` through its `plan-review` gate. The
-built-in placeholder only records a warning and passes; it does not judge the
-plan. Replace its checker as described in Step 4 before treating that pass as
-approval. A real review failure leaves drafts in place for revision — nothing is
-archived on rejection.
+Author and link two artifacts to `P`:
+
+- `dev/active/<C-id>-plan.md`: concise shared architecture, decisions, risks,
+  sources, and a generated overview;
+- `dev/active/<C-id>-breakdown.json`: the authoritative bare batch-create array,
+  including complete issue bodies, edges, and planning metadata.
+
+Validate the manifest, check the generated region, and run native validation
+without allocating ids or writing issues/events:
+
+```bash
+.agents/skills/jit-planning-lead/scripts/breakdown_manifest.py validate \
+  dev/active/<C-id>-breakdown.json --config .jit/config.toml \
+  --plan dev/active/<C-id>-plan.md \
+  --known-source <every-valid-source-id> ... \
+  --required-source <mandatory-source-id> ... --deny-warnings
+jit issue batch-create --from-json dev/active/<C-id>-breakdown.json --dry-run --json
+```
+
+Then drive `P` through `plan-review`. Review fails missing/invalid manifests,
+stale generated output, duplicated task prose, and non-worker-sized terminal
+tasks. Missing hierarchy/source universes, invented references, tier-laundered
+leaves, and malformed/duplicate contract headings also fail. Per-code sizing
+overrides remain visible for reviewer judgment. Shared contracts are marked
+`plan-fixed` or `implementation-produced`; produced contracts require one
+dependency-reachable producer. Each terminal discloses created/touched paths or
+footprint uncertainty, including greenfield files. The built-in placeholder is
+not approval; replace it as described in Step 4. Correct the manifest first,
+regenerate the plan, and rerun validation.
 
 ## Step 7 — Break down after the plan checkpoint
 
-Once `P`'s `plan-review` gate passes, break the container down. With the built-in
-placeholder, this means only that the sequencing checkpoint cleared; it is
-approval only after you install the real reviewer described in Step 4. The
-breakdown step
-**consumes the pre-created breakdown node `B`** (the one `jit apply plan` already
-scaffolded, carrying the `coverage-preview` and `breakdown-review` gates and the
-`brackets:<C-short-id>` label) — it does not create `B`. It then:
+Once a real `plan-review` passes, the breakdown consumes both the pre-created `B`
+and the linked manifest. Markdown-only plans are rejected; there is no legacy
+reinterpretation path. It then:
 
-1. drafts the implementation children in Backlog, each carrying the satisfies
-   label (`satisfies:<id>` / `tests:<id>`) for the criterion it covers;
+1. creates every implementation issue and intra-manifest edge in one
+   `jit issue batch-create` call, using its returned semantic key→id map;
 2. wires the **spine** — entry impl issues depend on `B` (sources), and the impl
    sinks are what `C` depends on; transitive reduction drops the now-redundant
-   `C → B` anchor edge — yielding `C → impl → B → P`;
-3. runs `B`'s gates.
+   `C → B` anchor edge (`jit dep add --reduce <C> <sinks...>` when wiring by
+   hand) — yielding `C → impl → B → P`;
+3. re-homes recorded external dependencies through the key→id map, verifies
+   issues and edges against the manifest, then runs `B`'s gates.
 
 `coverage-preview` runs `jit validate --scope <C>`, which fires your preview rule.
 If the drafted children leave a `[hard]` criterion with no satisfying child (in any
@@ -301,9 +322,8 @@ You can run the scoped check directly at any time:
 jit validate --scope epic-123
 ```
 
-The `jit-breakdown` skill performs this spine wiring and runs the gate
-automatically; if you wire it by hand, follow the source/sink edge geometry in
-[the concept page](../concepts/planning-bracket.md#edge-geometry).
+The `jit-breakdown` skill performs the batch and external wiring. Planning
+metadata is accepted for authoring but is neither persisted nor exported.
 
 ## Step 8 — Implement, then close
 

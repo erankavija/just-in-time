@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jit.dev/schemas/breakdown-manifest.json",
+  "title": "JIT breakdown manifest",
+  "type": "array",
+  "minItems": 1,
+  "items": { "$ref": "#/$defs/issue" },
+  "$defs": {
+    "strings": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "semanticKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "not": { "pattern": "^(?:[a-z]+-?)?[0-9]+$" }
+    },
+    "semanticKeys": { "type": "array", "items": { "$ref": "#/$defs/semanticKey" }, "uniqueItems": true },
+    "warningOverrides": {
+      "type": "object",
+      "propertyNames": {
+        "enum": ["acceptance-clusters", "broad-quantifier", "implementation-release", "independent-verbs", "mixed-deliverables", "multiple-consumer-families", "multiple-test-boundaries", "weak-worker-sized-reason"]
+      },
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "footprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "creates": { "$ref": "#/$defs/strings" },
+        "touches": { "$ref": "#/$defs/strings" },
+        "uncertainty": { "type": "string", "minLength": 1 }
+      },
+      "anyOf": [
+        { "required": ["creates"], "properties": { "creates": { "minItems": 1 } } },
+        { "required": ["touches"], "properties": { "touches": { "minItems": 1 } } },
+        { "required": ["uncertainty"] }
+      ]
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consumer_family", "test_boundary", "worker_sized_reason", "footprint"],
+      "properties": {
+        "consumer_family": { "type": "string", "minLength": 1 },
+        "test_boundary": { "type": "string", "minLength": 1 },
+        "worker_sized_reason": { "type": "string", "minLength": 1 },
+        "footprint": { "$ref": "#/$defs/footprint" },
+        "warning_overrides": { "$ref": "#/$defs/warningOverrides" }
+      }
+    },
+    "planning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "contract_refs", "source_refs"],
+      "properties": {
+        "outcome": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[^\\r\\n]+$" },
+        "contract_refs": { "$ref": "#/$defs/semanticKeys" },
+        "produces_contracts": { "$ref": "#/$defs/semanticKeys" },
+        "source_refs": { "$ref": "#/$defs/strings", "minItems": 1 },
+        "landing_group": { "$ref": "#/$defs/semanticKey" },
+        "terminal": { "$ref": "#/$defs/terminal" }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "title", "description", "type", "priority", "labels", "gates", "depends_on", "planning"],
+      "properties": {
+        "key": { "$ref": "#/$defs/semanticKey" },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "priority": { "enum": ["low", "normal", "high", "critical"] },
+        "labels": { "$ref": "#/$defs/strings" },
+        "gates": { "$ref": "#/$defs/strings" },
+        "depends_on": { "$ref": "#/$defs/strings" },
+        "planning": { "$ref": "#/$defs/planning" }
+      }
+    }
+  }
+}

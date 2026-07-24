@@ -1,0 +1,23 @@
+[
+  {
+    "key": "parser-renderer",
+    "title": "Build parser; update renderer",
+    "description": "Deliver the paired change.\n\n## Success Criteria\n\n- The focused boundary passes.",
+    "type": "task",
+    "priority": "normal",
+    "labels": ["component:planning"],
+    "gates": ["cargo-ci"],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Build parser; update renderer",
+      "contract_refs": [],
+      "source_refs": ["REQ-04"],
+      "terminal": {
+        "consumer_family": "parser",
+        "test_boundary": "parser contract test",
+        "worker_sized_reason": "One focused implementation cycle is claimed.",
+        "footprint": {"touches": ["parser", "renderer"]}
+      }
+    }
+  }
+]

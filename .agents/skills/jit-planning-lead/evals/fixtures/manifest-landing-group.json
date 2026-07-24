@@ -1,0 +1,36 @@
+[
+  {
+    "key": "render-table",
+    "title": "Render task table",
+    "description": "Render the compact table.\n\n## Success Criteria\n\n- Output is deterministic.",
+    "type": "task",
+    "priority": "normal",
+    "labels": ["component:planning"],
+    "gates": ["cargo-ci"],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A deterministic task table",
+      "contract_refs": ["generated-overview"],
+      "source_refs": ["REQ-02"],
+      "landing_group": "plan-renderer",
+      "terminal": {"consumer_family":"Markdown table readers","test_boundary":"golden table fixture","worker_sized_reason":"One renderer surface with one golden test.","footprint":{"touches":["plan generated region"]}}
+    }
+  },
+  {
+    "key": "render-dag",
+    "title": "Render dependency DAG",
+    "description": "Render the Mermaid graph.\n\n## Success Criteria\n\n- Edges match the manifest.",
+    "type": "task",
+    "priority": "normal",
+    "labels": ["component:planning"],
+    "gates": ["cargo-ci"],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A deterministic Mermaid DAG",
+      "contract_refs": ["generated-overview"],
+      "source_refs": ["REQ-02"],
+      "landing_group": "plan-renderer",
+      "terminal": {"consumer_family":"Markdown graph readers","test_boundary":"golden Mermaid fixture","worker_sized_reason":"One renderer surface with one golden test.","footprint":{"touches":["plan generated region"]}}
+    }
+  }
+]

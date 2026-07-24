@@ -90,6 +90,10 @@ pub struct BatchIssueDef {
     /// Symbolic `key`s of other entries in the same file this issue depends on.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub depends_on: Vec<String>,
+    /// Opaque authoring metadata accepted from planning manifests. It is never
+    /// interpreted, stored on an issue, or included in batch export.
+    #[serde(default, skip_serializing)]
+    pub planning: Option<serde_json::Value>,
 }
 
 /// A single pre-validation problem, attributed to the offending entry/entries.
@@ -178,6 +182,21 @@ pub struct BatchCreateOutcome {
     pub key_to_id: Vec<(String, String)>,
 }
 
+/// Successful validation-only result for `batch-create --dry-run`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct BatchDryRunOutcome {
+    /// Always true for a successful validation result.
+    pub valid: bool,
+    /// Distinguishes this result from creation output.
+    pub dry_run: bool,
+    /// Number of validated issue definitions.
+    pub issue_count: usize,
+    /// Number of validated symbolic dependency edges.
+    pub dependency_count: usize,
+    /// Semantic keys in input order.
+    pub keys: Vec<String>,
+}
+
 impl BatchCreateOutcome {
     /// Materialize the `{key: id}` pairs as a map for `--json` output and lookup.
     pub fn as_map(&self) -> HashMap<String, String> {
@@ -186,6 +205,21 @@ impl BatchCreateOutcome {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
+    /// Run native batch pre-validation without allocating ids or writing state.
+    pub fn validate_batch_from_json(&self, defs: &[BatchIssueDef]) -> Result<BatchDryRunOutcome> {
+        let problems = self.collect_batch_problems(defs)?;
+        if !problems.is_empty() {
+            return Err(BatchValidationError { problems }.into());
+        }
+        Ok(BatchDryRunOutcome {
+            valid: true,
+            dry_run: true,
+            issue_count: defs.len(),
+            dependency_count: defs.iter().map(|def| def.depends_on.len()).sum(),
+            keys: defs.iter().map(|def| def.key.clone()).collect(),
+        })
+    }
+
     /// Create a batch of issues with symbolic dependency wiring from declarative
     /// definitions.
     ///
@@ -213,6 +247,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///         labels: vec![],
     ///         gates: vec![],
     ///         depends_on: vec![],
+    ///         planning: None,
     ///     },
     ///     BatchIssueDef {
     ///         key: "impl".into(),
@@ -223,6 +258,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///         labels: vec![],
     ///         gates: vec![],
     ///         depends_on: vec!["spec".into()],
+    ///         planning: None,
     ///     },
     /// ];
     /// let outcome = executor.batch_create_from_json(defs).unwrap();
@@ -235,6 +271,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
         use crate::storage::RepositoryStateStoreError;
         use std::collections::BTreeMap;
+
+        self.validate_batch_from_json(&defs)?;
 
         let positions = defs
             .iter()
@@ -533,6 +571,7 @@ mod tests {
             labels: vec![],
             gates: vec![],
             depends_on: deps.iter().map(|s| s.to_string()).collect(),
+            planning: None,
         }
     }
 
@@ -682,6 +721,78 @@ mod tests {
         let impl_issue = exec.storage().load_issue(impl_id).unwrap();
         // The edge impl -> spec was wired.
         assert!(impl_issue.dependencies.contains(spec_id));
+    }
+
+    #[test]
+    fn test_validate_batch_from_json_has_no_issue_or_event_side_effects() {
+        let exec = executor();
+        let defs = vec![def("spec", &[]), def("impl", &["spec"])];
+        let before_events = exec.storage().read_events().unwrap();
+        let outcome = exec.validate_batch_from_json(&defs).unwrap();
+
+        assert_eq!(
+            outcome,
+            BatchDryRunOutcome {
+                valid: true,
+                dry_run: true,
+                issue_count: 2,
+                dependency_count: 1,
+                keys: vec!["spec".into(), "impl".into()],
+            }
+        );
+        assert!(exec.storage().list_issues().unwrap().is_empty());
+        assert_eq!(exec.storage().read_events().unwrap(), before_events);
+    }
+
+    #[test]
+    fn test_validate_batch_from_json_empty_batch_returns_zero_counts() {
+        let outcome = executor().validate_batch_from_json(&[]).unwrap();
+        assert_eq!(outcome.issue_count, 0);
+        assert_eq!(outcome.dependency_count, 0);
+        assert!(outcome.keys.is_empty());
+    }
+
+    #[test]
+    fn test_batch_issue_def_planning_deserializes_but_never_serializes() {
+        let def: BatchIssueDef =
+            serde_json::from_str(r#"{"key":"task","title":"Task","planning":{"outcome":"done"}}"#)
+                .unwrap();
+        assert!(def.planning.is_some());
+        assert!(serde_json::to_value(def).unwrap().get("planning").is_none());
+    }
+
+    #[test]
+    fn test_collect_batch_problems_matches_shared_structural_conformance_fixture() {
+        #[derive(serde::Deserialize)]
+        struct Suite {
+            cases: Vec<Case>,
+        }
+        #[derive(serde::Deserialize)]
+        struct Case {
+            name: String,
+            expected: Vec<String>,
+            issues: Vec<BatchIssueDef>,
+        }
+
+        let suite: Suite = serde_json::from_str(include_str!(
+            "../../tests/fixtures/batch-structural-conformance.json"
+        ))
+        .unwrap();
+        for case in suite.cases {
+            let actual = executor()
+                .collect_batch_problems(&case.issues)
+                .unwrap()
+                .into_iter()
+                .filter_map(|problem| match problem {
+                    BatchValidationProblem::DuplicateKey { .. } => Some("duplicate-key"),
+                    BatchValidationProblem::UnknownDependency { .. } => Some("unknown-dependency"),
+                    BatchValidationProblem::Cycle { .. } => Some("cycle"),
+                    _ => None,
+                })
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            assert_eq!(actual, case.expected, "shared case '{}'", case.name);
+        }
     }
 
     #[test]

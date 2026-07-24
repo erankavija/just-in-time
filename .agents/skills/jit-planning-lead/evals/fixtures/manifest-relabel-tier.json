@@ -1,0 +1,1 @@
+[{"key":"launder-work","title":"Migrate every consumer","description":"Hide work at story tier.\n\n## Success Criteria\n\n- Migration passes.","type":"story","priority":"normal","labels":["component:planning"],"gates":["cargo-ci"],"depends_on":[],"planning":{"outcome":"Migrate every consumer","contract_refs":[],"source_refs":["REQ-07"]}}]

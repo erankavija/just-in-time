@@ -55,6 +55,7 @@ report contains:
    tree including example/fixture/test/doc dirs** — not the two obvious call sites. The
    signature of a partial sweep is a *different* missed consumer surfacing each review
    round. Give the complete list with paths.
+   This report owns that inventory; the concise plan cites it and never copies it.
 
 4. **Primitive verification.** For each property the plan will likely assert
    (atomic / validated-first / transactional / idempotent / "reuses X"), find the cited

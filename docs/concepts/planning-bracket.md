@@ -54,9 +54,9 @@ it pulls plan review and a coverage check forward, in front of the fan-out.
 A **breakable container** `C` — a type a ruleset *declares* as requiring planning
 — is bracketed by two **function-typed children**:
 
-- **`P` — the planning node** (`type:planning`). It produces the plan and carries
-  the `plan-review` review checkpoint. The built-in checker is a warning-only
-  placeholder until the repository supplies a reviewer.
+- **`P` — the planning node** (`type:planning`). It owns a concise Markdown design
+  and an authoritative JSON breakdown manifest, and carries `plan-review`. The
+  Markdown task table and Mermaid DAG are generated from the manifest.
 - **`B` — the breakdown node** (`type:breakdown`). It is created **at scaffold
   time** by `jit apply plan`, carries **two gates** — a **deterministic
   coverage-preview gate** (`coverage-preview`) and the `breakdown-review` review
@@ -85,10 +85,10 @@ graph LR
   B -->|depends on| P
 ```
 
-The breakdown step then **consumes** the pre-created `B`, drafts the
-implementation subgraph, and splices it onto the spine — entry impl issues depend
-on `B`, the impl sinks become what `C` depends on, and transitive reduction drops
-the now-redundant `C → B` anchor edge, yielding `C → impl → B → P`:
+After plan review, breakdown feeds the linked manifest directly to one native
+batch-create call, then uses its key→id map only for external wiring. Entry impl
+issues depend on `B`, impl sinks become what `C` depends on, and transitive
+reduction drops the redundant `C → B` anchor, yielding `C → impl → B → P`:
 
 ```mermaid
 graph LR

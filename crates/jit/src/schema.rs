@@ -924,12 +924,6 @@ impl CommandSchema {
                 false,
             ),
             row(
-                "issue batch-create",
-                10,
-                "A write failed after some issues were already created.",
-                false,
-            ),
-            row(
                 "snapshot export",
                 6,
                 "The snapshot output path already exists.",

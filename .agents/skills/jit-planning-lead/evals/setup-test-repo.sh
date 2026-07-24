@@ -16,7 +16,7 @@
 # coverage-preview checker (scripts/coverage-preview.sh). It then defines the four
 # bracket gates the `plan` template references. The two AI-review gates (plan-review,
 # breakdown-review) are defined `manual` so an eval runner can attest them via
-# `jit gate pass` without the production codex-based reviewer; coverage-preview and
+# `jit gate evaluate --by ...` without the production reviewer; coverage-preview and
 # repo-validate are real `auto` gates (jit validate), so coverage keeps its teeth.
 set -euo pipefail
 
@@ -40,6 +40,8 @@ $JIT init >/dev/null
 cp "$JIT_SRC/.jit/templates.toml" .jit/templates.toml
 cp "$JIT_SRC/.jit/rules.toml"     .jit/rules.toml
 cp "$JIT_SRC/.jit/config.toml"    .jit/config.toml
+# Dogfood projections target files absent from the portable eval repository.
+sed -i '/^\[projection\./,$d' .jit/config.toml
 mkdir -p .jit/schemas
 cp -r "$JIT_SRC"/.jit/schemas/. .jit/schemas/ 2>/dev/null || true
 mkdir -p scripts
