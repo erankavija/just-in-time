@@ -238,13 +238,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
         let registries = || -> Result<Vec<VirtualPath>> {
             Ok(vec![
-                VirtualPath::data("config.toml")?,
-                VirtualPath::data("invariants.toml")?,
-                VirtualPath::data("rules.toml")?,
-                VirtualPath::data("gates.toml")?,
-                VirtualPath::data("templates.toml")?,
-                VirtualPath::data("index.json")?,
-                VirtualPath::data("events.jsonl")?,
+                VirtualPath::CONFIG,
+                VirtualPath::INVARIANTS,
+                VirtualPath::RULES,
+                VirtualPath::GATES,
+                VirtualPath::TEMPLATES,
+                VirtualPath::INDEX,
+                VirtualPath::EVENTS,
             ])
         };
         // Effective bytes at a repo-relative path: the override (create/replace or
@@ -353,7 +353,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     .collect::<Result<Vec<_>>>()?,
             )?;
             if capture_precheck_history {
-                let gate_runs = VirtualPath::data("gate-runs")?;
+                let gate_runs = VirtualPath::GATE_RUNS;
                 phase_three.discover_paths([gate_runs.clone()])?;
                 phase_three.discover_listing(gate_runs)?;
             }

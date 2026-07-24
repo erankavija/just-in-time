@@ -233,7 +233,7 @@ impl CommandExecutor<JsonFileStorage> {
             max_bytes: 64 * 1024 * 1024,
             max_depth: 6,
         };
-        let spec = CaptureSpec::phase_one([VirtualPath::data("config.toml")?], budget)?;
+        let spec = CaptureSpec::phase_one([VirtualPath::CONFIG], budget)?;
         let image = session.capture(spec)?;
         let generated_name: ProjectName = slugify_project_name(
             repo_dir
@@ -334,7 +334,7 @@ fn init_response_paths(
     .collect::<Vec<_>>();
     let mut modified = Vec::new();
 
-    let attributes_path = VirtualPath::worktree(".gitattributes")?;
+    let attributes_path = VirtualPath::GITATTRIBUTES;
     let attributes_action = plan
         .delta()
         .actions()

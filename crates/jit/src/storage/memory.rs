@@ -341,10 +341,6 @@ impl InMemoryStorage {
         )?)
     }
 
-    fn gate_runs_vpath() -> Result<VirtualPath> {
-        Ok(VirtualPath::data("gate-runs")?)
-    }
-
     fn gate_run_directory_vpath(run_id: &str) -> Result<VirtualPath> {
         let result = gate_run_result_relative_path(run_id)?;
         Ok(VirtualPath::data(result.as_path().parent().ok_or_else(
@@ -379,16 +375,6 @@ impl InMemoryStorage {
                 path.relative().as_path().display()
             ),
         }
-    }
-
-    /// Canonical `Data(...)` identity for the gate registry.
-    fn gate_registry_vpath() -> VirtualPath {
-        VirtualPath::data("gates.toml").expect("gate registry path is canonical")
-    }
-
-    /// Canonical `Data(...)` identity for the audit log.
-    fn events_vpath() -> VirtualPath {
-        VirtualPath::data("events.jsonl").expect("audit log path is canonical")
     }
 
     /// Publish a malformed fixture as a captured `File` entry.
@@ -496,7 +482,7 @@ impl InMemoryStorage {
 
     /// Deserialize the captured audit log, oldest event first.
     fn load_events(state: &MemoryRepositoryState) -> Result<Vec<Event>> {
-        let Some(bytes) = Self::data_entry_bytes(state, &Self::events_vpath()) else {
+        let Some(bytes) = Self::data_entry_bytes(state, &VirtualPath::EVENTS) else {
             return Ok(Vec::new());
         };
         String::from_utf8_lossy(&bytes)
@@ -589,7 +575,7 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
-        match Self::data_entry_bytes(&self.repository_state(), &Self::gate_registry_vpath()) {
+        match Self::data_entry_bytes(&self.repository_state(), &VirtualPath::GATES) {
             Some(bytes) => parse_gate_registry(&bytes)
                 .context("Failed to deserialize gate registry from repository image"),
             None => Ok(GateRegistry::default()),
@@ -609,7 +595,7 @@ impl IssueStore for InMemoryStorage {
         let path = Self::gate_run_vpath(run_id)?;
         let run_dir = Self::gate_run_directory_vpath(run_id)?;
         let state = self.repository_state();
-        if !Self::gate_run_parent_is_directory(&state, &Self::gate_runs_vpath()?)?
+        if !Self::gate_run_parent_is_directory(&state, &VirtualPath::GATE_RUNS)?
             || !Self::gate_run_parent_is_directory(&state, &run_dir)?
         {
             return Err(GateRunNotFoundError::new(run_id).into());
@@ -632,7 +618,7 @@ impl IssueStore for InMemoryStorage {
 
     fn list_gate_runs_for_issue(&self, issue_id: &str) -> Result<Vec<GateRunResult>> {
         let state = self.repository_state();
-        if !Self::gate_run_parent_is_directory(&state, &Self::gate_runs_vpath()?)? {
+        if !Self::gate_run_parent_is_directory(&state, &VirtualPath::GATE_RUNS)? {
             return Ok(Vec::new());
         }
         let run_ids = state
@@ -849,10 +835,10 @@ mod tests {
     fn test_gate_run_readers_validate_gate_runs_root_parent_kinds() {
         for kind in ["absent", "directory", "file", "symlink", "unsupported"] {
             let storage = InMemoryStorage::new();
-            storage.repository_state().entries.insert(
-                InMemoryStorage::gate_runs_vpath().unwrap(),
-                gate_run_parent_entry(kind),
-            );
+            storage
+                .repository_state()
+                .entries
+                .insert(VirtualPath::GATE_RUNS, gate_run_parent_entry(kind));
 
             let loaded = storage.load_gate_run_result("run-one");
             let listed = storage.list_gate_runs_for_issue("issue-one");
@@ -873,7 +859,7 @@ mod tests {
     fn test_gate_run_readers_validate_canonical_run_directory_parent_kinds() {
         for kind in ["absent", "directory", "file", "symlink", "unsupported"] {
             let storage = InMemoryStorage::new();
-            let root = InMemoryStorage::gate_runs_vpath().unwrap();
+            let root = VirtualPath::GATE_RUNS;
             let run_dir = InMemoryStorage::gate_run_directory_vpath("run-one").unwrap();
             let mut state = storage.repository_state();
             state

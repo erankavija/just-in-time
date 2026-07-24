@@ -290,7 +290,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .iter()
             .map(|id| VirtualPath::data(format!("issues/{id}.json")))
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        issue_paths.push(VirtualPath::data("issues")?);
+        issue_paths.push(VirtualPath::ISSUES);
 
         with_mutation_session(&self.storage, &layout, "batch issue creation", |session| {
             let Some(image) =

@@ -462,7 +462,7 @@ fn captured_issue<'a>(
 pub(crate) fn captured_archive_events(
     image: &RepositoryImage,
 ) -> Result<Vec<Event>, ArchiveExecutionError> {
-    let path = VirtualPath::data("events.jsonl").map_err(ProducerError::from)?;
+    let path = VirtualPath::EVENTS;
     let bytes = image
         .file_bytes(&path)
         .map_err(ProducerError::from)?

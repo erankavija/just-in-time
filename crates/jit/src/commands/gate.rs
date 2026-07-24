@@ -299,7 +299,7 @@ fn capture_gate_preset_image(
     };
 
     let presets_dir = VirtualPath::data("config/gate-presets")?;
-    let issues_dir = VirtualPath::data("issues")?;
+    let issues_dir = VirtualPath::ISSUES;
     let mut first_spec = CaptureSpec::phase_one(
         captured_gate_preset_fixed_paths()?,
         GATE_PRESET_CAPTURE_BUDGET,
@@ -311,7 +311,7 @@ fn capture_gate_preset_image(
     };
     let discovered_presets = listed_gate_preset_paths(&first)?;
     let index_bytes = first
-        .file_bytes(&VirtualPath::data("index.json")?)?
+        .file_bytes(&VirtualPath::INDEX)?
         .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
     let discovered_index = crate::storage::json::parse_repository_index(index_bytes)?;
     let issue_paths = discovered_index
@@ -353,7 +353,7 @@ fn capture_gate_preset_image(
         return Ok(None);
     }
     let current_index = image
-        .file_bytes(&VirtualPath::data("index.json")?)?
+        .file_bytes(&VirtualPath::INDEX)?
         .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))
         .and_then(crate::storage::json::parse_repository_index)?;
     if current_index.schema_version != discovered_index.schema_version
@@ -387,7 +387,7 @@ fn captured_gate_registry(
     image: &crate::repository_state::RepositoryImage,
 ) -> Result<crate::declarations::GateRegistry> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
-    match image.entry(&VirtualPath::data("gates.toml")?)? {
+    match image.entry(&VirtualPath::GATES)? {
         RepositoryEntry::File { bytes, .. } => {
             crate::declarations::parse_gate_registry(bytes).map_err(Into::into)
         }
@@ -1061,11 +1061,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         let registries = || -> Result<[VirtualPath; 5]> {
             Ok([
-                VirtualPath::data("config.toml")?,
-                VirtualPath::data("invariants.toml")?,
-                VirtualPath::data("rules.toml")?,
-                VirtualPath::data("gates.toml")?,
-                VirtualPath::data("events.jsonl")?,
+                VirtualPath::CONFIG,
+                VirtualPath::INVARIANTS,
+                VirtualPath::RULES,
+                VirtualPath::GATES,
+                VirtualPath::EVENTS,
             ])
         };
 
@@ -1095,7 +1095,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let Some(image) = capture_or_retry(session.capture(spec))? else {
                     return Ok(SessionStep::Retry);
                 };
-                let gates_path = VirtualPath::data("gates.toml")?;
+                let gates_path = VirtualPath::GATES;
                 let registry = match image.entry(&gates_path)? {
                     RepositoryEntry::File { bytes, .. } => {
                         crate::declarations::parse_gate_registry(bytes)?

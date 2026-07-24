@@ -199,8 +199,8 @@ impl CommandExecutor<JsonFileStorage> {
         let metadata = &package.manifest().profile;
         reject_reserved_application_targets(package.hashes().targets.keys().map(String::as_str))?;
         let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
-        let profiles_dir = VirtualPath::data("profiles")?;
-        let events_path = VirtualPath::data("events.jsonl")?;
+        let profiles_dir = VirtualPath::PROFILES;
+        let events_path = VirtualPath::EVENTS;
         let layout = self.require_layout()?;
 
         let mut content_paths = package

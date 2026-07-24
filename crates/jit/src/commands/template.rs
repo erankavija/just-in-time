@@ -231,11 +231,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .intents
                 .iter()
                 .any(|intent| matches!(intent, MutationIntent::EditGateRegistry { .. }));
-            let plan = if edits_gate_registry
-                && image
-                    .file_bytes(&VirtualPath::data("config.toml")?)?
-                    .is_some()
-            {
+            let plan = if edits_gate_registry && image.file_bytes(&VirtualPath::CONFIG)?.is_some() {
                 finalize_gate_registry_edit(
                     &layout,
                     &image,
@@ -407,7 +403,7 @@ fn capture_template_image(
     container_id: &str,
 ) -> Result<Option<RepositoryImage>> {
     let presets_dir = VirtualPath::data("config/gate-presets")?;
-    let issues_dir = VirtualPath::data("issues")?;
+    let issues_dir = VirtualPath::ISSUES;
     let mut first_spec = CaptureSpec::phase_one(template_fixed_paths()?, TEMPLATE_CAPTURE_BUDGET)?;
     first_spec.discover_listing(presets_dir.clone())?;
     let Some(first) = capture_or_retry(session.capture(first_spec))? else {
@@ -483,7 +479,7 @@ fn template_static_capture_matches(
 fn template_declaration_closure(image: &RepositoryImage) -> Result<Vec<VirtualPath>> {
     let config = template_config_from_image(image)?;
     let rules = image
-        .file_bytes(&VirtualPath::data("rules.toml")?)?
+        .file_bytes(&VirtualPath::RULES)?
         .map(std::str::from_utf8)
         .transpose()?;
     Ok(render_capture_closure(image.layout(), &config, &[], rules)?)
@@ -565,7 +561,7 @@ fn template_document_parent_paths(paths: &[VirtualPath]) -> Result<Vec<VirtualPa
 }
 
 fn template_config_from_image(image: &RepositoryImage) -> Result<crate::config::JitConfig> {
-    let config_path = VirtualPath::data("config.toml")?;
+    let config_path = VirtualPath::CONFIG;
     let mut config = match image.file_bytes(&config_path)? {
         Some(_) => crate::repository_state::assemble_config(image)?,
         None => toml::from_str("")?,
@@ -581,7 +577,7 @@ fn template_config_from_image(image: &RepositoryImage) -> Result<crate::config::
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    config.templates = match image.file_bytes(&VirtualPath::data("templates.toml")?)? {
+    config.templates = match image.file_bytes(&VirtualPath::TEMPLATES)? {
         Some(bytes) => crate::templates::TemplateRegistry::from_toml_str(
             std::str::from_utf8(bytes)?,
             &hierarchy_types,
@@ -595,14 +591,11 @@ fn template_declarations_from_image(
     image: &RepositoryImage,
     config: &crate::config::JitConfig,
 ) -> Result<crate::repository_state::CapturedRepositoryDeclarations> {
-    if image
-        .file_bytes(&VirtualPath::data("config.toml")?)?
-        .is_some()
-    {
+    if image.file_bytes(&VirtualPath::CONFIG)?.is_some() {
         return Ok(crate::repository_state::declarations_from_image(image)?);
     }
     let namespaces = crate::config_manager::namespaces_from_config(config);
-    let rules = match image.file_bytes(&VirtualPath::data("rules.toml")?)? {
+    let rules = match image.file_bytes(&VirtualPath::RULES)? {
         Some(bytes) => {
             let content = std::str::from_utf8(bytes)?;
             let schemas: Vec<_> = crate::declarations::rules::RuleSet::schema_requests(content)?
@@ -635,7 +628,7 @@ fn parse_template_index(
     image: &RepositoryImage,
 ) -> Result<crate::repository_state::RepositoryIndex> {
     image
-        .file_bytes(&VirtualPath::data("index.json")?)?
+        .file_bytes(&VirtualPath::INDEX)?
         .ok_or_else(|| anyhow!("index.json is absent during template apply"))
         .and_then(crate::storage::json::parse_repository_index)
 }
@@ -656,7 +649,7 @@ fn listed_json_paths(image: &RepositoryImage, dir: &VirtualPath) -> Result<Vec<V
 
 fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
     let index = parse_template_index(image)?;
-    let dir = VirtualPath::data("issues")?;
+    let dir = VirtualPath::ISSUES;
     let listing = image
         .listing_fingerprints()
         .get(&dir)
@@ -701,7 +694,7 @@ fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
 fn parse_template_gate_registry(
     image: &RepositoryImage,
 ) -> Result<crate::declarations::GateRegistry> {
-    match image.entry(&VirtualPath::data("gates.toml")?)? {
+    match image.entry(&VirtualPath::GATES)? {
         RepositoryEntry::File { bytes, .. } => Ok(crate::declarations::parse_gate_registry(bytes)?),
         RepositoryEntry::Absent => Ok(crate::declarations::GateRegistry::default()),
         _ => Err(anyhow!("captured gate registry is not an ordinary file")),

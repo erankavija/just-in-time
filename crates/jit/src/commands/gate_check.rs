@@ -67,7 +67,7 @@ fn captured_repository_index(
 ) -> Result<crate::repository_state::RepositoryIndex> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
 
-    let path = VirtualPath::data("index.json")?;
+    let path = VirtualPath::INDEX;
     match image.entry(&path)? {
         RepositoryEntry::File { bytes, .. } => crate::storage::json::parse_repository_index(bytes)
             .context("failed to parse captured issue index"),
@@ -117,7 +117,7 @@ fn captured_gate_registry(
 ) -> Result<crate::declarations::GateRegistry> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
 
-    let path = VirtualPath::data("gates.toml")?;
+    let path = VirtualPath::GATES;
     match image.entry(&path)? {
         RepositoryEntry::File { bytes, .. } => crate::declarations::parse_gate_registry(bytes)
             .context("failed to parse captured gate registry"),
@@ -762,7 +762,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             max_depth: 32,
         };
         with_mutation_session(&self.storage, layout, "gate target binding", |session| {
-            let mut spec = CaptureSpec::phase_one([VirtualPath::data("index.json")?], budget)?;
+            let mut spec = CaptureSpec::phase_one([VirtualPath::INDEX], budget)?;
             let Some(index_image) = capture_or_retry(session.capture(spec.clone()))? else {
                 return Ok(SessionStep::Retry);
             };
@@ -822,11 +822,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             max_depth: 32,
         };
         let mut paths = vec![
-            VirtualPath::data("index.json")?,
+            VirtualPath::INDEX,
             VirtualPath::data(format!("issues/{target_id}.json"))?,
-            VirtualPath::data("gates.toml")?,
-            VirtualPath::data("events.jsonl")?,
-            VirtualPath::data("gate-runs")?,
+            VirtualPath::GATES,
+            VirtualPath::EVENTS,
+            VirtualPath::GATE_RUNS,
         ];
         paths.extend(run_paths.iter().cloned());
         let mut spec = CaptureSpec::phase_one(paths, budget)?;
@@ -912,7 +912,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .parent()
             .ok_or_else(|| anyhow!("canonical gate-run result path has no parent"))?;
         let run_paths = [
-            VirtualPath::data("gate-runs")?,
+            VirtualPath::GATE_RUNS,
             VirtualPath::data(run_dir)?,
             VirtualPath::data(result_path.as_path())?,
         ];

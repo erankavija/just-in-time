@@ -257,7 +257,7 @@ impl InitializationScaffold {
         let Some(line) = self.gitattributes_line() else {
             return Ok(GitattributesStatus::NotApplicable);
         };
-        let entry = base.entry(&VirtualPath::worktree(".gitattributes")?)?;
+        let entry = base.entry(&VirtualPath::GITATTRIBUTES)?;
         Ok(resolve_gitattributes(entry, line)?.0)
     }
 
@@ -290,28 +290,28 @@ impl InitializationScaffold {
     fn desired_files(&self) -> Result<Vec<DesiredFile>, InitializationError> {
         let mut files = vec![
             DesiredFile {
-                path: VirtualPath::data("config.toml")?,
+                path: VirtualPath::CONFIG,
                 bytes: self.config.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
                 owner: SCAFFOLD_OWNER,
             },
             DesiredFile {
-                path: VirtualPath::data("index.json")?,
+                path: VirtualPath::INDEX,
                 bytes: self.index.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
                 owner: SCAFFOLD_OWNER,
             },
             DesiredFile {
-                path: VirtualPath::data("gates.toml")?,
+                path: VirtualPath::GATES,
                 bytes: self.gates.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
                 owner: SCAFFOLD_OWNER,
             },
             DesiredFile {
-                path: VirtualPath::data("rules.toml")?,
+                path: VirtualPath::RULES,
                 bytes: self.rules.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
@@ -337,7 +337,7 @@ impl InitializationScaffold {
     /// issues directory qualifies; schema and profile directories are ancestors of
     /// written files and enter the directory closure automatically.
     fn explicit_dirs(&self) -> Result<Vec<VirtualPath>, InitializationError> {
-        Ok(vec![VirtualPath::data("issues")?])
+        Ok(vec![VirtualPath::ISSUES])
     }
 
     /// Every path the composed delta may touch — files, the provenance record, the
@@ -352,17 +352,17 @@ impl InitializationScaffold {
             .collect();
         // The finalizer composes `events.jsonl` from the captured prefix, so its
         // path must be captured for the prior bytes and the action preimage.
-        paths.push(VirtualPath::data("events.jsonl")?);
+        paths.push(VirtualPath::EVENTS);
         if let Some(profile) = &self.profile {
             paths.push(profile.record_path.clone());
-            paths.push(VirtualPath::data("profiles")?);
+            paths.push(VirtualPath::PROFILES);
             paths.extend(profile.claims.target_paths()?);
             if profile_owns_default_rule_authority(profile) {
-                paths.push(VirtualPath::data("schemas")?);
+                paths.push(VirtualPath::SCHEMAS);
             }
         }
         if self.gitattributes_line().is_some() {
-            paths.push(VirtualPath::worktree(".gitattributes")?);
+            paths.push(VirtualPath::GITATTRIBUTES);
         }
         paths.extend(self.explicit_dirs()?);
         with_ancestor_dirs(paths)
@@ -428,8 +428,8 @@ pub(super) fn derive_initialization(
     context: &MutationContext,
 ) -> Result<MaterializationDerivation, InitializationError> {
     let mut actions = Vec::new();
-    let config_path = VirtualPath::data("config.toml")?;
-    let rules_path = VirtualPath::data("rules.toml")?;
+    let config_path = VirtualPath::CONFIG;
+    let rules_path = VirtualPath::RULES;
     let existing_rules = matches!(base.entry(&rules_path)?, RepositoryEntry::File { .. });
     let profile_changes_rules_authority = scaffold
         .profile
@@ -670,7 +670,7 @@ fn events_action(
             return profile_event_action(base, profile, context);
         }
     }
-    let path = VirtualPath::data("events.jsonl")?;
+    let path = VirtualPath::EVENTS;
     match base.entry(&path)? {
         RepositoryEntry::Absent => Ok(Some(RepositoryAction::WriteFile {
             path,
@@ -710,7 +710,7 @@ fn push_gitattributes_action(
     let Some(line) = scaffold.gitattributes_line() else {
         return Ok(());
     };
-    let path = VirtualPath::worktree(".gitattributes")?;
+    let path = VirtualPath::GITATTRIBUTES;
     let entry = base.entry(&path)?;
     if let (_status, Some(bytes)) = resolve_gitattributes(entry, line)? {
         actions.push(RepositoryAction::WriteFile {
@@ -813,8 +813,8 @@ pub(super) fn derive_profile_application(
         .collect::<Vec<_>>();
     let mut actions = Vec::new();
     push_file_actions(base, &files, &mut actions)?;
-    let config_path = VirtualPath::data("config.toml")?;
-    let rules_path = VirtualPath::data("rules.toml")?;
+    let config_path = VirtualPath::CONFIG;
+    let rules_path = VirtualPath::RULES;
     if profile.target_hashes.contains_key(".jit/config.toml")
         || profile.target_hashes.contains_key(".jit/rules.toml")
     {
@@ -850,7 +850,7 @@ pub(super) fn derive_profile_application(
             actions.push(action);
         }
     }
-    let profiles = VirtualPath::data("profiles")?;
+    let profiles = VirtualPath::PROFILES;
     let explicit = match base.entry(&profiles)? {
         RepositoryEntry::Absent => vec![profiles],
         RepositoryEntry::Directory { .. } => Vec::new(),
