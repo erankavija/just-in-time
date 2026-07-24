@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T11:09:25.267186308Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4b2005fe-a64e-490a-beab-add57df43db3",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Mutation-session retry combinator foundation",
-  "updated_at": "2026-07-24T08:15:53.740654701Z"
+  "updated_at": "2026-07-24T11:09:25.267186308Z"
 }
