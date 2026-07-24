@@ -12,6 +12,13 @@
       "format": "markdown",
       "label": "Epic Plan",
       "path": "dev/active/1cc809de-plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Breakdown Manifest",
+      "path": "dev/active/1cc809de-breakdown.json"
     }
   ],
   "done_at": "2026-07-23T22:30:00.915989658Z",
@@ -35,5 +42,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: Repository-state quality hardening",
-  "updated_at": "2026-07-23T22:30:00.915989658Z"
+  "updated_at": "2026-07-24T06:28:34.131638651Z"
 }

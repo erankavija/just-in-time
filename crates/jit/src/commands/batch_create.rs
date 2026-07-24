@@ -206,7 +206,10 @@ impl BatchCreateOutcome {
 
 impl<S: IssueStore> CommandExecutor<S> {
     /// Run native batch pre-validation without allocating ids or writing state.
-    pub fn validate_batch_from_json(&self, defs: &[BatchIssueDef]) -> Result<BatchDryRunOutcome> {
+    pub fn validate_batch_from_json(&self, defs: &[BatchIssueDef]) -> Result<BatchDryRunOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let problems = self.collect_batch_problems(defs)?;
         if !problems.is_empty() {
             return Err(BatchValidationError { problems }.into());
@@ -520,7 +523,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue
     }
 
-    #[cfg(test)]
     fn collect_batch_problems(&self, defs: &[BatchIssueDef]) -> Result<Vec<BatchValidationProblem>>
     where
         S: crate::storage::RepositoryStateStore,
