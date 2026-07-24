@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "b1d251f98093463b70a9bf76f537c960e60d64a6",
+  "completed_at": "2026-07-24T16:09:46.246743132Z",
+  "duration_ms": 228108,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/template.rs",
+        "id": "F1",
+        "line": 416,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/d159f9d4/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "REQ-01 remains unmet: fifteen non-test per-site RetryableConflict arms duplicate conflict classification outside the shared combinators."
+      }
+    ],
+    "summary": "REQ-01 is unresolved because per-site RetryableConflict classification remains outside the shared mutation-session contract.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d159f9d4-29ef-49cf-badd-11894026e7ba",
+  "message": null,
+  "run_id": "e6145554-aaf0-4ac1-8ba3-dfee883f90e7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T16:05:58.138150611Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6295 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f94e0-5801-7390-bb5f-e048d3b06f8c\n--------\nuser\n--- 6282 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b1d251f9 (`jit:d159f9d4`); gate-record-only patch\nPolicy sources: AGENTS.md\nResolved items: @/issue/d159f9d4/requirement/REQ-01–REQ-04 (issue description); @/gate/cargo-ci (.jit/gates.toml); @/invariant/atomic-writes, @/invariant/gate-semantics, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T16:00:55Z); code-review pending (no exit code)\nTruncation recovery: narrowed reads of retry-arm locations, planner/error boundary, transaction-kernel extraction, and relevant tests\n\n1. **F1 — blocking, issue-impact, high:** REQ-01 remains unmet: fifteen non-test, per-site `RetryableConflict` match arms still classify conflicts outside the shared combinators. Examples include [template.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/template.rs:416), [validate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:264), [gate_check.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/gate_check.rs:836), [gate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/gate.rs:312), [archive.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/archive.rs:318), and [commands/mod.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:1800). These duplicate the `RetryableConflict → retry/none` decision despite `capture_or_retry` being available, so conflict classification does not live in one place as required. REQ-02 through REQ-04 otherwise appear satisfied in the current tree.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-01 is unresolved because per-site RetryableConflict classification remains outside the shared mutation-session contract.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-01 remains unmet: fifteen non-test per-site RetryableConflict arms duplicate conflict classification outside the shared combinators.\",\"file\":\"crates/jit/src/commands/template.rs\",\"line\":416,\"references\":[\"@/issue/d159f9d4/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
