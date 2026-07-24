@@ -8,6 +8,7 @@
   ],
   "description": "A property-based test, with a contract-valid generator, asserts the managed-document splice round-trip through the public `render_managed_document`.\n\n## Background\n\nThe managed-document splice path in the repository-materialization subsystem (`crates/jit/src/repository_state/managed_document.rs`) has no property-based coverage; its round-trip guarantee is narrated rather than enforced.\n\nThe generator produces N region claims with unique, machine-distinct delimiters and content and outside bytes drawn from a delimiter-free alphabet, so `validate_regions` accepts them, interleaved into a base document per placement mode. The oracle goes through the public `render_managed_document` only and asserts the three round-trip properties: rendering is idempotent, each region's payload appears verbatim inside its region, and bytes outside all regions are unchanged.\n\n## Success Criteria\n\n- [hard] REQ-01: A `proptest` generator produces only region claims that satisfy `validate_regions` (unique machine-distinct delimiters; content and outside bytes from a delimiter-free alphabet).\n- [hard] REQ-02: A property test asserts, through the public `render_managed_document`, that rendering is idempotent, each region's payload appears verbatim within its region, and bytes outside all regions are unchanged.\n- [hard] REQ-03: Every assertion is a semantic property or relationship rather than a copied literal or field inventory.\n\n## Notes\n\nAssert observable semantic properties per the project's semantic-test-assertions invariant. The test lives in an in-crate test module and adds no integration-test target.",
   "documents": [],
+  "done_at": "2026-07-24T21:06:08.810187897Z",
   "first_ready_at": "2026-07-24T16:53:25.445464878Z",
   "gates_required": [
     "cargo-ci",
@@ -33,7 +34,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Managed-document splice round-trip property test",
-  "updated_at": "2026-07-24T21:05:11.611382326Z"
+  "updated_at": "2026-07-24T21:06:08.810187897Z"
 }
