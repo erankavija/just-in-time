@@ -88,7 +88,7 @@ done
 [[ "$WARMUP" -lt 3 ]] && WARMUP=3
 [[ "$SAMPLES" -lt 20 ]] && SAMPLES=20
 
-for tool in jq python3 git df cp awk find rg realpath; do
+for tool in jq python3 git df cp awk find ln rg realpath; do
   command -v "$tool" >/dev/null 2>&1 || {
     echo "ERROR: required tool '$tool' not found on PATH." >&2
     exit 2
@@ -138,7 +138,11 @@ WORK_PARENT="${SESSION_BENCH_WORK_DIR:-${TMPDIR:-/tmp}}"
 mkdir -p "$WORK_PARENT"
 WORK_PARENT=$(realpath "$WORK_PARENT")
 WORK_BASE=$(mktemp -d "$WORK_PARENT/jit-session-bench.XXXXXX")
-cleanup() { rm -rf "$WORK_BASE"; }
+ARTIFACT_TMP=""
+cleanup() {
+  [[ -z "$ARTIFACT_TMP" ]] || rm -f -- "$ARTIFACT_TMP"
+  rm -rf "$WORK_BASE"
+}
 trap cleanup EXIT
 trap 'cleanup; exit 130' INT
 trap 'cleanup; exit 143' TERM
@@ -404,8 +408,21 @@ fi
 
 # --- lock mechanism (derived, not hand-copied) --------------------------------
 LOCK_SITE=$(rg -n -m1 'with_extension\("lock"\)' crates/jit/src/storage/json.rs 2>/dev/null \
-  | awk -F: '{print "crates/jit/src/storage/json.rs:"$1}')
-[[ -n "$LOCK_SITE" ]] || LOCK_SITE="crates/jit/src/storage/json.rs"
+  | awk -F: '{print "crates/jit/src/storage/json.rs:"$1}' || true)
+if [[ -n "$LOCK_SITE" ]]; then
+  LOCK_CREATOR="FileLocker::open_or_create opens the sidecar with O_CREAT"
+  LOCK_LIFETIME="LockGuard::drop unlocks and removes the .lock.meta only; the .lock file persists"
+  LOCK_CLEANUP="cleanup_stale_locks sweeps the claims lock directory, not .jit/issues/*.lock"
+  SHOW_NOTE="reads one issue via load_issue; creates the target issue's sidecar .lock"
+  QUERY_NOTE="list_issues -> load_issue per id -> one sidecar .lock per issue"
+else
+  LOCK_SITE="none (the measured commit has no per-issue sidecar read lock)"
+  LOCK_CREATOR="not applicable; load_issue creates no per-issue sidecar"
+  LOCK_LIFETIME="not applicable; no per-issue sidecar is created"
+  LOCK_CLEANUP="legacy per-issue sidecars are removed during repository recovery"
+  SHOW_NOTE="reads one issue without creating a per-issue sidecar lock"
+  QUERY_NOTE="reads all issues without creating per-issue sidecar locks"
+fi
 REPO_LOCK_COUNT=$(count_locks "$repo_root")
 
 # --- assemble the artifact ----------------------------------------------------
@@ -427,8 +444,8 @@ with_stat() {
 }
 
 CMD_VERSION=$(with_stat version '["jit","--version"]' baseline "$VERSION_STATS" "$VERSION_LOCKS")
-CMD_SHOW=$(with_stat issue_show_single_read '["jit","issue","show","<id>","--json"]' pure_read_single "$SHOW_STATS" "$SHOW_LOCKS" "reads one issue via load_issue; creates the target issue's sidecar .lock")
-CMD_QUERY=$(with_stat query_available '["jit","query","available","--json"]' pure_read_all "$QUERY_STATS" "$QUERY_LOCKS" "list_issues -> load_issue per id -> one sidecar .lock per issue")
+CMD_SHOW=$(with_stat issue_show_single_read '["jit","issue","show","<id>","--json"]' pure_read_single "$SHOW_STATS" "$SHOW_LOCKS" "$SHOW_NOTE")
+CMD_QUERY=$(with_stat query_available '["jit","query","available","--json"]' pure_read_all "$QUERY_STATS" "$QUERY_LOCKS" "$QUERY_NOTE")
 CMD_LIST=$(with_stat issue_list '["jit","issue","list","--json"]' pure_read_all "$LIST_STATS" "$LIST_LOCKS")
 CMD_UPDATE=$(with_stat issue_update_mutation '["jit","issue","update","<id>","--priority","high","--json"]' mutation "$UPDATE_STATS" "$UPDATE_LOCKS" "fresh fixture materialized before every measured sample so no sample observes a prior mutation")
 
@@ -448,7 +465,9 @@ jq -n \
   --argjson cmd_query "$CMD_QUERY" --argjson cmd_list "$CMD_LIST" \
   --argjson cmd_update "$CMD_UPDATE" \
   --argjson syscall "$SYSCALL_JSON" \
-  --arg lock_site "$LOCK_SITE" --argjson repo_lock_count "$REPO_LOCK_COUNT" \
+  --arg lock_site "$LOCK_SITE" --arg lock_creator "$LOCK_CREATOR" \
+  --arg lock_lifetime "$LOCK_LIFETIME" --arg lock_cleanup "$LOCK_CLEANUP" \
+  --argjson repo_lock_count "$REPO_LOCK_COUNT" \
   '{
     schema_version: "1.0.0",
     artifact_kind: "jit-session-cost-profile",
@@ -476,16 +495,32 @@ jq -n \
     mutation_syscall_summary: $syscall,
     lock_mechanism: {
       per_issue_lock_site:$lock_site,
-      creator:"FileLocker::open_or_create opens the sidecar with O_CREAT",
-      never_removed:"LockGuard::drop unlocks and removes the .lock.meta only; the .lock file persists",
-      cleanup_scope:"cleanup_stale_locks sweeps the claims lock directory, not .jit/issues/*.lock",
+      creator:$lock_creator,
+      never_removed:$lock_lifetime,
+      cleanup_scope:$lock_cleanup,
       current_count_in_repo:$repo_lock_count,
       gitignored:".jit/**/*.lock",
       writes_are_atomic:"issue JSON is published by temp-file plus atomic rename; repository mutations serialize on .jit/.repo-write.lock"
     }
   }' >"$ARTIFACT_TMP"
 
-# Atomic publish (@/inv/atomic-writes): temp file in the destination directory,
-# then rename into place, so a reader never observes a partial artifact.
-mv "$ARTIFACT_TMP" "$ARTIFACT"
+# New-file publication (@/invariant/atomic-writes): validate the complete stage,
+# then use link(2) through `ln` as an atomic no-replace primitive. Both names
+# are in the destination directory/filesystem. An occupied destination makes
+# link fail without changing its inode or bytes; the EXIT trap removes the
+# still-staged temp file on every failure path.
+jq -e . "$ARTIFACT_TMP" >/dev/null || {
+  echo "ERROR: staged benchmark artifact is not valid JSON: $ARTIFACT_TMP" >&2
+  exit 1
+}
+if ! ln -T -- "$ARTIFACT_TMP" "$ARTIFACT"; then
+  if [[ -e "$ARTIFACT" ]]; then
+    echo "ERROR: benchmark artifact already exists; refusing to replace $ARTIFACT" >&2
+  else
+    echo "ERROR: could not publish benchmark artifact without replacement: $ARTIFACT" >&2
+  fi
+  exit 1
+fi
+rm -f -- "$ARTIFACT_TMP"
+ARTIFACT_TMP=""
 echo "[session-bench] wrote $ARTIFACT" >&2
