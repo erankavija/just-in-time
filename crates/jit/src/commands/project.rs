@@ -199,6 +199,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             // Keep projection and managed-region failures typed so the command
             // preserves their validation exit-code mapping.
             .map_err(|error| match error {
+                crate::repository_state::RepositoryStateError::Producer(
+                    crate::repository_state::ProducerError::Projection(projection),
+                ) => anyhow::Error::new(projection),
+                crate::repository_state::RepositoryStateError::Producer(
+                    crate::repository_state::ProducerError::ManagedDocument(managed),
+                ) => anyhow::Error::new(managed),
                 crate::repository_state::RepositoryStateError::Projection(projection) => {
                     anyhow::Error::new(projection)
                 }

@@ -131,7 +131,130 @@ pub use rules_document::{parse_rule_identities, splice_default_membership};
 pub use rules_gates_projection::render_rules_and_gates_markdown;
 
 use crate::declarations::rules::RuleSet;
-use crate::declarations::{ConfigurationDeclarations, GateRegistry};
+use crate::declarations::{ConfigurationDeclarationError, ConfigurationDeclarations, GateRegistry};
+
+/// A typed failure raised while deriving materialized repository state.
+///
+/// Producer errors retain their concrete source and raw declaration identities;
+/// rendering belongs to this type rather than to producer call sites.
+#[derive(Debug, thiserror::Error)]
+pub enum ProducerError {
+    /// A required declaration was absent from the captured repository image.
+    #[error("captured image has no {0}")]
+    MissingCapture(&'static str),
+    /// Captured bytes were not valid UTF-8.
+    #[error(transparent)]
+    MalformedUtf8(#[from] std::string::FromUtf8Error),
+    /// A requested projection is not declared.
+    #[error("unknown projection '{0}'")]
+    UnknownProjection(String),
+    /// A projection references an item kind that is not declared.
+    #[error("projection '{projection}' references unknown kind '{kind}'")]
+    UnknownKind { projection: String, kind: String },
+    /// An authored config edit could not be parsed.
+    #[error("invalid config.toml edit: {0}")]
+    ConfigParse(#[source] ConfigurationDeclarationError),
+    /// Closed-image capture failed.
+    #[error(transparent)]
+    Capture(#[from] CaptureError),
+    /// A producer path was invalid for the repository layout.
+    #[error(transparent)]
+    Layout(#[from] RepositoryLayoutError),
+    /// Captured configuration declarations were invalid.
+    #[error(transparent)]
+    ConfigurationDeclaration(#[from] ConfigurationDeclarationError),
+    /// Captured invariant declarations were invalid.
+    #[error(transparent)]
+    InvariantConfig(#[from] crate::declarations::invariants::InvariantConfigError),
+    /// Addressable item declarations or source content were invalid.
+    #[error(transparent)]
+    Item(#[from] crate::domain::item::ItemError),
+    /// Captured rule declarations were invalid.
+    #[error(transparent)]
+    RuleConfig(#[from] crate::declarations::rules::RuleConfigError),
+    /// A configured projection could not be rendered.
+    #[error(transparent)]
+    Projection(#[from] ProjectionError),
+    /// Managed-document claims could not be composed.
+    #[error(transparent)]
+    ManagedDocument(#[from] ManagedDocumentError),
+    /// A selected content parser is not available in this build.
+    #[error(transparent)]
+    ContentParser(#[from] crate::document::ContentParserError),
+    /// The repository-level content format is invalid.
+    #[error(
+        "invalid [validation].content_format in .jit/config.toml: '{0}': Invalid content format: '{0}' (expected markdown, html, or xml)"
+    )]
+    InvalidContentFormat(String),
+    /// A rules document could not be parsed or safely spliced.
+    #[error("{0:#}")]
+    RulesDocument(anyhow::Error),
+    /// Captured declarations could not be assembled into the canonical bundle.
+    #[error("{0:#}")]
+    DeclarationAssembly(anyhow::Error),
+    /// A profile registry target is occupied by a non-file entry.
+    #[error("profile registry '{target}' is not a regular file")]
+    ProfileRegistryNotFile { target: String },
+    /// A profile registry could not be decoded or parsed.
+    #[error("invalid profile registry '{target}': {source}")]
+    ProfileRegistryParse {
+        target: String,
+        #[source]
+        source: Box<ProfileRegistryParseError>,
+    },
+    /// A profile contribution conflicts with an existing registry identity.
+    #[error("profile contribution '{identity}' conflicts in '{registry}'")]
+    ProfileContributionConflict { identity: String, registry: String },
+    /// A supported archive edge target is absent from the proposed plan.
+    #[error("supported archive edge target is absent from plan: {target}")]
+    ProposedLayoutTargetAbsent { target: String },
+    /// A supported archive edge does not resolve after the proposed move.
+    #[error(
+        "supported edge {reference} from {parent} resolves to {resolved} in the proposed layout, not an available target location ({available})",
+        available = .available.join(", ")
+    )]
+    ProposedLayoutEdgeUnavailable {
+        reference: String,
+        parent: String,
+        resolved: String,
+        available: Vec<String>,
+    },
+}
+
+/// Typed parse failures for a profile-owned TOML registry.
+#[derive(Debug, thiserror::Error)]
+pub enum ProfileRegistryParseError {
+    #[error(transparent)]
+    Utf8(#[from] std::str::Utf8Error),
+    #[error(transparent)]
+    TomlEdit(#[from] toml_edit::TomlError),
+    #[error(transparent)]
+    TomlDeserialize(#[from] toml_edit::de::Error),
+    #[error("set target is not an array")]
+    SetTargetNotArray,
+    #[error("set target contains a non-string member")]
+    SetTargetNonStringMember,
+    #[error("entry lacks '{field}' identity")]
+    MissingIdentity { field: String },
+    #[error("duplicate '{field}' identity")]
+    DuplicateIdentity { field: String },
+    #[error("'{key}' is not a table")]
+    NotTable { key: String },
+    #[error("'{key}' is not an inline table")]
+    NotInlineTable { key: String },
+    #[error("'{key}' is not an array")]
+    NotArray { key: String },
+    #[error("'{key}' is not an array of tables")]
+    NotArrayOfTables { key: String },
+    #[error("contribution value is not a table")]
+    ContributionNotTable,
+    #[error("null is not a TOML value")]
+    NullValue,
+    #[error("unsupported numeric value")]
+    UnsupportedNumericValue,
+    #[error("value is not a table")]
+    ValueNotTable,
+}
 
 /// Explicit declaration bundle consumed by the closed producer call graph.
 pub struct RepositoryDeclarations<'a> {
@@ -497,16 +620,12 @@ pub fn finalize_config_edit(
     // The edit must parse before any planning: a malformed config is a typed
     // planning error, not a published file.
     let edited_configuration = crate::declarations::parse_configuration(edited_config_bytes)
-        .map_err(|error| {
-            RepositoryStateError::Producer(format!("invalid config.toml edit: {error:#}"))
-        })?;
+        .map_err(ProducerError::ConfigParse)?;
 
     let config_path = VirtualPath::data("config.toml")?;
     let overlay = std::iter::once((config_path.clone(), Some(edited_config_bytes.to_vec())))
         .collect::<std::collections::BTreeMap<_, _>>();
-    let overlaid = apply_overlay(base, overlay).map_err(|error| {
-        RepositoryStateError::Producer(format!("config overlay failed: {error}"))
-    })?;
+    let overlaid = apply_overlay(base, overlay)?;
 
     // The authored config write carries the base preimage; the complete producer
     // set derives the coupled schemas/rule-membership/projections from the edited
@@ -515,10 +634,7 @@ pub fn finalize_config_edit(
     let mut actions = vec![RepositoryAction::WriteFile {
         path: config_path.clone(),
         owner: "authored-config".to_string(),
-        expected: ExpectedPreimage::of(
-            base.entry(&config_path)
-                .map_err(|error| RepositoryStateError::producer(error.into()))?,
-        ),
+        expected: ExpectedPreimage::of(base.entry(&config_path).map_err(ProducerError::from)?),
         bytes: edited_config_bytes.to_vec(),
         mode: FileMode::Regular,
     }];
@@ -557,9 +673,12 @@ pub enum RepositoryStateError {
     /// Layout classification rejected a producer path.
     #[error(transparent)]
     Layout(#[from] RepositoryLayoutError),
+    /// A proposed-state overlay could not be closed.
+    #[error(transparent)]
+    Overlay(#[from] OverlayError),
     /// A producer read an uncaptured path or malformed captured bytes.
     #[error("materialization producer failed: {0}")]
-    Producer(String),
+    Producer(#[from] ProducerError),
     /// Ownership of a materialization boundary cannot be proven, so repair is
     /// refused before publication rather than risk rewriting or deleting authored
     /// content (ownership matrix: "never rewrites an authored boundary it cannot
@@ -577,25 +696,6 @@ impl RepositoryStateError {
                 | Self::Initialization(InitializationError::ProfileTargetConflict(_))
         )
     }
-
-    /// Wrap an opaque producer failure (an `anyhow` error from a relocated
-    /// projection/serialization producer) into the typed derivation error.
-    fn producer(error: anyhow::Error) -> Self {
-        Self::Producer(format!("{error:#}"))
-    }
-
-    /// Wrap a projection-composition producer failure, preserving a typed
-    /// projection or managed-document failure keeps its identity for exit-code
-    /// mapping instead of collapsing into an opaque string.
-    fn projection_producer(error: anyhow::Error) -> Self {
-        match error.downcast::<ProjectionError>() {
-            Ok(projection) => Self::Projection(projection),
-            Err(error) => match error.downcast::<ManagedDocumentError>() {
-                Ok(managed) => Self::ManagedDocument(managed),
-                Err(error) => Self::producer(error),
-            },
-        }
-    }
 }
 
 /// The complete owned-materialization producer set: default rules and their
@@ -608,14 +708,11 @@ fn compose_complete(
     image: &RepositoryImage,
     declarations: &RepositoryDeclarations<'_>,
 ) -> Result<Vec<RepositoryAction>, RepositoryStateError> {
-    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)
-        .map_err(RepositoryStateError::producer)?;
+    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)?;
     let mut actions = materialize::compose_default_ruleset(image, &config)?;
     actions.extend(
         // A semantic mutation is complete over EVERY declared projection.
-        materialize::compose_configured_projections(image, &config, declarations, None)
-            .map_err(RepositoryStateError::producer)?
-            .actions,
+        materialize::compose_configured_projections(image, &config, declarations, None)?.actions,
     );
     Ok(actions)
 }
@@ -641,11 +738,9 @@ fn derive_project_render(
     declarations: &RepositoryDeclarations<'_>,
     selected: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<(RepositoryDelta, std::collections::BTreeMap<String, usize>), RepositoryStateError> {
-    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)
-        .map_err(RepositoryStateError::producer)?;
+    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)?;
     let rendered =
-        materialize::compose_configured_projections(image, &config, declarations, selected)
-            .map_err(RepositoryStateError::projection_producer)?;
+        materialize::compose_configured_projections(image, &config, declarations, selected)?;
     Ok((
         RepositoryDelta::new(image.layout(), rendered.actions)?,
         rendered.counts,
@@ -672,15 +767,9 @@ fn derive_repair(
                 )));
             }
             actions.retain(|action| action.path() != &path);
-            let expected = ExpectedPreimage::of(
-                image
-                    .entry(&path)
-                    .map_err(|error| RepositoryStateError::producer(error.into()))?,
-            );
+            let expected = ExpectedPreimage::of(image.entry(&path).map_err(ProducerError::from)?);
             if !matches!(
-                image
-                    .entry(&path)
-                    .map_err(|error| RepositoryStateError::producer(error.into()))?,
+                image.entry(&path).map_err(ProducerError::from)?,
                 RepositoryEntry::File {
                     bytes: existing,
                     mode: existing_mode,

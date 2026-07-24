@@ -501,7 +501,7 @@ fn template_declaration_closure(image: &RepositoryImage) -> Result<Vec<VirtualPa
         .file_bytes(&VirtualPath::data("rules.toml")?)?
         .map(std::str::from_utf8)
         .transpose()?;
-    render_capture_closure(image.layout(), &config, &[], rules)
+    Ok(render_capture_closure(image.layout(), &config, &[], rules)?)
 }
 
 fn template_operation_capture_paths(

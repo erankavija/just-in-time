@@ -13,7 +13,7 @@ use super::rules_document::rewrite_default_assertions;
 use super::{
     compose_managed_documents, default_ruleset, parse_rule_identities, render_projection_body,
     render_rule_block, serialize_ruleset, splice_default_membership, ExpectedPreimage, FileMode,
-    ManagedDocumentClaim, ProjectionInputs, RegionPlacement, RepositoryAction,
+    ManagedDocumentClaim, ProducerError, ProjectionInputs, RegionPlacement, RepositoryAction,
     RepositoryDeclarations, RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
 };
 use crate::config::{JitConfig, ProjectionMode};
@@ -37,10 +37,7 @@ pub(crate) struct ConfiguredProjections {
 /// The projection producers address the engine registries and worktree targets by
 /// their logical `.jit/...` / worktree-relative spellings; a `.jit/`-prefixed path
 /// is a `Data(...)` target and every other repo-relative path is `Worktree(...)`.
-fn image_path(
-    image: &RepositoryImage,
-    repo_relative: &str,
-) -> Result<VirtualPath, RepositoryStateError> {
+fn image_path(image: &RepositoryImage, repo_relative: &str) -> Result<VirtualPath, ProducerError> {
     Ok(image.layout().classify_repository_relative(repo_relative)?)
 }
 
@@ -49,7 +46,10 @@ fn image_path(
 /// `Ok(None)` when the captured entry is absent; a producer requesting a path the
 /// image never captured fails with `UndiscoveredRepositoryPath`, never silent
 /// absence.
-fn read_text(image: &RepositoryImage, repo_relative: &str) -> anyhow::Result<Option<String>> {
+fn read_text(
+    image: &RepositoryImage,
+    repo_relative: &str,
+) -> Result<Option<String>, ProducerError> {
     let vpath = image_path(image, repo_relative)?;
     match image.file_bytes(&vpath)? {
         Some(bytes) => Ok(Some(String::from_utf8(bytes.to_vec())?)),
@@ -63,10 +63,10 @@ fn read_text(image: &RepositoryImage, repo_relative: &str) -> anyhow::Result<Opt
 /// validation settings; the sibling `invariants.toml` populates the `#[serde(skip)]`
 /// invariant registry the `full` invariant view renders. An absent `invariants.toml`
 /// is an empty registry, matching the on-disk load boundary.
-pub fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConfig> {
+pub fn assemble_config(image: &RepositoryImage) -> Result<JitConfig, ProducerError> {
     let config_bytes = image
         .file_bytes(&image_path(image, ".jit/config.toml")?)?
-        .ok_or_else(|| anyhow::anyhow!("captured image has no .jit/config.toml"))?;
+        .ok_or(ProducerError::MissingCapture(".jit/config.toml"))?;
     let declarations = crate::declarations::parse_configuration(config_bytes)?;
     assemble_config_from_declarations(image, &declarations)
 }
@@ -76,7 +76,7 @@ pub fn assemble_config(image: &RepositoryImage) -> anyhow::Result<JitConfig> {
 pub(crate) fn assemble_config_from_declarations(
     image: &RepositoryImage,
     declarations: &crate::declarations::ConfigurationDeclarations,
-) -> anyhow::Result<JitConfig> {
+) -> Result<JitConfig, ProducerError> {
     // An invariants.toml outside the captured closure (or captured absent) is an
     // empty registry, matching the on-disk load boundary.
     let invariants_path = image_path(image, ".jit/invariants.toml")?;
@@ -117,7 +117,7 @@ pub fn render_capture_closure(
     config: &JitConfig,
     selected: &[String],
     rules_content: Option<&str>,
-) -> anyhow::Result<Vec<VirtualPath>> {
+) -> Result<Vec<VirtualPath>, ProducerError> {
     use crate::config::SourceOfTruth;
     use crate::domain::item::resolve_item_kinds;
 
@@ -137,14 +137,15 @@ pub fn render_capture_closure(
     for name in &names {
         let projection = registry
             .get(name)
-            .ok_or_else(|| anyhow::anyhow!("unknown projection '{name}'"))?;
+            .ok_or_else(|| ProducerError::UnknownProjection(name.clone()))?;
         paths.push(layout.classify_repository_relative(super::require_target(projection, name)?)?);
         for kind_name in projection.kinds() {
             let kind = all_kinds
                 .iter()
                 .find(|k| k.name() == kind_name)
-                .ok_or_else(|| {
-                    anyhow::anyhow!("projection '{name}' references unknown kind '{kind_name}'")
+                .ok_or_else(|| ProducerError::UnknownKind {
+                    projection: name.clone(),
+                    kind: kind_name.clone(),
                 })?;
             match kind.source_of_truth() {
                 SourceOfTruth::MarkdownFirst => {
@@ -210,7 +211,7 @@ pub fn validate_capture_closure(
     config: &JitConfig,
     all_ids: &[String],
     rules_content: Option<&str>,
-) -> anyhow::Result<ValidationCaptureClosure> {
+) -> Result<ValidationCaptureClosure, ProducerError> {
     use crate::config::SourceOfTruth;
     use crate::domain::item::resolve_item_kinds;
 
@@ -240,8 +241,9 @@ pub fn validate_capture_closure(
             let kind = all_kinds
                 .iter()
                 .find(|k| k.name() == kind_name)
-                .ok_or_else(|| {
-                    anyhow::anyhow!("projection '{name}' references unknown kind '{kind_name}'")
+                .ok_or_else(|| ProducerError::UnknownKind {
+                    projection: name.clone(),
+                    kind: kind_name.clone(),
                 })?;
             match kind.source_of_truth() {
                 SourceOfTruth::MarkdownFirst => {
@@ -295,7 +297,7 @@ pub(crate) fn compose_configured_projections(
     config: &JitConfig,
     declarations: &RepositoryDeclarations<'_>,
     selected: Option<&std::collections::BTreeSet<String>>,
-) -> anyhow::Result<ConfiguredProjections> {
+) -> Result<ConfiguredProjections, ProducerError> {
     let Some(projections) = config.projection.as_ref() else {
         return Ok(ConfiguredProjections {
             actions: Vec::new(),
@@ -401,9 +403,7 @@ pub(crate) fn compose_default_ruleset(
     if !image.capture_spec().contains_path(&rules_path) {
         return Ok(Vec::new());
     }
-    let Some(current_rules) =
-        read_text(image, ".jit/rules.toml").map_err(RepositoryStateError::producer)?
-    else {
+    let Some(current_rules) = read_text(image, ".jit/rules.toml")? else {
         return Ok(Vec::new());
     };
     let namespaces = crate::config_manager::namespaces_from_config(config);
@@ -411,8 +411,7 @@ pub(crate) fn compose_default_ruleset(
 
     // Name-keyed ownership requires unique rule names; a duplicate makes ownership
     // unprovable across the whole pass, so refuse before any add/drop/delete.
-    let identities =
-        parse_rule_identities(&current_rules).map_err(RepositoryStateError::producer)?;
+    let identities = parse_rule_identities(&current_rules).map_err(ProducerError::RulesDocument)?;
     if let Some(dup) = first_duplicate_rule_name(&identities) {
         return Err(RepositoryStateError::AmbiguousOwnership(format!(
             "rules.toml declares more than one rule named '{dup}'; \
@@ -425,10 +424,10 @@ pub(crate) fn compose_default_ruleset(
     let diff = default_rule_membership_diff_from_identities(&identities, &namespaces);
     let rendered_add: Vec<String> = diff.to_add.iter().map(render_rule_block).collect();
     let spliced = splice_default_membership(&current_rules, &rendered_add, &diff.to_drop)
-        .map_err(RepositoryStateError::producer)?;
+        .map_err(ProducerError::RulesDocument)?;
     let serialized = serialized_default_ruleset(config);
     let expected_rules = rewrite_default_assertions(&spliced, &serialized.rules_toml)
-        .map_err(RepositoryStateError::producer)?;
+        .map_err(ProducerError::RulesDocument)?;
     if expected_rules != current_rules {
         actions.push(RepositoryAction::WriteFile {
             path: rules_path.clone(),
@@ -538,7 +537,7 @@ fn entry<'a>(
 ) -> Result<&'a RepositoryEntry, RepositoryStateError> {
     image
         .entry(path)
-        .map_err(|e| RepositoryStateError::producer(e.into()))
+        .map_err(|error| ProducerError::from(error).into())
 }
 
 /// The file name of a `Data("schemas/<name>")` entry, or `None` for any other
@@ -686,7 +685,20 @@ kind = "advisory"
         let all = render_capture_closure(&layout(), &config, &[], None).unwrap();
         assert!(all.contains(&VirtualPath::worktree("AGENTS.md").unwrap()));
         // An unknown selected name is a defensive error.
-        assert!(render_capture_closure(&layout(), &config, &["nope".to_string()], None).is_err());
+        assert!(matches!(
+            render_capture_closure(&layout(), &config, &["nope".to_string()], None),
+            Err(ProducerError::UnknownProjection(name)) if name == "nope"
+        ));
+    }
+
+    #[test]
+    fn test_assemble_config_reports_missing_capture_with_typed_error() {
+        let image = image(&[(".jit/config.toml", None)]);
+
+        assert!(matches!(
+            assemble_config(&image),
+            Err(ProducerError::MissingCapture(".jit/config.toml"))
+        ));
     }
 
     #[test]

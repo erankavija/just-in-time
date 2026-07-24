@@ -28,6 +28,7 @@
 
 use super::projection::{render_id_anchor_rows, render_invariants_markdown, ProjectionError};
 use super::rules_gates_projection::render_rules_and_gates_markdown;
+use super::ProducerError;
 use crate::config::{JitConfig, ProjectionConfig, ProjectionStyle, SourceOfTruth};
 use crate::declarations::rules::RuleSet;
 use crate::declarations::GateRegistry;
@@ -37,7 +38,6 @@ use crate::domain::item::{
     AddressableItem, ItemKind, Scope,
 };
 use crate::domain::ContentFormat;
-use anyhow::Result;
 use std::collections::BTreeSet;
 
 /// The loaded registries a projection body render reads besides its source files:
@@ -62,8 +62,8 @@ pub(crate) struct ProjectionInputs<'a> {
 pub(crate) fn render_projection_body(
     proj: &ProjectionConfig,
     inputs: &ProjectionInputs,
-    read: &mut dyn FnMut(&str) -> Result<Option<String>>,
-) -> Result<(String, usize)> {
+    read: &mut dyn FnMut(&str) -> Result<Option<String>, ProducerError>,
+) -> Result<(String, usize), ProducerError> {
     let all_kinds = resolve_item_kinds(inputs.config.item_kinds.as_ref())?;
     // Resolve every declared kind name (accepting aliases) to its ItemKind up
     // front, so an unknown kind fails before any source is read (REQ-07).
@@ -97,8 +97,8 @@ pub(crate) fn render_projection_body(
 fn resolve_rows(
     kinds: &[&ItemKind],
     config: &JitConfig,
-    read: &mut dyn FnMut(&str) -> Result<Option<String>>,
-) -> Result<Vec<AddressableItem>> {
+    read: &mut dyn FnMut(&str) -> Result<Option<String>, ProducerError>,
+) -> Result<Vec<AddressableItem>, ProducerError> {
     let parser = content_parser_for(None, repo_content_format(config)?)?;
     let mut rows = Vec::new();
     for kind in kinds {
@@ -179,8 +179,8 @@ fn render_full_body(
     proj: &ProjectionConfig,
     kinds: &[&ItemKind],
     inputs: &ProjectionInputs,
-    read: &mut dyn FnMut(&str) -> Result<Option<String>>,
-) -> Result<(String, usize)> {
+    read: &mut dyn FnMut(&str) -> Result<Option<String>, ProducerError>,
+) -> Result<(String, usize), ProducerError> {
     // A non-project kind has no project-scope registry to render (mirrors the
     // id-anchor guard), so reject it before touching any source.
     for kind in kinds {
@@ -242,9 +242,19 @@ fn render_full_body(
 /// The repo-level content format (`[validation].content_format`, defaulting to
 /// Markdown), matching the selection issue descriptions and project sources use so
 /// a projection scans its source identically.
-fn repo_content_format(config: &JitConfig) -> Result<ContentFormat> {
+fn repo_content_format(config: &JitConfig) -> Result<ContentFormat, ProducerError> {
     match config.validation.as_ref() {
-        Some(validation) => Ok(validation.content_format()?),
+        Some(validation) => match validation.content_format.as_deref() {
+            None => Ok(ContentFormat::Markdown),
+            Some(value)
+                if value.eq_ignore_ascii_case("markdown") || value.eq_ignore_ascii_case("md") =>
+            {
+                Ok(ContentFormat::Markdown)
+            }
+            Some(value) if value.eq_ignore_ascii_case("html") => Ok(ContentFormat::Html),
+            Some(value) if value.eq_ignore_ascii_case("xml") => Ok(ContentFormat::Xml),
+            Some(value) => Err(ProducerError::InvalidContentFormat(value.to_string())),
+        },
         None => Ok(ContentFormat::Markdown),
     }
 }
