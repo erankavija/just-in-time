@@ -62,36 +62,62 @@ echo "✅ Web UI build OK"
 echo ""
 
 # Test 9: Security audit (Rust)
+# Audits fail closed: a missing tool or reported vulnerabilities are CI
+# failures, not warnings (@/charter/D-11). Failures are collected so every
+# audit still runs and reports, but the script exits non-zero afterward
+# and never prints the success summary.
+AUDIT_FAILED=0
+
 echo "9️⃣  Running cargo audit..."
 if ! command -v cargo-audit &> /dev/null; then
-    echo "⚠️  cargo-audit not installed, skipping..."
+    echo "❌ cargo-audit not installed (required for security audit)"
     echo "   Install with: cargo install cargo-audit"
-else
-    cargo audit
+    AUDIT_FAILED=1
+elif cargo audit; then
     echo "✅ Cargo audit OK"
+else
+    echo "❌ Cargo audit found issues"
+    AUDIT_FAILED=1
 fi
 echo ""
 
 # Test 10: Security audit (npm - MCP)
 echo "🔟 Running npm audit (MCP Server)..."
 cd mcp-server
-npm audit --audit-level=moderate || echo "⚠️  Vulnerabilities found (check manually)"
+if npm audit --audit-level=moderate; then
+    echo "✅ npm audit (MCP Server) OK"
+else
+    echo "❌ npm audit (MCP Server) found vulnerabilities"
+    AUDIT_FAILED=1
+fi
 cd ..
 echo ""
 
 # Test 11: Security audit (npm - Web)
 echo "1️⃣1️⃣  Running npm audit (Web UI)..."
 cd web
-npm audit --audit-level=moderate || echo "⚠️  Vulnerabilities found (check manually)"
+if npm audit --audit-level=moderate; then
+    echo "✅ npm audit (Web UI) OK"
+else
+    echo "❌ npm audit (Web UI) found vulnerabilities"
+    AUDIT_FAILED=1
+fi
 cd ..
 echo ""
+
+if [ "$AUDIT_FAILED" -ne 0 ]; then
+    echo "=================================================="
+    echo "❌ CI checks failed: security audit missing or failing"
+    echo ""
+    exit 1
+fi
 
 echo "=================================================="
 echo "✅ All CI checks complete!"
 echo ""
 echo "Summary:"
-echo "  - Rust: fmt ✅, clippy ✅, build ✅, tests ✅"
-echo "  - MCP Server: tests ✅, audit ⚠️"
-echo "  - Web UI: lint ✅, tests ✅, build ✅, audit ⚠️"
+echo "  - Rust: fmt ✅, clippy ✅, build ✅, tests ✅, audit ✅"
+echo "  - MCP Server: tests ✅, audit ✅"
+echo "  - Web UI: lint ✅, tests ✅, build ✅, audit ✅"
 echo ""
 echo "Ready to push to GitHub! 🚀"
