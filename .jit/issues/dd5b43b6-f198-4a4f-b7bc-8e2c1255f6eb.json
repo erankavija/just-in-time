@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T22:07:21.485616927Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "dd5b43b6-f198-4a4f-b7bc-8e2c1255f6eb",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Multi-threaded contention tests for mutation sessions and layout reentry",
-  "updated_at": "2026-07-24T21:49:00.465494581Z"
+  "updated_at": "2026-07-24T22:07:21.485616927Z"
 }
