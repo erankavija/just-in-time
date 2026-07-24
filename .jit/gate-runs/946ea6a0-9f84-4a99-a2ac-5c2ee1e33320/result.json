@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "970508c4098e412ec975f7f3aed601b4672880d0",
+  "completed_at": "2026-07-24T17:25:30.812147105Z",
+  "duration_ms": 71066,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The project-render JSON error-code documentation matches the current typed error split.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "eb4be05c-a205-4d90-9c7e-905210c8a651",
+  "message": null,
+  "run_id": "946ea6a0-9f84-4a99-a2ac-5c2ee1e33320",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T17:24:19.745307035Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task (type level 4) with no resolved children. Reviewed tagged commits `b427340d` and merge `d765a02c` individually; their union changes only the project-render JSON error-code text.\n\nThe affected reference accurately reflects current dispatch: typed projection and managed-document failures produce `VALIDATION_FAILED`; other failures, including an unknown `--name`, produce `PROJECT_COMMAND_FAILED`.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The project-render JSON error-code documentation matches the current typed error split.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

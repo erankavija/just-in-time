@@ -13,7 +13,18 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T17:25:31.061448086Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-24T17:24:18.947573691Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "eb4be05c-a205-4d90-9c7e-905210c8a651",
   "labels": [
     "type:task",
@@ -24,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Correct the CLI project-render error-code documentation",
-  "updated_at": "2026-07-24T16:55:46.078795863Z"
+  "updated_at": "2026-07-24T17:25:31.061448086Z"
 }
