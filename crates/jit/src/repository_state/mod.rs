@@ -36,14 +36,10 @@ pub use default_rules::{
 // exposure as crate public API is gated behind `test-support`. The `pub(crate)`
 // twin keeps every internal caller's resolution
 // (`crate::repository_state::DefaultRuleMembershipDiff`, etc.) identical in
-// both feature states. Neither name has a by-name crate-internal caller under
-// the feature-off arm (the fn's only caller is its own doctest; the struct is
-// otherwise reached only via `default_rule_membership_diff_from_identities`'s
-// unconditional pub(crate) path), so both are allowed unused there.
+// both feature states.
 #[cfg(feature = "test-support")]
 pub use default_rules::{default_rule_membership_diff, DefaultRuleMembershipDiff};
 #[cfg(not(feature = "test-support"))]
-#[allow(unused_imports)]
 pub(crate) use default_rules::{default_rule_membership_diff, DefaultRuleMembershipDiff};
 pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,
@@ -73,16 +69,10 @@ pub use materialize::{assemble_config, render_capture_closure};
 // keeps every internal caller's resolution
 // (`crate::repository_state::validate_capture_closure`, etc.) identical in both
 // feature states.
-#[cfg(not(feature = "test-support"))]
-pub(crate) use materialize::validate_capture_closure;
 #[cfg(feature = "test-support")]
 pub use materialize::{validate_capture_closure, ValidationCaptureClosure};
-// `ValidationCaptureClosure` itself has no by-name crate-internal caller (it's
-// only reached as `validate_capture_closure`'s inferred return type), so its
-// feature-off twin alone is allowed unused.
 #[cfg(not(feature = "test-support"))]
-#[allow(unused_imports)]
-pub(crate) use materialize::ValidationCaptureClosure;
+pub(crate) use materialize::{validate_capture_closure, ValidationCaptureClosure};
 pub(crate) use mutation::captured_gate_run_result_paths;
 pub use mutation::{
     finalize, fresh_index_bytes, gate_run_result_relative_path, prefix_has_torn_tail,

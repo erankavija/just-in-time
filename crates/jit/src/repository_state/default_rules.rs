@@ -366,9 +366,6 @@ pub struct DefaultRuleMembershipDiff {
 
 impl DefaultRuleMembershipDiff {
     /// Whether applying this diff would change anything.
-    // Only called from this module's own unit tests (`cfg(test)`), so it is
-    // unreached in a plain, non-test build regardless of `test-support`.
-    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.to_add.is_empty() && self.to_drop.is_empty()
     }
@@ -434,11 +431,6 @@ impl DefaultRuleMembershipDiff {
 /// assert_eq!(diff.to_add[0].name, "namespace-unique-team");
 /// assert!(diff.to_drop.is_empty());
 /// ```
-// This fn must stay `pub` at its own definition (the `test-support` arm
-// re-exports it as fully `pub` from `repository_state`), but its sole caller
-// under a plain, non-test-support build is the doctest above, so it is
-// unreached there and allowed dead.
-#[allow(dead_code)]
 pub fn default_rule_membership_diff(
     loaded: &RuleSet,
     namespaces: &LabelNamespaces,
