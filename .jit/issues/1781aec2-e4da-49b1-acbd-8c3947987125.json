@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T22:45:30.305859968Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1781aec2-e4da-49b1-acbd-8c3947987125",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Migrate well-known path sites to VirtualPath constants",
-  "updated_at": "2026-07-24T22:17:35.005297569Z"
+  "updated_at": "2026-07-24T22:45:30.305859968Z"
 }
