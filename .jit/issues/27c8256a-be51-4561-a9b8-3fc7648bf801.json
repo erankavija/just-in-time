@@ -14,6 +14,11 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T17:29:41.579944371Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
       "status": "passed",
       "updated_at": "2026-07-24T17:26:07.851407133Z",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Clean up MCP schema-generator warnings",
-  "updated_at": "2026-07-24T17:26:07.851407133Z"
+  "updated_at": "2026-07-24T17:29:41.579944371Z"
 }

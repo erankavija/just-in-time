@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "e1d49a774c2c3b4bb7149fe61443edb6925a266b",
+  "completed_at": "2026-07-24T17:29:41.341811088Z",
+  "duration_ms": 175821,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The generator-boundary resolver fix preserves diagnostics for real errors, covers the warning-free production schema, and has passing MCP CI evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "27c8256a-be51-4561-a9b8-3fc7648bf801",
+  "message": null,
+  "run_id": "f6f30e4e-554b-4987-a33b-ae9836c2e321",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T17:26:45.520440144Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: cec981c0, e656dd10 (merge), e1d49a77\nPolicy sources: AGENTS.md\nResolved items: @/issue/27c8256a/requirement/REQ-01–REQ-03 — issue description; @/gate/mcp-ci — .jit/gates.toml; @/invariant/gate-semantics, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts — .jit/invariants.toml\nGate evidence: mcp-ci passed (exit 0, 2026-07-24T17:26:05Z); code-review pending\nTruncation recovery: none\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The generator-boundary resolver fix preserves diagnostics for real errors, covers the warning-free production schema, and has passing MCP CI evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
