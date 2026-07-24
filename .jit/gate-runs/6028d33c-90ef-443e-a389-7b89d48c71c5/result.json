@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "1337381afb8d3492a84843142bc677901f48fa8f",
+  "completed_at": "2026-07-24T14:02:10.321371896Z",
+  "duration_ms": 279541,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/bulk_update.rs",
+        "id": "F1",
+        "line": 237,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "A non-session preview authorizes skips using mutable repository declarations, losing required in-session errors."
+      }
+    ],
+    "summary": "Live preview validation can incorrectly skip an update that the authoritative session would reject.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "412925b9-874c-4679-909c-95afe31f9287",
+  "message": null,
+  "run_id": "6028d33c-90ef-443e-a389-7b89d48c71c5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T13:57:30.779551193Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 13451 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f946a-bd1e-7c52-9618-46e9c690d059\n--------\nuser\n--- 13438 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2ac7b230, 61eb2d41, 1337381a (`jit:412925b9`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/gate-semantics, @/invariant/label-format, @/invariant/assignee-format, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T13:50:06Z); code-review pending\nTruncation recovery: narrowed merge-parent, patch, current call-path, validator, captured-session, and registry reads; unrelated merge-parent changes were outside the impact cone\n\n1. [blocking][issue-impact] `apply_bulk_update` makes a live, non-session `validate_update_preview` result decisive for skipping at [bulk_update.rs:237](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/bulk_update.rs:237). That preview reads the current gate registry and cached configuration/rules ([bulk_update.rs:448](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/bulk_update.rs:448)), while the normal path re-derives validation from a captured mutation image. If declarations change after preview—for example, a requested already-present gate is removed from the registry—the new path reports “No changes needed” instead of opening a session and returning the former `GateNotFound` error. This moves repository-dependent validity outside the authoritative session and violates REQ-02/REQ-03.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Live preview validation can incorrectly skip an update that the authoritative session would reject.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A non-session preview authorizes skips using mutable repository declarations, losing required in-session errors.\",\"file\":\"crates/jit/src/commands/bulk_update.rs\",\"line\":237,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
