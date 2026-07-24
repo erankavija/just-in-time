@@ -1803,5 +1803,8 @@ fn first_image_difference(expected: &RepositoryImage, actual: &RepositoryImage) 
 }
 
 #[cfg(test)]
+#[path = "repository_state_store_contention_tests.rs"]
+mod repository_state_store_contention_tests;
+#[cfg(test)]
 #[path = "repository_state_store_tests.rs"]
 mod tests;
