@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "d5334e0eb9978cd0ae01ae88fc2309549afa9b37",
+  "completed_at": "2026-07-24T16:24:01.124637896Z",
+  "duration_ms": 170606,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard requirements are met by the attributable current tree; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a4b0fadf-ccbe-4f47-a41d-676f7a947f85",
+  "message": null,
+  "run_id": "fa4b303f-d7ea-4a52-a13c-54aa84c69e3f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T16:21:10.518079465Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c488ef85, 4ead5f12, 37acc378, 881b427b, d5334e0e (`jit:a4b0fadf`)\nPolicy sources: AGENTS.md; .jit/gates.toml\nResolved items: @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: narrower harness, self-test, artifact, per-commit, and merge-parent reads completed\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard requirements are met by the attributable current tree; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
