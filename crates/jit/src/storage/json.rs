@@ -961,7 +961,7 @@ impl IssueStore for JsonFileStorage {
         let issue_path = self.issue_path(id);
 
         if issue_path.exists() {
-            // File exists — delegate to load_issue which handles locking and
+            // File exists — delegate to load_issue for source selection and
             // deserialization; any remaining error is a genuine I/O/parse
             // failure → PathReadError::Other.
             return self.load_issue(id).map_err(PathReadError::Other);

@@ -26,8 +26,7 @@ where each comes up.
 ├── profiles/         # Minimal applied-profile provenance records
 │   └── <id>.json
 ├── issues/           # One JSON file per issue
-│   ├── <uuid>.json   # Issue data
-│   └── <uuid>.lock   # File lock for atomic operations
+│   └── <uuid>.json   # Issue data
 ├── gate-runs/        # Recorded gate runs, one directory per run
 │   └── <run-id>/
 │       └── result.json  # Run record (see Storage Record Layout)
@@ -40,10 +39,25 @@ does not scaffold either one. `config.toml`, the empty `gates.toml`, and
 by `jit init`.
 
 A live repository also carries gitignored, machine-local files directly under
-`.jit/`: `worktree.json`, `server.log`, `server.pid.json`, `*.lock`, and
-`tmp/`. Pending recoverable multi-file transactions use
-`.jit/tmp/transactions/`. These are runtime state, not part of the versioned
-data format.
+`.jit/`: `worktree.json`, `server.log`, `server.pid.json`, a fixed set of lock
+files, and `tmp/`. The store's fixed lock set under `.jit/` is
+`.repo-write.lock`, `.index.lock`, `.gates.lock`, and `.events.lock`; it is
+independent of the number of issues. The repository-sibling
+`.jit-bootstrap.lock` and the `.git/jit/locks/claims.lock` control-plane lock
+complete the fixed set. Their paths come from the
+[`JsonFileStorage`](../../crates/jit/src/storage/json.rs) and
+[`ClaimCoordinator`](../../crates/jit/src/storage/claim_coordinator.rs)
+implementations. The `.jit/` storage locks and `.jit-bootstrap.lock` retain
+their inodes for advisory-lock race safety; they are opened with
+create-if-absent semantics and are not unlinked. The claims lock belongs to the
+separate recovery-aware control plane described below.
+
+Issue reads do not create per-issue lock files. On the first read-all through a
+storage instance, JIT removes empty UUID-shaped `.lock` sidecars left in
+`issues/` by versions that predate this format. That sweep is legacy cleanup,
+not part of read correctness or the current storage layout. Pending recoverable
+multi-file transactions use `.jit/tmp/transactions/`. All of these are runtime
+state, not part of the versioned data format.
 
 When an embedded repository profile is applied, its minimal provenance record
 lives under `.jit/profiles/`. Fresh profiled initialization may temporarily use
