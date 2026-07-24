@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "569a5f77f13572bfe7883950c6999fde7e362ec4",
+  "completed_at": "2026-07-24T20:16:35.173798016Z",
+  "duration_ms": 215654,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "8becd4a1-707b-44ef-bc59-e870f565a40c",
+  "message": null,
+  "run_id": "8c3ab735-d4f8-4dc8-86f4-2b5163b462ed",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T20:12:59.518844358Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest commands::archive::tests::test_execute_waits_for_competing_repository_write_guard ... FAILED\ntest result: FAILED. 2104 passed; 1 failed; 4 ignored; 0 measured; 0 filtered out; finished in 63.81s\n---- commands::archive::tests::test_execute_waits_for_competing_repository_write_guard stdout ----\n\nthread 'commands::archive::tests::test_execute_waits_for_competing_repository_write_guard' (370782) panicked at crates/jit/src/commands/archive.rs:1189:14:\ncalled `Result::unwrap()` on an `Err` value: Timeout\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1217 bytes=20968292)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1263125184/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

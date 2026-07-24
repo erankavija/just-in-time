@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-07-24T20:16:35.189785522Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8becd4a1-707b-44ef-bc59-e870f565a40c",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derived repair-target coverage authority",
-  "updated_at": "2026-07-24T16:55:24.350067264Z"
+  "updated_at": "2026-07-24T20:16:35.189785522Z"
 }
