@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-07-23T18:11:28.753153980Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-07-24T06:39:15.834132328Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
       "status": "passed",
@@ -35,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "breakdown: Repository-state quality hardening",
-  "updated_at": "2026-07-24T05:27:19.294471772Z"
+  "updated_at": "2026-07-24T06:39:15.834132328Z"
 }

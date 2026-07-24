@@ -1,0 +1,177 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "276b06740f650be11fab4ea5b78ad1291dd28de5",
+  "completed_at": "2026-07-24T06:39:15.594728582Z",
+  "duration_ms": 606505,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F1",
+        "line": 1,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-3"
+        ],
+        "severity": "high",
+        "summary": "The manifest was authored after individual issue creation and plan approval, leaving no authoritative native-batch key-to-UUID evidence."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F2",
+        "line": 42,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-3",
+          "@/inv/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "The plan omits marked shared architectural contracts, so contract modes, references, and producer reachability cannot be validated."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F3",
+        "line": 141,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Handwritten DAG and task decomposition prose remains alongside the generated manifest overview instead of being replaced."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F4",
+        "line": 168,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The retry task combines a reusable combinator foundation with a 22-site migration and omits its main.rs exit-mapping footprint."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F5",
+        "line": 252,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The typed-error task combines several independent error families and a module-wide sweep while materially understating its footprint."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F6",
+        "line": 328,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The plan-identity task retains mutually exclusive implementation and exemption outcomes with unresolved test and footprint boundaries."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F7",
+        "line": 363,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/semantic-test-assertions"
+        ],
+        "severity": "medium",
+        "summary": "The property-test task combines two independent oracles and leaves its created test files unresolved."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F8",
+        "line": 481,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The path task combines a representation redesign, a broad call-site migration, and repair-target authority while declaring only three touched files."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F9",
+        "line": 556,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/semantic-test-assertions"
+        ],
+        "severity": "medium",
+        "summary": "The bulk-update task mixes command optimization and session-budget testing with a separate benchmark-artifact deliverable."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F10",
+        "line": 673,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/bounded-rust-build-footprint"
+        ],
+        "severity": "high",
+        "summary": "The public-surface task mixes deletion, demotion, and feature-gated exposure and omits multiple implementation files from its footprint."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F11",
+        "line": 788,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The advisory-debt task bundles four unrelated Rust, MCP, documentation, and CI deliverables and has an incomplete output-call-site footprint."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F12",
+        "line": 400,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/dag-acyclic"
+        ],
+        "severity": "medium",
+        "summary": "Visibility cutover and test-support feature gating are unordered despite both editing the storage module's visibility and export surface."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F13",
+        "line": 442,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Multiple descriptions refer to sibling tasks or gate mechanics instead of remaining standalone issue documents."
+      },
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/41aa1b75-3dba-4836-a3e2-78794a892914.json",
+        "id": "F14",
+        "line": 44,
+        "origin": "pre-existing",
+        "references": [
+          "@/inv/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Whole-repository validation fails because issue 41aa1b75 links a missing planning-lead evaluation report."
+      }
+    ],
+    "summary": "The stored graph mirrors the retroactive manifest, but the breakdown lacks reviewed manifest-first provenance and fails contract validation, eight terminal sizing simulations, content standards, overlap review, and whole-repository validation.",
+    "verdict": "fail"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "24bab642-6f1d-438a-aae5-5c327dceaff6",
+  "message": null,
+  "run_id": "6e68c23a-09f0-4f95-82e8-676e0da7b88a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T06:29:09.089178909Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8248 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f92d0-402a-7691-b1ac-426b0515c7f3\n--------\nuser\n--- 8235 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Deterministic evidence: renderer check passed; native batch dry-run passed with 24 issues and 30 intra-manifest edges; stored native fields and bracket geometry match by title; `planning` is absent from storage and batch export. However, provenance, contract validation, sizing, content, and repository validation fail.\n\n### Finest-tier assignment simulation\n\n| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---:|---:|---:|---:|---:|---:|---:|---|\n| retry-combinators-single-session | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | FAIL |\n| self-managed-multi-session | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| typed-producer-finalizer-errors | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | FAIL |\n| total-journal-action-extraction | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| plan-identity-tail | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ | FAIL |\n| property-tests-plan-hash-splice | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✓ | FAIL |\n| visibility-cutover-guard | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| contention-tests | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| path-constants-repair-coverage | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | FAIL |\n| benchmark-harness | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| bulk-update-session-budget | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | FAIL |\n| lock-hygiene-sidecar | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| test-support-feature-gating | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| public-surface-reduction | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | FAIL |\n| store-test-split-renames | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| architecture-doc-sweep | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| advisory-debt-clearance | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | FAIL |\n| successor-deck | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| predecessor-deck-tombstone | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n\n### Findings\n\n1. **High, blocking — the manifest is retroactive and lacks authoritative key→UUID creation evidence.** Commits `a26fcbe2` and `c11cce86` created the five stories and nineteen tasks before `b8c73768` introduced a “Retroactive 24-entry manifest”; the planning gate had already passed, and no native batch key→UUID map exists. Reopen planning, replace the retroactive artifacts, rerun plan review, detach/archive the 24 superseded records, create replacements through one native batch, retain the returned map, then rewire the six source→B edges and C→`presentation-succession` sink edge.\n\n2. **High, blocking — contract-mode validation cannot run.** The plan has no required `## Shared architectural contracts` section, all `contract_refs`/`produces_contracts` are empty, and the official validator invocation with `--plan` crashes while processing the invalid contract result. Add marked plan contracts such as `mutation-session-retry`, `typed-error-boundary`, `cutover-publisher-boundary`, `repair-target-authority`, `session-cost-artifact`, `test-support-feature`, `bulk-update-eligibility`, and `successor-deck-assets`; populate exact references and any producers, reconcile producer dependencies, and return the shared-contract change to plan review.\n\n3. **Medium, blocking — superseded decomposition prose was accumulated.** The plan retains its handwritten story DAG and task-level decomposition while appending the generated 24-row overview. Rewrite it to the current concise plan template, removing the manual DAG/task inventory and leaving the manifest-generated region as the sole decomposition projection; rerun renderer check and plan review.\n\n4. **High, blocking — `retry-combinators-single-session` combines a reusable foundation with a 22-site migration and has an incomplete footprint.** Its description also assigns a `main.rs` exit-mapping arm, but `main.rs` is absent from the footprint. Replace it with a retry-contract API/test task plus bounded single-session migration tasks grouped by command family; make every migration and `self-managed-multi-session` depend on the API task, add exact touched files including `main.rs`, and update the planning story’s sink edges.\n\n5. **High, blocking — `typed-producer-finalizer-errors` is not worker-sized and its footprint contradicts its module-wide acceptance rule.** It combines core producer retyping, profile failures, two unrelated finalizers, an exhaustive exit mapper, and a whole-module `anyhow`/`format!` sweep, while omitting affected repository-state files. Replace it with producer-core, profile-producer, gate-finalizer, archive-finalizer, and exit-mapping tasks; make the exit mapper depend on the other four and the retry API, then route the planning story through that sink.\n\n6. **High, blocking — `plan-identity-tail` has two mutually exclusive outcomes and unresolved test/footprint boundaries.** Select the preferred fold-through-tail outcome during planning, remove the exemption alternative, name its exact coverage test and touched files, and make it depend on the typed-error exit-mapping sink. Because this resolves an approved architectural choice, rerun plan review.\n\n7. **Medium, blocking — `property-tests-plan-hash-splice` combines two independent properties and leaves file placement unresolved.** Split it into plan-hash reordering and managed-document splice tasks, each with its own generator, oracle, and pinned in-crate test file; make the enforced-guarantees story depend on both.\n\n8. **High, blocking — `path-constants-repair-coverage` combines three decomposable outcomes and materially understates its footprint.** The current tree has `VirtualPath::data` callers across 27 files, not the three declared paths. Replace it with a Cow/constant API task, a bounded literal-call-site migration task or family of tasks, and a repair-target authority/coverage task; wire migration and repair work after the API where needed and enumerate every touched caller.\n\n9. **Medium, blocking — `bulk-update-session-budget` mixes the command optimization/test boundary with benchmark-artifact evolution.** Split it into an eligibility-prefilter/session-budget task and a bulk benchmark-scenario task depending on both the fix and `benchmark-harness`; make the performance story depend on the benchmark extension sink.\n\n10. **High, blocking — `public-surface-reduction` mixes deletion, demotion, feature-gated exposure, and contract preservation while listing only two files.** Definitions also live in `rule_serialize.rs`, `materialize.rs`, `path.rs`, `managed_document.rs`, and `default_rules.rs`. Split dead-export deletion, internal visibility demotions, and test-support-only rule serialization into separate tasks with exact footprints; preserve the existing dependency on feature-gating.\n\n11. **High, blocking — `advisory-debt-clearance` explicitly bundles four independent deliverables across Rust, MCP, documentation, and CI.** Its output-parameter change alone reaches `main.rs` and `output_macros.rs`, absent from the footprint. Replace it with four tasks carrying only their relevant gates and exact footprints, and make the hygiene story depend on all four.\n\n12. **Medium, blocking — an unresolved overlap remains between `visibility-cutover-guard` and `test-support-feature-gating`.** Both independently edit the visibility/export surface in `storage/mod.rs` after the planning story. Change `test-support-feature-gating.depends_on` from `planning-boundary-collapse` to `visibility-cutover-guard`—or the reverse after choosing ownership—then recompute story sinks and transitive reduction.\n\n13. **Medium, blocking — several issue descriptions violate standalone content rules.** `contention-tests`, `test-support-feature-gating`, `public-surface-reduction`, `store-test-split-renames`, `bulk-update-session-budget`, and `advisory-debt-clearance` refer to sibling tasks or gate mechanics. Replace those references with the necessary standalone contract facts, use plan contract metadata for shared facts, and leave gate assignment solely in native fields.\n\n14. **Medium, blocking, pre-existing — mandatory whole-repository validation fails.** Issue `41aa1b75` links the missing `.agents/skills/jit-planning-lead/evals/transcripts/research-and-plan.completion-report.md`. Restore the report or remove/reconcile the stale document and asset reference after checking its authority, then rerun `jit validate`.\n\nTotal findings: 14\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The stored graph mirrors the retroactive manifest, but the breakdown lacks reviewed manifest-first provenance and fails contract validation, eight terminal sizing simulations, content standards, overlap review, and whole-repository validation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The manifest was authored after individual issue creation and plan approval, leaving no authoritative native-batch key-to-UUID evidence.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":1,\"references\":[\"@/charter/D-3\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan omits marked shared architectural contracts, so contract modes, references, and producer reachability cannot be validated.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":42,\"references\":[\"@/charter/D-3\",\"@/inv/single-source-prose\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Handwritten DAG and task decomposition prose remains alongside the generated manifest overview instead of being replaced.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":141,\"references\":[\"@/inv/single-source-prose\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The retry task combines a reusable combinator foundation with a 22-site migration and omits its main.rs exit-mapping footprint.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":168},{\"id\":\"F5\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The typed-error task combines several independent error families and a module-wide sweep while materially understating its footprint.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":252},{\"id\":\"F6\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan-identity task retains mutually exclusive implementation and exemption outcomes with unresolved test and footprint boundaries.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":328},{\"id\":\"F7\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The property-test task combines two independent oracles and leaves its created test files unresolved.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":363,\"references\":[\"@/inv/semantic-test-assertions\"]},{\"id\":\"F8\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The path task combines a representation redesign, a broad call-site migration, and repair-target authority while declaring only three touched files.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":481},{\"id\":\"F9\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The bulk-update task mixes command optimization and session-budget testing with a separate benchmark-artifact deliverable.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":556,\"references\":[\"@/inv/semantic-test-assertions\"]},{\"id\":\"F10\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The public-surface task mixes deletion, demotion, and feature-gated exposure and omits multiple implementation files from its footprint.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":673,\"references\":[\"@/inv/bounded-rust-build-footprint\"]},{\"id\":\"F11\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The advisory-debt task bundles four unrelated Rust, MCP, documentation, and CI deliverables and has an incomplete output-call-site footprint.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":788},{\"id\":\"F12\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Visibility cutover and test-support feature gating are unordered despite both editing the storage module's visibility and export surface.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":400,\"references\":[\"@/inv/dag-acyclic\"]},{\"id\":\"F13\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Multiple descriptions refer to sibling tasks or gate mechanics instead of remaining standalone issue documents.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":442},{\"id\":\"F14\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"pre-existing\",\"summary\":\"Whole-repository validation fails because issue 41aa1b75 links a missing planning-lead evaluation report.\",\"file\":\".jit/issues/41aa1b75-3dba-4836-a3e2-78794a892914.json\",\"line\":44,\"references\":[\"@/inv/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
