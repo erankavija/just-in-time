@@ -21,7 +21,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T16:20:23.267409744Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a4b0fadf-ccbe-4f47-a41d-676f7a947f85",
   "labels": [
     "type:task",
@@ -32,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bulk-mutation benchmark scenario",
-  "updated_at": "2026-07-24T16:13:36.297409608Z"
+  "updated_at": "2026-07-24T16:20:23.267409744Z"
 }
