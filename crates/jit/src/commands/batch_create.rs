@@ -272,7 +272,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
-        use crate::storage::RepositoryStateStoreError;
         use std::collections::BTreeMap;
 
         self.validate_batch_from_json(&defs)?;
@@ -293,12 +292,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect::<std::result::Result<Vec<_>, _>>()?;
         issue_paths.push(VirtualPath::data("issues")?);
 
-        for _ in 0..8 {
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
+        with_mutation_session(&self.storage, &layout, "batch issue creation", |session| {
             let Some(image) =
-                self.capture_proposed_base(session.as_mut(), &BTreeMap::new(), &issue_paths, None)?
+                self.capture_proposed_base(session, &BTreeMap::new(), &issue_paths, None)?
             else {
-                continue;
+                return Ok(SessionStep::Retry);
             };
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let problems = Self::collect_batch_problems_from_declarations(&defs, &declarations)?;
@@ -339,23 +337,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                 dependencies,
             }];
             let plan = finalize(&layout, &image, &context, &intents)?;
-            match session.apply(&plan) {
-                Ok(_) => {
-                    return Ok(BatchCreateOutcome {
-                        key_to_id: defs
-                            .into_iter()
-                            .zip(created_issue_ids)
-                            .map(|(def, id)| (def.key, id))
-                            .collect(),
-                    });
-                }
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "batch issue creation did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Apply(
+                plan,
+                BatchCreateOutcome {
+                    key_to_id: defs
+                        .iter()
+                        .map(|def| def.key.clone())
+                        .zip(created_issue_ids.iter().cloned())
+                        .collect(),
+                },
+            ))
+        })
     }
 
     /// Collect EVERY pre-validation problem for a batch (does not stop at the
