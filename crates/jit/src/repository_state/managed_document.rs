@@ -471,3 +471,8 @@ mod tests {
         ));
     }
 }
+
+// Include property-based round-trip coverage.
+#[cfg(test)]
+#[path = "managed_document_property_tests.rs"]
+mod property_tests;
