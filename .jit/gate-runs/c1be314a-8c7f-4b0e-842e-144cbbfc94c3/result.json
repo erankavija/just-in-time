@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "4c53d6287c95887b55405e888e1a79bf811358d4",
+  "completed_at": "2026-07-24T18:12:39.633112791Z",
+  "duration_ms": 130658,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/test-ci-manual.sh",
+        "id": "F1",
+        "line": 87,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-11"
+        ],
+        "severity": "high",
+        "summary": "Bare npm audit inherits an ambient audit-level threshold, allowing advisories below that threshold to report CI success."
+      }
+    ],
+    "summary": "Ambient npm audit-level configuration can still allow dependency advisories to reach the success outcome.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "531ce80d-0a0e-4aac-84ea-65dfbd2091c6",
+  "message": null,
+  "run_id": "c1be314a-8c7f-4b0e-842e-144cbbfc94c3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T18:10:28.975039050Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10441 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9552-56e2-72a1-a474-9b3cf97b3f37\n--------\nuser\n--- 10428 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7fbfeb52, ef8e35fe, ade9111f, dfcc790f, c7d523b0, 55b01ae1, deaf4644, 80f910f8, 049ebdd4, 2cf116e7, 4c53d628 (all reachable `jit:531ce80d` commits)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/charter/D-11 — dev/vision/9db27a3a-charter.md (markdown-first); @/gate/jit-validate — .jit/gates.toml (registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T18:04:55Z); code-review failed (exit 1, 2026-07-24T17:59:52Z)\nTruncation recovery: narrowed multi-parent merge reads to each merge’s first-parent script patch; inspected second-parent changed-file list and excluded unrelated integration changes outside this issue’s impact cone\n\n1. [blocking, issue-impact] Bare `npm audit` at `scripts/test-ci-manual.sh:87` and `:99` still accepts the ambient npm `audit-level` configuration. An `.npmrc` or environment setting such as `audit-level=moderate` can make a low/info advisory exit successfully, leaving `AUDIT_FAILED=0` and printing the success message at line 116. Set the threshold explicitly to `--audit-level=info` so every reported advisory fails closed. References: `@/charter/D-11`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Ambient npm audit-level configuration can still allow dependency advisories to reach the success outcome.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Bare npm audit inherits an ambient audit-level threshold, allowing advisories below that threshold to report CI success.\",\"file\":\"scripts/test-ci-manual.sh\",\"line\":87,\"references\":[\"@/charter/D-11\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
