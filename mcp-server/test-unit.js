@@ -24,6 +24,23 @@ const realSchema = JSON.parse(execFileSync('jit', ['--schema'], { maxBuffer: 10 
 let passed = 0;
 let failed = 0;
 
+/**
+ * Run `fn` with console.error captured instead of printed, returning the
+ * captured messages. Used to assert the $ref resolver's diagnostic calls
+ * fire (or stay silent) under specific schema shapes.
+ */
+function captureConsoleErrors(fn) {
+  const messages = [];
+  const original = console.error;
+  console.error = (...args) => messages.push(args.join(' '));
+  try {
+    fn();
+  } finally {
+    console.error = original;
+  }
+  return messages;
+}
+
 async function runTest(name, fn) {
   try {
     await fn();
@@ -264,6 +281,160 @@ await runTest('real schema: outputSchema resolves $ref definitions inline', () =
     assert.ok(!str.includes('$ref'), 'outputSchema should not contain $ref');
     assert.ok(gateListTool.outputSchema.properties.gates, 'should have gates property');
   }
+});
+
+await runTest('real schema: generateTools resolves cleanly with no $ref-resolver warnings', () => {
+  const messages = captureConsoleErrors(() => generateTools(realSchema));
+  assert.deepStrictEqual(messages, [],
+    `$ref resolution should not warn on the real schema, got: ${JSON.stringify(messages)}`);
+});
+
+await runTest('outputSchema scopes definitions nested in oneOf branches, not just the outermost bag', () => {
+  // Mirrors the real CLI shape: a oneOf response where each branch is an
+  // independent JSON Schema document carrying its own local `definitions`,
+  // with no definitions at the success_schema's own top level.
+  const schema = {
+    version: '0.0.0-test',
+    commands: {
+      thing: {
+        description: 'oneOf with branch-local definitions',
+        args: [],
+        output: {
+          success_schema: {
+            description: 'one of two shapes',
+            oneOf: [
+              {
+                $schema: 'http://json-schema.org/draft-07/schema#',
+                type: 'object',
+                definitions: {
+                  Widget: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+                },
+                properties: { widget: { $ref: '#/definitions/Widget' } },
+                required: ['widget'],
+              },
+              {
+                $schema: 'http://json-schema.org/draft-07/schema#',
+                type: 'object',
+                properties: { empty: { type: 'boolean' } },
+                required: ['empty'],
+              },
+            ],
+          },
+        },
+      },
+    },
+  };
+
+  const messages = captureConsoleErrors(() => {
+    const tools = generateTools(schema);
+    const tool = tools.find(t => t.name === 'jit_thing');
+    const str = JSON.stringify(tool.outputSchema);
+    assert.ok(!str.includes('$ref'), 'branch-local $ref should resolve inline');
+    assert.ok(!str.includes('"definitions"'), 'branch-local definitions bag should not leak into output');
+    assert.deepStrictEqual(
+      tool.outputSchema.oneOf[0].properties.widget,
+      { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] });
+  });
+  assert.deepStrictEqual(messages, [], `should resolve without warnings, got: ${JSON.stringify(messages)}`);
+});
+
+await runTest('self-referential (tree-shaped) $ref truncates silently, no circular warning', () => {
+  // Mirrors DependencyTreeNode: a node whose children are more of itself.
+  // This is a legitimate recursive schema shape, not a generator bug.
+  const schema = {
+    version: '0.0.0-test',
+    commands: {
+      tree: {
+        description: 'self-referential node',
+        args: [],
+        output: {
+          success_schema: {
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            definitions: {
+              Node: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  children: { type: 'array', items: { $ref: '#/definitions/Node' } },
+                },
+                required: ['id', 'children'],
+              },
+            },
+            properties: { root: { $ref: '#/definitions/Node' } },
+            required: ['root'],
+          },
+        },
+      },
+    },
+  };
+
+  const messages = captureConsoleErrors(() => {
+    const tools = generateTools(schema);
+    const tool = tools.find(t => t.name === 'jit_tree');
+    const str = JSON.stringify(tool.outputSchema);
+    assert.ok(!str.includes('$ref'), 'recursive $ref should not survive resolution');
+    // One real level of Node, truncated to a bare object at the next level.
+    const root = tool.outputSchema.properties.root;
+    assert.deepStrictEqual(root.properties.id, { type: 'string' });
+    assert.deepStrictEqual(root.properties.children.items, { type: 'object' });
+  });
+  assert.deepStrictEqual(messages, [], `self-recursion should not warn, got: ${JSON.stringify(messages)}`);
+});
+
+await runTest('non-productive alias cycle between definitions still warns (diagnostic stays functional)', () => {
+  // A bare alias loop (A -> $ref B, B -> $ref A, no wrapping object/array in
+  // between) never terminates and can never appear in real generated output;
+  // it signals a genuine schema/generator mismatch, so it must still warn.
+  const schema = {
+    version: '0.0.0-test',
+    commands: {
+      alias: {
+        description: 'degenerate alias cycle',
+        args: [],
+        output: {
+          success_schema: {
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            definitions: {
+              A: { $ref: '#/definitions/B' },
+              B: { $ref: '#/definitions/A' },
+            },
+            properties: { value: { $ref: '#/definitions/A' } },
+            required: ['value'],
+          },
+        },
+      },
+    },
+  };
+
+  const messages = captureConsoleErrors(() => generateTools(schema));
+  assert.ok(messages.some(m => m.includes('Circular $ref detected: A') || m.includes('Circular $ref detected: B')),
+    `non-productive alias cycle should still warn, got: ${JSON.stringify(messages)}`);
+});
+
+await runTest('$ref to a genuinely missing definition still warns (diagnostic stays functional)', () => {
+  const schema = {
+    version: '0.0.0-test',
+    commands: {
+      missing: {
+        description: 'dangling ref',
+        args: [],
+        output: {
+          success_schema: {
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            properties: { value: { $ref: '#/definitions/DoesNotExist' } },
+            required: ['value'],
+          },
+        },
+      },
+    },
+  };
+
+  const messages = captureConsoleErrors(() => generateTools(schema));
+  assert.ok(messages.some(m => m.includes('Definition not found: DoesNotExist')),
+    `dangling $ref should still warn, got: ${JSON.stringify(messages)}`);
 });
 
 await runTest('real schema: tools with success_schema get outputSchema', () => {
