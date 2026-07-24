@@ -6,7 +6,7 @@
   "incident_log": [
     "Session 1: stale-worktree prune force-removed the 6 active wave-1 worktrees due to a zsh word-splitting bug in the exclusion filter (for p in $UNQUOTED does not split under zsh). No committed work lost (0 commits); no leak into main (verified). Recovery: stopped agents, deleted 6 anchor-only branches, recreated worktrees at a95dd58a, RESUMED all 6 agents from transcript (context preserved). Genuinely-stale worktrees (50) successfully pruned. See handoff Traps."
   ],
-  "worker_worktree_base": "a95dd58a",
+  "worker_worktree_base": "5aeadb2f",
   "waves": [
     {
       "wave_number": 1,
@@ -104,7 +104,9 @@
           "title": "Self-managed multi-session retry migration",
           "story": "S1",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-9298b912",
+          "model": "opus"
         },
         {
           "id": "58c2f0e9",
@@ -112,7 +114,9 @@
           "title": "Exhaustive exit-code mapping and residual error-string sweep",
           "story": "S1",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-58c2f0e9",
+          "model": "opus"
         },
         {
           "id": "412925b9",
@@ -120,7 +124,9 @@
           "title": "Bulk-update eligibility prefilter and session budget",
           "story": "S3",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "agent": "worker-412925b9",
+          "model": "sonnet"
         }
       ]
     },
