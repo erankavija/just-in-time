@@ -24,7 +24,7 @@ mod rules_document;
 mod rules_gates_projection;
 
 pub(crate) use archive::captured_archive_events;
-pub use archive::finalize_archive_execution;
+pub use archive::{finalize_archive_execution, ArchiveExecutionError};
 pub use default_rules::{
     default_rule_membership_diff, default_rule_membership_diff_from_identities, default_ruleset,
     hierarchy_config, reconcile_default_rules_with_config, type_hierarchy_known_schema,
@@ -74,40 +74,76 @@ pub fn finalize_gate_registry_edit(
     context: &MutationContext,
     intents: &[MutationIntent],
     declarations: RepositoryDeclarations<'_>,
-) -> anyhow::Result<MaterializationPlan> {
+) -> Result<MaterializationPlan, RepositoryStateError> {
     let registry = intents
         .iter()
         .find_map(|intent| match intent {
             MutationIntent::EditGateRegistry { registry } => Some(&**registry),
             _ => None,
         })
-        .ok_or_else(|| anyhow::anyhow!("gate registry finalization requires one typed edit"))?;
+        .ok_or(GateRegistryEditError::MissingEdit)?;
     if intents
         .iter()
         .filter(|intent| matches!(intent, MutationIntent::EditGateRegistry { .. }))
         .count()
         != 1
     {
-        anyhow::bail!("gate registry finalization requires exactly one typed edit");
+        return Err(GateRegistryEditError::MultipleEdits.into());
     }
     if declarations.gates != registry {
-        anyhow::bail!("gate registry edit and projection declarations disagree");
+        return Err(GateRegistryEditError::DeclarationMismatch.into());
     }
 
-    let record_plan = finalize(layout, base, context, intents)?;
+    let record_plan =
+        finalize(layout, base, context, intents).map_err(GateRegistryEditError::Mutation)?;
     let gate_path = VirtualPath::data("gates.toml")?;
-    let gate_bytes = crate::declarations::serialize_gate_registry(registry)?;
-    let overlaid = apply_overlay(base, std::iter::once((gate_path, Some(gate_bytes))))?;
+    let gate_bytes = crate::declarations::serialize_gate_registry(registry)
+        .map_err(GateRegistryEditError::GateDeclaration)?;
+    let overlaid = apply_overlay(base, std::iter::once((gate_path, Some(gate_bytes))))
+        .map_err(GateRegistryEditError::Overlay)?;
     let mut actions = record_plan.delta().actions().to_vec();
     actions.extend(compose_complete(&overlaid, &declarations)?);
     let delta = RepositoryDelta::new(layout, actions)?;
-    let seed = context.repository_seed(intents)?;
+    let seed = context
+        .repository_seed(intents)
+        .map_err(GateRegistryEditError::Mutation)?;
     Ok(MaterializationPlan::new(
         base,
         &seed,
         &MaterializationIntent::SemanticMutation,
         delta,
     )?)
+}
+
+/// A typed failure raised while finalizing a gate-registry edit.
+///
+/// Composed into [`RepositoryStateError::GateRegistryEdit`]. The three
+/// invariant-shaped variants carry no message text of their own beyond their
+/// `Display` impl; every propagated leaf retains its concrete source so
+/// rendering stays in `Display` rather than at the call site.
+#[derive(Debug, thiserror::Error)]
+pub enum GateRegistryEditError {
+    /// No typed `EditGateRegistry` intent was present among the finalized intents.
+    #[error("gate registry finalization requires one typed edit")]
+    MissingEdit,
+    /// More than one typed `EditGateRegistry` intent was present.
+    #[error("gate registry finalization requires exactly one typed edit")]
+    MultipleEdits,
+    /// The typed edit's registry disagreed with the projection declarations.
+    #[error("gate registry edit and projection declarations disagree")]
+    DeclarationMismatch,
+    /// The record finalizer or seed derivation failed.
+    #[error(transparent)]
+    Mutation(#[from] MutationError),
+    /// The edited registry could not be serialized canonically.
+    #[error(transparent)]
+    GateDeclaration(#[from] crate::declarations::GateDeclarationError),
+    /// The proposed-state overlay could not be closed.
+    #[error(transparent)]
+    Overlay(#[from] OverlayError),
+    /// The closed semantic seed was invalid.
+    #[error(transparent)]
+    Seed(#[from] SeedError),
 }
 pub use overlay::{apply_overlay, OverlayError};
 pub use path::{
@@ -718,6 +754,12 @@ pub enum RepositoryStateError {
     /// A producer read an uncaptured path or malformed captured bytes.
     #[error("materialization producer failed: {0}")]
     Producer(#[from] ProducerError),
+    /// A gate-registry edit finalization failed.
+    #[error(transparent)]
+    GateRegistryEdit(#[from] GateRegistryEditError),
+    /// An archive execution finalization failed.
+    #[error(transparent)]
+    ArchiveExecution(#[from] ArchiveExecutionError),
     /// Ownership of a materialization boundary cannot be proven, so repair is
     /// refused before publication rather than risk rewriting or deleting authored
     /// content (ownership matrix: "never rewrites an authored boundary it cannot
@@ -1109,5 +1151,169 @@ mod tests {
                 },
             ]
         );
+    }
+
+    fn empty_image() -> RepositoryImage {
+        RepositoryImage::close(
+            layout(),
+            CaptureSpec::phase_one(Vec::<VirtualPath>::new(), budget()).unwrap(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap()
+    }
+
+    fn image_with(entries: Vec<(VirtualPath, RepositoryEntry)>) -> RepositoryImage {
+        let paths: Vec<VirtualPath> = entries.iter().map(|(path, _)| path.clone()).collect();
+        RepositoryImage::close(
+            layout(),
+            CaptureSpec::phase_one(paths, budget()).unwrap(),
+            entries.into_iter().collect::<BTreeMap<_, _>>(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap()
+    }
+
+    fn empty_declarations() -> (ConfigurationDeclarations, GateRegistry, RuleSet) {
+        (
+            crate::declarations::parse_configuration(b"").unwrap(),
+            GateRegistry::default(),
+            RuleSet { rules: Vec::new() },
+        )
+    }
+
+    fn gate_definition(key: &str) -> crate::declarations::GateDefinition {
+        crate::declarations::GateDefinition {
+            version: 1,
+            key: key.to_string(),
+            title: key.to_string(),
+            description: String::new(),
+            stage: crate::declarations::GateStage::Postcheck,
+            mode: crate::declarations::GateMode::Manual,
+            checker: None,
+            priority: 100,
+            reserved: std::collections::HashMap::new(),
+            auto: false,
+            example_integration: None,
+        }
+    }
+
+    #[test]
+    fn test_finalize_gate_registry_edit_missing_edit_intent_is_typed() {
+        let image = empty_image();
+        let context = MutationContext::preview();
+        let (configuration, gates, rules) = empty_declarations();
+        let declarations = RepositoryDeclarations {
+            configuration: &configuration,
+            gates: &gates,
+            rules: &rules,
+        };
+        let error = finalize_gate_registry_edit(&layout(), &image, &context, &[], declarations)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            RepositoryStateError::GateRegistryEdit(GateRegistryEditError::MissingEdit)
+        ));
+    }
+
+    #[test]
+    fn test_finalize_gate_registry_edit_multiple_edit_intents_is_typed() {
+        let image = empty_image();
+        let context = MutationContext::preview();
+        let (configuration, gates, rules) = empty_declarations();
+        let declarations = RepositoryDeclarations {
+            configuration: &configuration,
+            gates: &gates,
+            rules: &rules,
+        };
+        let intents = vec![
+            MutationIntent::EditGateRegistry {
+                registry: Box::new(GateRegistry::default()),
+            },
+            MutationIntent::EditGateRegistry {
+                registry: Box::new(GateRegistry::default()),
+            },
+        ];
+        let error =
+            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
+                .unwrap_err();
+        assert!(matches!(
+            error,
+            RepositoryStateError::GateRegistryEdit(GateRegistryEditError::MultipleEdits)
+        ));
+    }
+
+    #[test]
+    fn test_finalize_gate_registry_edit_declaration_mismatch_is_typed() {
+        let image = empty_image();
+        let context = MutationContext::preview();
+        let (configuration, _default_gates, rules) = empty_declarations();
+        let mut mismatched = GateRegistry::default();
+        mismatched
+            .gates
+            .insert("distinct".to_string(), gate_definition("distinct"));
+        let declarations = RepositoryDeclarations {
+            configuration: &configuration,
+            gates: &mismatched,
+            rules: &rules,
+        };
+        let intents = vec![MutationIntent::EditGateRegistry {
+            registry: Box::new(GateRegistry::default()),
+        }];
+        let error =
+            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
+                .unwrap_err();
+        assert!(matches!(
+            error,
+            RepositoryStateError::GateRegistryEdit(GateRegistryEditError::DeclarationMismatch)
+        ));
+    }
+
+    #[test]
+    fn test_finalize_gate_registry_edit_propagates_typed_mutation_error() {
+        // A well-formed single edit intent alongside a claim of an issue absent
+        // from the captured image: the record finalizer's own typed
+        // `MutationError::MissingIssue` must surface through
+        // `GateRegistryEditError::Mutation`, short-circuiting before the
+        // declaration-derived producer set is ever composed.
+        let image = image_with(vec![
+            (
+                VirtualPath::data("events.jsonl").unwrap(),
+                RepositoryEntry::Absent,
+            ),
+            (
+                VirtualPath::data("issues/missing.json").unwrap(),
+                RepositoryEntry::Absent,
+            ),
+        ]);
+        let context = MutationContext::preview();
+        let (configuration, gates, rules) = empty_declarations();
+        let declarations = RepositoryDeclarations {
+            configuration: &configuration,
+            gates: &gates,
+            rules: &rules,
+        };
+        let intents = vec![
+            MutationIntent::EditGateRegistry {
+                registry: Box::new(GateRegistry::default()),
+            },
+            MutationIntent::ClaimIssue {
+                issue_id: "missing".to_string(),
+                agent: "agent:tester".parse().unwrap(),
+            },
+        ];
+        let error =
+            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
+                .unwrap_err();
+        match error {
+            RepositoryStateError::GateRegistryEdit(GateRegistryEditError::Mutation(
+                MutationError::MissingIssue(id),
+            )) => assert_eq!(id, "missing"),
+            other => panic!("expected a typed missing-issue mutation error, got {other:?}"),
+        }
     }
 }
