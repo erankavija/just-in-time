@@ -1152,4 +1152,168 @@ mod tests {
             ]
         );
     }
+
+    fn empty_image() -> RepositoryImage {
+        RepositoryImage::close(
+            layout(),
+            CaptureSpec::phase_one(Vec::<VirtualPath>::new(), budget()).unwrap(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap()
+    }
+
+    fn image_with(entries: Vec<(VirtualPath, RepositoryEntry)>) -> RepositoryImage {
+        let paths: Vec<VirtualPath> = entries.iter().map(|(path, _)| path.clone()).collect();
+        RepositoryImage::close(
+            layout(),
+            CaptureSpec::phase_one(paths, budget()).unwrap(),
+            entries.into_iter().collect::<BTreeMap<_, _>>(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap()
+    }
+
+    fn empty_declarations() -> (ConfigurationDeclarations, GateRegistry, RuleSet) {
+        (
+            crate::declarations::parse_configuration(b"").unwrap(),
+            GateRegistry::default(),
+            RuleSet { rules: Vec::new() },
+        )
+    }
+
+    fn gate_definition(key: &str) -> crate::declarations::GateDefinition {
+        crate::declarations::GateDefinition {
+            version: 1,
+            key: key.to_string(),
+            title: key.to_string(),
+            description: String::new(),
+            stage: crate::declarations::GateStage::Postcheck,
+            mode: crate::declarations::GateMode::Manual,
+            checker: None,
+            priority: 100,
+            reserved: std::collections::HashMap::new(),
+            auto: false,
+            example_integration: None,
+        }
+    }
+
+    #[test]
+    fn test_finalize_gate_registry_edit_missing_edit_intent_is_typed() {
+        let image = empty_image();
+        let context = MutationContext::preview();
+        let (configuration, gates, rules) = empty_declarations();
+        let declarations = RepositoryDeclarations {
+            configuration: &configuration,
+            gates: &gates,
+            rules: &rules,
+        };
+        let error = finalize_gate_registry_edit(&layout(), &image, &context, &[], declarations)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            RepositoryStateError::GateRegistryEdit(GateRegistryEditError::MissingEdit)
+        ));
+    }
+
+    #[test]
+    fn test_finalize_gate_registry_edit_multiple_edit_intents_is_typed() {
+        let image = empty_image();
+        let context = MutationContext::preview();
+        let (configuration, gates, rules) = empty_declarations();
+        let declarations = RepositoryDeclarations {
+            configuration: &configuration,
+            gates: &gates,
+            rules: &rules,
+        };
+        let intents = vec![
+            MutationIntent::EditGateRegistry {
+                registry: Box::new(GateRegistry::default()),
+            },
+            MutationIntent::EditGateRegistry {
+                registry: Box::new(GateRegistry::default()),
+            },
+        ];
+        let error =
+            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
+                .unwrap_err();
+        assert!(matches!(
+            error,
+            RepositoryStateError::GateRegistryEdit(GateRegistryEditError::MultipleEdits)
+        ));
+    }
+
+    #[test]
+    fn test_finalize_gate_registry_edit_declaration_mismatch_is_typed() {
+        let image = empty_image();
+        let context = MutationContext::preview();
+        let (configuration, _default_gates, rules) = empty_declarations();
+        let mut mismatched = GateRegistry::default();
+        mismatched
+            .gates
+            .insert("distinct".to_string(), gate_definition("distinct"));
+        let declarations = RepositoryDeclarations {
+            configuration: &configuration,
+            gates: &mismatched,
+            rules: &rules,
+        };
+        let intents = vec![MutationIntent::EditGateRegistry {
+            registry: Box::new(GateRegistry::default()),
+        }];
+        let error =
+            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
+                .unwrap_err();
+        assert!(matches!(
+            error,
+            RepositoryStateError::GateRegistryEdit(GateRegistryEditError::DeclarationMismatch)
+        ));
+    }
+
+    #[test]
+    fn test_finalize_gate_registry_edit_propagates_typed_mutation_error() {
+        // A well-formed single edit intent alongside a claim of an issue absent
+        // from the captured image: the record finalizer's own typed
+        // `MutationError::MissingIssue` must surface through
+        // `GateRegistryEditError::Mutation`, short-circuiting before the
+        // declaration-derived producer set is ever composed.
+        let image = image_with(vec![
+            (
+                VirtualPath::data("events.jsonl").unwrap(),
+                RepositoryEntry::Absent,
+            ),
+            (
+                VirtualPath::data("issues/missing.json").unwrap(),
+                RepositoryEntry::Absent,
+            ),
+        ]);
+        let context = MutationContext::preview();
+        let (configuration, gates, rules) = empty_declarations();
+        let declarations = RepositoryDeclarations {
+            configuration: &configuration,
+            gates: &gates,
+            rules: &rules,
+        };
+        let intents = vec![
+            MutationIntent::EditGateRegistry {
+                registry: Box::new(GateRegistry::default()),
+            },
+            MutationIntent::ClaimIssue {
+                issue_id: "missing".to_string(),
+                agent: "agent:tester".parse().unwrap(),
+            },
+        ];
+        let error =
+            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
+                .unwrap_err();
+        match error {
+            RepositoryStateError::GateRegistryEdit(GateRegistryEditError::Mutation(
+                MutationError::MissingIssue(id),
+            )) => assert_eq!(id, "missing"),
+            other => panic!("expected a typed missing-issue mutation error, got {other:?}"),
+        }
+    }
 }
