@@ -21,7 +21,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Plan-identity tail for initialize and profile-application requests",
-  "updated_at": "2026-07-24T07:20:22.518669229Z"
+  "updated_at": "2026-07-24T08:05:37.224666758Z"
 }

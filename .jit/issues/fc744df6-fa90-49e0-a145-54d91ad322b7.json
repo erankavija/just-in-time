@@ -21,7 +21,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Lock-hygiene: eliminate the per-issue sidecar read lock",
-  "updated_at": "2026-07-24T07:20:33.212953600Z"
+  "updated_at": "2026-07-24T08:05:33.768865096Z"
 }

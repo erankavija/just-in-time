@@ -21,7 +21,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Total journal-action extraction in the transaction kernel",
-  "updated_at": "2026-07-24T07:20:18.946338900Z"
+  "updated_at": "2026-07-24T08:05:26.853799468Z"
 }

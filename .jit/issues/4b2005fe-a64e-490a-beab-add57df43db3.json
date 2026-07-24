@@ -21,7 +21,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Mutation-session retry combinator foundation",
-  "updated_at": "2026-07-24T07:20:11.830222048Z"
+  "updated_at": "2026-07-24T08:05:19.962294517Z"
 }

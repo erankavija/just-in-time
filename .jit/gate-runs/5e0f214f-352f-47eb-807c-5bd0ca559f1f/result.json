@@ -1,0 +1,114 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "9cf168e46ad72b1b7563f05b61472db29ff45107",
+  "completed_at": "2026-07-24T07:47:17.074658871Z",
+  "duration_ms": 654085,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F1",
+        "line": 21,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/dag-acyclic"
+        ],
+        "severity": "high",
+        "summary": "The planning-boundary story declares a direct plan-identity dependency that storage reduced after the new transitive edge was added."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F2",
+        "line": 42,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-3",
+          "@/inv/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "Shared architectural contracts and the authoritative manifest were added after the only passing plan-review and were not returned to that gate."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F3",
+        "line": 21,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The plan retains copied criteria, a hand-authored DAG, exhaustive inventories, gate assignment, and tracker steps beside the generated overview."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F4",
+        "line": 346,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The finalizer task combines independently testable gate-registry-edit and archive-execution error families."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F5",
+        "line": 385,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The exit-mapping task combines exhaustive binary mapping with an uncertain module-wide untyped-error migration."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F6",
+        "line": 992,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The public-surface task combines dead-export deletion with eight independently testable visibility demotions."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F7",
+        "line": 104,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The hygiene story references a sibling as coordination authority and the contention task has no recognized Success Criteria heading."
+      },
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/24bab642-6f1d-438a-aae5-5c327dceaff6.json",
+        "id": "F8",
+        "line": 9,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The breakdown node embeds tracker mechanics and attempted review-policy waivers instead of observable work outcomes."
+      }
+    ],
+    "summary": "The graph has one direct-edge mismatch, post-approval plan changes and accumulated plan authority remain, three terminal tasks fail sizing, and content-standard defects remain in manifest and bracket descriptions.",
+    "verdict": "fail"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "24bab642-6f1d-438a-aae5-5c327dceaff6",
+  "message": null,
+  "run_id": "5e0f214f-352f-47eb-807c-5bd0ca559f1f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T07:36:22.989356287Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7154 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f930d-cd84-7b63-b078-1d01a9408980\n--------\nuser\n--- 7141 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Required checks completed read-only:\n\n- Manifest validation: passed with `--deny-warnings`; zero warnings or overrides.\n- Renderer `--check`: passed.\n- Native batch dry-run: passed; 35 issues and 50 declared edges.\n- `jit validate`: passed.\n- Stored comparison: 35 unique mapped records, no extra epic members, exact native fields, correct bracket geometry, and no persisted `planning`; one direct-edge mismatch remains.\n- Contract modes and producer reachability: passed.\n- Footprint uncertainties and unordered overlaps are fully surfaced as advisories; no hidden overrides remain.\n\n| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused implementation/review cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---|---|---|---|---|---|---|---|\n| retry-combinator-foundation | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| single-session-site-migration | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| self-managed-multi-session | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| producer-error-family | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| finalizer-error-types | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | FAIL |\n| exit-mapping-string-free-sweep | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | FAIL |\n| total-journal-action-extraction | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| plan-identity-tail | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| plan-hash-reorder-property-test | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| managed-document-splice-property-test | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| visibility-cutover-guard | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| contention-tests | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| virtualpath-cow-representation | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| virtualpath-callsite-migration | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| repair-target-coverage | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| benchmark-harness | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| bulk-update-eligibility-prefilter | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| bulk-mutation-benchmark-scenario | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| lock-hygiene-sidecar | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| test-support-feature-gating | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| public-surface-demotions | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | FAIL |\n| test-only-publics-gating | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| store-test-split-renames | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| architecture-doc-sweep | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-dead-command-parameter | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| mcp-schema-generator-warnings | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| cli-error-code-doc-correction | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| fail-closed-manual-ci-script | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| successor-deck | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| predecessor-deck-tombstone | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n\n1. The manifest is not edge-exact with storage. `planning-boundary-collapse` declares `plan-identity-tail` directly, but storage reduced that edge after `exit-mapping-string-free-sweep → plan-identity-tail` was added. Remove `plan-identity-tail` from the story’s `depends_on` and rerender; storage already has the correct reduced graph.\n\n2. Shared architectural contracts and the authoritative manifest were added after the only passing plan-review. The pass was recorded against commit `fad4a534`, while the contracts and generated overview arrived later. After correcting the artifacts, return P to plan-review; the owner waiver in B cannot override the review policy.\n\n3. The plan still accumulates prohibited duplicate authority: copied epic criteria, a hand-authored story DAG, exhaustive implementation inventories, gate assignment, and tracker-oriented implementation steps alongside the generated overview. Remove those sections, retain concise criterion approaches, named contracts, decisions, risks, investigation links, and the generated overview, then rerun plan-review.\n\n4. `finalizer-error-types` combines independently testable gate-registry-edit and archive-execution error families. Replace it with separate `gate-registry-edit-error-type` and `archive-execution-error-type` entries, both consuming `producer-error-type`; make the residual error sweep depend on both.\n\n5. `exit-mapping-string-free-sweep` combines the binary’s exhaustive exit mapping with an uncertain module-wide untyped-error migration whose declared test boundary does not observe the sweep. Split it into a bounded residual repository-state error migration with an exact footprint and a subsequent exhaustive exit-code mapping task; make the planning-boundary story depend on the mapping sink.\n\n6. `public-surface-demotions` combines dead-export deletion with eight independent visibility demotions across seven files. Split out `remove-dead-issue-draft-export`; keep the visibility changes in `demote-repository-state-publics`, ordered after the deletion and `test-support-feature-gating`, and make the hygiene story depend on the resulting sink.\n\n7. Two manifest descriptions still violate content standards. `hygiene-and-docs` names the sibling `performance-contract` as coordination authority, and `contention-tests` concatenates prose directly with `## Success Criteria`, so it has no recognized criteria heading. Rewrite the former as standalone scope and insert the missing blank-line-separated heading in the latter; update the stored records to remain field-exact.\n\n8. The breakdown node’s REQ-B2–REQ-B4 are tracker/reviewer mechanics and attempted policy waivers rather than observable work outcomes. Remove these waiver criteria and retain concise deliverable criteria; gate status, sizing review, and advisory handling belong to configured workflow evidence rather than the issue description.\n\nTotal findings: 8\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The graph has one direct-edge mismatch, post-approval plan changes and accumulated plan authority remain, three terminal tasks fail sizing, and content-standard defects remain in manifest and bracket descriptions.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The planning-boundary story declares a direct plan-identity dependency that storage reduced after the new transitive edge was added.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":21,\"references\":[\"@/inv/dag-acyclic\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Shared architectural contracts and the authoritative manifest were added after the only passing plan-review and were not returned to that gate.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":42,\"references\":[\"@/charter/D-3\",\"@/inv/single-source-prose\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan retains copied criteria, a hand-authored DAG, exhaustive inventories, gate assignment, and tracker steps beside the generated overview.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":21,\"references\":[\"@/inv/single-source-prose\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The finalizer task combines independently testable gate-registry-edit and archive-execution error families.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":346},{\"id\":\"F5\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The exit-mapping task combines exhaustive binary mapping with an uncertain module-wide untyped-error migration.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":385},{\"id\":\"F6\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The public-surface task combines dead-export deletion with eight independently testable visibility demotions.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":992},{\"id\":\"F7\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The hygiene story references a sibling as coordination authority and the contention task has no recognized Success Criteria heading.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":104,\"references\":[\"@/inv/single-source-prose\"]},{\"id\":\"F8\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The breakdown node embeds tracker mechanics and attempted review-policy waivers instead of observable work outcomes.\",\"file\":\".jit/issues/24bab642-6f1d-438a-aae5-5c327dceaff6.json\",\"line\":9,\"references\":[\"@/inv/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

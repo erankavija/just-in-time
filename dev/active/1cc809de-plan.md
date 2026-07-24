@@ -189,7 +189,7 @@ Generated from `dev/active/1cc809de-breakdown.json`; do not edit by hand.
 <!-- jit:breakdown-overview:begin -->
 | Key | Title | Type | Outcome | Contracts | Sources | Footprint | Landing | Depends on |
 |---|---|---|---|---|---|---|---|---|
-| planning-boundary-collapse | Collapse the planning boundary to a single mutation-session contract | story | A single mutation-session contract and a fully typed error boundary collapse the copy-pasted planning surface. | — | plan-story-structure, dev/studies/cdc840ad-audit-2026-07-23.md | — | — | self-managed-multi-session, exit-mapping-string-free-sweep, total-journal-action-extraction, plan-identity-tail |
+| planning-boundary-collapse | Collapse the planning boundary to a single mutation-session contract | story | A single mutation-session contract and a fully typed error boundary collapse the copy-pasted planning surface. | — | plan-story-structure, dev/studies/cdc840ad-audit-2026-07-23.md | — | — | self-managed-multi-session, exit-mapping-string-free-sweep, total-journal-action-extraction |
 | enforced-guarantees | Convert narrated materialization guarantees into enforced tests | story | Property, contention, visibility, and path tests convert narrated materialization guarantees into enforced checks. | — | plan-story-structure | — | — | plan-hash-reorder-property-test, managed-document-splice-property-test, visibility-cutover-guard, contention-tests, virtualpath-callsite-migration, repair-target-coverage |
 | performance-contract | Establish an artifact-backed performance contract | story | A checked-in benchmark harness, a bounded session budget, and lock-hygiene make performance claims artifact-backed. | — | plan-story-structure | — | — | lock-hygiene-sidecar, bulk-mutation-benchmark-scenario |
 | hygiene-and-docs | Clear repository-state hygiene debt and document the subsystem | story | Feature-gating, surface reduction, test-module hygiene, docs, and debt clearance harden the repository-state subsystem. | — | plan-story-structure | — | — | public-surface-demotions, test-only-publics-gating, store-test-split-renames, architecture-doc-sweep, remove-dead-command-parameter, mcp-schema-generator-warnings, cli-error-code-doc-correction, fail-closed-manual-ci-script |
@@ -265,7 +265,6 @@ flowchart LR
     N7 --> N0
     N10 --> N0
     N11 --> N0
-    N12 --> N0
     N13 --> N1
     N14 --> N1
     N15 --> N1
