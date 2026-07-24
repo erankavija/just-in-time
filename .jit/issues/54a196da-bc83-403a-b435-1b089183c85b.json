@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-24T05:26:36.925453517Z",
+  "dependencies": [
+    "105014ee-a206-40ea-ac16-c1ac876df6ac",
+    "201c2456-1982-4d4d-a95d-e8b399090efb",
+    "68999270-35af-4b30-8a86-3c9302fc3cd7"
+  ],
+  "description": "A corrected successor deck retells the repository-materialization story with every falsifiable claim traced to a repository artifact, and the predecessor deck is archived behind a tombstone.\n\n## Background\n\nThe adversarial audit in `dev/studies/cdc840ad-audit-2026-07-23.md` found nine falsifiable errors in the predecessor showcase deck (`dev/presentations/cdc840ad/talk.html`): a fabricated `fn derive(...)` signature, a non-existent \"inspectable\" plan JSON document, a \"130 session opens\" figure that is a 65-issue in-memory model prediction rather than a measurement of this repository, an \"independent holistic PASS\" that was written by the same agent that built the epic, a `RepositoryImage` struct with a field it does not have, and a diffstat row that reproduces under no stated path filter. It also found the deck loads reveal.js, KaTeX, and three font families from CDNs and cannot present air-gapped, while carrying KaTeX that no slide uses.\n\nThe successor deck lives at `dev/presentations/1cc809de/` and re-derives its figures from the performance artifacts and the final tree; every timing cites artifact path, command name, and stat. It carries an explicit correction inventory keyed by audit finding id (A1-1..A1-6, the A2 claims it retells, and A4-1..A4-3), mapping each to its corrected claim and evidence. It ships without KaTeX and with reveal.js and fonts vendored under the deck folder so it presents air-gapped. The predecessor deck moves to `dev/archive/features/cdc840ad/showcase`, leaving a tombstone at the original path that points to the successor deck and the audit.\n\n## Success Criteria\n\n- [hard] REQ-16: A corrected successor presentation of the repository-materialization story exists in which every falsifiable claim traces to a repository artifact, and the predecessor deck is archived with a tombstone pointing to the successor and the audit.\n\n## Notes\n\nThis deck is a corrected retelling of the predecessor story, not a deck about this epic's own work. Asset vendoring is pinned by plan decision PD-2: reveal.js and fonts are vendored locally and KaTeX is dropped, so rendering is reproducible from the repository alone. The successor must pass the presentation fit checker across all slides.",
+  "documents": [],
+  "first_ready_at": "2026-07-24T05:26:36.925453517Z",
+  "gates_required": [
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "54a196da-bc83-403a-b435-1b089183c85b",
+  "labels": [
+    "type:story",
+    "epic:repository-state-quality",
+    "story:presentation-succession",
+    "milestone:v1.0",
+    "satisfies:REQ-16"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Replace the repository-materialization showcase with a corrected successor",
+  "updated_at": "2026-07-24T05:26:59.343894945Z"
+}
