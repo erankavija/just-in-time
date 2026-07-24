@@ -214,8 +214,10 @@
           "title": "Multi-threaded contention tests",
           "story": "S2",
           "classification": "implementation",
-          "status": "pending-subwave",
-          "note": "serialized on repository_state_store.rs: e6d5e440 -> 28254964 -> dd5b43b6"
+          "status": "dispatched",
+          "note": "serialized on repository_state_store.rs: e6d5e440 -> 28254964 -> dd5b43b6",
+          "agent": "worker-dd5b43b6",
+          "model": "sonnet"
         },
         {
           "id": "28254964",
@@ -223,7 +225,7 @@
           "title": "Feature-gate the test-support library surface",
           "story": "S2/S4-shared",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "done",
           "note": "serialized on repository_state_store.rs: e6d5e440 -> 28254964 -> dd5b43b6",
           "agent": "worker-28254964",
           "model": "sonnet"
