@@ -614,7 +614,7 @@ fn template_declarations_from_image(
         .file_bytes(&VirtualPath::data("config.toml")?)?
         .is_some()
     {
-        return crate::repository_state::declarations_from_image(image);
+        return Ok(crate::repository_state::declarations_from_image(image)?);
     }
     let namespaces = crate::config_manager::namespaces_from_config(config);
     let rules = match image.file_bytes(&VirtualPath::data("rules.toml")?)? {

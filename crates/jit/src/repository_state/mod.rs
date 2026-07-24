@@ -163,7 +163,7 @@ pub(crate) use projection_render::{render_projection_body, ProjectionInputs};
 pub use rule_serialize::{
     render_rule_block, rules_file_header, serialize_ruleset, SchemaFile, SerializedRuleSet,
 };
-pub use rules_document::{parse_rule_identities, splice_default_membership};
+pub use rules_document::{parse_rule_identities, splice_default_membership, RulesDocumentError};
 pub use rules_gates_projection::render_rules_and_gates_markdown;
 
 use crate::declarations::rules::RuleSet;
@@ -223,11 +223,11 @@ pub enum ProducerError {
     )]
     InvalidContentFormat(String),
     /// A rules document could not be parsed or safely spliced.
-    #[error("{0:#}")]
-    RulesDocument(anyhow::Error),
+    #[error(transparent)]
+    RulesDocument(#[from] RulesDocumentError),
     /// Captured declarations could not be assembled into the canonical bundle.
-    #[error("{0:#}")]
-    DeclarationAssembly(anyhow::Error),
+    #[error(transparent)]
+    DeclarationAssembly(Box<DeclarationParseError>),
     /// A profile registry target is occupied by a non-file entry.
     #[error("profile registry '{target}' is not a regular file")]
     ProfileRegistryNotFile { target: String },
@@ -292,6 +292,44 @@ pub enum ProfileRegistryParseError {
     ValueNotTable,
 }
 
+/// A typed failure raised while parsing captured declaration files into the
+/// canonical bundle ([`declarations_from_image`] /
+/// [`validation_declarations_from_image`]).
+///
+/// Each variant carries its leaf parser's concrete error; rendering lives in this
+/// type's `Display` impl rather than at the parse site. Also the stored type of a
+/// deferred `rules.toml` load failure ([`CapturedRepositoryDeclarations::rules_load_error`]).
+#[derive(Debug, thiserror::Error)]
+pub enum DeclarationParseError {
+    /// A required declaration file was absent from the captured image.
+    #[error("captured image has no {0}")]
+    MissingCapture(String),
+    /// Reading a captured entry failed.
+    #[error(transparent)]
+    Capture(#[from] CaptureError),
+    /// A declaration path was invalid for the repository layout.
+    #[error(transparent)]
+    Layout(#[from] RepositoryLayoutError),
+    /// Captured bytes were not valid UTF-8.
+    #[error(transparent)]
+    Utf8(#[from] std::str::Utf8Error),
+    /// The repository configuration could not be parsed.
+    #[error(transparent)]
+    Configuration(#[from] ConfigurationDeclarationError),
+    /// The captured configuration could not be assembled into the effective config.
+    #[error(transparent)]
+    Producer(#[from] ProducerError),
+    /// The template registry could not be parsed.
+    #[error(transparent)]
+    Template(#[from] crate::templates::TemplateConfigError),
+    /// The gate registry could not be parsed.
+    #[error(transparent)]
+    Gate(#[from] crate::declarations::GateDeclarationError),
+    /// The rule set could not be parsed.
+    #[error(transparent)]
+    Rule(#[from] crate::declarations::rules::RuleConfigError),
+}
+
 /// Explicit declaration bundle consumed by the closed producer call graph.
 pub struct RepositoryDeclarations<'a> {
     /// Parsed repository configuration.
@@ -309,7 +347,7 @@ pub(crate) struct CapturedRepositoryDeclarations {
     pub(crate) config: crate::config::JitConfig,
     pub(crate) gates: GateRegistry,
     pub(crate) rules: RuleSet,
-    rules_load_error: Option<anyhow::Error>,
+    rules_load_error: Option<DeclarationParseError>,
 }
 
 impl CapturedRepositoryDeclarations {
@@ -352,11 +390,11 @@ impl CapturedRepositoryDeclarations {
         self.rules_load_error.is_none()
     }
 
-    pub(crate) fn rules_load_error(&self) -> Option<&anyhow::Error> {
+    pub(crate) fn rules_load_error(&self) -> Option<&DeclarationParseError> {
         self.rules_load_error.as_ref()
     }
 
-    pub(crate) fn take_rules_load_error(&mut self) -> Option<anyhow::Error> {
+    pub(crate) fn take_rules_load_error(&mut self) -> Option<DeclarationParseError> {
         self.rules_load_error.take()
     }
 }
@@ -364,7 +402,7 @@ impl CapturedRepositoryDeclarations {
 /// Parse one captured image into the canonical declaration bundle exactly once.
 pub(crate) fn declarations_from_image(
     image: &RepositoryImage,
-) -> anyhow::Result<CapturedRepositoryDeclarations> {
+) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
     let mut declarations = validation_declarations_from_image(image)?;
     match declarations.take_rules_load_error() {
         Some(error) => Err(error),
@@ -378,10 +416,10 @@ pub(crate) fn declarations_from_image(
 /// validation must still report bindings into an unloadable rule source.
 pub(crate) fn validation_declarations_from_image(
     image: &RepositoryImage,
-) -> anyhow::Result<CapturedRepositoryDeclarations> {
+) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
     let config_bytes = image
         .file_bytes(&VirtualPath::data("config.toml")?)?
-        .ok_or_else(|| anyhow::anyhow!("captured image has no .jit/config.toml"))?;
+        .ok_or_else(|| DeclarationParseError::MissingCapture(".jit/config.toml".to_string()))?;
     let configuration = crate::declarations::parse_configuration(config_bytes)?;
     let mut config = materialize::assemble_config_from_declarations(image, &configuration)?;
     let hierarchy_types = config
@@ -411,18 +449,18 @@ pub(crate) fn validation_declarations_from_image(
         None => GateRegistry::default(),
     };
     let rules = match image.file_bytes(&VirtualPath::data("rules.toml")?)? {
-        Some(bytes) => (|| -> anyhow::Result<RuleSet> {
+        Some(bytes) => (|| -> Result<RuleSet, DeclarationParseError> {
             let content = std::str::from_utf8(bytes)?;
             let schemas = RuleSet::schema_requests(content)?
                 .into_iter()
-                .map(|request| -> anyhow::Result<_> {
+                .map(|request| -> Result<_, DeclarationParseError> {
                     let path = VirtualPath::data(&request.reference)?;
                     let bytes = image.file_bytes(&path)?.ok_or_else(|| {
-                        anyhow::anyhow!("captured image has no {}", request.reference)
+                        DeclarationParseError::MissingCapture(request.reference.clone())
                     })?;
                     Ok((request.reference, bytes.to_vec()))
                 })
-                .collect::<anyhow::Result<Vec<_>>>()?;
+                .collect::<Result<Vec<_>, DeclarationParseError>>()?;
             let parsed = RuleSet::parse(content, Some(&config), schemas)?;
             Ok(reconcile_default_rules_with_config(parsed, &namespaces))
         })(),
@@ -763,20 +801,27 @@ pub enum RepositoryStateError {
     /// Ownership of a materialization boundary cannot be proven, so repair is
     /// refused before publication rather than risk rewriting or deleting authored
     /// content (ownership matrix: "never rewrites an authored boundary it cannot
-    /// prove"). Carries a human description of the ambiguous boundary.
+    /// prove"). Carries a typed reason naming the ambiguous boundary.
     #[error("ambiguous materialization ownership, not repairable: {0}")]
-    AmbiguousOwnership(String),
+    AmbiguousOwnership(#[from] AmbiguousOwnershipError),
 }
 
-impl RepositoryStateError {
-    /// Whether this derivation failed on an unowned profile target occupant.
-    pub fn is_profile_target_conflict(&self) -> bool {
-        matches!(
-            self,
-            Self::ProfileTargetConflict(_)
-                | Self::Initialization(InitializationError::ProfileTargetConflict(_))
-        )
-    }
+/// The proven-unprovable ownership boundary that refused a materialization repair.
+///
+/// Each variant holds the raw identifier at fault; rendering lives in this type's
+/// `Display` impl. Composed into [`RepositoryStateError::AmbiguousOwnership`].
+#[derive(Debug, thiserror::Error)]
+pub enum AmbiguousOwnershipError {
+    /// More than one installed profile claims the same materialization target.
+    #[error("multiple installed profiles claim {0:?}")]
+    MultipleProfileClaims(VirtualPath),
+    /// `rules.toml` declares more than one rule with the same name, so
+    /// default-rule and schema ownership cannot be proven.
+    #[error(
+        "rules.toml declares more than one rule named '{0}'; \
+         default-rule and schema ownership cannot be proven"
+    )]
+    DuplicateRuleName(String),
 }
 
 /// The complete owned-materialization producer set: default rules and their
@@ -843,9 +888,7 @@ fn derive_repair(
     for claims in profiles {
         for (path, (bytes, mode)) in profile_apply::compose_profile_targets(image, claims)? {
             if !claimed.insert(path.clone()) {
-                return Err(RepositoryStateError::AmbiguousOwnership(format!(
-                    "multiple installed profiles claim {path:?}"
-                )));
+                return Err(AmbiguousOwnershipError::MultipleProfileClaims(path.clone()).into());
             }
             actions.retain(|action| action.path() != &path);
             let expected = ExpectedPreimage::of(image.entry(&path).map_err(ProducerError::from)?);

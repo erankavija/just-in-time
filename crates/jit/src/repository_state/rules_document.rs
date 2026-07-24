@@ -11,8 +11,36 @@
 //! derive pipeline.
 
 use crate::declarations::rules::DEFAULT_ORIGIN;
-use anyhow::{Context, Result};
 use serde::Deserialize;
+
+/// A typed failure raised while parsing or span-editing a `rules.toml` document.
+///
+/// Every variant carries its concrete parse source (or none, for a structural
+/// absence); rendering lives in this type's `Display` impl rather than at the call
+/// site. Composed into [`ProducerError::RulesDocument`](super::ProducerError).
+#[derive(Debug, thiserror::Error)]
+pub enum RulesDocumentError {
+    /// `rules.toml` could not be parsed for `(name, origin)` rule identities.
+    #[error("parsing rule identities from rules.toml")]
+    ParseIdentities(#[source] toml::de::Error),
+    /// The authored `rules.toml` could not be parsed as a TOML document.
+    #[error("parsing rules.toml as TOML")]
+    ParseDocument(#[source] toml_edit::TomlError),
+    /// The derived default `rules.toml` could not be parsed as a TOML document.
+    #[error("parsing derived default rules.toml")]
+    ParseDerived(#[source] toml_edit::TomlError),
+    /// The derived default `rules.toml` carried no `rules` array.
+    #[error("derived default rules.toml has no rules array")]
+    DerivedMissingRulesArray,
+    /// A proven default-origin rule carried no assertion value.
+    #[error("default-origin rule has no assertion value")]
+    DefaultRuleMissingAssertion,
+    /// A derived default rule carried no assertion value.
+    #[error("derived default rule has no assertion value")]
+    DerivedRuleMissingAssertion,
+}
+
+type Result<T> = std::result::Result<T, RulesDocumentError>;
 
 /// Minimal per-rule identity read off a `[[rules]]` block: just enough
 /// (`name`, `origin`) to compute the default-family membership diff, without the
@@ -40,7 +68,7 @@ struct RuleIdentitiesFile {
 /// rule — the membership diff must not be strandable by an unrelated rule's defect.
 pub fn parse_rule_identities(content: &str) -> Result<Vec<(String, Option<String>)>> {
     let identities: RuleIdentitiesFile =
-        toml::from_str(content).context("parsing rule identities from rules.toml")?;
+        toml::from_str(content).map_err(RulesDocumentError::ParseIdentities)?;
     Ok(identities
         .rules
         .into_iter()
@@ -107,14 +135,14 @@ fn key_after_rules(doc: &toml_edit::DocumentMut) -> Option<String> {
 pub(super) fn rewrite_default_assertions(content: &str, expected: &str) -> Result<String> {
     let mut doc = content
         .parse::<toml_edit::DocumentMut>()
-        .context("parsing rules.toml as TOML")?;
+        .map_err(RulesDocumentError::ParseDocument)?;
     let expected = expected
         .parse::<toml_edit::DocumentMut>()
-        .context("parsing derived default rules.toml")?;
+        .map_err(RulesDocumentError::ParseDerived)?;
     let expected_rules = expected
         .get(RULES_ARRAY_KEY)
         .and_then(toml_edit::Item::as_array_of_tables)
-        .context("derived default rules.toml has no rules array")?;
+        .ok_or(RulesDocumentError::DerivedMissingRulesArray)?;
     let Some(rules) = doc
         .get_mut(RULES_ARRAY_KEY)
         .and_then(toml_edit::Item::as_array_of_tables_mut)
@@ -139,10 +167,10 @@ pub(super) fn rewrite_default_assertions(content: &str, expected: &str) -> Resul
         let current = table
             .get("assert")
             .and_then(toml_edit::Item::as_value)
-            .context("default-origin rule has no assertion value")?;
+            .ok_or(RulesDocumentError::DefaultRuleMissingAssertion)?;
         let replacement_value = replacement
             .as_value_mut()
-            .context("derived default rule has no assertion value")?;
+            .ok_or(RulesDocumentError::DerivedRuleMissingAssertion)?;
         *replacement_value.decor_mut() = current.decor().clone();
         table["assert"] = replacement;
     }
@@ -174,7 +202,7 @@ pub fn splice_default_membership(
     }
     let mut doc = content
         .parse::<toml_edit::DocumentMut>()
-        .context("parsing rules.toml as TOML")?;
+        .map_err(RulesDocumentError::ParseDocument)?;
 
     let mut orphaned_leading_prefix: Option<String> = None;
     let dropped_any = !to_drop.is_empty()

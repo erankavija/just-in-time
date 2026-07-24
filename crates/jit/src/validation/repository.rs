@@ -153,7 +153,7 @@ pub fn validate_repository(
     image: &RepositoryImage,
 ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
     let declarations = crate::repository_state::validation_declarations_from_image(image)
-        .map_err(RepositoryValidationFailure::declaration)?;
+        .map_err(|error| RepositoryValidationFailure::declaration(error.into()))?;
     let seed = crate::repository_state::RepositorySeed::new(
         crate::repository_state::RepositorySeedKind::Command {
             name: "validate repository".to_string(),

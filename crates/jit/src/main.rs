@@ -100,11 +100,37 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         || error
             .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()
-        || error
-            .downcast_ref::<jit::repository_state::RepositoryStateError>()
-            .is_some_and(|error| error.is_profile_target_conflict())
     {
         return ExitCode::ValidationFailed;
+    }
+
+    // The repository-state derivation error is classified by an exhaustive match
+    // over every current variant — no fallback arm — so a newly added variant forces
+    // a deliberate classification here rather than silently taking the generic code.
+    // Projection, managed-document, profile-target-conflict, ambiguous-ownership,
+    // gate-registry-edit, and archive-execution failures are validation failures (4);
+    // a layout rejection is an argument error (2); capture/parse producer failures and
+    // the structural plan-identity/delta/overlay/initialization failures keep the
+    // generic code (1). The `project render` command additionally unwraps this error
+    // to its bare inner `ProjectionError`/`ManagedDocumentError`, which the checks
+    // above classify identically.
+    if let Some(state_error) = error.downcast_ref::<jit::repository_state::RepositoryStateError>() {
+        use jit::repository_state::{InitializationError, RepositoryStateError};
+        return match state_error {
+            RepositoryStateError::Projection(_)
+            | RepositoryStateError::ManagedDocument(_)
+            | RepositoryStateError::ProfileTargetConflict(_)
+            | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(_))
+            | RepositoryStateError::AmbiguousOwnership(_)
+            | RepositoryStateError::GateRegistryEdit(_)
+            | RepositoryStateError::ArchiveExecution(_) => ExitCode::ValidationFailed,
+            RepositoryStateError::Layout(_) => ExitCode::InvalidArgument,
+            RepositoryStateError::Producer(_)
+            | RepositoryStateError::Initialization(_)
+            | RepositoryStateError::Delta(_)
+            | RepositoryStateError::PlanHash(_)
+            | RepositoryStateError::Overlay(_) => ExitCode::GenericError,
+        };
     }
     // A failed batch-create pre-validation is an argument error (exit 2): no
     // writes happened, the file is malformed.
@@ -781,24 +807,42 @@ fn invalid_argument(message: String, command: &str, json: bool) -> anyhow::Error
 
 fn profile_json_error(error: &anyhow::Error, command: &str) -> jit::output::JsonError {
     use jit::output::{ErrorCode, JsonError};
+    use jit::repository_state::{InitializationError, ProducerError, RepositoryStateError};
 
     if error.downcast_ref::<jit::errors::NotFoundError>().is_some() {
-        JsonError::new(ErrorCode::PROFILE_NOT_FOUND, error.to_string(), command)
-            .with_suggestion("Run 'jit profile list --json' to see embedded profiles")
-    } else if error
+        return JsonError::new(ErrorCode::PROFILE_NOT_FOUND, error.to_string(), command)
+            .with_suggestion("Run 'jit profile list --json' to see embedded profiles");
+    }
+    if error
         .downcast_ref::<jit::profile::ProfileClaimError>()
         .is_some()
         || error
             .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()
-        || error
-            .downcast_ref::<jit::repository_state::RepositoryStateError>()
-            .is_some_and(|error| error.is_profile_target_conflict())
     {
-        JsonError::new(ErrorCode::PROFILE_CONFLICT, error.to_string(), command)
-    } else {
-        JsonError::new("PROFILE_ERROR", error.to_string(), command)
+        return JsonError::new(ErrorCode::PROFILE_CONFLICT, error.to_string(), command);
     }
+    // The single sanctioned downcast of the anyhow CLI transport to the typed
+    // repository-state error: a profile target conflict (raised directly or through
+    // initialization) and a profile registry contribution conflict are conflicts; an
+    // unreadable or unparseable profile registry is a generic profile error. Every
+    // other variant keeps the generic profile-error code.
+    if let Some(state_error) = error.downcast_ref::<RepositoryStateError>() {
+        let code = match state_error {
+            RepositoryStateError::ProfileTargetConflict(_)
+            | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(_))
+            | RepositoryStateError::Producer(ProducerError::ProfileContributionConflict {
+                ..
+            }) => ErrorCode::PROFILE_CONFLICT,
+            RepositoryStateError::Producer(
+                ProducerError::ProfileRegistryNotFile { .. }
+                | ProducerError::ProfileRegistryParse { .. },
+            ) => "PROFILE_ERROR",
+            _ => "PROFILE_ERROR",
+        };
+        return JsonError::new(code, error.to_string(), command);
+    }
+    JsonError::new("PROFILE_ERROR", error.to_string(), command)
 }
 
 fn profile_result<T>(result: anyhow::Result<T>, command: &str, json: bool) -> anyhow::Result<T> {
@@ -8113,5 +8157,118 @@ mod exit_code_projection_tests {
                  command_exit_codes projection has no `{row}` row documenting it"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod repository_state_classifier_tests {
+    //! REQ-01/REQ-02: pin the exhaustive `RepositoryStateError` exit-code mapping
+    //! and the profile `--json` variant classification to their real classifiers
+    //! ([`error_to_exit_code`] and [`profile_json_error`]). Each representative
+    //! variant is asserted so a reclassification (or a mis-mapped newly added
+    //! variant) fails here rather than silently changing a command's exit status.
+
+    use super::{error_to_exit_code, profile_json_error};
+    use jit::repository_state::{
+        AmbiguousOwnershipError, ArchiveExecutionError, GateRegistryEditError, InitializationError,
+        ManagedDocumentError, ProducerError, ProfileTargetConflictError, ProjectionError,
+        RepositoryLayoutError, RepositoryStateError, VirtualPath,
+    };
+
+    fn path() -> VirtualPath {
+        VirtualPath::data("issues/abc123.json").unwrap()
+    }
+
+    /// Each repository-state variant paired with the exit code the exhaustive match
+    /// must produce: validation failures (4) for the semantic-boundary variants, an
+    /// argument error (2) for a layout rejection, and the generic code (1) for the
+    /// capture/parse producer and structural initialization families.
+    fn state_error_cases() -> Vec<(RepositoryStateError, i32)> {
+        vec![
+            (ProjectionError::UnknownKind { kind: "k".into() }.into(), 4),
+            (
+                ManagedDocumentError::DuplicateRegionIdentity("r".into()).into(),
+                4,
+            ),
+            (ProfileTargetConflictError { path: path() }.into(), 4),
+            (
+                RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
+                    ProfileTargetConflictError { path: path() },
+                )),
+                4,
+            ),
+            (
+                AmbiguousOwnershipError::DuplicateRuleName("dup".into()).into(),
+                4,
+            ),
+            (GateRegistryEditError::MissingEdit.into(), 4),
+            (
+                ArchiveExecutionError::MissingDestination("d".into()).into(),
+                4,
+            ),
+            (RepositoryLayoutError::LexicalEscape("p".into()).into(), 2),
+            (ProducerError::UnknownProjection("p".into()).into(), 1),
+            (
+                RepositoryStateError::Initialization(InitializationError::UnexpectedOccupant {
+                    path: path(),
+                }),
+                1,
+            ),
+        ]
+    }
+
+    #[test]
+    fn test_error_to_exit_code_maps_every_repository_state_class() {
+        for (state_error, expected) in state_error_cases() {
+            let error = anyhow::Error::new(state_error);
+            assert_eq!(
+                error_to_exit_code(&error).code(),
+                expected,
+                "classifier produced the wrong code for `{error}`"
+            );
+        }
+    }
+
+    #[test]
+    fn test_profile_json_error_classifies_repository_state_variants() {
+        // A profile target conflict and a registry contribution conflict are
+        // profile conflicts (validation exit 4); an unreadable registry and an
+        // unrelated variant keep the generic profile-error code (exit 1).
+        let conflict_cases: Vec<RepositoryStateError> = vec![
+            ProfileTargetConflictError { path: path() }.into(),
+            RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
+                ProfileTargetConflictError { path: path() },
+            )),
+            ProducerError::ProfileContributionConflict {
+                identity: "i".into(),
+                registry: "r".into(),
+            }
+            .into(),
+        ];
+        for state_error in conflict_cases {
+            let error = anyhow::Error::new(state_error);
+            let json = profile_json_error(&error, "profile apply");
+            assert_eq!(json.error.code, jit::output::ErrorCode::PROFILE_CONFLICT);
+            assert_eq!(json.exit_code().code(), 4);
+        }
+
+        let error_cases: Vec<RepositoryStateError> = vec![
+            ProducerError::ProfileRegistryNotFile { target: "t".into() }.into(),
+            RepositoryLayoutError::LexicalEscape("p".into()).into(),
+        ];
+        for state_error in error_cases {
+            let error = anyhow::Error::new(state_error);
+            let json = profile_json_error(&error, "profile apply");
+            assert_eq!(json.error.code, "PROFILE_ERROR");
+            assert_eq!(json.exit_code().code(), 1);
+        }
+    }
+
+    #[test]
+    fn test_profile_json_error_maps_not_found_before_variant_match() {
+        let error = anyhow::Error::new(jit::errors::NotFoundError::new("no such profile"));
+        let json = profile_json_error(&error, "profile show");
+        assert_eq!(json.error.code, jit::output::ErrorCode::PROFILE_NOT_FOUND);
+        assert_eq!(json.exit_code().code(), 3);
     }
 }
