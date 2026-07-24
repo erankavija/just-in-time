@@ -31,17 +31,19 @@ pub struct UpdateOperations {
 
 impl UpdateOperations {
     /// True when every operation's target value already holds on `issue`, so
-    /// applying this update to it would be a provable no-op.
+    /// `issue` is nominated as a skip CANDIDATE — not yet a confirmed skip.
     ///
     /// Pure and Issue-local: it decides each operation kind from `issue` alone
     /// (state equality, label presence/absence, priority equality, gate
     /// presence/absence, assignee identity or absence) and never consults the
-    /// repository. It is skip-only — a `false` result means only "not provably
-    /// a no-op," not "valid": repository-dependent validity (gate registry
-    /// membership, dependency/gate transition guards, label and assignee
-    /// format) is still decided exclusively by the authoritative in-session
-    /// check, so callers may use this to skip opening a session but must never
-    /// treat it as authorization to apply the update.
+    /// repository. It never authorizes a skip by itself — a `false` result
+    /// means only "not a candidate," and a `true` result means only
+    /// "worth checking further": repository-dependent validity (gate registry
+    /// membership, dependency/gate transition guards, rule cleanliness, label
+    /// and assignee format) is decided exclusively inside a session — the
+    /// shared verification session that confirms candidates
+    /// (`CommandExecutor::confirm_bulk_noop_candidates`), or the normal
+    /// per-issue session for anything that session does not confirm.
     pub fn is_provable_noop(&self, issue: &Issue) -> bool {
         let state_holds = self.state.is_none_or(|target| target == issue.state);
         let labels_hold = self
@@ -203,21 +205,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Applies operations to all matched issues with per-issue atomicity.
     /// Best-effort: continues on errors, tracks successes and failures.
     ///
-    /// Only opens preflight/publication sessions for matched issues that are
-    /// not provable no-ops (see [`UpdateOperations::is_provable_noop`]); an
-    /// issue the prefilter recognizes as already at its target values is
-    /// recorded as skipped without touching the repository, matching the
-    /// per-issue result an in-session no-op would have produced.
-    ///
-    /// A field-level no-op is skipped only when [`Self::validate_update_preview`]
-    /// also finds nothing to reject: the in-session write path evaluates local
-    /// rules against the projected issue unconditionally, even when no field
-    /// actually changes, so an issue that already violates an `enforce` rule
-    /// still needs a session to reproduce its pre-change result — an error
-    /// without `--force`, or a bypass event with it (jit 412925b9). That
-    /// preview call is a cheap, non-session repository read (cached config and
-    /// rules, no mutation session), so gating the skip on it does not
-    /// reintroduce the session-open cost this prefilter exists to avoid.
+    /// Only opens per-issue preflight/publication sessions for matched issues
+    /// that are not confirmed no-ops. [`UpdateOperations::is_provable_noop`]
+    /// nominates skip CANDIDATES from the unlocked `matched` snapshot, but
+    /// never authorizes a skip by itself; every candidate is confirmed inside
+    /// one shared, read-only verification session
+    /// ([`Self::confirm_bulk_noop_candidates`]) before being recorded as
+    /// skipped, so repository-dependent validity is decided only inside a
+    /// session — the shared one, or the normal per-issue one for anything the
+    /// shared session does not confirm.
     pub fn apply_bulk_update(
         &mut self,
         filter: &QueryFilter,
@@ -233,10 +229,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut result = BulkUpdateResult::new();
         result.matched = matched.iter().map(|i| i.id.clone()).collect();
 
+        let candidates: Vec<&Issue> = matched
+            .iter()
+            .copied()
+            .filter(|issue| operations.is_provable_noop(issue))
+            .collect();
+        let confirmed_skips = if candidates.is_empty() {
+            std::collections::HashSet::new()
+        } else {
+            self.confirm_bulk_noop_candidates(&candidates, operations)?
+        };
+
         for issue in matched {
-            let provable_noop = operations.is_provable_noop(issue)
-                && self.validate_update_preview(issue, operations).is_ok();
-            if provable_noop {
+            if confirmed_skips.contains(&issue.id) {
                 result
                     .skipped
                     .push((issue.id.clone(), "No changes needed".to_string()));
@@ -263,6 +268,84 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         result.compute_summary();
         Ok(result)
+    }
+
+    /// Confirm skip candidates nominated by
+    /// [`UpdateOperations::is_provable_noop`] inside one shared, read-only
+    /// verification session, returning the ids safe to record as skipped.
+    ///
+    /// `is_provable_noop` nominates candidates from the unlocked outer
+    /// snapshot and never authorizes a skip on its own; this captures the
+    /// repository declarations and the candidates' issue records from ONE
+    /// consistent point in time and re-derives, per candidate:
+    ///   - field-level no-op-ness against the freshly captured issue (a
+    ///     candidate's fields may have moved since the outer snapshot),
+    ///   - that every `add_gates` key is still declared in the captured gate
+    ///     registry (the write path rejects a missing key unconditionally,
+    ///     even when the gate is already required), and
+    ///   - that [`derive_write_validation`] finds nothing to bypass: the
+    ///     in-session write path evaluates local rules against the issue
+    ///     unconditionally, even when no field changes, so a no-op whose
+    ///     issue already violates an `enforce` rule must still reach a
+    ///     per-issue session so its error (or `--force` bypass event) is
+    ///     byte-identical to the pre-change result (jit 412925b9).
+    ///
+    /// Only candidates confirmed clean on every count are returned; anything
+    /// else is left for the caller to route through the normal per-issue
+    /// session, exactly like a non-candidate. This session is never used to
+    /// apply a plan, so an uncontended run opens exactly one.
+    fn confirm_bulk_noop_candidates(
+        &self,
+        candidates: &[&Issue],
+        operations: &UpdateOperations,
+    ) -> Result<std::collections::HashSet<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::declarations_from_image;
+        use std::collections::HashSet;
+
+        let layout = self.require_layout()?;
+        with_mutation_session(
+            &self.storage,
+            &layout,
+            "bulk-update no-op verification",
+            |session| {
+                let Some(image) = self.capture_proposed_base(
+                    session,
+                    &std::collections::BTreeMap::new(),
+                    &[],
+                    None,
+                )?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let active = captured_active_issues(&image)?;
+                let declarations = declarations_from_image(&image)?;
+                let config = declarations.config();
+
+                let confirmed = candidates
+                    .iter()
+                    .filter_map(|candidate| {
+                        let fresh = active.iter().find(|issue| issue.id == candidate.id)?;
+                        let gates_registered = operations
+                            .add_gates
+                            .iter()
+                            .all(|key| declarations.gates.gates.contains_key(key));
+                        // force=true: we want "would anything need bypassing",
+                        // not the force-gated rejection itself.
+                        let rule_clean =
+                            derive_write_validation(fresh, &declarations, config, true)
+                                .map(|validation| validation.bypassed_rules.is_empty())
+                                .unwrap_or(false);
+                        (operations.is_provable_noop(fresh) && gates_registered && rule_clean)
+                            .then(|| fresh.id.clone())
+                    })
+                    .collect::<HashSet<_>>();
+
+                Ok(SessionStep::Done(confirmed))
+            },
+        )
     }
 
     /// Apply operations to a single issue
@@ -1326,14 +1409,16 @@ mod tests {
 
     // -- Session budget (REQ-01, REQ-04) ---------------------------------
 
-    /// REQ-01, REQ-04: sessions open only for matched issues that are not
-    /// provable no-ops. `C` (the per-mutation session constant) is derived
-    /// from a single-issue baseline run rather than hardcoded, session opens
-    /// are counted via the once-per-session-open failure-point probe shared
-    /// with the automatic-transitions budget test
+    /// REQ-01, REQ-04 (amended, D-1): sessions open only for matched issues
+    /// that are not CONFIRMED no-ops, plus exactly one shared verification
+    /// session whenever at least one skip candidate exists. `C` (the
+    /// per-mutation session constant) is derived from a single-issue baseline
+    /// run rather than hardcoded, session opens are counted via the
+    /// once-per-session-open failure-point probe shared with the
+    /// automatic-transitions budget test
     /// (`crate::commands::issue::tests::test_check_auto_transitions_opens_sessions_only_for_eligible_backlog_issues`),
-    /// and the assertion is the semantic relationship `C * J`, not a copied
-    /// constant.
+    /// and the assertion is the semantic relationship `C * J + 1`, not a
+    /// copied constant.
     #[test]
     fn test_apply_bulk_update_session_budget_scales_with_issues_needing_change() {
         use crate::commands::test_helpers::SessionOpenCounter;
@@ -1347,6 +1432,8 @@ mod tests {
         };
 
         // Baseline: a single issue that DOES require the change derives C.
+        // No skip candidates exist in this run, so no shared verification
+        // session is funded and the baseline measures C alone.
         let baseline_counter = SessionOpenCounter::new();
         let baseline_storage =
             InMemoryStorage::new().with_repository_state_failure_view(baseline_counter.clone());
@@ -1367,8 +1454,8 @@ mod tests {
         );
 
         // K = 5 matched issues, J = 2 require the change; the remaining K-J
-        // already hold the target priority and must be recognized as provable
-        // no-ops.
+        // already hold the target priority and must be recognized as skip
+        // candidates confirmed clean by the shared verification session.
         let k = 5;
         let j = 2;
         let counter = SessionOpenCounter::new();
@@ -1388,15 +1475,71 @@ mod tests {
         assert_eq!(result.summary.total_skipped, k - j);
         assert_eq!(
             counter.count(),
-            sessions_per_change * j,
-            "session opens must scale with issues that are not provable no-ops, not with matched count"
+            sessions_per_change * j + 1,
+            "session opens must scale with issues that are not confirmed no-ops, plus the one shared verification session that confirmed the rest"
         );
     }
 
-    /// Edge case of REQ-01: every matched issue is a provable no-op, so no
-    /// session opens at all.
+    /// Amended REQ-04's zero-candidate case: when no matched issue is a skip
+    /// candidate, no shared verification session is opened at all, so the
+    /// budget is exactly `C * K`, with no `+ 1` term.
     #[test]
-    fn test_apply_bulk_update_all_provable_noops_opens_no_sessions() {
+    fn test_apply_bulk_update_session_budget_zero_candidates_opens_exactly_c_times_k() {
+        use crate::commands::test_helpers::SessionOpenCounter;
+        use crate::query_engine::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            priority: Some(Priority::High),
+            ..Default::default()
+        };
+
+        let baseline_counter = SessionOpenCounter::new();
+        let baseline_storage =
+            InMemoryStorage::new().with_repository_state_failure_view(baseline_counter.clone());
+        crate::commands::test_helpers::seed_issue(
+            &baseline_storage,
+            create_test_issue("baseline", State::Ready, vec![]),
+        );
+        let mut baseline_executor =
+            crate::commands::test_helpers::memory_executor(baseline_storage);
+        baseline_executor
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
+        let sessions_per_change = baseline_counter.count();
+        assert!(sessions_per_change > 0);
+
+        // K = 3 matched issues, none already at the target priority: zero
+        // skip candidates.
+        let k = 3;
+        let counter = SessionOpenCounter::new();
+        let storage = InMemoryStorage::new().with_repository_state_failure_view(counter.clone());
+        for index in 0..k {
+            crate::commands::test_helpers::seed_issue(
+                &storage,
+                create_test_issue(&format!("issue-{index}"), State::Ready, vec![]),
+            );
+        }
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+
+        assert_eq!(result.summary.total_matched, k);
+        assert_eq!(result.summary.total_modified, k);
+        assert_eq!(result.summary.total_skipped, 0);
+        assert_eq!(
+            counter.count(),
+            sessions_per_change * k,
+            "no skip candidates must mean no shared verification session, so the budget carries no +1 term"
+        );
+    }
+
+    /// Edge case of amended REQ-01: every matched issue is a skip candidate
+    /// and every candidate is confirmed clean, so no PER-ISSUE session opens
+    /// at all -- but the one shared verification session that confirmed them
+    /// still does.
+    #[test]
+    fn test_apply_bulk_update_all_confirmed_noops_opens_only_shared_verification_session() {
         use crate::commands::test_helpers::SessionOpenCounter;
         use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
@@ -1422,16 +1565,16 @@ mod tests {
         assert_eq!(result.summary.total_skipped, 3);
         assert_eq!(
             counter.count(),
-            0,
-            "provable no-ops must not open any session"
+            1,
+            "every candidate confirmed clean means zero per-issue sessions, but the shared verification session that confirmed them still opens exactly once"
         );
     }
 
-    /// REQ-03: an issue whose update is potentially invalid is not a provable
-    /// no-op (its state differs from the requested target), so it still opens
-    /// a session, and the authoritative in-session check still produces the
-    /// same typed error as before this change (matching
-    /// `test_apply_bulk_update_with_errors`).
+    /// REQ-03: an issue whose update is potentially invalid is not even a
+    /// skip candidate (its state differs from the requested target), so it
+    /// still opens a per-issue session, and the authoritative in-session
+    /// check still produces the same typed error as before this change
+    /// (matching `test_apply_bulk_update_with_errors`).
     #[test]
     fn test_apply_bulk_update_potentially_invalid_transition_still_opens_session_and_errors() {
         use crate::commands::test_helpers::SessionOpenCounter;
@@ -1469,15 +1612,21 @@ mod tests {
     /// actually changes (see `test_bulk_update_force_noop_logs_bypass` in
     /// `fast_rules::local_rule_enforcement_tests`, which covers the `--force`
     /// arm of this same scenario). A field-level no-op is therefore only a
-    /// TRUE no-op when the issue also passes validation; a pre-existing
-    /// violation must still surface through a session, not be swallowed by
-    /// the prefilter as "No changes needed".
+    /// CONFIRMED no-op when the shared verification session also finds the
+    /// issue clean; a pre-existing violation must demote the candidate to a
+    /// real per-issue session so the error surfaces exactly as pre-change,
+    /// not be swallowed by the prefilter as "No changes needed". The session
+    /// count proves the demotion actually happened: one shared verification
+    /// session (which nominated then rejected the candidate) plus a real
+    /// per-issue session for the demoted issue's authoritative attempt.
     #[test]
     fn test_apply_bulk_update_field_level_noop_with_preexisting_violation_still_errors() {
+        use crate::commands::test_helpers::SessionOpenCounter;
         use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
-        let storage = InMemoryStorage::new();
+        let counter = SessionOpenCounter::new();
+        let storage = InMemoryStorage::new().with_repository_state_failure_view(counter.clone());
         // Seeded directly, bypassing create-time validation, so the issue
         // already violates the always-enforced default label-format rule.
         crate::commands::test_helpers::seed_issue(
@@ -1487,7 +1636,8 @@ mod tests {
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
-        // Field-level no-op: the requested priority already holds.
+        // Field-level no-op: the requested priority already holds, so this
+        // issue IS nominated as a skip candidate.
         let ops = UpdateOperations {
             priority: Some(Priority::Normal),
             ..Default::default()
@@ -1506,5 +1656,9 @@ mod tests {
         );
         assert_eq!(result.summary.total_skipped, 0);
         assert!(result.errors[0].1.contains("label-format"));
+        assert!(
+            counter.count() > 1,
+            "the candidate must be demoted to a real per-issue session, not just the shared verification session"
+        );
     }
 }
