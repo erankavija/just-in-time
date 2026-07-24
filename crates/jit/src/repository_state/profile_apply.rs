@@ -358,8 +358,8 @@ pub(super) fn compose_profile_targets(
         })
         .collect::<Result<Vec<_>, super::RepositoryLayoutError>>()?;
     let proposed = apply_overlay(&proposed, schema_overlay)?;
-    let declarations =
-        declarations_from_image(&proposed).map_err(ProducerError::DeclarationAssembly)?;
+    let declarations = declarations_from_image(&proposed)
+        .map_err(|error| ProducerError::DeclarationAssembly(Box::new(error)))?;
     let projection_actions = compose_configured_projections(
         &proposed,
         declarations.config(),

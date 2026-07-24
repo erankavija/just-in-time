@@ -420,10 +420,10 @@ pub enum MutationError {
     #[error(transparent)]
     PlanHash(#[from] PlanHashError),
     /// A captured record could not be parsed.
-    #[error("captured record at {path} is malformed: {reason}")]
+    #[error("captured record at {path:?} is malformed: {reason}")]
     MalformedRecord {
         /// The offending path.
-        path: String,
+        path: VirtualPath,
         /// Stable diagnostic.
         reason: String,
     },
@@ -438,9 +438,16 @@ pub enum MutationError {
          ProfileApplied marker to certify it; refusing to append (@/inv/event-log)"
     )]
     UncertifiedTornTail,
-    /// A custom preset is structurally invalid or collides with a builtin.
+    /// A custom preset failed structural validation, or the builtin preset set
+    /// could not be loaded; carries the underlying validator's forwarded message.
     #[error("invalid custom gate preset: {0}")]
     InvalidGatePreset(String),
+    /// A custom preset name collides with a builtin preset.
+    #[error("invalid custom gate preset: '{0}' collides with a builtin preset")]
+    GatePresetCollidesWithBuiltin(String),
+    /// A custom-preset ancestor path is occupied by a non-directory.
+    #[error("invalid custom gate preset: custom preset parent '{0}' is not a directory")]
+    GatePresetParentNotDirectory(String),
     /// The canonical custom-preset target was already occupied.
     #[error("custom gate preset '{0}' already exists")]
     GatePresetAlreadyExists(String),
@@ -613,7 +620,7 @@ fn captured_issue(image: &RepositoryImage, id: &str) -> Result<Option<Issue>, Mu
         None => Ok(None),
         Some(bytes) => serde_json::from_slice(bytes).map(Some).map_err(|error| {
             MutationError::MalformedRecord {
-                path: format!("{path:?}"),
+                path: path.clone(),
                 reason: error.to_string(),
             }
         }),
@@ -628,11 +635,11 @@ fn captured_events(image: &RepositoryImage) -> Result<Vec<Event>, MutationError>
         return Ok(Vec::new());
     };
     let text = std::str::from_utf8(bytes).map_err(|error| MutationError::MalformedRecord {
-        path: format!("{path:?}"),
+        path: path.clone(),
         reason: error.to_string(),
     })?;
     crate::domain::parse_known_events(text).map_err(|error| MutationError::MalformedRecord {
-        path: format!("{path:?}"),
+        path: path.clone(),
         reason: error.to_string(),
     })
 }
@@ -969,10 +976,9 @@ pub(super) fn finalize_delta(
                 .map_err(|error| MutationError::InvalidGatePreset(error.to_string()))?
                 .contains_key(&preset.name)
             {
-                return Err(MutationError::InvalidGatePreset(format!(
-                    "'{}' collides with a builtin preset",
-                    preset.name
-                )));
+                return Err(MutationError::GatePresetCollidesWithBuiltin(
+                    preset.name.clone(),
+                ));
             }
             for parent in ["config", "config/gate-presets"] {
                 let path = VirtualPath::data(parent)?;
@@ -986,9 +992,9 @@ pub(super) fn finalize_delta(
                     }
                     crate::repository_state::RepositoryEntry::Directory { .. } => {}
                     _ => {
-                        return Err(MutationError::InvalidGatePreset(format!(
-                            "custom preset parent '{parent}' is not a directory"
-                        )))
+                        return Err(MutationError::GatePresetParentNotDirectory(
+                            parent.to_string(),
+                        ))
                     }
                 }
             }
@@ -1264,7 +1270,7 @@ fn index_membership_action(
     let mut index = match captured_file_bytes(image, &path)? {
         Some(bytes) => super::RepositoryIndex::parse(bytes).map_err(|error| {
             MutationError::MalformedRecord {
-                path: format!("{path:?}"),
+                path: path.clone(),
                 reason: error.to_string(),
             }
         })?,

@@ -128,10 +128,10 @@ pub enum InitializationError {
     #[error(transparent)]
     ProfileTargetConflict(#[from] ProfileTargetConflictError),
     /// A scaffold path is occupied by an unexpected filesystem kind.
-    #[error("initialization target '{path}' is occupied by an unsupported filesystem kind")]
+    #[error("initialization target '{path:?}' is occupied by an unsupported filesystem kind")]
     UnexpectedOccupant {
         /// The offending path.
-        path: String,
+        path: VirtualPath,
     },
     #[error("installed profile record '{path:?}' conflicts with embedded package {id}@{version}")]
     InstalledRecordConflict {
@@ -680,9 +680,7 @@ fn events_action(
             mode: FileMode::Regular,
         })),
         RepositoryEntry::File { .. } => Ok(None),
-        _ => Err(InitializationError::UnexpectedOccupant {
-            path: format!("{path:?}"),
-        }),
+        _ => Err(InitializationError::UnexpectedOccupant { path }),
     }
 }
 
@@ -969,11 +967,7 @@ fn directory_actions(
                 expected: ExpectedPreimage::Absent,
             }),
             RepositoryEntry::Directory { .. } => {}
-            _ => {
-                return Err(InitializationError::UnexpectedOccupant {
-                    path: format!("{dir:?}"),
-                })
-            }
+            _ => return Err(InitializationError::UnexpectedOccupant { path: dir }),
         }
     }
     Ok(actions)
@@ -1019,7 +1013,7 @@ fn push_file_actions(
             RepositoryEntry::Absent | RepositoryEntry::File { .. } => {}
             _ => {
                 return Err(InitializationError::UnexpectedOccupant {
-                    path: format!("{:?}", file.path),
+                    path: file.path.clone(),
                 })
             }
         }

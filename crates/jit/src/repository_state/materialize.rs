@@ -12,9 +12,10 @@
 use super::rules_document::rewrite_default_assertions;
 use super::{
     compose_managed_documents, default_ruleset, parse_rule_identities, render_projection_body,
-    render_rule_block, serialize_ruleset, splice_default_membership, ExpectedPreimage, FileMode,
-    ManagedDocumentClaim, ProducerError, ProjectionInputs, RegionPlacement, RepositoryAction,
-    RepositoryDeclarations, RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
+    render_rule_block, serialize_ruleset, splice_default_membership, AmbiguousOwnershipError,
+    ExpectedPreimage, FileMode, ManagedDocumentClaim, ProducerError, ProjectionInputs,
+    RegionPlacement, RepositoryAction, RepositoryDeclarations, RepositoryEntry, RepositoryImage,
+    RepositoryStateError, VirtualPath,
 };
 use crate::config::{JitConfig, ProjectionMode};
 use crate::declarations::invariants::InvariantRegistry;
@@ -413,10 +414,7 @@ pub(crate) fn compose_default_ruleset(
     // unprovable across the whole pass, so refuse before any add/drop/delete.
     let identities = parse_rule_identities(&current_rules).map_err(ProducerError::RulesDocument)?;
     if let Some(dup) = first_duplicate_rule_name(&identities) {
-        return Err(RepositoryStateError::AmbiguousOwnership(format!(
-            "rules.toml declares more than one rule named '{dup}'; \
-             default-rule and schema ownership cannot be proven"
-        )));
+        return Err(AmbiguousOwnershipError::DuplicateRuleName(dup.to_string()).into());
     }
 
     // rules.toml: splice only the generated default-family membership + assertions,

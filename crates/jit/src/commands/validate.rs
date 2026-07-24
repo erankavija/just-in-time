@@ -613,7 +613,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Ok(declarations) => declarations,
             Err(error) => {
                 return Ok(Some(Err(
-                    crate::validation::repository::RepositoryValidationFailure::declaration(error),
+                    crate::validation::repository::RepositoryValidationFailure::declaration(
+                        error.into(),
+                    ),
                 )))
             }
         };
