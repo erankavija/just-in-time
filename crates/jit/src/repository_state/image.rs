@@ -2386,3 +2386,8 @@ mod tests {
         );
     }
 }
+
+// Include property-based tests
+#[cfg(test)]
+#[path = "image_plan_hash_property_tests.rs"]
+mod plan_hash_property_tests;
