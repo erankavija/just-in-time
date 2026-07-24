@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T10:26:31.742965067Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-24T10:30:12.652569802Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "73981310-4173-4224-82bf-f38a9d5222fd",
@@ -30,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Benchmark harness and first session-cost artifact",
-  "updated_at": "2026-07-24T10:26:31.742965067Z"
+  "updated_at": "2026-07-24T10:30:12.652569802Z"
 }

@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "ed983b980452728234ee69c5309e6eb8940b9803",
+  "completed_at": "2026-07-24T10:30:12.416722712Z",
+  "duration_ms": 162715,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/benchmark-session-cost.sh",
+        "id": "F1",
+        "line": 490,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/atomic-writes"
+        ],
+        "severity": "high",
+        "summary": "Artifact publication overwrites an existing commit-named artifact instead of using atomic no-replace publication."
+      }
+    ],
+    "summary": "The harness can overwrite an existing commit-named benchmark artifact.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "73981310-4173-4224-82bf-f38a9d5222fd",
+  "message": null,
+  "run_id": "e901a6b2-63e4-4584-b09e-ec389f186088",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T10:27:29.701148380Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2652 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f93aa-7796-7c02-9530-0c81991e231e\n--------\nuser\n--- 2639 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c3a31ff (implementation), b1606dd (merge of same patch), ed983b9 (cargo-CI record)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T10:22:24Z); code-review pending\nTruncation recovery: bounded current-script reads (lines 1–491), artifact/doc reads, and first-parent merge-patch inspection\n\n1. **F1 — high, blocking, issue-impact:** [scripts/benchmark-session-cost.sh:490](/home/vkaskivuo/Projects/just-in-time/scripts/benchmark-session-cost.sh:490) publishes with `mv \"$ARTIFACT_TMP\" \"$ARTIFACT\"`, which replaces an existing `session-cost-<jit-commit>.json` on a rerun of the same commit. This violates the required no-replace publication contract and can erase a previously recorded provenance artifact. Publish atomically without replacement and fail safely if that commit-named destination already exists. References: `@/invariant/atomic-writes`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The harness can overwrite an existing commit-named benchmark artifact.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Artifact publication overwrites an existing commit-named artifact instead of using atomic no-replace publication.\",\"file\":\"scripts/benchmark-session-cost.sh\",\"line\":490,\"references\":[\"@/invariant/atomic-writes\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
