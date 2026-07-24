@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T23:22:35.098685498Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T23:26:31.016276075Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "73d9070f-da76-48db-9311-00c15a4db4f4",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Delete a dead export and demote the repository-state public surface",
-  "updated_at": "2026-07-24T23:22:35.098685498Z"
+  "updated_at": "2026-07-24T23:26:31.016276075Z"
 }
