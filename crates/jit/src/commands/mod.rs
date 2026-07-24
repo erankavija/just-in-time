@@ -711,6 +711,35 @@ enum CapturedLabelEdit {
 }
 
 impl CapturedFieldUpdate {
+    /// Build the bulk-update request shape for one issue. Shared by the real
+    /// per-issue publication path ([`CommandExecutor::publish_captured_bulk_update`])
+    /// and the no-op verification derivation
+    /// ([`CommandExecutor::confirm_bulk_noop_candidates`]) so both run the
+    /// identical authoritative request through [`derive_field_update`] --
+    /// there is exactly one place that turns `UpdateOperations` into a
+    /// captured request, so the two call sites cannot silently drift apart.
+    fn bulk(issue_id: String, operations: &UpdateOperations, force: bool) -> Result<Self> {
+        Ok(Self {
+            issue_id,
+            title: None,
+            description: None,
+            priority: operations.priority,
+            state: operations.state,
+            add_labels: operations.add_labels.clone(),
+            remove_labels: operations.remove_labels.clone(),
+            label_edit: None,
+            content_format: None,
+            issue_type: None,
+            add_gates: operations.add_gates.clone(),
+            remove_gates: operations.remove_gates.clone(),
+            assignee: operations.assignee.as_deref().map(str::parse).transpose()?,
+            unassign: operations.unassign,
+            bulk: true,
+            force,
+            enforce_lease: false,
+        })
+    }
+
     fn label_edit(issue_id: String, label_edit: CapturedLabelEdit) -> Self {
         Self {
             issue_id,
@@ -2386,25 +2415,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let outcome = self.publish_captured_field_update(CapturedFieldUpdate {
-            issue_id,
-            title: None,
-            description: None,
-            priority: operations.priority,
-            state: operations.state,
-            add_labels: operations.add_labels.clone(),
-            remove_labels: operations.remove_labels.clone(),
-            label_edit: None,
-            content_format: None,
-            issue_type: None,
-            add_gates: operations.add_gates.clone(),
-            remove_gates: operations.remove_gates.clone(),
-            assignee: operations.assignee.as_deref().map(str::parse).transpose()?,
-            unassign: operations.unassign,
-            bulk: true,
-            force,
-            enforce_lease: false,
-        })?;
+        let request = CapturedFieldUpdate::bulk(issue_id, operations, force)?;
+        let outcome = self.publish_captured_field_update(request)?;
         Ok((outcome.changed, outcome.warnings))
     }
 

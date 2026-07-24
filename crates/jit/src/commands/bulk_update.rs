@@ -237,7 +237,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let confirmed_skips = if candidates.is_empty() {
             std::collections::HashSet::new()
         } else {
-            self.confirm_bulk_noop_candidates(&candidates, operations)?
+            self.confirm_bulk_noop_candidates(&candidates, operations, force)?
         };
 
         for issue in matched {
@@ -275,34 +275,41 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// verification session, returning the ids safe to record as skipped.
     ///
     /// `is_provable_noop` nominates candidates from the unlocked outer
-    /// snapshot and never authorizes a skip on its own; this captures the
-    /// repository declarations and the candidates' issue records from ONE
-    /// consistent point in time and re-derives, per candidate:
-    ///   - field-level no-op-ness against the freshly captured issue (a
-    ///     candidate's fields may have moved since the outer snapshot),
-    ///   - that every `add_gates` key is still declared in the captured gate
-    ///     registry (the write path rejects a missing key unconditionally,
-    ///     even when the gate is already required), and
-    ///   - that [`derive_write_validation`] finds nothing to bypass: the
-    ///     in-session write path evaluates local rules against the issue
-    ///     unconditionally, even when no field changes, so a no-op whose
-    ///     issue already violates an `enforce` rule must still reach a
-    ///     per-issue session so its error (or `--force` bypass event) is
-    ///     byte-identical to the pre-change result (jit 412925b9).
+    /// snapshot and never authorizes a skip on its own. Rather than
+    /// re-implementing a hand-picked subset of the write path's checks (which
+    /// only ever grows a new gap one reviewer finding at a time — see jit
+    /// 412925b9), this runs the SAME authoritative derivation the per-issue
+    /// path runs: it captures the repository declarations and the
+    /// candidates' issue records from ONE consistent point in time, builds
+    /// the identical [`CapturedFieldUpdate`] request
+    /// ([`CapturedFieldUpdate::bulk`], shared with
+    /// [`CommandExecutor::publish_captured_bulk_update`]) with the caller's
+    /// real `force`, and calls [`derive_field_update`] against the freshly
+    /// captured issue -- the exact function the per-issue session calls
+    /// before applying a plan. A candidate is confirmed clean only when that
+    /// derivation reports no field change, no error, and no intents at all
+    /// (an empty `intents` list rules out a `--force` bypass event too,
+    /// since [`derive_field_update`] appends one whenever a blocking rule is
+    /// force-overridden, changed or not).
     ///
     /// Only candidates confirmed clean on every count are returned; anything
-    /// else is left for the caller to route through the normal per-issue
-    /// session, exactly like a non-candidate. This session is never used to
-    /// apply a plan, so an uncontended run opens exactly one.
+    /// else -- including a derivation error, or one that reports a change,
+    /// like the gate-semantics Done-with-unpassed-gates redirect that
+    /// rewrites `state` to `Gated` even when the request's target state
+    /// already equalled the issue's current state -- is left for the caller
+    /// to route through the normal per-issue session, exactly like a
+    /// non-candidate. This session never applies a plan, so an uncontended
+    /// run opens exactly one.
     fn confirm_bulk_noop_candidates(
         &self,
         candidates: &[&Issue],
         operations: &UpdateOperations,
+        force: bool,
     ) -> Result<std::collections::HashSet<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::declarations_from_image;
+        use crate::repository_state::{declarations_from_image, MutationContext};
         use std::collections::HashSet;
 
         let layout = self.require_layout()?;
@@ -323,23 +330,32 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let active = captured_active_issues(&image)?;
                 let declarations = declarations_from_image(&image)?;
                 let config = declarations.config();
+                let plan_content =
+                    crate::commands::validate::plan_content_from_image(&image, &active)?;
+                let context = MutationContext::production();
 
                 let confirmed = candidates
                     .iter()
                     .filter_map(|candidate| {
                         let fresh = active.iter().find(|issue| issue.id == candidate.id)?;
-                        let gates_registered = operations
-                            .add_gates
-                            .iter()
-                            .all(|key| declarations.gates.gates.contains_key(key));
-                        // force=true: we want "would anything need bypassing",
-                        // not the force-gated rejection itself.
-                        let rule_clean =
-                            derive_write_validation(fresh, &declarations, config, true)
-                                .map(|validation| validation.bypassed_rules.is_empty())
-                                .unwrap_or(false);
-                        (operations.is_provable_noop(fresh) && gates_registered && rule_clean)
-                            .then(|| fresh.id.clone())
+                        let request =
+                            CapturedFieldUpdate::bulk(fresh.id.clone(), operations, force).ok()?;
+                        let derived = derive_field_update(
+                            fresh.clone(),
+                            &request,
+                            CapturedTransitionEvidence {
+                                issues: &active,
+                                declarations: &declarations,
+                                config,
+                                plan_content: &plan_content,
+                                context: &context,
+                            },
+                        )
+                        .ok()?;
+                        let confirmed_clean = !derived.changed
+                            && derived.error_after_apply.is_none()
+                            && derived.intents.is_empty();
+                        confirmed_clean.then(|| fresh.id.clone())
                     })
                     .collect::<HashSet<_>>();
 
@@ -1659,6 +1675,79 @@ mod tests {
         assert!(
             counter.count() > 1,
             "the candidate must be demoted to a real per-issue session, not just the shared verification session"
+        );
+    }
+
+    /// REQ-03 (round 2 regression, `@/inv/gate-semantics`): the gate-semantics
+    /// Done redirect in `derive_field_update` fires from "target == Done AND
+    /// unpassed gates" alone, independent of whether the issue's CURRENT
+    /// state already equals Done. A bulk `state: Some(Done)` request on an
+    /// already-Done issue with an unpassed required gate therefore looks
+    /// like a field-level no-op to `is_provable_noop` (state already equals
+    /// the target), but the authoritative derivation still rewrites state to
+    /// `Gated` and reports a gate error -- so the shared verification
+    /// session must demote it, never confirm it as a skip.
+    ///
+    /// Proves this by comparing the full `apply_bulk_update` path against
+    /// `apply_operations_to_issue` called directly on an identically seeded
+    /// issue -- the per-issue path every matched issue went through before
+    /// this prefilter existed -- and asserting byte-identical results
+    /// (error text and final stored state), not a hardcoded message.
+    #[test]
+    fn test_apply_bulk_update_done_state_noop_with_unpassed_gate_still_diverts_and_errors() {
+        use crate::errors::TransitionBlockedError;
+        use crate::query_engine::QueryFilter;
+        use crate::storage::InMemoryStorage;
+
+        let seed = |storage: &InMemoryStorage| {
+            let mut issue = create_test_issue("aaaa1111", State::Done, vec!["type:task"]);
+            issue.gates_required = vec!["tests".to_string()];
+            crate::commands::test_helpers::seed_issue(storage, issue);
+        };
+        let ops = UpdateOperations {
+            state: Some(State::Done),
+            ..Default::default()
+        };
+
+        // Ground truth: the per-issue path called directly, bypassing the
+        // prefilter entirely (what every matched issue went through before
+        // 412925b9).
+        let direct_storage = InMemoryStorage::new();
+        seed(&direct_storage);
+        let mut direct = crate::commands::test_helpers::memory_executor(direct_storage);
+        let issue = direct.get_issue("aaaa1111").unwrap();
+        let direct_error = direct
+            .apply_operations_to_issue(&issue, &ops, false)
+            .unwrap_err()
+            .downcast::<TransitionBlockedError>()
+            .expect("direct per-issue path reports a typed transition blocker");
+        let direct_final_state = direct.get_issue("aaaa1111").unwrap().state;
+        assert_eq!(
+            direct_final_state,
+            State::Gated,
+            "gate-semantics diverts an unpassed-gate Done request to Gated"
+        );
+
+        // Full bulk path: this issue IS a skip candidate (state == target),
+        // so the shared verification session must demote it.
+        let bulk_storage = InMemoryStorage::new();
+        seed(&bulk_storage);
+        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
+        let filter = QueryFilter::parse("state:done").unwrap();
+        let result = bulk.apply_bulk_update(&filter, &ops, false).unwrap();
+
+        assert_eq!(result.summary.total_matched, 1);
+        assert_eq!(
+            result.summary.total_skipped, 0,
+            "must be demoted to a per-issue session, not confirmed as a skip"
+        );
+        assert_eq!(result.summary.total_modified, 0);
+        assert_eq!(result.summary.total_errors, 1);
+        assert_eq!(result.errors[0].1, direct_error.to_string());
+        assert_eq!(
+            bulk.get_issue("aaaa1111").unwrap().state,
+            direct_final_state,
+            "the divert-to-Gated write must happen identically through the bulk path"
         );
     }
 }
