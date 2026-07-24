@@ -252,7 +252,7 @@
           "title": "Make manual CI script fail closed on skipped audits",
           "story": "S4",
           "classification": "implementation",
-          "status": "rework-3-invoker-authorized",
+          "status": "rework-4-whole-surface",
           "agent": "worker-531ce80d",
           "model": "sonnet"
         },
@@ -398,6 +398,12 @@
       "issue": "531ce80d",
       "status": "resolved_guidance_reset",
       "summary": "Reviewer walked the npm audit threshold ladder across 4 rounds (fail-open aggregation; moderate; low/info gap; ambient-config inheritance). Round-4 reviewer prescribed explicit --audit-level=info; invoker authorized rework 3 applying it."
+    },
+    {
+      "category": "rework-cap-exceeded",
+      "issue": "531ce80d",
+      "status": "resolved_guidance_reset",
+      "summary": "Round-5 review: npm vectors resolved; cargo audit lacks -D warnings. Invoker authorized whole-surface fail-closed rework (fix all remaining fail-open vectors in one pass) instead of another single-finding patch."
     }
   ],
   "rework_counts": {
@@ -408,7 +414,7 @@
     "fc744df6": 1,
     "412925b9": 4,
     "d159f9d4": 1,
-    "531ce80d": 3
+    "531ce80d": 4
   },
   "surfaced_pitfalls": [
     "28254964 (test-support-feature-gating) satisfies REQ-12 (an S4/hygiene criterion) but is DAG-parented under story 2958105e (S2/enforced-guarantees). Membership label (story:hygiene-and-docs) disagrees with hierarchy parent. Structurally harmless (breakdown gates passed, DAG ordering correct: it is a shared foundation consumed by S2's cutover guard and S4's demotions) but a labeling/parent inconsistency worth noting."
