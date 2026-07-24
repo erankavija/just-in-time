@@ -49,7 +49,7 @@ pub(crate) struct FileTransactionOutcome {
 
 /// Machine-local control location containing pending transaction journals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum TransactionControlLocation {
+pub(in crate::storage) enum TransactionControlLocation {
     /// Worktree-side control at `Worktree(.jit-bootstrap/transactions)`, used while
     /// the selected data root does not yet exist.
     ExternalBootstrap,
@@ -61,7 +61,11 @@ pub(crate) enum TransactionControlLocation {
 
 /// Capability-based transaction service rooted at an already-open repository
 /// parent directory. No publication operation accepts an ambient path.
-pub(crate) struct FileTransactionKernel {
+///
+/// Storage-only by construction: repository publication is reachable to the rest
+/// of the crate solely through `RepositoryStateStore` mutation sessions, so
+/// `crate::commands` cannot name this type.
+pub(in crate::storage) struct FileTransactionKernel {
     injector: Arc<dyn TransactionFailureInjector>,
     repository: RepositoryKernelRoots,
 }

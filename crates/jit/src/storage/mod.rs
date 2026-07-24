@@ -16,6 +16,7 @@ pub mod clock;
 pub mod control_plane;
 pub mod discovery;
 pub mod errors;
+pub(crate) mod external_publish;
 pub(crate) mod file_transaction;
 pub mod gate_runs;
 pub mod gate_store;
@@ -52,7 +53,9 @@ pub use errors::{
     InvalidIdPrefixError, IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError,
     RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
-pub(crate) use file_transaction::{FileTransactionKernel, TransactionControlLocation};
+// Storage-only: the transaction kernel publishes into repository roots, so no
+// command may name it. Commands publish through `RepositoryStateStore` sessions.
+pub(in crate::storage) use file_transaction::{FileTransactionKernel, TransactionControlLocation};
 pub use git_revision::{GitRevisionError, GitRevisionResolver, PinnedArtifactRead};
 pub use json::{JsonFileStorage, RetainedMutationSessionGuard, RetainedSessionSuspendedError};
 pub use lock::FileLocker;

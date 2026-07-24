@@ -1,4 +1,13 @@
 //! Known current-tree regressions forbidden by the repository-state cutover.
+//!
+//! Publisher access itself is compiler-enforced rather than asserted here: the
+//! in-repository writers (`storage::atomic_write`) and the transaction kernel
+//! (`storage::file_transaction`) are `pub(in crate::storage)`, so `crate::commands`
+//! cannot name them and a regression fails the build. This file covers the two
+//! properties visibility cannot express — deleted modules/wrappers and canonical
+//! renderer ownership — plus the one residual publication channel visibility has
+//! no handle on (see
+//! [`test_cutover_command_modules_publish_no_raw_filesystem_writes`]).
 
 use std::path::{Path, PathBuf};
 
@@ -36,31 +45,29 @@ fn contains_cargo_manifest(root: &Path) -> bool {
     })
 }
 
+/// Raw `std::fs` publication is the one residual channel into a repository root
+/// that visibility cannot close: `std::fs` is public to every crate, so no
+/// `pub(in ...)` restriction reaches it. This is therefore a deliberate,
+/// recorded source-text exception to the compiler-enforced mechanism, and it is
+/// kept as narrow as the exception requires — the four cutover command modules,
+/// the four call shapes that publish. A crate-wide `clippy.toml`
+/// `disallowed_methods` entry is the wrong instrument: `commands/snapshot.rs`
+/// legitimately stages exports with raw `std::fs` into temp directories outside
+/// the repository roots, which such a rule would forbid.
 #[test]
-fn test_plan_named_cutover_consumers_do_not_call_known_legacy_publishers() {
+fn test_cutover_command_modules_publish_no_raw_filesystem_writes() {
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     for consumer in ["init.rs", "profile.rs", "project.rs", "validate.rs"] {
         let source = production_source(&source_root.join("commands").join(consumer));
         for publisher in [
-            "save_issue(",
-            "restore_issue_verbatim(",
-            "append_event(",
-            "save_gate_run_result(",
-            "save_gate_registry(",
-            "save_gate_preset(",
-            "write_repo_file(",
-            "std::fs::write(",
             "fs::write(",
-            "std::fs::rename(",
             "fs::rename(",
             "File::create(",
             "OpenOptions::new(",
-            "FileTransactionKernel",
-            "atomic_write",
         ] {
             assert!(
                 !source.contains(publisher),
-                "known legacy publisher returned in commands/{consumer}: {publisher}"
+                "raw filesystem publication returned in commands/{consumer}: {publisher}"
             );
         }
     }

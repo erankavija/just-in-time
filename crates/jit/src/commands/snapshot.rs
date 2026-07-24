@@ -727,7 +727,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                     }
                     RepositoryExportDestination::External(path) => {
                         let outcome =
-                            crate::storage::atomic_write::publish_external_directory_noreplace(
+                            crate::storage::external_publish::publish_external_directory_noreplace(
                                 &path,
                                 staging.path(),
                                 &tree.directories,
@@ -753,7 +753,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                     }
                     RepositoryExportDestination::External(path) => {
                         let outcome =
-                            crate::storage::atomic_write::publish_external_file_noreplace(
+                            crate::storage::external_publish::publish_external_file_noreplace(
                                 &path,
                                 tar.path(),
                             )?;
