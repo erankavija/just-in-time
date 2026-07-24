@@ -2586,7 +2586,7 @@ fn test_session_committed_recovery_tolerates_edited_worktree_target() {
 
 #[cfg(unix)]
 #[test]
-fn test_f4_external_data_root_replacement_between_capture_and_apply_conflicts() {
+fn test_json_apply_rejects_data_root_replaced_since_capture_as_retryable_conflict() {
     let worktree = TempDir::new().unwrap();
     let data = worktree.path().join(".jit");
     std::fs::create_dir(&data).unwrap();
@@ -2866,7 +2866,7 @@ fn test_session_rolledback_recovery_tolerates_edited_worktree_target() {
 }
 
 #[test]
-fn test_a4_memory_stale_preimage_is_a_retryable_conflict() {
+fn test_memory_apply_rejects_stale_preimage_as_retryable_conflict() {
     let temp = TempDir::new().unwrap();
     let layout = RepositoryLayout::new(
         RepositoryRootEvidence::new(temp.path(), "wt", true),
