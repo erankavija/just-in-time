@@ -291,10 +291,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             apply_overlay, finalize_config_edit, CaptureBudget, CaptureSpec, RepositorySeed,
             RepositorySeedKind, VirtualPath,
         };
-        use crate::storage::RepositoryStateStoreError;
-
         let layout = self.require_layout()?;
-        let mut session = self.storage().open_mutation_session(layout)?;
         let seed = RepositorySeed::new(
             RepositorySeedKind::Command {
                 name: "config set".to_string(),
@@ -310,15 +307,15 @@ impl<S: IssueStore> CommandExecutor<S> {
             max_depth: 6,
         };
 
-        for _ in 0..8 {
+        with_mutation_session(self.storage(), &layout, "config set", |session| {
             // Read the current config for a preservation-safe edit from the closed
             // image, so a concurrent edit is caught by the apply-time preimage check.
-            let config_image =
-                match session.capture(CaptureSpec::phase_one([config_vpath.clone()], budget)?) {
-                    Ok(image) => image,
-                    Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                    Err(error) => return Err(error.into()),
-                };
+            let Some(config_image) = capture_or_retry(
+                session.capture(CaptureSpec::phase_one([config_vpath.clone()], budget)?),
+            )?
+            else {
+                return Ok(SessionStep::Retry);
+            };
             let current =
                 super::image_repo_bytes(&config_image, ".jit/config.toml")?.unwrap_or_default();
             let mut doc = String::from_utf8(current)
@@ -333,9 +330,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             // the finalized-delta overlay, and publish under one held session.
             let overrides =
                 std::iter::once((config_vpath.clone(), Some(edited_bytes.clone()))).collect();
-            let base = match self.capture_proposed_base(session.as_mut(), &overrides, &[], None)? {
-                None => continue,
-                Some(base) => base,
+            let Some(base) = self.capture_proposed_base(session, &overrides, &[], None)? else {
+                return Ok(SessionStep::Retry);
             };
             // Declarations are read from the config-overlaid image so the effective
             // ruleset and projection inputs reflect the EDITED configuration (the
@@ -355,13 +351,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     validation.rule_report.error_count()
                 );
             }
-            match session.apply(&plan) {
-                Ok(_) => return Ok(()),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        anyhow::bail!("config set did not converge after repeated capture conflicts")
+            Ok(SessionStep::Apply(plan, ()))
+        })
     }
 
     /// Resolve a dotted `section[.field[.subfield...]]` key against the WHOLE

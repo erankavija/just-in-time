@@ -181,10 +181,11 @@ fn synchronize_claim_repository_state<S>(
 where
     S: IssueStore + crate::storage::RepositoryStateStore,
 {
+    use super::{capture_or_retry, with_mutation_session, SessionStep};
     use crate::repository_state::{
         finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, VirtualPath,
     };
-    use crate::storage::{discover_repository_layout, RepositoryStateStoreError};
+    use crate::storage::discover_repository_layout;
 
     let layout = discover_repository_layout(worktree_root, data_root)?;
     let intents = [MutationIntent::ClaimIssue {
@@ -209,21 +210,18 @@ where
     // Operation-scoped: a capture/apply retry must keep claim audit identity and
     // transition time stable while opening a fresh recovered session.
     let context = MutationContext::production();
-    for _ in 0..8 {
-        let mut session = storage.open_mutation_session(layout.clone())?;
-        let image = match session.capture(build_spec()?) {
-            Ok(image) => image,
-            Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-            Err(error) => return Err(error.into()),
-        };
-        let plan = finalize(&layout, &image, &context, &intents)?;
-        match session.apply(&plan) {
-            Ok(_) => return Ok(()),
-            Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-            Err(error) => return Err(error.into()),
-        }
-    }
-    anyhow::bail!("claim repository synchronization did not converge after repeated conflicts")
+    with_mutation_session(
+        storage,
+        &layout,
+        "claim repository synchronization",
+        |session| {
+            let Some(image) = capture_or_retry(session.capture(build_spec()?))? else {
+                return Ok(SessionStep::Retry);
+            };
+            let plan = finalize(&layout, &image, &context, &intents)?;
+            Ok(SessionStep::Apply(plan, ()))
+        },
+    )
 }
 
 /// Execute `jit claim heartbeat` command.

@@ -1055,7 +1055,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             assemble_config, finalize_gate_registry_edit, render_capture_closure, CaptureBudget,
             CaptureSpec, MutationContext, MutationIntent, RepositoryEntry, VirtualPath,
         };
-        use crate::storage::RepositoryStateStoreError;
 
         let layout = self.require_layout()?;
         let context = MutationContext::production();
@@ -1075,62 +1074,62 @@ impl<S: IssueStore> CommandExecutor<S> {
             ])
         };
 
-        for _ in 0..8 {
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let image_one = match session.capture(CaptureSpec::phase_one(registries()?, budget)?) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            };
-            let config = assemble_config(&image_one)?;
-            let rules_text = super::image_repo_bytes(&image_one, ".jit/rules.toml")?
-                .map(String::from_utf8)
-                .transpose()?;
-            let closure =
-                render_capture_closure(image_one.layout(), &config, &[], rules_text.as_deref())?;
-            let mut spec = CaptureSpec::phase_one(registries()?, budget)?;
-            spec.discover_paths(closure)?;
-            let image = match session.capture(spec) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            };
-            let gates_path = VirtualPath::data("gates.toml")?;
-            let registry = match image.entry(&gates_path)? {
-                RepositoryEntry::File { bytes, .. } => {
-                    crate::declarations::parse_gate_registry(bytes)?
-                }
-                RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),
-                _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
-            };
-            let derived = derive_gate_registry_mutation(registry, &request)?;
-            let mut declarations = crate::repository_state::declarations_from_image(&image)?;
-            declarations.gates = derived.registry.clone();
-            let intents = vec![
-                MutationIntent::EditGateRegistry {
-                    registry: Box::new(derived.registry),
-                },
-                MutationIntent::RecordEvent {
-                    phase: 1,
-                    event: Box::new(derived.event),
-                },
-            ];
-            let plan = finalize_gate_registry_edit(
-                &layout,
-                &image,
-                &context,
-                &intents,
-                declarations.borrowed(),
-            )?;
-            match session.apply(&plan) {
-                Ok(_) => return Ok(derived.outcome),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "gate registry mutation did not converge after repeated conflicts"
-        ))
+        with_mutation_session(
+            &self.storage,
+            &layout,
+            "gate registry mutation",
+            |session| {
+                let Some(image_one) = capture_or_retry(
+                    session.capture(CaptureSpec::phase_one(registries()?, budget)?),
+                )?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let config = assemble_config(&image_one)?;
+                let rules_text = super::image_repo_bytes(&image_one, ".jit/rules.toml")?
+                    .map(String::from_utf8)
+                    .transpose()?;
+                let closure = render_capture_closure(
+                    image_one.layout(),
+                    &config,
+                    &[],
+                    rules_text.as_deref(),
+                )?;
+                let mut spec = CaptureSpec::phase_one(registries()?, budget)?;
+                spec.discover_paths(closure)?;
+                let Some(image) = capture_or_retry(session.capture(spec))? else {
+                    return Ok(SessionStep::Retry);
+                };
+                let gates_path = VirtualPath::data("gates.toml")?;
+                let registry = match image.entry(&gates_path)? {
+                    RepositoryEntry::File { bytes, .. } => {
+                        crate::declarations::parse_gate_registry(bytes)?
+                    }
+                    RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),
+                    _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
+                };
+                let derived = derive_gate_registry_mutation(registry, &request)?;
+                let mut declarations = crate::repository_state::declarations_from_image(&image)?;
+                declarations.gates = derived.registry.clone();
+                let intents = vec![
+                    MutationIntent::EditGateRegistry {
+                        registry: Box::new(derived.registry),
+                    },
+                    MutationIntent::RecordEvent {
+                        phase: 1,
+                        event: Box::new(derived.event),
+                    },
+                ];
+                let plan = finalize_gate_registry_edit(
+                    &layout,
+                    &image,
+                    &context,
+                    &intents,
+                    declarations.borrowed(),
+                )?;
+                Ok(SessionStep::Apply(plan, derived.outcome))
+            },
+        )
     }
 
     pub fn add_gate_definition(
@@ -1474,11 +1473,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let layout = self.require_layout()?;
         let context = crate::repository_state::MutationContext::production();
-        for _ in 0..8 {
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(image) = capture_gate_preset_image(&mut *session, false, Some(preset_name))?
-            else {
-                continue;
+        with_mutation_session(&self.storage, &layout, "gate preset creation", |session| {
+            let Some(image) = capture_gate_preset_image(session, false, Some(preset_name))? else {
+                return Ok(SessionStep::Retry);
             };
             let issues = super::captured_active_issues(&image)?;
             let full_id = super::resolve_issue_from_capture(&issues, from_issue_id)?;
@@ -1526,22 +1523,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                 preset: Box::new(preset),
             }];
             let plan = crate::repository_state::finalize(&layout, &image, &context, &intents)?;
-            match session.apply(&plan) {
-                Ok(_) => {
-                    return Ok(layout
-                        .data_root()
-                        .join("config/gate-presets")
-                        .join(format!("{preset_name}.json")))
-                }
-                Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. }) => {
-                    continue
-                }
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "gate preset creation did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Apply(
+                plan,
+                layout
+                    .data_root()
+                    .join("config/gate-presets")
+                    .join(format!("{preset_name}.json")),
+            ))
+        })
     }
 }
 

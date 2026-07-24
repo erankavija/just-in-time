@@ -1937,25 +1937,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::finalize_repository_export;
-        use crate::storage::RepositoryStateStoreError;
 
-        for _ in 0..8 {
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let image = match session.capture(intent.capture_spec(budget)?) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+        with_mutation_session(&self.storage, layout, "repository export", |session| {
+            let Some(image) = capture_or_retry(session.capture(intent.capture_spec(budget)?))?
+            else {
+                return Ok(SessionStep::Retry);
             };
             let plan = finalize_repository_export(&image, intent)?;
-            match session.apply(&plan) {
-                Ok(_) => return Ok(()),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "repository export did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Apply(plan, ()))
+        })
     }
 
     /// Rebase one closed issue-local operation on a freshly captured record.
@@ -1973,81 +1963,76 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{
             finalize, CaptureBudget, CaptureSpec, MutationContext, RepositoryEntry, VirtualPath,
         };
-        use crate::storage::RepositoryStateStoreError;
         use std::collections::BTreeSet;
 
         let layout = self.require_layout()?;
         let context = MutationContext::production();
-        for _ in 0..8 {
-            let mut paths = BTreeSet::from([
-                VirtualPath::data(format!("issues/{}.json", request.issue_id()))?,
-                VirtualPath::data("events.jsonl")?,
-            ]);
-            if request.captures_gate_registry() {
-                paths.insert(VirtualPath::data("gates.toml")?);
-            }
-            let spec = CaptureSpec::phase_one(
-                paths.clone(),
-                CaptureBudget {
-                    max_paths: paths.len(),
-                    max_listings: 0,
-                    max_bytes: 64 * 1024 * 1024,
-                    max_depth: 4,
-                },
-            )?;
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let image = match session.capture(spec) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            };
-            let issue_path = VirtualPath::data(format!("issues/{}.json", request.issue_id()))?;
-            let issue: Issue = match image.entry(&issue_path)? {
-                RepositoryEntry::File { bytes, .. } => {
-                    serde_json::from_slice(bytes).with_context(|| {
-                        format!("failed to parse captured issue {}", request.issue_id())
-                    })?
+        with_mutation_session(
+            &self.storage,
+            &layout,
+            "captured issue mutation",
+            |session| {
+                let mut paths = BTreeSet::from([
+                    VirtualPath::data(format!("issues/{}.json", request.issue_id()))?,
+                    VirtualPath::data("events.jsonl")?,
+                ]);
+                if request.captures_gate_registry() {
+                    paths.insert(VirtualPath::data("gates.toml")?);
                 }
-                RepositoryEntry::Absent => {
-                    return Err(crate::storage::IssueNotFoundError::new(request.issue_id()).into())
-                }
-                _ => return Err(anyhow!("captured issue path is not an ordinary file")),
-            };
-            if issue.id != request.issue_id() {
-                return Err(anyhow!(
-                    "captured issue identity mismatch: requested {}, found {}",
-                    request.issue_id(),
-                    issue.id
-                ));
-            }
-            let registry = if request.captures_gate_registry() {
-                let path = VirtualPath::data("gates.toml")?;
-                match image.entry(&path)? {
-                    RepositoryEntry::File { bytes, .. } => {
-                        crate::declarations::parse_gate_registry(bytes)
-                            .context("failed to parse captured gate registry")?
+                let spec = CaptureSpec::phase_one(
+                    paths.clone(),
+                    CaptureBudget {
+                        max_paths: paths.len(),
+                        max_listings: 0,
+                        max_bytes: 64 * 1024 * 1024,
+                        max_depth: 4,
+                    },
+                )?;
+                let Some(image) = capture_or_retry(session.capture(spec))? else {
+                    return Ok(SessionStep::Retry);
+                };
+                let issue_path = VirtualPath::data(format!("issues/{}.json", request.issue_id()))?;
+                let issue: Issue = match image.entry(&issue_path)? {
+                    RepositoryEntry::File { bytes, .. } => serde_json::from_slice(bytes)
+                        .with_context(|| {
+                            format!("failed to parse captured issue {}", request.issue_id())
+                        })?,
+                    RepositoryEntry::Absent => {
+                        return Err(
+                            crate::storage::IssueNotFoundError::new(request.issue_id()).into()
+                        )
                     }
-                    RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),
-                    _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
+                    _ => return Err(anyhow!("captured issue path is not an ordinary file")),
+                };
+                if issue.id != request.issue_id() {
+                    return Err(anyhow!(
+                        "captured issue identity mismatch: requested {}, found {}",
+                        request.issue_id(),
+                        issue.id
+                    ));
                 }
-            } else {
-                crate::declarations::GateRegistry::default()
-            };
+                let registry = if request.captures_gate_registry() {
+                    let path = VirtualPath::data("gates.toml")?;
+                    match image.entry(&path)? {
+                        RepositoryEntry::File { bytes, .. } => {
+                            crate::declarations::parse_gate_registry(bytes)
+                                .context("failed to parse captured gate registry")?
+                        }
+                        RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),
+                        _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
+                    }
+                } else {
+                    crate::declarations::GateRegistry::default()
+                };
 
-            let derived = derive_captured_issue_mutation(issue, &registry, &request)?;
-            if derived.intents.is_empty() {
-                return Ok(derived.outcome);
-            }
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
-            match session.apply(&plan) {
-                Ok(_) => return Ok(derived.outcome),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "captured issue mutation did not converge after repeated conflicts"
-        ))
+                let derived = derive_captured_issue_mutation(issue, &registry, &request)?;
+                if derived.intents.is_empty() {
+                    return Ok(SessionStep::Done(derived.outcome));
+                }
+                let plan = finalize(&layout, &image, &context, &derived.intents)?;
+                Ok(SessionStep::Apply(plan, derived.outcome))
+            },
+        )
     }
 
     fn publish_issue_creation(
@@ -2060,16 +2045,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
-        use crate::storage::RepositoryStateStoreError;
         use std::collections::BTreeMap;
 
         let layout = self.require_layout()?;
         let context = MutationContext::production();
-        for _ in 0..8 {
+        with_mutation_session(&self.storage, &layout, "issue creation", |session| {
             let issue_id = context.identifier_at(0);
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some(image) = self.capture_proposed_base(
-                session.as_mut(),
+                session,
                 &BTreeMap::new(),
                 &[
                     VirtualPath::data("issues")?,
@@ -2078,7 +2061,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 None,
             )?
             else {
-                continue;
+                return Ok(SessionStep::Retry);
             };
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let mut final_draft = draft.clone();
@@ -2136,15 +2119,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             )
             .collect::<Vec<_>>();
             let plan = finalize(&layout, &image, &context, &intents)?;
-            match session.apply(&plan) {
-                Ok(_) => return Ok((issue_id, validation)),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "issue creation did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Apply(plan, (issue_id, validation)))
+        })
     }
 
     /// Get reference to the storage backend

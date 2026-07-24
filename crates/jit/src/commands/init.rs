@@ -1,4 +1,4 @@
-use super::CommandExecutor;
+use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::config::{slugify_project_name, ProjectName};
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
@@ -9,8 +9,8 @@ use crate::repository_state::{
     GitattributesStatus, InitializationScaffold, MaterializationPlan, MaterializationRequest,
     ProfileApplicationInput, ProfileTargetDisposition, RepositoryAction, VirtualPath,
 };
-use crate::storage::{JsonFileStorage, RepositoryStateStore, RepositoryStateStoreError};
-use anyhow::{anyhow, Context, Result};
+use crate::storage::JsonFileStorage;
+use anyhow::{Context, Result};
 use std::path::Path;
 
 /// Result of publishing a fresh repository scaffold.
@@ -69,155 +69,152 @@ impl CommandExecutor<JsonFileStorage> {
         let layout = self.require_layout()?;
         // Typed Git evidence is acquired once at the boundary (loop-invariant).
         let gitattributes = gitattributes_claim(&layout);
-        let mut session = self.storage().open_mutation_session(layout)?;
         // One MutationContext per operation, reused across probe/final finalize and
         // every retry so a composed ProfileApplied event's id/timestamp stay stable.
         let context = crate::repository_state::MutationContext::production();
-        for _ in 0..8 {
-            let (config, project_name) =
-                self.resolve_init_config(session.as_mut(), repo_dir, template)?;
-            let profile = match package.as_ref() {
-                Some(package) => Some(self.profile_input(package)?),
-                None => None,
-            };
-            let scaffold = InitializationScaffold::from_config(config, project_name, profile)?
-                .with_gitattributes(gitattributes.clone());
+        with_mutation_session(
+            self.storage(),
+            &layout,
+            "repository initialization",
+            |session| {
+                let (config, project_name) =
+                    self.resolve_init_config(&mut *session, repo_dir, template)?;
+                let profile = match package.as_ref() {
+                    Some(package) => Some(self.profile_input(package)?),
+                    None => None,
+                };
+                let scaffold = InitializationScaffold::from_config(config, project_name, profile)?
+                    .with_gitattributes(gitattributes.clone());
 
-            let mut extra_paths = scaffold.delta_paths()?;
-            // Probe capture: the deliberately over-inclusive scaffold overlay yields
-            // a base good enough to finalize the exact delta. That delta's overlay
-            // is the AUTHORITATIVE proposed state — only the files init writes — so a
-            // preserved `IfAbsent` file (e.g. an existing `rules.toml` referencing a
-            // custom schema) is not shadowed by its neutral default in the closure.
-            let probe_overrides = scaffold.overlay_overrides()?;
-            let mut probe = match self.capture_proposed_base(
-                session.as_mut(),
-                &probe_overrides,
-                &extra_paths,
-                None,
-            )? {
-                None => continue,
-                Some(base) => base,
-            };
-            if scaffold.profile().is_some() {
-                extra_paths.extend(scaffold.profile_capture_closure(&probe)?);
-                let expanded = match self.capture_proposed_base(
-                    session.as_mut(),
+                let mut extra_paths = scaffold.delta_paths()?;
+                // Probe capture: the deliberately over-inclusive scaffold overlay yields
+                // a base good enough to finalize the exact delta. That delta's overlay
+                // is the AUTHORITATIVE proposed state — only the files init writes — so a
+                // preserved `IfAbsent` file (e.g. an existing `rules.toml` referencing a
+                // custom schema) is not shadowed by its neutral default in the closure.
+                let probe_overrides = scaffold.overlay_overrides()?;
+                let Some(mut probe) = self.capture_proposed_base(
+                    &mut *session,
                     &probe_overrides,
                     &extra_paths,
                     None,
-                )? {
-                    None => continue,
-                    Some(base) => base,
+                )?
+                else {
+                    return Ok(SessionStep::Retry);
                 };
-                if !expanded.has_stable_overlap(&probe) {
-                    continue;
+                if scaffold.profile().is_some() {
+                    extra_paths.extend(scaffold.profile_capture_closure(&probe)?);
+                    let Some(expanded) = self.capture_proposed_base(
+                        &mut *session,
+                        &probe_overrides,
+                        &extra_paths,
+                        None,
+                    )?
+                    else {
+                        return Ok(SessionStep::Retry);
+                    };
+                    if !expanded.has_stable_overlap(&probe) {
+                        return Ok(SessionStep::Retry);
+                    }
+                    probe = expanded;
                 }
-                probe = expanded;
-            }
-            let delta_overlay = super::validation_overlay(
-                derive_materialization(
-                    &probe,
+                let delta_overlay = super::validation_overlay(
+                    derive_materialization(
+                        &probe,
+                        MaterializationRequest::Initialize {
+                            scaffold: &scaffold,
+                            context: &context,
+                        },
+                    )?
+                    .delta(),
+                );
+
+                // Re-capture the base with the exact write set so the validation closure
+                // and the delta's preimages come from one coherent image, then finalize,
+                // validate, and publish under the same held session.
+                let Some(base) =
+                    self.capture_proposed_base(&mut *session, &delta_overlay, &extra_paths, None)?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let final_profile_closure = scaffold.profile_capture_closure(&base)?;
+                if final_profile_closure
+                    .iter()
+                    .any(|path| !base.capture_spec().contains_path(path))
+                {
+                    return Ok(SessionStep::Retry);
+                }
+                let plan = derive_materialization(
+                    &base,
                     MaterializationRequest::Initialize {
                         scaffold: &scaffold,
                         context: &context,
                     },
-                )?
-                .delta(),
-            );
-
-            // Re-capture the base with the exact write set so the validation closure
-            // and the delta's preimages come from one coherent image, then finalize,
-            // validate, and publish under the same held session.
-            let base = match self.capture_proposed_base(
-                session.as_mut(),
-                &delta_overlay,
-                &extra_paths,
-                None,
-            )? {
-                None => continue,
-                Some(base) => base,
-            };
-            let final_profile_closure = scaffold.profile_capture_closure(&base)?;
-            if final_profile_closure
-                .iter()
-                .any(|path| !base.capture_spec().contains_path(path))
-            {
-                continue;
-            }
-            let plan = derive_materialization(
-                &base,
-                MaterializationRequest::Initialize {
-                    scaffold: &scaffold,
-                    context: &context,
-                },
-            )?;
-            if plan.delta().actions().iter().any(|action| {
-                !base
-                    .capture_spec()
-                    .paths()
-                    .any(|path| path == action.path())
-            }) {
-                continue;
-            }
-            let profile_status = package.as_ref().map(|package| {
-                let record_path =
-                    VirtualPath::data(format!("profiles/{}.json", package.manifest().profile.id));
-                let changed_target = plan
-                    .profile_targets()
-                    .iter()
-                    .any(|target| target.disposition != ProfileTargetDisposition::Unchanged);
-                let changed_record = record_path.is_ok_and(|path| {
-                    plan.delta()
-                        .actions()
-                        .iter()
-                        .any(|action| action.path() == &path)
-                });
-                if changed_target || changed_record {
-                    ProfileApplicationStatus::Applied
-                } else {
-                    ProfileApplicationStatus::Unchanged
+                )?;
+                if plan.delta().actions().iter().any(|action| {
+                    !base
+                        .capture_spec()
+                        .paths()
+                        .any(|path| path == action.path())
+                }) {
+                    return Ok(SessionStep::Retry);
                 }
-            });
-            let proposed = apply_overlay(&base, super::validation_overlay(plan.delta()))?;
-            let validation = crate::validation::repository::validate_repository(&proposed)
-                .map_err(init_validation_error)?;
-            if validation.rule_report.has_errors() {
-                anyhow::bail!(
-                    "repository initialization produced {} validation error finding(s)",
-                    validation.rule_report.error_count()
-                );
-            }
-            let gitattributes = scaffold.gitattributes_status(&base)?;
-            let (created_paths, modified_paths) = init_response_paths(&plan, gitattributes)?;
+                let profile_status = package.as_ref().map(|package| {
+                    let record_path = VirtualPath::data(format!(
+                        "profiles/{}.json",
+                        package.manifest().profile.id
+                    ));
+                    let changed_target = plan
+                        .profile_targets()
+                        .iter()
+                        .any(|target| target.disposition != ProfileTargetDisposition::Unchanged);
+                    let changed_record = record_path.is_ok_and(|path| {
+                        plan.delta()
+                            .actions()
+                            .iter()
+                            .any(|action| action.path() == &path)
+                    });
+                    if changed_target || changed_record {
+                        ProfileApplicationStatus::Applied
+                    } else {
+                        ProfileApplicationStatus::Unchanged
+                    }
+                });
+                let proposed = apply_overlay(&base, super::validation_overlay(plan.delta()))?;
+                let validation = crate::validation::repository::validate_repository(&proposed)
+                    .map_err(init_validation_error)?;
+                if validation.rule_report.has_errors() {
+                    anyhow::bail!(
+                        "repository initialization produced {} validation error finding(s)",
+                        validation.rule_report.error_count()
+                    );
+                }
+                let gitattributes = scaffold.gitattributes_status(&base)?;
+                let (created_paths, modified_paths) = init_response_paths(&plan, gitattributes)?;
 
-            match session.apply(&plan) {
-                Ok(outcome) => {
-                    let profile = profile_status
-                        .zip(package.as_ref())
-                        .map(|(status, package)| ProfileApplyResult {
-                            id: package.manifest().profile.id.clone(),
-                            version: package.manifest().profile.version.clone(),
-                            status,
-                            plan_hash: plan.hash().to_string(),
-                            transaction_id: (status == ProfileApplicationStatus::Applied)
-                                .then(|| outcome.transaction_hash.clone()),
-                            warnings: Vec::new(),
-                        });
-                    return Ok(FreshInitResult {
+                let profile = profile_status
+                    .zip(package.as_ref())
+                    .map(|(status, package)| ProfileApplyResult {
+                        id: package.manifest().profile.id.clone(),
+                        version: package.manifest().profile.version.clone(),
+                        status,
+                        plan_hash: plan.hash().to_string(),
+                        // The applied transaction hash is the plan hash by construction.
+                        transaction_id: (status == ProfileApplicationStatus::Applied)
+                            .then(|| plan.hash().to_string()),
+                        warnings: Vec::new(),
+                    });
+                Ok(SessionStep::Apply(
+                    plan,
+                    FreshInitResult {
                         profile,
                         gitattributes,
                         created_paths,
                         modified_paths,
-                    });
-                }
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "repository initialization did not converge after repeated capture conflicts"
-        ))
+                    },
+                ))
+            },
+        )
     }
 
     /// Resolve the effective configuration bytes and project identity: an existing
@@ -464,7 +461,7 @@ mod tests {
     use super::*;
     use crate::profile::jit_dogfood_package;
     use crate::repository_state::AppliedProfileRecord;
-    use crate::storage::{discover_repository_layout, IssueStore};
+    use crate::storage::{discover_repository_layout, IssueStore, RepositoryStateStore};
     use std::fs;
     use std::path::PathBuf;
     use std::sync::{Arc, Barrier};

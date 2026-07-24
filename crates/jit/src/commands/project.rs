@@ -137,11 +137,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             CaptureBudget, CaptureSpec, MaterializationRequest, RepositorySeed, RepositorySeedKind,
             VirtualPath,
         };
-        use crate::storage::RepositoryStateStoreError;
         use std::collections::BTreeSet;
 
         let layout = self.require_layout()?;
-        let mut session = self.storage().open_mutation_session(layout)?;
         let budget = CaptureBudget {
             max_paths: 4096,
             max_listings: 64,
@@ -166,12 +164,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
         // Bounded two-phase capture with conflict retry: phase one reads the engine
         // registries, then the parsed declarations enumerate the phase-two closure.
-        for _ in 0..8 {
+        with_mutation_session(self.storage(), &layout, "project render", |session| {
             let phase_one = CaptureSpec::phase_one(registries()?, budget)?;
-            let image_one = match session.capture(phase_one) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            let Some(image_one) = capture_or_retry(session.capture(phase_one))? else {
+                return Ok(SessionStep::Retry);
             };
             let config_one = assemble_config(&image_one)?;
             let selected_names = selected_projection_names(&config_one, name)?;
@@ -187,10 +183,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             .map_err(project_producer_error)?;
             let mut phase_two = CaptureSpec::phase_one(registries()?, budget)?;
             phase_two.discover_paths(closure)?;
-            let image = match session.capture(phase_two) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            let Some(image) = capture_or_retry(session.capture(phase_two))? else {
+                return Ok(SessionStep::Retry);
             };
 
             let declarations = crate::repository_state::declarations_from_image(&image)?;
@@ -212,7 +206,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 .cloned()
                 .collect::<BTreeSet<_>>();
             if final_closure.into_iter().collect::<BTreeSet<_>>() != captured {
-                continue;
+                return Ok(SessionStep::Retry);
             }
 
             // Derive the exact delta over the same image and apply it. The delta
@@ -253,20 +247,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     })
                 })
                 .collect::<Result<Vec<_>>>()?;
-            match session.apply(&plan) {
-                Ok(_) => {
-                    return Ok(ProjectRenderResult {
-                        count: projections.len(),
-                        projections,
-                    })
-                }
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "project render did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Apply(
+                plan,
+                ProjectRenderResult {
+                    count: projections.len(),
+                    projections,
+                },
+            ))
+        })
     }
 }
 

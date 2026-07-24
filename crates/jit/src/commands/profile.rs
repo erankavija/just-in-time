@@ -1,4 +1,4 @@
-use super::CommandExecutor;
+use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
     build_profile_claims, jit_dogfood_package, EmbeddedProfilePackage, ProfileApplicationStatus,
     ProfileApplyResult, ProfileListResult, ProfileOrigin, ProfilePlanResult, ProfilePlanStatus,
@@ -10,11 +10,9 @@ use crate::repository_state::{
     ProfileTargetDisposition, RepositoryEntry, RepositoryImage, RepositoryRootClass,
     RootRelativePath, VirtualPath,
 };
-use crate::storage::{
-    JsonFileStorage, RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
-};
+use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::collections::BTreeMap;
 
 /// Profile application conflict detected before transaction preparation.
@@ -93,15 +91,14 @@ impl CommandExecutor<JsonFileStorage> {
         let package = embedded_profile(id)?;
         let metadata = &package.manifest().profile;
         let layout = self.require_layout()?;
-        let mut session = self.storage().open_mutation_session(layout)?;
         let context = MutationContext::preview();
-        for _ in 0..8 {
+        with_mutation_session(self.storage(), &layout, "profile planning", |session| {
             let Some((plan, changes)) =
-                self.prepare_embedded_profile(session.as_mut(), &package, &context)?
+                self.prepare_embedded_profile(session, &package, &context)?
             else {
-                continue;
+                return Ok(SessionStep::Retry);
             };
-            return Ok(ProfilePlanResult {
+            Ok(SessionStep::Done(ProfilePlanResult {
                 id: metadata.id.clone(),
                 version: metadata.version.clone(),
                 status: if plan.delta().actions().is_empty() {
@@ -111,11 +108,8 @@ impl CommandExecutor<JsonFileStorage> {
                 },
                 plan_hash: plan.hash().to_string(),
                 targets: changes,
-            });
-        }
-        Err(anyhow!(
-            "profile planning did not converge after repeated capture conflicts"
-        ))
+            }))
+        })
     }
 
     /// Resolve and apply one embedded profile by stable ID.
@@ -145,25 +139,24 @@ impl CommandExecutor<JsonFileStorage> {
     ) -> Result<ProfileApplyResult> {
         let metadata = &package.manifest().profile;
         let layout = self.require_layout()?;
-        let mut session = self.storage().open_mutation_session(layout)?;
         // One MutationContext per operation, reused across probe/final finalize and
         // every retry so the appended ProfileApplied event's id/timestamp stay stable.
         let context = MutationContext::production();
-        for _ in 0..8 {
+        with_mutation_session(self.storage(), &layout, "profile application", |session| {
             let Some((plan, _changes)) =
-                self.prepare_embedded_profile(session.as_mut(), package, &context)?
+                self.prepare_embedded_profile(session, package, &context)?
             else {
-                continue;
+                return Ok(SessionStep::Retry);
             };
             if plan.delta().actions().is_empty() {
-                return Ok(ProfileApplyResult {
+                return Ok(SessionStep::Done(ProfileApplyResult {
                     id: metadata.id.clone(),
                     version: metadata.version.clone(),
                     status: ProfileApplicationStatus::Unchanged,
                     plan_hash: plan.hash().to_string(),
                     transaction_id: None,
                     warnings: Vec::new(),
-                });
+                }));
             }
             let proposed = apply_overlay(plan.image(), super::validation_overlay(plan.delta()))
                 .map_err(anyhow::Error::from)?;
@@ -176,24 +169,17 @@ impl CommandExecutor<JsonFileStorage> {
                 .into());
             }
 
-            match session.apply(&plan) {
-                Ok(outcome) => {
-                    return Ok(ProfileApplyResult {
-                        id: metadata.id.clone(),
-                        version: metadata.version.clone(),
-                        status: ProfileApplicationStatus::Applied,
-                        plan_hash: plan.hash().to_string(),
-                        transaction_id: Some(outcome.transaction_hash),
-                        warnings: Vec::new(),
-                    });
-                }
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "profile application did not converge after repeated capture conflicts"
-        ))
+            let result = ProfileApplyResult {
+                id: metadata.id.clone(),
+                version: metadata.version.clone(),
+                status: ProfileApplicationStatus::Applied,
+                plan_hash: plan.hash().to_string(),
+                // The applied transaction hash is the plan hash by construction.
+                transaction_id: Some(plan.hash().to_string()),
+                warnings: Vec::new(),
+            };
+            Ok(SessionStep::Apply(plan, result))
+        })
     }
 
     /// Capture the base and derive one complete canonical profile plan.
@@ -325,23 +311,25 @@ impl CommandExecutor<JsonFileStorage> {
         let metadata = &package.manifest().profile;
         let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
         let layout = self.require_layout()?;
-        let mut session = self.storage().open_mutation_session(layout)?;
         let budget = CaptureBudget {
             max_paths: 16,
             max_listings: 0,
             max_bytes: 4 * 1024 * 1024,
             max_depth: 4,
         };
-        for _ in 0..8 {
-            match session.capture(CaptureSpec::phase_one([record_path.clone()], budget)?) {
-                Ok(image) => return read_applied_record(&image, &record_path, metadata),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "profile record read did not converge after repeated capture conflicts"
-        ))
+        with_mutation_session(self.storage(), &layout, "profile record read", |session| {
+            let Some(image) = capture_or_retry(
+                session.capture(CaptureSpec::phase_one([record_path.clone()], budget)?),
+            )?
+            else {
+                return Ok(SessionStep::Retry);
+            };
+            Ok(SessionStep::Done(read_applied_record(
+                &image,
+                &record_path,
+                metadata,
+            )?))
+        })
     }
 }
 
@@ -449,7 +437,9 @@ mod tests {
     use super::*;
     use crate::domain::Event;
     use crate::hierarchy_templates::HierarchyTemplate;
-    use crate::storage::{discover_repository_layout, IssueStore};
+    use crate::storage::{
+        discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
+    };
     use include_dir::{include_dir, Dir};
     use std::collections::BTreeMap;
     use std::fs;

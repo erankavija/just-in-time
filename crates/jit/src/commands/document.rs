@@ -101,7 +101,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationContext, VirtualPath};
-        use crate::storage::{validate_repo_relative_path, RepositoryStateStoreError};
+        use crate::storage::validate_repo_relative_path;
         use std::collections::BTreeSet;
 
         validate_repo_relative_path(path)?;
@@ -119,18 +119,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         let context = MutationContext::production();
 
-        for _ in 0..8 {
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
+        with_mutation_session(&self.storage, &layout, "document add", |session| {
             let initial_paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
             let initial_spec = if skip_scan {
                 document_capture_spec(initial_paths)?
             } else {
                 document_scan_capture_spec(initial_paths, &source, &BTreeSet::new())?
             };
-            let image = match session.capture(initial_spec) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            let Some(image) = capture_or_retry(session.capture(initial_spec))? else {
+                return Ok(SessionStep::Retry);
             };
 
             let initial_scan = if skip_scan {
@@ -145,14 +142,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let expanded_paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
                 let spec =
                     document_scan_capture_spec(expanded_paths, &source, &captured_asset_paths)?;
-                let image = match session.capture(spec) {
-                    Ok(image) => image,
-                    Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                    Err(error) => return Err(error.into()),
+                let Some(image) = capture_or_retry(session.capture(spec))? else {
+                    return Ok(SessionStep::Retry);
                 };
                 let scan = scan_document_source(&layout, &image, path, &source)?;
                 if !scan.required_paths.is_subset(&captured_asset_paths) {
-                    continue;
+                    return Ok(SessionStep::Retry);
                 }
                 (image, scan)
             };
@@ -175,18 +170,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .into_iter()
                 .collect();
             if derived.intents.is_empty() {
-                return Ok((derived.outcome, warnings));
+                return Ok(SessionStep::Done((derived.outcome, warnings)));
             }
             let plan = finalize(&layout, &image, &context, &derived.intents)?;
-            match session.apply(&plan) {
-                Ok(_) => return Ok((derived.outcome, warnings)),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "document add did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Apply(plan, (derived.outcome, warnings)))
+        })
     }
 
     /// Remove one path-selected document reference and its event atomically.
@@ -195,33 +183,23 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationContext, VirtualPath};
-        use crate::storage::RepositoryStateStoreError;
         use std::collections::BTreeSet;
 
         let layout = self.require_layout()?;
         let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
         let events_path = VirtualPath::data("events.jsonl")?;
         let context = MutationContext::production();
-        for _ in 0..8 {
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
+        with_mutation_session(&self.storage, &layout, "document removal", |session| {
             let paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
-            let image = match session.capture(document_capture_spec(paths)?) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            let Some(image) = capture_or_retry(session.capture(document_capture_spec(paths)?))?
+            else {
+                return Ok(SessionStep::Retry);
             };
             let issue = captured_issue(&image, &issue_path, issue_id)?;
             let derived = derive_document_remove(issue, path)?;
             let plan = finalize(&layout, &image, &context, &derived.intents)?;
-            match session.apply(&plan) {
-                Ok(_) => return Ok(derived.outcome),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "document removal did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Apply(plan, derived.outcome))
+        })
     }
 
     pub fn show_document_content(
@@ -787,7 +765,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
-        use crate::storage::RepositoryStateStoreError;
 
         let layout = self.require_layout()?;
         let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
@@ -798,8 +775,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Operation-scoped so a fresh-session retry cannot resample the update
         // timestamp or audit-event identity.
         let context = MutationContext::production();
-        for _ in 0..8 {
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
+        with_mutation_session(&self.storage, &layout, "document rescan", |session| {
             let initial = document_scan_capture_spec(
                 [issue_path.clone(), events_path.clone()]
                     .into_iter()
@@ -807,10 +783,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 &source,
                 &Default::default(),
             )?;
-            let image = match session.capture(initial) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            let Some(image) = capture_or_retry(session.capture(initial))? else {
+                return Ok(SessionStep::Retry);
             };
             let issue = captured_issue(&image, &issue_path, issue_id)?;
             let current_assets = issue
@@ -823,10 +797,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             let initial_scan = scan_document_source(&layout, &image, path, &source)?;
             if let Some(warning) = initial_scan.warning {
                 warnings.push(warning.message().to_string());
-                return Ok(match warning {
+                return Ok(SessionStep::Done(match warning {
                     DocumentScanWarning::Missing(_) => current_assets,
                     DocumentScanWarning::Failed(_) => Vec::new(),
-                });
+                }));
             }
             let expanded_paths = initial_scan.required_paths;
             let expanded = document_scan_capture_spec(
@@ -836,10 +810,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 &source,
                 &expanded_paths,
             )?;
-            let image = match session.capture(expanded) {
-                Ok(image) => image,
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            let Some(image) = capture_or_retry(session.capture(expanded))? else {
+                return Ok(SessionStep::Retry);
             };
             let mut issue = captured_issue(&image, &issue_path, issue_id)?;
             let document = issue
@@ -849,18 +821,18 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .ok_or_else(|| anyhow!("document '{path}' changed during rescan"))?;
             let scan = scan_document_source(&layout, &image, path, &source)?;
             if !scan.required_paths.is_subset(&expanded_paths) {
-                continue;
+                return Ok(SessionStep::Retry);
             }
             if let Some(warning) = scan.warning {
                 warnings.push(warning.message().to_string());
-                return Ok(match warning {
+                return Ok(SessionStep::Done(match warning {
                     DocumentScanWarning::Missing(_) => document.assets.clone(),
                     DocumentScanWarning::Failed(_) => Vec::new(),
-                });
+                }));
             }
             let scanned = hydrate_document_scan(&layout, &image, &source, scan)?.assets;
             if document.assets == scanned {
-                return Ok(scanned);
+                return Ok(SessionStep::Done(scanned));
             }
             document.assets = scanned.clone();
             let intents = vec![
@@ -877,15 +849,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 },
             ];
             let plan = finalize(&layout, &image, &context, &intents)?;
-            match session.apply(&plan) {
-                Ok(_) => return Ok(scanned),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "document rescan did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Apply(plan, scanned))
+        })
     }
 
     /// Validate that an external URL is reachable

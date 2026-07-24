@@ -165,17 +165,16 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         use crate::repository_state::apply_overlay;
 
         let layout = self.require_layout()?;
-        let mut session = self.storage().open_mutation_session(layout)?;
-        for _ in 0..8 {
-            match self.capture_proposed_base(session.as_mut(), overrides, &[], None)? {
-                None => continue,
-                Some(base) if overrides.is_empty() => return Ok(base),
-                Some(base) => return Ok(apply_overlay(&base, overrides.clone())?),
-            }
-        }
-        Err(anyhow!(
-            "validation capture did not converge after repeated capture conflicts"
-        ))
+        with_mutation_session(
+            self.storage(),
+            &layout,
+            "validation capture",
+            |session| match self.capture_proposed_base(session, overrides, &[], None)? {
+                None => Ok(SessionStep::Retry),
+                Some(base) if overrides.is_empty() => Ok(SessionStep::Done(base)),
+                Some(base) => Ok(SessionStep::Done(apply_overlay(&base, overrides.clone())?)),
+            },
+        )
     }
 
     /// One bounded two-phase capture attempt of the whole-repository validation
@@ -420,40 +419,43 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         crate::output::DivergenceResponse,
     )> {
         let layout = self.require_layout()?;
-        let mut session = self.storage().open_mutation_session(layout)?;
         let seed = repair_seed()?;
         let package = crate::profile::jit_dogfood_package()?;
-        for _ in 0..8 {
-            let Some(derived) = self.capture_repair_plan(session.as_mut(), &seed, &package)? else {
-                continue;
-            };
-            let captured = match derived {
-                Ok(derived) => derived,
-                Err(failure) => {
-                    return Ok((
-                        Err(failure),
-                        crate::output::DivergenceResponse {
+        with_mutation_session(
+            self.storage(),
+            &layout,
+            "repository validation",
+            |session| {
+                let Some(derived) = self.capture_repair_plan(session, &seed, &package)? else {
+                    return Ok(SessionStep::Retry);
+                };
+                let captured = match derived {
+                    Ok(derived) => derived,
+                    Err(failure) => {
+                        return Ok(SessionStep::Done((
+                            Err(failure),
+                            crate::output::DivergenceResponse {
+                                count: 0,
+                                divergences: Vec::new(),
+                            },
+                        )));
+                    }
+                };
+                let divergences =
+                    captured_divergences(&captured.image, captured.declarations.config())
+                        .unwrap_or_else(|_| crate::output::DivergenceResponse {
                             count: 0,
                             divergences: Vec::new(),
-                        },
-                    ));
-                }
-            };
-            let divergences = captured_divergences(&captured.image, captured.declarations.config())
-                .unwrap_or_else(|_| crate::output::DivergenceResponse {
-                    count: 0,
-                    divergences: Vec::new(),
-                });
-            let report = crate::validation::repository::validate_repository_with_materializations(
-                &captured.image,
-                &captured.declarations,
-                captured.plan.as_ref(),
-            );
-            return Ok((report, divergences));
-        }
-        Err(anyhow!(
-            "repository validation did not converge after repeated capture conflicts"
-        ))
+                        });
+                let report =
+                    crate::validation::repository::validate_repository_with_materializations(
+                        &captured.image,
+                        &captured.declarations,
+                        captured.plan.as_ref(),
+                    );
+                Ok(SessionStep::Done((report, divergences)))
+            },
+        )
     }
 
     /// Repair derived state (default rules/schemas plus every configured
@@ -469,15 +471,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// a per-target message. JSON and memory stores execute this same path.
     fn repair_derived_state(&self, dry_run: bool) -> Result<(usize, Vec<String>)> {
         use crate::repository_state::RepositoryAction;
-        use crate::storage::RepositoryStateStoreError;
 
         let layout = self.require_layout()?;
-        let mut session = self.storage().open_mutation_session(layout)?;
         let seed = repair_seed()?;
         let package = crate::profile::jit_dogfood_package()?;
-        for _ in 0..8 {
-            let Some(derived) = self.capture_repair_plan(session.as_mut(), &seed, &package)? else {
-                continue;
+        with_mutation_session(self.storage(), &layout, "derived-state repair", |session| {
+            let Some(derived) = self.capture_repair_plan(session, &seed, &package)? else {
+                return Ok(SessionStep::Retry);
             };
             let mut captured = derived.map_err(|failure| {
                 crate::errors::ValidationFailedError::new(failure.to_string())
@@ -507,20 +507,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 .map(|path| format!("✓ Repaired derived-state target {path:?}"))
                 .collect::<Vec<_>>();
             if messages.is_empty() {
-                return Ok((0, Vec::new()));
+                return Ok(SessionStep::Done((0, Vec::new())));
             }
             if dry_run {
-                return Ok((messages.len(), messages));
+                return Ok(SessionStep::Done((messages.len(), messages)));
             }
-            match session.apply(&plan) {
-                Ok(_) => return Ok((messages.len(), messages)),
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        Err(anyhow!(
-            "derived-state repair did not converge after repeated capture conflicts"
-        ))
+            Ok(SessionStep::Apply(plan, (messages.len(), messages)))
+        })
     }
 
     /// Capture one complete validation closure and derive its exact repair plan.
