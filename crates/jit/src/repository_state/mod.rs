@@ -27,10 +27,24 @@ pub(crate) use archive::captured_archive_events;
 pub use archive::{finalize_archive_execution, ArchiveExecutionError};
 pub(crate) use default_rules::default_rule_membership_diff_from_identities;
 pub use default_rules::{
-    default_rule_membership_diff, default_ruleset, hierarchy_config,
-    reconcile_default_rules_with_config, type_hierarchy_known_schema, DefaultRuleMembershipDiff,
-    TYPE_HIERARCHY_SCHEMA_FILE,
+    default_ruleset, hierarchy_config, reconcile_default_rules_with_config,
+    type_hierarchy_known_schema, TYPE_HIERARCHY_SCHEMA_FILE,
 };
+// Rule-membership-diff seam: `default_rule_membership_diff` and
+// `DefaultRuleMembershipDiff` are `pub` only for this function's own doctest (no
+// production or integration-test consumer outside `repository_state`), so their
+// exposure as crate public API is gated behind `test-support`. The `pub(crate)`
+// twin keeps every internal caller's resolution
+// (`crate::repository_state::DefaultRuleMembershipDiff`, etc.) identical in
+// both feature states. Neither name has a by-name crate-internal caller under
+// the feature-off arm (the fn's only caller is its own doctest; the struct is
+// otherwise reached only via `default_rule_membership_diff_from_identities`'s
+// unconditional pub(crate) path), so both are allowed unused there.
+#[cfg(feature = "test-support")]
+pub use default_rules::{default_rule_membership_diff, DefaultRuleMembershipDiff};
+#[cfg(not(feature = "test-support"))]
+#[allow(unused_imports)]
+pub(crate) use default_rules::{default_rule_membership_diff, DefaultRuleMembershipDiff};
 pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,
     RepositoryExportDestination, RepositoryExportError, RepositoryExportIntent,
@@ -51,9 +65,24 @@ pub(crate) use managed_document::compose_managed_documents;
 pub use managed_document::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,
 };
-pub use materialize::{
-    assemble_config, render_capture_closure, validate_capture_closure, ValidationCaptureClosure,
-};
+pub use materialize::{assemble_config, render_capture_closure};
+// Capture-closure seam: `validate_capture_closure` and `ValidationCaptureClosure`
+// are `pub` only for the `fast_rules` integration-test crate (no production
+// consumer outside `repository_state`/`commands::validate`), so their exposure
+// as crate public API is gated behind `test-support`. The `pub(crate)` twin
+// keeps every internal caller's resolution
+// (`crate::repository_state::validate_capture_closure`, etc.) identical in both
+// feature states.
+#[cfg(not(feature = "test-support"))]
+pub(crate) use materialize::validate_capture_closure;
+#[cfg(feature = "test-support")]
+pub use materialize::{validate_capture_closure, ValidationCaptureClosure};
+// `ValidationCaptureClosure` itself has no by-name crate-internal caller (it's
+// only reached as `validate_capture_closure`'s inferred return type), so its
+// feature-off twin alone is allowed unused.
+#[cfg(not(feature = "test-support"))]
+#[allow(unused_imports)]
+pub(crate) use materialize::ValidationCaptureClosure;
 pub(crate) use mutation::captured_gate_run_result_paths;
 pub use mutation::{
     finalize, fresh_index_bytes, gate_run_result_relative_path, prefix_has_torn_tail,
