@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T17:37:39.500783110Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T17:41:30.854087052Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "5b121c3f-7d68-4229-9619-ffa3fb2f525e",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Plan-hash reorder-invariance property test",
-  "updated_at": "2026-07-24T17:37:39.500783110Z"
+  "updated_at": "2026-07-24T17:41:30.854087052Z"
 }
