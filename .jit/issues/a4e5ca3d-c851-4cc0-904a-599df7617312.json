@@ -7,6 +7,7 @@
   ],
   "description": "The pure single-session capture/plan/apply/retry loops in the command layer, and the inline capture-conflict arms, adopt the shared mutation-session combinators, so no single-session site keeps a hand-written retry loop, conflict arm, or bespoke convergence message.\n\n## Background\n\nThe command layer historically hand-copied a capture/plan/apply/retry protocol at thirty sites. Twenty-two of them are pure single-session loops: open one recovered mutation session, capture, plan, apply, and retry on a conflict. The shared contract they adopt is:\n\n```rust\nenum SessionStep<T> { Apply(MaterializationPlan, T), Done(T), Retry }\n\nfn with_mutation_session<S: RepositoryStateStore, T>(\n    store: &S, layout: &RepositoryLayout, operation: &'static str,\n    attempt: impl FnMut(&mut dyn RepositoryMutationSession) -> Result<SessionStep<T>>,\n) -> Result<T>;\n\nfn capture_or_retry<T>(outcome: Result<T, RepositoryStateStoreError>) -> Result<AttemptOutcome<T>>;\n```\n\nEach single-session loop is rewritten to a `with_mutation_session` call whose closure returns `SessionStep::Apply(plan, value)` when it derives a plan, `SessionStep::Done(value)` for a read-only or already-converged path, and `SessionStep::Retry` on a capture conflict. The four sites that classify a capture conflict with an inline match arm adopt `capture_or_retry` instead. After the rewrite these sites carry no `for _ in 0..8` loop, no `RetryableConflict` match arm, and no bespoke \"did not converge\" message.\n\n## Success Criteria\n\n- [hard] REQ-01: The pure single-session retry loops in the command modules are rewritten onto `with_mutation_session`, with read-only or already-converged paths returning `SessionStep::Done`.\n- [hard] REQ-02: The inline capture-conflict arms adopt `capture_or_retry`; none of these sites retains a `for _ in 0..8` loop, a `RetryableConflict` arm, or a bespoke convergence message.\n- [hard] REQ-03: The command-module behavior is unchanged: the existing failure-injection and interruption tests pass without modification.\n\n## Notes\n\nThe self-managed multi-session sites - those that release a preflight session and then take a claims guard or run a subprocess before applying - are not migrated here; they retain their between-session structure and are converted separately. Lock ordering at every rewritten site is preserved.",
   "documents": [],
+  "first_ready_at": "2026-07-24T11:14:42.847364447Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -20,7 +21,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Single-session retry call-site migration",
-  "updated_at": "2026-07-24T07:19:49.615370967Z"
+  "updated_at": "2026-07-24T11:14:42.847364447Z"
 }

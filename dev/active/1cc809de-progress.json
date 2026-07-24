@@ -12,7 +12,7 @@
       "wave_number": 1,
       "rationale": "S1+S3 foundations, all Ready (dep only on breakdown node). File overlap: eefbfe84 & fee3c528 both touch repository_state/mod.rs -> worktree isolation, resolve on merge.",
       "issues": [
-        {"id": "4b2005fe", "short_id": "4b2005fe", "title": "Mutation-session retry combinator foundation", "story": "S1", "classification": "implementation", "status": "integrated_pending_review", "agent": "a47904c2abe5eb2c7"},
+        {"id": "4b2005fe", "short_id": "4b2005fe", "title": "Mutation-session retry combinator foundation", "story": "S1", "classification": "implementation", "status": "done", "agent": "a47904c2abe5eb2c7"},
         {"id": "9fda1f86", "short_id": "9fda1f86", "title": "Total journal-action extraction in the transaction kernel", "story": "S1", "classification": "implementation", "status": "done", "agent": "a3997b30440e4c766"},
         {"id": "eefbfe84", "short_id": "eefbfe84", "title": "Typed producer error family for repository-state", "story": "S1", "classification": "implementation", "status": "integrated_rework_1_pending_review", "agent": "a153a21640ca7b6c1"},
         {"id": "fee3c528", "short_id": "fee3c528", "title": "Plan-identity tail for initialize and profile-application requests", "story": "S1", "classification": "implementation", "status": "integrated_pending_review", "agent": "adacec6613c17bc6f"},
