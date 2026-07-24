@@ -84,7 +84,7 @@ echo ""
 # Test 10: Security audit (npm - MCP)
 echo "🔟 Running npm audit (MCP Server)..."
 cd mcp-server
-if npm audit --audit-level=low; then
+if npm audit; then
     echo "✅ npm audit (MCP Server) OK"
 else
     echo "❌ npm audit (MCP Server) found vulnerabilities"
@@ -96,7 +96,7 @@ echo ""
 # Test 11: Security audit (npm - Web)
 echo "1️⃣1️⃣  Running npm audit (Web UI)..."
 cd web
-if npm audit --audit-level=low; then
+if npm audit; then
     echo "✅ npm audit (Web UI) OK"
 else
     echo "❌ npm audit (Web UI) found vulnerabilities"
