@@ -7,6 +7,7 @@
   ],
   "description": "The dead `issue_draft` export is deleted and every repository-state `pub` item without an external consumer is demoted to `pub(crate)`, keeping only the items pinned by an external wire contract.\n\n## Background\n\nThe repository-state module carries a dead export and over-broad `pub` items. `issue_draft` has zero callers in production, tests, or the server crate. The remaining items are `pub` but have no consumer outside `repository_state`.\n\n**Delete:** `issue_draft` and its re-export.\n\n**Demote to `pub(crate)`:** the five clean items `compose_managed_documents`, `finalize_audit_append`, `profile_applied_event`, `FixedMutationClock`, and `default_rule_membership_diff_from_identities`; and three items whose non-candidate producers must be co-demoted so the demotion compiles - `ValidationCaptureClosure` together with `validate_capture_closure`, `DefaultRuleMembershipDiff` together with `default_rule_membership_diff`, and `InjectivityProof` together with `RepositoryLayout::injectivity_proof`.\n\n**Keep `pub`:** `CompleteProjectionConfig`, `SetStringTarget`, `KeyedArrayTarget`, and `MapEntryTarget`. These are the `Contribution` variant payload types reachable through the public `ProfileManifest.contributions` JsonSchema wire contract, so they are legitimately part of the external surface.\n\nThe three integration-test-only rule-serialization publics are not part of this task.\n\n## Success Criteria\n\n- [hard] REQ-01: `issue_draft` is removed from `repository_state/mutation.rs` and its re-export at `repository_state/mod.rs`; no reference to it remains in the crate, the tests, or the server crate.\n- [hard] REQ-02: `compose_managed_documents`, `finalize_audit_append`, `profile_applied_event`, `FixedMutationClock`, `default_rule_membership_diff_from_identities`, `ValidationCaptureClosure` (with `validate_capture_closure`), `DefaultRuleMembershipDiff` (with `default_rule_membership_diff`), and `InjectivityProof` (with `RepositoryLayout::injectivity_proof`) are `pub(crate)` and no longer reachable from the crate's public API.\n- [hard] REQ-03: `CompleteProjectionConfig`, `SetStringTarget`, `KeyedArrayTarget`, and `MapEntryTarget` remain `pub` and continue to serialize through the `ProfileManifest.contributions` JsonSchema contract unchanged.\n- [hard] REQ-04: The workspace builds, `cargo test --workspace` passes, and `cargo clippy --lib` on the default surface reports zero warnings.\n\n## Notes\n\nThe demotions build on the established `test-support` feature twin pattern so the visibility baseline is already in place.",
   "documents": [],
+  "first_ready_at": "2026-07-24T21:48:56.612742560Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -20,7 +21,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Delete a dead export and demote the repository-state public surface",
-  "updated_at": "2026-07-24T07:19:49.615370967Z"
+  "updated_at": "2026-07-24T21:48:56.612742560Z"
 }
