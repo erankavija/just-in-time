@@ -1,7 +1,7 @@
 //! Unified dependency-aware archive planning and coordinated execution.
 
 use super::CommandExecutor;
-use super::{with_mutation_session, SessionStep};
+use super::{capture_or_retry, with_mutation_session, SessionStep};
 use crate::domain::artifact_classifier::{
     artifact_destination_root, artifact_mirror_destination, classification_facts_from_evidence,
     classify_artifacts, preferred_container_destination_root,
@@ -28,7 +28,7 @@ use crate::domain::{Event, Issue};
 use crate::storage::{
     collect_artifact_classification_facts, discover_archive_artifacts,
     resolve_container_destination, validate_repo_relative_path, GitRevisionResolver, IssueStore,
-    JsonFileStorage, RepositoryMutationSession, RepositoryStateStoreError,
+    JsonFileStorage, RepositoryMutationSession,
 };
 use anyhow::{bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
@@ -309,14 +309,12 @@ fn capture_more(
     for listing in listings {
         spec.discover_listing(listing)?;
     }
-    match session.capture(spec) {
-        Ok(next) if next.has_stable_overlap(image) => {
+    match capture_or_retry(session.capture(spec))? {
+        Some(next) if next.has_stable_overlap(image) => {
             *image = next;
             Ok(true)
         }
-        Ok(_) => Ok(false),
-        Err(RepositoryStateStoreError::RetryableConflict { .. }) => Ok(false),
-        Err(error) => Err(error.into()),
+        Some(_) | None => Ok(false),
     }
 }
 
@@ -335,14 +333,12 @@ fn capture_pinned_more(
     for (revision, path) in requests {
         spec.discover_pinned(revision.clone(), path.clone())?;
     }
-    match session.capture(spec) {
-        Ok(next) if next.has_stable_overlap(image) => {
+    match capture_or_retry(session.capture(spec))? {
+        Some(next) if next.has_stable_overlap(image) => {
             *image = next;
             Ok(true)
         }
-        Ok(_) => Ok(false),
-        Err(RepositoryStateStoreError::RetryableConflict { .. }) => Ok(false),
-        Err(error) => Err(error.into()),
+        Some(_) | None => Ok(false),
     }
 }
 

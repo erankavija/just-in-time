@@ -1786,7 +1786,6 @@ fn capture_gate_run_results(
     image: crate::repository_state::RepositoryImage,
 ) -> Result<Option<crate::repository_state::RepositoryImage>> {
     use crate::repository_state::VirtualPath;
-    use crate::storage::RepositoryStateStoreError;
 
     let root = VirtualPath::data("gate-runs")?;
     let mut spec = image.capture_spec().clone();
@@ -1795,11 +1794,10 @@ fn capture_gate_run_results(
     } else {
         spec.discover_paths([root.clone()])?;
         spec.discover_listing(root.clone())?;
-        match session.capture(spec.clone()) {
-            Ok(image) => image,
-            Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-            Err(error) => return Err(error.into()),
-        }
+        let Some(image) = capture_or_retry(session.capture(spec.clone()))? else {
+            return Ok(None);
+        };
+        image
     };
     let children = image
         .listing_fingerprints()
@@ -1813,10 +1811,8 @@ fn capture_gate_run_results(
         return Ok(Some(image));
     }
     spec.discover_paths(children)?;
-    let image = match session.capture(spec.clone()) {
-        Ok(image) => image,
-        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-        Err(error) => return Err(error.into()),
+    let Some(image) = capture_or_retry(session.capture(spec.clone()))? else {
+        return Ok(None);
     };
     let results = crate::repository_state::captured_gate_run_result_paths(&image)?
         .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?;
@@ -1824,11 +1820,7 @@ fn capture_gate_run_results(
         return Ok(Some(image));
     }
     spec.discover_paths(results)?;
-    match session.capture(spec) {
-        Ok(image) => Ok(Some(image)),
-        Err(RepositoryStateStoreError::RetryableConflict { .. }) => Ok(None),
-        Err(error) => Err(error.into()),
-    }
+    capture_or_retry(session.capture(spec))
 }
 
 fn resolve_issue_from_capture(issues: &[Issue], requested: &str) -> Result<String> {

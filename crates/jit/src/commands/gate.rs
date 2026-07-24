@@ -297,7 +297,6 @@ fn capture_gate_preset_image(
     use crate::repository_state::{
         assemble_config, render_capture_closure, CaptureSpec, VirtualPath,
     };
-    use crate::storage::RepositoryStateStoreError;
 
     let presets_dir = VirtualPath::data("config/gate-presets")?;
     let issues_dir = VirtualPath::data("issues")?;
@@ -307,10 +306,8 @@ fn capture_gate_preset_image(
     )?;
     first_spec.discover_listing(presets_dir.clone())?;
     first_spec.discover_listing(issues_dir.clone())?;
-    let first = match session.capture(first_spec) {
-        Ok(image) => image,
-        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-        Err(error) => return Err(error.into()),
+    let Some(first) = capture_or_retry(session.capture(first_spec))? else {
+        return Ok(None);
     };
     let discovered_presets = listed_gate_preset_paths(&first)?;
     let index_bytes = first
@@ -349,10 +346,8 @@ fn capture_gate_preset_image(
     )?;
     spec.discover_listing(presets_dir)?;
     spec.discover_listing(issues_dir.clone())?;
-    let image = match session.capture(spec) {
-        Ok(image) => image,
-        Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
-        Err(error) => return Err(error.into()),
+    let Some(image) = capture_or_retry(session.capture(spec))? else {
+        return Ok(None);
     };
     if listed_gate_preset_paths(&image)? != discovered_presets {
         return Ok(None);
