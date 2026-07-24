@@ -4,8 +4,7 @@ use super::*;
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
 use crate::repository_state::{finalize, MutationContext, MutationIntent};
 use crate::storage::{
-    AmbiguousIdError, InvalidIdPrefixError, IssueNotFoundError, RepositoryStateStoreError,
-    MIN_ID_PREFIX_LENGTH,
+    AmbiguousIdError, InvalidIdPrefixError, IssueNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
 use std::collections::HashSet;
 
@@ -257,7 +256,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let context = MutationContext::production();
 
-        for _ in 0..8 {
+        with_mutation_attempts("dependency mutation", || {
             let (expected_source, expected_lease_mode, enforce_lease) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
                 let Some(image) = self.capture_proposed_base(
@@ -267,7 +266,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     None,
                 )?
                 else {
-                    continue;
+                    return Ok(AttemptOutcome::Retry);
                 };
                 let issues = super::captured_active_issues(&image)?;
                 let source = match &request {
@@ -300,7 +299,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 None,
             )?
             else {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             };
             let issues = super::captured_active_issues(&image)?;
             let current_source = match &request {
@@ -317,7 +316,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     && self.config_manager.enforcement_mode_from_config(&config)?
                         != expected_lease_mode)
             {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             }
             let lease_warnings = if enforce_lease {
                 captured_lease_warnings(
@@ -362,24 +361,18 @@ impl<S: IssueStore> CommandExecutor<S> {
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.into()),
-                    None => Ok(derived.outcome),
+                    None => Ok(AttemptOutcome::Done(derived.outcome)),
                 };
             }
             let plan = finalize(&layout, &image, &context, &derived.intents)?;
-            match session.apply(&plan) {
-                Ok(_) => {
-                    return match derived.error_after_apply {
-                        Some(error) => Err(error.into()),
-                        None => Ok(derived.outcome),
-                    }
-                }
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
+                return Ok(AttemptOutcome::Retry);
             }
-        }
-        Err(anyhow!(
-            "dependency mutation did not converge after repeated capture conflicts"
-        ))
+            match derived.error_after_apply {
+                Some(error) => Err(error.into()),
+                None => Ok(AttemptOutcome::Done(derived.outcome)),
+            }
+        })
     }
 
     fn publish_captured_dependency_removal(
@@ -393,13 +386,13 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let layout = self.require_layout()?;
         let context = MutationContext::production();
-        for _ in 0..8 {
+        with_mutation_attempts("dependency removal", || {
             let (resolved_request, expected_lease_mode, enforce_lease) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
                 let Some(image) =
                     self.capture_proposed_base(preflight.as_mut(), &BTreeMap::new(), &[], None)?
                 else {
-                    continue;
+                    return Ok(AttemptOutcome::Retry);
                 };
                 let issues = super::captured_active_issues(&image)?;
                 let resolved = match &request {
@@ -434,7 +427,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let Some(image) =
                 self.capture_proposed_base(session.as_mut(), &BTreeMap::new(), &[], None)?
             else {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             };
             let issues = super::captured_active_issues(&image)?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
@@ -442,7 +435,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             if enforce_lease
                 && self.config_manager.enforcement_mode_from_config(&config)? != expected_lease_mode
             {
-                continue;
+                return Ok(AttemptOutcome::Retry);
             }
             let recaptured_request = match &request {
                 CapturedDependencyMutation::RemoveSingle {
@@ -508,24 +501,18 @@ impl<S: IssueStore> CommandExecutor<S> {
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.into()),
-                    None => Ok(derived.outcome),
+                    None => Ok(AttemptOutcome::Done(derived.outcome)),
                 };
             }
             let plan = finalize(&layout, &image, &context, &derived.intents)?;
-            match session.apply(&plan) {
-                Ok(_) => {
-                    return match derived.error_after_apply {
-                        Some(error) => Err(error.into()),
-                        None => Ok(derived.outcome),
-                    }
-                }
-                Err(RepositoryStateStoreError::RetryableConflict { .. }) => continue,
-                Err(error) => return Err(error.into()),
+            if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
+                return Ok(AttemptOutcome::Retry);
             }
-        }
-        Err(anyhow!(
-            "dependency removal did not converge after repeated capture conflicts"
-        ))
+            match derived.error_after_apply {
+                Some(error) => Err(error.into()),
+                None => Ok(AttemptOutcome::Done(derived.outcome)),
+            }
+        })
     }
 
     /// Remove multiple dependencies from an issue.
