@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "99614a05c2dc975d0a7329c303b6977a968430f0",
+  "completed_at": "2026-07-24T22:12:20.080229072Z",
+  "duration_ms": 154299,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable hard criteria are met by the contention-test implementation; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dd5b43b6-f198-4a4f-b7bc-8e2c1255f6eb",
+  "message": null,
+  "run_id": "8099d644-9629-49f5-a2eb-06b5aa1e3002",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T22:09:45.780835535Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 298dd419, b468921c, 99614a05\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T22:07:21Z); code-review pending\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable hard criteria are met by the contention-test implementation; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
