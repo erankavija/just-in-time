@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T12:54:39.742337947Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a6ee4e23-f2ae-4430-b35d-e583352dcde6",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Typed finalizer errors for gate-registry edit and archive execution",
-  "updated_at": "2026-07-24T11:59:54.770434977Z"
+  "updated_at": "2026-07-24T12:54:39.742337947Z"
 }
