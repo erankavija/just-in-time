@@ -9238,3 +9238,4 @@
 {"from":"in_progress","id":"1417387f-aeab-4e1f-9b99-6dd8e99bd13d","issue_id":"39e1c091-2e2a-412a-a89a-69ceff40c910","timestamp":"2026-07-24T19:34:13.984356042Z","to":"done","type":"issue_state_changed"}
 {"id":"f0f5bb46-2aac-4960-bf88-5bc077d74394","issue_id":"39e1c091-2e2a-412a-a89a-69ceff40c910","timestamp":"2026-07-24T19:34:13.984356042Z","type":"issue_completed"}
 {"gate_key":"cargo-ci","id":"3fa0a1a9-229c-46ce-944e-16c67c966bdc","issue_id":"531ce80d-0a0e-4aac-84ea-65dfbd2091c6","timestamp":"2026-07-24T19:40:32.623161944Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"bb7df7cf-d45e-456c-b292-cb0275305cd7","issue_id":"531ce80d-0a0e-4aac-84ea-65dfbd2091c6","timestamp":"2026-07-24T19:44:09.434715404Z","type":"gate_failed","updated_by":"auto:executor"}
