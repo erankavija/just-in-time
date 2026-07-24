@@ -20,6 +20,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T14:22:00.449731337Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T14:25:31.367116811Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "58c2f0e9-9d6f-445a-9d6f-7a08bdff26db",
@@ -32,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Exhaustive exit-code mapping and residual error-string sweep",
-  "updated_at": "2026-07-24T14:22:00.449731337Z"
+  "updated_at": "2026-07-24T14:25:31.367116811Z"
 }

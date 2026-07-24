@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "15f39497c1853fa42ffffddc76b2743d65327db2",
+  "completed_at": "2026-07-24T14:25:31.114447815Z",
+  "duration_ms": 164639,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable changes satisfy the hard criteria; recorded cargo-ci passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "58c2f0e9-9d6f-445a-9d6f-7a08bdff26db",
+  "message": null,
+  "run_id": "dd66696f-22ec-4f91-86d1-a32c7a82f62f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T14:22:46.475419077Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:58c2f0e9` commits d661ff3f, 69625588 (merge resolution), and 15f39497\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T14:18:04Z); code-review pending (exit none)\nTruncation recovery: narrowed per-commit patches, current classifier/error-type reads, and item-registry reads after aggregate-output truncation; unrelated archive/history matches were outside this issue’s impact cone.\n\n1. No findings. The state-error classifier is exhaustive without a wildcard at `crates/jit/src/main.rs:117`; profile JSON classification explicitly handles profile conflicts at `crates/jit/src/main.rs:830`; the module has no `anyhow` signatures or `format!`-constructed error values; and focused classifier tests cover the changed behavior at `crates/jit/src/main.rs:8221`.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable changes satisfy the hard criteria; recorded cargo-ci passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
