@@ -24,8 +24,8 @@
       "wave_number": 2,
       "rationale": "S1 mid-layer. a4e5ca3d touches ~15 command files (big mechanical); a6ee4e23 touches repository_state/{mod,archive}.rs. No overlap.",
       "issues": [
-        {"id": "a4e5ca3d", "short_id": "a4e5ca3d", "title": "Single-session retry call-site migration", "story": "S1", "classification": "implementation", "status": "pending"},
-        {"id": "a6ee4e23", "short_id": "a6ee4e23", "title": "Typed finalizer errors for gate-registry edit and archive execution", "story": "S1", "classification": "implementation", "status": "pending"}
+        {"id": "a4e5ca3d", "short_id": "a4e5ca3d", "title": "Single-session retry call-site migration", "story": "S1", "classification": "implementation", "status": "dispatched", "agent": "worker-a4e5ca3d", "model": "opus"},
+        {"id": "a6ee4e23", "short_id": "a6ee4e23", "title": "Typed finalizer errors for gate-registry edit and archive execution", "story": "S1", "classification": "implementation", "status": "dispatched", "agent": "worker-a6ee4e23", "model": "sonnet"}
       ]
     },
     {
