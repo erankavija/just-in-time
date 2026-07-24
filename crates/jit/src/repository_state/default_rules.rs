@@ -366,6 +366,10 @@ pub struct DefaultRuleMembershipDiff {
 
 impl DefaultRuleMembershipDiff {
     /// Whether applying this diff would change anything.
+    // Measured: no production caller anywhere in the crate. Its only
+    // consumers are this module's own `cfg(test)` unit tests, so it is
+    // unreached in a plain, non-test-support build.
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.to_add.is_empty() && self.to_drop.is_empty()
     }
@@ -431,6 +435,12 @@ impl DefaultRuleMembershipDiff {
 /// assert_eq!(diff.to_add[0].name, "namespace-unique-team");
 /// assert!(diff.to_drop.is_empty());
 /// ```
+// This fn must stay `pub` at its own definition (the `test-support` arm
+// re-exports it as fully `pub` from `repository_state`). Measured: it has no
+// production caller anywhere in the crate — its only consumers are this
+// module's own `cfg(test)` unit tests and the doctest above — so it is
+// unreached in a plain, non-test-support build.
+#[allow(dead_code)]
 pub fn default_rule_membership_diff(
     loaded: &RuleSet,
     namespaces: &LabelNamespaces,
@@ -454,7 +464,7 @@ pub fn default_rule_membership_diff(
 ///
 /// Pure: no I/O, deterministic — `to_add` and `to_drop` are sorted by rule
 /// name.
-pub fn default_rule_membership_diff_from_identities(
+pub(crate) fn default_rule_membership_diff_from_identities(
     existing_rules: &[(String, Option<String>)],
     namespaces: &LabelNamespaces,
 ) -> DefaultRuleMembershipDiff {

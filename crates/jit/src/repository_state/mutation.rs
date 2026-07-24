@@ -21,7 +21,7 @@ use super::{
     RootRelativePath, SeedError, VirtualPath,
 };
 use crate::declarations::GateRegistry;
-use crate::domain::{Assignee, Event, GateRunResult, GateStatus, Issue, Priority, State};
+use crate::domain::{Assignee, Event, GateRunResult, GateStatus, Issue, State};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
@@ -50,11 +50,11 @@ impl MutationClock for SystemMutationClock {
 
 /// Deterministic clock returning one fixed instant, for memory and tests.
 #[derive(Debug, Clone, Copy)]
-pub struct FixedMutationClock(DateTime<Utc>);
+pub(crate) struct FixedMutationClock(DateTime<Utc>);
 
 impl FixedMutationClock {
     /// Construct a clock that always returns `instant`.
-    pub fn new(instant: DateTime<Utc>) -> Self {
+    pub(crate) fn new(instant: DateTime<Utc>) -> Self {
         Self(instant)
     }
 }
@@ -1179,7 +1179,7 @@ fn compose_event_action(
 /// finalizer sets from the captured prefix. Unlike `Event::draft_profile_applied` it
 /// samples neither a UUID nor the wall clock, so the finalizer — not command code —
 /// owns the event's identity, time, and torn-tail evidence.
-pub fn profile_applied_event(
+pub(crate) fn profile_applied_event(
     profile_id: String,
     version: String,
     origin: crate::domain::ProfileOrigin,
@@ -1198,7 +1198,7 @@ pub fn profile_applied_event(
     }
 }
 
-pub fn finalize_audit_append(
+pub(crate) fn finalize_audit_append(
     image: &RepositoryImage,
     context: &MutationContext,
     events: Vec<(u8, Event)>,
@@ -1301,16 +1301,6 @@ fn event_identities(event: &Event) -> (String, String) {
         Event::IssueClaimed { assignee, .. } => (issue_id, assignee.to_string()),
         _ => (issue_id, String::new()),
     }
-}
-
-/// Convenience for callers building a fresh issue draft with a known priority.
-///
-/// The draft carries no authoritative id or lifecycle timestamps; the finalizer
-/// assigns them. Kept here so command producers never stamp identity or time.
-pub fn issue_draft(title: String, description: String, priority: Priority) -> Issue {
-    let mut issue = Issue::draft(title, description);
-    issue.priority = priority;
-    issue
 }
 
 #[cfg(test)]
