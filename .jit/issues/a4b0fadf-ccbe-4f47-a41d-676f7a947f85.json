@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-24T15:59:04.375946585Z",
   "context": {},
   "created_at": "2026-07-24T07:19:49.615370967Z",
   "dependencies": [
@@ -22,7 +23,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Bulk-mutation benchmark scenario",
-  "updated_at": "2026-07-24T15:58:04.166950159Z"
+  "updated_at": "2026-07-24T15:59:04.375946585Z"
 }
