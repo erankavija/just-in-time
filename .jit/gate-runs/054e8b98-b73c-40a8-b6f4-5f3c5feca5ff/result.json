@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "510000daf249542ade04abbc7b7630d25678445f",
+  "completed_at": "2026-07-24T11:25:51.934296684Z",
+  "duration_ms": 216626,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met in the attributable current tree; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "eefbfe84-ff5a-4430-ad0c-e49f1020abef",
+  "message": null,
+  "run_id": "054e8b98-b73c-40a8-b6f4-5f3c5feca5ff",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T11:22:15.307708272Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 510000da, 64e1c586, e1decb64, bea9a8bf, ba7d4838 (`jit:eefbfe84`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1 and @/charter/D-3 and @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics and @/invariant/semantic-test-assertions and @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-07-24T11:16:09Z (fmt, clippy, 3,821 tests); code-review pending/unrun\nTruncation recovery: narrowed current-file reads for all affected Rust paths; inspected merge-parent diffs and excluded bea9a8bf’s unrelated incoming-parent changes\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met in the attributable current tree; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
