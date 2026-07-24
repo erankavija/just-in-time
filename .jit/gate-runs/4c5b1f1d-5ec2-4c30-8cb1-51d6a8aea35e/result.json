@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "4015630d8c4684b895668a531836fb9e66ff54d5",
+  "completed_at": "2026-07-24T23:40:39.558543914Z",
+  "duration_ms": 193671,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/managed_document_property_tests.rs",
+        "id": "F1",
+        "line": 120,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/2958105e/requirement/REQ-05",
+          "@/invariant/semantic-test-assertions"
+        ],
+        "severity": "medium",
+        "summary": "Managed-document property seeds present regions with empty bodies and only asserts payload containment, so stale content around a replacement payload can pass."
+      }
+    ],
+    "summary": "Managed-document splice property coverage does not verify replacement of non-empty existing region content.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2958105e-d9ea-4ba6-8594-35d01e504b07",
+  "message": null,
+  "run_id": "4c5b1f1d-5ec2-4c30-8cb1-51d6a8aea35e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T23:37:25.886670693Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5093 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f967d-ab90-7fa3-a80a-45faeb849db8\n--------\nuser\n--- 5080 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 4015630d (gate-result record only); completed dependency integration inspected separately  \nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml  \nResolved items: @/issue/2958105e/requirement/REQ-05–REQ-08 (issue description); @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)  \nGate evidence: cargo-ci passed (exit 0, 2026-07-24T23:30:22Z); code-review pending (no prior run)  \nTruncation recovery: narrowed the initially truncated relevant-source search to the property, contention, repair, visibility, and path implementation/test slices; avoided further item-list calls after its lock attempt failed  \n\n1. [blocking][issue-impact][medium] The managed-document property does not exercise replacement of a non-empty existing region body: generated present regions contain only adjacent delimiters at `crates/jit/src/repository_state/managed_document_property_tests.rs:120-123`, and the assertion merely checks that the new payload is contained within the delimiters at line 196. A regression that preserves stale interior bytes around the new payload would pass idempotence and all current assertions, leaving REQ-05’s splice round-trip guarantee materially unverified. References: @/issue/2958105e/requirement/REQ-05, @/invariant/semantic-test-assertions.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Managed-document splice property coverage does not verify replacement of non-empty existing region content.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Managed-document property seeds present regions with empty bodies and only asserts payload containment, so stale content around a replacement payload can pass.\",\"file\":\"crates/jit/src/repository_state/managed_document_property_tests.rs\",\"line\":120,\"references\":[\"@/issue/2958105e/requirement/REQ-05\",\"@/invariant/semantic-test-assertions\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
