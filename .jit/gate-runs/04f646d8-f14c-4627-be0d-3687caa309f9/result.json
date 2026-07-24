@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "1fecec933b1827fbea2bb3524c3d11b11eeedb4b",
+  "completed_at": "2026-07-24T11:36:52.335251262Z",
+  "duration_ms": 178251,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied; both variants use the shared identity tail and the five-variant test is present.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fee3c528-6591-40d2-8c7b-c5a64b2b3de7",
+  "message": null,
+  "run_id": "04f646d8-f14c-4627-be0d-3687caa309f9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T11:33:54.083404378Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `4189cae3`, `710df7c7`, `1fecec93` (`jit:fee3c528`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-1`, `@/charter/D-3`, `@/charter/D-4` (`dev/vision/9db27a3a-charter.md`); `@/invariant/gate-semantics`, `@/invariant/derived-state-coherence`, `@/invariant/semantic-test-assertions`, `@/invariant/shared-test-contracts`, `@/invariant/bounded-rust-build-footprint` (`.jit/invariants.toml`); `@/gate/jit-validate` (`.jit/gates.toml`)\nGate evidence: `cargo-ci` passed (exit 0, 2026-07-24T11:27:47Z); `code-review` pending\nTruncation recovery: narrowed merge-parent patches, source registries, plan-hash implementation, and affected callers\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied; both variants use the shared identity tail and the five-variant test is present.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
