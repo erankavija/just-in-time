@@ -2,7 +2,7 @@
 # Fast contract test for scripts/benchmark-session-cost.sh (jit:73981310).
 set -euo pipefail
 
-for tool in jq git; do
+for tool in cmp find git grep jq sha256sum; do
   command -v "$tool" >/dev/null 2>&1 || {
     echo "selftest: required tool '$tool' is unavailable" >&2
     exit 2
@@ -69,13 +69,16 @@ chmod +x "$mock_jit"
 out="$scratch/out"
 work="$scratch/work"
 export MOCK_JIT_LOG="$scratch/jit.log"
-SESSION_BENCH_BIN="$mock_jit" \
-SESSION_BENCH_ISSUE_COUNT=2 \
-SESSION_BENCH_WARMUP=1 \
-SESSION_BENCH_SAMPLES=1 \
-SESSION_BENCH_OUT_DIR="$out" \
-SESSION_BENCH_WORK_DIR="$work" \
-  "$harness"
+run_harness() {
+  SESSION_BENCH_BIN="$mock_jit" \
+  SESSION_BENCH_ISSUE_COUNT=2 \
+  SESSION_BENCH_WARMUP=1 \
+  SESSION_BENCH_SAMPLES=1 \
+  SESSION_BENCH_OUT_DIR="$out" \
+  SESSION_BENCH_WORK_DIR="$work" \
+    "$harness"
+}
+run_harness
 
 artifact="$out/session-cost-deadbeef.json"
 [[ -f "$artifact" ]] || {
@@ -120,5 +123,40 @@ update_count=$(grep -c '^issue update ' "$MOCK_JIT_LOG")
   echo "selftest: expected at least 23 mutation invocations, got $update_count" >&2
   exit 1
 }
+
+# A second run has the same measured commit and therefore collides with the
+# existing stable artifact name. Publication must fail atomically without
+# changing the first artifact or leaking its staged temporary file.
+expected="$scratch/expected-artifact.json"
+cp "$artifact" "$expected"
+expected_checksum=$(sha256sum "$artifact" | awk '{print $1}')
+set +e
+run_harness >"$scratch/collision.stdout" 2>"$scratch/collision.stderr"
+collision_rc=$?
+set -e
+[[ "$collision_rc" -ne 0 ]] || {
+  echo "selftest: colliding artifact publication unexpectedly succeeded" >&2
+  exit 1
+}
+grep -Fq 'benchmark artifact already exists; refusing to replace' \
+  "$scratch/collision.stderr" || {
+  echo "selftest: collision did not report the occupied destination" >&2
+  exit 1
+}
+cmp -s "$expected" "$artifact" || {
+  echo "selftest: colliding publication changed existing artifact bytes" >&2
+  exit 1
+}
+actual_checksum=$(sha256sum "$artifact" | awk '{print $1}')
+[[ "$actual_checksum" == "$expected_checksum" ]] || {
+  echo "selftest: colliding publication changed existing artifact checksum" >&2
+  exit 1
+}
+temp_count=$(find "$out" -maxdepth 1 -name '.session-cost.json.*' -print | wc -l | tr -d ' ')
+[[ "$temp_count" -eq 0 ]] || {
+  echo "selftest: colliding publication leaked $temp_count staged artifact(s)" >&2
+  exit 1
+}
+echo "benchmark-session-cost collision: PASS (existing bytes preserved, no staged leak)"
 
 echo "benchmark-session-cost selftest: PASS"
