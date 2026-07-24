@@ -7,9 +7,9 @@
 ## Current state
 
 - Epic: `1cc809de` — state: in_progress; epic gates `repo-validate` and `holistic-review` remain pending until the implementation interior is complete.
-- Wave in progress: wave 5 of 8, sub-wave 5c. 11 of wave 5's 12 issues are Done; only `dd5b43b6` (multi-threaded contention tests) is outstanding.
-- Children summary: waves 1–4 fully done (14 issues incl. stories S1 `d159f9d4` and S3 `d752293b`); wave 5: 11 done, 1 dispatched (`dd5b43b6`); waves 6–8 (6 issues incl. stories S2/S4/S5) pending.
-- Active claims: `dd5b43b6` claimed `agent:worker`; worker `worker-dd5b43b6` (Sonnet) LIVE in background, worktree `.agents/worktrees/agent-dd5b43b6`, branch `worktree-agent-dd5b43b6`, anchored `848181ff`. All other workers shut down gracefully.
+- Wave in progress: **wave 5 of 8 COMPLETE (12/12)** — `dd5b43b6` reported after the initial handoff commit and was merged, gated (cargo-ci + code-review ✓✓), reviewed PASS, and completed within session 4. `current_wave` is 6; wave 6 has NOT been dispatched.
+- Children summary: waves 1–5 fully done (26 issues incl. stories S1 `d159f9d4` and S3 `d752293b`); waves 6–8 (6 issues incl. stories S2/S4/S5) pending.
+- Active claims: none. All workers shut down gracefully.
 - Open escalations: none awaiting input. Three rework-cap escalations were resolved by invoker guidance this session (412925b9 ×1, 531ce80d ×2 — see progress file `escalations`).
 - Progress file: `dev/active/1cc809de-progress.json` (current).
 
@@ -27,7 +27,7 @@
 
 ## What to do next
 
-- [ ] Await `worker-dd5b43b6` (SendMessage name `worker-dd5b43b6`; check worktree `git -C .agents/worktrees/agent-dd5b43b6 log --oneline 848181ff..HEAD` + dirty-file mtimes). On report: merge `--no-ff`, `scripts/verify-commit-builds.sh`, then run its gate chain (pattern: `scratchpad gate-chain-*.sh` scripts from this session — evaluate cargo-ci, commit evidence, reinstall via `./scripts/install-jit.sh`, `rm -rf target/debug/incremental`, evaluate code-review, commit, reinstall). Six-tier review, complete, advance progress to wave 6.
+- [ ] ~~Await `worker-dd5b43b6`~~ DONE within session 4: merged (`b468921c`), gates passed, completed (`c425c422`). Gate-chain pattern for wave 6: background script per issue — evaluate cargo-ci, commit evidence, reinstall via `./scripts/install-jit.sh`, `rm -rf target/debug/incremental`, evaluate code-review, commit, reinstall.
 - [ ] Wave 6 (four tasks then two stories): `1781aec2` (VirtualPath const call-site migration; touch list in plan manifest — wide but mechanical), `67a77503` (visibility-enforced cutover guard), `73d9070f` (delete dead export + demote publics), `42ee0dd5` (gate rule-serialization publics behind test-support twin pattern per 28254964). Conflict analysis: 1781aec2 overlaps most repository_state/commands files — dispatch it SOLO first or in a worktree with the other three serialized after; 73d9070f/42ee0dd5 both touch visibility surfaces — check exact files before parallelizing. Then stories S2 `2958105e`, S4 `755cf453` (story-level gates; expect the story reviewer to read against EPIC criteria, not just task criteria — see Traps).
 - [ ] Wave 7: `f87e3273` (successor deck; REQ-16 traceability — every falsifiable claim cites a repository artifact); wave 8: `cba48167` (tombstone), story S5 `9ee14023`, then Section 10 epic completion (map all 16 REQs, run `jit gate evaluate-all 1cc809de`, completion report, archive).
 - [ ] Dispatch-prompt policy (worked, keep): workers verify fmt + clippy + targeted tests + `cargo test --workspace --no-run`, commit, report immediately; lead's cargo-ci gate is the authoritative full-suite run.
