@@ -1,5 +1,7 @@
 //! Typed recovery state and failure/race injection for the transaction kernel.
 
+use super::transaction_journal::ActionTag;
+
 /// Observable recovery state returned after prepare/commit/rollback.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum RecoveryState {
@@ -107,4 +109,17 @@ pub(crate) enum FileTransactionError {
         "transaction journal actions resolve to one physical identity (a hard-link alias): {path}"
     )]
     AliasedTarget { path: String },
+    /// The semantic delta and its durable journal action drifted out of
+    /// alignment at `index`: a total extraction expected the `expected` action
+    /// tag but the journal action carried `found`. Structurally unreachable for
+    /// a delta built through `RepositoryDelta::new` (its journal is derived from
+    /// the same validated actions); it replaces the former mid-publication
+    /// `unreachable!` so any drift aborts with no partial write instead of a
+    /// panic.
+    #[error("journal action {index} kind mismatch: expected {expected}, found {found}")]
+    JournalActionMismatch {
+        index: usize,
+        expected: ActionTag,
+        found: ActionTag,
+    },
 }
