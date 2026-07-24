@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "c3d12d6c97769b8e597b287dca502a8285aeef53",
+  "completed_at": "2026-07-24T15:33:34.976631777Z",
+  "duration_ms": 194130,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/bulk_update.rs",
+        "id": "F1",
+        "line": 255,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "A skip confirmed in a released session is never revalidated, so a concurrent change can suppress a necessary update or error."
+      }
+    ],
+    "summary": "A released shared verification session can authorize a stale skip and suppress a required per-issue update or error.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "412925b9-874c-4679-909c-95afe31f9287",
+  "message": null,
+  "run_id": "e09399ed-2abb-42f3-8f49-077e773c9c6e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T15:30:20.845890088Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6008 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f94bf-bb0d-7b90-9f2a-22e60b4a89aa\n--------\nuser\n--- 5995 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2ac7b230, 61eb2d41, 1337381a, f911f11d, 0cbe8763, 5c9c363d, 9f4e0c23, 3992a65a, f3ff8ad7, 9fb26635, 7229afdc, 031218bb, c3d12d6c (`jit:412925b9`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, @/invariant/derived-state-coherence, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T15:24:22Z); code-review failed (exit 1, 2026-07-24T14:58:08Z; prior F1 is addressed)\nTruncation recovery: narrowed the truncated combined source scan to the mutation-session driver, verifier, authoritative derivation, budget/regression tests, and storage session lifetime.\n\n1. [blocking][issue-impact] The shared verifier releases its session before [apply_bulk_update](crates/jit/src/commands/bulk_update.rs:255) records `confirmed_skips` in the following loop. A concurrent mutation can therefore change a clean candidate after verification—for example, remove an already-requested gate declaration or alter its target field—while the new code reports “No changes needed.” The former per-issue path would open its own fresh session and return the current error or apply the needed update. This violates REQ-03’s behavior-preserving per-issue result requirement; no regression test covers the post-verification race.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A released shared verification session can authorize a stale skip and suppress a required per-issue update or error.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A skip confirmed in a released session is never revalidated, so a concurrent change can suppress a necessary update or error.\",\"file\":\"crates/jit/src/commands/bulk_update.rs\",\"line\":255,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
