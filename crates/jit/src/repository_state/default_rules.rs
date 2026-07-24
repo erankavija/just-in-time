@@ -454,7 +454,7 @@ pub fn default_rule_membership_diff(
 ///
 /// Pure: no I/O, deterministic — `to_add` and `to_drop` are sorted by rule
 /// name.
-pub fn default_rule_membership_diff_from_identities(
+pub(crate) fn default_rule_membership_diff_from_identities(
     existing_rules: &[(String, Option<String>)],
     namespaces: &LabelNamespaces,
 ) -> DefaultRuleMembershipDiff {

@@ -302,7 +302,7 @@ impl RepositoryRootEvidence {
 
 /// Proof included in capture and plan identities.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct InjectivityProof {
+pub(crate) struct InjectivityProof {
     worktree_identity: String,
     data_identity: String,
     nested_data_relative: Option<RootRelativePath>,
@@ -383,11 +383,6 @@ impl RepositoryLayout {
     /// Boundary identity captured for the selected data root.
     pub(crate) fn data_identity(&self) -> &str {
         self.data.identity()
-    }
-
-    /// Stable virtual-to-physical uniqueness proof.
-    pub fn injectivity_proof(&self) -> &InjectivityProof {
-        &self.proof
     }
 
     /// Deserialize a virtual path through this layout's canonicality check.

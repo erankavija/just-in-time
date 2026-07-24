@@ -40,7 +40,7 @@ pub enum ManagedDocumentClaim {
 }
 
 /// Compose every target only after all claims have been collected.
-pub fn compose_managed_documents(
+pub(crate) fn compose_managed_documents(
     image: &RepositoryImage,
     claims: impl IntoIterator<Item = (VirtualPath, ManagedDocumentClaim)>,
 ) -> Result<BTreeMap<VirtualPath, Vec<u8>>, ManagedDocumentError> {

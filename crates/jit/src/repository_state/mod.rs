@@ -25,10 +25,11 @@ mod rules_gates_projection;
 
 pub(crate) use archive::captured_archive_events;
 pub use archive::{finalize_archive_execution, ArchiveExecutionError};
+pub(crate) use default_rules::default_rule_membership_diff_from_identities;
 pub use default_rules::{
-    default_rule_membership_diff, default_rule_membership_diff_from_identities, default_ruleset,
-    hierarchy_config, reconcile_default_rules_with_config, type_hierarchy_known_schema,
-    DefaultRuleMembershipDiff, TYPE_HIERARCHY_SCHEMA_FILE,
+    default_rule_membership_diff, default_ruleset, hierarchy_config,
+    reconcile_default_rules_with_config, type_hierarchy_known_schema, DefaultRuleMembershipDiff,
+    TYPE_HIERARCHY_SCHEMA_FILE,
 };
 pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,
@@ -46,19 +47,18 @@ pub use initialize::{
     render_repo_config, GitattributesClaim, GitattributesStatus, InitializationError,
     InitializationScaffold,
 };
+pub(crate) use managed_document::compose_managed_documents;
 pub use managed_document::{
-    compose_managed_documents, render_managed_document, ManagedDocumentClaim, ManagedDocumentError,
-    RegionPlacement,
+    render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,
 };
 pub use materialize::{
     assemble_config, render_capture_closure, validate_capture_closure, ValidationCaptureClosure,
 };
 pub(crate) use mutation::captured_gate_run_result_paths;
 pub use mutation::{
-    finalize, finalize_audit_append, fresh_index_bytes, gate_run_result_relative_path, issue_draft,
-    prefix_has_torn_tail, profile_applied_event, serialize_event, serialize_gate_run,
-    serialize_issue, FixedMutationClock, IdAuthority, MutationClock, MutationContext,
-    MutationError, MutationIntent, SystemMutationClock,
+    finalize, fresh_index_bytes, gate_run_result_relative_path, prefix_has_torn_tail,
+    serialize_event, serialize_gate_run, serialize_issue, IdAuthority, MutationClock,
+    MutationContext, MutationError, MutationIntent, SystemMutationClock,
 };
 
 /// Finalize one typed gate-registry edit, its audit event, and every coupled
@@ -147,8 +147,8 @@ pub enum GateRegistryEditError {
 }
 pub use overlay::{apply_overlay, OverlayError};
 pub use path::{
-    InjectivityProof, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RepositoryRootEvidence, RootRelativePath, VirtualPath,
+    RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RepositoryRootEvidence,
+    RootRelativePath, VirtualPath,
 };
 pub(crate) use profile_apply::profile_capture_closure;
 pub use profile_apply::{
