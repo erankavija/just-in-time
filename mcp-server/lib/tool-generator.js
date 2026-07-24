@@ -114,59 +114,82 @@ function toMcpOutputSchema(schema, globalTypes = {}) {
   delete out.$schema;
   delete out.title;
 
-  // Merge local definitions with global types for resolution
-  const allDefinitions = {
-    ...globalTypes,
-    ...(out.definitions || {})
-  };
+  // Recursively resolve all $ref references. Local `definitions` blocks
+  // (including ones nested inside oneOf branches) are picked up as scopes
+  // by resolveRefs itself; global types seed the outermost scope.
+  const resolved = resolveRefs(out, globalTypes);
 
-  // Recursively resolve all $ref references
-  const resolved = resolveRefs(out, allDefinitions);
-  
-  // Remove definitions section (no longer needed)
+  // Remove definitions section (no longer needed; resolveRefs already
+  // strips nested ones, but the outermost object was cloned pre-resolution)
   delete resolved.definitions;
-  
+
   return ensureObjectType(resolved);
 }
 
 /**
  * Recursively resolve all $ref references in a schema object.
+ *
+ * `success_schema` documents from the CLI are not one flat `definitions`
+ * bag: a `oneOf` response carries one independent JSON Schema document per
+ * branch, each with its own local `definitions`. Resolution therefore
+ * scopes definitions the way JSON Schema does — a `definitions` object
+ * merges into the lookup table for its own subtree, shadowing outer
+ * definitions of the same name — rather than relying solely on the
+ * outermost bag.
+ *
+ * Self-referential definitions (e.g. a tree node whose children are more
+ * of itself) are legitimate recursive schema shapes, not generator bugs:
+ * once a `$ref` chain has passed through at least one array/object member
+ * since it last substituted a definition, revisiting that definition is
+ * expected and is truncated silently. A `$ref` chain that revisits a
+ * definition with no structural progress at all (a bare alias loop, e.g.
+ * `A -> {$ref: B}`, `B -> {$ref: A}`) is a real generator/schema mismatch
+ * and still warns.
+ *
  * @param {any} obj - Schema object or value to process
- * @param {Object} definitions - All available definitions (local + global)
- * @param {Set} visiting - Set of refs being resolved (for cycle detection)
+ * @param {Object} definitions - Definitions in scope (local + global)
+ * @param {Set} visiting - Definition names being resolved (for cycle detection)
+ * @param {boolean} tookStructuralStep - Whether a property/array member was
+ *   traversed since the current `visiting` chain last substituted a definition
  * @returns {any} Schema with all $ref resolved
  */
-function resolveRefs(obj, definitions, visiting = new Set()) {
+function resolveRefs(obj, definitions, visiting = new Set(), tookStructuralStep = false) {
   // Handle primitives and null
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
 
-  // Handle arrays
+  // Handle arrays: each item is a structural step into the schema
   if (Array.isArray(obj)) {
-    return obj.map(item => resolveRefs(item, definitions, visiting));
+    return obj.map(item => resolveRefs(item, definitions, visiting, true));
   }
 
   // Handle $ref objects
   if (obj.$ref && typeof obj.$ref === 'string') {
     const refPath = obj.$ref;
-    
+
     // Extract definition name from #/definitions/Name or #/types/Name
     const match = refPath.match(/^#\/(definitions|types)\/(.+)$/);
     if (match) {
       const defName = match[2];
-      
+
       // Prevent infinite recursion
       if (visiting.has(defName)) {
+        if (tookStructuralStep) {
+          // Legitimate recursive type (e.g. a tree node referencing itself
+          // through a child array): flatten by truncating here.
+          return { type: 'object' };
+        }
         console.error(`Warning: Circular $ref detected: ${defName}`);
         return { type: 'object' }; // Fallback for circular refs
       }
-      
+
       const definition = definitions[defName];
       if (definition) {
-        // Resolve nested refs in the definition
+        // Resolve nested refs in the definition, against a fresh
+        // structural-step count for this substitution.
         visiting.add(defName);
-        const resolved = resolveRefs(definition, definitions, visiting);
+        const resolved = resolveRefs(definition, definitions, visiting, false);
         visiting.delete(defName);
         return resolved;
       } else {
@@ -174,16 +197,24 @@ function resolveRefs(obj, definitions, visiting = new Set()) {
         return { type: 'object' }; // Fallback for missing definitions
       }
     }
-    
+
     // Unknown $ref format, leave as-is (will likely cause an error, but at least we tried)
     console.error(`Warning: Unrecognized $ref format: ${refPath}`);
     return obj;
   }
 
-  // Handle regular objects: recursively process all properties
+  // Handle regular objects: recursively process all properties. A local
+  // `definitions` block scopes over the rest of this object's subtree
+  // (shadowing same-named outer definitions) and is dropped from the
+  // output — MCP outputSchema has no `$ref` left to point at it.
+  const scopedDefinitions = obj.definitions
+    ? { ...definitions, ...obj.definitions }
+    : definitions;
+
   const result = {};
   for (const [key, value] of Object.entries(obj)) {
-    result[key] = resolveRefs(value, definitions, visiting);
+    if (key === 'definitions') continue;
+    result[key] = resolveRefs(value, scopedDefinitions, visiting, true);
   }
   return result;
 }
