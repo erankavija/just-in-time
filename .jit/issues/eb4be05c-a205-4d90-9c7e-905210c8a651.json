@@ -8,6 +8,7 @@
   ],
   "description": "The CLI reference documents the typed error-code split for `project render` under `--json` as implemented, rather than a single blanket code.\n\n## Background\n\n`docs/reference/cli-commands.md` states that a failing `project render` under `--json` returns `PROJECT_COMMAND_FAILED`, while typed validation and projection failures actually surface `VALIDATION_FAILED`, as documented elsewhere in the same file. The reference must describe the typed error-code split as implemented.\n\n## Success Criteria\n\n- [hard] REQ-01: `docs/reference/cli-commands.md` describes the typed error-code split for `project render` under `--json` - validation and projection failures surface `VALIDATION_FAILED` - instead of stating a single `PROJECT_COMMAND_FAILED`, matching the code's actual behavior.\n- [hard] REQ-02: The corrected text states current behavior with no before/after narration.\n\n## Notes\n\nVerify the documented codes against the command's actual `--json` failure paths.",
   "documents": [],
+  "done_at": "2026-07-24T17:52:38.959386769Z",
   "first_ready_at": "2026-07-24T16:53:36.041376160Z",
   "gates_required": [
     "doc-review",
@@ -33,7 +34,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Correct the CLI project-render error-code documentation",
-  "updated_at": "2026-07-24T17:25:31.061448086Z"
+  "updated_at": "2026-07-24T17:52:38.959386769Z"
 }
