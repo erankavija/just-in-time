@@ -1,6 +1,8 @@
 use crate::harness::TestHarness;
 use jit::repository_state::{
-    CaptureBudget, CaptureSpec, FileMode, RepositoryEntry, RepositoryRootClass, VirtualPath,
+    assemble_config, repair_target_paths, validate_capture_closure, CaptureBudget, CaptureSpec,
+    FileMode, RepositoryDeclarations, RepositoryEntry, RepositoryLayout, RepositoryRootClass,
+    VirtualPath,
 };
 use jit::storage::{IssueStore, RepositoryStateStore};
 use std::collections::BTreeMap;
@@ -82,31 +84,161 @@ fn capture(
     session.capture(spec).unwrap().entries().clone()
 }
 
-fn repair_paths() -> Vec<String> {
+/// Render a captured `VirtualPath` back to the `write`/`read`-facing spelling
+/// this file's fixtures use: `.jit/`-prefixed for the data root, bare for the
+/// worktree.
+fn repo_relative(path: &VirtualPath) -> String {
+    let relative = path
+        .relative()
+        .as_path()
+        .to_str()
+        .expect("canonical paths are UTF-8")
+        .to_string();
+    match path.root_class() {
+        RepositoryRootClass::Data => format!(".jit/{relative}"),
+        RepositoryRootClass::Worktree => relative,
+    }
+}
+
+/// Capture the complete image `repair_target_paths` needs from a jit-dogfood
+/// repository: the engine registries, the validation-derived
+/// projection/schema/kind closure those registries imply, and the profile's own
+/// target paths plus its applied-profile record. This is the exact closure
+/// production repair itself captures (`CommandExecutor::capture_repair_plan`),
+/// assembled here from public `repository_state` producers only.
+fn repository_image(
+    storage: &impl RepositoryStateStore,
+    layout: &RepositoryLayout,
+) -> jit::repository_state::RepositoryImage {
+    let budget = CaptureBudget {
+        max_paths: 512,
+        max_listings: 16,
+        max_bytes: 32 * 1024 * 1024,
+        max_depth: 16,
+    };
+    let registries = [
+        "config.toml",
+        "invariants.toml",
+        "rules.toml",
+        "gates.toml",
+        "templates.toml",
+        "index.json",
+        "events.jsonl",
+    ]
+    .into_iter()
+    .map(|path| VirtualPath::data(path).unwrap())
+    .collect::<Vec<_>>();
+    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+    let image_one = session
+        .capture(CaptureSpec::phase_one(registries.clone(), budget).unwrap())
+        .unwrap();
+
+    let config = assemble_config(&image_one).unwrap();
+    let rules_content = image_one
+        .file_bytes(&VirtualPath::data("rules.toml").unwrap())
+        .unwrap()
+        .map(|bytes| std::str::from_utf8(bytes).unwrap().to_string());
+    let closure = validate_capture_closure(layout, &config, &[], rules_content.as_deref()).unwrap();
+
+    let mut spec = CaptureSpec::phase_one(registries, budget).unwrap();
+    spec.discover_paths(closure.paths).unwrap();
+    for listing in &closure.listings {
+        spec.discover_listing(listing.clone()).unwrap();
+    }
     let package = jit::profile::jit_dogfood_package().unwrap();
-    package
-        .hashes()
-        .targets
-        .keys()
-        .cloned()
-        .chain(
-            [
-                PROFILE_RECORD,
-                ".jit/config.toml",
-                ".jit/gates.toml",
-                ".jit/rules.toml",
-                ".jit/reference/rules-and-gates.md",
-                ".jit/schemas/default-label-format.json",
-                ".jit/schemas/default-namespace-registry.json",
-                ".jit/schemas/default-type-hierarchy-known.json",
-                ".jit/index.json",
-                ".jit/events.jsonl",
-                "AGENTS.md",
-            ]
+    spec.discover_paths(
+        package
+            .hashes()
+            .targets
+            .keys()
+            .map(|path| layout.classify_repository_relative(path).unwrap()),
+    )
+    .unwrap();
+    spec.discover_paths([layout.classify_repository_relative(PROFILE_RECORD).unwrap()])
+        .unwrap();
+
+    session.capture(spec).unwrap()
+}
+
+/// `repair_target_paths` computed over a freshly initialized, coherent
+/// jit-dogfood repository, as `write`/`read`-facing repo-relative strings.
+/// Computed once and cached: every call site needs the identical set, and this
+/// repository is otherwise self-contained (does not depend on any test's own,
+/// possibly already-drifted, harness).
+///
+/// The `profiles` argument passed to `repair_target_paths` here uses
+/// `build_profile_claims` (install semantics), not the
+/// `build_profile_repair_claims` production repair itself passes: a repair
+/// claim carries no contributions at all, because a registry-merge target
+/// (config.toml/gates.toml/templates.toml) is install-time only — a mismatched
+/// value is an unresolvable conflict, never something repair rewrites (see
+/// `crate::profile::apply_claims::build_claims`). Using install semantics here
+/// means this fixture's target set additionally covers those registries, so
+/// `profiled_harness` can seed a genuinely coherent repository; it does not
+/// change what production repair itself would touch.
+fn repair_target_path_strings() -> Vec<String> {
+    static PATHS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    PATHS
+        .get_or_init(|| {
+            let source = tempfile::tempdir().unwrap();
+            let storage = jit::storage::JsonFileStorage::new(source.path().join(".jit"));
+            let layout =
+                jit::storage::discover_repository_layout(source.path(), storage.root()).unwrap();
+            jit::commands::CommandExecutor::new(storage.clone())
+                .with_layout(layout.clone())
+                .initialize_fresh_repository(
+                    source.path(),
+                    &jit::hierarchy_templates::HierarchyTemplate::default(),
+                    Some("jit-dogfood"),
+                )
+                .unwrap();
+
+            let image = repository_image(&storage, &layout);
+            let record_path = layout.classify_repository_relative(PROFILE_RECORD).unwrap();
+            let config_bytes = image
+                .file_bytes(&VirtualPath::data("config.toml").unwrap())
+                .unwrap()
+                .unwrap();
+            let configuration = jit::declarations::parse_configuration(config_bytes).unwrap();
+            let gates = jit::declarations::GateRegistry::default();
+            let rules = jit::declarations::rules::RuleSet::empty();
+            let declarations = RepositoryDeclarations {
+                configuration: &configuration,
+                gates: &gates,
+                rules: &rules,
+            };
+            let package = jit::profile::jit_dogfood_package().unwrap();
+            let profiles = match image.entry(&record_path).unwrap() {
+                RepositoryEntry::Absent => Vec::new(),
+                _ => vec![jit::profile::build_profile_claims(&package, image.layout()).unwrap()],
+            };
+
+            let mut paths: Vec<String> = repair_target_paths(&image, declarations, profiles)
+                .unwrap()
+                .into_iter()
+                .map(|path| repo_relative(&path))
+                .collect();
+            paths.sort();
+            paths
+        })
+        .clone()
+}
+
+/// The complete fixture-seeding path set: [`repair_target_path_strings`] plus
+/// the three explicit fixture-input paths repair reads but never writes
+/// (`index.json` and `events.jsonl` are command-only ledgers; the
+/// applied-profile record is provenance repair only reads, never a repair write
+/// target).
+fn repair_paths() -> Vec<String> {
+    let mut paths = repair_target_path_strings();
+    paths.extend(
+        [PROFILE_RECORD, ".jit/index.json", ".jit/events.jsonl"]
             .into_iter()
             .map(str::to_string),
-        )
-        .collect()
+    );
+    paths.sort();
+    paths.dedup();
+    paths
 }
 
 #[test]
