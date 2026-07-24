@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T11:21:20.336446835Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "eefbfe84-ff5a-4430-ad0c-e49f1020abef",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Typed producer error family for repository-state",
-  "updated_at": "2026-07-24T08:16:01.919332293Z"
+  "updated_at": "2026-07-24T11:21:20.336446835Z"
 }

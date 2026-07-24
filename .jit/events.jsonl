@@ -9099,3 +9099,4 @@
 {"from":"in_progress","id":"b7d266b7-3599-44e2-bda3-bf49a1958b96","issue_id":"4b2005fe-a64e-490a-beab-add57df43db3","timestamp":"2026-07-24T11:14:39.046528530Z","to":"done","type":"issue_state_changed"}
 {"id":"b168f6c1-0b4a-46b5-849e-a3148b3b1092","issue_id":"4b2005fe-a64e-490a-beab-add57df43db3","timestamp":"2026-07-24T11:14:39.046528530Z","type":"issue_completed"}
 {"from":"backlog","id":"1b2f7340-203d-41c4-a96c-e70764a85526","issue_id":"a4e5ca3d-c851-4cc0-904a-599df7617312","timestamp":"2026-07-24T11:14:42.847364447Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"01b937cc-2ba0-40ba-83da-27c46171143e","issue_id":"eefbfe84-ff5a-4430-ad0c-e49f1020abef","timestamp":"2026-07-24T11:21:20.336446835Z","type":"gate_passed","updated_by":"auto:executor"}
