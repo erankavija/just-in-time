@@ -34,7 +34,7 @@ use super::mutation::{
 };
 use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
 use super::rule_serialize::serialize_ruleset;
-use super::MaterializationPlan;
+use super::MaterializationDerivation;
 use super::{ProfileApplicationInput, ProfileTargetDisposition, ProfileTargetMaterialization};
 use super::{ProfileTargetConflictError, RepositoryStateError};
 
@@ -329,7 +329,7 @@ impl InitializationScaffold {
         }
         // The audit log is not a neutral scaffold file: the finalizer composes it
         // (an empty log for a plain init, a `ProfileApplied` append for a profiled
-        // one) from the captured prefix. See `derive_initialization_plan`.
+        // one) from the captured prefix. See `derive_initialization`.
         Ok(files)
     }
 
@@ -422,11 +422,11 @@ impl InitializationScaffold {
 /// by the finalizer (`context`): a plain init creates it empty, a profiled init
 /// appends one `ProfileApplied` record. An empty delta (nothing to publish) is a
 /// complete no-op.
-pub(super) fn derive_initialization_plan(
+pub(super) fn derive_initialization(
     base: &RepositoryImage,
     scaffold: &InitializationScaffold,
     context: &MutationContext,
-) -> Result<MaterializationPlan, InitializationError> {
+) -> Result<MaterializationDerivation, InitializationError> {
     let mut actions = Vec::new();
     let config_path = VirtualPath::data("config.toml")?;
     let rules_path = VirtualPath::data("rules.toml")?;
@@ -494,13 +494,11 @@ pub(super) fn derive_initialization_plan(
     let mut all = directory_actions(base, &actions, &scaffold.explicit_dirs()?)?;
     all.extend(actions);
     let delta = RepositoryDelta::new(base.layout(), all)?;
-    let seed = scaffold.seed()?;
-    Ok(MaterializationPlan::new(
-        base,
-        &seed,
-        &MaterializationIntent::InitializeRepository,
+    Ok(MaterializationDerivation::new(
         delta,
-    )?
+        scaffold.seed()?,
+        MaterializationIntent::InitializeRepository,
+    )
     .with_profile_targets(profile_targets))
 }
 
@@ -784,11 +782,11 @@ fn resolve_gitattributes(
 
 /// Compose the complete profile-application delta over an existing repository's
 /// captured base image (no neutral scaffold).
-pub(super) fn derive_profile_application_plan(
+pub(super) fn derive_profile_application(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
     context: &MutationContext,
-) -> Result<MaterializationPlan, InitializationError> {
+) -> Result<MaterializationDerivation, InitializationError> {
     let derived = super::profile_apply::compose_profile_targets(base, profile.claims.clone())
         .map_err(profile_composition_error)?;
     let mut targets = Vec::with_capacity(derived.len());
@@ -874,7 +872,7 @@ pub(super) fn derive_profile_application_plan(
         BTreeMap::new(),
     )?;
     Ok(
-        MaterializationPlan::new(base, &seed, &MaterializationIntent::ApplyProfile, delta)?
+        MaterializationDerivation::new(delta, seed, MaterializationIntent::ApplyProfile)
             .with_profile_targets(targets),
     )
 }

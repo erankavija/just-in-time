@@ -558,13 +558,16 @@ fn schema_file_name(path: &VirtualPath) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ProjectName;
     use crate::declarations::rules::RuleSet;
     use crate::declarations::GateRegistry;
+    use crate::domain::ProfileOrigin;
     use crate::repository_state::{
         compare_materializations, derive_materialization, CaptureBudget, CaptureSpec,
-        EntryIdentity, MaterializationDriftKind, MaterializationIntent, MaterializationPlan,
-        MaterializationRequest, RepositoryImage, RepositoryLayout, RepositoryRootEvidence,
-        RepositorySeed, RepositorySeedKind,
+        EntryIdentity, InitializationScaffold, MaterializationDriftKind, MaterializationIntent,
+        MaterializationPlan, MaterializationRequest, MutationContext, ProfileApplicationInput,
+        ProfileClaims, RepositoryImage, RepositoryLayout, RepositoryRootEvidence, RepositorySeed,
+        RepositorySeedKind,
     };
     use std::collections::BTreeMap;
 
@@ -648,6 +651,36 @@ kind = "advisory"
             layout,
             spec,
             entries,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap()
+    }
+
+    fn absent_image(paths: Vec<VirtualPath>) -> RepositoryImage {
+        let (data_paths, worktree_paths): (Vec<_>, Vec<_>) =
+            paths.iter().cloned().partition(|path| {
+                path.root_class() == crate::repository_state::RepositoryRootClass::Data
+            });
+        let mut spec = CaptureSpec::phase_one(
+            data_paths,
+            CaptureBudget {
+                max_paths: 128,
+                max_listings: 0,
+                max_bytes: 1 << 20,
+                max_depth: 16,
+            },
+        )
+        .unwrap();
+        spec.discover_paths(worktree_paths).unwrap();
+        RepositoryImage::close(
+            layout(),
+            spec,
+            paths
+                .into_iter()
+                .map(|path| (path, RepositoryEntry::Absent))
+                .collect(),
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
@@ -835,6 +868,114 @@ kind = "advisory"
 
     fn agents_with_region(region: &str, inner: &str) -> String {
         format!("# Doc\n\nintro\n\n<!-- jit:{region}:begin -->\n{inner}\n<!-- jit:{region}:end -->\n\ntrailing\n")
+    }
+
+    #[test]
+    fn test_derive_materialization_produces_plan_identity_for_every_request_variant() {
+        let config = config_decls(CONFIG);
+        let (gate_registry, rule_set) = (gates(), rules());
+        let declared_image = image(&[
+            (".jit/config.toml", Some(CONFIG)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            (
+                "AGENTS.md",
+                Some(&agents_with_region("invariants", "STALE")),
+            ),
+        ]);
+        let semantic = derive_materialization(
+            &declared_image,
+            MaterializationRequest::SemanticMutation {
+                declarations: declarations(&config, &gate_registry, &rule_set),
+                seed: &seed(),
+            },
+        )
+        .unwrap();
+        let render = derive_materialization(
+            &declared_image,
+            MaterializationRequest::RenderConfiguredProjections {
+                declarations: declarations(&config, &gate_registry, &rule_set),
+                seed: &seed(),
+                selected: None,
+            },
+        )
+        .unwrap();
+        let repair = derive_materialization(
+            &declared_image,
+            MaterializationRequest::RepairDerivedState {
+                declarations: declarations(&config, &gate_registry, &rule_set),
+                profiles: Vec::new(),
+                seed: &seed(),
+            },
+        )
+        .unwrap();
+
+        let context = MutationContext::preview();
+        let scaffold = InitializationScaffold::render(
+            "",
+            "identity-test".parse::<ProjectName>().unwrap(),
+            None,
+        )
+        .unwrap();
+        let initialization_image = absent_image(scaffold.delta_paths().unwrap());
+        let initialize = derive_materialization(
+            &initialization_image,
+            MaterializationRequest::Initialize {
+                scaffold: &scaffold,
+                context: &context,
+            },
+        )
+        .unwrap();
+
+        let profile = ProfileApplicationInput {
+            id: "identity-test".into(),
+            version: "1.0.0".into(),
+            package_hash: "package-hash".into(),
+            target_hashes: BTreeMap::new(),
+            origin: ProfileOrigin::Embedded,
+            claims: ProfileClaims {
+                contributions: Vec::new(),
+                assets: Vec::new(),
+                regions: Vec::new(),
+            },
+            record_path: VirtualPath::data("profiles/identity-test.json").unwrap(),
+        };
+        let profile_image = image(&[
+            (
+                ".jit/config.toml",
+                Some("[project]\nname = \"identity-test\"\n"),
+            ),
+            (".jit/gates.toml", None),
+            (".jit/rules.toml", None),
+            (".jit/profiles", None),
+            (".jit/profiles/identity-test.json", None),
+            (".jit/events.jsonl", None),
+        ]);
+        let apply_profile = derive_materialization(
+            &profile_image,
+            MaterializationRequest::ApplyProfile {
+                profile,
+                context: &context,
+            },
+        )
+        .unwrap();
+
+        for (variant, plan) in [
+            ("SemanticMutation", semantic),
+            ("RenderConfiguredProjections", render),
+            ("RepairDerivedState", repair),
+            ("Initialize", initialize),
+            ("ApplyProfile", apply_profile),
+        ] {
+            assert_eq!(
+                plan.hash().len(),
+                64,
+                "{variant} must produce a SHA-256 plan identity"
+            );
+            assert!(
+                plan.hash().bytes().all(|byte| byte.is_ascii_hexdigit()),
+                "{variant} plan identity must be hexadecimal"
+            );
+        }
     }
 
     #[test]
