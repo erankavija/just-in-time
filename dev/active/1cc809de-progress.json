@@ -2,7 +2,7 @@
   "epic_id": "1cc809de-4669-45d4-960f-f881e716663d",
   "epic_short_id": "1cc809de",
   "current_wave": 5,
-  "notes": "Bracket (planning 02dc4bac, breakdown 24bab642) done. Waves plan over the impl interior only. Fan-out order per plan: S1+S3 parallel first, S2+S4 after S1 story done, S5 last. Story checkpoints (d159f9d4 S1, 2958105e S2, d752293b S3, 755cf453 S4, 9ee14023 S5) complete when their subtree tasks+deps are done.",
+  "notes": "Bracket (planning 02dc4bac, breakdown 24bab642) done. Waves plan over the impl interior only. Fan-out order per plan: S1+S3 parallel first, S2+S4 after S1 story done, S5 last. Story checkpoints (d159f9d4 S1, 2958105e S2, d752293b S3, 755cf453 S4, 9ee14023 S5) complete when their subtree tasks+deps are done. Session 4 handoff: dev/active/1cc809de-handoff-4.md. Worker worker-dd5b43b6 LIVE (worktree agent-dd5b43b6 @ 848181ff) when session ended.",
   "incident_log": [
     "Session 1: stale-worktree prune force-removed the 6 active wave-1 worktrees due to a zsh word-splitting bug in the exclusion filter (for p in $UNQUOTED does not split under zsh). No committed work lost (0 commits); no leak into main (verified). Recovery: stopped agents, deleted 6 anchor-only branches, recreated worktrees at a95dd58a, RESUMED all 6 agents from transcript (context preserved). Genuinely-stale worktrees (50) successfully pruned. See handoff Traps."
   ],
