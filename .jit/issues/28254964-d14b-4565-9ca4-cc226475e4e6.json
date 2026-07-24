@@ -14,7 +14,13 @@
     "code-review",
     "clippy"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "clippy": {
+      "status": "passed",
+      "updated_at": "2026-07-24T21:37:57.747631444Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "28254964-d14b-4565-9ca4-cc226475e4e6",
   "labels": [
     "type:task",
@@ -25,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Feature-gate the test-support library surface",
-  "updated_at": "2026-07-24T21:18:46.228376467Z"
+  "updated_at": "2026-07-24T21:37:57.747631444Z"
 }
