@@ -195,11 +195,10 @@ Phase 3: Orchestrator & External Integrations
   - Commands: start (daemon), once (single cycle)
 - Graph export (dot, mermaid)
 - Event queries and tail commands
-- **Storage abstraction (NEXT)**: Trait-based backend system for pluggable storage
-  - Extract IssueStore trait for multiple backend support
-  - Refactor current Storage to JsonFileStorage
-  - Enable future SQLite, in-memory, or custom backends
-  - See docs/storage-abstraction.md for detailed plan
+- **Storage abstraction**: trait-based backends behind `IssueStore`, with
+  `JsonFileStorage` and an in-memory implementation. Durable publication and
+  crash recovery run through the repository-state/materialization subsystem
+  documented in [repository-state-materialization.md](repository-state-materialization.md).
 - Bulk operations for batch updates
 - Automation integration: read CI artifacts to auto-pass gates
 - Pull-based agent mode (polling alternative)
