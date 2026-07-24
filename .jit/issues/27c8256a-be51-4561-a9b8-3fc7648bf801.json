@@ -13,7 +13,13 @@
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T17:26:07.851407133Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "27c8256a-be51-4561-a9b8-3fc7648bf801",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Clean up MCP schema-generator warnings",
-  "updated_at": "2026-07-24T16:55:31.600903583Z"
+  "updated_at": "2026-07-24T17:26:07.851407133Z"
 }
