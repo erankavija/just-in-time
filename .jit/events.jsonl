@@ -9150,3 +9150,6 @@
 {"gate_key":"code-review","id":"7f0ce965-fd26-4c17-9035-f9be56cff1a3","issue_id":"412925b9-874c-4679-909c-95afe31f9287","timestamp":"2026-07-24T15:33:35.228338962Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"b0895d28-4723-4aa4-84ca-c48ee709096f","issue_id":"412925b9-874c-4679-909c-95afe31f9287","timestamp":"2026-07-24T15:52:43.135116355Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"d709f034-2dc7-4ada-8d4c-4e51b42de8b0","issue_id":"412925b9-874c-4679-909c-95afe31f9287","timestamp":"2026-07-24T15:57:21.244184932Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"d4b53ad7-3be2-41b2-9b00-1f3452b90388","issue_id":"412925b9-874c-4679-909c-95afe31f9287","timestamp":"2026-07-24T15:58:00.621995384Z","to":"done","type":"issue_state_changed"}
+{"id":"de66239a-2b12-48ad-8c13-939f7123ed48","issue_id":"412925b9-874c-4679-909c-95afe31f9287","timestamp":"2026-07-24T15:58:00.621995384Z","type":"issue_completed"}
+{"from":"backlog","id":"f77065b8-3673-4caf-bb4b-4c95c72b33b8","issue_id":"a4b0fadf-ccbe-4f47-a41d-676f7a947f85","timestamp":"2026-07-24T15:58:04.166950159Z","to":"ready","type":"issue_state_changed"}
