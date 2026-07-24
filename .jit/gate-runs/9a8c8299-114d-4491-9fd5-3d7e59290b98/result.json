@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "902a9329eda90353ae3f1b90ff93fdf643ae9109",
+  "completed_at": "2026-07-24T19:33:05.630044298Z",
+  "duration_ms": 76744,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Leaf-attributed contributor documentation is accurate; no adopter-facing documentation impact was found.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "39e1c091-2e2a-412a-a89a-69ceff40c910",
+  "message": null,
+  "run_id": "9a8c8299-114d-4491-9fd5-3d7e59290b98",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T19:31:48.885232371Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf (configured maximum level 4; DAG children empty). I inspected both reachable `jit:39e1c091` commits individually; their union changes only contributor documentation and issue metadata. Current sources match the documented pipeline, and the stale pointer is removed at `dev/architecture/core-system-design.md:198`.\n\nNo adopter-facing documentation impact requires an update; `dev/` is outside this gate’s adopter-doc surface.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Leaf-attributed contributor documentation is accurate; no adopter-facing documentation impact was found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

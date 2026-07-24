@@ -21,7 +21,18 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T19:33:05.898611190Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-24T19:31:48.071249621Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "39e1c091-2e2a-412a-a89a-69ceff40c910",
   "labels": [
     "type:task",
@@ -32,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Write the repository-state architecture doc and sweep the stale storage pointer",
-  "updated_at": "2026-07-24T17:02:23.805334233Z"
+  "updated_at": "2026-07-24T19:33:05.898611190Z"
 }
