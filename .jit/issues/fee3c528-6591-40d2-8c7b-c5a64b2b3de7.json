@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T11:32:57.308046508Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fee3c528-6591-40d2-8c7b-c5a64b2b3de7",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Plan-identity tail for initialize and profile-application requests",
-  "updated_at": "2026-07-24T08:16:05.607903579Z"
+  "updated_at": "2026-07-24T11:32:57.308046508Z"
 }
