@@ -39,7 +39,15 @@ pub use default_rules::{
 // both feature states.
 #[cfg(feature = "test-support")]
 pub use default_rules::{default_rule_membership_diff, DefaultRuleMembershipDiff};
+// Measured (cargo build -p jit, feature off): neither name is referenced by
+// that path anywhere in the crate — `default_rule_membership_diff` has no
+// production caller at all (only this module's own unit tests and its
+// doctest call it), and `DefaultRuleMembershipDiff` is otherwise reached only
+// via `default_rule_membership_diff_from_identities`'s separate, unconditional
+// `pub(crate)` path. Both are genuinely unused here, so the allow is scoped to
+// exactly this pair, not a blanket over unrelated items.
 #[cfg(not(feature = "test-support"))]
+#[allow(unused_imports)]
 pub(crate) use default_rules::{default_rule_membership_diff, DefaultRuleMembershipDiff};
 pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,
@@ -69,10 +77,19 @@ pub use materialize::{assemble_config, render_capture_closure};
 // keeps every internal caller's resolution
 // (`crate::repository_state::validate_capture_closure`, etc.) identical in both
 // feature states.
+#[cfg(not(feature = "test-support"))]
+pub(crate) use materialize::validate_capture_closure;
 #[cfg(feature = "test-support")]
 pub use materialize::{validate_capture_closure, ValidationCaptureClosure};
+// Measured (cargo build -p jit, feature off): `validate_capture_closure` has a
+// real internal caller (`commands/validate.rs` resolves it through this same
+// `crate::repository_state::` path in both feature states) so it needs no
+// allow. `ValidationCaptureClosure` itself has no by-name crate-internal
+// caller — it's only reached as `validate_capture_closure`'s inferred return
+// type — so its feature-off twin alone is allowed unused.
 #[cfg(not(feature = "test-support"))]
-pub(crate) use materialize::{validate_capture_closure, ValidationCaptureClosure};
+#[allow(unused_imports)]
+pub(crate) use materialize::ValidationCaptureClosure;
 pub(crate) use mutation::captured_gate_run_result_paths;
 pub use mutation::{
     finalize, fresh_index_bytes, gate_run_result_relative_path, prefix_has_torn_tail,
