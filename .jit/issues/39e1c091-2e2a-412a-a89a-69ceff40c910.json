@@ -16,6 +16,7 @@
       "path": "dev/architecture/repository-state-materialization.md"
     }
   ],
+  "done_at": "2026-07-24T19:34:13.984356042Z",
   "first_ready_at": "2026-07-24T16:53:04.291645245Z",
   "gates_required": [
     "doc-review",
@@ -41,7 +42,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Write the repository-state architecture doc and sweep the stale storage pointer",
-  "updated_at": "2026-07-24T19:33:05.898611190Z"
+  "updated_at": "2026-07-24T19:34:13.984356042Z"
 }

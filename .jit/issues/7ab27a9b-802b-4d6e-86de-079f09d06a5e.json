@@ -8,6 +8,7 @@
   ],
   "description": "`VirtualPath` becomes `Cow<'static, str>`-backed so the well-known repository paths are `pub const` associated items, with an exhaustive round-trip test proving each constant canonical.\n\n## Background\n\n`VirtualPath` is `String`-backed through `RootRelativePath::Descendant(String)` (`crates/jit/src/repository_state/path.rs`), which blocks `const` construction. Changing the payload to `Cow<'static, str>` makes `Cow::Borrowed` const-constructible, so the well-known paths become `pub const` associated items (`VirtualPath::GATES`, `EVENTS`, `CONFIG`, `INDEX`, `RULES`, and the rest).\n\nParsing and deserialization produce `Cow::Owned`; `Ord`/`Hash`/`Eq` semantics are unchanged (`Borrowed(\"x\") == Owned(\"x\")`), so const and parsed keys collide correctly in the `BTreeMap`-keyed image. Because consts bypass the reserved-path `checked()` guard, one test iterates every associated const via a `VirtualPath::ALL_KNOWN` list and asserts round-trip equality through the fallible constructor, proving each const canonical and non-reserved.\n\n## Success Criteria\n\n- [hard] REQ-01: `VirtualPath` is `Cow<'static, str>`-backed, with `Ord`/`Hash`/`Eq` semantics preserved so const and parsed keys collide correctly.\n- [hard] REQ-02: The well-known repository paths are `pub const` associated items of `VirtualPath`, enumerated by a `VirtualPath::ALL_KNOWN` list.\n- [hard] REQ-03: A test iterates every associated const via `VirtualPath::ALL_KNOWN` and asserts round-trip equality through the fallible constructor, proving each const canonical and non-reserved.\n\n## Notes\n\nMigrating the fallible `VirtualPath::data(\"literal\")` call sites to these constants is separate work; this task delivers the representation, the constants, and the round-trip test.",
   "documents": [],
+  "done_at": "2026-07-24T19:34:06.579158175Z",
   "first_ready_at": "2026-07-24T16:53:14.868785227Z",
   "gates_required": [
     "cargo-ci",
@@ -33,7 +34,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Cow-backed VirtualPath with well-known path constants",
-  "updated_at": "2026-07-24T19:31:05.172466543Z"
+  "updated_at": "2026-07-24T19:34:06.579158175Z"
 }
