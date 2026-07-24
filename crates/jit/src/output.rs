@@ -429,8 +429,7 @@ pub struct JsonOutput<T: Serialize> {
 
 impl<T: Serialize> JsonOutput<T> {
     /// Create a new successful output with the given data
-    /// Note: command parameter is kept for API compatibility but no longer used
-    pub fn success(data: T, _command: impl Into<String>) -> Self {
+    pub fn success(data: T) -> Self {
         Self {
             data,
             message: None,
@@ -470,11 +469,7 @@ pub struct JsonError {
 #[allow(dead_code)]
 impl JsonError {
     /// Create a new error output
-    pub fn new(
-        code: impl Into<String>,
-        message: impl Into<String>,
-        _command: impl Into<String>, // Kept for API compatibility
-    ) -> Self {
+    pub fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             error: ErrorDetail {
                 code: code.into(),
@@ -721,23 +716,16 @@ impl ErrorCode {
 /// is a no-op for the vast majority of call sites.
 pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
     if let Some(prefix_error) = error.downcast_ref::<crate::storage::InvalidIdPrefixError>() {
-        return JsonError::new(
-            ErrorCode::INVALID_ID_PREFIX,
-            prefix_error.to_string(),
-            String::new(),
-        )
-        .with_details(serde_json::json!({ "prefix": prefix_error.prefix() }));
+        return JsonError::new(ErrorCode::INVALID_ID_PREFIX, prefix_error.to_string())
+            .with_details(serde_json::json!({ "prefix": prefix_error.prefix() }));
     }
     if let Some(ambiguous) = error.downcast_ref::<crate::storage::AmbiguousIdError>() {
-        return JsonError::new(
-            ErrorCode::AMBIGUOUS_ID,
-            ambiguous.to_string(),
-            String::new(),
-        )
-        .with_details(serde_json::json!({
-            "prefix": ambiguous.prefix(),
-            "matches": ambiguous.matches(),
-        }));
+        return JsonError::new(ErrorCode::AMBIGUOUS_ID, ambiguous.to_string()).with_details(
+            serde_json::json!({
+                "prefix": ambiguous.prefix(),
+                "matches": ambiguous.matches(),
+            }),
+        );
     }
     fallback
 }
@@ -745,64 +733,55 @@ pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError 
 /// Helper to create common error responses
 #[allow(dead_code)]
 impl JsonError {
-    pub fn issue_not_found(issue_id: &str, command: impl Into<String>) -> Self {
+    pub fn issue_not_found(issue_id: &str) -> Self {
         Self::new(
             ErrorCode::ISSUE_NOT_FOUND,
             format!("Issue not found: {}", issue_id),
-            command,
         )
         .with_details(serde_json::json!({"issue_id": issue_id}))
         .with_suggestion("Run 'jit query all' to see available issues")
         .with_suggestion("Check if the issue ID is correct")
     }
 
-    pub fn gate_not_found(gate_key: &str, command: impl Into<String>) -> Self {
+    pub fn gate_not_found(gate_key: &str) -> Self {
         Self::new(
             ErrorCode::GATE_NOT_FOUND,
             format!("Gate not found: {}", gate_key),
-            command,
         )
         .with_details(serde_json::json!({"key": gate_key}))
         .with_suggestion("Run 'jit gate list' to see available gates")
         .with_suggestion("Add the gate to the registry first with 'jit gate define'")
     }
 
-    pub fn cycle_detected(from: &str, to: &str, command: impl Into<String>) -> Self {
+    pub fn cycle_detected(from: &str, to: &str) -> Self {
         Self::new(
             ErrorCode::CYCLE_DETECTED,
             format!("Adding dependency would create a cycle: {} -> {}", from, to),
-            command,
         )
         .with_details(serde_json::json!({"from": from, "to": to}))
         .with_suggestion("Remove existing dependencies that create the cycle")
         .with_suggestion("Use 'jit graph show' to visualize the dependency graph")
     }
 
-    pub fn invalid_state(state: &str, command: impl Into<String>) -> Self {
+    pub fn invalid_state(state: &str) -> Self {
         Self::new(
             ErrorCode::INVALID_STATE,
             format!("Invalid state: {}", state),
-            command,
         )
         .with_details(serde_json::json!({"invalid_state": state}))
         .with_suggestion("Valid states are: open, ready, in_progress, done")
     }
 
-    pub fn invalid_priority(priority: &str, command: impl Into<String>) -> Self {
+    pub fn invalid_priority(priority: &str) -> Self {
         Self::new(
             ErrorCode::INVALID_ARGUMENT,
             format!("Invalid priority: {}", priority),
-            command,
         )
         .with_details(serde_json::json!({"invalid_priority": priority}))
         .with_suggestion("Valid priorities are: low, normal, high, critical")
     }
 
-    pub fn gate_validation_failed(
-        unpassed_gates: &[String],
-        issue_id: &str,
-        command: impl Into<String>,
-    ) -> Self {
+    pub fn gate_validation_failed(unpassed_gates: &[String], issue_id: &str) -> Self {
         Self::new(
             ErrorCode::VALIDATION_FAILED,
             format!(
@@ -810,7 +789,6 @@ impl JsonError {
                 unpassed_gates.len(),
                 unpassed_gates.join(", ")
             ),
-            command,
         )
         .with_details(serde_json::json!({
             "issue_id": issue_id,
@@ -830,11 +808,8 @@ impl JsonError {
     ///
     /// This keeps machine-readable error shaping in the output layer while the
     /// command layer returns typed blocker data.
-    pub fn transition_blocked(
-        blocked: &TransitionBlockedError,
-        command: impl Into<String>,
-    ) -> Self {
-        Self::new(blocked.error_code(), blocked.summary(), command)
+    pub fn transition_blocked(blocked: &TransitionBlockedError) -> Self {
+        Self::new(blocked.error_code(), blocked.summary())
             .with_details(serde_json::json!({
                 "issue_id": blocked.issue_id(),
                 "requested_state": state_name(blocked.requested_state()),
@@ -2609,7 +2584,7 @@ mod tests {
     #[test]
     fn test_json_output_success() {
         let data = json!({"id": "123", "title": "Test"});
-        let output = JsonOutput::success(data, "issue show");
+        let output = JsonOutput::success(data);
 
         // success field removed
         assert_eq!(output.data["id"], "123");
@@ -2619,7 +2594,7 @@ mod tests {
     #[test]
     fn test_json_output_serialization() {
         let data = json!({"id": "123", "title": "test"});
-        let output = JsonOutput::success(data, "issue list");
+        let output = JsonOutput::success(data);
 
         let json_str = output.to_json_string().unwrap();
         // Should contain raw data without envelope
@@ -2674,8 +2649,7 @@ mod tests {
     #[test]
     fn test_json_output_with_message() {
         let data = json!({"id": "abc12345", "title": "Test issue"});
-        let output = JsonOutput::success(data, "issue create")
-            .with_message("Created issue abc12345 - Test issue");
+        let output = JsonOutput::success(data).with_message("Created issue abc12345 - Test issue");
 
         let json_str = output.to_json_string().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
@@ -2687,7 +2661,7 @@ mod tests {
     #[test]
     fn test_json_output_without_message() {
         let data = json!({"id": "123"});
-        let output = JsonOutput::success(data, "test");
+        let output = JsonOutput::success(data);
 
         let json_str = output.to_json_string().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
@@ -2699,7 +2673,7 @@ mod tests {
         // When data serializes to a JSON array (not object), message cannot be injected.
         // Verify the output is still valid JSON (the array), just without message.
         let data = json!([{"id": "a"}, {"id": "b"}]);
-        let output = JsonOutput::success(data, "some list").with_message("Should not appear");
+        let output = JsonOutput::success(data).with_message("Should not appear");
 
         let json_str = output.to_json_string().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
@@ -2710,7 +2684,7 @@ mod tests {
 
     #[test]
     fn test_json_error_basic() {
-        let error = JsonError::new("TEST_ERROR", "This is a test error", "test command");
+        let error = JsonError::new("TEST_ERROR", "This is a test error");
 
         assert_eq!(error.error.code, "TEST_ERROR");
         assert_eq!(error.error.message, "This is a test error");
@@ -2720,7 +2694,7 @@ mod tests {
 
     #[test]
     fn test_json_error_with_details() {
-        let error = JsonError::new("NOT_FOUND", "Resource not found", "show resource")
+        let error = JsonError::new("NOT_FOUND", "Resource not found")
             .with_details(json!({"requested_id": "abc123"}));
 
         assert_eq!(error.error.details, Some(json!({"requested_id": "abc123"})));
@@ -2728,7 +2702,7 @@ mod tests {
 
     #[test]
     fn test_json_error_with_suggestions() {
-        let error = JsonError::new("NOT_FOUND", "Issue not found", "issue show")
+        let error = JsonError::new("NOT_FOUND", "Issue not found")
             .with_suggestion("Run 'jit issue list' to see available issues")
             .with_suggestion("Check if the issue ID is correct");
 
@@ -2738,7 +2712,7 @@ mod tests {
 
     #[test]
     fn test_json_error_serialization() {
-        let error = JsonError::new("TEST_ERROR", "Test", "test")
+        let error = JsonError::new("TEST_ERROR", "Test")
             .with_details(json!({"key": "value"}))
             .with_suggestion("Try something");
 
@@ -2783,7 +2757,7 @@ mod tests {
         let issues = vec![test_minimal_issue()];
         let response = ReadyQueryResponse { issues, count: 1 };
 
-        let json_output = JsonOutput::success(response, "query ready");
+        let json_output = JsonOutput::success(response);
         let serialized = json_output.to_json_string().unwrap();
 
         assert!(serialized.contains("\"count\": 1"));
@@ -2810,7 +2784,7 @@ mod tests {
             count: 1,
         };
 
-        let json_output = JsonOutput::success(response, "query blocked");
+        let json_output = JsonOutput::success(response);
         let serialized = json_output.to_json_string().unwrap();
 
         assert!(serialized.contains("\"blocked_reasons\""));
@@ -2829,7 +2803,7 @@ mod tests {
             count: 1,
         };
 
-        let json_output = JsonOutput::success(response, "query assignee");
+        let json_output = JsonOutput::success(response);
         let serialized = json_output.to_json_string().unwrap();
 
         assert!(serialized.contains("\"assignee\""));
@@ -2848,7 +2822,7 @@ mod tests {
             count: 1,
         };
 
-        let json_output = JsonOutput::success(response, "query state");
+        let json_output = JsonOutput::success(response);
         let serialized = json_output.to_json_string().unwrap();
 
         assert!(serialized.contains("\"state\""));
@@ -2867,7 +2841,7 @@ mod tests {
             count: 1,
         };
 
-        let json_output = JsonOutput::success(response, "query priority");
+        let json_output = JsonOutput::success(response);
         let serialized = json_output.to_json_string().unwrap();
 
         assert!(serialized.contains("\"priority\""));

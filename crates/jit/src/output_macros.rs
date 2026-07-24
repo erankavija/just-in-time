@@ -4,12 +4,12 @@
 /// Respects --quiet flag to suppress non-essential output
 #[macro_export]
 macro_rules! output_message {
-    ($quiet:expr, $json:expr, $command:expr, $($arg:tt)*) => {
+    ($quiet:expr, $json:expr, $($arg:tt)*) => {
         if $json {
             use jit::output::JsonOutput;
             use serde_json::json;
             let msg = format!($($arg)*);
-            let output = JsonOutput::success(json!({"message": msg}), $command);
+            let output = JsonOutput::success(json!({"message": msg}));
             println!("{}", output.to_json_string()?);
         } else if !$quiet {
             println!($($arg)*);
@@ -21,19 +21,19 @@ macro_rules! output_message {
 /// Data output is preserved in quiet mode (essential output)
 #[macro_export]
 macro_rules! output_data {
-    ($quiet:expr, $json:expr, $command:expr, $data:expr, $msg:expr, $human_block:block) => {
+    ($quiet:expr, $json:expr, $data:expr, $msg:expr, $human_block:block) => {
         if $json {
             use jit::output::JsonOutput;
-            let output = JsonOutput::success(&$data, $command).with_message($msg);
+            let output = JsonOutput::success(&$data).with_message($msg);
             println!("{}", output.to_json_string()?);
         } else {
             $human_block
         }
     };
-    ($quiet:expr, $json:expr, $command:expr, $data:expr, $human_block:block) => {
+    ($quiet:expr, $json:expr, $data:expr, $human_block:block) => {
         if $json {
             use jit::output::JsonOutput;
-            let output = JsonOutput::success(&$data, $command);
+            let output = JsonOutput::success(&$data);
             println!("{}", output.to_json_string()?);
         } else {
             $human_block
@@ -45,19 +45,19 @@ macro_rules! output_data {
 /// Human output preserved in quiet mode (essential data)
 #[macro_export]
 macro_rules! output_json {
-    ($quiet:expr, $json:expr, $command:expr, $json_data:expr, $msg:expr, $human_block:block) => {
+    ($quiet:expr, $json:expr, $json_data:expr, $msg:expr, $human_block:block) => {
         if $json {
             use jit::output::JsonOutput;
-            let output = JsonOutput::success($json_data, $command).with_message($msg);
+            let output = JsonOutput::success($json_data).with_message($msg);
             println!("{}", output.to_json_string()?);
         } else {
             $human_block
         }
     };
-    ($quiet:expr, $json:expr, $command:expr, $json_data:expr, $human_block:block) => {
+    ($quiet:expr, $json:expr, $json_data:expr, $human_block:block) => {
         if $json {
             use jit::output::JsonOutput;
-            let output = JsonOutput::success($json_data, $command);
+            let output = JsonOutput::success($json_data);
             println!("{}", output.to_json_string()?);
         } else {
             $human_block

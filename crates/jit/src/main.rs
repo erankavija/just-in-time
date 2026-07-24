@@ -447,12 +447,12 @@ fn dep_add_batch_json_error(
         err.downcast_ref::<GraphError>(),
         Some(GraphError::CycleDetected)
     ) {
-        JsonError::cycle_detected(from_id, to, "dep add")
+        JsonError::cycle_detected(from_id, to)
     } else if err
         .downcast_ref::<jit::errors::RedundantDependencyError>()
         .is_some()
     {
-        JsonError::new(ErrorCode::VALIDATION_FAILED, err.to_string(), "dep add")
+        JsonError::new(ErrorCode::VALIDATION_FAILED, err.to_string())
     } else if err
         .downcast_ref::<jit::storage::IssueNotFoundError>()
         .is_some()
@@ -461,12 +461,9 @@ fn dep_add_batch_json_error(
             Some(GraphError::NodeNotFound { .. })
         )
     {
-        JsonError::issue_not_found(to, "dep add")
+        JsonError::issue_not_found(to)
     } else {
-        jit::output::refine_id_error(
-            err,
-            JsonError::new("DEPENDENCY_ERROR", err.to_string(), "dep add"),
-        )
+        jit::output::refine_id_error(err, JsonError::new("DEPENDENCY_ERROR", err.to_string()))
     };
 
     let mut details = json_error
@@ -492,11 +489,7 @@ fn dep_add_batch_json_error(
 /// 10, matching the human path and the documented contract. The actionable
 /// message (which names the git requirement) is preserved on both paths. Any
 /// other failure keeps the command-specific `fallback_code`.
-fn claim_json_error(
-    error: &anyhow::Error,
-    fallback_code: &str,
-    command: &'static str,
-) -> jit::output::JsonError {
+fn claim_json_error(error: &anyhow::Error, fallback_code: &str) -> jit::output::JsonError {
     use jit::output::{ErrorCode, JsonError};
     let code = if error
         .downcast_ref::<jit::errors::ClaimRequiresGitError>()
@@ -506,7 +499,7 @@ fn claim_json_error(
     } else {
         fallback_code
     };
-    JsonError::new(code, error.to_string(), command)
+    JsonError::new(code, error.to_string())
 }
 
 /// Preserve a `validate --fix` failure's complete cause chain while selecting
@@ -522,7 +515,7 @@ fn validate_fix_json_error(error: &anyhow::Error, exit_code: ExitCode) -> jit::o
         ExitCode::PermissionDenied | ExitCode::ExternalError => ErrorCode::IO_ERROR,
         ExitCode::Success | ExitCode::GenericError | ExitCode::BrokenPipe => ErrorCode::IO_ERROR,
     };
-    jit::output::JsonError::new(code, format!("{error:#}"), "validate")
+    jit::output::JsonError::new(code, format!("{error:#}"))
 }
 
 /// Render a failed `gate evaluate` / `gate evaluate-all` outcome and terminate appropriately.
@@ -546,7 +539,6 @@ fn render_gate_pass_error(
     id: &str,
     output_ctx: &OutputContext,
     json: bool,
-    command: &str,
 ) -> Result<()> {
     if !json {
         if let Some(gate_failure) = e.downcast_ref::<jit::commands::GatePassFailed>() {
@@ -566,7 +558,7 @@ fn render_gate_pass_error(
             jit::domain::GateRunStatus::Error => ("IO_ERROR", "error"),
             _ => ("GATE_FAILED", "fail"),
         };
-        JsonError::new(error_code, e.to_string(), command)
+        JsonError::new(error_code, e.to_string())
             .with_details(serde_json::json!({
                 "issue_id": gate_failure.issue_id,
                 "key": gate_failure.gate_key,
@@ -590,7 +582,7 @@ fn render_gate_pass_error(
     } else if let Some(not_required) = e.downcast_ref::<jit::commands::GateNotRequiredError>() {
         // Pre-verdict argument error: not a gate verdict, so it carries no
         // `verdict` field.
-        JsonError::new("INVALID_ARGUMENT", e.to_string(), command)
+        JsonError::new("INVALID_ARGUMENT", e.to_string())
             .with_details(serde_json::json!({
                 "issue_id": not_required.issue_id,
                 "key": not_required.gate_key,
@@ -606,7 +598,7 @@ fn render_gate_pass_error(
         // no checker to run, so a bare evaluate would silently record an
         // unattributed pass. No write happened, so — like `GateNotRequiredError`
         // above — this carries no `verdict` field.
-        JsonError::new("INVALID_ARGUMENT", e.to_string(), command)
+        JsonError::new("INVALID_ARGUMENT", e.to_string())
             .with_details(serde_json::json!({
                 "issue_id": needs_attestor.issue_id,
                 "key": needs_attestor.gate_key,
@@ -620,7 +612,7 @@ fn render_gate_pass_error(
         .is_some()
     {
         // Pre-verdict lookup error: issue id did not resolve.
-        JsonError::issue_not_found(id, command)
+        JsonError::issue_not_found(id)
     } else if let Some(stale) = e.downcast_ref::<jit::errors::StaleBinaryError>() {
         // Pre-verdict refusal (jit:7446af34): the checker never spawned, so —
         // like `GateNotRequiredError` above, and unlike `GatePassFailed` — this
@@ -628,9 +620,9 @@ fn render_gate_pass_error(
         // (`ErrorCode::to_exit_code`), matching the non-JSON path's
         // `ExitCode::ExternalError` classification of the same typed error in
         // `error_to_exit_code`.
-        stale_binary_json_error(stale, command)
+        stale_binary_json_error(stale)
     } else {
-        JsonError::new("GATE_ERROR", e.to_string(), command)
+        JsonError::new("GATE_ERROR", e.to_string())
     };
     println!("{}", json_error.to_json_string()?);
     std::process::exit(json_error.exit_code().code());
@@ -645,10 +637,7 @@ fn render_gate_pass_error(
 /// `details` (issue id, gate key, reason, build commit), and reinstall
 /// suggestion — one envelope shape regardless of which process in the gate
 /// run detected the staleness.
-fn stale_binary_json_error(
-    stale: &jit::errors::StaleBinaryError,
-    command: &str,
-) -> jit::output::JsonError {
+fn stale_binary_json_error(stale: &jit::errors::StaleBinaryError) -> jit::output::JsonError {
     use jit::domain::build_provenance::StaleBinaryReason;
     use jit::output::{ErrorCode, JsonError};
 
@@ -658,7 +647,7 @@ fn stale_binary_json_error(
         }
         StaleBinaryReason::DirtyBuild { built_from } => ("dirty_build", built_from.clone()),
     };
-    JsonError::new(ErrorCode::STALE_BINARY, stale.to_string(), command)
+    JsonError::new(ErrorCode::STALE_BINARY, stale.to_string())
         .with_details(serde_json::json!({
             "issue_id": stale.issue_id(),
             "key": stale.gate_key(),
@@ -708,7 +697,7 @@ fn print_apply_result(
             created_issues,
         };
         let msg = format!("Applied template '{}' to {}", result.template, container);
-        let output = JsonOutput::success(response, "apply").with_message(msg);
+        let output = JsonOutput::success(response).with_message(msg);
         println!("{}", output.to_json_string()?);
     } else if quiet {
         for id in result.created_node_ids_by_role.values() {
@@ -776,7 +765,6 @@ fn resolve_gate_key_for(
                 let json_error = jit::output::JsonError::new(
                     jit::output::ErrorCode::INVALID_ARGUMENT,
                     e.to_string(),
-                    command,
                 );
                 println!("{}", json_error.to_json_string()?);
                 std::process::exit(json_error.exit_code().code());
@@ -793,10 +781,10 @@ fn resolve_gate_key_for(
 /// caller receives the typed [`InvalidArgumentError`](jit::errors::InvalidArgumentError)
 /// so the top-level handler classifies it (exit 2) and prints the plain message.
 /// Never returns when `json` is true.
-fn invalid_argument(message: String, command: &str, json: bool) -> anyhow::Error {
+fn invalid_argument(message: String, json: bool) -> anyhow::Error {
     if json {
         let json_error =
-            jit::output::JsonError::new(jit::output::ErrorCode::INVALID_ARGUMENT, message, command);
+            jit::output::JsonError::new(jit::output::ErrorCode::INVALID_ARGUMENT, message);
         if let Ok(s) = json_error.to_json_string() {
             println!("{}", s);
         }
@@ -805,12 +793,12 @@ fn invalid_argument(message: String, command: &str, json: bool) -> anyhow::Error
     jit::errors::InvalidArgumentError::new(message).into()
 }
 
-fn profile_json_error(error: &anyhow::Error, command: &str) -> jit::output::JsonError {
+fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
     use jit::output::{ErrorCode, JsonError};
     use jit::repository_state::{InitializationError, ProducerError, RepositoryStateError};
 
     if error.downcast_ref::<jit::errors::NotFoundError>().is_some() {
-        return JsonError::new(ErrorCode::PROFILE_NOT_FOUND, error.to_string(), command)
+        return JsonError::new(ErrorCode::PROFILE_NOT_FOUND, error.to_string())
             .with_suggestion("Run 'jit profile list --json' to see embedded profiles");
     }
     if error
@@ -820,7 +808,7 @@ fn profile_json_error(error: &anyhow::Error, command: &str) -> jit::output::Json
             .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()
     {
-        return JsonError::new(ErrorCode::PROFILE_CONFLICT, error.to_string(), command);
+        return JsonError::new(ErrorCode::PROFILE_CONFLICT, error.to_string());
     }
     // The single sanctioned downcast of the anyhow CLI transport to the typed
     // repository-state error: a profile target conflict (raised directly or through
@@ -840,16 +828,16 @@ fn profile_json_error(error: &anyhow::Error, command: &str) -> jit::output::Json
             ) => "PROFILE_ERROR",
             _ => "PROFILE_ERROR",
         };
-        return JsonError::new(code, error.to_string(), command);
+        return JsonError::new(code, error.to_string());
     }
-    JsonError::new("PROFILE_ERROR", error.to_string(), command)
+    JsonError::new("PROFILE_ERROR", error.to_string())
 }
 
-fn profile_result<T>(result: anyhow::Result<T>, command: &str, json: bool) -> anyhow::Result<T> {
+fn profile_result<T>(result: anyhow::Result<T>, json: bool) -> anyhow::Result<T> {
     match result {
         Ok(value) => Ok(value),
         Err(error) if json => {
-            let json_error = profile_json_error(&error, command);
+            let json_error = profile_json_error(&error);
             println!("{}", json_error.to_json_string()?);
             std::process::exit(json_error.exit_code().code());
         }
@@ -911,7 +899,6 @@ fn verb_hint_error(group: &str, verb: &str, args: &[String]) -> anyhow::Error {
     let command = format!("{group} {verb}");
     invalid_argument(
         format!("'jit {command}' is not a jit command. Use '{canonical}' instead."),
-        &command,
         json,
     )
 }
@@ -941,7 +928,6 @@ fn read_description_source(path: &str) -> Result<String> {
 fn resolve_optional_gate_key(
     positional: Option<String>,
     flag: Option<String>,
-    command: &str,
     json: bool,
 ) -> Result<Option<String>> {
     match (positional, flag) {
@@ -950,7 +936,6 @@ fn resolve_optional_gate_key(
         (None, Some(flag_val)) => Ok(Some(flag_val)),
         (Some(_), Some(_)) => Err(invalid_argument(
             "provide the gate key as a positional argument OR via --gate, not both.".to_string(),
-            command,
             json,
         )),
     }
@@ -960,7 +945,7 @@ fn resolve_optional_gate_key(
 ///
 /// Accepts the snake_case status names; an unknown value is an
 /// `INVALID_ARGUMENT` error (routed `--json`-aware).
-fn parse_run_status(value: &str, command: &str, json: bool) -> Result<jit::domain::GateRunStatus> {
+fn parse_run_status(value: &str, json: bool) -> Result<jit::domain::GateRunStatus> {
     use jit::domain::GateRunStatus;
     match value.to_ascii_lowercase().as_str() {
         "passed" => Ok(GateRunStatus::Passed),
@@ -973,7 +958,6 @@ fn parse_run_status(value: &str, command: &str, json: bool) -> Result<jit::domai
                 "unknown --status value '{other}'; expected one of: \
                  passed, failed, error, pending, skipped."
             ),
-            command,
             json,
         )),
     }
@@ -1273,7 +1257,7 @@ fn build_issue_show_response<S: IssueStore>(
 fn print_item_show(result: &jit::commands::ItemShowResult, json: bool, quiet: bool) -> Result<()> {
     let output_ctx = OutputContext::new(quiet, json);
     if json {
-        let output = JsonOutput::success(result, "item show");
+        let output = JsonOutput::success(result);
         println!("{}", output.to_json_string()?);
     } else {
         output_ctx.print_data(format!("Qualified id: {}", result.item.qualified_id))?;
@@ -1319,7 +1303,7 @@ fn run_item<S: IssueStore>(
         handle_json_error!(
             json,
             e,
-            jit::output::JsonError::new("ITEM_COMMAND_FAILED", e.to_string(), "item")
+            jit::output::JsonError::new("ITEM_COMMAND_FAILED", e.to_string())
         );
     }
     Ok(())
@@ -1339,7 +1323,7 @@ fn run_item_inner<S: IssueStore>(
         let output_ctx = OutputContext::new(quiet, json);
         if json {
             let msg = format!("Found {} item(s)", result.count);
-            let output = JsonOutput::success(result, "item list").with_message(msg);
+            let output = JsonOutput::success(result).with_message(msg);
             println!("{}", output.to_json_string()?);
         } else if result.items.is_empty() {
             let _ = output_ctx.print_info("No addressable items found");
@@ -1393,7 +1377,7 @@ fn run_invariant<S: IssueStore>(
         handle_json_error!(
             json,
             e,
-            jit::output::JsonError::new("INVARIANT_COMMAND_FAILED", e.to_string(), "invariant")
+            jit::output::JsonError::new("INVARIANT_COMMAND_FAILED", e.to_string())
         );
     }
     Ok(())
@@ -1417,7 +1401,7 @@ fn run_invariant_inner<S: IssueStore>(
                 } else {
                     "No enforcement drift".to_string()
                 };
-                let output = JsonOutput::success(&result, "invariant check").with_message(msg);
+                let output = JsonOutput::success(&result).with_message(msg);
                 println!("{}", output.to_json_string()?);
             } else if result.findings.is_empty() {
                 output_ctx.print_data("✓ No enforcement drift".to_string())?;
@@ -1471,11 +1455,7 @@ fn run_project<S: IssueStore + jit::storage::RepositoryStateStore>(
         } else {
             "PROJECT_COMMAND_FAILED"
         };
-        handle_json_error!(
-            json,
-            e,
-            jit::output::JsonError::new(code, e.to_string(), "project")
-        );
+        handle_json_error!(json, e, jit::output::JsonError::new(code, e.to_string()));
     }
     Ok(())
 }
@@ -1493,7 +1473,7 @@ fn run_project_inner<S: IssueStore + jit::storage::RepositoryStateStore>(
             let output_ctx = OutputContext::new(quiet, json);
             if json {
                 let msg = format!("Rendered {} projection(s)", result.count);
-                let output = JsonOutput::success(&result, "project render").with_message(msg);
+                let output = JsonOutput::success(&result).with_message(msg);
                 println!("{}", output.to_json_string()?);
             } else if result.projections.is_empty() {
                 output_ctx.print_data("No projections declared".to_string())?;
@@ -1548,14 +1528,14 @@ fn run_query_all<S: IssueStore>(
                 count: issues.len(),
                 issues,
             };
-            JsonOutput::success(serde_json::to_value(response)?, "query all")
+            JsonOutput::success(serde_json::to_value(response)?)
         } else {
             let minimal: Vec<MinimalIssue> = issues.iter().map(MinimalIssue::from).collect();
             let response = IssueListResponse {
                 count: minimal.len(),
                 issues: minimal,
             };
-            JsonOutput::success(serde_json::to_value(response)?, "query all")
+            JsonOutput::success(serde_json::to_value(response)?)
         }
         .with_message(msg);
         println!("{}", output.to_json_string()?);
@@ -1700,7 +1680,6 @@ fn reject_parent_query_filters(
              are ignored. Put them after the subcommand (e.g. `jit query {sub} {flags}`), \
              or drop the subcommand to use the bare form (e.g. `jit query {flags}`)."
         ),
-        "query",
         json,
     ))
 }
@@ -1794,14 +1773,14 @@ fn emit_startup_json_error(error: &anyhow::Error) {
         .downcast_ref::<jit::storage::RepositoryNotFoundError>()
         .is_some()
     {
-        JsonError::new(ErrorCode::REPOSITORY_NOT_FOUND, error.to_string(), "")
+        JsonError::new(ErrorCode::REPOSITORY_NOT_FOUND, error.to_string())
     } else if error
         .downcast_ref::<jit::storage::RepositoryFormatTooNewError>()
         .is_some()
     {
-        JsonError::new(ErrorCode::REPOSITORY_FORMAT_TOO_NEW, error.to_string(), "")
+        JsonError::new(ErrorCode::REPOSITORY_FORMAT_TOO_NEW, error.to_string())
     } else if let Some(stale) = error.downcast_ref::<jit::errors::StaleBinaryError>() {
-        stale_binary_json_error(stale, "")
+        stale_binary_json_error(stale)
     } else {
         return;
     };
@@ -1916,7 +1895,7 @@ fn run() -> Result<()> {
     if let Commands::Version { json } = &command {
         let info = jit::build_info::version_info();
         if *json {
-            let output = JsonOutput::success(&info, "version");
+            let output = JsonOutput::success(&info);
             println!("{}", output.to_json_string()?);
         } else {
             println!("Version: {}", info.version);
@@ -2046,7 +2025,6 @@ fn run() -> Result<()> {
                     None => {
                         return Err(invalid_argument(
                             format!("Unknown hierarchy template: {}", template_name),
-                            "init",
                             *json,
                         ));
                     }
@@ -2060,7 +2038,7 @@ fn run() -> Result<()> {
                 .cloned()
                 .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
             if let Some(id) = profile.as_deref() {
-                profile_result(executor.validate_profile_id(id), "init", *json)?;
+                profile_result(executor.validate_profile_id(id), *json)?;
             }
 
             // Every init and re-init — plain, profiled, or over an existing root —
@@ -2077,7 +2055,6 @@ fn run() -> Result<()> {
                 } else {
                     executor.initialize_fresh_repository(&current_dir, &chosen, None)
                 },
-                "init",
                 *json,
             )?;
             // Machine-local worktree identity (gitignored, not part of the
@@ -2128,7 +2105,7 @@ fn run() -> Result<()> {
                     modified_paths: init_result.modified_paths,
                     profile: profile_result,
                 };
-                let output = JsonOutput::success(payload, "init").with_message(message);
+                let output = JsonOutput::success(payload).with_message(message);
                 println!("{}", output.to_json_string()?);
             }
         }
@@ -2177,7 +2154,7 @@ fn run() -> Result<()> {
             ProfileCommands::List { json } => match executor.list_embedded_profiles() {
                 Ok(result) => {
                     if json {
-                        let output = JsonOutput::success(&result, "profile list");
+                        let output = JsonOutput::success(&result);
                         println!("{}", output.to_json_string()?);
                     } else {
                         for profile in result.profiles {
@@ -2191,7 +2168,7 @@ fn run() -> Result<()> {
                     }
                 }
                 Err(error) if json => {
-                    let json_error = profile_json_error(&error, "profile list");
+                    let json_error = profile_json_error(&error);
                     println!("{}", json_error.to_json_string()?);
                     std::process::exit(json_error.exit_code().code());
                 }
@@ -2200,7 +2177,7 @@ fn run() -> Result<()> {
             ProfileCommands::Show { id, json } => match executor.show_embedded_profile(&id) {
                 Ok(result) => {
                     if json {
-                        let output = JsonOutput::success(&result, "profile show");
+                        let output = JsonOutput::success(&result);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let profile = &result.manifest.profile;
@@ -2222,7 +2199,7 @@ fn run() -> Result<()> {
                     }
                 }
                 Err(error) if json => {
-                    let json_error = profile_json_error(&error, "profile show");
+                    let json_error = profile_json_error(&error);
                     println!("{}", json_error.to_json_string()?);
                     std::process::exit(json_error.exit_code().code());
                 }
@@ -2233,7 +2210,7 @@ fn run() -> Result<()> {
                     match executor.plan_embedded_profile(&id) {
                         Ok(plan) => {
                             if json {
-                                let output = JsonOutput::success(&plan, "profile apply");
+                                let output = JsonOutput::success(&plan);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 let status = match plan.status {
@@ -2252,7 +2229,7 @@ fn run() -> Result<()> {
                             }
                         }
                         Err(error) if json => {
-                            let json_error = profile_json_error(&error, "profile apply");
+                            let json_error = profile_json_error(&error);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         }
@@ -2262,7 +2239,7 @@ fn run() -> Result<()> {
                     match executor.apply_profile(&id) {
                         Ok(applied) => {
                             if json {
-                                let output = JsonOutput::success(&applied, "profile apply");
+                                let output = JsonOutput::success(&applied);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 let status = match applied.status {
@@ -2278,7 +2255,7 @@ fn run() -> Result<()> {
                             }
                         }
                         Err(error) if json => {
-                            let json_error = profile_json_error(&error, "profile apply");
+                            let json_error = profile_json_error(&error);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         }
@@ -2349,8 +2326,7 @@ fn run() -> Result<()> {
                             enriched_deps,
                             &gate_runs,
                         );
-                        let output =
-                            JsonOutput::success(response, "issue create").with_message(msg);
+                        let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         // In quiet mode, output just the ID for scripting
@@ -2512,8 +2488,7 @@ fn run() -> Result<()> {
                             })?
                         };
 
-                        let output =
-                            JsonOutput::success(output_data, "issue search").with_message(msg);
+                        let output = JsonOutput::success(output_data).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_info(format!("Found {} issue(s):", issues.len()));
@@ -2553,13 +2528,12 @@ fn run() -> Result<()> {
                             .iter()
                             .map(|id| build_issue_show_response(&executor, id))
                             .collect::<Result<Vec<_>>>()?;
-                        let output = jit::output::JsonOutput::success(
-                            serde_json::to_value(jit::output::IssueShowListResponse {
+                        let output = jit::output::JsonOutput::success(serde_json::to_value(
+                            jit::output::IssueShowListResponse {
                                 count: responses.len(),
                                 issues: responses,
-                            })?,
-                            "issue show",
-                        );
+                            },
+                        )?);
                         println!("{}", output.to_json_string()?);
                         return Ok(());
                     }
@@ -2592,11 +2566,7 @@ fn run() -> Result<()> {
                                 handle_json_error!(
                                     json,
                                     e,
-                                    jit::output::JsonError::new(
-                                        "ITEM_NOT_FOUND",
-                                        e.to_string(),
-                                        "issue show",
-                                    )
+                                    jit::output::JsonError::new("ITEM_NOT_FOUND", e.to_string())
                                 );
                             }
                         }
@@ -2652,11 +2622,8 @@ fn run() -> Result<()> {
                                     summary_response.title,
                                     summary_response.state
                                 );
-                                let output = jit::output::JsonOutput::success(
-                                    summary_response,
-                                    "issue show",
-                                )
-                                .with_message(msg);
+                                let output = jit::output::JsonOutput::success(summary_response)
+                                    .with_message(msg);
                                 println!("{}", output.to_json_string()?);
                                 return Ok(());
                             }
@@ -2677,7 +2644,7 @@ fn run() -> Result<()> {
                                 response.title,
                                 response.state
                             );
-                            output_data!(quiet, json, "issue show", response, show_msg, {
+                            output_data!(quiet, json, response, show_msg, {
                                 print_issue_show_human(&response);
                             });
                         }
@@ -2685,7 +2652,7 @@ fn run() -> Result<()> {
                             handle_json_error!(
                                 json,
                                 e,
-                                jit::output::JsonError::issue_not_found(&id, "issue show")
+                                jit::output::JsonError::issue_not_found(&id)
                             );
                         }
                     }
@@ -2714,7 +2681,7 @@ fn run() -> Result<()> {
                                 handle_json_error!(
                                     json,
                                     e,
-                                    jit::output::JsonError::issue_not_found(id, "issue status")
+                                    jit::output::JsonError::issue_not_found(id)
                                 );
                             }
                         }
@@ -2723,17 +2690,15 @@ fn run() -> Result<()> {
                     if json {
                         if statuses.len() == 1 {
                             // Single id stays a bare object, mirroring `issue show`.
-                            let output =
-                                jit::output::JsonOutput::success(&statuses[0], "issue status");
+                            let output = jit::output::JsonOutput::success(&statuses[0]);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            let output = jit::output::JsonOutput::success(
-                                serde_json::to_value(jit::output::IssueStatusListResponse {
+                            let output = jit::output::JsonOutput::success(serde_json::to_value(
+                                jit::output::IssueStatusListResponse {
                                     count: statuses.len(),
                                     issues: statuses,
-                                })?,
-                                "issue status",
-                            );
+                                },
+                            )?);
                             println!("{}", output.to_json_string()?);
                         }
                     } else {
@@ -2750,8 +2715,7 @@ fn run() -> Result<()> {
                     match executor.issue_children(&id) {
                         Ok(response) => {
                             if json {
-                                let output =
-                                    jit::output::JsonOutput::success(&response, "issue children");
+                                let output = jit::output::JsonOutput::success(&response);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 for child in &response.issues {
@@ -2766,7 +2730,7 @@ fn run() -> Result<()> {
                             handle_json_error!(
                                 json,
                                 e,
-                                jit::output::JsonError::issue_not_found(&id, "issue children")
+                                jit::output::JsonError::issue_not_found(&id)
                             );
                         }
                     }
@@ -2778,8 +2742,7 @@ fn run() -> Result<()> {
                     match executor.issue_progress(&id) {
                         Ok(response) => {
                             if json {
-                                let output =
-                                    jit::output::JsonOutput::success(&response, "issue progress");
+                                let output = jit::output::JsonOutput::success(&response);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 println!(
@@ -2800,7 +2763,7 @@ fn run() -> Result<()> {
                             handle_json_error!(
                                 json,
                                 e,
-                                jit::output::JsonError::issue_not_found(&id, "issue progress")
+                                jit::output::JsonError::issue_not_found(&id)
                             );
                         }
                     }
@@ -2837,14 +2800,12 @@ fn run() -> Result<()> {
                     if id.is_none() && filter.is_none() {
                         return Err(invalid_argument(
                             "Must specify either issue ID or --filter for batch mode".to_string(),
-                            "issue update",
                             json,
                         ));
                     }
                     if id.is_some() && filter.is_some() {
                         return Err(invalid_argument(
                             "Cannot specify both ID and --filter (mutually exclusive)".to_string(),
-                            "issue update",
                             json,
                         ));
                     }
@@ -2853,16 +2814,13 @@ fn run() -> Result<()> {
                     if filter.is_some() && content_format.is_some() {
                         return Err(invalid_argument(
                             "--content-format is not supported with --filter (batch mode); set it per issue".to_string(),
-                            "issue update",
-                            json,
-                        ));
+                            json));
                     }
                     // --type is a per-issue field; batch mode does not support it.
                     if filter.is_some() && issue_type.is_some() {
                         return Err(invalid_argument(
                             "--type is not supported with --filter (batch mode); set it per issue"
                                 .to_string(),
-                            "issue update",
                             json,
                         ));
                     }
@@ -2878,9 +2836,7 @@ fn run() -> Result<()> {
                     {
                         return Err(invalid_argument(
                             "description flags (--description/--description-file/--append-description/--append-description-file) are not supported with --filter (batch mode); update descriptions per issue".to_string(),
-                            "issue update",
-                            json,
-                        ));
+                            json));
                     }
 
                     // Single issue mode
@@ -2973,8 +2929,7 @@ fn run() -> Result<()> {
                                         issue.state
                                     );
                                     let response = jit::output::IssueUpdateResponse::from(&issue);
-                                    let output = JsonOutput::success(response, "issue update")
-                                        .with_message(msg);
+                                    let output = JsonOutput::success(response).with_message(msg);
                                     println!("{}", output.to_json_string()?);
                                 } else {
                                     let _ = output_ctx
@@ -2991,25 +2946,15 @@ fn run() -> Result<()> {
                                 let json_error = if let Some(blocked) =
                                     e.downcast_ref::<jit::errors::TransitionBlockedError>()
                                 {
-                                    jit::output::JsonError::transition_blocked(
-                                        blocked,
-                                        "issue update",
-                                    )
+                                    jit::output::JsonError::transition_blocked(blocked)
                                 } else if e
                                     .downcast_ref::<jit::storage::IssueNotFoundError>()
                                     .is_some()
                                 {
-                                    jit::output::JsonError::issue_not_found(
-                                        &full_id,
-                                        "issue update",
-                                    )
+                                    jit::output::JsonError::issue_not_found(&full_id)
                                 } else {
                                     // Generic error - use the JsonError::new directly
-                                    jit::output::JsonError::new(
-                                        "GENERIC_ERROR",
-                                        &error_msg,
-                                        "issue update",
-                                    )
+                                    jit::output::JsonError::new("GENERIC_ERROR", &error_msg)
                                 };
                                 handle_json_error!(json, e, json_error);
                             }
@@ -3042,8 +2987,7 @@ fn run() -> Result<()> {
                         if json {
                             let msg =
                                 format!("Modified {} issue(s)", result.summary.total_modified);
-                            let output =
-                                JsonOutput::success(result, "bulk update").with_message(msg);
+                            let output = JsonOutput::success(result).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
                             // Human-readable output
@@ -3108,7 +3052,6 @@ fn run() -> Result<()> {
                             let json_error = jit::output::JsonError::new(
                                 jit::output::ErrorCode::DELETION_NOT_CONFIRMED,
                                 e.to_string(),
-                                "issue delete",
                             )
                             .with_details(serde_json::json!({ "id": id }))
                             .with_suggestion(format!(
@@ -3134,7 +3077,7 @@ fn run() -> Result<()> {
                             "deleted": true
                         });
                         let msg = format!("Deleted issue {}", short);
-                        let output = JsonOutput::success(result, "issue delete").with_message(msg);
+                        let output = JsonOutput::success(result).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Deleted issue: {}", id));
@@ -3168,7 +3111,7 @@ fn run() -> Result<()> {
                                 .as_ref()
                                 .map_or_else(|| "unknown".to_string(), |a| a.to_string())
                         );
-                        let output = JsonOutput::success(issue, "issue assign").with_message(msg);
+                        let output = JsonOutput::success(issue).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Assigned issue: {}", full_id));
@@ -3201,8 +3144,7 @@ fn run() -> Result<()> {
                                     .as_ref()
                                     .map_or_else(|| "unknown".to_string(), |a| a.to_string())
                             );
-                            let output =
-                                JsonOutput::success(issue, "issue claim").with_message(msg);
+                            let output = JsonOutput::success(issue).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
                             let _ = output_ctx
@@ -3218,10 +3160,8 @@ fn run() -> Result<()> {
                                 if let Some(blocked) =
                                     e.downcast_ref::<jit::errors::TransitionBlockedError>()
                                 {
-                                    let json_error = jit::output::JsonError::transition_blocked(
-                                        blocked,
-                                        "issue claim",
-                                    );
+                                    let json_error =
+                                        jit::output::JsonError::transition_blocked(blocked);
                                     println!("{}", json_error.to_json_string()?);
                                     std::process::exit(json_error.exit_code().code());
                                 }
@@ -3241,7 +3181,7 @@ fn run() -> Result<()> {
                             issue,
                             warnings: claim_warnings,
                         };
-                        let output = JsonOutput::success(response, "issue claim").with_message(msg);
+                        let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Claimed issue: {}", full_id));
@@ -3261,7 +3201,7 @@ fn run() -> Result<()> {
                     if json {
                         let issue = storage.load_issue(&full_id)?;
                         let msg = format!("Unassigned issue {}", issue.short_id());
-                        let output = JsonOutput::success(issue, "issue unassign").with_message(msg);
+                        let output = JsonOutput::success(issue).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Unassigned issue: {}", full_id));
@@ -3292,7 +3232,7 @@ fn run() -> Result<()> {
                     if json {
                         let issue = storage.load_issue(&full_id)?;
                         let msg = format!("Rejected issue {}", issue.short_id());
-                        let output = JsonOutput::success(issue, "issue reject").with_message(msg);
+                        let output = JsonOutput::success(issue).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else if let Some(reason_value) = reason {
                         let _ = output_ctx.print_success(format!(
@@ -3311,7 +3251,7 @@ fn run() -> Result<()> {
                     if json {
                         let issue = storage.load_issue(&full_id)?;
                         let msg = format!("Released issue {}", issue.short_id());
-                        let output = JsonOutput::success(issue, "issue release").with_message(msg);
+                        let output = JsonOutput::success(issue).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!(
@@ -3333,10 +3273,8 @@ fn run() -> Result<()> {
                                 if let Some(blocked) =
                                     e.downcast_ref::<jit::errors::TransitionBlockedError>()
                                 {
-                                    let json_error = jit::output::JsonError::transition_blocked(
-                                        blocked,
-                                        "issue claim-next",
-                                    );
+                                    let json_error =
+                                        jit::output::JsonError::transition_blocked(blocked);
                                     println!("{}", json_error.to_json_string()?);
                                     std::process::exit(json_error.exit_code().code());
                                 }
@@ -3353,8 +3291,7 @@ fn run() -> Result<()> {
                             issue,
                             warnings: claim_warnings,
                         };
-                        let output =
-                            JsonOutput::success(response, "issue claim-next").with_message(msg);
+                        let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Claimed issue: {}", id));
@@ -3434,7 +3371,7 @@ fn run() -> Result<()> {
                                 "skipped": result.skipped,
                                 "message": format!("Added {} dependencies to issue {}", result.added.len(), from_id)
                             });
-                            let output = JsonOutput::success(response, "dep add");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
                             if !result.added.is_empty() {
@@ -3482,11 +3419,7 @@ fn run() -> Result<()> {
                         handle_json_error!(
                             json,
                             e,
-                            jit::output::JsonError::new(
-                                "DEPENDENCY_ERROR",
-                                e.to_string(),
-                                "dep add",
-                            )
+                            jit::output::JsonError::new("DEPENDENCY_ERROR", e.to_string())
                         );
                     }
                 }
@@ -3507,7 +3440,7 @@ fn run() -> Result<()> {
                                 "not_found": result.not_found,
                                 "message": format!("Removed {} dependencies from issue {}", result.removed.len(), from_id)
                             });
-                            let output = JsonOutput::success(response, "dep rm");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
                             if !result.removed.is_empty() {
@@ -3540,11 +3473,7 @@ fn run() -> Result<()> {
                         handle_json_error!(
                             json,
                             e,
-                            jit::output::JsonError::new(
-                                "DEPENDENCY_ERROR",
-                                e.to_string(),
-                                "dep rm",
-                            )
+                            jit::output::JsonError::new("DEPENDENCY_ERROR", e.to_string())
                         );
                     }
                 }
@@ -3592,9 +3521,7 @@ fn run() -> Result<()> {
                                     "--mode manual conflicts with --checker-command for gate '{}': a manual gate cannot have a checker. Drop --checker-command, or omit --mode to define an automated gate.",
                                     key
                                 ),
-                                "gate define",
-                                json,
-                            ));
+                                json));
                         }
                         Some(explicit) => explicit,
                         None if has_checker_command => jit::declarations::GateMode::Auto,
@@ -3651,7 +3578,7 @@ fn run() -> Result<()> {
                                 "key": key,
                                 "message": format!("Defined gate '{}'", key)
                             });
-                            let output = JsonOutput::success(response, "gate define");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
                             let _ = output_ctx.print_success(format!("Defined gate '{}'", key));
@@ -3660,7 +3587,7 @@ fn run() -> Result<()> {
                     Err(e) => {
                         if json {
                             use jit::output::JsonError;
-                            let json_error = JsonError::new("GATE_ERROR", e.to_string(), "gate");
+                            let json_error = JsonError::new("GATE_ERROR", e.to_string());
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -3716,9 +3643,7 @@ fn run() -> Result<()> {
                             format!(
                                 "--{flag} and --clear-{flag} are mutually exclusive; provide only one."
                             ),
-                            "gate update",
-                            json,
-                        )),
+                            json)),
                         (Some(v), false) => Ok(FieldEdit::Set(v)),
                         (None, true) => Ok(FieldEdit::Clear),
                         (None, false) => Ok(FieldEdit::Keep),
@@ -3752,7 +3677,7 @@ fn run() -> Result<()> {
                         .collect();
                     match parsed {
                         Ok(map) => Some(map),
-                        Err(msg) => return Err(invalid_argument(msg, "gate update", json)),
+                        Err(msg) => return Err(invalid_argument(msg, json)),
                     }
                 };
                 let env_edit = resolve_field_edit(env_set, clear_env, "env", json)?;
@@ -3779,7 +3704,6 @@ fn run() -> Result<()> {
                         "no fields to update; provide at least one field to change \
                          (e.g. --title, --description, --mode, --checker-command)"
                             .to_string(),
-                        "gate update",
                         json,
                     ));
                 }
@@ -3789,7 +3713,7 @@ fn run() -> Result<()> {
                         if json {
                             use jit::output::JsonOutput;
                             let msg = format!("Updated gate '{}'", gate.key);
-                            let output = JsonOutput::success(gate, "gate update").with_message(msg);
+                            let output = JsonOutput::success(gate).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
                             let _ = output_ctx.print_success(format!("Updated gate '{}'", key));
@@ -3802,9 +3726,9 @@ fn run() -> Result<()> {
                                 .downcast_ref::<jit::storage::GateNotFoundError>()
                                 .is_some()
                             {
-                                JsonError::gate_not_found(&key, "gate update")
+                                JsonError::gate_not_found(&key)
                             } else {
-                                JsonError::new("GATE_ERROR", e.to_string(), "gate update")
+                                JsonError::new("GATE_ERROR", e.to_string())
                             };
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
@@ -3828,8 +3752,7 @@ fn run() -> Result<()> {
                                 gates: gate_defs,
                             };
                             let msg = format!("{} gate definition(s)", count);
-                            let output =
-                                JsonOutput::success(response, "gate list").with_message(msg);
+                            let output = JsonOutput::success(response).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else if gates.is_empty() {
                             let _ = output_ctx.print_info("No gates defined");
@@ -3846,7 +3769,7 @@ fn run() -> Result<()> {
                     Err(e) => {
                         if json {
                             use jit::output::JsonError;
-                            let json_error = JsonError::new("GATE_ERROR", e.to_string(), "gate");
+                            let json_error = JsonError::new("GATE_ERROR", e.to_string());
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -3860,7 +3783,7 @@ fn run() -> Result<()> {
                     if json {
                         use jit::output::JsonOutput;
                         let msg = format!("Gate {}: {}", gate.key, gate.title);
-                        let output = JsonOutput::success(gate, "gate show").with_message(msg);
+                        let output = JsonOutput::success(gate).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         println!("Gate: {}", gate.key);
@@ -3910,7 +3833,7 @@ fn run() -> Result<()> {
                 Err(e) => {
                     if json {
                         use jit::output::JsonError;
-                        let json_error = JsonError::gate_not_found(&key, "gate show");
+                        let json_error = JsonError::gate_not_found(&key);
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
                     } else {
@@ -3928,7 +3851,7 @@ fn run() -> Result<()> {
                                 "key": key,
                                 "message": format!("Removed gate '{}'", key)
                             });
-                            let output = JsonOutput::success(response, "gate remove");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
                             let _ = output_ctx.print_success(format!("Removed gate '{}'", key));
@@ -3937,7 +3860,7 @@ fn run() -> Result<()> {
                     Err(e) => {
                         if json {
                             use jit::output::JsonError;
-                            let json_error = JsonError::gate_not_found(&key, "gate show");
+                            let json_error = JsonError::gate_not_found(&key);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -3984,7 +3907,6 @@ fn run() -> Result<()> {
                         "history (--all/--limit), flat-output (--stdout/--stderr/--tail), and \
                          findings (--findings) views are mutually exclusive."
                             .to_string(),
-                        "gate status",
                         json,
                     ));
                 }
@@ -3993,7 +3915,6 @@ fn run() -> Result<()> {
                     return Err(invalid_argument(
                         "--status only applies to the history view; pass --all or --limit."
                             .to_string(),
-                        "gate status",
                         json,
                     ));
                 }
@@ -4024,7 +3945,7 @@ fn run() -> Result<()> {
                                         findings: vec![],
                                     },
                                 };
-                                let output = JsonOutput::success(response, "gate status");
+                                let output = JsonOutput::success(response);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 print!("{}", render_gate_findings_text(&result));
@@ -4037,8 +3958,8 @@ fn run() -> Result<()> {
                             );
                             if json {
                                 use jit::output::JsonOutput;
-                                let output = JsonOutput::<Option<()>>::success(None, "gate status")
-                                    .with_message(msg);
+                                let output =
+                                    JsonOutput::<Option<()>>::success(None).with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 println!("{}", msg);
@@ -4047,11 +3968,7 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new(
-                                    "GATE_CHECK_ERROR",
-                                    e.to_string(),
-                                    "gate status",
-                                );
+                                let json_error = JsonError::new("GATE_CHECK_ERROR", e.to_string());
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
                             }
@@ -4060,10 +3977,9 @@ fn run() -> Result<()> {
                     }
                 } else if history_mode {
                     // Gate key is an optional filter here (positional or --gate).
-                    let gate_filter =
-                        resolve_optional_gate_key(gate_key, gate_flag, "gate status", json)?;
+                    let gate_filter = resolve_optional_gate_key(gate_key, gate_flag, json)?;
                     let status_filter = match status {
-                        Some(ref s) => Some(parse_run_status(s, "gate status", json)?),
+                        Some(ref s) => Some(parse_run_status(s, json)?),
                         None => None,
                     };
 
@@ -4072,11 +3988,7 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new(
-                                    "GATE_CHECK_ERROR",
-                                    e.to_string(),
-                                    "gate status",
-                                );
+                                let json_error = JsonError::new("GATE_CHECK_ERROR", e.to_string());
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
                             }
@@ -4103,7 +4015,7 @@ fn run() -> Result<()> {
                             count,
                         };
                         let msg = format!("{} gate run(s) listed for issue {}", count, id);
-                        let output = JsonOutput::success(response, "gate status").with_message(msg);
+                        let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else if runs.is_empty() {
                         let _ = output_ctx
@@ -4137,7 +4049,7 @@ fn run() -> Result<()> {
                                     stdout: rendered_stdout,
                                     stderr: rendered_stderr,
                                 };
-                                let output = JsonOutput::success(response, "gate status");
+                                let output = JsonOutput::success(response);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 // Verbatim: no headers, no decoration, no
@@ -4159,8 +4071,8 @@ fn run() -> Result<()> {
                             );
                             if json {
                                 use jit::output::JsonOutput;
-                                let output = JsonOutput::<Option<()>>::success(None, "gate status")
-                                    .with_message(msg);
+                                let output =
+                                    JsonOutput::<Option<()>>::success(None).with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 println!("{}", msg);
@@ -4169,11 +4081,7 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new(
-                                    "GATE_CHECK_ERROR",
-                                    e.to_string(),
-                                    "gate status",
-                                );
+                                let json_error = JsonError::new("GATE_CHECK_ERROR", e.to_string());
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
                             }
@@ -4203,14 +4111,13 @@ fn run() -> Result<()> {
                             );
                             if json {
                                 use jit::output::JsonError;
-                                let json_error =
-                                    JsonError::new("INVALID_ARGUMENT", message, "gate status")
-                                        .with_details(serde_json::json!({
-                                            "issue_id": gate_key,
-                                            "key": id,
-                                            "transposed": true,
-                                        }))
-                                        .with_suggestion(format!("Did you mean: {canonical}"));
+                                let json_error = JsonError::new("INVALID_ARGUMENT", message)
+                                    .with_details(serde_json::json!({
+                                        "issue_id": gate_key,
+                                        "key": id,
+                                        "transposed": true,
+                                    }))
+                                    .with_suggestion(format!("Did you mean: {canonical}"));
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
                             } else {
@@ -4227,8 +4134,7 @@ fn run() -> Result<()> {
                                 use jit::output::{GateRunSummary, JsonOutput};
                                 let msg = format!("Gate '{}': {:?}", gate_key, result.status);
                                 let summary = GateRunSummary::full(&result);
-                                let output =
-                                    JsonOutput::success(summary, "gate status").with_message(msg);
+                                let output = JsonOutput::success(summary).with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 print_gate_run_details(&result);
@@ -4242,8 +4148,8 @@ fn run() -> Result<()> {
                             );
                             if json {
                                 use jit::output::JsonOutput;
-                                let output = JsonOutput::<Option<()>>::success(None, "gate status")
-                                    .with_message(msg);
+                                let output =
+                                    JsonOutput::<Option<()>>::success(None).with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 println!("{}", msg);
@@ -4252,11 +4158,7 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new(
-                                    "GATE_CHECK_ERROR",
-                                    e.to_string(),
-                                    "gate status",
-                                );
+                                let json_error = JsonError::new("GATE_CHECK_ERROR", e.to_string());
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
                             } else {
@@ -4329,7 +4231,7 @@ fn run() -> Result<()> {
                         gates: gate_status_entries,
                         all_passed,
                     };
-                    let output = JsonOutput::success(response, "gate status-all").with_message(msg);
+                    let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else if total == 0 {
                     let _ = output_ctx
@@ -4388,7 +4290,7 @@ fn run() -> Result<()> {
                                 "already_exist": result.already_exist,
                                 "message": format!("Added {} gate(s) to issue {}", result.added.len(), id)
                             });
-                            let output = JsonOutput::success(response, "gate add");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
                             if !result.added.is_empty() {
@@ -4420,14 +4322,14 @@ fn run() -> Result<()> {
                                 .downcast_ref::<jit::storage::IssueNotFoundError>()
                                 .is_some()
                             {
-                                JsonError::issue_not_found(&id, "gate add")
+                                JsonError::issue_not_found(&id)
                             } else if e
                                 .downcast_ref::<jit::storage::GateNotFoundError>()
                                 .is_some()
                             {
-                                JsonError::new("GATE_NOT_FOUND", error_str, "gate add")
+                                JsonError::new("GATE_NOT_FOUND", error_str)
                             } else {
-                                JsonError::new("GATE_ERROR", error_str, "gate add")
+                                JsonError::new("GATE_ERROR", error_str)
                             };
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
@@ -4474,7 +4376,7 @@ fn run() -> Result<()> {
                                 "warnings": outcome.warnings,
                                 "message": message,
                             });
-                            let output = JsonOutput::success(response, "gate evaluate");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else if already_passed {
                             let _ = output_ctx.print_success(format!(
@@ -4489,7 +4391,7 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
-                        render_gate_pass_error(e, &id, &output_ctx, json, "gate evaluate")?;
+                        render_gate_pass_error(e, &id, &output_ctx, json)?;
                     }
                 }
             }
@@ -4535,7 +4437,7 @@ fn run() -> Result<()> {
                                     id
                                 ),
                             });
-                            let output = JsonOutput::success(response, "gate evaluate-all");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else if outcome.results.is_empty() {
                             let _ = output_ctx
@@ -4555,7 +4457,7 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
-                        render_gate_pass_error(e, &id, &output_ctx, json, "gate evaluate-all")?;
+                        render_gate_pass_error(e, &id, &output_ctx, json)?;
                     }
                 }
             }
@@ -4581,7 +4483,7 @@ fn run() -> Result<()> {
                                 "status": "failed",
                                 "message": format!("Failed gate '{}' for issue {}", gate_key, id)
                             });
-                            let output = JsonOutput::success(response, "gate fail");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
                             let _ = output_ctx.print_success(format!(
@@ -4593,8 +4495,7 @@ fn run() -> Result<()> {
                     Err(e) => {
                         if json {
                             use jit::output::JsonError;
-                            let json_error =
-                                JsonError::new("GATE_ERROR", e.to_string(), "gate fail");
+                            let json_error = JsonError::new("GATE_ERROR", e.to_string());
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -4610,13 +4511,10 @@ fn run() -> Result<()> {
                         Ok(presets) => {
                             if json {
                                 let msg = format!("{} preset(s)", presets.len());
-                                let output = JsonOutput::success(
-                                    serde_json::json!({
-                                        "count": presets.len(),
-                                        "presets": presets,
-                                    }),
-                                    "gate preset list",
-                                )
+                                let output = JsonOutput::success(serde_json::json!({
+                                    "count": presets.len(),
+                                    "presets": presets,
+                                }))
                                 .with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else if presets.is_empty() {
@@ -4647,11 +4545,7 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new(
-                                    "PRESET_ERROR",
-                                    e.to_string(),
-                                    "gate preset list",
-                                );
+                                let json_error = JsonError::new("PRESET_ERROR", e.to_string());
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
                             } else {
@@ -4666,8 +4560,7 @@ fn run() -> Result<()> {
                         Ok(preset) => {
                             if json {
                                 let msg = format!("Preset {}: {}", preset.name, preset.description);
-                                let output = JsonOutput::success(preset, "gate preset show")
-                                    .with_message(msg);
+                                let output = JsonOutput::success(preset).with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 println!("Preset: {}", preset.name);
@@ -4717,11 +4610,7 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new(
-                                    "PRESET_ERROR",
-                                    e.to_string(),
-                                    "gate preset show",
-                                );
+                                let json_error = JsonError::new("PRESET_ERROR", e.to_string());
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
                             } else {
@@ -4766,25 +4655,22 @@ fn run() -> Result<()> {
                     if json {
                         let msg =
                             format!("Applied preset '{}' to {} issue(s)", name, results.len());
-                        let output = JsonOutput::success(
-                            serde_json::json!({
-                                "preset": name,
-                                "success": results.iter().map(|(id, r, _)| {
-                                    serde_json::json!({
-                                        "issue_id": id,
-                                        "gates_added": r.added,
-                                        "already_existed": r.already_exist
-                                    })
-                                }).collect::<Vec<_>>(),
-                                "errors": errors.iter().map(|(id, e)| {
-                                    serde_json::json!({
-                                        "issue_id": id,
-                                        "error": e
-                                    })
-                                }).collect::<Vec<_>>()
-                            }),
-                            "gate preset apply",
-                        )
+                        let output = JsonOutput::success(serde_json::json!({
+                            "preset": name,
+                            "success": results.iter().map(|(id, r, _)| {
+                                serde_json::json!({
+                                    "issue_id": id,
+                                    "gates_added": r.added,
+                                    "already_existed": r.already_exist
+                                })
+                            }).collect::<Vec<_>>(),
+                            "errors": errors.iter().map(|(id, e)| {
+                                serde_json::json!({
+                                    "issue_id": id,
+                                    "error": e
+                                })
+                            }).collect::<Vec<_>>()
+                        }))
                         .with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
@@ -4818,9 +4704,7 @@ fn run() -> Result<()> {
                             if json {
                                 let msg = format!("Created preset '{}'", name);
                                 let output = JsonOutput::success(
-                                    serde_json::json!({ "name": name, "path": path.display().to_string() }),
-                                    "gate preset create",
-                                )
+                                    serde_json::json!({ "name": name, "path": path.display().to_string() }))
                                 .with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else {
@@ -4830,11 +4714,7 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new(
-                                    "PRESET_ERROR",
-                                    e.to_string(),
-                                    "gate preset create",
-                                );
+                                let json_error = JsonError::new("PRESET_ERROR", e.to_string());
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
                             } else {
@@ -4864,7 +4744,7 @@ fn run() -> Result<()> {
                         summary,
                     };
                     let msg = format!("{} dependencies", response.summary.total);
-                    let output = JsonOutput::success(response, "graph deps").with_message(msg);
+                    let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     // For human output, use tree structure
@@ -4909,7 +4789,7 @@ fn run() -> Result<()> {
                         count: issues.len(),
                     };
                     let msg = format!("{} dependents", issues.len());
-                    let output = JsonOutput::success(response, "graph rdeps").with_message(msg);
+                    let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info(format!("Reverse dependencies of {}:", id));
@@ -4932,7 +4812,7 @@ fn run() -> Result<()> {
                         count: issues.len(),
                     };
                     let msg = format!("{} root issues", issues.len());
-                    let output = JsonOutput::success(response, "graph roots").with_message(msg);
+                    let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Root issues (no dependencies):");
@@ -4948,7 +4828,7 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::JsonOutput;
                     let msg = format!("{} nodes", response.count);
-                    let output = JsonOutput::success(response, "graph tree").with_message(msg);
+                    let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let scope = match &response.root {
@@ -5052,13 +4932,10 @@ fn run() -> Result<()> {
                 let events = executor.tail_events(n)?;
                 if json {
                     use jit::output::JsonOutput;
-                    let output = JsonOutput::success(
-                        serde_json::json!({
-                            "count": events.len(),
-                            "events": events,
-                        }),
-                        "events tail",
-                    )
+                    let output = JsonOutput::success(serde_json::json!({
+                        "count": events.len(),
+                        "events": events,
+                    }))
                     .with_message(format!("{} event(s)", events.len()));
                     println!("{}", output.to_json_string()?);
                 } else {
@@ -5076,13 +4953,10 @@ fn run() -> Result<()> {
                 let events = executor.query_events(event_type, issue_id, limit)?;
                 if json {
                     use jit::output::JsonOutput;
-                    let output = JsonOutput::success(
-                        serde_json::json!({
-                            "count": events.len(),
-                            "events": events,
-                        }),
-                        "events query",
-                    )
+                    let output = JsonOutput::success(serde_json::json!({
+                        "count": events.len(),
+                        "events": events,
+                    }))
                     .with_message(format!("{} event(s)", events.len()));
                     println!("{}", output.to_json_string()?);
                 } else {
@@ -5119,7 +4993,7 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::JsonOutput;
                     let msg = format!("{} document reference on issue {}", verb, result.issue_id);
-                    let output = JsonOutput::success(&result, "doc add").with_message(msg);
+                    let output = JsonOutput::success(&result).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     println!("{} document reference on issue {}", verb, result.issue_id);
@@ -5149,7 +5023,7 @@ fn run() -> Result<()> {
 
                 if json {
                     let msg = format!("{} document(s) attached", result.count);
-                    let output = JsonOutput::success(&result, "doc list").with_message(msg);
+                    let output = JsonOutput::success(&result).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else if result.documents.is_empty() {
                     output_ctx.print_data(format!(
@@ -5188,7 +5062,7 @@ fn run() -> Result<()> {
                         "Removed document reference {} from issue {}",
                         result.path, result.issue_id
                     );
-                    let output = JsonOutput::success(&result, "doc remove").with_message(msg);
+                    let output = JsonOutput::success(&result).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     println!(
@@ -5205,7 +5079,7 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::JsonOutput;
                     let msg = "Document content retrieved".to_string();
-                    let output = JsonOutput::success(&result, "doc show").with_message(msg);
+                    let output = JsonOutput::success(&result).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     println!("Document: {}", result.path);
@@ -5228,7 +5102,7 @@ fn run() -> Result<()> {
 
                 if json {
                     let msg = format!("{} commits in history", result.commits.len());
-                    let output = JsonOutput::success(&result, "doc history").with_message(msg);
+                    let output = JsonOutput::success(&result).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     output_ctx.print_data(format!("History for {}:\n", result.path))?;
@@ -5254,7 +5128,7 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::JsonOutput;
                     let msg = "Document diff retrieved".to_string();
-                    let output = JsonOutput::success(&result, "doc diff").with_message(msg);
+                    let output = JsonOutput::success(&result).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     print!("{}", result.diff);
@@ -5280,7 +5154,7 @@ fn run() -> Result<()> {
 
                     if json {
                         let msg = format!("{} assets found", result.summary.total);
-                        let output = JsonOutput::success(&result, "doc assets").with_message(msg);
+                        let output = JsonOutput::success(&result).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let repo_root = executor_layout.worktree_root();
@@ -5417,7 +5291,7 @@ fn run() -> Result<()> {
                             result.summary.errors, result.summary.warnings
                         )
                     };
-                    let output = JsonOutput::success(&result, "doc check-links").with_message(msg);
+                    let output = JsonOutput::success(&result).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     output_ctx.print_data(format!(
@@ -5611,23 +5485,21 @@ fn run() -> Result<()> {
 
                             let msg = format!("Found {} issue(s)", issues.len());
                             let output = if full {
-                                JsonOutput::success(
-                                    serde_json::to_value(jit::output::IssueListFullResponse {
+                                JsonOutput::success(serde_json::to_value(
+                                    jit::output::IssueListFullResponse {
                                         count: issues.len(),
                                         issues,
-                                    })?,
-                                    "query available",
-                                )
+                                    },
+                                )?)
                             } else {
                                 let minimal: Vec<MinimalIssue> =
                                     issues.iter().map(MinimalIssue::from).collect();
-                                JsonOutput::success(
-                                    serde_json::to_value(jit::output::IssueListResponse {
+                                JsonOutput::success(serde_json::to_value(
+                                    jit::output::IssueListResponse {
                                         count: minimal.len(),
                                         issues: minimal,
-                                    })?,
-                                    "query available",
-                                )
+                                    },
+                                )?)
                             }
                             .with_message(msg);
                             println!("{}", output.to_json_string()?);
@@ -5691,13 +5563,12 @@ fn run() -> Result<()> {
                                     })
                                     .collect();
 
-                                JsonOutput::success(
-                                    serde_json::to_value(jit::output::BlockedFullListResponse {
+                                JsonOutput::success(serde_json::to_value(
+                                    jit::output::BlockedFullListResponse {
                                         count: blocked_issues.len(),
                                         issues: blocked_issues,
-                                    })?,
-                                    "query blocked",
-                                )
+                                    },
+                                )?)
                             } else {
                                 use jit::domain::MinimalBlockedIssue;
                                 let minimal: Vec<MinimalBlockedIssue> = blocked
@@ -5709,13 +5580,12 @@ fn run() -> Result<()> {
                                     })
                                     .collect();
 
-                                JsonOutput::success(
-                                    serde_json::to_value(jit::output::BlockedListResponse {
+                                JsonOutput::success(serde_json::to_value(
+                                    jit::output::BlockedListResponse {
                                         count: minimal.len(),
                                         issues: minimal,
-                                    })?,
-                                    "query blocked",
-                                )
+                                    },
+                                )?)
                             }
                             .with_message(msg);
                             println!("{}", output.to_json_string()?);
@@ -5749,23 +5619,21 @@ fn run() -> Result<()> {
 
                             let msg = format!("Found {} issue(s)", issues.len());
                             let output = if full {
-                                JsonOutput::success(
-                                    serde_json::to_value(jit::output::IssueListFullResponse {
+                                JsonOutput::success(serde_json::to_value(
+                                    jit::output::IssueListFullResponse {
                                         count: issues.len(),
                                         issues,
-                                    })?,
-                                    "query strategic",
-                                )
+                                    },
+                                )?)
                             } else {
                                 let minimal: Vec<MinimalIssue> =
                                     issues.iter().map(MinimalIssue::from).collect();
-                                JsonOutput::success(
-                                    serde_json::to_value(jit::output::IssueListResponse {
+                                JsonOutput::success(serde_json::to_value(
+                                    jit::output::IssueListResponse {
                                         count: minimal.len(),
                                         issues: minimal,
-                                    })?,
-                                    "query strategic",
-                                )
+                                    },
+                                )?)
                             }
                             .with_message(msg);
                             println!("{}", output.to_json_string()?);
@@ -5796,23 +5664,21 @@ fn run() -> Result<()> {
 
                             let msg = format!("Found {} issue(s)", issues.len());
                             let output = if full {
-                                JsonOutput::success(
-                                    serde_json::to_value(jit::output::IssueListFullResponse {
+                                JsonOutput::success(serde_json::to_value(
+                                    jit::output::IssueListFullResponse {
                                         count: issues.len(),
                                         issues,
-                                    })?,
-                                    "query closed",
-                                )
+                                    },
+                                )?)
                             } else {
                                 let minimal: Vec<MinimalIssue> =
                                     issues.iter().map(MinimalIssue::from).collect();
-                                JsonOutput::success(
-                                    serde_json::to_value(jit::output::IssueListResponse {
+                                JsonOutput::success(serde_json::to_value(
+                                    jit::output::IssueListResponse {
                                         count: minimal.len(),
                                         issues: minimal,
-                                    })?,
-                                    "query closed",
-                                )
+                                    },
+                                )?)
                             }
                             .with_message(msg);
                             println!("{}", output.to_json_string()?);
@@ -5839,8 +5705,8 @@ fn run() -> Result<()> {
                                 "{}/{} done ({}%)",
                                 rollup.done, rollup.total, rollup.percent
                             );
-                            let output = jit::output::JsonOutput::success(&rollup, "query count")
-                                .with_message(msg);
+                            let output =
+                                jit::output::JsonOutput::success(&rollup).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
                             for line in rollup.to_lines() {
@@ -5854,9 +5720,7 @@ fn run() -> Result<()> {
 
                         if json {
                             let msg = format!("{} divergence(s)", report.count);
-                            let output =
-                                jit::output::JsonOutput::success(report, "query divergence")
-                                    .with_message(msg);
+                            let output = jit::output::JsonOutput::success(report).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else if report.divergences.is_empty() {
                             let _ = output_ctx.print_success("No membership/DAG divergences");
@@ -5888,8 +5752,7 @@ fn run() -> Result<()> {
                         namespaces: namespace_names,
                     };
                     let msg = format!("{} namespace(s)", response.count);
-                    let output =
-                        JsonOutput::success(response, "label namespaces").with_message(msg);
+                    let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     let _ = output_ctx.print_info("Label Namespaces:\n");
@@ -5907,14 +5770,11 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::JsonOutput;
                     let msg = format!("{} value(s)", values.len());
-                    let output = JsonOutput::success(
-                        serde_json::json!({
-                            "namespace": namespace,
-                            "values": values,
-                            "count": values.len()
-                        }),
-                        "label values",
-                    )
+                    let output = JsonOutput::success(serde_json::json!({
+                        "namespace": namespace,
+                        "values": values,
+                        "count": values.len()
+                    }))
                     .with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
@@ -6005,7 +5865,7 @@ fn run() -> Result<()> {
                     });
                     println!(
                         "{}",
-                        JsonOutput::success(output, "config show")
+                        JsonOutput::success(output)
                             .with_message("Effective configuration")
                             .to_json_string()?
                     );
@@ -6083,8 +5943,7 @@ fn run() -> Result<()> {
                             println!(
                                 "{}",
                                 JsonOutput::success(
-                                    json!({"key": outcome.key, "value": outcome.value}),
-                                    "config get"
+                                    json!({"key": outcome.key, "value": outcome.value})
                                 )
                                 .to_json_string()?
                             );
@@ -6108,11 +5967,7 @@ fn run() -> Result<()> {
                             handle_json_error!(
                                 json,
                                 e,
-                                JsonError::new(
-                                    ErrorCode::INVALID_ARGUMENT,
-                                    e.to_string(),
-                                    "config get"
-                                )
+                                JsonError::new(ErrorCode::INVALID_ARGUMENT, e.to_string())
                             );
                         } else {
                             return Err(e);
@@ -6134,15 +5989,12 @@ fn run() -> Result<()> {
                 if json {
                     println!(
                         "{}",
-                        JsonOutput::success(
-                            json!({
-                                "key": outcome.key,
-                                "value": outcome.value,
-                                "file": outcome.file.display().to_string(),
-                                "scope": outcome.scope
-                            }),
-                            "config set"
-                        )
+                        JsonOutput::success(json!({
+                            "key": outcome.key,
+                            "value": outcome.value,
+                            "file": outcome.file.display().to_string(),
+                            "scope": outcome.scope
+                        }))
                         .to_json_string()?
                     );
                 } else {
@@ -6212,7 +6064,7 @@ fn run() -> Result<()> {
                     });
                     println!(
                         "{}",
-                        JsonOutput::success(output, "config validate")
+                        JsonOutput::success(output)
                             .with_message(if has_errors {
                                 format!("Validation failed: {} error(s)", result.errors.len())
                             } else {
@@ -6246,7 +6098,7 @@ fn run() -> Result<()> {
                     use jit::output::JsonOutput;
                     println!(
                         "{}",
-                        JsonOutput::success(hierarchy, "config show-hierarchy")
+                        JsonOutput::success(hierarchy)
                             .with_message("Type hierarchy")
                             .to_json_string()?
                     );
@@ -6280,8 +6132,7 @@ fn run() -> Result<()> {
                     println!(
                         "{}",
                         JsonOutput::success(
-                            serde_json::json!({"templates": template_data, "count": count}),
-                            "config list-templates",
+                            serde_json::json!({"templates": template_data, "count": count})
                         )
                         .with_message(format!("{} template(s)", count))
                         .to_json_string()?
@@ -6303,14 +6154,11 @@ fn run() -> Result<()> {
                 match install_hooks(None) {
                     Ok(result) => {
                         if json {
-                            let output = jit::output::JsonOutput::success(
-                                serde_json::json!({
-                                    "hooks_dir": result.hooks_dir,
-                                    "installed": result.installed,
-                                    "skipped": result.skipped,
-                                }),
-                                "hooks install",
-                            )
+                            let output = jit::output::JsonOutput::success(serde_json::json!({
+                                "hooks_dir": result.hooks_dir,
+                                "installed": result.installed,
+                                "skipped": result.skipped,
+                            }))
                             .with_message(format!(
                                 "Installed {} hook(s) to {}",
                                 result.installed.len(),
@@ -6338,11 +6186,8 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = jit::output::JsonError::new(
-                                "HOOKS_INSTALL_ERROR",
-                                e.to_string(),
-                                "hooks install",
-                            );
+                            let json_error =
+                                jit::output::JsonError::new("HOOKS_INSTALL_ERROR", e.to_string());
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -6393,7 +6238,7 @@ fn run() -> Result<()> {
                             count: results.len(),
                             results,
                         };
-                        let output = JsonOutput::success(response, "search").with_message(msg);
+                        let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else if results.is_empty() {
                         let _ =
@@ -6453,7 +6298,7 @@ fn run() -> Result<()> {
                             None
                         };
 
-                        let mut json_error = JsonError::new(error_code, e.to_string(), "validate");
+                        let mut json_error = JsonError::new(error_code, e.to_string());
                         if let Some(sug) = suggestion {
                             json_error = json_error.with_suggestion(sug);
                         }
@@ -6474,7 +6319,7 @@ fn run() -> Result<()> {
                     "{} open, {} ready, {} in progress, {} done",
                     summary.open, summary.ready, summary.in_progress, summary.done
                 );
-                let output = JsonOutput::success(&summary, "status").with_message(msg);
+                let output = JsonOutput::success(&summary).with_message(msg);
                 println!("{}", output.to_json_string()?);
             } else {
                 output_ctx.print_data("Status:")?;
@@ -6507,7 +6352,6 @@ fn run() -> Result<()> {
                      `jit query divergence` for membership labels the DAG does \
                      not back."
                         .to_string(),
-                    "validate",
                     json,
                 ));
             }
@@ -6551,15 +6395,14 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::JsonOutput;
                     let value = serde_json::to_value(&report)?;
-                    let output =
-                        JsonOutput::success(value, "validate").with_message(if exit_nonzero {
-                            format!(
-                                "Scope validation failed with {} error(s)",
-                                report.error_count()
-                            )
-                        } else {
-                            "Scope validation passed".to_string()
-                        });
+                    let output = JsonOutput::success(value).with_message(if exit_nonzero {
+                        format!(
+                            "Scope validation failed with {} error(s)",
+                            report.error_count()
+                        )
+                    } else {
+                        "Scope validation passed".to_string()
+                    });
                     println!("{}", output.to_json_string()?);
                 } else if report.findings.is_empty() {
                     println!("✓ Scope validation passed");
@@ -6600,12 +6443,11 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::JsonOutput;
                     let value = serde_json::to_value(&report)?;
-                    let output =
-                        JsonOutput::success(value, "validate").with_message(if exit_nonzero {
-                            "Validation found error-severity rule failures".to_string()
-                        } else {
-                            "Validation passed".to_string()
-                        });
+                    let output = JsonOutput::success(value).with_message(if exit_nonzero {
+                        "Validation found error-severity rule failures".to_string()
+                    } else {
+                        "Validation passed".to_string()
+                    });
                     println!("{}", output.to_json_string()?);
                 } else {
                     println!("Rule explanation for issue {}", report.issue_id);
@@ -6664,12 +6506,11 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::JsonOutput;
                     let value = serde_json::to_value(&report)?;
-                    let output =
-                        JsonOutput::success(value, "validate").with_message(if exit_nonzero {
-                            format!("Validation failed with {} error(s)", report.error_count())
-                        } else {
-                            "Validation passed".to_string()
-                        });
+                    let output = JsonOutput::success(value).with_message(if exit_nonzero {
+                        format!("Validation failed with {} error(s)", report.error_count())
+                    } else {
+                        "Validation passed".to_string()
+                    });
                     println!("{}", output.to_json_string()?);
                 } else if report.findings.is_empty() {
                     println!("✓ Issue validation passed");
@@ -6769,13 +6610,10 @@ fn run() -> Result<()> {
                     } else {
                         "Validation failed".to_string()
                     };
-                    let output = JsonOutput::success(
-                        json!({
-                            "valid": all_valid,
-                            "validations": results_json
-                        }),
-                        "validate",
-                    )
+                    let output = JsonOutput::success(json!({
+                        "valid": all_valid,
+                        "validations": results_json
+                    }))
                     .with_message(msg);
                     println!("{}", output.to_json_string()?);
 
@@ -6817,21 +6655,18 @@ fn run() -> Result<()> {
                     use jit::output::JsonOutput;
                     use serde_json::json;
 
-                    let output = JsonOutput::success(
-                        json!({
-                            "valid": true,
-                            "fixes_applied": fixes_applied,
-                            "dry_run": dry_run,
-                            "message": if dry_run {
-                                format!("{} fixes would be applied", fixes_applied)
-                            } else if fixes_applied > 0 {
-                                format!("Applied {} fixes, repository is now valid", fixes_applied)
-                            } else {
-                                "Repository is valid".to_string()
-                            }
-                        }),
-                        "validate",
-                    );
+                    let output = JsonOutput::success(json!({
+                        "valid": true,
+                        "fixes_applied": fixes_applied,
+                        "dry_run": dry_run,
+                        "message": if dry_run {
+                            format!("{} fixes would be applied", fixes_applied)
+                        } else if fixes_applied > 0 {
+                            format!("Applied {} fixes, repository is now valid", fixes_applied)
+                        } else {
+                            "Repository is valid".to_string()
+                        }
+                    }));
                     println!("{}", output.to_json_string()?);
                 }
             } else {
@@ -6910,20 +6745,17 @@ fn run() -> Result<()> {
                         "Repository validation passed".to_string()
                     };
                     let divergences_json = serde_json::to_value(&divergence_report.divergences)?;
-                    let output = JsonOutput::success(
-                        json!({
-                            "valid": !validation_failed,
-                            "integrity_error": integrity_message,
-                            "warnings": warnings_json,
-                            "warning_count": warnings_json.len(),
-                            "membership_divergences": divergences_json,
-                            "divergence_count": divergence_report.count,
-                            "rule_findings": findings_json,
-                            "error_count": rule_report.error_count(),
-                            "message": message
-                        }),
-                        "validate",
-                    );
+                    let output = JsonOutput::success(json!({
+                        "valid": !validation_failed,
+                        "integrity_error": integrity_message,
+                        "warnings": warnings_json,
+                        "warning_count": warnings_json.len(),
+                        "membership_divergences": divergences_json,
+                        "divergence_count": divergence_report.count,
+                        "rule_findings": findings_json,
+                        "error_count": rule_report.error_count(),
+                        "message": message
+                    }));
                     println!("{}", output.to_json_string()?);
                 } else {
                     if validation_failed {
@@ -6998,9 +6830,7 @@ fn run() -> Result<()> {
                             "expired_leases_evicted": 0,
                             "temp_files_removed": 0,
                             "warnings": [],
-                        }),
-                        "recover",
-                    )
+                        }))
                     .with_message(format!(
                         "Recovery: {transactions_recovered} transaction(s) recovered; repository absence restored"
                     ));
@@ -7020,18 +6850,15 @@ fn run() -> Result<()> {
                             "Recovery: {} locks cleaned, {} leases evicted",
                             report.stale_locks_cleaned, report.expired_leases_evicted
                         );
-                        let output = JsonOutput::success(
-                            json!({
-                                "success": true,
-                                "transactions_recovered": transactions_recovered,
-                                "stale_locks_cleaned": report.stale_locks_cleaned,
-                                "index_rebuilt": report.index_rebuilt,
-                                "expired_leases_evicted": report.expired_leases_evicted,
-                                "temp_files_removed": report.temp_files_removed,
-                                "warnings": report.warnings,
-                            }),
-                            "recover",
-                        )
+                        let output = JsonOutput::success(json!({
+                            "success": true,
+                            "transactions_recovered": transactions_recovered,
+                            "stale_locks_cleaned": report.stale_locks_cleaned,
+                            "index_rebuilt": report.index_rebuilt,
+                            "expired_leases_evicted": report.expired_leases_evicted,
+                            "temp_files_removed": report.temp_files_removed,
+                            "warnings": report.warnings,
+                        }))
                         .with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
@@ -7052,11 +6879,7 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        let output = jit::output::JsonError::new(
-                            "recovery_failed",
-                            e.to_string(),
-                            "recover",
-                        );
+                        let output = jit::output::JsonError::new("recovery_failed", e.to_string());
                         eprintln!("{}", serde_json::to_string(&output)?);
                         std::process::exit(1);
                     } else {
@@ -7071,13 +6894,10 @@ fn run() -> Result<()> {
                 let result = executor.backfill_lifecycle_timestamps()?;
                 if json {
                     use jit::output::JsonOutput;
-                    let output = JsonOutput::success(
-                        serde_json::json!({
-                            "issues_scanned": result.issues_scanned,
-                            "issues_updated": result.issues_updated,
-                        }),
-                        "migrate lifecycle-timestamps",
-                    )
+                    let output = JsonOutput::success(serde_json::json!({
+                        "issues_scanned": result.issues_scanned,
+                        "issues_updated": result.issues_updated,
+                    }))
                     .with_message(format!(
                         "Backfilled lifecycle timestamps on {} of {} issue(s)",
                         result.issues_updated, result.issues_scanned
@@ -7404,7 +7224,7 @@ fn run() -> Result<()> {
                                 "warnings": warnings,
                                 "message": format!("Acquired lease {} on issue {}", lease_id, issue_id),
                             });
-                            let output = JsonOutput::success(response, "claim acquire");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
                             println!("✓ Acquired lease: {}", lease_id);
@@ -7418,8 +7238,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error =
-                                claim_json_error(&e, "CLAIM_ACQUIRE_ERROR", "claim acquire");
+                            let json_error = claim_json_error(&e, "CLAIM_ACQUIRE_ERROR");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7449,7 +7268,7 @@ fn run() -> Result<()> {
                                     released.actor
                                 ),
                             });
-                            let output = JsonOutput::success(response, "claim release");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
                             println!("✓ Released lease: {}", released.lease_id);
@@ -7464,8 +7283,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error =
-                                claim_json_error(&e, "CLAIM_RELEASE_ERROR", "claim release");
+                            let json_error = claim_json_error(&e, "CLAIM_RELEASE_ERROR");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7490,7 +7308,7 @@ fn run() -> Result<()> {
                                 "warnings": warnings,
                                 "message": format!("Renewed lease {} by {} seconds", lease_id, extension),
                             });
-                            let output = JsonOutput::success(response, "claim renew");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
                             println!("✓ Renewed lease: {}", lease_id);
@@ -7507,8 +7325,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error =
-                                claim_json_error(&e, "CLAIM_RENEW_ERROR", "claim renew");
+                            let json_error = claim_json_error(&e, "CLAIM_RENEW_ERROR");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7529,7 +7346,7 @@ fn run() -> Result<()> {
                                 "warnings": warnings,
                                 "message": format!("Heartbeat sent for lease {}", lease_id),
                             });
-                            let output = JsonOutput::success(response, "claim heartbeat");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
                             println!("✓ Heartbeat sent: {}", lease_id);
@@ -7541,8 +7358,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error =
-                                claim_json_error(&e, "CLAIM_HEARTBEAT_ERROR", "claim heartbeat");
+                            let json_error = claim_json_error(&e, "CLAIM_HEARTBEAT_ERROR");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7567,8 +7383,7 @@ fn run() -> Result<()> {
                                 "count": leases.len(),
                                 "warnings": warnings,
                             });
-                            let output =
-                                JsonOutput::success(response, "claim status").with_message(msg);
+                            let output = JsonOutput::success(response).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else if leases.is_empty() {
                             println!("No active leases found.");
@@ -7631,8 +7446,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error =
-                                claim_json_error(&e, "CLAIM_STATUS_ERROR", "claim status");
+                            let json_error = claim_json_error(&e, "CLAIM_STATUS_ERROR");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7654,8 +7468,7 @@ fn run() -> Result<()> {
                                 "count": leases.len(),
                                 "warnings": warnings,
                             });
-                            let output =
-                                JsonOutput::success(response, "claim list").with_message(msg);
+                            let output = JsonOutput::success(response).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else if leases.is_empty() {
                             println!("No active leases.");
@@ -7706,7 +7519,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = claim_json_error(&e, "CLAIM_LIST_ERROR", "claim list");
+                            let json_error = claim_json_error(&e, "CLAIM_LIST_ERROR");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7732,7 +7545,7 @@ fn run() -> Result<()> {
                                 "warnings": warnings,
                                 "message": format!("Force-evicted lease {}", lease_id),
                             });
-                            let output = JsonOutput::success(response, "claim force-evict");
+                            let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
                             println!("✓ Force-evicted lease: {}", lease_id);
@@ -7745,11 +7558,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = claim_json_error(
-                                &e,
-                                "CLAIM_FORCE_EVICT_ERROR",
-                                "claim force-evict",
-                            );
+                            let json_error = claim_json_error(&e, "CLAIM_FORCE_EVICT_ERROR");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7775,11 +7584,10 @@ fn run() -> Result<()> {
                                 "common_dir": info.common_dir,
                                 "warnings": warnings,
                             });
-                            let output = JsonOutput::success(response, "worktree info")
-                                .with_message(format!(
-                                    "Worktree {} on branch {}",
-                                    info.worktree_id, info.branch
-                                ));
+                            let output = JsonOutput::success(response).with_message(format!(
+                                "Worktree {} on branch {}",
+                                info.worktree_id, info.branch
+                            ));
                             println!("{}", output.to_json_string()?);
                         } else {
                             println!("Worktree Information:");
@@ -7803,11 +7611,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = JsonError::new(
-                                "WORKTREE_INFO_ERROR",
-                                e.to_string(),
-                                "worktree info",
-                            );
+                            let json_error = JsonError::new("WORKTREE_INFO_ERROR", e.to_string());
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7832,7 +7636,7 @@ fn run() -> Result<()> {
                                     serde_json::to_value(&warnings)?,
                                 );
                             }
-                            let output = JsonOutput::success(value, "worktree list")
+                            let output = JsonOutput::success(value)
                                 .with_message(format!("{} worktree(s)", count));
                             println!("{}", output.to_json_string()?);
                         } else {
@@ -7860,11 +7664,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = JsonError::new(
-                                "WORKTREE_LIST_ERROR",
-                                e.to_string(),
-                                "worktree list",
-                            );
+                            let json_error = JsonError::new("WORKTREE_LIST_ERROR", e.to_string());
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7921,9 +7721,10 @@ fn run() -> Result<()> {
                 if json {
                     use jit::output::JsonOutput;
 
-                    let output = JsonOutput::success(&result, "snapshot export").with_message(
-                        format!("Exported {} issues to {}", result.issue_count, result.path),
-                    );
+                    let output = JsonOutput::success(&result).with_message(format!(
+                        "Exported {} issues to {}",
+                        result.issue_count, result.path
+                    ));
                     println!("{}", output.to_json_string()?);
                 } else {
                     println!("✓ Snapshot exported to: {}", result.path);
@@ -8247,7 +8048,7 @@ mod repository_state_classifier_tests {
         ];
         for state_error in conflict_cases {
             let error = anyhow::Error::new(state_error);
-            let json = profile_json_error(&error, "profile apply");
+            let json = profile_json_error(&error);
             assert_eq!(json.error.code, jit::output::ErrorCode::PROFILE_CONFLICT);
             assert_eq!(json.exit_code().code(), 4);
         }
@@ -8258,7 +8059,7 @@ mod repository_state_classifier_tests {
         ];
         for state_error in error_cases {
             let error = anyhow::Error::new(state_error);
-            let json = profile_json_error(&error, "profile apply");
+            let json = profile_json_error(&error);
             assert_eq!(json.error.code, "PROFILE_ERROR");
             assert_eq!(json.exit_code().code(), 1);
         }
@@ -8267,7 +8068,7 @@ mod repository_state_classifier_tests {
     #[test]
     fn test_profile_json_error_maps_not_found_before_variant_match() {
         let error = anyhow::Error::new(jit::errors::NotFoundError::new("no such profile"));
-        let json = profile_json_error(&error, "profile show");
+        let json = profile_json_error(&error);
         assert_eq!(json.error.code, jit::output::ErrorCode::PROFILE_NOT_FOUND);
         assert_eq!(json.exit_code().code(), 3);
     }
