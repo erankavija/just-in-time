@@ -8,6 +8,7 @@
   ],
   "description": "The eight self-managed multi-session retry sites move onto the shared session-free retry driver, keeping their preflight-release-guard-apply structure and lock ordering unchanged.\n\n## Background\n\nEight command sites run a multi-session retry: within one attempt they release a preflight session and then acquire a `.git/jit` claims guard, run an external checker subprocess, or revalidate a cross-reopen invariant before opening the apply session. The sites are `dependency.rs:260,396`; `issue.rs:552`; `gate.rs:1357`; `mod.rs:2141,2353`; `gate_check.rs:909`; `template.rs:176`. A retry driver that held a session across this between-session work would hold `.repo-write.lock` across `claims_mutation_guard` (inverting today's lock order into a deadlock hazard) and across multi-second subprocess runs, so these sites cannot use a session-holding convenience.\n\nThey migrate onto the session-free retry driver:\n\n```rust\nfn with_mutation_attempts<T>(operation: &'static str,\n    attempt: impl FnMut() -> Result<AttemptOutcome<T>>) -> Result<T>;\nenum AttemptOutcome<T> { Done(T), Retry }\n```\n\n`with_mutation_attempts` owns the retry bound and the terminal `MutationSessionExhausted` error and holds no session, so the closure opens and releases sessions, takes a claims guard, and runs a subprocess between them exactly as today. Each site keeps its present structure: preflight, release, guard/subprocess, the same cross-reopen equality checks (`template.rs:217-227`; `mod.rs:2430-2444,2491`; `gate_check.rs:997`) returning `Retry`, then apply classified through the shared apply-conflict classifier. Guards are closure locals whose `Drop` runs after apply, preserving lock ordering byte-for-byte.\n\n## Success Criteria\n\n- [hard] REQ-01: The eight sites (`dependency.rs:260,396`; `issue.rs:552`; `gate.rs:1357`; `mod.rs:2141,2353`; `gate_check.rs:909`; `template.rs:176`) run their retry through `with_mutation_attempts`; none retains a `for _ in 0..8` loop, a per-site `RetryableConflict` arm, or a bespoke convergence message.\n- [hard] REQ-02: The cross-reopen revalidation and lock ordering at each site are unchanged; guards drop after apply exactly as before.\n- [hard] REQ-03: After this task no `for _ in 0..8` loop, no `RetryableConflict` match arm, and no bespoke \"did not converge\" message remains anywhere in the command modules.\n- [hard] REQ-04: The existing failure-injection and interruption tests pass unchanged; behavior is preserved.\n\n## Notes\n\nThis migration consumes the session-free retry driver and shared apply-conflict classifier; those must already exist. Lock ordering must remain byte-for-byte identical: holding `.repo-write.lock` across the claims guard or a subprocess would deadlock.",
   "documents": [],
+  "done_at": "2026-07-24T13:46:52.125578483Z",
   "first_ready_at": "2026-07-24T13:13:36.142781572Z",
   "gates_required": [
     "cargo-ci",
@@ -33,7 +34,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Self-managed multi-session retry migration",
-  "updated_at": "2026-07-24T13:46:18.652676214Z"
+  "updated_at": "2026-07-24T13:46:52.125578483Z"
 }
