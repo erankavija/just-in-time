@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T13:08:53.837413492Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T13:12:23.053637718Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "a4e5ca3d-c851-4cc0-904a-599df7617312",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Single-session retry call-site migration",
-  "updated_at": "2026-07-24T13:08:53.837413492Z"
+  "updated_at": "2026-07-24T13:12:23.053637718Z"
 }

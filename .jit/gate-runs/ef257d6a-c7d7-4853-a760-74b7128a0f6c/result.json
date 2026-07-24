@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "a92e5fd7aabbbea43055f77e5a69f8b73c064bfa",
+  "completed_at": "2026-07-24T13:12:22.817680479Z",
+  "duration_ms": 164622,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable single-session retry migrations satisfy the issue requirements; recorded cargo-ci passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a4e5ca3d-c851-4cc0-904a-599df7617312",
+  "message": null,
+  "run_id": "ef257d6a-c7d7-4853-a760-74b7128a0f6c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T13:09:38.194884367Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:a4e5ca3d commits a8ea5f06, a013c6cf, 8f3a1b19, 4d1aee4f, 0bb92942, c1101bb2 (merge; no combined conflict patch), and a92e5fd7\nPolicy sources: AGENTS.md\nResolved items: @/issue/a4e5ca3d/requirement/REQ-01, REQ-02, REQ-03 (issue description, markdown-first); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml); @/invariant/atomic-writes, derived-state-coherence, gate-semantics, semantic-test-assertions, shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T13:02:43Z); code-review pending (exit none)\nTruncation recovery: narrowed init.rs patch read, retry-loop/classifier searches, merge combined patch, and item-source reads\n\n1. No findings. The shared driver correctly owns session creation and apply-conflict classification at `crates/jit/src/commands/mod.rs:253-268`; migrated read-only paths return `SessionStep::Done`, and the remaining literal loops are multi-session workflows excluded by the issue scope.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable single-session retry migrations satisfy the issue requirements; recorded cargo-ci passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
