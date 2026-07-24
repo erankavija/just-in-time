@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T21:13:53.280571590Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T21:17:40.016647291Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "e6d5e440-ad70-4303-8329-db518efbf595",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Split the store test module to a sibling file and fix review-round test names",
-  "updated_at": "2026-07-24T21:13:53.280571590Z"
+  "updated_at": "2026-07-24T21:17:40.016647291Z"
 }

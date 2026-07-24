@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "f8faf5bea3ebc522041862b777667a656bc3b954",
+  "completed_at": "2026-07-24T21:17:39.774067271Z",
+  "duration_ms": 190898,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are satisfied by the attributed current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e6d5e440-ad70-4303-8329-db518efbf595",
+  "message": null,
+  "run_id": "914af51d-a026-4821-b8f0-f33479404431",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T21:14:28.875086983Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e6357bc6, 38028ff3, 14133da2, f8faf5be (`jit:e6d5e440`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: passed (exit 0, 2026-07-24T21:08:40Z); code-review: pending (no run)\nTruncation recovery: partitioned per-commit reads; normalized full-module comparison found only intentional renames and three whitespace-only hunks\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are satisfied by the attributed current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
