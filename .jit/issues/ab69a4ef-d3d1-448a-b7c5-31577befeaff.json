@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-24T21:01:29.301696548Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-24T21:05:11.611382326Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "ab69a4ef-d3d1-448a-b7c5-31577befeaff",
@@ -30,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Managed-document splice round-trip property test",
-  "updated_at": "2026-07-24T21:01:29.301696548Z"
+  "updated_at": "2026-07-24T21:05:11.611382326Z"
 }

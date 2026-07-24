@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "459a77e559ce1829b2b0fd41861a6cd27dc2f4e7",
+  "completed_at": "2026-07-24T21:05:11.369395556Z",
+  "duration_ms": 189544,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed property-test implementation satisfies the issue’s hard criteria and applicable test policy.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ab69a4ef-d3d1-448a-b7c5-31577befeaff",
+  "message": null,
+  "run_id": "1b3bc67f-3a95-4b79-9830-a53d81c8f0b5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T21:02:01.825230818Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 001c1c51, 4cea5476, 459a77e5 (`jit:ab69a4ef`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/ab69a4ef/requirement/REQ-01, REQ-02, REQ-03 (issue description, markdown-first); @/invariant/semantic-test-assertions and @/invariant/bounded-rust-build-footprint (.jit/invariants.toml, registry-first); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T20:54:18Z); code-review pending (current judgment)\nTruncation recovery: recovered the initially truncated broad search with bounded merge-patch, registry, and source-line reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed property-test implementation satisfies the issue’s hard criteria and applicable test policy.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
