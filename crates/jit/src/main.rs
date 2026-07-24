@@ -286,6 +286,18 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         };
     }
 
+    // A mutation session that kept losing its capture/apply race is reported
+    // through the typed MutationSessionExhausted terminal error (jit:4b2005fe).
+    // It keeps the generic exit code the bespoke "did not converge" bails
+    // carried before the shared retry contract, made explicit here as a typed
+    // classification rather than a message-text fallthrough.
+    if error
+        .downcast_ref::<jit::commands::MutationSessionExhausted>()
+        .is_some()
+    {
+        return ExitCode::GenericError;
+    }
+
     // No typed classifier matched: a genuinely-unknown error keeps the historical
     // default exit code. Every condition the CLI deliberately distinguishes is
     // classified by a typed downcast above; classification is never driven by

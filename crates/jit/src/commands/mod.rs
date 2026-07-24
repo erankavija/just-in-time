@@ -109,6 +109,165 @@ use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::sync::OnceLock;
 
+// ── Mutation-session retry contract (mutation-session-contract) ──────────────
+//
+// One owner of the command-layer capture/plan/apply/retry protocol: the retry
+// bound, the apply-conflict classification, and the terminal "did not converge"
+// error each live here exactly once. Command sites adopt these combinators in
+// place of the hand-copied `for _ in 0..MUTATION_SESSION_RETRY_LIMIT` loops and
+// per-site `RetryableConflict => continue` arms. Migrating those sites is
+// separate work; this module only establishes the contract they consume.
+//
+// Two entry points share the same bound and terminal error:
+//
+// * [`with_mutation_attempts`] — the retry driver. It holds NO session, so a
+//   caller may open and release a preflight session, take a claims guard, and
+//   run an external subprocess between attempts without inverting lock ordering.
+// * [`with_mutation_session`] — the session-passed convenience for pure
+//   single-session sites: it opens one fresh recovered session per attempt and
+//   applies the plan the closure returns through [`classify_apply`].
+
+/// Maximum capture/apply attempts before a mutation session is reported
+/// non-convergent.
+///
+/// The single home of the retry bound that command retry loops previously
+/// copied as the literal `8`.
+const MUTATION_SESSION_RETRY_LIMIT: usize = 8;
+
+/// Terminal error for a mutation session that keeps losing its capture/apply
+/// race.
+///
+/// Replaces the bespoke "did not converge after repeated conflicts" bails: it
+/// names the operation and the number of attempts made, and maps to the generic
+/// exit code through a single arm in `main.rs`.
+#[derive(Debug, thiserror::Error)]
+#[error("{operation} did not converge after {attempts} capture conflicts")]
+pub struct MutationSessionExhausted {
+    operation: &'static str,
+    attempts: usize,
+}
+
+/// Outcome of one retry attempt: a converged value, or a signal to retry.
+pub enum AttemptOutcome<T> {
+    /// The attempt converged with this value; stop retrying.
+    Done(T),
+    /// The attempt lost a capture/apply race; retry against a fresh capture.
+    Retry,
+}
+
+/// Fold one `apply` result into an [`AttemptOutcome`] — the single place a
+/// [`RepositoryStateStoreError::RetryableConflict`] raised on apply is
+/// interpreted.
+///
+/// A retryable conflict becomes [`AttemptOutcome::Retry`]; any other storage
+/// error propagates; a successful apply carries `value` as
+/// [`AttemptOutcome::Done`].
+///
+/// [`RepositoryStateStoreError::RetryableConflict`]: crate::storage::RepositoryStateStoreError::RetryableConflict
+pub fn classify_apply<T>(
+    outcome: std::result::Result<impl Sized, crate::storage::RepositoryStateStoreError>,
+    value: T,
+) -> Result<AttemptOutcome<T>> {
+    match outcome {
+        Ok(_) => Ok(AttemptOutcome::Done(value)),
+        Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. }) => {
+            Ok(AttemptOutcome::Retry)
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// Fold one `capture` result into a retry signal for sites that classify
+/// capture conflicts inline.
+///
+/// A retryable conflict on capture becomes `Ok(None)` (retry); any other
+/// storage error propagates; a successful capture yields `Ok(Some(image))`.
+/// This mirrors the fold the `capture_*` helpers already apply, so an inline
+/// capture site can share the same interpretation instead of writing its own
+/// `RetryableConflict => continue` arm.
+pub fn capture_or_retry(
+    outcome: std::result::Result<
+        crate::repository_state::RepositoryImage,
+        crate::storage::RepositoryStateStoreError,
+    >,
+) -> Result<Option<crate::repository_state::RepositoryImage>> {
+    match outcome {
+        Ok(image) => Ok(Some(image)),
+        Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. }) => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// Drive `attempt` up to [`MUTATION_SESSION_RETRY_LIMIT`] times, owning the
+/// retry bound and the terminal [`MutationSessionExhausted`] error.
+///
+/// Each call returns [`AttemptOutcome::Done`] to stop with a value,
+/// [`AttemptOutcome::Retry`] to try again, or an error to abort immediately.
+/// The driver holds no session, so the closure may open and release sessions,
+/// take a claims guard, and run subprocesses between attempts. When the bound is
+/// exhausted `operation` is reported as non-convergent via
+/// [`MutationSessionExhausted`].
+pub fn with_mutation_attempts<T>(
+    operation: &'static str,
+    mut attempt: impl FnMut() -> Result<AttemptOutcome<T>>,
+) -> Result<T> {
+    for _ in 0..MUTATION_SESSION_RETRY_LIMIT {
+        match attempt()? {
+            AttemptOutcome::Done(value) => return Ok(value),
+            AttemptOutcome::Retry => continue,
+        }
+    }
+    Err(MutationSessionExhausted {
+        operation,
+        attempts: MUTATION_SESSION_RETRY_LIMIT,
+    }
+    .into())
+}
+
+/// One step of a session-passed mutation attempt driven by
+/// [`with_mutation_session`].
+///
+/// The plan carried by `Apply` is the dominant field, but this enum is a
+/// transient control value returned once per attempt and immediately consumed by
+/// the driver — never stored in a collection — so the inline
+/// [`MaterializationPlan`](crate::repository_state::MaterializationPlan) is
+/// carried by value rather than boxed onto the retry hot path.
+#[allow(clippy::large_enum_variant)]
+pub enum SessionStep<T> {
+    /// Apply this plan through [`classify_apply`]; on success the attempt
+    /// converges with the carried value.
+    Apply(crate::repository_state::MaterializationPlan, T),
+    /// The attempt converged without applying a plan (e.g. a read-only path).
+    Done(T),
+    /// The captured base is stale; open a fresh session and retry.
+    Retry,
+}
+
+/// Retry driver for the pure single-session sites: open one fresh recovered
+/// session per attempt, hand it to `attempt`, and apply the returned plan
+/// through [`classify_apply`].
+///
+/// Built on [`with_mutation_attempts`], so the retry bound and terminal error
+/// stay shared with the self-managed sites. The store generic keeps this a free
+/// function usable from both methods and the free-function command entry points.
+pub fn with_mutation_session<S: crate::storage::RepositoryStateStore, T>(
+    store: &S,
+    layout: &crate::repository_state::RepositoryLayout,
+    operation: &'static str,
+    mut attempt: impl FnMut(
+        &mut dyn crate::storage::RepositoryMutationSession,
+    ) -> Result<SessionStep<T>>,
+) -> Result<T> {
+    with_mutation_attempts(operation, || {
+        let mut session = store.open_mutation_session(layout.clone())?;
+        match attempt(session.as_mut())? {
+            SessionStep::Done(value) => Ok(AttemptOutcome::Done(value)),
+            SessionStep::Retry => Ok(AttemptOutcome::Retry),
+            SessionStep::Apply(plan, value) => classify_apply(session.apply(&plan), value),
+        }
+    })
+}
+
 /// Closed issue-local operations whose final record is derived from the issue
 /// captured by the mutation session. Ordinary commands use this instead of
 /// constructing a full-record `UpdateIssue` from an earlier storage read.
