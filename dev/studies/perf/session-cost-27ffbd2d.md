@@ -1,6 +1,8 @@
 # jit session-cost profile
 
-Companion summary for `session-cost-profile.json`. This is the template shape for the epic's checked-in artifact.
+Companion summary for `dev/studies/perf/session-cost-27ffbd2d.json`. That
+artifact is the schema template for subsequent harness runs. Every timing below
+cites its artifact path, command name, and statistic.
 
 ## Machine and corpus
 
@@ -10,26 +12,32 @@ Companion summary for `session-cost-profile.json`. This is the template shape fo
 - **fs caveat:** measured on **tmpfs**; the real repo is **ext4**. Lock-file / rename / fsync
   costs are understated here. The dominant cost below (minor page faults) is fs-independent.
 
-## Timing (warm, n=25)
+## Timing
 
-| command | class | median | p95 | locks created |
-|---|---|---:|---:|---:|
-| `jit --version` | baseline | 3.0 ms | 3.2 ms | 0 |
-| `jit issue show <id> --json` | single read | 50.6 ms | 52.8 ms | 1 |
-| `jit query available --json` | read-all | 23.4 ms | 25.0 ms | 665 |
-| `jit issue list --json` | read-all | 26.9 ms | 28.9 ms | 665 |
-| `jit issue update <id> --priority … --json` | mutation | **3720.6 ms** | **3747.5 ms** | 1 |
+Warm, 25-sample measurements. Sample count source:
+`dev/studies/perf/session-cost-27ffbd2d.json > method > samples_per_command`.
+
+| command | class | median | p95 | locks created | timing source |
+|---|---|---:|---:|---:|---|
+| `jit --version` | baseline | 3.0 ms | 3.2 ms | 0 | `dev/studies/perf/session-cost-27ffbd2d.json > version > median_ms,p95_ms` |
+| `jit issue show <id> --json` | single read | 50.6 ms | 52.8 ms | 1 | `dev/studies/perf/session-cost-27ffbd2d.json > issue_show_single_read > median_ms,p95_ms` |
+| `jit query available --json` | read-all | 23.4 ms | 25.0 ms | 665 | `dev/studies/perf/session-cost-27ffbd2d.json > query_available > median_ms,p95_ms` |
+| `jit issue list --json` | read-all | 26.9 ms | 28.9 ms | 665 | `dev/studies/perf/session-cost-27ffbd2d.json > issue_list > median_ms,p95_ms` |
+| `jit issue update <id> --priority … --json` | mutation | **3720.6 ms** | **3747.5 ms** | 1 | `dev/studies/perf/session-cost-27ffbd2d.json > issue_update_mutation > median_ms,p95_ms` |
 
 ## Where the mutation cost goes (perf stat, one mutation)
 
 - task-clock 3430 ms: **user 1.14 s, sys 2.70 s**
+  (`dev/studies/perf/session-cost-27ffbd2d.json > mutation_syscall_summary.command > task_clock_ms,user_s,sys_s`)
 - **545,219 minor page faults** (~2.1 GiB touched), context-switches 0
 - System-time / page-fault dominated → memory materialization, not I/O.
 - context-switches 0 → no blocking git subprocess.
-- A title-only mutation costs the same (~3.67 s) → it is the base two-full-capture
-  materialization, not the auto-transition recursion and not lock I/O (1 lock).
+- The sampled `issue_update_mutation` result points to base two-full-capture
+  materialization, not lock I/O (one sidecar).
 
-This reproducibly corroborates the audit's previously single-sourced **3.747 s** figure.
+The p95 measurement reproducibly corroborates the audit's previously
+single-sourced figure (`dev/studies/perf/session-cost-27ffbd2d.json >
+issue_update_mutation > p95_ms`).
 
 ## Lock mechanism
 
