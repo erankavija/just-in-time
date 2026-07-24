@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T16:31:30.495450699Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d752293b-2b28-4df0-9c11-75f5a35a3caf",
   "labels": [
     "type:story",
@@ -27,5 +33,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Establish an artifact-backed performance contract",
-  "updated_at": "2026-07-24T16:25:33.519812130Z"
+  "updated_at": "2026-07-24T16:31:30.495450699Z"
 }
