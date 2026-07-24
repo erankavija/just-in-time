@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-24T13:14:52.420972359Z",
   "context": {},
   "created_at": "2026-07-24T07:19:49.615370967Z",
   "dependencies": [
@@ -23,7 +24,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Exhaustive exit-code mapping and residual error-string sweep",
-  "updated_at": "2026-07-24T13:00:37.206350632Z"
+  "updated_at": "2026-07-24T13:14:52.420972359Z"
 }
