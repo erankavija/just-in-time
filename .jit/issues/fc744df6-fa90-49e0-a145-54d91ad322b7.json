@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-24T10:47:29.061556218Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fc744df6-fa90-49e0-a145-54d91ad322b7",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Lock-hygiene: eliminate the per-issue sidecar read lock",
-  "updated_at": "2026-07-24T08:16:12.928068530Z"
+  "updated_at": "2026-07-24T10:47:29.061556218Z"
 }
