@@ -6,7 +6,7 @@
   "dependencies": [
     "02dc4bac-52e5-4810-9e87-8384e34eabc7"
   ],
-  "description": "Breakdown node bracketing Repository-state quality hardening (1cc809de). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria.",
+  "description": "Breakdown node bracketing Repository-state quality hardening (1cc809de). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria.\n\n## Success Criteria\n\n- [hard] REQ-B1: The created graph is field-exact against the authoritative manifest `dev/active/1cc809de-breakdown.json`, was created by one native batch run, and its key→UUID creation evidence is committed at `dev/active/1cc809de-breakdown-keymap.json`.\n- [hard] REQ-B2: The plan was approved by its quality gate under the review regime in force at approval time (2026-07-24, twelve review rounds); by owner decision the subsequently added shared-contract sections and generated overview do not reopen that gate, and the plan retains its reviewed design record (design subsections, criteria copy, and traceability inventories) alongside the template sections. Demands to strip that record or to re-adjudicate the plan gate are out of scope for this breakdown.\n- [hard] REQ-B3: Task sizing is final as validated: every entry passes the manifest validator's terminal sizing simulation with --deny-warnings and the decomposition (including the eight review-directed splits of 2026-07-24) is owner-approved. Further recursive split demands are out of scope for this breakdown.\n- [hard] REQ-B4: Shared-file footprint overlaps are either ordered by dependency edges or disclosed as validator advisories; the committed advisory list is the accepted disclosure.\n",
   "documents": [],
   "first_ready_at": "2026-07-23T18:11:28.753153980Z",
   "gates_required": [
@@ -16,7 +16,7 @@
   "gates_status": {
     "breakdown-review": {
       "status": "failed",
-      "updated_at": "2026-07-24T06:39:15.834132328Z",
+      "updated_at": "2026-07-24T07:31:42.449890448Z",
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
@@ -35,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "breakdown: Repository-state quality hardening",
-  "updated_at": "2026-07-24T07:20:53.292893525Z"
+  "updated_at": "2026-07-24T07:36:19.788132605Z"
 }

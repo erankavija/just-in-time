@@ -1,0 +1,117 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "2b4d5438ddc5783c28d53a10e7e02f968d7a1e2a",
+  "completed_at": "2026-07-24T07:31:42.209188751Z",
+  "duration_ms": 640012,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/events.jsonl",
+        "id": "F1",
+        "line": 8968,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-3"
+        ],
+        "severity": "high",
+        "summary": "The native batch's returned semantic key-to-UUID map was not preserved as creation evidence."
+      },
+      {
+        "disposition": "blocking",
+        "file": ".jit/gate-runs/034b1509-62c8-4d7c-9163-bea2afaf1974/result.json",
+        "id": "F2",
+        "line": 5,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-3",
+          "@/inv/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "The manifest and shared architectural contracts were added after the only passing plan-review and were never returned to that gate."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-plan.md",
+        "id": "F3",
+        "line": 70,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The plan retains copied criteria, exhaustive inventories, a hand-written DAG, decomposition prose, and gate steps beside the generated overview."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F4",
+        "line": 346,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The finalizer-error task combines two independently testable error families and failure-path boundaries."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F5",
+        "line": 385,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/semantic-test-assertions"
+        ],
+        "severity": "high",
+        "summary": "The exit-mapping task combines an exhaustive binary mapping with an uncertain module-wide untyped-error migration."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F6",
+        "line": 988,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The public-surface task still mixes dead-export deletion with independently testable visibility demotions."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F7",
+        "line": 169,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/dag-acyclic"
+        ],
+        "severity": "high",
+        "summary": "Multiple shared-file footprint overlaps remain unordered across command, storage, and repository-state task families."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/1cc809de-breakdown.json",
+        "id": "F8",
+        "line": 616,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Several descriptions refer to sibling decomposition or coordination instead of remaining standalone issue documents."
+      }
+    ],
+    "summary": "The stored graph is field-exact and all deterministic checks pass, but approval provenance, plan hygiene, three terminal decompositions, creation-map evidence, overlap ordering, and standalone-content requirements remain blocking.",
+    "verdict": "fail"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "24bab642-6f1d-438a-aae5-5c327dceaff6",
+  "message": null,
+  "run_id": "6e3cac73-2a16-44ac-809c-fb9064a15eab",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-24T07:21:02.196902475Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8388 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f92ff-c0d8-7b03-a1b8-fac58c616a8c\n--------\nuser\n--- 8375 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "The deterministic checks pass: manifest validation reports no warnings, renderer `--check` passes, native dry-run reports 35 issues and 47 edges, and `jit validate` passes. Stored-record comparison also confirms 35/35 exact issues, exact fields and edges, correct seven-source/one-sink bracket wiring, and no persisted `planning` field.\n\n| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---|---|---|---|---|---|---|---|\n| retry-combinator-foundation | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| single-session-site-migration | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| self-managed-multi-session | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| producer-error-family | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| finalizer-error-types | Fail | Fail | Fail | Pass | Fail | Fail | Fail | FAIL |\n| exit-mapping-string-free-sweep | Fail | Fail | Fail | Fail | Fail | Fail | Fail | FAIL |\n| total-journal-action-extraction | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| plan-identity-tail | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| plan-hash-reorder-property-test | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| managed-document-splice-property-test | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| visibility-cutover-guard | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| contention-tests | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| virtualpath-cow-representation | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| virtualpath-callsite-migration | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| repair-target-coverage | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| benchmark-harness | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| bulk-update-eligibility-prefilter | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| bulk-mutation-benchmark-scenario | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| lock-hygiene-sidecar | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| test-support-feature-gating | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| public-surface-demotions | Fail | Pass | Pass | Pass | Pass | Fail | Fail | FAIL |\n| test-only-publics-gating | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| store-test-split-renames | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| architecture-doc-sweep | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| remove-dead-command-parameter | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| mcp-schema-generator-warnings | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| cli-error-code-doc-correction | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| fail-closed-manual-ci-script | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| successor-deck | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n| predecessor-deck-tombstone | Pass | Pass | Pass | Pass | Pass | Pass | Pass | PASS |\n\n1. **F1 — High, blocking:** The native-batch transaction is visible in `.jit/events.jsonl`, but its returned semantic key→UUID map was not captured: creation events contain UUID and title only. The review map therefore had to be reconstructed from unique titles and stored records, contrary to the required creation evidence. After correcting the manifest, replace the current implementation graph in one native batch, persist the complete returned `{key: uuid}` map in a breakdown evidence document linked to `B`, and use only that map for bracket wiring.\n\n2. **F2 — High, blocking:** The current manifest and six shared architectural contracts were added after the only passing plan review, which evaluated commit `fad4a534`; the current plan and manifest changed by more than 1,500 lines afterward. Reopen `P`, apply all manifest and plan corrections, regenerate the overview, and rerun plan-review before recreating the implementation graph. This is mandatory because shared-contract modes and consumer/producer geometry changed.\n\n3. **F3 — Medium, blocking:** The plan still violates the canonical concise-plan contract and leaves prior F3 unresolved. It copies REQ-01..16, retains exhaustive implementation inventories, contains a hand-written story DAG and leaf-wiring prose beside the generated graph, and includes implementation/gate steps. Rewrite it to the plan template: criterion-approach table, shared contracts, generated overview, material risks/decisions, and source links only. Move exhaustive inventories elsewhere and delete the manual DAG, fan-out prose, and gate mechanics rather than appending another correction section.\n\n4. **F4 — High, blocking:** `finalizer-error-types` contains two independently testable error families—gate-registry edit and archive execution—with distinct implementations and failure-path suites. Replace it with `gate-registry-finalizer-error` and `archive-execution-finalizer-error`, both depending on `producer-error-family`; make downstream sweep/mapping work depend on both, delete the merged issue, and reconcile its edges.\n\n5. **F5 — High, blocking:** `exit-mapping-string-free-sweep` combines an exhaustive binary exit-code mapping with an uncertain module-wide migration of residual `anyhow` signatures and `format!`-constructed errors. Its declared exit-code tests do not observe the structural sweep, and its footprint may expand across many undeclared files. Split it into `repository-state-untyped-error-sweep` and `repository-state-exit-code-mapping`; give each its own footprint and observable boundary, with mapping depending on the completed sweep and all error-family producers.\n\n6. **F6 — High, blocking:** `public-surface-demotions` still mixes the independent deletion of `issue_draft` with eight visibility demotions, leaving prior F10 only partially resolved. Replace it with `remove-dead-issue-draft-export` and `repository-state-public-demotions`; order the demotion issue after the deletion and test-support baseline, and update the hygiene checkpoint dependencies.\n\n7. **F7 — High, blocking:** Footprint overlap advisories remain unresolved by the graph. Unordered conflicts include `main.rs`, `commands/issue.rs`, `commands/mod.rs`, `repository_state/mod.rs`, `repository_state_store.rs`, and the path/materialization/public-surface files. Reconcile them with these dependency paths: exit mapping after retry foundation and the error sweep; error sweep after plan identity and both split finalizers; bulk eligibility after `planning-boundary-collapse`; test-support after contention and lock hygiene; store-test relocation after test-support; VirtualPath migration after test-support and the plan-hash property test; repair-target coverage after VirtualPath migration; public demotions after repair coverage and the managed-document property test; test-only public gating after public demotions. Remove checkpoint edges made transitively redundant.\n\n8. **F8 — Medium, blocking:** Several issue descriptions encode sibling decomposition and coordination instead of remaining standalone documents—for example the contention issue names the separate hygiene task, while the store-test issue names the contention-test task and asserts that no coordination is needed. Similar “separate work,” “added later,” and “builds on” prose appears across retry, error, path, benchmark, bulk-update, and public-surface issues. Remove sibling/workflow references from the descriptions; keep scope self-contained and represent sequencing solely through manifest edges and planning metadata.\n\nTotal findings: 8\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The stored graph is field-exact and all deterministic checks pass, but approval provenance, plan hygiene, three terminal decompositions, creation-map evidence, overlap ordering, and standalone-content requirements remain blocking.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The native batch's returned semantic key-to-UUID map was not preserved as creation evidence.\",\"file\":\".jit/events.jsonl\",\"line\":8968,\"references\":[\"@/charter/D-3\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The manifest and shared architectural contracts were added after the only passing plan-review and were never returned to that gate.\",\"file\":\".jit/gate-runs/034b1509-62c8-4d7c-9163-bea2afaf1974/result.json\",\"line\":5,\"references\":[\"@/charter/D-3\",\"@/inv/single-source-prose\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan retains copied criteria, exhaustive inventories, a hand-written DAG, decomposition prose, and gate steps beside the generated overview.\",\"file\":\"dev/active/1cc809de-plan.md\",\"line\":70,\"references\":[\"@/inv/single-source-prose\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The finalizer-error task combines two independently testable error families and failure-path boundaries.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":346},{\"id\":\"F5\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The exit-mapping task combines an exhaustive binary mapping with an uncertain module-wide untyped-error migration.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":385,\"references\":[\"@/inv/semantic-test-assertions\"]},{\"id\":\"F6\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The public-surface task still mixes dead-export deletion with independently testable visibility demotions.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":988},{\"id\":\"F7\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Multiple shared-file footprint overlaps remain unordered across command, storage, and repository-state task families.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":169,\"references\":[\"@/inv/dag-acyclic\"]},{\"id\":\"F8\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Several descriptions refer to sibling decomposition or coordination instead of remaining standalone issue documents.\",\"file\":\"dev/active/1cc809de-breakdown.json\",\"line\":616,\"references\":[\"@/inv/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
