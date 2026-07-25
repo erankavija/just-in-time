@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "3559ca25-4d31-4e57-9eb1-0853ccd60996"
+  ],
+  "description": "The execution-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and each packaged profile twin carries the identical content.\n\n## Background\n\nThe execution-lead skill spells out flat plan, progress, and handoff paths in its main prompt and in its progress-file, handoff, architect, explorer, and documentation-agent references. Handoff numbering and progress persistence both read and write those paths, so the instructions name the resolved directory and an unprefixed filename instead.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "1373e042-4756-43df-ac63-7eca36cedf74",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:skill-path-adoption",
+    "satisfies:REQ-11",
+    "per:@/issue/8e071e18/decision/D-11"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Convert the execution-lead skill to the artifact directory convention",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

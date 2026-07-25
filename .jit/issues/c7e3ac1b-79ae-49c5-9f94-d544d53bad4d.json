@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "aa38b236-4f45-4e28-b80a-b8beaca88642"
+  ],
+  "description": "Both benchmark generators declare a default output directory inside a development area the reclassification manages, and each declaration resolves to the directory the generator's own run creates.\n\n## Background\n\nA generator states its output directory in its usage comments and again in the executable assignment that creates it. The assignment is the sharp case, because it is the path the run writes to rather than a comment about it.\n\nThe output-path policy is decided rather than open: both generators keep their current defaults. Each area is regenerated output whose contents the next run recreates, which is the premise the managed classification rests on, so no path in either generator changes and the work is to confirm each declaration still resolves after the archival runs.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set.\n\nThe enumerated citations are:\n\n- `scripts/benchmark-rust-build.sh` — four citations of `dev/benchmarks/rust-build-efficiency`, one of them the executable default that creates the directory\n- `scripts/benchmark-session-cost.sh` — three citations of `dev/studies/perf`, one of them the executable default that creates the directory\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named scripts resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: Each generator's executable output-path default names the directory that generator's run creates.\n- [hard] REQ-03: Each generator's usage comments state the same default as its executable assignment.\n- [hard] REQ-04: A citation whose cited artifact the runs relocated names the artifact's new location.\n",
+  "documents": [],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "c7e3ac1b-79ae-49c5-9f94-d544d53bad4d",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:development-root-cleanup",
+    "satisfies:REQ-09",
+    "per:@/issue/8e071e18/decision/D-13"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Resolve the benchmark generators' citations of their own output areas",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

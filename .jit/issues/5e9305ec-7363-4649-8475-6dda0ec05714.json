@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "58c56743-b5e6-4fe3-90af-1910974faefc",
+    "aa38b236-4f45-4e28-b80a-b8beaca88642"
+  ],
+  "description": "The contributor index and the authoring guide describe the mechanism the tool actually implements and cite the canonical adopter reference instead of narrating a lifecycle of their own.\n\n## Background\n\nThe contributor index independently narrates a retention-window and category-subfolder lifecycle. The shipped mechanism has no age, retention, category, suggestion, or default-target behaviour, and its destination is a container-owned directory under the archive root. The authoring guide contradicts itself: one section demonstrates moving a document into a category subfolder by hand, while a later section states that archival takes no category input.\n\nBoth guides also describe the area split, which this work changes, so their text is stale by construction once the classification lands and the cleanup has run.\n\n## Success Criteria\n\n- [hard] REQ-01: The contributor index describes the archival destination and lifecycle the tool implements, with no retention-window or category-subfolder narrative.\n- [hard] REQ-02: The authoring guide's archival guidance is internally consistent and carries no hand-moved category example.\n- [hard] REQ-03: Both guides cite the canonical adopter reference for the area classification and the directory convention rather than restating them.\n- [hard] REQ-04: Path references in both guides resolve after the cleanup.\n- [hard] REQ-05: Mechanical documentation checks over the development root pass.\n",
+  "documents": [],
+  "gates_required": [
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "5e9305ec-7363-4649-8475-6dda0ec05714",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:canonical-documentation-home",
+    "satisfies:REQ-12",
+    "per:@/charter/D-13",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Align contributor guides with the shipped archival mechanism",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

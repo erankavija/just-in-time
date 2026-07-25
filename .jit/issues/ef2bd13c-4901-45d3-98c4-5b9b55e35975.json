@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "2ac35e8e-01ca-446a-a70c-d9313ddba624"
+  ],
+  "description": "The adopter-facing configuration reference states the citation scan key, the entry forms it accepts, and the root set it resolves to when nothing is declared.\n\n## Background\n\nAn adopter who wants archival to warn about citations living outside the development root has to know that the scanned file set is configurable at all, what an entry may be, and what the default already covers. That fact gets one canonical home in the adopter surface, and the configuration reference is it: the key sits inside the documentation policy block that reference already describes.\n\nThe command reference is not edited here. This epic's command-surface changes are documented together in that one reference, so the writing here stays inside the configuration reference.\n\n## Success Criteria\n\n- [hard] REQ-01: The configuration reference names the citation scan key, states that its entries are repository-relative path prefixes and exact file paths, and states the root set it resolves to when the key is absent.\n- [hard] REQ-02: The reference states that the key is optional and that omitting it leaves archive eligibility unchanged.\n- [hard] REQ-03: The default root set is stated once in the adopter surface, and any other adopter page that needs it links to that statement.\n",
+  "documents": [],
+  "gates_required": [
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "ef2bd13c-4901-45d3-98c4-5b9b55e35975",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:archive-naming-and-warnings",
+    "satisfies:REQ-08",
+    "per:@/charter/D-13",
+    "per:@/issue/8e071e18/decision/D-16"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "State the citation scan universe in the adopter configuration reference",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

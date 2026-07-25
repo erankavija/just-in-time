@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "f88a16d9-3975-44da-9040-68653fe691da"
+  ],
+  "description": "The documentation policy gains an optional key naming the repository-relative roots that an in-content citation scan reads, so the scanned file set is configuration rather than an assumption baked into the planner.\n\n## Background\n\nArchival planning warns when a move would break a citation of an artifact's path written in the text of some other file. Reaching those citations needs a declared file set: the citations that matter live in shell scripts, a workspace manifest, a changelog, adopter guides, and production module comments, so a set scoped to the development root would miss most of them.\n\nDeriving the set from version-control tracking is rejected. Archival is a core command that behaves the same in a working tree that is under no version control, so a tracking-derived set would silently empty there. A whole-worktree walk is not the alternative either: with no tracking data there is no ignore information to bound it, and it would descend into build output.\n\nThe key holds repository-relative path prefixes and exact file entries, matched the way the managed and permanent area entries are matched. Its default is the development root together with the permanent paths, which is the set an adopter who declares nothing should get. The key is optional, and the three fields that authorize archival mutation are unchanged, so a repository that omits it keeps the archive eligibility it has today.\n\nThe surface here is the configuration one: the key, its accessor, and the resolved root set. Reading file bytes and building warnings happen further along the planning pipeline.\n\n## Success Criteria\n\n- [hard] REQ-01: The documentation policy accepts an optional key whose entries are repository-relative path prefixes and exact file paths.\n- [hard] REQ-02: With the key absent, the resolved root set is the development root together with the configured permanent paths.\n- [hard] REQ-03: With the key present, the resolved root set is exactly the declared entries, including an entry that lies outside the development root.\n- [hard] REQ-04: Policy status is unaffected by the key: a documentation table supplying the three mutation-authorizing fields reports a configured policy whether or not the key is present.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "6aa82c0b-13d9-4d91-ba2e-f0fc50158716",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:archive-naming-and-warnings",
+    "satisfies:REQ-08",
+    "per:@/issue/8e071e18/decision/D-16"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Declare the citation scan universe in the documentation policy",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

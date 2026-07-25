@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "aa38b236-4f45-4e28-b80a-b8beaca88642"
+  ],
+  "description": "The benchmark report cites the area it sits in twice, and both citations resolve after the cleanup.\n\n## Background\n\nThe report is the only prose record in the measurement area, and its two citations name that area rather than a single file inside it. Whether a run relocates a record out of that area or mirrors it and retains the source, the citations must still name a path that exists.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the report's two citations of its own area resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: Mechanical link checks over the report pass.\n",
+  "documents": [],
+  "gates_required": [
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "d52bd541-9984-449c-bd74-1866143159ff",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:development-root-cleanup",
+    "satisfies:REQ-09",
+    "per:@/issue/8e071e18/decision/D-8"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Resolve the benchmark report's citations of its own area",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

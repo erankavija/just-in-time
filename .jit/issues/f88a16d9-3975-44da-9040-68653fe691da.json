@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "b3fc1a92-9d6c-43f6-9309-5be17adfbd98"
+  ],
+  "description": "Configuration declares which areas under the development root organize their artifacts by issue, so every path resolution names the area it wants instead of inferring one.\n\n## Background\n\nA development root holds many areas and only some of them are organized by issue. The rest hold living documentation, dated records, or generated output that no single issue owns. Configuration today declares one development root plus the managed and permanent path lists, and none of those answers which areas are issue-scoped. A resolver handed only an issue therefore cannot decide which area a new artifact belongs to, and any answer it invented would be a guess.\n\nThe registry is an explicit list of area paths. A resolver, a command, a template declaration, and a conformance report each name one of the registered areas and receive the issue-scoped directory inside it. Naming an area the registry does not declare is an error rather than a silently accepted path. The registry is also what the conformance report walks, so the scanned area set comes from configuration rather than from a built-in list.\n\nAreas outside the registry keep their flat shape and are unaffected by the convention.\n\n## Success Criteria\n\n- [hard] REQ-01: Configuration carries a declared list of the development areas that adopt the issue directory convention.\n- [hard] REQ-02: An accessor returns the declared areas and falls back to a shipped default when no list is authored.\n- [hard] REQ-03: Membership is queryable, so a caller can reject an area the registry does not declare.\n- [hard] REQ-04: The repository-initialization scaffold emits the registry as active configuration rather than as commented-out guidance.\n- [hard] REQ-05: The area paths appear once in the shipped default and nowhere else in engine logic.\n\n## Notes\n\nThe shipped default is derived from initialization code and templates. This repository's live configuration is repository-local policy and is not the source of the shipped default.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f88a16d9-3975-44da-9040-68653fe691da",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:artifact-directory-convention",
+    "per:@/issue/8e071e18/decision/D-3",
+    "enforces:@/invariant/domain-agnostic"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Declare the development areas that adopt the issue directory convention",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

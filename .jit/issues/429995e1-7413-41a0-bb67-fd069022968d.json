@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "d2870182-68c3-4b0e-a1ee-fdd3ca127d5d"
+  ],
+  "description": "The planning-bracket template's plan-document path resolves inside the container's canonical artifact directory with an unprefixed filename, in this repository's declaration and in its packaged profile twin.\n\n## Background\n\nThe planning-bracket template declares its plan-document path as a flat area-plus-short-id-prefix pattern. The same declaration exists twice: once in this repository's template registry and once inside the packaged profile manifest that ships the same bracket to adopters. The two are asserted to agree, so they change together or the suite fails.\n\nThe filename inside the directory drops the redundant short id, matching the conformant directory-per-issue precedent already in the archive.\n\n## Success Criteria\n\n- [hard] REQ-01: The plan-document path in the repository template registry resolves inside the container's canonical artifact directory.\n- [hard] REQ-02: The filename produced by that declaration carries no short-id prefix.\n- [hard] REQ-03: The packaged profile declaration carries the same path shape as the repository declaration.\n- [hard] REQ-04: Applying the template to a container produces a document path under the canonical directory.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "id": "429995e1-7413-41a0-bb67-fd069022968d",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:artifact-directory-convention",
+    "satisfies:REQ-05",
+    "per:@/issue/8e071e18/decision/D-2",
+    "per:@/issue/8e071e18/decision/D-11"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Point the planning-bracket template at the canonical artifact directory",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

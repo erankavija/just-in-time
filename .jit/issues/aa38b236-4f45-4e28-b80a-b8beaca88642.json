@@ -1,0 +1,53 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "1c4b7a3c-74f5-4ad1-ab2f-a26012b73cab",
+    "2f524511-8176-4c9a-862f-06de7c3de21c",
+    "3559ca25-4d31-4e57-9eb1-0853ccd60996",
+    "39757bb3-666a-465c-97ff-9e5d8dd03246",
+    "3c36ffa1-1ad3-4382-bba1-1ab209ce1685",
+    "3ef329f3-10a4-4110-92cc-56e8788c5f69",
+    "5c09146f-32de-423a-accf-02c4631944ef",
+    "60c398d3-16aa-471e-a412-cd1df6f3e0f1",
+    "6116d362-ccaa-45e1-aed6-40e7130efbbe",
+    "6f6fe80e-1606-4d25-859d-c9434264ec43",
+    "74a51f37-96af-49a0-816d-3f03958fbff7",
+    "83c61de0-9820-4f48-80f9-6b17ded0c467",
+    "89b7f534-e6ff-4fce-867d-eec5033bf988",
+    "8ea5b13d-676b-4727-acaf-f73e2e75a370",
+    "95b01080-0be9-4e9a-ba94-9c4279fc8d66",
+    "a21185df-4053-498c-a413-a4dbdb6ba71f",
+    "a45bc29c-d53d-42c5-8bc7-47196c7490b6",
+    "d1ae9782-3bc9-42b6-bb1c-315cc41dd1e8",
+    "deb50576-7598-4b01-8cad-338824f22a92",
+    "e536ea5a-54cb-45ea-a757-0d94dba0a001",
+    "edf71346-61e2-4836-8eff-8acf1e343f9e",
+    "f2f05554-e2a5-4cfd-87a2-6ce24eb1a766",
+    "f320923c-702d-4910-b046-0817375de510",
+    "f3ddbf55-7a94-4e2d-bfef-8b575bd301c5",
+    "fccedb73-b4b4-4990-a26d-b99a2cda7739"
+  ],
+  "description": "The archival runs are judged complete against the development root as a whole, and the in-content citation warnings they reported are consolidated into one working list.\n\n## Background\n\nThe cleanup runs as one execution per container. Each execution proves its own container moved; none of them proves the development root as a whole is finished. That judgement needs a single pass over the post-run tree, and it is also the backstop for a container whose artifact set grew after the executions were measured.\n\nSeveral outcomes are legitimate and must be told apart. An artifact whose owner sits wholly inside an archived subtree relocates, leaving nothing behind. An artifact an owner outside that subtree also claims is mirrored into the archive while its source stays in place. An artifact whose document reference is pinned to a commit is retained by design. An artifact with a live owner stays in the active area. An artifact carrying an issue-shaped filename prefix but no document reference is invisible to the mechanism, which owns artifacts by reference rather than by filename, so no run selects it. One container already sits under the archive root from an earlier run and converges without a new execution.\n\nRecording which artifacts took which outcome, and why each remaining artifact remains, is what makes the cleanup auditable and what keeps an unreachable artifact from being mistaken for a missed run.\n\nCitations inside records the runs themselves relocated stay verbatim. A historical document's citation is part of its record, which is why the planner warns rather than rewriting content.\n\nThe completeness record and the consolidated warning list are written into this epic's canonical artifact directory in the active area, `dev/active/8e071e18-dev-artifact-layout`, obtained from the command that resolves it rather than composed by hand.\n\n## Success Criteria\n\n- [hard] REQ-01: Every artifact under a managed development area that a terminal issue's document reference names is present under the archive root after the runs.\n- [hard] REQ-02: An artifact the runs mirrored without relocating is recorded as mirrored, with its retained source path named.\n- [hard] REQ-03: Every artifact remaining in a managed development area is recorded together with the reason it remains: a live owner, a commit-pinned reference, an owner outside the archived subtree, or no document reference at all.\n- [hard] REQ-04: A container whose artifacts an earlier run already relocated converges on its existing destination rather than producing a second one.\n- [hard] REQ-05: In-content citations inside records the runs relocated are unchanged.\n- [hard] REQ-06: The in-content citation warnings the runs reported are consolidated into one working list.\n- [hard] REQ-07: Whole-repository validation passes and every document reference resolves.\n",
+  "documents": [],
+  "gates_required": [
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "id": "aa38b236-4f45-4e28-b80a-b8beaca88642",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:development-root-cleanup",
+    "satisfies:REQ-09",
+    "satisfies:REQ-13",
+    "per:@/issue/8e071e18/decision/D-10",
+    "enforces:@/invariant/derived-state-coherence"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Confirm the archival runs serviced the development root",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

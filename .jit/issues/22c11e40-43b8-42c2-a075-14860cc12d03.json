@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "f88a16d9-3975-44da-9040-68653fe691da"
+  ],
+  "description": "A pure domain function maps an issue and a registered issue-scoped area to the issue's canonical artifact directory in that area, so every consumer derives the path from one rule instead of restating it.\n\n## Background\n\nTwo independent naming rules exist today and neither answers the question for a source-side artifact. The archival planner derives a destination directory from a membership label and falls back to the issue title; template interpolation composes a flat filename from a short id. The convention needs one derivation: the named area joined with the short id and the membership slug, or with the bare short id when no single membership value is available.\n\nThe area is an input rather than an inference. A development root holds several issue-scoped areas, so the caller states which one it wants and the function rejects an area the configured registry does not declare. What a caller never composes is the directory name itself.\n\nName precedence has three steps. Collect the issue's type labels; only when exactly one type label exists, look up that type's configured membership namespace; collect that namespace's values on the issue and only when exactly one exists, use it as the slug. Both ambiguous cases collapse to the bare short-id directory, which needs no new tie-breaking policy and matches the legacy directory shape the archival resolver already adopts.\n\nThe area set comes from the configured registry and the namespace from the configured type mapping, so the function carries no path literal. Slug normalization reuses the existing bounded, Unicode-safe slug helper rather than adding a second one. Legacy flat and suffix-form filenames stay resolvable; the function names where a new artifact belongs and never restructures an existing one.\n\n## Success Criteria\n\n- [hard] REQ-01: An issue with exactly one type label and exactly one value in that type's membership namespace resolves to the named area joined with its short id and that value's slug.\n- [hard] REQ-02: An issue with no membership label, several type labels, or several membership values resolves to the named area joined with its bare short id.\n- [hard] REQ-03: An area the configured registry does not declare produces a descriptive error rather than a resolved path.\n- [hard] REQ-04: No resolved directory name is derived from an issue title.\n- [hard] REQ-05: The area set is read from the configured registry and the membership namespace from the configured type mapping, with no path literal in the function.\n- [hard] REQ-06: The function performs no input or output and reuses the existing slug normalizer.\n- [hard] REQ-07: Resolving a directory for an issue whose artifacts are stored flat reports the canonical location and moves nothing.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "22c11e40-43b8-42c2-a075-14860cc12d03",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:artifact-directory-convention",
+    "satisfies:REQ-03",
+    "satisfies:REQ-13",
+    "per:@/issue/8e071e18/decision/D-1",
+    "per:@/issue/8e071e18/decision/D-4",
+    "enforces:@/invariant/domain-agnostic"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Resolve an issue's canonical artifact directory inside a named area",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

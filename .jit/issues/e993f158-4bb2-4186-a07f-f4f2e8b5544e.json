@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "3559ca25-4d31-4e57-9eb1-0853ccd60996"
+  ],
+  "description": "The breakdown skill's prompt names the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThis skill locates an approved manifest by the flat area-plus-prefix pattern, so it is the one instruction that has to find an existing artifact rather than create one. It names the resolved directory and an unprefixed filename instead, which keeps it working for a container whose artifacts already follow the convention.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "e993f158-4bb2-4186-a07f-f4f2e8b5544e",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:skill-path-adoption",
+    "satisfies:REQ-11",
+    "per:@/issue/8e071e18/decision/D-11"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Convert the breakdown skill to the artifact directory convention",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

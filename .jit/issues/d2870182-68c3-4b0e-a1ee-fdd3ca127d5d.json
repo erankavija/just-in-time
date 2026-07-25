@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "67345efd-b94a-439d-bdf4-7a9c3dbcba19"
+  ],
+  "description": "Two derivations of a template document path live outside the apply engine, and a third resolves the plan-document location when a plan reference is first written. Each substitutes the artifact-directory field to the path the apply engine produces.\n\n## Background\n\nThe apply engine resolves a document declaration against one fixed token-substitution context. Three other places derive the same path from the same declaration: the capture-path computation that pre-declares which files a template operation writes, the refresh derivation that rebuilds the context when reconciling an already-applied template, and the plan-document location resolver that substitutes a container identifier into the declaration.\n\nA field the apply engine resolves and these derivations do not becomes a literal token in a written path, a capture set that misses the file the operation writes, or a reconciliation that rewrites a resolved path into a broken one. The capture-path computation composes its token substitution by hand rather than sharing the engine's context, which is what lets the two drift.\n\nThe plan-document resolver receives a container identifier rather than the container, so resolving the field at that boundary needs the resolved directory reachable from what the resolver is handed. Area validation behaves as it does at application time: an area the configured registry does not declare yields a descriptive error rather than an unsubstituted or out-of-convention path.\n\n## Success Criteria\n\n- [hard] REQ-01: The capture-path computation resolves the artifact-directory field to the path the apply engine produces for the same declaration.\n- [hard] REQ-02: The refresh derivation that rebuilds the interpolation context resolves the artifact-directory field to that same path.\n- [hard] REQ-03: The plan-document location resolver substitutes the artifact-directory field rather than leaving the token literal.\n- [hard] REQ-04: A derivation handed an area the configured registry does not declare reports a descriptive error rather than an unsubstituted path.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d2870182-68c3-4b0e-a1ee-fdd3ca127d5d",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:artifact-directory-convention",
+    "per:@/issue/8e071e18/decision/D-2"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Resolve the artifact-directory field in the path derivations outside the apply engine",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

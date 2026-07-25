@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "0b3840f1-fa19-4b9c-8591-3d8c287f9f8f",
+    "35499d1e-ca3e-4f66-a1e3-2c62c09f9cf3",
+    "89b5899a-ae6e-4bae-82eb-460fb5fccaf7"
+  ],
+  "description": "The configuration reference becomes the single adopter-facing home for the issue artifact directory convention and the development-area classification, and the other adopter documents that restate either fact become pointers to it.\n\n## Background\n\nThe configuration reference is already the strongest anchor: it owns the documentation configuration keys, the move-versus-copy semantics, and the three-state policy status, and it already disclaims its own example as illustration rather than vocabulary. What it lacks is the path convention, which currently appears only in a how-to, and a statement of the area classification as a classification rather than as an example list.\n\nSeveral other adopter documents carry partial copies: an example configuration file, a glossary, a command reference, a planning-bracket how-to, and the project readme. Each keeps whatever is genuinely its own — command mechanics belong to the command reference — and cites the canonical home for the rest.\n\nWhere a fact has one source of truth, prose reaches it by citation rather than by a hand-maintained copy, and a duplicated list is a staleness defect rather than a convenience.\n\n## Success Criteria\n\n- [hard] REQ-01: The configuration reference states the issue artifact directory convention, including how the directory name is derived and that filenames inside it carry no short-id prefix.\n- [hard] REQ-02: The configuration reference states the development-area classification as the canonical statement of which areas are managed and which are permanent.\n- [hard] REQ-03: The configuration reference names the command that resolves an issue's canonical artifact directory as the way to obtain the path.\n- [hard] REQ-04: Other adopter-facing documents that previously restated either fact cite the canonical home instead.\n- [hard] REQ-05: Repository-local examples are identified as this project's configuration rather than as the shipped default.\n- [hard] REQ-06: Mechanical documentation checks over the adopter surface pass.\n",
+  "documents": [],
+  "gates_required": [
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "58c56743-b5e6-4fe3-90af-1910974faefc",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:canonical-documentation-home",
+    "satisfies:REQ-12",
+    "satisfies:REQ-04",
+    "per:@/charter/D-13",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "State the artifact layout facts in one adopter reference",
+  "updated_at": "2026-07-25T13:20:37.281986323Z"
+}

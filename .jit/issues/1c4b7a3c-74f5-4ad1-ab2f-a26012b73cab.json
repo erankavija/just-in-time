@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T13:20:37.281986323Z",
+  "dependencies": [
+    "b4d1a2c8-d408-46d0-b0b6-dc3e30283420",
+    "daf4fa46-8785-41f6-a992-9bf844fb5aa3"
+  ],
+  "description": "The linked artifacts of the documentation tooling evaluation task reach the archive through the product's own execution path, and the plan warnings the run reports are recorded for the citation work that follows.\n\n## Background\n\nRunning the cleanup through archival execution rather than by hand is the point: an earlier hand-rolled move skipped the planner's reference remapping, left a document reference dangling, and forced a hand repair of a validation failure. Executing the real mechanism exercises the remapping on real artifacts and makes the run its own acceptance evidence.\n\nThis is the single execution over container `a4e3cfb0`, whose destination directory is `dev/archive/a4e3cfb0`. Its plan currently schedules 1 artifact for relocation.\n\nThe enumerated artifact set is the plan's current one. A classification change landing before this run can move an entry between relocation and copying and can admit an entry the current plan reports as a blocked selected root, so the execution reads its own plan rather than a frozen list.\n\nRelocation is the only outcome this plan currently schedules: it copies nothing, so the run has no retained source to read. The declared footprint names only what this run writes, which is the destination directory it creates plus the sources it relocates.\n\nAn execution refuses to run unless its plan is eligible, so an ineligible preview is a stop rather than a partial move. The run reports plan warnings naming in-content citations of the artifacts it relocates; those warnings are the input to the citation work that follows and are recorded rather than discarded.\n\n## Success Criteria\n\n- [hard] REQ-01: The container previews an eligible plan before its execution runs.\n- [hard] REQ-02: Every artifact the plan schedules for relocation is present at its destination under `dev/archive/a4e3cfb0` and absent from its source path.\n- [hard] REQ-03: The relocation was performed by the archival execution path, evidenced by the recorded execution events and the container marker in the destination directory.\n- [hard] REQ-04: The plan warnings naming in-content citations of the artifacts this run relocates are recorded.\n- [hard] REQ-05: Artifacts owned by live issues are left where they are.\n- [hard] REQ-06: Whole-repository validation passes after the run and every document reference resolves.\n",
+  "documents": [],
+  "gates_required": [
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "id": "1c4b7a3c-74f5-4ad1-ab2f-a26012b73cab",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:development-root-cleanup",
+    "satisfies:REQ-09",
+    "per:@/issue/8e071e18/decision/D-10",
+    "enforces:@/invariant/derived-state-coherence",
+    "per:@/issue/8e071e18/decision/D-21"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Archive the documentation tooling evaluation task's linked artifacts",
+  "updated_at": "2026-07-25T13:23:10.054597853Z"
+}
