@@ -1537,6 +1537,8 @@
       "changelog-citation-repoint",
       "testing-guide-citation-repoint",
       "active-working-notes-citation-repoint",
+      "benchmark-generator-output-policy",
+      "benchmark-report-citation-repoint",
       "active-design-document-disposition",
       "active-plan-document-disposition",
       "active-reference-material-disposition",
@@ -1600,6 +1602,98 @@
           "touches": [
             ".jit/issues/73981310-4173-4224-82bf-f38a9d5222fd.json",
             ".jit/issues/a4b0fadf-ccbe-4f47-a41d-676f7a947f85.json"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "design-phase-citation-repoint",
+    "title": "Resolve the phase design records' citations before their archival run",
+    "description": "The two phase design records cite companion records that one archival run relocates, so their citations name the archived locations before that run moves them.\n\n## Background\n\nArchival never rewrites the content of a record it relocates. A citation left uncorrected when its own file moves is therefore frozen at its stale value for good, which is why these records are corrected first and relocated afterwards.\n\nBoth citing records and both cited records belong to one container, so a single run relocates all of them into the same destination root. The corrected citations name that destination and resolve once the run completes; between the correction and the run they name a location the run has yet to create.\n\nValidation resolves document link records only, so an inline path mention in prose breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences.\n\nThe enumerated citations are:\n\n- `dev/design/phase2-collapse-expand.md` — cites `dev/design/subgraph-clustering-layout.md`\n- `dev/design/phase3-advanced-features.md` — cites `dev/design/subgraph-clustering-layout.md`, `dev/design/phase2-collapse-expand.md`\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation names the archived location the production polish run produces for the record it cites.\n- [hard] REQ-02: Both citing records carry their corrected citations before that run relocates them.\n- [hard] REQ-03: No other content in either record is changed.\n- [hard] REQ-04: Whole-repository validation passes afterwards.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-8"
+    ],
+    "gates": [
+      "doc-review",
+      "repo-validate"
+    ],
+    "depends_on": [
+      "citation-scan-warnings"
+    ],
+    "planning": {
+      "outcome": "The two phase design records cite their companions at the locations the production polish run produces.",
+      "contract_refs": [
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-8",
+        "D-13",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "the phase design records that cite a companion record",
+        "test_boundary": "the archived locations the two phase design records name",
+        "worker_sized_reason": "Two named files carry three enumerated citations of two records the same run relocates.",
+        "footprint": {
+          "touches": [
+            "dev/design/phase2-collapse-expand.md",
+            "dev/design/phase3-advanced-features.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "parallel-work-record-citation-repoint",
+    "title": "Resolve the parallel-work research records' citations before their archival runs",
+    "description": "The two parallel-work research records cite records that one archival run relocates, while a different run relocates one of the citing records itself, so both are corrected before either run moves them.\n\n## Background\n\nArchival never rewrites the content of a record it relocates. A citation left uncorrected when its own file moves is therefore frozen at its stale value for good, which is why these records are corrected first and relocated afterwards.\n\nThe two records sit in different areas and are relocated by different runs, while every path they cite is relocated by the parallel work run. Correcting them together is what keeps the pair consistent across that split: the study cites the experiment record, so a correction to one that lagged the other would leave the pair naming two generations of the same path.\n\nValidation resolves document link records only, so an inline path mention in prose breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences.\n\nThe enumerated citations are:\n\n- `dev/studies/ai-tool-worktree-compatibility.md` — three citations of `dev/design/worktree-parallel-work.md`, one of `dev/experiments/worktree-manual-coordination-experiment.md`\n- `dev/experiments/worktree-manual-coordination-experiment.md` — cites `dev/design/worktree-parallel-work.md`\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation names the archived location the parallel work run produces for the record it cites.\n- [hard] REQ-02: Both citing records carry their corrected citations before either run relocates them.\n- [hard] REQ-03: No other content in either record is changed.\n- [hard] REQ-04: Whole-repository validation passes afterwards.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-8"
+    ],
+    "gates": [
+      "doc-review",
+      "repo-validate"
+    ],
+    "depends_on": [
+      "citation-scan-warnings"
+    ],
+    "planning": {
+      "outcome": "The two parallel-work research records cite the archived locations the parallel work run produces.",
+      "contract_refs": [
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-8",
+        "D-13",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "the parallel-work research records that cite the parallel work design record",
+        "test_boundary": "the archived locations the two research records name",
+        "worker_sized_reason": "Two named files carry five enumerated citations of two records one run relocates.",
+        "footprint": {
+          "touches": [
+            "dev/studies/ai-tool-worktree-compatibility.md",
+            "dev/experiments/worktree-manual-coordination-experiment.md"
           ]
         }
       }
@@ -2380,7 +2474,8 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "citation-scan-warnings"
+      "citation-scan-warnings",
+      "design-phase-citation-repoint"
     ],
     "planning": {
       "outcome": "The production polish container relocates its linked artifacts through the archival execution path.",
@@ -2621,7 +2716,8 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "citation-scan-warnings"
+      "citation-scan-warnings",
+      "parallel-work-record-citation-repoint"
     ],
     "planning": {
       "outcome": "The agent validation container relocates its linked artifacts through the archival execution path.",
@@ -2901,7 +2997,8 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "citation-scan-warnings"
+      "citation-scan-warnings",
+      "parallel-work-record-citation-repoint"
     ],
     "planning": {
       "outcome": "The parallel work container relocates its linked artifacts through the archival execution path.",
@@ -3081,7 +3178,7 @@
   {
     "key": "cleanup-completeness-landing",
     "title": "Confirm the archival runs serviced the development root",
-    "description": "The archival runs are judged complete against the development root as a whole, and the in-content citation warnings they reported are consolidated into one working list.\n\n## Background\n\nThe cleanup runs as one execution per container. Each execution proves its own container moved; none of them proves the development root as a whole is finished. That judgement needs a single pass over the post-run tree, and it is also the backstop for a container whose artifact set grew after the executions were measured.\n\nSeveral outcomes are legitimate and must be told apart. An artifact whose owner sits wholly inside an archived subtree relocates, leaving nothing behind. An artifact an owner outside that subtree also claims is mirrored into the archive while its source stays in place. An artifact whose document reference is pinned to a commit is retained by design. An artifact with a live owner stays in the active area. An artifact carrying an issue-shaped filename prefix but no document reference is invisible to the mechanism, which owns artifacts by reference rather than by filename, so no run selects it. One container already sits under the archive root from an earlier run and converges without a new execution.\n\nRecording which artifacts took which outcome, and why each remaining artifact remains, is what makes the cleanup auditable and what keeps an unreachable artifact from being mistaken for a missed run.\n\nCitations inside records the runs themselves relocated stay verbatim. A historical document's citation is part of its record, which is why the planner warns rather than rewriting content.\n\n## Success Criteria\n\n- [hard] REQ-01: Every artifact under a managed development area that a terminal issue's document reference names is present under the archive root after the runs.\n- [hard] REQ-02: An artifact the runs mirrored without relocating is recorded as mirrored, with its retained source path named.\n- [hard] REQ-03: Every artifact remaining in a managed development area is recorded together with the reason it remains: a live owner, a commit-pinned reference, an owner outside the archived subtree, or no document reference at all.\n- [hard] REQ-04: A container whose artifacts an earlier run already relocated converges on its existing destination rather than producing a second one.\n- [hard] REQ-05: In-content citations inside records the runs relocated are unchanged.\n- [hard] REQ-06: The in-content citation warnings the runs reported are consolidated into one working list.\n- [hard] REQ-07: Whole-repository validation passes and every document reference resolves.\n",
+    "description": "The archival runs are judged complete against the development root as a whole, and the in-content citation warnings they reported are consolidated into one working list.\n\n## Background\n\nThe cleanup runs as one execution per container. Each execution proves its own container moved; none of them proves the development root as a whole is finished. That judgement needs a single pass over the post-run tree, and it is also the backstop for a container whose artifact set grew after the executions were measured.\n\nSeveral outcomes are legitimate and must be told apart. An artifact whose owner sits wholly inside an archived subtree relocates, leaving nothing behind. An artifact an owner outside that subtree also claims is mirrored into the archive while its source stays in place. An artifact whose document reference is pinned to a commit is retained by design. An artifact with a live owner stays in the active area. An artifact carrying an issue-shaped filename prefix but no document reference is invisible to the mechanism, which owns artifacts by reference rather than by filename, so no run selects it. One container already sits under the archive root from an earlier run and converges without a new execution.\n\nRecording which artifacts took which outcome, and why each remaining artifact remains, is what makes the cleanup auditable and what keeps an unreachable artifact from being mistaken for a missed run.\n\nCitations inside records the runs themselves relocated stay verbatim. A historical document's citation is part of its record, which is why the planner warns rather than rewriting content.\n\nThe completeness record and the consolidated warning list are written into this epic's canonical artifact directory in the active area, `dev/active/8e071e18-dev-artifact-layout`, obtained from the command that resolves it rather than composed by hand.\n\n## Success Criteria\n\n- [hard] REQ-01: Every artifact under a managed development area that a terminal issue's document reference names is present under the archive root after the runs.\n- [hard] REQ-02: An artifact the runs mirrored without relocating is recorded as mirrored, with its retained source path named.\n- [hard] REQ-03: Every artifact remaining in a managed development area is recorded together with the reason it remains: a live owner, a commit-pinned reference, an owner outside the archived subtree, or no document reference at all.\n- [hard] REQ-04: A container whose artifacts an earlier run already relocated converges on its existing destination rather than producing a second one.\n- [hard] REQ-05: In-content citations inside records the runs relocated are unchanged.\n- [hard] REQ-06: The in-content citation warnings the runs reported are consolidated into one working list.\n- [hard] REQ-07: Whole-repository validation passes and every document reference resolves.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -3097,6 +3194,7 @@
       "repo-validate"
     ],
     "depends_on": [
+      "artifact-directory-command",
       "archive-sweep-2d109173",
       "archive-sweep-6eb585bc",
       "archive-sweep-cfb3ba94",
@@ -3125,6 +3223,7 @@
     "planning": {
       "outcome": "The archival runs are confirmed complete against the development root with their citation warnings consolidated.",
       "contract_refs": [
+        "canonical-artifact-directory",
         "shipped-area-declaration",
         "citation-warning-code",
         "citation-scan-universe",
@@ -3439,9 +3538,101 @@
     }
   },
   {
+    "key": "benchmark-generator-output-policy",
+    "title": "Resolve the benchmark generators' citations of their own output areas",
+    "description": "Both benchmark generators declare a default output directory inside a development area the reclassification manages, and each declaration resolves to the directory the generator's own run creates.\n\n## Background\n\nA generator states its output directory in its usage comments and again in the executable assignment that creates it. The assignment is the sharp case, because it is the path the run writes to rather than a comment about it.\n\nThe output-path policy is decided rather than open: both generators keep their current defaults. Each area is regenerated output whose contents the next run recreates, which is the premise the managed classification rests on, so no path in either generator changes and the work is to confirm each declaration still resolves after the archival runs.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set.\n\nThe enumerated citations are:\n\n- `scripts/benchmark-rust-build.sh` — four citations of `dev/benchmarks/rust-build-efficiency`, one of them the executable default that creates the directory\n- `scripts/benchmark-session-cost.sh` — three citations of `dev/studies/perf`, one of them the executable default that creates the directory\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named scripts resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: Each generator's executable output-path default names the directory that generator's run creates.\n- [hard] REQ-03: Each generator's usage comments state the same default as its executable assignment.\n- [hard] REQ-04: A citation whose cited artifact the runs relocated names the artifact's new location.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-13"
+    ],
+    "gates": [
+      "code-review"
+    ],
+    "depends_on": [
+      "cleanup-completeness-landing"
+    ],
+    "planning": {
+      "outcome": "Both benchmark generators keep a declared output path that resolves to the directory their run recreates.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-8",
+        "D-13",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "the benchmark generators that cite their own output directory",
+        "test_boundary": "path existence checks over the output directories the generators declare",
+        "worker_sized_reason": "Two named scripts carry seven enumerated citations under one decided output-path policy.",
+        "footprint": {
+          "touches": [
+            "scripts/benchmark-rust-build.sh",
+            "scripts/benchmark-session-cost.sh"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "benchmark-report-citation-repoint",
+    "title": "Resolve the benchmark report's citations of its own area",
+    "description": "The benchmark report cites the area it sits in twice, and both citations resolve after the cleanup.\n\n## Background\n\nThe report is the only prose record in the measurement area, and its two citations name that area rather than a single file inside it. Whether a run relocates a record out of that area or mirrors it and retains the source, the citations must still name a path that exists.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the report's two citations of its own area resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: Mechanical link checks over the report pass.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-8"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "cleanup-completeness-landing"
+    ],
+    "planning": {
+      "outcome": "The benchmark report's two citations of its own area resolve after the archival runs.",
+      "contract_refs": [
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-8",
+        "D-13",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "the benchmark report that cites its own output area",
+        "test_boundary": "mechanical link checks over the benchmark report",
+        "worker_sized_reason": "One named file carries two enumerated citations of one area.",
+        "footprint": {
+          "touches": [
+            "dev/benchmarks/rust-build-efficiency/report.md"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "active-design-document-disposition",
     "title": "Record the decided disposition of the unprefixed active-area design documents",
-    "description": "Each design document in the active area that carries no issue prefix is recorded against the outcome this plan decides for it, so no file is left undecided and no worker has to judge one.\n\n## Background\n\nEach file's outcome is decided rather than open: 8 take the archived location an owning container's run produces; 1 is claimed by a terminal owner outside every archived subtree, so the runs mirror it into the archive and retain the source. Recording is therefore an application of a decided mapping and needs no judgement about an individual file.\n\nThe disposition record lives at `dev/active/8e071e18-dev-artifact-layout/disposition-design-documents.md`. Keeping it in one document rather than inside each file leaves the historical documents' bytes untouched, for the same reason archival warns about in-content citations instead of rewriting them.\n\nThe mapping is:\n\n- `dev/active/agent-validation-design.md` — archived location `dev/archive/4a00b2b0-agent-validation/dev/active/agent-validation-design.md`\n- `dev/active/ci-gate-integration-design.md` — archived location `dev/archive/14303b30-phase5-2/dev/active/ci-gate-integration-design.md`\n- `dev/active/documentation-lifecycle-design.md` — mirrored to `dev/archive/2d109173-docs-exhaustive-audit/dev/active/documentation-lifecycle-design.md`, `dev/archive/6eb585bc-core-maintenance/dev/active/documentation-lifecycle-design.md`, `dev/archive/9ac9fdac-graph-templates/dev/active/documentation-lifecycle-design.md`, `dev/archive/f2532a2d-jit-project-lead/dev/active/documentation-lifecycle-design.md`, `dev/archive/2fbd2a82-planning-bracket/dev/active/documentation-lifecycle-design.md`, `dev/archive/2e926e39-agent-seamlessness/dev/active/documentation-lifecycle-design.md`, `dev/archive/71373e37-docs-lifecycle/dev/active/documentation-lifecycle-design.md`, `dev/archive/cfb3ba94-docs/dev/active/documentation-lifecycle-design.md`, with the source retained at `dev/active/documentation-lifecycle-design.md` because a terminal owner sits outside every archived subtree\n- `dev/active/documentation-lifecycle-phase2-design.md` — archived location `dev/archive/94f873c8-docs-lifecycle-p2/dev/active/documentation-lifecycle-phase2-design.md`\n- `dev/active/observability-design.md` — archived location `dev/archive/d7bfd4a4-observability/dev/active/observability-design.md`\n- `dev/active/planning-bracket-design.md` — archived location `dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-design.md`\n- `dev/active/production-polish-design.md` — archived location `dev/archive/9d427a6b-production-polish/dev/active/production-polish-design.md`\n- `dev/active/production-stability-design.md` — archived location `dev/archive/5fe00921-production-stability/dev/active/production-stability-design.md`\n- `dev/active/rejection-state-design.md` — archived location `dev/archive/93f3e4df-rejection-state/dev/active/rejection-state-design.md`\n\n## Success Criteria\n\n- [hard] REQ-01: The record at `dev/active/8e071e18-dev-artifact-layout/disposition-design-documents.md` lists every file in the set with exactly one disposition of the three kinds.\n- [hard] REQ-02: Every file recorded with an archived location is present at that location and absent from the active area.\n- [hard] REQ-03: Every file recorded as mirrored is present at each mirrored location and retained at its source path.\n- [hard] REQ-04: No file in the set is left without a recorded disposition.\n- [hard] REQ-05: No file in the set has its own content edited to carry its disposition.\n- [hard] REQ-06: Whole-repository validation passes afterwards.\n",
+    "description": "Each design document in the active area that carries no issue prefix is recorded against the outcome this plan decides for it, so no file is left undecided and no worker has to judge one.\n\n## Background\n\nEach file's outcome is decided rather than open: 8 take the archived location an owning container's run produces; 1 is claimed by a terminal owner outside every archived subtree, so the runs mirror it into the archive and retain the source. Recording is therefore an application of a decided mapping and needs no judgement about an individual file.\n\nThe disposition record is `disposition-design-documents.md` inside this epic's canonical artifact directory, `dev/active/8e071e18-dev-artifact-layout`. The record's directory is the canonical artifact directory the command resolves for this epic in the active area rather than a path composed by hand, which makes this epic one of the convention's first consumers. Keeping the record in one document rather than inside each file leaves the historical documents' bytes untouched, for the same reason archival warns about in-content citations instead of rewriting them.\n\nThe mapping is:\n\n- `dev/active/agent-validation-design.md` — archived location `dev/archive/4a00b2b0-agent-validation/dev/active/agent-validation-design.md`\n- `dev/active/ci-gate-integration-design.md` — archived location `dev/archive/14303b30-phase5-2/dev/active/ci-gate-integration-design.md`\n- `dev/active/documentation-lifecycle-design.md` — mirrored to `dev/archive/2d109173-docs-exhaustive-audit/dev/active/documentation-lifecycle-design.md`, `dev/archive/6eb585bc-core-maintenance/dev/active/documentation-lifecycle-design.md`, `dev/archive/9ac9fdac-graph-templates/dev/active/documentation-lifecycle-design.md`, `dev/archive/f2532a2d-jit-project-lead/dev/active/documentation-lifecycle-design.md`, `dev/archive/2fbd2a82-planning-bracket/dev/active/documentation-lifecycle-design.md`, `dev/archive/2e926e39-agent-seamlessness/dev/active/documentation-lifecycle-design.md`, `dev/archive/71373e37-docs-lifecycle/dev/active/documentation-lifecycle-design.md`, `dev/archive/cfb3ba94-docs/dev/active/documentation-lifecycle-design.md`, with the source retained at `dev/active/documentation-lifecycle-design.md` because a terminal owner sits outside every archived subtree\n- `dev/active/documentation-lifecycle-phase2-design.md` — archived location `dev/archive/94f873c8-docs-lifecycle-p2/dev/active/documentation-lifecycle-phase2-design.md`\n- `dev/active/observability-design.md` — archived location `dev/archive/d7bfd4a4-observability/dev/active/observability-design.md`\n- `dev/active/planning-bracket-design.md` — archived location `dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-design.md`\n- `dev/active/production-polish-design.md` — archived location `dev/archive/9d427a6b-production-polish/dev/active/production-polish-design.md`\n- `dev/active/production-stability-design.md` — archived location `dev/archive/5fe00921-production-stability/dev/active/production-stability-design.md`\n- `dev/active/rejection-state-design.md` — archived location `dev/archive/93f3e4df-rejection-state/dev/active/rejection-state-design.md`\n\n## Success Criteria\n\n- [hard] REQ-01: The record at `dev/active/8e071e18-dev-artifact-layout/disposition-design-documents.md` lists every file in the set with exactly one disposition of the three kinds.\n- [hard] REQ-02: Every file recorded with an archived location is present at that location and absent from the active area.\n- [hard] REQ-03: Every file recorded as mirrored is present at each mirrored location and retained at its source path.\n- [hard] REQ-04: No file in the set is left without a recorded disposition.\n- [hard] REQ-05: No file in the set has its own content edited to carry its disposition.\n- [hard] REQ-06: Whole-repository validation passes afterwards.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3455,11 +3646,13 @@
       "repo-validate"
     ],
     "depends_on": [
+      "artifact-directory-command",
       "cleanup-completeness-landing"
     ],
     "planning": {
       "outcome": "Each design document in the set carries one recorded disposition.",
       "contract_refs": [
+        "canonical-artifact-directory",
         "shipped-area-declaration"
       ],
       "source_refs": [
@@ -3483,7 +3676,7 @@
   {
     "key": "active-plan-document-disposition",
     "title": "Record the decided disposition of the unprefixed active-area implementation plans",
-    "description": "Each implementation plan in the active area that carries no issue prefix is recorded against the outcome this plan decides for it, so no file is left undecided and no worker has to judge one.\n\n## Background\n\nEach file's outcome is decided rather than open: 9 take the archived location an owning container's run produces; 1 is claimed by a terminal owner outside every archived subtree, so the runs mirror it into the archive and retain the source. Recording is therefore an application of a decided mapping and needs no judgement about an individual file.\n\nThe disposition record lives at `dev/active/8e071e18-dev-artifact-layout/disposition-implementation-plans.md`. Keeping it in one document rather than inside each file leaves the historical documents' bytes untouched, for the same reason archival warns about in-content citations instead of rewriting them.\n\nThe mapping is:\n\n- `dev/active/bulk-operations-plan.md` — archived location `dev/archive/14303b30-phase5-2/dev/active/bulk-operations-plan.md`\n- `dev/active/config-consolidation-plan.md` — archived location `dev/archive/5fe00921-production-stability/dev/active/config-consolidation-plan.md`\n- `dev/active/dependency-display-improvements-plan.md` — archived location `dev/archive/9d427a6b-production-polish/dev/active/dependency-display-improvements-plan.md`\n- `dev/active/gate-modification-flags-plan.md` — archived location `dev/archive/14303b30-phase5-2/dev/active/gate-modification-flags-plan.md`\n- `dev/active/gate-presets-implementation-plan.md` — archived location `dev/archive/9d427a6b-production-polish/dev/active/gate-presets-implementation-plan.md`\n- `dev/active/json-output-standardization-plan.md` — mirrored to `dev/archive/14303b30-phase5-2/dev/active/json-output-standardization-plan.md`, `dev/archive/9d427a6b-production-polish/dev/active/json-output-standardization-plan.md`, with the source retained at `dev/active/json-output-standardization-plan.md` because a terminal owner sits outside every archived subtree\n- `dev/active/multi-issue-bulk-operations-plan.md` — archived location `dev/archive/5fe00921-production-stability/dev/active/multi-issue-bulk-operations-plan.md`\n- `dev/active/quiet-mode-plan.md` — archived location `dev/archive/14303b30-phase5-2/dev/active/quiet-mode-plan.md`\n- `dev/active/snapshot-export-implementation-plan.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/active/snapshot-export-implementation-plan.md`\n- `dev/active/transitive-reduction-validation-plan.md` — archived location `dev/archive/5fe00921-production-stability/dev/active/transitive-reduction-validation-plan.md`\n\n## Success Criteria\n\n- [hard] REQ-01: The record at `dev/active/8e071e18-dev-artifact-layout/disposition-implementation-plans.md` lists every file in the set with exactly one disposition of the three kinds.\n- [hard] REQ-02: Every file recorded with an archived location is present at that location and absent from the active area.\n- [hard] REQ-03: Every file recorded as mirrored is present at each mirrored location and retained at its source path.\n- [hard] REQ-04: No file in the set is left without a recorded disposition.\n- [hard] REQ-05: No file in the set has its own content edited to carry its disposition.\n- [hard] REQ-06: Whole-repository validation passes afterwards.\n",
+    "description": "Each implementation plan in the active area that carries no issue prefix is recorded against the outcome this plan decides for it, so no file is left undecided and no worker has to judge one.\n\n## Background\n\nEach file's outcome is decided rather than open: 9 take the archived location an owning container's run produces; 1 is claimed by a terminal owner outside every archived subtree, so the runs mirror it into the archive and retain the source. Recording is therefore an application of a decided mapping and needs no judgement about an individual file.\n\nThe disposition record is `disposition-implementation-plans.md` inside this epic's canonical artifact directory, `dev/active/8e071e18-dev-artifact-layout`. The record's directory is the canonical artifact directory the command resolves for this epic in the active area rather than a path composed by hand, which makes this epic one of the convention's first consumers. Keeping the record in one document rather than inside each file leaves the historical documents' bytes untouched, for the same reason archival warns about in-content citations instead of rewriting them.\n\nThe mapping is:\n\n- `dev/active/bulk-operations-plan.md` — archived location `dev/archive/14303b30-phase5-2/dev/active/bulk-operations-plan.md`\n- `dev/active/config-consolidation-plan.md` — archived location `dev/archive/5fe00921-production-stability/dev/active/config-consolidation-plan.md`\n- `dev/active/dependency-display-improvements-plan.md` — archived location `dev/archive/9d427a6b-production-polish/dev/active/dependency-display-improvements-plan.md`\n- `dev/active/gate-modification-flags-plan.md` — archived location `dev/archive/14303b30-phase5-2/dev/active/gate-modification-flags-plan.md`\n- `dev/active/gate-presets-implementation-plan.md` — archived location `dev/archive/9d427a6b-production-polish/dev/active/gate-presets-implementation-plan.md`\n- `dev/active/json-output-standardization-plan.md` — mirrored to `dev/archive/14303b30-phase5-2/dev/active/json-output-standardization-plan.md`, `dev/archive/9d427a6b-production-polish/dev/active/json-output-standardization-plan.md`, with the source retained at `dev/active/json-output-standardization-plan.md` because a terminal owner sits outside every archived subtree\n- `dev/active/multi-issue-bulk-operations-plan.md` — archived location `dev/archive/5fe00921-production-stability/dev/active/multi-issue-bulk-operations-plan.md`\n- `dev/active/quiet-mode-plan.md` — archived location `dev/archive/14303b30-phase5-2/dev/active/quiet-mode-plan.md`\n- `dev/active/snapshot-export-implementation-plan.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/active/snapshot-export-implementation-plan.md`\n- `dev/active/transitive-reduction-validation-plan.md` — archived location `dev/archive/5fe00921-production-stability/dev/active/transitive-reduction-validation-plan.md`\n\n## Success Criteria\n\n- [hard] REQ-01: The record at `dev/active/8e071e18-dev-artifact-layout/disposition-implementation-plans.md` lists every file in the set with exactly one disposition of the three kinds.\n- [hard] REQ-02: Every file recorded with an archived location is present at that location and absent from the active area.\n- [hard] REQ-03: Every file recorded as mirrored is present at each mirrored location and retained at its source path.\n- [hard] REQ-04: No file in the set is left without a recorded disposition.\n- [hard] REQ-05: No file in the set has its own content edited to carry its disposition.\n- [hard] REQ-06: Whole-repository validation passes afterwards.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3497,11 +3690,13 @@
       "repo-validate"
     ],
     "depends_on": [
+      "artifact-directory-command",
       "cleanup-completeness-landing"
     ],
     "planning": {
       "outcome": "Each implementation plan in the set carries one recorded disposition.",
       "contract_refs": [
+        "canonical-artifact-directory",
         "shipped-area-declaration"
       ],
       "source_refs": [
@@ -3525,7 +3720,7 @@
   {
     "key": "active-reference-material-disposition",
     "title": "Record the decided disposition of the unprefixed active-area guides and briefs",
-    "description": "Each guide, requirement list, example set, and scope brief in the active area that carries no issue prefix is recorded against the outcome this plan decides for it, so no file is left undecided.\n\n## Background\n\nEach file's outcome is decided rather than open: 3 take the archived location an owning container's run produces; 1 carries an assigned owning issue that is still live. Recording is therefore an application of a decided mapping and needs no judgement about an individual file.\n\nThe disposition record lives at `dev/active/8e071e18-dev-artifact-layout/disposition-reference-material.md`. Keeping it in one document rather than inside each file leaves the historical documents' bytes untouched, for the same reason archival warns about in-content citations instead of rewriting them.\n\nThe mapping is:\n\n- `dev/active/config-consolidation-documentation-requirements.md` — archived location `dev/archive/5fe00921-production-stability/dev/active/config-consolidation-documentation-requirements.md`\n- `dev/active/doc-archive-implementation-guide.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/active/doc-archive-implementation-guide.md`\n- `dev/active/gate-examples.md` — archived location `dev/archive/14303b30-phase5-2/dev/active/gate-examples.md`\n- `dev/active/v1-production-readiness-scope-brief.md` — assigned owning issue `8b05a612`, which is live, so the brief stays in the active area until that container's own artifacts are archived\n\n## Success Criteria\n\n- [hard] REQ-01: The record at `dev/active/8e071e18-dev-artifact-layout/disposition-reference-material.md` lists every file in the set with exactly one disposition of the three kinds.\n- [hard] REQ-02: Every file recorded with an archived location is present at that location and absent from the active area.\n- [hard] REQ-03: Every file recorded against a live owning issue is linked to that issue and remains where it is.\n- [hard] REQ-04: No file in the set is left without a recorded disposition.\n- [hard] REQ-05: No file in the set has its own content edited to carry its disposition.\n- [hard] REQ-06: Whole-repository validation passes afterwards.\n",
+    "description": "Each guide, requirement list, example set, and scope brief in the active area that carries no issue prefix is recorded against the outcome this plan decides for it, so no file is left undecided.\n\n## Background\n\nEach file's outcome is decided rather than open: 3 take the archived location an owning container's run produces; 1 carries an assigned owning issue that is still live. Recording is therefore an application of a decided mapping and needs no judgement about an individual file.\n\nThe disposition record is `disposition-reference-material.md` inside this epic's canonical artifact directory, `dev/active/8e071e18-dev-artifact-layout`. The record's directory is the canonical artifact directory the command resolves for this epic in the active area rather than a path composed by hand, which makes this epic one of the convention's first consumers. Keeping the record in one document rather than inside each file leaves the historical documents' bytes untouched, for the same reason archival warns about in-content citations instead of rewriting them.\n\nThe mapping is:\n\n- `dev/active/config-consolidation-documentation-requirements.md` — archived location `dev/archive/5fe00921-production-stability/dev/active/config-consolidation-documentation-requirements.md`\n- `dev/active/doc-archive-implementation-guide.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/active/doc-archive-implementation-guide.md`\n- `dev/active/gate-examples.md` — archived location `dev/archive/14303b30-phase5-2/dev/active/gate-examples.md`\n- `dev/active/v1-production-readiness-scope-brief.md` — assigned owning issue `8b05a612`, which is live, so the brief stays in the active area until that container's own artifacts are archived\n\n## Success Criteria\n\n- [hard] REQ-01: The record at `dev/active/8e071e18-dev-artifact-layout/disposition-reference-material.md` lists every file in the set with exactly one disposition of the three kinds.\n- [hard] REQ-02: Every file recorded with an archived location is present at that location and absent from the active area.\n- [hard] REQ-03: Every file recorded against a live owning issue is linked to that issue and remains where it is.\n- [hard] REQ-04: No file in the set is left without a recorded disposition.\n- [hard] REQ-05: No file in the set has its own content edited to carry its disposition.\n- [hard] REQ-06: Whole-repository validation passes afterwards.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3539,11 +3734,13 @@
       "repo-validate"
     ],
     "depends_on": [
+      "artifact-directory-command",
       "cleanup-completeness-landing"
     ],
     "planning": {
       "outcome": "Each guide or brief in the set carries one recorded disposition.",
       "contract_refs": [
+        "canonical-artifact-directory",
         "shipped-area-declaration"
       ],
       "source_refs": [
@@ -3567,7 +3764,7 @@
   {
     "key": "session-record-reclassification",
     "title": "Record the blanket disposition of the session records",
-    "description": "The session area takes one recorded blanket disposition covering every record it holds, because the area is a uniform set of dated records where per-file inspection would be volume without added signal.\n\n## Background\n\nEach file's outcome is decided rather than open: 30 take the archived location an owning container's run produces. The blanket call is one decision — a session record follows its owning issue's archival outcome — and it holds for the whole area, because a terminal issue's document reference names every record in it. The enumeration below states that decision's scope rather than thirty separate judgements.\n\nThe disposition record lives at `dev/active/8e071e18-dev-artifact-layout/disposition-session-records.md`. Keeping it in one document rather than inside each file leaves the historical documents' bytes untouched, for the same reason archival warns about in-content citations instead of rewriting them.\n\nThe mapping is:\n\n- `dev/sessions/session-2024-12-24-check-links-incomplete.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/sessions/session-2024-12-24-check-links-incomplete.md`\n- `dev/sessions/session-2025-12-21-short-hash-progress.md` — archived location `dev/archive/14303b30-phase5-2/dev/sessions/session-2025-12-21-short-hash-progress.md`\n- `dev/sessions/session-2025-12-22-doc-consolidation.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/sessions/session-2025-12-22-doc-consolidation.md`\n- `dev/sessions/session-2025-12-26-config-consolidation.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-26-config-consolidation.md`\n- `dev/sessions/session-2025-12-27-doc-archive.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/sessions/session-2025-12-27-doc-archive.md`\n- `dev/sessions/session-2025-12-29-quiet-flag-implementation.md` — archived location `dev/archive/14303b30-phase5-2/dev/sessions/session-2025-12-29-quiet-flag-implementation.md`\n- `dev/sessions/session-2025-12-30-bulk-cli-integration.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-cli-integration.md`\n- `dev/sessions/session-2025-12-30-bulk-operations-progress.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-operations-progress.md`\n- `dev/sessions/session-2025-12-30-bulk-phase5-docs.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-phase5-docs.md`\n- `dev/sessions/session-2025-12-30-bulk-state-decision.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-state-decision.md`\n- `dev/sessions/session-2025-12-30-bulk-validation.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-validation.md`\n- `dev/sessions/session-2026-01-01-example-md-migration.md` — archived location `dev/archive/cfb3ba94-docs/dev/sessions/session-2026-01-01-example-md-migration.md`\n- `dev/sessions/session-20260103-parallel-work-design-review.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260103-parallel-work-design-review.md`\n- `dev/sessions/session-20260109-query-consolidation.md` — archived location `dev/archive/9d427a6b-production-polish/dev/sessions/session-20260109-query-consolidation.md`\n- `dev/sessions/session-20260111-validate-implementation.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260111-validate-implementation.md`\n- `dev/sessions/session-20260115-cli-quality-phase3.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-cli-quality-phase3.md`\n- `dev/sessions/session-20260115-phase3-issue7-complete.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-phase3-issue7-complete.md`\n- `dev/sessions/session-20260115-story-review-f023.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-story-review-f023.md`\n- `dev/sessions/session-20260118-f849-manual-testing.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260118-f849-manual-testing.md`\n- `dev/sessions/session-20260201-cli-enforcement-82b17394.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-cli-enforcement-82b17394.md`\n- `dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md`\n- `dev/sessions/session-20260201-refactor-1bdc5395-analysis.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-refactor-1bdc5395-analysis.md`\n- `dev/sessions/session-20260201-refactor-items-5-7.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-refactor-items-5-7.md`\n- `dev/sessions/session-20260620-planning-skill-design.md` — archived location `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260620-planning-skill-design.md`\n- `dev/sessions/session-20260622-planning-failures-and-churn.md` — archived location `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260622-planning-failures-and-churn.md`\n- `dev/sessions/session-20260623-planning-skill-observations.md` — archived location `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260623-planning-skill-observations.md`\n- `dev/sessions/session-20260624-project-lead-role-design.md` — archived location `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260624-project-lead-role-design.md`\n- `dev/sessions/session-20260625-planning-skill-authoring.md` — archived location `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260625-planning-skill-authoring.md`\n- `dev/sessions/session-claim-coordination-parallel.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-claim-coordination-parallel.md`\n- `dev/sessions/session-claim-coordination-review.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-claim-coordination-review.md`\n\n## Success Criteria\n\n- [hard] REQ-01: The record at `dev/active/8e071e18-dev-artifact-layout/disposition-session-records.md` states the blanket call and lists every path it covers with exactly one disposition of the three kinds.\n- [hard] REQ-02: Every file recorded with an archived location is present at that location and absent from its source path.\n- [hard] REQ-03: No file in the set is left without a recorded disposition.\n- [hard] REQ-04: No file in the set has its own content edited to carry its disposition.\n- [hard] REQ-05: Whole-repository validation passes afterwards.\n",
+    "description": "The session area takes one recorded blanket disposition covering every record it holds, because the area is a uniform set of dated records where per-file inspection would be volume without added signal.\n\n## Background\n\nEach file's outcome is decided rather than open: 30 take the archived location an owning container's run produces. The blanket call is one decision — a session record follows its owning issue's archival outcome — and it holds for the whole area, because a terminal issue's document reference names every record in it. The enumeration below states that decision's scope rather than thirty separate judgements.\n\nThe disposition record is `disposition-session-records.md` inside this epic's canonical artifact directory, `dev/active/8e071e18-dev-artifact-layout`. The record's directory is the canonical artifact directory the command resolves for this epic in the active area rather than a path composed by hand, which makes this epic one of the convention's first consumers. Keeping the record in one document rather than inside each file leaves the historical documents' bytes untouched, for the same reason archival warns about in-content citations instead of rewriting them.\n\nThe mapping is:\n\n- `dev/sessions/session-2024-12-24-check-links-incomplete.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/sessions/session-2024-12-24-check-links-incomplete.md`\n- `dev/sessions/session-2025-12-21-short-hash-progress.md` — archived location `dev/archive/14303b30-phase5-2/dev/sessions/session-2025-12-21-short-hash-progress.md`\n- `dev/sessions/session-2025-12-22-doc-consolidation.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/sessions/session-2025-12-22-doc-consolidation.md`\n- `dev/sessions/session-2025-12-26-config-consolidation.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-26-config-consolidation.md`\n- `dev/sessions/session-2025-12-27-doc-archive.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/sessions/session-2025-12-27-doc-archive.md`\n- `dev/sessions/session-2025-12-29-quiet-flag-implementation.md` — archived location `dev/archive/14303b30-phase5-2/dev/sessions/session-2025-12-29-quiet-flag-implementation.md`\n- `dev/sessions/session-2025-12-30-bulk-cli-integration.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-cli-integration.md`\n- `dev/sessions/session-2025-12-30-bulk-operations-progress.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-operations-progress.md`\n- `dev/sessions/session-2025-12-30-bulk-phase5-docs.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-phase5-docs.md`\n- `dev/sessions/session-2025-12-30-bulk-state-decision.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-state-decision.md`\n- `dev/sessions/session-2025-12-30-bulk-validation.md` — archived location `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-validation.md`\n- `dev/sessions/session-2026-01-01-example-md-migration.md` — archived location `dev/archive/cfb3ba94-docs/dev/sessions/session-2026-01-01-example-md-migration.md`\n- `dev/sessions/session-20260103-parallel-work-design-review.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260103-parallel-work-design-review.md`\n- `dev/sessions/session-20260109-query-consolidation.md` — archived location `dev/archive/9d427a6b-production-polish/dev/sessions/session-20260109-query-consolidation.md`\n- `dev/sessions/session-20260111-validate-implementation.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260111-validate-implementation.md`\n- `dev/sessions/session-20260115-cli-quality-phase3.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-cli-quality-phase3.md`\n- `dev/sessions/session-20260115-phase3-issue7-complete.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-phase3-issue7-complete.md`\n- `dev/sessions/session-20260115-story-review-f023.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-story-review-f023.md`\n- `dev/sessions/session-20260118-f849-manual-testing.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260118-f849-manual-testing.md`\n- `dev/sessions/session-20260201-cli-enforcement-82b17394.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-cli-enforcement-82b17394.md`\n- `dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md`\n- `dev/sessions/session-20260201-refactor-1bdc5395-analysis.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-refactor-1bdc5395-analysis.md`\n- `dev/sessions/session-20260201-refactor-items-5-7.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-refactor-items-5-7.md`\n- `dev/sessions/session-20260620-planning-skill-design.md` — archived location `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260620-planning-skill-design.md`\n- `dev/sessions/session-20260622-planning-failures-and-churn.md` — archived location `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260622-planning-failures-and-churn.md`\n- `dev/sessions/session-20260623-planning-skill-observations.md` — archived location `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260623-planning-skill-observations.md`\n- `dev/sessions/session-20260624-project-lead-role-design.md` — archived location `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260624-project-lead-role-design.md`\n- `dev/sessions/session-20260625-planning-skill-authoring.md` — archived location `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260625-planning-skill-authoring.md`\n- `dev/sessions/session-claim-coordination-parallel.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-claim-coordination-parallel.md`\n- `dev/sessions/session-claim-coordination-review.md` — archived location `dev/archive/ad601a15-parallel-work/dev/sessions/session-claim-coordination-review.md`\n\n## Success Criteria\n\n- [hard] REQ-01: The record at `dev/active/8e071e18-dev-artifact-layout/disposition-session-records.md` states the blanket call and lists every path it covers with exactly one disposition of the three kinds.\n- [hard] REQ-02: Every file recorded with an archived location is present at that location and absent from its source path.\n- [hard] REQ-03: No file in the set is left without a recorded disposition.\n- [hard] REQ-04: No file in the set has its own content edited to carry its disposition.\n- [hard] REQ-05: Whole-repository validation passes afterwards.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3581,11 +3778,13 @@
       "repo-validate"
     ],
     "depends_on": [
+      "artifact-directory-command",
       "cleanup-completeness-landing"
     ],
     "planning": {
       "outcome": "The session area carries one recorded blanket disposition over an enumerated path list.",
       "contract_refs": [
+        "canonical-artifact-directory",
         "shipped-area-declaration"
       ],
       "source_refs": [
@@ -3609,7 +3808,7 @@
   {
     "key": "study-record-reclassification",
     "title": "Record the blanket disposition of the study records with the runtime-read carve-out",
-    "description": "The study area takes one recorded blanket disposition covering every record it holds, with the measurement subtree that a committed self-test script reads carved out and retained where it is.\n\n## Background\n\nEach file's outcome is decided rather than open: 9 take the archived location an owning container's run produces; 4 are claimed by a terminal owner outside every archived subtree, so the runs mirror them into the archive and retain the source; 6 take a project-scoped reclassification and stay where they are, two of them under the runtime-fixture carve-out. The blanket call is one decision — a study record follows its owning issue's archival outcome, and a record no terminal owner claims is project-scoped — and the enumeration below states that decision's scope rather than nineteen separate judgements.\n\nThe area is close to homogeneous but not uniform: a measurement subtree inside it holds a record that a committed self-test script opens by path at runtime, so that subtree is carved out of the blanket call and retained.\n\nThe disposition record lives at `dev/active/8e071e18-dev-artifact-layout/disposition-study-records.md`. Keeping it in one document rather than inside each file leaves the historical documents' bytes untouched, for the same reason archival warns about in-content citations instead of rewriting them.\n\nThe mapping is:\n\n- `dev/studies/addressing-v2-item-use-cases.md` — archived location `dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-item-use-cases.md`\n- `dev/studies/addressing-v2-rule-gate-items.md` — archived location `dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-rule-gate-items.md`\n- `dev/studies/agent-ux-observations.md` — archived location `dev/archive/9d427a6b-production-polish/dev/studies/agent-ux-observations.md`\n- `dev/studies/ai-tool-worktree-compatibility.md` — archived location `dev/archive/4a00b2b0-agent-validation/dev/studies/ai-tool-worktree-compatibility.md`\n- `dev/studies/architecture-pitfalls.md` — mirrored to `dev/archive/2d109173-docs-exhaustive-audit/dev/studies/architecture-pitfalls.md`, `dev/archive/6eb585bc-core-maintenance/dev/studies/architecture-pitfalls.md`, `dev/archive/9ac9fdac-graph-templates/dev/studies/architecture-pitfalls.md`, `dev/archive/f2532a2d-jit-project-lead/dev/studies/architecture-pitfalls.md`, `dev/archive/2fbd2a82-planning-bracket/dev/studies/architecture-pitfalls.md`, `dev/archive/2e926e39-agent-seamlessness/dev/studies/architecture-pitfalls.md`, `dev/archive/cfb3ba94-docs/dev/studies/architecture-pitfalls.md`, with the source retained at `dev/studies/architecture-pitfalls.md` because a terminal owner sits outside every archived subtree\n- `dev/studies/cdc840ad-audit-2026-07-23.md` — mirrored to `dev/archive/1cc809de-repository-state-quality/dev/studies/cdc840ad-audit-2026-07-23.md`, with the source retained at `dev/studies/cdc840ad-audit-2026-07-23.md` because a terminal owner sits outside every archived subtree\n- `dev/studies/clippy-suppressions.md` — mirrored to `dev/archive/2d109173-docs-exhaustive-audit/dev/studies/clippy-suppressions.md`, `dev/archive/6eb585bc-core-maintenance/dev/studies/clippy-suppressions.md`, `dev/archive/9ac9fdac-graph-templates/dev/studies/clippy-suppressions.md`, `dev/archive/f2532a2d-jit-project-lead/dev/studies/clippy-suppressions.md`, `dev/archive/2fbd2a82-planning-bracket/dev/studies/clippy-suppressions.md`, `dev/archive/2e926e39-agent-seamlessness/dev/studies/clippy-suppressions.md`, `dev/archive/cfb3ba94-docs/dev/studies/clippy-suppressions.md`, with the source retained at `dev/studies/clippy-suppressions.md` because a terminal owner sits outside every archived subtree\n- `dev/studies/documentation-lifecycle-strategy.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/studies/documentation-lifecycle-strategy.md`\n- `dev/studies/documentation-organization-strategy.md` — mirrored to `dev/archive/2d109173-docs-exhaustive-audit/dev/studies/documentation-organization-strategy.md`, `dev/archive/6eb585bc-core-maintenance/dev/studies/documentation-organization-strategy.md`, `dev/archive/9ac9fdac-graph-templates/dev/studies/documentation-organization-strategy.md`, `dev/archive/f2532a2d-jit-project-lead/dev/studies/documentation-organization-strategy.md`, `dev/archive/2fbd2a82-planning-bracket/dev/studies/documentation-organization-strategy.md`, `dev/archive/2e926e39-agent-seamlessness/dev/studies/documentation-organization-strategy.md`, `dev/archive/71373e37-docs-lifecycle/dev/studies/documentation-organization-strategy.md`, `dev/archive/cfb3ba94-docs/dev/studies/documentation-organization-strategy.md`, with the source retained at `dev/studies/documentation-organization-strategy.md` because a terminal owner sits outside every archived subtree\n- `dev/studies/documentation-tooling-evaluation.md` — archived location `dev/archive/a4e3cfb0/dev/studies/documentation-tooling-evaluation.md`\n- `dev/studies/jit-vs-agentic-trends-2026.md` — project-scoped reclassification, retained at its current path as standing background rather than one issue's work product\n- `dev/studies/multi-agent-parallelism-analysis.md` — project-scoped reclassification, retained at its current path as standing background rather than one issue's work product\n- `dev/studies/perf/session-cost-27ffbd2d.json` — project-scoped reclassification, retained at its current path under the runtime-fixture carve-out because a committed self-test script opens it by path\n- `dev/studies/perf/session-cost-27ffbd2d.md` — project-scoped reclassification, retained at its current path as the prose companion of a runtime fixture\n- `dev/studies/perf/session-cost-c488ef85.json` — project-scoped reclassification, retained at its current path under the runtime-fixture carve-out alongside the record the self-test script reads\n- `dev/studies/research-workflow-examples.md` — project-scoped reclassification, retained at its current path as standing background rather than one issue's work product\n- `dev/studies/session-mining-jit-improvements.md` — archived location `dev/archive/53e3fa36-agent-ergonomics/dev/studies/session-mining-jit-improvements.md`\n- `dev/studies/short-hash-implementation-plan.md` — archived location `dev/archive/14303b30-phase5-2/dev/studies/short-hash-implementation-plan.md`\n- `dev/studies/worktree-merge-analysis.md` — archived location `dev/archive/4a00b2b0-agent-validation/dev/studies/worktree-merge-analysis.md`\n\n## Success Criteria\n\n- [hard] REQ-01: The record at `dev/active/8e071e18-dev-artifact-layout/disposition-study-records.md` states the blanket call and lists every path it covers with exactly one disposition of the three kinds.\n- [hard] REQ-02: Every file recorded with an archived location is present at that location and absent from its source path.\n- [hard] REQ-03: Every file recorded as mirrored is present at each mirrored location and retained at its source path.\n- [hard] REQ-04: Every file recorded as retained or reclassified is present at its current path.\n- [hard] REQ-05: No file in the set is left without a recorded disposition.\n- [hard] REQ-06: No file in the set has its own content edited to carry its disposition.\n- [hard] REQ-07: Whole-repository validation passes afterwards.\n",
+    "description": "The study area takes one recorded blanket disposition covering every record it holds, with the measurement subtree that a committed self-test script reads carved out and retained where it is.\n\n## Background\n\nEach file's outcome is decided rather than open: 9 take the archived location an owning container's run produces; 4 are claimed by a terminal owner outside every archived subtree, so the runs mirror them into the archive and retain the source; 6 take a project-scoped reclassification and stay where they are, two of them under the runtime-fixture carve-out. The blanket call is one decision — a study record follows its owning issue's archival outcome, and a record no terminal owner claims is project-scoped — and the enumeration below states that decision's scope rather than nineteen separate judgements.\n\nThe area is close to homogeneous but not uniform: a measurement subtree inside it holds a record that a committed self-test script opens by path at runtime, so that subtree is carved out of the blanket call and retained.\n\nThe disposition record is `disposition-study-records.md` inside this epic's canonical artifact directory, `dev/active/8e071e18-dev-artifact-layout`. The record's directory is the canonical artifact directory the command resolves for this epic in the active area rather than a path composed by hand, which makes this epic one of the convention's first consumers. Keeping the record in one document rather than inside each file leaves the historical documents' bytes untouched, for the same reason archival warns about in-content citations instead of rewriting them.\n\nThe mapping is:\n\n- `dev/studies/addressing-v2-item-use-cases.md` — archived location `dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-item-use-cases.md`\n- `dev/studies/addressing-v2-rule-gate-items.md` — archived location `dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-rule-gate-items.md`\n- `dev/studies/agent-ux-observations.md` — archived location `dev/archive/9d427a6b-production-polish/dev/studies/agent-ux-observations.md`\n- `dev/studies/ai-tool-worktree-compatibility.md` — archived location `dev/archive/4a00b2b0-agent-validation/dev/studies/ai-tool-worktree-compatibility.md`\n- `dev/studies/architecture-pitfalls.md` — mirrored to `dev/archive/2d109173-docs-exhaustive-audit/dev/studies/architecture-pitfalls.md`, `dev/archive/6eb585bc-core-maintenance/dev/studies/architecture-pitfalls.md`, `dev/archive/9ac9fdac-graph-templates/dev/studies/architecture-pitfalls.md`, `dev/archive/f2532a2d-jit-project-lead/dev/studies/architecture-pitfalls.md`, `dev/archive/2fbd2a82-planning-bracket/dev/studies/architecture-pitfalls.md`, `dev/archive/2e926e39-agent-seamlessness/dev/studies/architecture-pitfalls.md`, `dev/archive/cfb3ba94-docs/dev/studies/architecture-pitfalls.md`, with the source retained at `dev/studies/architecture-pitfalls.md` because a terminal owner sits outside every archived subtree\n- `dev/studies/cdc840ad-audit-2026-07-23.md` — mirrored to `dev/archive/1cc809de-repository-state-quality/dev/studies/cdc840ad-audit-2026-07-23.md`, with the source retained at `dev/studies/cdc840ad-audit-2026-07-23.md` because a terminal owner sits outside every archived subtree\n- `dev/studies/clippy-suppressions.md` — mirrored to `dev/archive/2d109173-docs-exhaustive-audit/dev/studies/clippy-suppressions.md`, `dev/archive/6eb585bc-core-maintenance/dev/studies/clippy-suppressions.md`, `dev/archive/9ac9fdac-graph-templates/dev/studies/clippy-suppressions.md`, `dev/archive/f2532a2d-jit-project-lead/dev/studies/clippy-suppressions.md`, `dev/archive/2fbd2a82-planning-bracket/dev/studies/clippy-suppressions.md`, `dev/archive/2e926e39-agent-seamlessness/dev/studies/clippy-suppressions.md`, `dev/archive/cfb3ba94-docs/dev/studies/clippy-suppressions.md`, with the source retained at `dev/studies/clippy-suppressions.md` because a terminal owner sits outside every archived subtree\n- `dev/studies/documentation-lifecycle-strategy.md` — archived location `dev/archive/71373e37-docs-lifecycle/dev/studies/documentation-lifecycle-strategy.md`\n- `dev/studies/documentation-organization-strategy.md` — mirrored to `dev/archive/2d109173-docs-exhaustive-audit/dev/studies/documentation-organization-strategy.md`, `dev/archive/6eb585bc-core-maintenance/dev/studies/documentation-organization-strategy.md`, `dev/archive/9ac9fdac-graph-templates/dev/studies/documentation-organization-strategy.md`, `dev/archive/f2532a2d-jit-project-lead/dev/studies/documentation-organization-strategy.md`, `dev/archive/2fbd2a82-planning-bracket/dev/studies/documentation-organization-strategy.md`, `dev/archive/2e926e39-agent-seamlessness/dev/studies/documentation-organization-strategy.md`, `dev/archive/71373e37-docs-lifecycle/dev/studies/documentation-organization-strategy.md`, `dev/archive/cfb3ba94-docs/dev/studies/documentation-organization-strategy.md`, with the source retained at `dev/studies/documentation-organization-strategy.md` because a terminal owner sits outside every archived subtree\n- `dev/studies/documentation-tooling-evaluation.md` — archived location `dev/archive/a4e3cfb0/dev/studies/documentation-tooling-evaluation.md`\n- `dev/studies/jit-vs-agentic-trends-2026.md` — project-scoped reclassification, retained at its current path as standing background rather than one issue's work product\n- `dev/studies/multi-agent-parallelism-analysis.md` — project-scoped reclassification, retained at its current path as standing background rather than one issue's work product\n- `dev/studies/perf/session-cost-27ffbd2d.json` — project-scoped reclassification, retained at its current path under the runtime-fixture carve-out because a committed self-test script opens it by path\n- `dev/studies/perf/session-cost-27ffbd2d.md` — project-scoped reclassification, retained at its current path as the prose companion of a runtime fixture\n- `dev/studies/perf/session-cost-c488ef85.json` — project-scoped reclassification, retained at its current path under the runtime-fixture carve-out alongside the record the self-test script reads\n- `dev/studies/research-workflow-examples.md` — project-scoped reclassification, retained at its current path as standing background rather than one issue's work product\n- `dev/studies/session-mining-jit-improvements.md` — archived location `dev/archive/53e3fa36-agent-ergonomics/dev/studies/session-mining-jit-improvements.md`\n- `dev/studies/short-hash-implementation-plan.md` — archived location `dev/archive/14303b30-phase5-2/dev/studies/short-hash-implementation-plan.md`\n- `dev/studies/worktree-merge-analysis.md` — archived location `dev/archive/4a00b2b0-agent-validation/dev/studies/worktree-merge-analysis.md`\n\n## Success Criteria\n\n- [hard] REQ-01: The record at `dev/active/8e071e18-dev-artifact-layout/disposition-study-records.md` states the blanket call and lists every path it covers with exactly one disposition of the three kinds.\n- [hard] REQ-02: Every file recorded with an archived location is present at that location and absent from its source path.\n- [hard] REQ-03: Every file recorded as mirrored is present at each mirrored location and retained at its source path.\n- [hard] REQ-04: Every file recorded as retained or reclassified is present at its current path.\n- [hard] REQ-05: No file in the set is left without a recorded disposition.\n- [hard] REQ-06: No file in the set has its own content edited to carry its disposition.\n- [hard] REQ-07: Whole-repository validation passes afterwards.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3623,11 +3822,13 @@
       "repo-validate"
     ],
     "depends_on": [
+      "artifact-directory-command",
       "cleanup-completeness-landing"
     ],
     "planning": {
       "outcome": "The study area carries one recorded blanket disposition with the runtime-read subtree carved out.",
       "contract_refs": [
+        "canonical-artifact-directory",
         "shipped-area-declaration"
       ],
       "source_refs": [

@@ -1,0 +1,62 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "fa5a28f7cb4cc65ece0c9f32de3e60e36cf6f6b3",
+  "completed_at": "2026-07-25T12:54:20.720586167Z",
+  "duration_ms": 244956,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F1",
+        "line": 3193,
+        "references": [
+          "@/issue/8e071e18/requirement/REQ-08",
+          "@/issue/8e071e18/requirement/REQ-09",
+          "@/issue/8e071e18/decision/D-16"
+        ],
+        "severity": "high",
+        "summary": "The citation-resolution graph omits scripts/benchmark-rust-build.sh despite four investigated live citations, including its executable default path; add a focused leaf with a decided post-archive output-path policy."
+      },
+      {
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F2",
+        "line": 2653,
+        "references": [
+          "@/issue/8e071e18/requirement/REQ-09",
+          "@/issue/8e071e18/decision/D-8",
+          "@/issue/8e071e18/decision/D-16"
+        ],
+        "severity": "high",
+        "summary": "The four live citations in dev/studies/ai-tool-worktree-compatibility.md have no repoint owner even though its archive sweep moves the file; add a focused leaf ordered before archive-sweep-4a00b2b0."
+      },
+      {
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F3",
+        "line": 3147,
+        "references": [
+          "@/issue/8e071e18/requirement/REQ-04",
+          "@/issue/8e071e18/requirement/REQ-05",
+          "@/issue/8e071e18/decision/D-1"
+        ],
+        "severity": "high",
+        "summary": "Cleanup creates the first canonical artifact-directory files without declaring or depending on canonical-artifact-directory; wire it through artifact-directory-command before those records are created."
+      }
+    ],
+    "summary": "The manifest leaves two live citation consumer families uncovered and creates the convention's first artifacts before consuming its produced contract.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "55fe8ec2-880f-4380-91f2-97f4daf71bda",
+  "message": null,
+  "run_id": "63a9082c-df02-475c-b155-85eaa5a7dc30",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T12:50:15.764065392Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4291 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9953-875b-7c11-a487-85f7c6435dd8\n--------\nuser\n--- 4278 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 (high):** The required citation-resolution graph omits `scripts/benchmark-rust-build.sh`. The investigation records four live citations there, including its executable default path (`8e071e18-investigation.md:1338-1341`), but `build-tooling-citation-repoint` touches only `rust-build-budget.sh`, `cargo-ci.sh`, and `Cargo.toml` (`8e071e18-breakdown.json:3193-3197`). Add a focused benchmark-script citation leaf with a decided post-archive output-path policy.\n\n2. **F2 (high):** The four live citations in `dev/studies/ai-tool-worktree-compatibility.md` are not assigned to any citation-repoint leaf (`8e071e18-investigation.md:1308-1310`, `:1360`), while its owning archive sweep moves that study artifact (`8e071e18-breakdown.json:2653`). Add a focused pre-archive citation leaf, ordered before `archive-sweep-4a00b2b0`, so its mutable content is corrected before archival rather than left as a broken historical path.\n\n3. **F3 (high):** The plan calls the cleanup records the convention’s “first consumer” (`8e071e18-plan.md:479`), yet `cleanup-completeness-landing` creates files at a hand-composed canonical directory (`8e071e18-breakdown.json:3147-3150`) without referencing `canonical-artifact-directory` (`:3127-3132`) or depending on its producer/command (`:3099-3124`). Declare the contract and add a dependency through `artifact-directory-command` before creating that directory; retain the dependency transitively for the disposition-record leaves.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The manifest leaves two live citation consumer families uncovered and creates the convention's first artifacts before consuming its produced contract.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The citation-resolution graph omits scripts/benchmark-rust-build.sh despite four investigated live citations, including its executable default path; add a focused leaf with a decided post-archive output-path policy.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":3193,\"references\":[\"@/issue/8e071e18/requirement/REQ-08\",\"@/issue/8e071e18/requirement/REQ-09\",\"@/issue/8e071e18/decision/D-16\"]},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"The four live citations in dev/studies/ai-tool-worktree-compatibility.md have no repoint owner even though its archive sweep moves the file; add a focused leaf ordered before archive-sweep-4a00b2b0.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":2653,\"references\":[\"@/issue/8e071e18/requirement/REQ-09\",\"@/issue/8e071e18/decision/D-8\",\"@/issue/8e071e18/decision/D-16\"]},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Cleanup creates the first canonical artifact-directory files without declaring or depending on canonical-artifact-directory; wire it through artifact-directory-command before those records are created.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":3147,\"references\":[\"@/issue/8e071e18/requirement/REQ-04\",\"@/issue/8e071e18/requirement/REQ-05\",\"@/issue/8e071e18/decision/D-1\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
