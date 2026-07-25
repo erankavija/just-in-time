@@ -47,14 +47,15 @@
       "path": "dev/active/8e071e18-breakdown.json"
     }
   ],
+  "done_at": "2026-07-25T13:19:14.064364439Z",
   "first_ready_at": "2026-07-25T07:52:48.923758675Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "failed",
-      "updated_at": "2026-07-25T12:54:21.034011361Z",
+      "status": "passed",
+      "updated_at": "2026-07-25T13:18:52.572273521Z",
       "updated_by": "auto:executor"
     }
   },
@@ -65,7 +66,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "planning: Issue-based development artifact layout and serviceable archival",
-  "updated_at": "2026-07-25T12:54:21.034011361Z"
+  "updated_at": "2026-07-25T13:19:14.064364439Z"
 }
