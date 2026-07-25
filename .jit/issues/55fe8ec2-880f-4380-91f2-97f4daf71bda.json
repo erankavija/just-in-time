@@ -54,7 +54,7 @@
   "gates_status": {
     "plan-review": {
       "status": "failed",
-      "updated_at": "2026-07-25T10:55:17.169385547Z",
+      "updated_at": "2026-07-25T11:44:42.967553153Z",
       "updated_by": "auto:executor"
     }
   },
@@ -67,5 +67,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: Issue-based development artifact layout and serviceable archival",
-  "updated_at": "2026-07-25T10:55:17.169385547Z"
+  "updated_at": "2026-07-25T11:44:42.967553153Z"
 }

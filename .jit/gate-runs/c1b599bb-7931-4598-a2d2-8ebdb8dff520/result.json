@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "8ac2e5e9b8e26a7c42c40fe57791c5f18a68dce1",
+  "completed_at": "2026-07-25T11:44:42.652954107Z",
+  "duration_ms": 115398,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/8e071e18-plan.md",
+        "id": "F1",
+        "line": 447,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/decision/D-20"
+        ],
+        "severity": "high",
+        "summary": "Ten footprint overlaps are deferred to dispatcher instructions instead of explicit ownership or ordering; resolve each in the manifest."
+      }
+    ],
+    "summary": "The manifest is structurally valid but retains unresolved footprint overlaps.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "55fe8ec2-880f-4380-91f2-97f4daf71bda",
+  "message": null,
+  "run_id": "c1b599bb-7931-4598-a2d2-8ebdb8dff520",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T11:42:47.254920334Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4273 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9915-c0ca-7282-b6de-1d445da5b0af\n--------\nuser\n--- 4260 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — Blocking:** Ten footprint overlaps remain unresolved. The plan explicitly leaves them unordered and delegates separation to a dispatcher, while validation reports the conflicts. Replace this with explicit per-path ownership or manifest dependency ordering for every overlap. [dev/active/8e071e18-plan.md:447](/home/vkaskivuo/Projects/just-in-time/dev/active/8e071e18-plan.md:447) (`@/issue/8e071e18/decision/D-20`)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The manifest is structurally valid but retains unresolved footprint overlaps.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Ten footprint overlaps are deferred to dispatcher instructions instead of explicit ownership or ordering; resolve each in the manifest.\",\"file\":\"dev/active/8e071e18-plan.md\",\"line\":447,\"references\":[\"@/issue/8e071e18/decision/D-20\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
