@@ -53,7 +53,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "merged-pending-gates"
         },
         {
           "id": "1f80212b-4c96-477c-9ed8-a008656bfdde",
@@ -64,7 +64,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "merged-pending-gates"
         },
         {
           "id": "7d6d2783-9f0d-4a28-9880-9f9f510ecd27",
@@ -75,7 +75,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "gates-passed"
         }
       ]
     },
@@ -930,10 +930,20 @@
       "situation": "code-review F1 blocked on the satisfies:REQ-08 label claiming the epic's citation-scan criterion while the task ships only the warning vocabulary; the producer is 2ac35e8e.",
       "lead_analysis": "@/rule/coverage-preview defines satisfies: as many-to-one coverage credit ('credited by some issue in its dependency closure'), and seven issues carried satisfies:REQ-08. Deferring was impossible: 2ac35e8e depends on 30595d22.",
       "resolution": "Owner approved dropping the label from 30595d22. REQ-08 retains six crediting issues. code-review round 2 passed."
+    },
+    {
+      "id": "E2",
+      "wave": 2,
+      "issue": "b3fc1a92",
+      "category": "issue scope change (labels)",
+      "situation": "code-review F1 blocked on enforces:@/invariant/single-source-prose being contradicted by stale adopter copies at docs/reference/configuration.md:50 and docs/reference/example-config.toml:21. The issue's three hard criteria were confirmed met by the reviewer.",
+      "lead_analysis": "Both files are the declared footprint of 58c56743 (wave 11), which carries doc-review and docs-mechanical; b3fc1a92 carries neither. Same structural pattern as E1: the label reaches further than the issue delivers.",
+      "resolution": "Owner approved dropping the enforces label. Known cost: docs/reference states 3 managed paths while jit init writes 8, until 58c56743 lands in wave 11."
     }
   ],
   "rework_counts": {
-    "30595d22": 1
+    "30595d22": 1,
+    "b3fc1a92": 1
   },
   "surfaced_pitfalls": [
     {
@@ -948,7 +958,7 @@
       "raised_by": "69dd4e36",
       "subject": "stale adopter examples of the documentation policy",
       "detail": "docs/reference/configuration.md:45-88 and docs/reference/example-config.toml:15-26 still show the old three-area managed set and permanent_paths=[\"docs/\"].",
-      "disposition": "covered \u2014 58c56743 (configuration-reference-home) declares both files in its footprint"
+      "disposition": "covered by 58c56743, but NOTE: this staleness is a live adopter-facing inconsistency from wave 2 until wave 11, and it already cost b3fc1a92 a code-review round. Verify 58c56743 closes both files."
     },
     {
       "id": "P3",
