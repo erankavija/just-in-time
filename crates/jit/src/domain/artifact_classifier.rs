@@ -1328,6 +1328,65 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_container_destination_adopts_a_preexisting_identifier_only_directory_without_relocating_it(
+    ) {
+        let issue = container_issue("Mutable title", &["type:epic", "epic:artifact-archival"]);
+        let preferred =
+            preferred_container_destination_root(&issue, &archive_hierarchy(), "archive");
+        let legacy = artifact_destination_root(
+            &PlanTarget::Container {
+                id: issue.id.clone(),
+            },
+            "archive",
+        );
+        assert_ne!(
+            preferred, legacy,
+            "the precondition needs a preferred name the legacy directory does not already carry"
+        );
+
+        // The identifier-only directory exists and carries no ownership marker.
+        let occupied = ArtifactEvidenceMap::from([
+            (
+                "archive".to_string(),
+                directory(ArtifactListingScope::ImmediateChildren, &[legacy.as_str()]),
+            ),
+            (
+                legacy.clone(),
+                directory(ArtifactListingScope::MetadataOnly, &[]),
+            ),
+            (format!("{legacy}/.jit-container"), ArtifactEvidence::Missing),
+        ]);
+        let adopted =
+            resolve_container_destination(&preferred, &legacy, &issue.id, &occupied).unwrap();
+        assert_eq!(adopted.destination_root, legacy);
+        assert!(adopted.conflicting_roots.is_empty());
+        assert!(
+            matches!(
+                occupied.get(&adopted.destination_root),
+                Some(ArtifactEvidence::Directory { .. })
+            ),
+            "adoption resolves onto the directory that already exists, so nothing relocates"
+        );
+
+        // The same container against an archive root without that directory
+        // takes the preferred branch, so the adoption above is the legacy
+        // branch rather than a coincidence of the expected name.
+        let vacant = ArtifactEvidenceMap::from([
+            (
+                "archive".to_string(),
+                directory(ArtifactListingScope::ImmediateChildren, &[]),
+            ),
+            (legacy.clone(), ArtifactEvidence::Missing),
+        ]);
+        assert_eq!(
+            resolve_container_destination(&preferred, &legacy, &issue.id, &vacant)
+                .unwrap()
+                .destination_root,
+            preferred
+        );
+    }
+
+    #[test]
     fn test_destination_resolution_rejects_missing_immediate_child_evidence() {
         let evidence = ArtifactEvidenceMap::from([
             (
@@ -1619,41 +1678,87 @@ mod tests {
         .unwrap()
     }
 
-    #[test]
-    fn test_preferred_container_destination_uses_unambiguous_strategic_label_slug() {
-        let mut issue =
-            crate::domain::types::fixture_issue("A title that may change".into(), String::new());
+    fn container_issue(title: &str, labels: &[&str]) -> Issue {
+        let mut issue = crate::domain::types::fixture_issue(title.into(), String::new());
         issue.id = CONTAINER.into();
-        issue.labels = vec!["type:epic".into(), "epic:artifact-archival".into()];
+        issue.labels = labels.iter().map(|label| (*label).to_string()).collect();
+        issue
+    }
+
+    fn bare_short_id_root() -> String {
+        format!("archive/{}", &CONTAINER[..SHORT_ID_LENGTH])
+    }
+
+    #[test]
+    fn test_preferred_container_destination_root_uses_the_single_membership_label_value_as_slug() {
+        let issue = container_issue(
+            "A title that may change",
+            &["type:epic", "epic:artifact-archival"],
+        );
 
         assert_eq!(
             preferred_container_destination_root(&issue, &archive_hierarchy(), "archive"),
-            "archive/abcdef12-artifact-archival"
+            format!("{}-artifact-archival", bare_short_id_root())
         );
     }
 
     #[test]
-    fn test_preferred_container_destination_falls_back_to_title_for_missing_or_ambiguous_label() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Stable Title Fallback".into(), String::new());
-        issue.id = CONTAINER.into();
-        issue.labels = vec!["type:epic".into()];
-
-        assert_eq!(
-            preferred_container_destination_root(&issue, &archive_hierarchy(), "archive"),
-            "archive/abcdef12-stable-title-fallback"
-        );
-
-        issue.labels = vec![
-            "type:epic".into(),
-            "epic:first".into(),
-            "epic:second".into(),
+    fn test_preferred_container_destination_root_uses_the_bare_short_id_for_ambiguous_or_absent_membership_labels(
+    ) {
+        // Each shape names a genuinely slug-worthy title, so a title-derived
+        // name would be distinguishable from the bare short-id directory.
+        let ambiguous = [
+            vec!["type:epic", "type:task", "epic:artifact-archival"],
+            vec!["type:epic", "epic:first", "epic:second"],
+            vec!["type:epic"],
         ];
 
-        assert_eq!(
-            preferred_container_destination_root(&issue, &archive_hierarchy(), "archive"),
-            "archive/abcdef12-stable-title-fallback"
-        );
+        ambiguous.into_iter().for_each(|labels| {
+            assert_eq!(
+                preferred_container_destination_root(
+                    &container_issue("Stable Title Fallback", &labels),
+                    &archive_hierarchy(),
+                    "archive",
+                ),
+                bare_short_id_root(),
+                "{labels:?} names no single membership value"
+            );
+        });
+    }
+
+    #[test]
+    fn test_preferred_container_destination_root_ignores_the_title_for_labelled_and_ambiguous_issues(
+    ) {
+        let titles = ["Stable Title Fallback", "Entirely Renamed Container"];
+        let shapes = [
+            vec!["type:epic", "epic:artifact-archival"],
+            vec!["type:epic"],
+        ];
+
+        shapes.into_iter().for_each(|labels| {
+            let roots = titles
+                .iter()
+                .map(|title| {
+                    preferred_container_destination_root(
+                        &container_issue(title, &labels),
+                        &archive_hierarchy(),
+                        "archive",
+                    )
+                })
+                .collect::<Vec<_>>();
+            assert!(
+                roots.windows(2).all(|pair| pair[0] == pair[1]),
+                "renaming the issue must not rename its destination: {roots:?}"
+            );
+            assert!(
+                titles
+                    .iter()
+                    .flat_map(|title| title.split_whitespace())
+                    .all(|word| !roots[0].contains(&word.to_lowercase())),
+                "no title word may reach the destination name: {}",
+                roots[0]
+            );
+        });
     }
 
     #[test]
