@@ -851,6 +851,7 @@ fn test_init_documentation_block_is_active_configuration_naming_only_typed_keys(
         managed_paths: Some(Vec::new()),
         archive_root: Some(String::new()),
         permanent_paths: Some(Vec::new()),
+        issue_scoped_areas: Some(Vec::new()),
     })
     .unwrap();
     let carried = typed
@@ -930,6 +931,43 @@ fn test_init_documentation_policy_is_the_shipped_area_declaration() {
         policy.permanent_paths(),
         SHIPPED_DOCUMENTATION_POLICY.permanent_paths
     );
+    assert_eq!(
+        policy.issue_scoped_areas(),
+        SHIPPED_DOCUMENTATION_POLICY.issue_scoped_areas
+    );
+}
+
+#[test]
+fn test_init_scaffolds_an_authored_issue_scoped_area_registry_the_membership_query_accepts() {
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path(), &[]).status.success());
+
+    let policy = scaffolded_documentation_policy(temp.path());
+    // Active configuration, not commented-out guidance: the registry is authored
+    // in the scaffolded file, so the accessor reads it rather than falling back.
+    let registry = policy
+        .issue_scoped_areas
+        .clone()
+        .expect("the scaffolded policy should author its issue-scoped area registry");
+    assert!(!registry.is_empty());
+
+    // Every declared entry is a distinct area beneath the development root, and
+    // the membership query accepts exactly what the scaffold declared.
+    let development_root = policy.development_root();
+    for area in &registry {
+        assert!(
+            contains_path(&development_root, area) && *area != development_root,
+            "{area} should be a distinct area under {development_root}"
+        );
+        assert!(
+            policy.is_issue_scoped_area(area),
+            "the membership query should accept the declared area {area}"
+        );
+    }
+
+    // An area the registry does not declare is rejected, so a caller naming one
+    // can be refused rather than silently handed a path.
+    assert!(!policy.is_issue_scoped_area(&format!("{development_root}/undeclared-area")));
 }
 
 #[test]

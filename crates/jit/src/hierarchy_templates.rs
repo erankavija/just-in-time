@@ -278,6 +278,12 @@ source-of-truth = "registry-first"
 # named one at a time because an entry for the root itself would cover every area
 # under it.
 #
+# `issue_scoped_areas` is a separate question: an area listed there organizes its
+# artifacts one directory per issue, and every other area stays flat. An area is
+# named whole — a path inside one is not itself an area — and adoption is
+# independent of the classification above, so a flat managed area still archives
+# its artifacts normally and only the naming differs.
+#
 # Reclassify freely: these are your areas, not engine policy.
 
 [documentation]
@@ -287,6 +293,8 @@ managed_paths = [
 {managed_paths}]
 permanent_paths = [
 {permanent_paths}]
+issue_scoped_areas = [
+{issue_scoped_areas}]
 
 # =============================================================================
 # ADVANCED (uncomment to enable)
@@ -324,6 +332,8 @@ permanent_paths = [
                 render_policy_paths(crate::config::SHIPPED_DOCUMENTATION_POLICY.managed_paths),
             permanent_paths =
                 render_policy_paths(crate::config::SHIPPED_DOCUMENTATION_POLICY.permanent_paths),
+            issue_scoped_areas =
+                render_policy_paths(crate::config::SHIPPED_DOCUMENTATION_POLICY.issue_scoped_areas),
             coord_ttl_secs = crate::runtime_defaults::CLAIM_TTL_SECS,
             coord_stale_secs = crate::storage::lease::DEFAULT_STALE_THRESHOLD_SECS,
         )
