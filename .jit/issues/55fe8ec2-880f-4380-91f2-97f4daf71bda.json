@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T07:52:48.923758675Z",
+  "dependencies": [
+    "1cc809de-4669-45d4-960f-f881e716663d"
+  ],
+  "description": "Planning node for Issue-based development artifact layout and serviceable archival (8e071e18). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/8e071e18-plan.md and link it to this node once written.",
+  "documents": [],
+  "first_ready_at": "2026-07-25T07:52:48.923758675Z",
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_at": "2026-07-25T07:52:48.923758675Z",
+      "updated_by": null
+    }
+  },
+  "id": "55fe8ec2-880f-4380-91f2-97f4daf71bda",
+  "labels": [
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "type:planning"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "planning: Issue-based development artifact layout and serviceable archival",
+  "updated_at": "2026-07-25T07:52:48.923758675Z"
+}

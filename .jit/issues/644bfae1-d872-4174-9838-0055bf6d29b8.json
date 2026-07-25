@@ -1,0 +1,38 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T07:52:48.923758675Z",
+  "dependencies": [
+    "55fe8ec2-880f-4380-91f2-97f4daf71bda"
+  ],
+  "description": "Breakdown node bracketing Issue-based development artifact layout and serviceable archival (8e071e18). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria.",
+  "documents": [],
+  "first_ready_at": "2026-07-25T07:52:48.923758675Z",
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-07-25T07:52:48.923758675Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-07-25T07:52:48.923758675Z",
+      "updated_by": null
+    }
+  },
+  "id": "644bfae1-d872-4174-9838-0055bf6d29b8",
+  "labels": [
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "type:breakdown",
+    "brackets:8e071e18"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "breakdown: Issue-based development artifact layout and serviceable archival",
+  "updated_at": "2026-07-25T07:52:48.923758675Z"
+}
