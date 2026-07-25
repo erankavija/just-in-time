@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-25T16:20:59.114102354Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-25T16:35:33.845020719Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "69dd4e36-f4d9-4f11-b1b3-fa7af71e6f34",
@@ -34,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Ship the development-area classification in the initialization scaffold",
-  "updated_at": "2026-07-25T16:20:59.114102354Z"
+  "updated_at": "2026-07-25T16:35:33.845020719Z"
 }

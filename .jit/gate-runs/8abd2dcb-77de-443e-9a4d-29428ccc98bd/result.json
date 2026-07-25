@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "65b1269150952b9276d5f5de8596b206deb63233",
+  "completed_at": "2026-07-25T16:35:33.589421107Z",
+  "duration_ms": 173040,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard criteria are implemented in the initialization scaffold and covered by attributable tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "69dd4e36-f4d9-4f11-b1b3-fa7af71e6f34",
+  "message": null,
+  "run_id": "8abd2dcb-77de-443e-9a4d-29428ccc98bd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T16:32:40.549201730Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9fe43445, ba32102b (jit:69dd4e36; merge tree equals implementation tree)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-13 and D-19 (issue description, markdown-first); @/invariant/domain-agnostic, semantic-test-assertions, shared-test-contracts (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0); code-review pending (this review)\nTruncation recovery: narrowed reads of classifier/status logic, policy sources, and per-path patches; verified merge and implementation trees are identical\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are implemented in the initialization scaffold and covered by attributable tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "65b1269150952b9276d5f5de8596b206deb63233",
+  "completed_at": "2026-07-25T16:42:26.630342963Z",
+  "duration_ms": 235976,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/30595d22-d00b-4eb0-a25d-53ce21bb8847.json",
+        "id": "F1",
+        "line": 29,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/requirement/REQ-08"
+        ],
+        "severity": "high",
+        "summary": "The satisfies:REQ-08 label claims a citation-scan criterion that the current implementation does not perform."
+      }
+    ],
+    "summary": "The task's satisfies:REQ-08 claim is unsupported because no citation-scan warning producer exists.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "30595d22-d00b-4eb0-a25d-53ce21bb8847",
+  "message": null,
+  "run_id": "20b04656-b3d4-42e2-9cf8-a35590721bf6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T16:38:30.653350860Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6628 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9a24-7ebc-7f02-bb06-e2992a7fb923\n--------\nuser\n--- 6615 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:30595d22` commits 32ff800c and c9c003c (merge first-parent patch)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml\nResolved items: @/issue/8e071e18/requirement/REQ-08 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json); @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-25T16:26:34Z); code-review pending/unrun\nTruncation recovery: narrowed merge-parent, current warning/test, and relationship-item reads; excluded incoming-parent changes with separate issue tags\n\n1. [blocking][issue-impact] `satisfies:REQ-08` claims this task satisfies the epic’s citation-scan criterion at [.jit/issues/30595d22-d00b-4eb0-a25d-53ce21bb8847.json:29](/home/vkaskivuo/Projects/just-in-time/.jit/issues/30595d22-d00b-4eb0-a25d-53ce21bb8847.json:29), but `MovingPathCitation` has no producer in the current tree—only its enum, vocabulary contract, and test exist. Archival plans therefore cannot yet report moving-path citations as REQ-08 requires. [`@/issue/8e071e18/requirement/REQ-08`]\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The task's satisfies:REQ-08 claim is unsupported because no citation-scan warning producer exists.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The satisfies:REQ-08 label claims a citation-scan criterion that the current implementation does not perform.\",\"file\":\".jit/issues/30595d22-d00b-4eb0-a25d-53ce21bb8847.json\",\"line\":29,\"references\":[\"@/issue/8e071e18/requirement/REQ-08\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

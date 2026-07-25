@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-25T16:31:51.507655926Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-25T16:42:26.876071199Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "30595d22-d00b-4eb0-a25d-53ce21bb8847",
@@ -26,11 +31,10 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:archive-naming-and-warnings",
-    "satisfies:REQ-08",
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "high",
   "state": "in_progress",
   "title": "Add a plan-warning code for in-content path citations",
-  "updated_at": "2026-07-25T16:31:51.507655926Z"
+  "updated_at": "2026-07-25T16:48:48.744769999Z"
 }

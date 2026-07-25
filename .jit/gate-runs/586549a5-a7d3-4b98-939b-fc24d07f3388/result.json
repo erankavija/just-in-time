@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "65b1269150952b9276d5f5de8596b206deb63233",
+  "completed_at": "2026-07-25T16:38:29.567858433Z",
+  "duration_ms": 174649,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue hard criteria are implemented and covered; no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4f9af089-9699-4b8a-9dd6-b245c14daca2",
+  "message": null,
+  "run_id": "586549a5-a7d3-4b98-939b-fc24d07f3388",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T16:35:34.918507286Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1af9f559, 32c5a2c8 (jit:4f9af089)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/requirement/REQ-14, @/issue/8e071e18/decision/D-14, @/issue/8e071e18/decision/D-17 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json); @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-25T16:20:59Z); code-review pending\nTruncation recovery: narrowed item-source reads and per-path, merge-parent patch reads\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue hard criteria are implemented and covered; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
