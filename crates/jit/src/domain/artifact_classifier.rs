@@ -914,7 +914,10 @@ fn classify_entry(
 /// where it is leaves every citation of that path resolvable, so it contributes
 /// none. The warnings carry no action and no blocker, leaving the plan's
 /// eligibility untouched.
-fn cite_moving_path(entry: ArtifactPlanEntry, citations: &CitationScanEvidence) -> ArtifactPlanEntry {
+fn cite_moving_path(
+    entry: ArtifactPlanEntry,
+    citations: &CitationScanEvidence,
+) -> ArtifactPlanEntry {
     if entry.action() != ArtifactAction::Move {
         return entry;
     }
@@ -2680,15 +2683,18 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_artifacts_reports_no_citation_warning_for_an_artifact_the_plan_leaves_in_place()
-    {
+    fn test_classify_artifacts_reports_no_citation_warning_for_an_artifact_the_plan_leaves_in_place(
+    ) {
         // One citing file and one artifact path across every arm, so the
         // classified action is the only difference: the relocating arm is the
         // control proving the fixture really cites the path, and the arms whose
         // source stays where the citation points report nothing.
         let files = [("dev/studies/tooling.md", "See `dev/active/plan.md`.\n")];
         let arms = [
-            (vec![owner("inside", State::Done, true)], ArtifactAction::Move),
+            (
+                vec![owner("inside", State::Done, true)],
+                ArtifactAction::Move,
+            ),
             (
                 vec![
                     owner("inside", State::Done, true),
