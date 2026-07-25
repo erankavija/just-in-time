@@ -2,7 +2,7 @@
   "epic_id": "1cc809de-4669-45d4-960f-f881e716663d",
   "epic_short_id": "1cc809de",
   "current_wave": 8,
-  "notes": "Bracket (planning 02dc4bac, breakdown 24bab642) done. Waves plan over the impl interior only. Story checkpoints complete when their subtree tasks+deps are done. Session 6 resumed after session 5 stalled mid-wave-7 with the worker's deck committed but unreviewed/unmerged/ungated. Wave 7 COMPLETE: f87e3273 took two rework rounds (lead-found unsourced claims, then doc-review's uncited completion-evidence claims) and both gates passed. Wave 8 in progress: cba48167 (tombstone) dispatched; then story S5 9ee14023, then epic completion (Section 10: map all 16 REQs, jit gate evaluate-all 1cc809de including holistic-review, completion report, archive). Session 4 handoff: dev/active/1cc809de-handoff-4.md.",
+  "notes": "Bracket (planning 02dc4bac, breakdown 24bab642) done. All 8 waves COMPLETE; all 5 stories done; 35 impl-interior issues + 2 bracket nodes = 37-node closure. Remaining: epic completion (Section 10) — map all 16 REQs, run epic gates repo-validate + holistic-review, completion report, archive + link. Session 4 handoff: dev/active/1cc809de-handoff-4.md.",
   "incident_log": [
     "Session 1: stale-worktree prune force-removed the 6 active wave-1 worktrees due to a zsh word-splitting bug in the exclusion filter (for p in $UNQUOTED does not split under zsh). No committed work lost (0 commits); no leak into main (verified). Recovery: stopped agents, deleted 6 anchor-only branches, recreated worktrees at a95dd58a, RESUMED all 6 agents from transcript (context preserved). Genuinely-stale worktrees (50) successfully pruned. See handoff Traps."
   ],
@@ -402,7 +402,8 @@
           "title": "STORY S5: Presentation succession",
           "story": "S5",
           "classification": "story-checkpoint",
-          "status": "pending"
+          "status": "done",
+          "note": "Story checkpoint. Lead pre-gate sweep against REQ-16 literally (not the union of task criteria): successor deck present at 31 sections, tombstone's three links resolve, successor carries no residual reference to the moved predecessor path, no presentations index to update, historical 'showcase' references in dev/active plans and dev/archive left intact as dated artifacts. Both gates passed first round (docs-mechanical a920f175, doc-review d42fb56b)."
         }
       ]
     }
