@@ -1,7 +1,7 @@
 {
   "epic_id": "8e071e18-d786-43ff-b424-a283fecb11f8",
   "epic_short_id": "8e071e18",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -91,7 +91,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "review_failed_awaiting_remediation",
+          "status": "done",
           "model": "opus",
           "worktree": ".agents/worktrees/agent-f88a16d9",
           "branch": "worktree-agent-f88a16d9"
@@ -119,12 +119,14 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "dispatched",
+          "status": "done",
           "model": "opus",
           "origin": "created during execution (E4 remediation); not in the reviewed breakdown manifest"
         }
       ],
-      "dispatched_from_main_sha": "aa5db1d37ced23275380ddf3d22b723cae6f9f63"
+      "dispatched_from_main_sha": "aa5db1d37ced23275380ddf3d22b723cae6f9f63",
+      "status": "complete",
+      "outcome": "All three closed. 8cd6eb73 passed both gates first time. f88a16d9 passed cargo-ci, failed code-review on F1 (undocumented shipped config key), and passed on re-review after fd88adda landed - reviewer stated the prior finding is resolved in the current tree, zero new findings. fd88adda passed doc-review and docs-mechanical first time. Three merge commits each verified to build in isolation; leak check clean."
     },
     {
       "wave_number": 4,
@@ -997,7 +999,8 @@
   "rework_counts": {
     "30595d22": 1,
     "b3fc1a92": 1,
-    "1f80212b": 1
+    "1f80212b": 1,
+    "f88a16d9": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1046,8 +1049,8 @@
       "id": "P7",
       "raised_by": "fd88adda (worker) and lead",
       "subject": "no projection binds the adopter documentation policy lists to SHIPPED_DOCUMENTATION_POLICY",
-      "detail": "docs/reference/configuration.md and docs/reference/example-config.toml restate the managed, permanent, and issue-scoped area lists by hand. Nothing binds them to crates/jit/src/config.rs SHIPPED_DOCUMENTATION_POLICY, which is why they went stale from wave 1 to wave 3 and blocked two code reviews (E2 on b3fc1a92, F1 on f88a16d9). Repairing the values does not repair the mechanism.",
-      "disposition": "OPEN - no epic issue owns it. 58c56743 (wave 11) consolidates the adopter surface into one canonical home, which reduces the number of copies but still leaves a hand-maintained one. A generated projection would need a change under crates/ and is outside every current issue's footprint. Reconcile against the epic's [hard] criteria before the epic gate: REQ-12 names a single canonical home, not a derived one, so this is most likely a genuine follow-up rather than a criterion violation, but per the lead-review protocol that call is made at the gate. If a follow-up issue is filed, bind the doc's freshness test to the constant's own derive or runtime, never to a hand-written mirror."
+      "detail": "docs/reference/configuration.md and docs/reference/example-config.toml restate the managed, permanent, and issue-scoped area lists by hand. Nothing binds them to crates/jit/src/config.rs SHIPPED_DOCUMENTATION_POLICY, which is why they went stale from wave 1 to wave 3 and blocked two code reviews (E2 on b3fc1a92, F1 on f88a16d9). Repairing the values does not repair the mechanism. Concrete targets: docs/reference/configuration.md:51-60 (managed_paths, 8), :62-69 (permanent_paths, 6), :70-75 (issue_scoped_areas, 4); docs/reference/example-config.toml:26-35, :38-45, :49-54 (the same three lists in the copyable sample). Authority is crates/jit/src/config.rs SHIPPED_DOCUMENTATION_POLICY, and render_policy_paths at crates/jit/src/hierarchy_templates.rs:22 (used by generate_config_toml at :289) is an EXISTING emitter that already turns the constant into TOML, so a durable fix reuses it rather than writing a generator from scratch.",
+      "disposition": "PARTIALLY MITIGATED by fd88adda commit b93db9e2: the reference now cites SHIPPED_DOCUMENTATION_POLICY in crates/jit/src/config.rs by name and path as the single source, which gives the invariant its 'reaches prose by citation' half, and the example configuration was reduced to a values-only sample pointing at the reference so the two documents are no longer two copies of one explanation. Still OPEN as a mechanism: nothing enforces agreement. Reconcile against the epic's [hard] criteria before the epic gate; REQ-12 names a single canonical home rather than a derived one, so this is most likely a genuine follow-up. Bind any guard to the constant's own renderer, never to a hand-written mirror."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
