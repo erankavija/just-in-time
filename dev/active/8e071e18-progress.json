@@ -91,7 +91,10 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "opus",
+          "worktree": ".agents/worktrees/agent-f88a16d9",
+          "branch": "worktree-agent-f88a16d9"
         },
         {
           "id": "8cd6eb73-abb3-4531-90c2-4048a13cbd92",
@@ -102,9 +105,13 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "opus",
+          "worktree": ".agents/worktrees/agent-8cd6eb73",
+          "branch": "worktree-agent-8cd6eb73"
         }
-      ]
+      ],
+      "dispatched_from_main_sha": "aa5db1d37ced23275380ddf3d22b723cae6f9f63"
     },
     {
       "wave_number": 4,
@@ -947,6 +954,15 @@
       "category": "rework (not escalated)",
       "situation": "code-review F1: the retention test archived scripts/install.sh as an unowned direct path, so the terminal-owner check passed vacuously and REQ-01's linked-artifact scenario was never exercised.",
       "resolution": "Lead fixed the fixture to link the script to a Done issue via `jit doc add --skip-scan` before preview and execute. cargo-ci and code-review both re-passed."
+    },
+    {
+      "id": "E3",
+      "wave": 3,
+      "issue": "8cd6eb73 (and standing for the remainder of the epic)",
+      "category": "issue scope change (labels)",
+      "situation": "8cd6eb73 carried satisfies:REQ-07 and satisfies:REQ-13. It delivers only the title-fallback clause of REQ-07 (b4d1a2c8 delivers the rename clause) and only the archive-directory half of REQ-13 (22c11e40 and aa38b236 credit the rest). Same structural shape as E1 and E2, both of which cost a code-review round.",
+      "lead_analysis": "The code-review prompt (scripts/code-review-prompt.md:32) tests satisfies:/enforces: labels as evidence claims and treats an unsupported claim as blocking, so a partial-coverage label reliably blocks. 7 issues carry satisfies:REQ-08, 35 carry REQ-09, 26 carry enforces:@/invariant/derived-state-coherence, so the pattern recurs across the remaining waves.",
+      "resolution": "Owner granted a STANDING approval: the lead drops a satisfies:/enforces: label at dispatch time whenever the issue's own Success Criteria deliver only part of the target, provided at least one sibling issue still credits that criterion. Every drop is recorded here and in the completion report. Applied to 8cd6eb73: both satisfies labels removed (commit aa5db1d3). enforces:@/invariant/domain-agnostic on f88a16d9 was KEPT: an enforces label asserts the issue upholds the invariant rather than delivering it whole, nothing in the footprint contradicts it, and the identically-labelled 69dd4e36 passed review in wave 1."
     }
   ],
   "rework_counts": {
@@ -960,7 +976,7 @@
       "raised_by": "69dd4e36",
       "subject": "CHANGELOG entry for the epic's user-visible shipped-behaviour changes",
       "detail": "jit init now authors a live [documentation] policy; archival classifies out-of-root artifacts as permanent and skips directory link targets. No epic issue owns a CHANGELOG entry (6e963a7f touches CHANGELOG.md but is scoped to citation-path repointing only). Repository convention records user-visible behaviour changes in CHANGELOG.md.",
-      "disposition": "open \u2014 lead to create one epic-wide CHANGELOG task in a late wave; reconcile against epic criteria before the epic gate"
+      "disposition": "closed \u2014 owner decided NO CHANGELOG entry for this epic (wave 3). None of the epic's 15 [hard] criteria requires one; the shipped-behaviour changes are to be recorded when the v1.0 release notes are assembled. No CHANGELOG task is created, and 6e963a7f stays scoped to citation-path repointing."
     },
     {
       "id": "P2",
