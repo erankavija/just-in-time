@@ -9604,3 +9604,4 @@
 {"from":"backlog","id":"f9301e28-caa0-49f1-a571-4b7b5aabd109","issue_id":"30595d22-d00b-4eb0-a25d-53ce21bb8847","timestamp":"2026-07-25T13:36:20.657507919Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"613cc15c-8f9c-46b7-9b03-af539c346132","issue_id":"4f9af089-9699-4b8a-9dd6-b245c14daca2","timestamp":"2026-07-25T13:36:24.366375867Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"4d1cee7e-a67c-4fbd-a7e1-8e39d8f4014f","issue_id":"69dd4e36-f4d9-4f11-b1b3-fa7af71e6f34","timestamp":"2026-07-25T13:36:28.049711445Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"ca11b4a7-2871-460d-b63e-b57d4ba4918d","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-25T14:22:19.630193056Z","to":"in_progress","type":"issue_state_changed"}
