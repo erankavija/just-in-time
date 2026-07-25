@@ -9364,3 +9364,6 @@
 {"fields":["documents"],"id":"c1f2d9d7-e630-4ccc-85e0-6033dd5b7d3e","issue_id":"02dc4bac-52e5-4810-9e87-8384e34eabc7","timestamp":"2026-07-25T06:33:48.157599842Z","type":"issue_updated","updated_by":"doc-add"}
 {"fields":["documents"],"id":"43e4329c-54f4-4024-a13d-d31da8a1d80e","issue_id":"02dc4bac-52e5-4810-9e87-8384e34eabc7","timestamp":"2026-07-25T06:33:48.282000442Z","type":"issue_updated","updated_by":"doc-remove"}
 {"fields":["documents"],"id":"8ca240d1-b7bc-425b-a682-256e96fb1043","issue_id":"02dc4bac-52e5-4810-9e87-8384e34eabc7","timestamp":"2026-07-25T06:33:48.405941942Z","type":"issue_updated","updated_by":"doc-add"}
+{"id":"6d28dc83-f2ed-427f-a14c-9c84268a2ffa","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","priority":"high","timestamp":"2026-07-25T07:17:03.106580363Z","title":"Issue-based development artifact layout and serviceable archival","type":"issue_created"}
+{"fields":["dependencies"],"id":"a0a998ad-a244-4c90-a1c9-4f67e9e01016","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-25T07:17:18.031029301Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"f54c0b9c-a134-44e3-ab4a-5109d9448e26","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-07-25T07:18:26.201338609Z","type":"issue_updated","updated_by":"dependency-add"}
