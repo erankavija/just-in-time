@@ -319,10 +319,7 @@ fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
             "a development area outside the convention",
             undeclared_area().to_string(),
         ),
-        (
-            "a path inside a declared area",
-            declared_directory.clone(),
-        ),
+        ("a path inside a declared area", declared_directory.clone()),
         (
             "a sibling whose name starts with a declared area",
             format!("{area}-elsewhere"),
@@ -420,7 +417,10 @@ fn test_doc_dir_json_output_is_a_flat_object_naming_the_issue_the_area_and_the_d
     );
 
     let printed = resolve_directory(repo.path(), &issue.short_id, area);
-    let output = jit(repo.path(), &["doc", "dir", &issue.short_id, area, "--json"]);
+    let output = jit(
+        repo.path(),
+        &["doc", "dir", &issue.short_id, area, "--json"],
+    );
     assert!(
         output.status.success(),
         "doc dir --json: {}",
@@ -463,7 +463,10 @@ fn test_doc_dir_rejects_an_unknown_issue_identifier() {
     let area = declared_area();
     let known = create_issue(repo.path(), "Known issue", &[]);
     let unknown = "deadbeef";
-    assert_ne!(known.short_id, unknown, "the identifier names no issue here");
+    assert_ne!(
+        known.short_id, unknown,
+        "the identifier names no issue here"
+    );
 
     // The same area resolves for an issue that exists, so the rejection below
     // is the identifier and not the area.

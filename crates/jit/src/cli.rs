@@ -1942,8 +1942,9 @@ pub enum DocCommands {
     /// creates nothing.
     ///
     /// Human output is the bare repository-relative directory, so it composes
-    /// directly: mkdir -p "$(jit doc dir \<id\> \<area\>)". JSON output is the
-    /// flat object {"issue_id", "short_id", "area", "directory"}.
+    /// directly: `mkdir -p "$(jit doc dir <id> <area>)"`. JSON output is a flat
+    /// object naming the issue, the area, and the directory; `jit --schema`
+    /// declares its exact shape.
     Dir {
         /// Issue ID
         id: String,
@@ -3408,6 +3409,7 @@ mod recovery_dispatch_tests {
         "doc check-links",
         "doc delete",
         "doc diff",
+        "doc dir",
         "doc history",
         "doc list",
         "doc remove",

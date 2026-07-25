@@ -96,7 +96,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::output::ArtifactDirectoryResponse> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
-        let documentation = self.config_manager.load()?.documentation.unwrap_or_default();
+        let documentation = self
+            .config_manager
+            .load()?
+            .documentation
+            .unwrap_or_default();
         let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
 
         let directory = crate::domain::artifact_directory::resolve_artifact_directory(
