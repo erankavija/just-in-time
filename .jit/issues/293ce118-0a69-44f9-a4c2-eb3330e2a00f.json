@@ -16,6 +16,11 @@
       "status": "passed",
       "updated_at": "2026-07-25T06:19:14.877037812Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-25T06:24:08.015695306Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "293ce118-0a69-44f9-a4c2-eb3330e2a00f",
@@ -28,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Make the gate-presets path a constant and the known-path inventory self-enforcing",
-  "updated_at": "2026-07-25T06:19:14.877037812Z"
+  "updated_at": "2026-07-25T06:24:08.015695306Z"
 }
