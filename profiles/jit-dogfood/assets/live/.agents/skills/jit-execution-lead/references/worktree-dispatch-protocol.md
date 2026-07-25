@@ -78,6 +78,20 @@ This closes a gap that the leak check (Step 4) and the per-issue gates cannot: b
 
 If the check reports failure, repair the merge commit (`git commit --amend` or a follow-up fix commit) and re-run it before merging the next branch.
 
+### Step 6 — Reclaim worktrees once the wave closes
+
+Merging a branch does not reclaim its worktree. One worktree accumulates per dispatched issue, each carrying a full build tree, so a container exhausts host storage unless the lead prunes.
+
+After each wave closes, with no build running:
+
+```bash
+git branch --no-merged main --list 'worktree-agent-*'   # these carry salvage commits — keep them
+git worktree remove --force <path>                      # only branches in `git branch --merged main`
+git worktree prune
+```
+
+Removing a worktree does not delete its branch, so the lead-preserve salvage points below survive. Never remove a worktree whose branch has unmerged commits.
+
 ## Lead-preserve workflow on worker truncation
 
 If a worker terminates abnormally (API outage, timeout, OOM) leaving uncommitted changes in its worktree, capture them on the worker branch so the next-session lead can review:

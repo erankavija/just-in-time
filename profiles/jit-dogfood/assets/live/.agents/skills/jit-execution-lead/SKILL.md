@@ -168,6 +168,7 @@ For each issue that passes review, follow jit-manage Workflow E:
 - Run `jit graph downstream <id>` on each completed issue to see what's newly unblocked.
 - Run `jit validate` to confirm DAG integrity.
 - If new issues were created during the wave (bugs discovered, missing prerequisites), slot them into the appropriate future wave.
+- Reclaim the wave's worktrees per `references/worktree-dispatch-protocol.md` Step 6.
 - Update the progress file: advance `current_wave`, update issue statuses.
 - Commit the progress file.
 
