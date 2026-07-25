@@ -374,10 +374,10 @@
           "title": "Corrected successor deck for the repository-materialization story",
           "story": "S5",
           "classification": "documentation",
-          "status": "rework_r1",
-          "agent": "worker-f87e3273-r1",
+          "status": "rework_r2",
+          "agent": "worker-f87e3273-r2",
           "model": "opus",
-          "note": "Worker committed the deck before the session-5 stall; lead review FAILED round 1 on three falsifiable-claim defects. All other criteria independently verified: A1-1..A1-6 exact against source, all 15 A2 rows, perf table matches session-cost-c488ef85.json cell-for-cell, both diffstat scopes reproduce, no external resources, no math code, one slide-number chrome, fitcheck PASS 30/30 under both themes."
+          "note": "Worker committed the deck before the session-5 stall; lead review FAILED round 1 on three falsifiable-claim defects. All other criteria independently verified: A1-1..A1-6 exact against source, all 15 A2 rows, perf table matches session-cost-c488ef85.json cell-for-cell, both diffstat scopes reproduce, no external resources, no math code, one slide-number chrome, fitcheck PASS 30/30 under both themes. Round 2 lead review PASS; merged 9e27fb24. docs-mechanical PASSED (4f341268). doc-review FAILED (c9e71fb7, run 347e3064): the Completion-evidence slide is the only slide making falsifiable repository claims with no provenance citation, violating the deck's own stated rule. Fair catch and a lead-review miss: the lead verified all five claims against artifacts but did not check that the SLIDE cites them. Rework r2 dispatched (last attempt before escalation); lead class sweep of all 30 slides found one more instance (roadmap slide's present-tense perf claim) and confirmed the inventory tables cite through their Evidence column."
         }
       ]
     },
@@ -447,7 +447,7 @@
     "d159f9d4": 1,
     "531ce80d": 4,
     "2958105e": 1,
-    "f87e3273": 1
+    "f87e3273": 2
   },
   "surfaced_pitfalls": [
     "28254964 (test-support-feature-gating) satisfies REQ-12 (an S4/hygiene criterion) but is DAG-parented under story 2958105e (S2/enforced-guarantees). Membership label (story:hygiene-and-docs) disagrees with hierarchy parent. Structurally harmless (breakdown gates passed, DAG ordering correct: it is a shared foundation consumed by S2's cutover guard and S4's demotions) but a labeling/parent inconsistency worth noting.",
@@ -460,7 +460,8 @@
     "storage/atomic_write.rs:23 and storage/external_publish.rs:31 each hold an independent process-local AtomicU64 minting temp names of the same shape .{leaf}.{pid}.{seq}.tmp. Collision needs the same directory, leaf, and sequence drawn from two separate counters — reachable only if an export destination coincides with a write_file_atomic target. The external publishers use create_new(true) and fail loudly, but write_file_atomic_bytes_with_permissions uses raw fs::write on its temp and would silently overwrite. A single shared sequence source removes the class. Adjacent to @/inv/atomic-writes. Raised by worker-67a77503.",
     "The provenance-contract suite's production_source helper still splits source text on the literal \"\\n#[cfg(test)]\\nmod \" (repository_state_cutover_tests.rs:14-20). All three retained tests depend on it, so a rustfmt change or a differently spelled test-module attribute silently widens or narrows what they see. It is load-bearing for less than before the visibility cutover, but it carries the same brittleness that cutover was aimed at.",
     "write_external_export_atomic (storage/external_publish.rs:60-63) open-codes the temp name that external_temp_name(leaf) at :236-243 produces identically; moved verbatim during relocation to keep that diff reviewable. Free follow-up dedup.",
-    "FileTransactionKernel's inherent methods remain declared pub(crate) on a type that is now pub(in crate::storage). Legal and lint-free since effective visibility is capped by the type's, but the declared visibility overstates reach and can mislead a later reader about the boundary."
+    "FileTransactionKernel's inherent methods remain declared pub(crate) on a type that is now pub(in crate::storage). Legal and lint-free since effective visibility is capped by the type's, but the declared visibility overstates reach and can mislead a later reader about the boundary.",
+    "Lead-review blind spot, wave 7: Tier 2 verifies that a documentation artifact's claims are TRUE against source, but a deck that declares its own citation rule also needs a check that each falsifiable claim is CITED on the slide that makes it. The lead verified all five completion-evidence facts (15-issue closure, 3784/0/14 cargo-ci, 11 gate keys on 661d6be2, repo-validate on cdc840ad, holistic-review on 1cc809de) and still passed a slide that cited none of them. A per-section 'has provenance footnote or inline cite' sweep is cheap and would have caught it pre-gate; run it on any artifact that states a self-imposed evidence policy."
   ],
   "started_at": "2026-07-24T00:00:00Z"
 }
