@@ -7,6 +7,7 @@
   ],
   "description": "Executing a plan that contains an out-of-root linked artifact copies it into the mirror and leaves the original where it is, proven by regression coverage rather than by narration.\n\n## Background\n\nPermanent classification already implies a copy action, and a copy schedules no pending deletion, so source retention follows from the existing action model. That guarantee is currently unasserted: nothing fails if a future change turns one of those copies into a move and starts relocating source files, scripts, or agent assets out of the tree.\n\nBecause plan eligibility is all-or-nothing, the assertion is written against the retention property directly rather than against whole-plan eligibility, which can be false for unrelated reasons.\n\n## Success Criteria\n\n- [hard] REQ-01: Executing a plan whose artifact set includes a linked file outside the development root leaves that file at its original path.\n- [hard] REQ-02: The same execution publishes the mirrored copy under the archive root, so retention is not achieved by skipping the artifact.\n- [hard] REQ-03: No pending deletion is scheduled for an artifact outside the development root.\n",
   "documents": [],
+  "first_ready_at": "2026-07-25T16:52:39.860465409Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "per:@/issue/8e071e18/decision/D-14"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Guarantee archive execution retains sources outside the development root",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-25T16:52:39.860465409Z"
 }

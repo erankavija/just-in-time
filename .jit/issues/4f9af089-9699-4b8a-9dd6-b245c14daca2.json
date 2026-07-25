@@ -8,6 +8,7 @@
   ],
   "description": "A selected root that lies outside the configured development root is classified permanent instead of raising a blocker, so archival stops refusing plans over source files, scripts, agent assets, and repository-root documents.\n\n## Background\n\nThe planner blocks a selected root that is neither managed, permanent, nor already archived, and returns no destination for it. Linked artifacts outside the development root fall into that gap: they are legitimately linked to terminal issues and archiving them by copy is the correct treatment, yet they defeat the whole plan because eligibility is all-or-nothing.\n\nThe relaxation is scoped to artifacts outside the configured development root, not to any artifact that matches no configured area. A blanket relaxation would turn a mistyped managed-path entry into silent copying with no diagnostic, discarding the signal the blocker exists to raise. Enumerating each outside root as permanent was rejected as a maintenance treadmill that re-blocks on the first unlisted root, and prefix matching would make an entry such as the crate source root permanent wholesale.\n\nThe classification policy value does not currently carry the development root, although the configuration accessor for it exists. Threading it in is the structural part of this work and stays inside the pure domain layer. The blocker code remains part of the stable wire vocabulary even though it fires less often; removing it would break the schema.\n\nThe adopter command reference is not edited here. This epic's command-surface changes are documented together in that one reference, so this issue's footprint names only the files it mutates.\n\n## Success Criteria\n\n- [hard] REQ-01: A selected root outside the configured development root is classified permanent and receives a destination instead of an unmanaged-selected-root blocker.\n- [hard] REQ-02: A selected root inside the development root that matches no configured area still raises the blocker, so a mistyped area entry stays diagnosable.\n- [hard] REQ-03: The classification policy value carries the configured development root, and the comparison uses that configured value rather than a built-in path literal.\n- [hard] REQ-04: The unmanaged-selected-root code remains in the published blocker vocabulary.\n",
   "documents": [],
+  "done_at": "2026-07-25T16:52:36.121834322Z",
   "first_ready_at": "2026-07-25T13:20:37.281986323Z",
   "gates_required": [
     "cargo-ci",
@@ -37,7 +38,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Classify linked artifacts outside the development root as permanent",
-  "updated_at": "2026-07-25T16:38:29.821792232Z"
+  "updated_at": "2026-07-25T16:52:36.121834322Z"
 }

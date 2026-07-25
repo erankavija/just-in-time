@@ -1,7 +1,7 @@
 {
   "epic_id": "8e071e18-d786-43ff-b424-a283fecb11f8",
   "epic_short_id": "8e071e18",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -15,7 +15,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "4f9af089-9699-4b8a-9dd6-b245c14daca2",
@@ -26,7 +26,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged-pending-gates"
+          "status": "done"
         },
         {
           "id": "69dd4e36-f4d9-4f11-b1b3-fa7af71e6f34",
@@ -37,7 +37,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged-pending-gates"
+          "status": "done"
         }
       ]
     },
@@ -921,8 +921,20 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
-  "rework_counts": {},
+  "escalations": [
+    {
+      "id": "E1",
+      "wave": 1,
+      "issue": "30595d22",
+      "category": "issue scope change (gates/criteria/labels)",
+      "situation": "code-review F1 blocked on the satisfies:REQ-08 label claiming the epic's citation-scan criterion while the task ships only the warning vocabulary; the producer is 2ac35e8e.",
+      "lead_analysis": "@/rule/coverage-preview defines satisfies: as many-to-one coverage credit ('credited by some issue in its dependency closure'), and seven issues carried satisfies:REQ-08. Deferring was impossible: 2ac35e8e depends on 30595d22.",
+      "resolution": "Owner approved dropping the label from 30595d22. REQ-08 retains six crediting issues. code-review round 2 passed."
+    }
+  ],
+  "rework_counts": {
+    "30595d22": 1
+  },
   "surfaced_pitfalls": [
     {
       "id": "P1",

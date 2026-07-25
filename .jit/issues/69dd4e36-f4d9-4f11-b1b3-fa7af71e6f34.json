@@ -8,6 +8,7 @@
   ],
   "description": "The repository-initialization scaffold declares each development area as managed or permanent from one authoritative declaration, so a freshly initialized repository reports a configured documentation policy.\n\n## Background\n\nThe documentation block the scaffold writes is commented out, covers a subset of the areas under a development root, and advertises two keys the configuration type no longer carries. Policy completeness is computed from authored fields alone, so an adopter who leaves the scaffolded block untouched gets an unconfigured policy and archival refuses to run. Making policy completeness honour the runtime fallbacks instead was rejected: it would change archive eligibility for every existing repository that has no authored table.\n\nClassification is explicit per area. Areas holding revision-specific work products of terminal issues are managed and move on archive. Areas holding living documentation, a configured item-kind source, or documented invocation paths are permanent, archive by copy, and retain their source. Files that sit at the development root and belong to no area are classified individually as exact path entries, which the path matcher supports. A single entry for the development root itself is wrong, because matching is by path prefix and it would silently make every managed area permanent.\n\nThe declaration is configuration the tool writes for an adopter rather than engine policy, so it belongs in the scaffold instead of in classifier logic.\n\n## Success Criteria\n\n- [hard] REQ-01: A repository created by initialization carries an authored documentation policy that names each development area as managed or permanent, with the presentation area managed and the architecture area permanent.\n- [hard] REQ-02: The scaffolded documentation block is active configuration rather than commented-out guidance, and names only keys the configuration type carries.\n- [hard] REQ-03: Development-root files that belong to no area are classified as exact path entries rather than swept in by a prefix.\n- [hard] REQ-04: The managed and permanent area sets exist as one declaration that the scaffold emitter consumes, not as a restated literal list.\n- [hard] REQ-05: Archive planning in a freshly initialized repository reports a configured policy status.\n\n## Notes\n\nThe shipped classification is derived from initialization code and templates. This repository's live configuration is repository-local policy and is not the source of the shipped default.\n",
   "documents": [],
+  "done_at": "2026-07-25T16:52:28.627945552Z",
   "first_ready_at": "2026-07-25T13:20:37.281986323Z",
   "gates_required": [
     "cargo-ci",
@@ -37,7 +38,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Ship the development-area classification in the initialization scaffold",
-  "updated_at": "2026-07-25T16:35:33.845020719Z"
+  "updated_at": "2026-07-25T16:52:28.627945552Z"
 }

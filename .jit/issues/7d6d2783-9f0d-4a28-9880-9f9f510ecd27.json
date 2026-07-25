@@ -7,6 +7,7 @@
   ],
   "description": "A markdown link whose target resolves to a directory is treated as navigation and skipped by artifact discovery, so it stops blocking the plans that reach it.\n\n## Background\n\nArtifact discovery follows document link edges and resolves each target. A trailing-slash link to a sibling directory resolves to something that is not a regular file, and the planner records it as an unsupported artifact with a blocking action. Index documents that link their sibling directories are legitimate markdown, and they are reached transitively as embedded artifacts from documents that are themselves linked, so the blockers land in container plans that have nothing to do with those index files. This is the largest blocker population in the repository and it is independent of any path classification.\n\nRewriting the offending links was rejected: they are valid markdown, one of the index documents is adopter-facing, and the defect would stay shipped for every adopter. Narrowing the cleanup criterion was rejected because it would leave the epic's acceptance evidence partial and the defect unrecorded.\n\nA directory is navigation rather than a document, so skipping it is the correct semantics and not a suppression.\n\nThe adopter command reference is not edited here. This epic's command-surface changes are documented together in that one reference, so this issue's footprint names only the files it mutates.\n\n## Success Criteria\n\n- [hard] REQ-01: A link target that resolves to a directory produces no unsupported-artifact-type blocker and contributes no artifact entry.\n- [hard] REQ-02: A link target that resolves to a regular file or symbolic link is unaffected.\n- [hard] REQ-03: A container whose remaining blockers were all directory targets yields an eligible plan.\n",
   "documents": [],
+  "first_ready_at": "2026-07-25T16:52:43.580815176Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "per:@/issue/8e071e18/decision/D-18"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Skip directory link targets during artifact discovery",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-25T16:52:43.580815176Z"
 }

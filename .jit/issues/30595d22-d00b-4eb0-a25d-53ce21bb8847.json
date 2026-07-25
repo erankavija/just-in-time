@@ -8,6 +8,7 @@
   ],
   "description": "The archival plan's warning vocabulary gains a stable code for an in-content citation of a moving artifact's path, extending a closed schema contract deliberately.\n\n## Background\n\nPlan warnings are a closed vocabulary: a fixed enumeration, a fixed-length exhaustive array, stable wire spellings, and a golden assertion that compares the array against those spellings. Adding a code touches all four and is an explicit schema decision rather than a free addition. The warning channel itself already exists at both target level and per-artifact level and is already present in the machine-readable envelope, so no new channel is needed.\n\nThis issue adds the vocabulary entry and its contract coverage only. Producing the warning from a content scan is separate work.\n\nThe adopter command reference is not edited here. This epic's command-surface changes are documented together in that one reference, so this issue's footprint names only the files it mutates.\n\n## Success Criteria\n\n- [hard] REQ-01: The warning vocabulary carries a new code for an in-content path citation of a moving artifact.\n- [hard] REQ-02: The exhaustive warning array and its length include the new code.\n- [hard] REQ-03: The new code has a stable kebab-case wire spelling.\n- [hard] REQ-04: The golden contract assertion covers the new code and continues to derive both comparison sides from the enumeration.\n",
   "documents": [],
+  "done_at": "2026-07-25T16:52:47.324528591Z",
   "first_ready_at": "2026-07-25T13:20:37.281986323Z",
   "gates_required": [
     "cargo-ci",
@@ -20,8 +21,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-25T16:42:26.876071199Z",
+      "status": "passed",
+      "updated_at": "2026-07-25T16:51:48.313309733Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,7 +35,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Add a plan-warning code for in-content path citations",
-  "updated_at": "2026-07-25T16:48:48.744769999Z"
+  "updated_at": "2026-07-25T16:52:47.324528591Z"
 }
