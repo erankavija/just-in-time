@@ -8,12 +8,24 @@
   ],
   "description": "The archival planner names a destination directory from a membership label or a bare short id, never from an issue title.\n\n## Background\n\nDestination naming has three steps: collect the issue's type labels, and only when exactly one exists look up its configured membership namespace; collect that namespace's values on the issue, and only when exactly one exists use it as the slug. Both ambiguous cases currently fall through to the issue title, which is normalized and cut at a fixed character bound with no word boundary, producing names truncated mid-word.\n\nThe replacement for the fallback is the bare short-id directory. It needs no new tie-breaking policy, it is the shape the resolver already adopts for legacy directories, and it converges on an existing supported form rather than inventing one.\n\nThis reverses a shipped, reviewed naming decision. The properties that make the reversal safe are also already shipped: a destination name is frozen at first archive and re-adopted by marker, and legacy identifier-only directories are adopted without data movement.\n\nThe adopter command reference is not edited here. This epic's command-surface changes are documented together in that one reference, so this issue's footprint names only the files it mutates.\n\n## Success Criteria\n\n- [hard] REQ-01: An issue with exactly one type label and exactly one value in that type's membership namespace yields a destination directory named from the short id and that value.\n- [hard] REQ-02: An issue with several type labels, several membership values, or no membership label yields a destination directory named from the bare short id.\n- [hard] REQ-03: No destination directory name is derived from an issue title.\n- [hard] REQ-04: A pre-existing archive directory named with an identifier only is still adopted, with no data movement.\n",
   "documents": [],
+  "done_at": "2026-07-25T21:10:04.274851397Z",
   "first_ready_at": "2026-07-25T19:33:19.840546329Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-25T20:55:00.446649086Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-25T21:00:28.168684026Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8cd6eb73-abb3-4531-90c2-4048a13cbd92",
   "labels": [
     "type:task",
@@ -24,7 +36,7 @@
     "per:@/issue/8e071e18/decision/D-9"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Derive the archive directory name without a title fallback",
-  "updated_at": "2026-07-25T19:41:41.688063773Z"
+  "updated_at": "2026-07-25T21:10:04.274851397Z"
 }

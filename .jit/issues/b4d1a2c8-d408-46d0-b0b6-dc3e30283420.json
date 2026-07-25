@@ -7,6 +7,7 @@
   ],
   "description": "The one pre-existing archive directory whose name came from an issue title is renamed to its bare short id, and its container marker still resolves the renamed directory.\n\n## Background\n\nExactly one archive directory carries a title-derived name, truncated mid-word. Its owning issue's type has no configured membership namespace, so under the naming rule without a title fallback its name becomes the bare short id — the same shape a second, older archive directory already uses and that the resolver already adopts.\n\nThe container marker holds the owning container's full identifier and nothing else; it encodes no directory name. That independence is what makes the rename safe: after the move, the marker still matches, the resolver re-adopts the directory by marker, and a rerun of the plan converges instead of creating a second destination.\n\nThe hand-made semantic subdirectories elsewhere in the archive are legacy and are not migrated. They carry no marker and are not identifier-shaped, so they are outside this work.\n\n## Success Criteria\n\n- [hard] REQ-01: The title-slugged archive directory is renamed to its bare short id with its contents intact.\n- [hard] REQ-02: The container marker file is unchanged and still names the owning container's full identifier.\n- [hard] REQ-03: A preview for that container resolves the renamed directory as its destination and plans no second destination.\n- [hard] REQ-04: The hand-made semantic subdirectories under the archive root are left as they are.\n- [hard] REQ-05: Whole-repository validation passes after the rename.\n",
   "documents": [],
+  "first_ready_at": "2026-07-25T21:10:07.974032660Z",
   "gates_required": [
     "repo-validate"
   ],
@@ -21,7 +22,7 @@
     "per:@/issue/8e071e18/decision/D-9"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Rename the title-slugged archive directory to its bare short id",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-25T21:10:07.974032660Z"
 }

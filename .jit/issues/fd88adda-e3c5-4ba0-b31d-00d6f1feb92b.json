@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-25T21:11:02.624556801Z",
+  "dependencies": [
+    "69dd4e36-f4d9-4f11-b1b3-fa7af71e6f34"
+  ],
+  "description": "The adopter-facing configuration reference and its example configuration state the documentation policy a freshly initialized repository writes, including the key that declares which areas organize their artifacts by issue.\n\n## Background\n\nThe configuration reference documents the `[documentation]` table: the development root, the archive root, the managed and permanent path lists, and the three-state policy status that authorizes archival. Its worked example shows three managed areas and a single permanent entry, while an initialized repository now writes eight managed areas and six permanent entries, three of which name individual files rather than directories. The table also carries a key declaring which areas organize their artifacts one directory per issue, and that key appears in neither the reference nor the example configuration file.\n\nAn adopter who reads either document to learn what the tool writes receives a list that disagrees with the file in front of them. A path list maintained by hand against a shipped declaration is a staleness defect rather than a convenience.\n\nScope here is factual agreement with the shipped policy and the meaning of each key. Restructuring the reference into the single canonical home for the artifact directory convention is separate work and is not undertaken here.\n\n## Success Criteria\n\n- [hard] REQ-01: The configuration reference's documentation-table example states the managed and permanent areas a freshly initialized repository writes.\n- [hard] REQ-02: The example configuration file states the same managed and permanent areas as that reference.\n- [hard] REQ-03: Both documents carry the key declaring the issue-scoped areas, and the reference states its meaning and that an unauthored key resolves to a shipped default.\n- [hard] REQ-04: The reference states that a permanent or managed entry may name an individual file rather than a directory, and how each form is matched.\n- [hard] REQ-05: The reference distinguishes the policy a freshly initialized repository writes from this repository's own configuration, and states that an adopter may reclassify any area.\n- [hard] REQ-06: Mechanical documentation checks over the adopter surface pass.\n\n## Notes\n\nThe shipped values are derived from initialization code and templates. This repository's live configuration is repository-local policy and is not the source of the shipped default.",
+  "documents": [],
+  "first_ready_at": "2026-07-25T21:11:02.624556801Z",
+  "gates_required": [
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "fd88adda-e3c5-4ba0-b31d-00d6f1feb92b",
+  "labels": [
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:area-classification",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Align the adopter configuration reference with the shipped documentation policy",
+  "updated_at": "2026-07-25T21:12:34.305749065Z"
+}

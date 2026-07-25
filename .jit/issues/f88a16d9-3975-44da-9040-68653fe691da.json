@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-25T20:49:28.187071493Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-25T20:57:40.848304384Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f88a16d9-3975-44da-9040-68653fe691da",
   "labels": [
     "type:task",
@@ -26,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Declare the development areas that adopt the issue directory convention",
-  "updated_at": "2026-07-25T19:41:37.906960028Z"
+  "updated_at": "2026-07-25T20:57:40.848304384Z"
 }

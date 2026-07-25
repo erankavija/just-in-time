@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "eb28056359ca418b74c3cc0b4f8d04adc11bfac7",
+  "completed_at": "2026-07-25T21:00:27.921677619Z",
+  "duration_ms": 165978,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard archive-naming criteria are satisfied by the attributable implementation and tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8cd6eb73-abb3-4531-90c2-4048a13cbd92",
+  "message": null,
+  "run_id": "c2e68d5f-49ef-4dc7-8595-75b9525d1aad",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T20:57:41.943662697Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:8cd6eb73 commits 641a56bc, dc381831, b63e50f, fcb63e1, 9710edbc, d2f2ac9, c71e065b, e807e34a, eb280563; uncommitted `.jit` changes excluded\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json; .jit/invariants.toml\nResolved items: @/issue/8e071e18/decision/D-1, @/issue/8e071e18/decision/D-9, @/issue/8e071e18/decision/D-18, @/invariant/single-source-prose\nGate evidence: cargo-ci passed (exit 0, 2026-07-25T20:49:28.798598357+00:00)\nTruncation recovery: recovered merge changes with path-bounded first-parent reads and narrowed planner, resolver, execution, and test reads\n1. No findings. The planner uses the membership label or bare short ID at [artifact_classifier.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/artifact_classifier.rs:1099); both planning and execution resolve legacy identifier-only directories through the same resolver ([archive.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/archive.rs:202), [archive.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/archive.rs:669)). Tests cover all hard criteria.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard archive-naming criteria are satisfied by the attributable implementation and tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
