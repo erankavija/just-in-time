@@ -196,16 +196,17 @@
   <h2>The one plan document that is emitted</h2>
 <pre><code class="language-json" data-trim>{
   "id": "jit-dogfood",
-  "plan_hash": "d0d3f2a631bcf412…",
+  "plan_hash": "&lt;64 lowercase hex digits&gt;",
   "status": "would_apply",
   "targets": [
     { "action": "create", "executable": false, "path": ".agents/skills/…" }
   ],
   "version": "1.0.0"
 }</code></pre>
-  <p class="small">Live output of <code>jit profile apply jit-dogfood --dry-run --json</code> in a freshly
-     initialized repository, elided to one of its 69 targets, with the 64-character hash and the target path
-     truncated.</p>
+  <p class="caption">Live output of <code>jit profile apply jit-dogfood --dry-run --json</code> in a freshly
+     initialized repository, elided to one of its 69 targets, with the target path truncated. The digest is a
+     placeholder because plan identity is repository-specific: <code>plan_hash</code> digests the captured
+     image including its layout roots (<code>repository_state/image.rs</code>).</p>
 </section>
 
 <!-- ── PUBLICATION ─────────────────────────────────────────────────────── -->
@@ -524,8 +525,8 @@ jit validate          # exact, idempotent clean result</code></pre>
       <tr><td>A2-2</td><td>Every timing comes from a recorded artifact stating samples, warm state, machine, and
           method. No results table holds a prose cell.</td>
           <td>perf artifact, <code>method</code>, <code>machine</code></td></tr>
-      <tr><td>A2-3</td><td>The uncorroborated archived 3.747s prose figure is not restated; the mutation cost
-          shown is artifact-backed.</td>
+      <tr><td>A2-3</td><td>The predecessor's uncorroborated archived prose figure for the epic-transition cost
+          is not restated; the mutation cost shown here is artifact-backed.</td>
           <td>perf artifact, <code>median_ms</code></td></tr>
       <tr><td>A2-4</td><td>The session bound is stated for bulk update too, so it is not scoped past its
           evidence.</td>
@@ -598,8 +599,8 @@ jit validate          # exact, idempotent clean result</code></pre>
     <thead><tr><th>Id</th><th>Corrected claim</th><th>Evidence</th></tr></thead>
     <tbody>
       <tr><td>A4-1</td><td>No math-rendering library is loaded, no rendering hook runs, and no slide carries
-          mathematical notation. The stylesheet carries no math rules either.</td>
-          <td><code>talk.html</code>; <code>base.css</code></td></tr>
+          mathematical notation.</td>
+          <td><code>talk.html</code> head and script block</td></tr>
       <tr><td>A4-2</td><td>reveal.js 5.1.0 and all three font families are committed under <code>vendor/</code>
           and referenced by relative path, so the deck presents air-gapped.</td>
           <td><code>vendor/reveal.js/</code>; <code>vendor/fonts/fonts.css</code></td></tr>

@@ -4,9 +4,10 @@
    the active theme file (themes/<name>.css) supplies the :root token block.
    Swap themes by changing the single <link id="theme"> href in the deck.
 
-   This deck's copy carries no math styling: the deck contains no mathematical
-   notation and loads no math-rendering library, so the selectors for one would
-   be dead rules.
+   This deck's copy drops the toolkit's KaTeX and .math-block rules: the deck
+   loads no math-rendering library and carries no mathematical notation, so
+   those selectors could never match. The .theorem/.lemma/.proof callout
+   vocabulary below is shared toolkit structure that this deck does not use.
    ============================================================================ */
 
 html, body, .reveal { background: var(--bg); color: var(--text); }
