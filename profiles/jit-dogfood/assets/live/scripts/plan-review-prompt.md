@@ -16,6 +16,10 @@ jit issue batch-create --from-json <manifest> --dry-run --json
 Any structural/native validation error, cycle, coverage gap, stale generated
 region, unresolved sizing warning, or unresolved source/contract reference fails.
 
+Obey a container decision the plan or manifest explicitly cites; it is settled.
+Finding: the plan fails to implement it, or code contradicts its premise.
+Not a finding: preferring a different decision, or a shape the cited decision fixes.
+
 Check the plan's architecture, criterion approach, risks, and decisions against
 the code. It must be concise: copied issue bodies, exhaustive consumer/file
 inventories, repeated acceptance criteria, hand-written task/DAG views, review

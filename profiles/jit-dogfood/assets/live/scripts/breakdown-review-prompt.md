@@ -27,6 +27,10 @@ per-code override. A shared `landing_group` or single final landing never excuse
 oversized implementation work. Do not recount
 criterion labels; the separate coverage gate owns deterministic coverage.
 
+Obey a container decision the plan or manifest explicitly cites; it is settled.
+Finding: the graph fails to implement it, or code contradicts its premise.
+Not a finding: preferring a different decision, or a shape the cited decision fixes.
+
 Recheck contract modes, unique producer reachability, and all footprint
 creates/touches, uncertainties, and overlap advisories against the created graph.
 
