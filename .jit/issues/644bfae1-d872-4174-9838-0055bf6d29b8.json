@@ -7,6 +7,7 @@
   ],
   "description": "Breakdown node bracketing Issue-based development artifact layout and serviceable archival (8e071e18). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria.",
   "documents": [],
+  "done_at": "2026-07-25T13:36:16.969116433Z",
   "first_ready_at": "2026-07-25T07:52:48.923758675Z",
   "gates_required": [
     "coverage-preview",
@@ -14,14 +15,14 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-07-25T07:52:48.923758675Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-25T13:35:37.702463550Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-07-25T07:52:48.923758675Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-25T13:26:24.677125104Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "644bfae1-d872-4174-9838-0055bf6d29b8",
@@ -32,7 +33,7 @@
     "brackets:8e071e18"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "breakdown: Issue-based development artifact layout and serviceable archival",
-  "updated_at": "2026-07-25T13:19:17.770703154Z"
+  "updated_at": "2026-07-25T13:36:16.969116433Z"
 }

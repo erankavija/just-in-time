@@ -25,7 +25,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Classify linked artifacts outside the development root as permanent",
-  "updated_at": "2026-07-25T13:24:30.305643983Z"
+  "updated_at": "2026-07-25T13:36:24.366375867Z"
 }

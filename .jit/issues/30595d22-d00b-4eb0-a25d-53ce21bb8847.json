@@ -23,7 +23,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Add a plan-warning code for in-content path citations",
-  "updated_at": "2026-07-25T13:24:34.074745779Z"
+  "updated_at": "2026-07-25T13:36:20.657507919Z"
 }

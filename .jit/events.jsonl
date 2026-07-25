@@ -9597,3 +9597,10 @@
 {"from":"ready","id":"2b8ad646-627f-4880-9c1f-5bf42e75b9a7","issue_id":"30595d22-d00b-4eb0-a25d-53ce21bb8847","timestamp":"2026-07-25T13:24:34.074745779Z","to":"backlog","type":"issue_state_changed"}
 {"fields":["dependencies"],"id":"95786fd0-d172-4262-8b26-b72ced96415c","issue_id":"30595d22-d00b-4eb0-a25d-53ce21bb8847","timestamp":"2026-07-25T13:24:34.074745779Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"50054e01-6bfb-478b-aeb9-e9fd56bd10e0","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-25T13:24:37.828162339Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"coverage-preview","id":"60624c03-9999-401a-aeb5-316589960854","issue_id":"644bfae1-d872-4174-9838-0055bf6d29b8","timestamp":"2026-07-25T13:26:24.677125104Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"breakdown-review","id":"cffcf95f-4097-422d-b893-c517fbcaf0cb","issue_id":"644bfae1-d872-4174-9838-0055bf6d29b8","timestamp":"2026-07-25T13:35:37.702463550Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"ready","id":"d93dcbcc-e598-4ac8-be8c-c9bb225b8a9c","issue_id":"644bfae1-d872-4174-9838-0055bf6d29b8","timestamp":"2026-07-25T13:36:16.969116433Z","to":"done","type":"issue_state_changed"}
+{"id":"72f7a760-dac4-4c72-a055-60c545850f5c","issue_id":"644bfae1-d872-4174-9838-0055bf6d29b8","timestamp":"2026-07-25T13:36:16.969116433Z","type":"issue_completed"}
+{"from":"backlog","id":"f9301e28-caa0-49f1-a571-4b7b5aabd109","issue_id":"30595d22-d00b-4eb0-a25d-53ce21bb8847","timestamp":"2026-07-25T13:36:20.657507919Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"613cc15c-8f9c-46b7-9b03-af539c346132","issue_id":"4f9af089-9699-4b8a-9dd6-b245c14daca2","timestamp":"2026-07-25T13:36:24.366375867Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"4d1cee7e-a67c-4fbd-a7e1-8e39d8f4014f","issue_id":"69dd4e36-f4d9-4f11-b1b3-fa7af71e6f34","timestamp":"2026-07-25T13:36:28.049711445Z","to":"ready","type":"issue_state_changed"}

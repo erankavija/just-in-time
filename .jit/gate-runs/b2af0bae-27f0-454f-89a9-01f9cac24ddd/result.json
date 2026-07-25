@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/coverage-preview.sh",
+  "commit": "6b19ba16c27c4cb050d5c271c8b62a51294e5a97",
+  "completed_at": "2026-07-25T13:26:24.415522343Z",
+  "duration_ms": 740,
+  "exit_code": 0,
+  "gate_key": "coverage-preview",
+  "issue_id": "644bfae1-d872-4174-9838-0055bf6d29b8",
+  "message": null,
+  "run_id": "b2af0bae-27f0-454f-89a9-01f9cac24ddd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T13:26:23.675063271Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "✓ Scope validation passed\n",
+  "tree_dirty": false
+}
