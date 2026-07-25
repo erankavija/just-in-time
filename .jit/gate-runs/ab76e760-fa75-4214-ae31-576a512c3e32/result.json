@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "53d0e43c976b2a2c5b1b70732c432d38f44bf12b",
+  "completed_at": "2026-07-25T19:32:32.074491928Z",
+  "duration_ms": 143626,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The linked terminal-owner regression test verifies source retention, mirror publication, and no pending deletion for an out-of-root artifact.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1f80212b-4c96-477c-9ed8-a008656bfdde",
+  "message": null,
+  "run_id": "ab76e760-fa75-4214-ae31-576a512c3e32",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T19:30:08.447811416Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 50183650, bd9d8772, 1f797deb, 53d0e43c (`jit:1f80212b`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/1f80212b/requirement/REQ-01, REQ-02, REQ-03 (issue description); @/issue/8e071e18/decision/D-14 (issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-25T19:24:55Z); code-review failed (exit 1, prior F1 reassessed and resolved)\nTruncation recovery: narrowed reads of the current regression test, classifier/action selection, execution result construction, merge-parent patch, and gate record\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The linked terminal-owner regression test verifies source retention, mirror publication, and no pending deletion for an out-of-root artifact.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

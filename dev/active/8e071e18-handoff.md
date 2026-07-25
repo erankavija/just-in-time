@@ -7,9 +7,9 @@
 ## Current state
 
 - Epic: `8e071e18` — state: in_progress, claimed by `agent:jit-execution-lead`
-- Wave in progress: wave 2 of 13 (closing); wave 3 not yet dispatched
-- Children summary: 79 interior issues — 6 done (wave 1 + wave 2), 73 backlog/ready. Bracket nodes `55fe8ec2` (planning) and `644bfae1` (breakdown) were already done before this session.
-- Active claims: none outstanding once wave 2 closes; all six wave-1/wave-2 issues were claimed `agent:worker` and completed.
+- Waves 1 and 2 are **complete**: all six issues Done, every gate passed, `jit validate` green, main clean. Wave 3 not yet dispatched.
+- Children summary: 79 interior issues — 6 done, 73 backlog/ready. Bracket nodes `55fe8ec2` (planning) and `644bfae1` (breakdown) were already done before this session.
+- Active claims: none. All six wave-1/wave-2 issues were claimed `agent:worker` and completed.
 - Open escalations: none open. Two were raised and resolved by the owner this session (E1, E2 — see the progress file and Traps).
 - Progress file: `dev/active/8e071e18-progress.json` (wave plan, per-issue status, `surfaced_pitfalls`, `escalations`)
 
@@ -19,13 +19,14 @@
 - Verified **zero intra-wave footprint conflicts** across all 13 waves from the manifest's declared `creates`/`touches` — the plan's ordered-writers property holds, so every wave can fan out fully.
 - Wave 1 dispatched (`69dd4e36`, `4f9af089`, `30595d22`) in isolated worktrees. All three merged to main; cargo-ci + code-review green; closed Done.
 - `30595d22` failed code-review round 1 on finding F1 (its `satisfies:REQ-08` label claimed the epic's citation-scan criterion while the task ships only the warning vocabulary). Escalated per policy item 4; owner approved dropping the label; round 2 passed.
-- Wave 2 dispatched (`b3fc1a92`, `1f80212b`, `7d6d2783`). All three merged to main. Merged main verified green independently: **3883 tests, 0 failed**.
-- `7d6d2783` deviated from its declared footprint deliberately and correctly: the skip landed in `domain/artifact_discovery.rs`, not `artifact_classifier.rs`. Accepted — see Traps.
-- `1f80212b` was committed by the lead from its worktree after it went idle with complete, verified work; the diff was reviewed before commit.
+- Wave 2 dispatched (`b3fc1a92`, `1f80212b`, `7d6d2783`). All three merged to main and closed Done. Merged main verified green independently: **3883 tests, 0 failed**.
+- `7d6d2783` deviated from its declared footprint deliberately and correctly: the skip landed in `domain/artifact_discovery.rs`, not `artifact_classifier.rs`. Accepted — see Traps. It also inverted the assertions in an existing CLI test that encoded the removed behaviour, and renamed it to `..._reports_directory_root_but_skips_directory_link_targets`.
+- `b3fc1a92` failed code-review round 1 (F1: `enforces:@/invariant/single-source-prose` contradicted by stale adopter docs owned by wave-11 `58c56743`). Escalated as E2; owner approved dropping the label; round 2 passed.
+- `1f80212b` was committed by the lead from its worktree after it went idle with complete work, then **failed code-review on a substantive finding**: its retention test archived `scripts/install.sh` as an *unowned* direct path, so the terminal-owner check passed vacuously and REQ-01's linked-artifact scenario was never exercised. The lead fixed the fixture (link to a Done issue via `jit doc add --skip-scan` before preview/execute); cargo-ci and code-review both re-passed. Recorded as R1.
+- A global `PreToolUse` hook was added to `~/.claude/settings.json` blocking wait-loops built on `pgrep -f`/`pkill -f`, after that pattern cost ~50 minutes this session. Verified live.
 
 ## What to do next
 
-- [ ] Confirm `1f80212b` cargo-ci + code-review results (job was in flight at session end), then close wave 2: `jit issue update <id> --state done` for `b3fc1a92`, `7d6d2783`, `1f80212b`, commit `.jit/` + progress file.
 - [ ] Dispatch wave 3: `f88a16d9` (declare the issue-scoped area registry) and `8cd6eb73` (derive the archive directory name without a title fallback). Both `cargo-ci` + `code-review`; footprints disjoint (`touches 3` and `touches 1`).
 - [ ] Wave 4 next: `6aa82c0b`, `b4d1a2c8`, `22c11e40`. Note `b4d1a2c8` carries only `repo-validate` — it renames the one title-slugged archive directory.
 - [ ] Before wave 8, decide the archive-execution strategy (see Traps — the 24 `archive-sweep-*` issues cannot fan out in worktrees).
@@ -43,7 +44,7 @@
 
 - **Note there are stale orphan `codex` processes on this host** (observed at 23h and 7h old, from earlier sessions). They will match any pattern-based liveness check for the review gates and make a fresh review look like it is already running. Check process age before concluding a gate is in flight.
 
-- **Do NOT run `jit gate evaluate` without reinstalling the binary first.** The stale-binary guard rejects any verdict whose binary provenance is not exactly HEAD, and HEAD moves on every merge and every `.jit/` commit. Sequence is always: commit → `./scripts/install-jit.sh` → `jit --version` → evaluate. Three gate evaluations were wasted learning this.
+- **Do NOT run `jit gate evaluate` without reinstalling the binary from a CLEAN tree first.** The stale-binary guard rejects any verdict whose binary provenance is not exactly HEAD *and* `dirty=false`. It bit three separate ways this session: (1) HEAD moved past the binary after a merge; (2) HEAD moved after a `.jit/` state commit; (3) the binary was built while an unrelated handoff-doc edit sat uncommitted, giving `dirty=true`. Sequence is always: commit everything → `git status --porcelain` empty → `./scripts/install-jit.sh` → `jit --version` shows HEAD and `dirty=false` → evaluate. **Do not edit any repo file while a gate batch is running**, or the later gates in the batch fail this guard.
 
 - **Do NOT run gate evaluations in parallel.** They serialize on per-issue locks and lose results. Run them sequentially. `cargo-ci` additionally holds a host-wide flock, so a parallel wave's workers each wait their turn — budget ~10-15 min per run.
 
@@ -57,6 +58,8 @@
   - `30595d22` was blocked because `satisfies:REQ-08` read as a claim to the whole citation-scan criterion while the task shipped only the warning vocabulary. `@/rule/coverage-preview` actually defines the label as many-to-one coverage credit ("credited by **some** issue in its dependency closure") and seven issues carried it — but the reviewer read it as a total claim.
   - `b3fc1a92` was blocked because `enforces:@/invariant/single-source-prose` was contradicted by stale adopter copies that a *different, later* issue owns, even though the reviewer confirmed all three of its own hard criteria were met.
   - Both were resolved by dropping the label, owner-approved. **Before dispatching any issue, check whether its labels claim more than its `## Success Criteria` deliver**, and raise it with the owner up front rather than after a ~30 min review round. Same-shape issues still ahead: `6aa82c0b` and `ef2bd13c` (both `satisfies:REQ-08`, both deliver one part), and every task carrying `enforces:@/invariant/single-source-prose` whose criteria stop short of the adopter docs.
+
+- **Do NOT accept a regression test that never establishes the precondition its criterion names.** `1f80212b`'s test archived an out-of-root file that had no document owner, so the terminal-owner check (`artifact_classifier.rs:1005-1012`) was vacuously true and the *linked*-artifact scenario REQ-01 requires was never run — yet the test passed and cargo-ci was green. The lead's own Tier-2 read missed it; code-review caught it. When a criterion says "a linked X", verify the fixture actually links it: create an issue, `jit doc add <id> <path> --skip-scan --json`, terminalize it, *then* archive. Ask of every new test: what would still pass if the feature were absent?
 
 - **Do NOT assume a "covered by a later issue" pitfall is inert.** P2 (stale adopter docs at `docs/reference/configuration.md:50` and `example-config.toml:21`) was correctly attributed to `58c56743` in wave 11 — and then blocked wave 2's `b3fc1a92` anyway. From this session until `58c56743` lands, the adopter reference claims 3 managed paths while `jit init` writes 8. Expect any issue touching that fact to trip on it.
 

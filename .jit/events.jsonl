@@ -9643,3 +9643,12 @@
 {"gate_key":"code-review","id":"5da57699-f479-4a09-8d89-c999179c74e3","issue_id":"1f80212b-4c96-477c-9ed8-a008656bfdde","timestamp":"2026-07-25T19:20:40.186193950Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"c88d132a-5718-4446-891c-f13cf61dedf9","issue_id":"b3fc1a92-9d6c-43f6-9309-5be17adfbd98","timestamp":"2026-07-25T19:23:03.864373924Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"1a8404dc-bd95-4556-a2c2-083fd1c2434a","issue_id":"1f80212b-4c96-477c-9ed8-a008656bfdde","timestamp":"2026-07-25T19:29:21.839599758Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"79c64c45-f3aa-4638-87d4-1cd93bb5bf96","issue_id":"1f80212b-4c96-477c-9ed8-a008656bfdde","timestamp":"2026-07-25T19:32:32.325416811Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"a8ef6f15-d872-4a72-b55c-a9c5d4b98447","issue_id":"b3fc1a92-9d6c-43f6-9309-5be17adfbd98","timestamp":"2026-07-25T19:33:06.734529957Z","to":"done","type":"issue_state_changed"}
+{"id":"05078e06-026e-42c2-b49e-b4b0b8d2b7e1","issue_id":"b3fc1a92-9d6c-43f6-9309-5be17adfbd98","timestamp":"2026-07-25T19:33:06.734529957Z","type":"issue_completed"}
+{"from":"backlog","id":"3d5e7409-d70e-4db2-bba3-d38ddc9970cb","issue_id":"f88a16d9-3975-44da-9040-68653fe691da","timestamp":"2026-07-25T19:33:11.903965976Z","to":"ready","type":"issue_state_changed"}
+{"from":"in_progress","id":"f56c06a3-8e88-4a13-beef-26b76f275bdc","issue_id":"7d6d2783-9f0d-4a28-9880-9f9f510ecd27","timestamp":"2026-07-25T19:33:15.903276612Z","to":"done","type":"issue_state_changed"}
+{"id":"cd7bdcb4-7acb-4d06-92ee-fa8ee2f86cfa","issue_id":"7d6d2783-9f0d-4a28-9880-9f9f510ecd27","timestamp":"2026-07-25T19:33:15.903276612Z","type":"issue_completed"}
+{"from":"backlog","id":"46eb208c-d6e2-4c94-b631-3416194a2d5b","issue_id":"8cd6eb73-abb3-4531-90c2-4048a13cbd92","timestamp":"2026-07-25T19:33:19.840546329Z","to":"ready","type":"issue_state_changed"}
+{"from":"in_progress","id":"3ed8a01e-d067-42e2-a470-2b65bb82c7e1","issue_id":"1f80212b-4c96-477c-9ed8-a008656bfdde","timestamp":"2026-07-25T19:33:23.850383752Z","to":"done","type":"issue_state_changed"}
+{"id":"41950f23-e857-4783-881e-e75665ef4e5e","issue_id":"1f80212b-4c96-477c-9ed8-a008656bfdde","timestamp":"2026-07-25T19:33:23.850383752Z","type":"issue_completed"}

@@ -8,6 +8,7 @@
   ],
   "description": "The runtime configuration accessors fall back to the same shipped area declaration the initialization scaffold writes, so the two can no longer disagree.\n\n## Background\n\nThe documentation accessors return hard-coded fallback lists when no table is authored, and doc comments beside them restate those lists a second time. The scaffolded block, the accessor fallbacks, the adopter example configuration, and the adopter reference are four copies of one fact, and they already disagree with each other. Reducing them to one declaration removes the staleness defect rather than adding a fifth copy.\n\nThe fallbacks stay non-authorizing. Policy completeness is judged from authored fields alone, so a repository with no documentation table still reports an incomplete or unconfigured policy and archival still refuses to mutate. Changing that judgement is out of scope, because it would alter archive eligibility for existing repositories.\n\n## Success Criteria\n\n- [hard] REQ-01: The managed-path, permanent-path, archive-root, and development-root fallbacks return values read from the shipped area declaration rather than from literals of their own.\n- [hard] REQ-02: Doc comments describing the fallbacks carry no second copy of the path lists.\n- [hard] REQ-03: A repository with no authored documentation table still reports an unconfigured or incomplete policy status, unchanged by the fallbacks.\n",
   "documents": [],
+  "done_at": "2026-07-25T19:33:06.734529957Z",
   "first_ready_at": "2026-07-25T16:52:32.376163834Z",
   "gates_required": [
     "cargo-ci",
@@ -34,7 +35,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Derive the runtime documentation defaults from the shipped declaration",
-  "updated_at": "2026-07-25T19:23:03.864373924Z"
+  "updated_at": "2026-07-25T19:33:06.734529957Z"
 }

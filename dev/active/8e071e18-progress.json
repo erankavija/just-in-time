@@ -1,7 +1,7 @@
 {
   "epic_id": "8e071e18-d786-43ff-b424-a283fecb11f8",
   "epic_short_id": "8e071e18",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -53,7 +53,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged-pending-gates"
+          "status": "done"
         },
         {
           "id": "1f80212b-4c96-477c-9ed8-a008656bfdde",
@@ -64,7 +64,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged-pending-gates"
+          "status": "done"
         },
         {
           "id": "7d6d2783-9f0d-4a28-9880-9f9f510ecd27",
@@ -75,7 +75,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "gates-passed"
+          "status": "done"
         }
       ]
     },
@@ -939,11 +939,20 @@
       "situation": "code-review F1 blocked on enforces:@/invariant/single-source-prose being contradicted by stale adopter copies at docs/reference/configuration.md:50 and docs/reference/example-config.toml:21. The issue's three hard criteria were confirmed met by the reviewer.",
       "lead_analysis": "Both files are the declared footprint of 58c56743 (wave 11), which carries doc-review and docs-mechanical; b3fc1a92 carries neither. Same structural pattern as E1: the label reaches further than the issue delivers.",
       "resolution": "Owner approved dropping the enforces label. Known cost: docs/reference states 3 managed paths while jit init writes 8, until 58c56743 lands in wave 11."
+    },
+    {
+      "id": "R1",
+      "wave": 2,
+      "issue": "1f80212b",
+      "category": "rework (not escalated)",
+      "situation": "code-review F1: the retention test archived scripts/install.sh as an unowned direct path, so the terminal-owner check passed vacuously and REQ-01's linked-artifact scenario was never exercised.",
+      "resolution": "Lead fixed the fixture to link the script to a Done issue via `jit doc add --skip-scan` before preview and execute. cargo-ci and code-review both re-passed."
     }
   ],
   "rework_counts": {
     "30595d22": 1,
-    "b3fc1a92": 1
+    "b3fc1a92": 1,
+    "1f80212b": 1
   },
   "surfaced_pitfalls": [
     {
@@ -966,6 +975,13 @@
       "subject": "config.rs accessor doc comments restate the old default path lists",
       "detail": "crates/jit/src/config.rs:313-352 restate (default: [\"dev/active\",...]) and (default: [\"docs/\"]).",
       "disposition": "covered \u2014 b3fc1a92 REQ-02 requires the fallback doc comments carry no second copy"
+    },
+    {
+      "id": "P4",
+      "raised_by": "7d6d2783",
+      "subject": "docs/reference/cli-commands.md:251 states a directory link target warns unsupported-edge-target",
+      "detail": "False since 7d6d2783: a directory link target now yields no warning and no edge. The preceding sentence at :245-248 (an issue-linked path that is not a regular file or symlink blocks as unsupported-artifact-type) stays accurate for issue-linked ROOTS, so this needs a narrow correction rather than a rewrite.",
+      "disposition": "covered \u2014 4a6fb8c1 (command-reference-surface) declares docs/reference/cli-commands.md and carries REQ-15"
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00"
