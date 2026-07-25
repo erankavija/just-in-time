@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>One repository, one truth — repository materialization in JIT</title>
+
+<!-- Every asset below is vendored under this deck folder. The deck opens from
+     a file:// URL with no network: reveal.js 5.1.0 in vendor/reveal.js/, the
+     three font families in vendor/fonts/. No CDN, no Google Fonts, no math
+     library. -->
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
+<link rel="stylesheet" href="vendor/reveal.js/reset.css">
+<link rel="stylesheet" href="vendor/reveal.js/reveal.css">
+
+<!-- Theme system: structure is theme-agnostic; swap the #theme link to retheme -->
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- ── TITLE ───────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>One repository, one truth</h1>
+  <p class="tagline">Transactional materialization and derived-state coherence in JIT</p>
+  <p>Repository materialization &nbsp;·&nbsp; just-in-time &nbsp;·&nbsp; 2026-07-25</p>
+  <p class="caption">Every falsifiable claim on these slides cites a repository artifact by path and symbol,
+     command name, or commit range. The closing section inventories each correction against
+     <code>dev/studies/cdc840ad-audit-2026-07-23.md</code>.</p>
+</section>
+
+<!-- ── WHAT THE FEATURE IS ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Feature introduction</span>
+  <h2>What repository materialization is</h2>
+  <div class="def">
+    JIT turns its declared semantic state into every coupled persisted file
+    through one captured final view, one pure plan, and one recoverable
+    publication.
+  </div>
+  <p>The boundary is <strong>tracked semantic state</strong> under <code>.jit/</code>: configuration,
+     registries, issues, projections, schemas, managed prose, provenance, and audit state are
+     planned and published together.</p>
+  <p class="small">Machine-local files that <code>.gitignore</code> excludes keep their own writers:
+     <code>.jit/**/*.lock</code>, <code>.jit/server.log</code>, <code>.jit/server.pid.json</code>,
+     <code>.jit/worktree.json</code>, <code>.jit/tmp/</code>.</p>
+  <div class="note">For users, commands are atomic and repairable. For agents, the repository is a coherent input rather than a set of files that may disagree.</div>
+</section>
+
+<!-- ── WHY ONE TRANSACTION ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Motivation</span>
+  <h2>Why coherence needs a single owner</h2>
+  <ul>
+    <li>One semantic edit implies coupled derived outputs: schemas, projections, managed regions, provenance, audit records.</li>
+    <li>Independent write paths are each locally reasonable. Their composition is not a transaction.</li>
+    <li>Validation can compute the right answer while the persisted addressable state disagrees with it.</li>
+    <li>Recovery written per command multiplies the number of ways a repository can be left half-updated.</li>
+  </ul>
+  <div class="warning">Coherence is a property of the whole publication, so it has to be owned in one place.</div>
+</section>
+
+<!-- ── BENEFITS ────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Why it matters</span>
+  <h2>What JIT gains</h2>
+  <div class="three-col">
+    <div>
+      <h3>Correctness</h3>
+      <p>Declared and derived state agree after every successful mutation, or nothing changes.</p>
+    </div>
+    <div>
+      <h3>Operations</h3>
+      <p>Crashes, conflicts, and interruption share one recovery story instead of command-specific cleanup.</p>
+    </div>
+    <div>
+      <h3>Agentability</h3>
+      <p>Plans are deterministic, errors are typed, and repository evidence is safe to inspect and retry.</p>
+    </div>
+  </div>
+  <div class="note">The feature strengthens JIT's core promise: plain JSON in Git, without accepting partially coherent JSON.</div>
+</section>
+
+<!-- ── PIPELINE ────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Mental model</span>
+  <h2>The entire contract in one pipeline</h2>
+  <div class="item-decl">CaptureSpec -&gt; RepositoryImage -&gt; MaterializationPlan -&gt; revalidate preimages -&gt; recoverable apply</div>
+  <ol>
+    <li>Bound exactly which repository evidence the operation may read.</li>
+    <li>Capture an immutable, closed image of that evidence.</li>
+    <li>Derive one deterministic delta without filesystem access.</li>
+    <li>Revalidate every preimage and publish the complete delta atomically.</li>
+  </ol>
+  <p class="small">Reads define the plan; the plan owns its captured image; storage publishes but does not
+     invent semantics. Types: <code>CaptureSpec</code> and <code>RepositoryImage</code> in
+     <code>repository_state/image.rs</code>; <code>MaterializationPlan</code> in
+     <code>repository_state/mod.rs</code>; the session boundary <code>capture</code> and <code>apply</code> in
+     <code>storage/repository_state_store.rs</code>.</p>
+</section>
+
+<!-- ── CAPTURE: THE TYPE ───────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Capture</span>
+  <h2>A closed final repository view</h2>
+<pre><code class="language-rust" data-trim>pub struct RepositoryImage {
+    layout: RepositoryLayout,
+    spec: CaptureSpec,
+    entries: BTreeMap&lt;VirtualPath, RepositoryEntry&gt;,
+    listings: BTreeMap&lt;VirtualPath, ListingFingerprint&gt;,
+    pinned: BTreeMap&lt;(String, String), PinnedDocumentEvidence&gt;,
+    linked_worktree: BTreeMap&lt;VirtualPath, LinkedWorktreeEvidence&gt;,
+}</code></pre>
+  <p class="small">Verbatim from <code>crates/jit/src/repository_state/image.rs</code>. Root evidence is not a
+     field here: <code>RepositoryLayout</code> holds it, recording the worktree root and the data root
+     separately (<code>repository_state/path.rs</code>).</p>
+</section>
+
+<!-- ── CAPTURE: WHAT IT CLOSES OVER ────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Capture</span>
+  <h2>What the image closes over</h2>
+  <ul>
+    <li>Virtual paths separate semantic identity from physical layout and custom data roots.</li>
+    <li>Directory listings, pinned documents, and linked worktrees are captured explicitly, not re-read
+        during planning.</li>
+    <li>An undiscovered read is a capture error rather than a fallback to ambient filesystem access.</li>
+  </ul>
+  <div class="warning">One declaration reads absence as empty rather than as an error: an absent
+     <code>templates.toml</code> yields an empty template registry
+     (<code>repository_state/mod.rs</code>).</div>
+</section>
+
+<!-- ── PURE PLAN ───────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Planning</span>
+  <h2>One closed, fallible planning entry point</h2>
+<pre><code class="language-rust" data-trim>pub fn derive_materialization(
+    image: &amp;RepositoryImage,
+    request: MaterializationRequest&lt;'_&gt;,
+) -&gt; Result&lt;MaterializationPlan, RepositoryStateError&gt;</code></pre>
+  <ul>
+    <li><code>MaterializationRequest</code> is closed with five variants: <code>SemanticMutation</code>,
+        <code>RenderConfiguredProjections</code>, <code>RepairDerivedState</code>, <code>Initialize</code>,
+        <code>ApplyProfile</code>.</li>
+    <li>Three of them carry <code>RepositoryDeclarations</code> parsed from the captured image, so derivation
+        reads nothing the image does not already hold.</li>
+  </ul>
+  <p class="small">The signature above is exact, from <code>crates/jit/src/repository_state/mod.rs</code>,
+     with only its opening brace elided. Derivation is fallible and performs no filesystem access.</p>
+</section>
+
+<!-- ── DETERMINISM ─────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Planning</span>
+  <h2>Determinism is a tested property</h2>
+  <ul>
+    <li>Plan identity is a SHA-256 digest over the layout, capture spec, entries, listings, pinned evidence,
+        linked worktrees, semantic seed, intent, and normalized delta, emitted as bare lowercase hex with no
+        algorithm prefix.</li>
+    <li>Reordering a delta's actions does not change plan identity, and equal plan identity tracks equal
+        normalized deltas.</li>
+    <li>Rendering a managed document against a claim set is idempotent, and every byte outside a claimed
+        region survives unchanged and in order.</li>
+  </ul>
+  <p class="small">Properties: <code>prop_plan_hash_invariant_under_action_reorder</code>,
+     <code>prop_plan_hash_equality_matches_normalized_delta_equality</code>
+     (<code>repository_state/image_plan_hash_property_tests.rs</code>);
+     <code>prop_render_managed_document_round_trips</code>
+     (<code>repository_state/managed_document_property_tests.rs</code>).</p>
+</section>
+
+<!-- ── WHAT IS INSPECTABLE ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Planning</span>
+  <h2>What you can actually inspect</h2>
+  <ul>
+    <li>The plan is an in-memory value. <code>MaterializationPlan</code> derives
+        <code>Debug, Clone, PartialEq, Eq</code> and no serializer, and no command emits it.</li>
+    <li>The emitted preview is <code>jit profile apply --dry-run --json</code>, which reports the same plan
+        identity alongside every package target.</li>
+    <li>Its target vocabulary is <code>path</code>, <code>action</code>, <code>executable</code>; the underlying
+        delta vocabulary is <code>CreateDirectory</code>, <code>WriteFile</code>, <code>SetMode</code>,
+        <code>DeleteFile</code>, each carrying the preimage it expects.</li>
+  </ul>
+  <p class="small">Types: <code>MaterializationPlan</code> in <code>repository_state/mod.rs</code>;
+     <code>ProfilePlanResult</code> and <code>ProfileTargetChange</code> in
+     <code>crates/jit/src/profile/application.rs</code>; <code>RepositoryAction</code> in
+     <code>repository_state/image.rs</code>.</p>
+</section>
+
+<!-- ── THE DRY-RUN DOCUMENT ────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Planning</span>
+  <h2>The one plan document that is emitted</h2>
+<pre><code class="language-json" data-trim>{
+  "id": "jit-dogfood",
+  "plan_hash": "&lt;64 lowercase hex digits&gt;",
+  "status": "would_apply",
+  "targets": [
+    { "action": "create", "executable": false, "path": ".agents/skills/…" }
+  ],
+  "version": "1.0.0"
+}</code></pre>
+  <p class="caption">Live output of <code>jit profile apply jit-dogfood --dry-run --json</code> in a freshly
+     initialized repository, elided to one of its 69 targets, with the target path truncated. The digest is a
+     placeholder because plan identity is repository-specific: <code>plan_hash</code> digests the captured
+     image including its layout roots (<code>repository_state/image.rs</code>).</p>
+</section>
+
+<!-- ── PUBLICATION ─────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Publication</span>
+  <h2>Publication has one failure model</h2>
+  <table>
+    <thead><tr><th>Narrative step</th><th>Responsibility</th><th>Failure result</th></tr></thead>
+    <tbody>
+      <tr><td>capture</td><td>record exact preimages and root identity</td><td>no writes</td></tr>
+      <tr><td>prepare</td><td>stage every target and a durable journal</td><td>recover the old state</td></tr>
+      <tr><td>publish</td><td>replace the complete validated file set</td><td>roll forward or roll back</td></tr>
+      <tr><td>commit</td><td>make publication irreversible, clean the journal</td><td>complete new state</td></tr>
+    </tbody>
+  </table>
+  <div class="note">The observable contract is all-old or all-new, across interruption and process restart: every mutation session opens by recovering any pending journal first.</div>
+  <p class="small">Those four words are this deck's labels, not a code enum. The journal records
+     <code>RepositoryActionProgress</code> (<code>Planned</code>, <code>Prepared</code>, <code>BackupReady</code>,
+     <code>Published</code>, <code>Restored</code>) per action and <code>TransactionDecision</code>
+     (<code>Prepared</code>, <code>Committed</code>, <code>RolledBack</code>) per transaction, in
+     <code>storage/transaction_journal.rs</code>.</p>
+</section>
+
+<!-- ── CONSUMERS ───────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Adoption</span>
+  <h2>One path serves the mutation surface</h2>
+  <table>
+    <thead><tr><th>Consumer</th><th>Coupled state planned together</th></tr></thead>
+    <tbody>
+      <tr><td>init / re-init</td><td>config, rules, schemas, attributes, projections</td></tr>
+      <tr><td>profile apply</td><td>contributions, assets, regions, provenance, audit</td></tr>
+      <tr><td>config / gate / template edits</td><td>declaration plus every affected materialization</td></tr>
+      <tr><td>project render</td><td>all selected targets, including shared targets</td></tr>
+      <tr><td>issue / dependency / docs</td><td>records, index, events, and coupled outputs</td></tr>
+      <tr><td>export to an in-repository target</td><td>source mutation and the published target</td></tr>
+    </tbody>
+  </table>
+  <p class="small">Two neighbours sit outside it by design. Claims and leases live under <code>.git/jit</code>,
+     outside both repository roots (<code>@/charter/D-4</code>): the claims log appends and the claims index
+     publishes by temp file plus rename (<code>storage/claim_coordinator.rs</code>,
+     <code>storage/worktree_paths.rs</code>). An export to a path outside the repository publishes through the
+     external atomic-write path, and snapshot staging writes into a temporary directory first
+     (<code>repository_state/export.rs</code>, <code>commands/snapshot.rs</code>).</p>
+</section>
+
+<!-- ── MANAGED PROSE ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Managed prose</span>
+  <h2>One marker engine, multiple policies</h2>
+  <div class="two-col">
+    <div>
+      <h3>Mechanics are shared</h3>
+      <ul>
+        <li>strict marker parsing</li>
+        <li>nested-region support</li>
+        <li>crossing and duplicate rejection</li>
+        <li>byte-preserving splice</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Semantics stay separate</h3>
+      <ul>
+        <li>profile ownership</li>
+        <li>projection ownership</li>
+        <li>placement policy</li>
+        <li>rendering policy</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note">Sharing the primitive removes duplicate marker logic without pretending every producer owns prose in the same way.</div>
+  <p class="small">Engine: <code>compose_managed_documents</code> and <code>render_managed_document</code> in
+     <code>repository_state/managed_document.rs</code>. Both producers call it: projections in
+     <code>repository_state/materialize.rs</code>, profile regions in <code>repository_state/profile_apply.rs</code>.</p>
+</section>
+
+<!-- ── VALIDATION AND REPAIR ───────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Validation</span>
+  <h2>Repair derived state, never redefine authority</h2>
+<pre><code class="language-bash" data-trim>jit validate          # diagnose missing or stale materializations
+jit validate --fix    # recompute from declarations; publish one plan
+jit validate          # exact, idempotent clean result</code></pre>
+  <ul>
+    <li>Expected bytes are recomputed from declared configuration and registries.</li>
+    <li>Unrelated content and authored rule prose stay byte-for-byte intact.</li>
+    <li>Malformed or ambiguous ownership fails before publication.</li>
+  </ul>
+  <div class="warning">A projection may repair derived assertions. It must not silently become authority over authored semantics.</div>
+  <p class="small">Repair routes through <code>MaterializationRequest::RepairDerivedState</code>, the same
+     producer graph as ordinary mutation. Idempotence is asserted in <code>commands/validate.rs</code>.</p>
+</section>
+
+<!-- ── AUTHORITY ───────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Authority</span>
+  <h2>The source-of-truth hierarchy is explicit</h2>
+  <table>
+    <thead><tr><th>State</th><th>Role</th><th>May override declarations?</th></tr></thead>
+    <tbody>
+      <tr><td>config + registries</td><td>semantic authority</td><td><span class="badge green">yes, by authorship</span></td></tr>
+      <tr><td>schemas + projections + managed regions</td><td>derived materialization</td><td><span class="badge gray">no</span></td></tr>
+      <tr><td>profile records</td><td>provenance and ownership</td><td><span class="badge gray">no</span></td></tr>
+      <tr><td>transaction journals</td><td>recovery state</td><td><span class="badge gray">no</span></td></tr>
+    </tbody>
+  </table>
+  <p class="small">The project invariant <code>derived-state-coherence</code> states this, and
+     <code>.jit/invariants.toml</code> declares it <code>kind = "advisory"</code>: it is documentation, not a
+     checked rule. What mechanically holds the third column is the closed producer graph plus the
+     <code>ExpectedPreimage</code> that every action revalidates at publication
+     (<code>repository_state/image.rs</code>).</p>
+</section>
+
+<!-- ── LINE COUNT ──────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Complexity accounting</span>
+  <h2>The honest line-count result</h2>
+  <table>
+    <thead><tr><th>Scope (stated path filter)</th><th>Files</th><th>Added</th><th>Deleted</th><th>Net</th></tr></thead>
+    <tbody>
+      <tr><td><code>-- crates/jit</code></td><td>199</td><td>48,806</td><td>23,843</td><td><strong>+24,963</strong></td></tr>
+      <tr><td><code>-- crates/jit/src</code></td><td>127</td><td>44,799</td><td>21,690</td><td><strong>+23,109</strong></td></tr>
+    </tbody>
+  </table>
+  <p class="small">Both rows reproduce exactly from
+     <code>git diff --shortstat 82a8cf3f^..46ed1b94 -- &lt;scope&gt;</code>. <code>82a8cf3f</code> is a claim
+     commit touching no code, so its parent is the correct zero-code baseline; the first code commit is
+     <code>aef6dd26</code>. No wider scope is claimed, because no wider path filter reproduces one.</p>
+  <div class="warning">This work is net additive. Its simplicity claim is structural: fewer authorities and fewer ways to publish, not fewer lines.</div>
+</section>
+
+<!-- ── DELETION ────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Complexity accounting</span>
+  <h2>What the deleted lines were</h2>
+  <div class="two-col">
+    <div>
+      <h3>Deleted profile engines</h3>
+      <ul>
+        <li><code>profile/planner.rs</code></li>
+        <li><code>profile/snapshot.rs</code></li>
+        <li><code>profile/render.rs</code></li>
+        <li><code>profile/drift.rs</code></li>
+        <li><code>profile/preset.rs</code></li>
+      </ul>
+    </div>
+    <div>
+      <h3>Deleted storage predecessors</h3>
+      <ul>
+        <li><code>storage/artifact_mutation.rs</code></li>
+        <li><code>storage/transaction_action.rs</code></li>
+        <li><code>storage/recovery_coordinator.rs</code></li>
+        <li><code>storage/config_store.rs</code></li>
+        <li><code>storage/gitattributes.rs</code></li>
+      </ul>
+    </div>
+  </div>
+  <p class="small">Source-tree movement over the same commit range, by scope. At <code>crates/jit/src</code>:
+     20 added, 10 deleted, 7 renamed, 90 modified. At <code>crates/jit</code>: 23 added, 12 deleted, 7 renamed,
+     157 modified. Both from <code>git diff --name-status -M 82a8cf3f^..46ed1b94 -- &lt;scope&gt;</code>; the ten
+     files above are the deletions at <code>crates/jit/src</code>.</p>
+</section>
+
+<!-- ── COST ────────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Performance</span>
+  <h2>What a command costs, from a recorded artifact</h2>
+  <table>
+    <thead><tr><th>Command entry</th><th><code>median_ms</code></th><th><code>p95_ms</code></th><th><code>lock_files_created</code></th></tr></thead>
+    <tbody>
+      <tr><td><code>version</code></td><td>2.75</td><td>3.24</td><td>0</td></tr>
+      <tr><td><code>issue_show_single_read</code></td><td>4.55</td><td>4.89</td><td>0</td></tr>
+      <tr><td><code>issue_list</code></td><td>17.08</td><td>17.93</td><td>1</td></tr>
+      <tr><td><code>query_available</code></td><td>17.41</td><td>18.11</td><td>1</td></tr>
+      <tr><td><code>issue_update_mutation</code></td><td><strong>113.47</strong></td><td>116.41</td><td>0</td></tr>
+      <tr><td><code>issue_update_bulk_mutation_k30_j15</code></td><td><strong>1583.22</strong></td><td>1597.04</td><td>1</td></tr>
+    </tbody>
+  </table>
+  <p class="small">Every figure above:
+     <code>dev/studies/perf/session-cost-c488ef85.json &gt; commands[] &gt; &lt;name&gt; &gt; &lt;statistic&gt;</code>.
+     20 warm samples per command over a 665-issue corpus; machine, filesystem caveat, and timing method are
+     recorded in the same artifact.</p>
+</section>
+
+<!-- ── THE BOUND ───────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Performance</span>
+  <h2>What bounds the work</h2>
+  <p>Automatic readiness transitions open repository mutation sessions only for issues that are actually
+     eligible. Blocked backlog issues cost none.</p>
+  <ul>
+    <li>A deterministic model of one eligible Backlog issue, 64 blocked ones, and their open blocker asserts
+        exactly two session opens
+        (<code>test_check_auto_transitions_opens_sessions_only_for_eligible_backlog_issues</code>,
+        <code>crates/jit/src/commands/issue.rs</code>).</li>
+    <li>The same model's 65 Backlog issues <em>predict</em> 130 session opens for a path that opens a session
+        per Backlog issue. The 2 is measured; the 130 is a model prediction.</li>
+  </ul>
+  <p class="small">The 130 is recorded as "130 predicted" in the narrative archives
+     <code>dev/archive/cdc840ad-completion-report.md</code> and
+     <code>dev/archive/cdc840ad-progress.json</code>.</p>
+</section>
+
+<!-- ── THE BOUND (CONT.) ───────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Performance</span>
+  <h2>What bounds the work (cont.)</h2>
+  <ul>
+    <li>Bulk update carries the same bound: one session per issue that needs a change, plus one shared
+        verification session that confirms the rest are no-ops
+        (<code>test_apply_bulk_update_session_budget_scales_with_issues_needing_change</code>,
+        <code>crates/jit/src/commands/bulk_update.rs</code>).</li>
+    <li>Repository size is not the cost driver. Whole-repository validation recorded
+        <code>duration_ms</code> 1536 and 1538 in two <code>repo-validate</code> gate runs, at commits
+        <code>a12666a2</code> and <code>8b02e864</code>.</li>
+  </ul>
+  <p class="small">Gate-run artifacts:
+     <code>.jit/gate-runs/3e8ea1d1-3b40-49d2-9f03-f43ac2284b91/result.json</code> and
+     <code>.jit/gate-runs/b8c84e03-2388-4def-a5ae-ec859229536b/result.json</code>, field
+     <code>duration_ms</code>. Measure session opens and elapsed time together: latency alone does not reveal
+     an accidental per-issue recapture loop.</p>
+</section>
+
+<!-- ── EVIDENCE ────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Quality</span>
+  <h2>Completion evidence, and what counts as evidence</h2>
+  <div class="two-col">
+    <div>
+      <h3>What is recorded</h3>
+      <ul>
+        <li>15 dependencies in the epic's transitive closure, all Done</li>
+        <li><code>cargo-ci</code> recorded 3,784 passed, 0 failed, 14 ignored at commit <code>3dd32960</code></li>
+        <li>the multi-category gate sweep is recorded on the cutover child <code>661d6be2</code>, which requires
+            11 gate keys; the epic record itself requires <code>repo-validate</code></li>
+      </ul>
+    </div>
+    <div>
+      <h3>What makes it evidence</h3>
+      <ul>
+        <li><code>.jit/gates.toml</code> declares <code>holistic-review</code>, whose checker runs a reviewer
+            distinct from the building agent</li>
+        <li>the current hardening epic <code>1cc809de</code> lists that gate in <code>gates_required</code></li>
+        <li>a review authored by the agent that built the work is self-attestation, whatever it concludes</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ── FUTURE ──────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Future development</span>
+  <h2>Where this goes next</h2>
+  <ol>
+    <li><strong>Performance as a maintained contract:</strong> the session-cost profile is a checked-in artifact
+        with recorded machine, method, and per-command statistics, and session-open budgets are asserted by
+        tests rather than by recollection.</li>
+    <li><strong>Explainability:</strong> expose plan and repair previews from the existing pure planner, on the
+        path that already emits a dry run.</li>
+    <li><strong>Profile lifecycle:</strong> build safe upgrade and removal on captured ownership and provenance,
+        without a second planner.</li>
+    <li><strong>Typed integrations:</strong> let new consumers contribute typed intent rather than acquire
+        private publication logic.</li>
+  </ol>
+</section>
+
+<!-- ── CORRECTION INVENTORY: A1 (1/2) ──────────────────────────────────── -->
+<section>
+  <span class="seclabel">Correction inventory</span>
+  <h2>Audit findings A1: falsifiable errors</h2>
+  <table>
+    <thead><tr><th>Id</th><th>Corrected claim, and where it appears</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>A1-1</td><td>"One closed, fallible planning entry point" states the real
+          <code>derive_materialization</code> signature, its closed 5-variant request, and its fallible return.</td>
+          <td><code>repository_state/mod.rs</code></td></tr>
+      <tr><td>A1-2</td><td>"What you can actually inspect" states that the plan carries no serializer; the
+          emitted document is the profile dry run, with bare-hex plan identity.</td>
+          <td><code>repository_state/mod.rs</code>; <code>profile/application.rs</code>; live command output</td></tr>
+      <tr><td>A1-3</td><td>"What bounds the work" states 130 as a 65-issue model prediction and 2 as the
+          measured result.</td>
+          <td><code>dev/archive/cdc840ad-progress.json</code>; <code>commands/issue.rs</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── CORRECTION INVENTORY: A1 (2/2) ──────────────────────────────────── -->
+<section>
+  <span class="seclabel">Correction inventory</span>
+  <h2>Audit findings A1: falsifiable errors (cont.)</h2>
+  <table>
+    <thead><tr><th>Id</th><th>Corrected claim, and where it appears</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>A1-4</td><td>No holistic-review verdict is claimed anywhere in this deck. "Completion evidence"
+          claims only that a gate with an independent reviewer is declared and required.</td>
+          <td><code>.jit/gates.toml</code>; <code>gates_required</code> of <code>1cc809de</code></td></tr>
+      <tr><td>A1-5</td><td>"A closed final repository view" shows all six <code>RepositoryImage</code> fields,
+          with root evidence located inside <code>RepositoryLayout</code>.</td>
+          <td><code>repository_state/image.rs</code>; <code>repository_state/path.rs</code></td></tr>
+      <tr><td>A1-6</td><td>"The honest line-count result" keeps only the two scopes that reproduce, each with
+          its path filter, and names <code>aef6dd26</code> as the first code commit.</td>
+          <td><code>git diff --shortstat 82a8cf3f^..46ed1b94</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── CORRECTION INVENTORY: A2 (1/3) ──────────────────────────────────── -->
+<section>
+  <span class="seclabel">Correction inventory</span>
+  <h2>Audit findings A2: framing, part one</h2>
+  <table>
+    <thead><tr><th>Id</th><th>Corrected claim</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>A2-1</td><td>Lock-file creation is a measured column of the cost table, not a load-bearing word.</td>
+          <td>perf artifact, <code>lock_files_created</code></td></tr>
+      <tr><td>A2-2</td><td>Every timing comes from a recorded artifact stating samples, warm state, machine, and
+          method. No results table holds a prose cell.</td>
+          <td>perf artifact, <code>method</code>, <code>machine</code></td></tr>
+      <tr><td>A2-3</td><td>The predecessor's uncorroborated archived prose figure for the epic-transition cost
+          is not restated; the mutation cost shown here is artifact-backed.</td>
+          <td>perf artifact, <code>median_ms</code></td></tr>
+      <tr><td>A2-4</td><td>The session bound is stated for bulk update too, so it is not scoped past its
+          evidence.</td>
+          <td><code>commands/bulk_update.rs</code></td></tr>
+      <tr><td>A2-5</td><td>Claims and leases are named as outside the transaction and both repository roots,
+          with their own publication path.</td>
+          <td><code>storage/claim_coordinator.rs</code></td></tr>
+    </tbody>
+  </table>
+  <p class="small">"perf artifact" above is
+     <code>dev/studies/perf/session-cost-c488ef85.json</code>, read under <code>commands[]</code>.</p>
+</section>
+
+<!-- ── CORRECTION INVENTORY: A2 (2/3) ──────────────────────────────────── -->
+<section>
+  <span class="seclabel">Correction inventory</span>
+  <h2>Audit findings A2: framing, part two</h2>
+  <table>
+    <thead><tr><th>Id</th><th>Corrected claim</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>A2-6</td><td>The export row covers in-repository targets only; external destinations and snapshot
+          staging are named as separate paths.</td>
+          <td><code>repository_state/export.rs</code>; <code>commands/snapshot.rs</code></td></tr>
+      <tr><td>A2-7</td><td>The boundary is stated as tracked semantic state, and the gitignored classes with
+          private writers are enumerated.</td>
+          <td><code>.gitignore</code>; <code>storage/worktree_identity.rs</code></td></tr>
+      <tr><td>A2-8</td><td>The multi-category gate sweep is attributed to the cutover child
+          <code>661d6be2</code>, with the epic's own requirement stated.</td>
+          <td><code>gates_required</code> of <code>661d6be2</code> and <code>cdc840ad</code></td></tr>
+      <tr><td>A2-9</td><td>Every file-movement count states its scope, and both scopes are given.</td>
+          <td><code>git diff --name-status -M 82a8cf3f^..46ed1b94</code></td></tr>
+      <tr><td>A2-10</td><td>The footnote states that <code>82a8cf3f</code> touches no code and that
+          <code>aef6dd26</code> is the first code commit.</td>
+          <td><code>git show --name-only 82a8cf3f</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── CORRECTION INVENTORY: A2 (3/3) ──────────────────────────────────── -->
+<section>
+  <span class="seclabel">Correction inventory</span>
+  <h2>Audit findings A2: framing, part three</h2>
+  <table>
+    <thead><tr><th>Id</th><th>Corrected claim</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>A2-11</td><td>The whole-repository validation duration appears once, with both recorded gate runs
+          and their commits.</td>
+          <td>two <code>repo-validate</code> gate-run records, <code>duration_ms</code></td></tr>
+      <tr><td>A2-12</td><td>No paraphrase is presented as source: both Rust blocks are copied from their cited
+          file, and no line-delta is claimed for a block.</td>
+          <td><code>image.rs</code>; <code>mod.rs</code></td></tr>
+      <tr><td>A2-13</td><td>The four publication steps are labelled as this deck's narrative, and the recorded
+          per-action and per-transaction vocabularies are named.</td>
+          <td><code>storage/transaction_journal.rs</code></td></tr>
+      <tr><td>A2-14</td><td>The undiscovered-read rule is stated together with its one exception, the absent
+          template registry.</td>
+          <td><code>repository_state/mod.rs</code> declarations capture</td></tr>
+      <tr><td>A2-15</td><td><code>derived-state-coherence</code> is stated as advisory documentation, with the
+          enforcing mechanism named separately.</td>
+          <td><code>.jit/invariants.toml</code>; <code>ExpectedPreimage</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── CORRECTION INVENTORY: A4 ────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Correction inventory</span>
+  <h2>Audit findings A4: deck mechanics</h2>
+  <table>
+    <thead><tr><th>Id</th><th>Corrected claim</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>A4-1</td><td>No math-rendering library is loaded, no rendering hook runs, and no slide carries
+          mathematical notation.</td>
+          <td><code>talk.html</code> head and script block</td></tr>
+      <tr><td>A4-2</td><td>reveal.js 5.1.0 and all three font families are committed under <code>vendor/</code>
+          and referenced by relative path, so the deck presents air-gapped.</td>
+          <td><code>vendor/reveal.js/</code>; <code>vendor/fonts/fonts.css</code></td></tr>
+      <tr><td>A4-3</td><td>Exactly one slide-number chrome per slide: reveal's own counter. No manual counter is
+          written into a section label, so numbering cannot drift from slide order.</td>
+          <td><code>talk.html</code> reveal configuration</td></tr>
+    </tbody>
+  </table>
+  <div class="note">The rule this deck follows: a timing figure names its artifact, the command entry inside it, and the statistic read. An uncited timing is a defect.</div>
+</section>
+
+<!-- ── CLOSING ─────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>Takeaways</h1>
+  <p class="tagline">One final view · one deterministic plan · one recoverable publication</p>
+  <p>JIT gained stronger correctness and simpler authority boundaries, at the cost of a net-additive diff
+     that these slides state under their exact path filters.</p>
+  <p class="caption">Corrections traced against <code>dev/studies/cdc840ad-audit-2026-07-23.md</code>.
+     Deck sources and vendored assets: <code>dev/presentations/1cc809de/</code>.</p>
+</section>
+
+</div></div>
+
+<script src="vendor/reveal.js/reveal.js"></script>
+<script src="vendor/reveal.js/plugin/highlight/highlight.js"></script>
+<script>
+  window.__deckReady = false;
+
+  function initDeck() {
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>
