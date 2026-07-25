@@ -3,7 +3,8 @@
 use crate::domain::artifact_classifier::{
     artifact_mirror_destination, classification_facts_from_evidence,
     resolve_container_destination as derive_container_destination, ArtifactClassificationFacts,
-    ArtifactClassificationPolicy, EmbeddedArtifactOwner, ResolvedContainerDestination,
+    ArtifactClassificationPolicy, CitationScanEvidence, EmbeddedArtifactOwner,
+    ResolvedContainerDestination,
 };
 use crate::domain::artifact_discovery::{
     ArtifactEvidence, ArtifactEvidenceMap, ArtifactListingScope,
@@ -74,7 +75,8 @@ pub fn resolve_container_destination<S: IssueStore>(
     )?)
 }
 
-/// Acquire every source, mirror, marker, and destination listing used by classification.
+/// Acquire every source, mirror, marker, and destination listing used by
+/// classification, plus the text of the declared citation scan universe.
 pub fn collect_artifact_classification_facts<S: IssueStore>(
     storage: &S,
     target: &PlanTarget,
@@ -121,14 +123,60 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
         }
         evidence.insert(destination_root.to_string(), destination);
     }
-    classification_facts_from_evidence(
-        target,
-        destination_root,
-        artifacts,
-        policy,
-        embedded_owners,
-        &evidence,
-    )
+    Ok(ArtifactClassificationFacts {
+        citations: collect_citation_scan_evidence(storage, &policy.citation_scan_roots),
+        ..classification_facts_from_evidence(
+            target,
+            destination_root,
+            artifacts,
+            policy,
+            embedded_owners,
+            &evidence,
+        )?
+    })
+}
+
+/// Read the text of every file the declared citation scan roots reach.
+///
+/// Advisory plan evidence, so no path failure reaches the caller: a declared
+/// root that is absent, a path component that is a symbolic link, a file whose
+/// bytes are not valid UTF-8, and any other unreadable path are skipped, and the
+/// plan is produced from whatever the scan did reach. A root naming one file
+/// contributes that file; a root naming a directory contributes every file
+/// beneath it.
+///
+/// The walk is [`inspect_artifact_evidence`]'s recursive listing, which opens
+/// every component with the no-follow directory handles the rest of the planner
+/// uses, so the scan escapes the repository through no symbolic link and starts
+/// no external process.
+pub(crate) fn collect_citation_scan_evidence<S: IssueStore>(
+    storage: &S,
+    roots: &[String],
+) -> CitationScanEvidence {
+    roots
+        .iter()
+        .map(|root| normalize_artifact_path(root))
+        .filter(|root| !root.is_empty())
+        .flat_map(|root| {
+            match inspect_artifact_evidence(storage, &root, ArtifactListingScope::RecursiveFiles) {
+                Ok(ArtifactEvidence::File(bytes)) => vec![(root, bytes)],
+                Ok(ArtifactEvidence::Directory { entries, .. }) => entries
+                    .into_iter()
+                    .filter_map(|entry| read_scanned_file(storage, entry))
+                    .collect(),
+                _ => Vec::new(),
+            }
+        })
+        .filter_map(|(path, bytes)| String::from_utf8(bytes).ok().map(|text| (path, text)))
+        .collect()
+}
+
+/// Read one listed scan path, skipping everything that is not a regular file.
+fn read_scanned_file<S: IssueStore>(storage: &S, path: String) -> Option<(String, Vec<u8>)> {
+    match inspect_artifact_evidence(storage, &path, ArtifactListingScope::MetadataOnly) {
+        Ok(ArtifactEvidence::File(bytes)) => Some((path, bytes)),
+        _ => None,
+    }
 }
 
 /// Inspect one repository-relative path without following any symlink component.

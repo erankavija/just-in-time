@@ -12,7 +12,7 @@ use crate::domain::artifact_plan::{
     normalize_artifact_path, ArtifactAction, ArtifactEdge, ArtifactOwner, ArtifactPlan,
     ArtifactPlanEntry, ArtifactProvenance, ArtifactVersion, BlockerCode, ContentIdentity, EdgeKind,
     EdgeResolutionMode, EvidenceCode, PendingDeletion, PlanBlocker, PlanError, PlanTarget,
-    PolicyStatus, ReferenceChange, WarningCode,
+    PlanWarning, PolicyStatus, ReferenceChange, WarningCode,
 };
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::Issue;
@@ -47,6 +47,8 @@ pub struct ArtifactClassificationPolicy {
     pub permanent_paths: Vec<String>,
     /// Repository-relative destination root.
     pub archive_root: String,
+    /// Repository-relative roots whose file text the in-content citation scan reads.
+    pub citation_scan_roots: Vec<String>,
 }
 
 impl ArtifactClassificationPolicy {
@@ -66,11 +68,20 @@ impl ArtifactClassificationPolicy {
             archive_root: documentation
                 .map(DocumentationConfig::archive_root)
                 .unwrap_or_default(),
+            citation_scan_roots: documentation
+                .map(DocumentationConfig::citation_scan_roots)
+                .unwrap_or_default(),
         }
         .normalized()
     }
 
     /// Construct an explicit configured policy, primarily for embedded callers and tests.
+    ///
+    /// The policy declares no citation scan universe, so no in-content citation
+    /// warning is derived until [`with_citation_scan_roots`](Self::with_citation_scan_roots)
+    /// supplies one. Authored configuration reaches the universe through
+    /// [`from_documentation`](Self::from_documentation), which carries the
+    /// documented fallback.
     pub fn configured(
         development_root: impl Into<String>,
         managed_paths: Vec<String>,
@@ -83,8 +94,18 @@ impl ArtifactClassificationPolicy {
             managed_paths,
             permanent_paths,
             archive_root: archive_root.into(),
+            citation_scan_roots: Vec::new(),
         }
         .normalized()
+    }
+
+    /// Declare the repository-relative roots the in-content citation scan reads.
+    ///
+    /// The roots need not lie under the development root: a citation that a move
+    /// breaks lives wherever the repository writes it.
+    pub fn with_citation_scan_roots(mut self, roots: Vec<String>) -> Self {
+        self.citation_scan_roots = normalized_paths(roots);
+        self
     }
 
     /// Whether the configured archive root already contains this source.
@@ -129,6 +150,7 @@ impl ArtifactClassificationPolicy {
         self.managed_paths = normalized_paths(self.managed_paths);
         self.permanent_paths = normalized_paths(self.permanent_paths);
         self.archive_root = normalize_artifact_path(&self.archive_root);
+        self.citation_scan_roots = normalized_paths(self.citation_scan_roots);
         self
     }
 }
@@ -201,6 +223,15 @@ pub enum ContainerDestinationState {
     Symlink,
 }
 
+/// Text of the files the citation scan universe reached, keyed by normalized
+/// repository-relative citing path.
+///
+/// Acquired at the storage and planning boundary, where the rest of the plan
+/// evidence is gathered, and read here to derive in-content citation warnings.
+/// A file the scan could not read as UTF-8 text is absent rather than
+/// represented, because the scan is advisory and a plan is produced without it.
+pub type CitationScanEvidence = BTreeMap<String, String>;
+
 /// All I/O-derived facts consumed by pure classification.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ArtifactClassificationFacts {
@@ -210,6 +241,11 @@ pub struct ArtifactClassificationFacts {
     pub embedded_owners: Vec<EmbeddedArtifactOwner>,
     /// Marker/occupancy state for a container destination directory.
     pub container_destination: ContainerDestinationState,
+    /// Scanned file text backing in-content citation warnings. Empty when the
+    /// caller derives facts from a closed evidence snapshot instead of the
+    /// planning boundary's scan, which leaves every other classification
+    /// outcome unchanged.
+    pub citations: CitationScanEvidence,
 }
 
 /// Marker-backed destination chosen from a closed evidence snapshot.
@@ -320,6 +356,11 @@ fn required_resolution_evidence<'a>(
 }
 
 /// Derive source, mirror, and container occupancy facts from closed evidence.
+///
+/// A closed evidence snapshot carries the paths classification names, not the
+/// text of the citation scan universe, so the derived facts declare no citation
+/// evidence and the resulting plan reports no in-content citation warning. The
+/// planning boundary supplies that evidence separately.
 pub fn classification_facts_from_evidence(
     target: &PlanTarget,
     destination_root: &str,
@@ -358,6 +399,7 @@ pub fn classification_facts_from_evidence(
         locations,
         embedded_owners,
         container_destination,
+        citations: CitationScanEvidence::new(),
     })
 }
 
@@ -554,6 +596,7 @@ pub fn classify_artifacts(
                 &unpreservable_parents,
                 &destination_root,
             )
+            .map(|entry| cite_moving_path(entry, &facts.citations))
         })
         .collect::<Result<Vec<_>, PlanError>>()?;
 
@@ -863,6 +906,58 @@ fn classify_entry(
         classified = classified.with_content_identity(identity);
     }
     Ok(classified)
+}
+
+/// Warn about every in-content citation the relocation of `entry` would break.
+///
+/// Only a relocating artifact earns warnings: an artifact whose source stays
+/// where it is leaves every citation of that path resolvable, so it contributes
+/// none. The warnings carry no action and no blocker, leaving the plan's
+/// eligibility untouched.
+fn cite_moving_path(entry: ArtifactPlanEntry, citations: &CitationScanEvidence) -> ArtifactPlanEntry {
+    if entry.action() != ArtifactAction::Move {
+        return entry;
+    }
+    let warnings = merge(
+        entry.warnings(),
+        moving_path_citation_warnings(entry.source(), citations),
+    );
+    entry.with_warnings(warnings)
+}
+
+/// One [`WarningCode::MovingPathCitation`] warning per occurrence of `source` in
+/// the text of a scanned file.
+///
+/// Each warning names the citing file with the occurrence's 1-based line and
+/// column, spelled `<citing path>:<line>:<column>`. The position both locates a
+/// citation that structured document edges cannot see — a code comment, an
+/// inline code span, a shell-script line — and keeps every occurrence a distinct
+/// warning under the plan's code-and-path warning identity, so repeated
+/// citations in one file are each reported.
+fn moving_path_citation_warnings(
+    source: &str,
+    citations: &CitationScanEvidence,
+) -> Vec<PlanWarning> {
+    if source.is_empty() {
+        return Vec::new();
+    }
+    citations
+        .iter()
+        .flat_map(|(citing, text)| {
+            text.lines().enumerate().flat_map(move |(index, line)| {
+                line.match_indices(source).map(move |(offset, _)| {
+                    PlanWarning::new(
+                        WarningCode::MovingPathCitation,
+                        Some(format!(
+                            "{citing}:{}:{}",
+                            index + 1,
+                            line[..offset].chars().count() + 1
+                        )),
+                    )
+                })
+            })
+        })
+        .collect()
 }
 
 fn selected_destination_roots(
@@ -2414,6 +2509,209 @@ mod tests {
             .blockers()
             .iter()
             .any(|blocker| blocker.code == BlockerCode::UnpreservableLayout));
+    }
+
+    /// The path whose relocation the citation fixture below would break.
+    const CITED_SOURCE: &str = "dev/active/plan.md";
+
+    /// Scanned file text covering the citation kinds the in-content census in
+    /// `dev/active/8e071e18-investigation.md` measured: a production Rust module
+    /// doc comment, an adopter-facing inline code span, a shell-script comment
+    /// beside an executable default, and one file citing the path twice on a
+    /// single line. The last entry is one of the census's verified
+    /// non-citations, an illustrative JSON sample naming a different path.
+    fn citation_fixture() -> [(&'static str, &'static str); 5] {
+        [
+            (
+                "crates/jit/src/storage/claim_coordinator.rs",
+                "//! Claim coordination.\n//! See design doc: `dev/active/plan.md` - \"Claim Acquisition\"\n",
+            ),
+            (
+                "docs/tutorials/parallel-work-worktrees.md",
+                "## Further reading\n\n- Design document: `dev/active/plan.md`\n",
+            ),
+            (
+                "scripts/benchmark-rust-build.sh",
+                "#!/usr/bin/env bash\n# Outputs (default dev/active/plan.md)\nOUT=\"${BENCH_OUT:-dev/active/plan.md}\"\n",
+            ),
+            (
+                "dev/studies/tooling.md",
+                "Both `dev/active/plan.md` and `dev/active/plan.md` cover it.\n",
+            ),
+            (
+                "docs/concepts/core-model.md",
+                "An illustrative sample: {\"path\": \"dev/design/auth-design.md\"}\n",
+            ),
+        ]
+    }
+
+    fn citations(files: &[(&str, &str)]) -> CitationScanEvidence {
+        files
+            .iter()
+            .map(|(path, text)| ((*path).to_string(), (*text).to_string()))
+            .collect()
+    }
+
+    fn scanned_plan(owners: Vec<ArtifactOwner>, files: &[(&str, &str)]) -> ArtifactPlan {
+        container(
+            vec![explicit(CITED_SOURCE, owners)],
+            ArtifactClassificationFacts {
+                citations: citations(files),
+                ..present_source(CITED_SOURCE)
+            },
+        )
+    }
+
+    fn cited_locations(artifact: &ArtifactPlanEntry) -> Vec<(String, usize, usize)> {
+        artifact
+            .warnings()
+            .iter()
+            .filter(|warning| warning.code == WarningCode::MovingPathCitation)
+            .map(|warning| {
+                let location = warning
+                    .path
+                    .as_deref()
+                    .expect("a citation warning names where it was found");
+                let mut parts = location.rsplitn(3, ':');
+                let column = parts.next().and_then(|part| part.parse().ok());
+                let line = parts.next().and_then(|part| part.parse().ok());
+                match (parts.next(), line, column) {
+                    (Some(citing), Some(line), Some(column)) => (citing.to_string(), line, column),
+                    _ => panic!("{location} does not name a citing path with its position"),
+                }
+            })
+            .collect()
+    }
+
+    fn scanned_text<'a>(files: &[(&'a str, &'a str)], citing: &str) -> &'a str {
+        files
+            .iter()
+            .find(|(path, _)| *path == citing)
+            .map(|(_, text)| *text)
+            .unwrap_or_else(|| panic!("{citing} is not one of the scanned files"))
+    }
+
+    /// The scanned line a warning points at, with the cited path's own column
+    /// range resolved, so a test can inspect what surrounds the occurrence.
+    fn cited_line<'a>(files: &[(&'a str, &'a str)], location: &(String, usize, usize)) -> &'a str {
+        let (citing, line, _) = location;
+        scanned_text(files, citing)
+            .lines()
+            .nth(line - 1)
+            .unwrap_or_else(|| panic!("{citing} has no line {line}"))
+    }
+
+    #[test]
+    fn test_classify_artifacts_warns_once_per_occurrence_of_a_moving_artifact_path_in_scanned_text()
+    {
+        let files = citation_fixture();
+        let plan = scanned_plan(vec![owner("i", State::Done, true)], &files);
+        let artifact = entry(&plan, CITED_SOURCE);
+        assert_eq!(artifact.action(), ArtifactAction::Move);
+        let located = cited_locations(artifact);
+
+        // Every warning points at a real occurrence: reading the file it names
+        // from the line and column it names yields the moving artifact's path.
+        for location in &located {
+            let (citing, line, column) = location;
+            let from_column = cited_line(&files, location)
+                .chars()
+                .skip(column - 1)
+                .collect::<String>();
+            assert!(
+                from_column.starts_with(CITED_SOURCE),
+                "{citing}:{line}:{column} does not locate a citation"
+            );
+        }
+        // Every occurrence earns exactly one warning, counted over the fixture
+        // text independently of the scan, so a file citing the path twice on one
+        // line is reported twice and a file citing another path is silent.
+        for (citing, text) in &files {
+            assert_eq!(
+                located.iter().filter(|(cited, ..)| cited == citing).count(),
+                text.matches(CITED_SOURCE).count(),
+                "{citing} earns one warning per occurrence"
+            );
+        }
+    }
+
+    #[test]
+    fn test_classify_artifacts_reports_citations_in_code_comments_inline_code_spans_and_shell_scripts(
+    ) {
+        let files = citation_fixture();
+        let plan = scanned_plan(vec![owner("i", State::Done, true)], &files);
+        let located = cited_locations(entry(&plan, CITED_SOURCE));
+        let reported = |citing: &str| {
+            located
+                .iter()
+                .filter(|(cited, ..)| cited == citing)
+                .collect::<Vec<_>>()
+        };
+
+        // A production module doc comment, which no document edge records.
+        let comment = reported("crates/jit/src/storage/claim_coordinator.rs");
+        assert!(comment
+            .iter()
+            .all(|location| cited_line(&files, location).trim_start().starts_with("//!")));
+        assert_eq!(comment.len(), 1);
+
+        // An adopter-facing citation inside a markdown inline code span.
+        let span = reported("docs/tutorials/parallel-work-worktrees.md");
+        assert!(span.iter().all(|location| {
+            let (_, _, column) = location;
+            let line = cited_line(&files, location);
+            let before = line.chars().take(column - 1).collect::<String>();
+            let after = line.chars().skip(column - 1 + CITED_SOURCE.chars().count());
+            before.ends_with('`') && after.clone().next() == Some('`')
+        }));
+        assert_eq!(span.len(), 1);
+
+        // A shell script, in a comment and in an executable default alike.
+        let script = reported("scripts/benchmark-rust-build.sh");
+        let commented = script
+            .iter()
+            .filter(|location| cited_line(&files, location).trim_start().starts_with('#'))
+            .count();
+        assert_eq!(commented, 1);
+        assert_eq!(script.len() - commented, 1);
+
+        // A verified non-citation naming a different path stays silent.
+        assert!(reported("docs/concepts/core-model.md").is_empty());
+    }
+
+    #[test]
+    fn test_classify_artifacts_reports_no_citation_warning_for_an_artifact_the_plan_leaves_in_place()
+    {
+        // One citing file and one artifact path across every arm, so the
+        // classified action is the only difference: the relocating arm is the
+        // control proving the fixture really cites the path, and the arms whose
+        // source stays where the citation points report nothing.
+        let files = [("dev/studies/tooling.md", "See `dev/active/plan.md`.\n")];
+        let arms = [
+            (vec![owner("inside", State::Done, true)], ArtifactAction::Move),
+            (
+                vec![
+                    owner("inside", State::Done, true),
+                    owner("outside", State::Done, false),
+                ],
+                ArtifactAction::Copy,
+            ),
+            (
+                vec![owner("active", State::InProgress, true)],
+                ArtifactAction::Retain,
+            ),
+        ];
+
+        for (owners, expected) in arms {
+            let plan = scanned_plan(owners, &files);
+            let artifact = entry(&plan, CITED_SOURCE);
+            assert_eq!(artifact.action(), expected);
+            assert_eq!(
+                cited_locations(artifact).is_empty(),
+                expected != ArtifactAction::Move,
+                "a {expected:?} artifact reports citations only when its source relocates"
+            );
+        }
     }
 
     #[test]
