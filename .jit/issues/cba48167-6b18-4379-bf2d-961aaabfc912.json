@@ -42,6 +42,7 @@
       "path": "dev/presentations/cdc840ad/README.md"
     }
   ],
+  "done_at": "2026-07-25T05:13:41.618613419Z",
   "first_ready_at": "2026-07-25T05:02:25.329636482Z",
   "gates_required": [
     "doc-review",
@@ -67,7 +68,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Archive the predecessor deck behind a tombstone",
-  "updated_at": "2026-07-25T05:10:52.810770563Z"
+  "updated_at": "2026-07-25T05:13:41.618613419Z"
 }
