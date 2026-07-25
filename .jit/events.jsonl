@@ -9692,3 +9692,6 @@
 {"assignee":"agent:jit-execution-lead","id":"aa3ee4dd-372b-4ab2-b25f-e2089ece8867","issue_id":"b4d1a2c8-d408-46d0-b0b6-dc3e30283420","timestamp":"2026-07-25T21:33:11.510763518Z","type":"issue_claimed"}
 {"fields":["documents"],"id":"9d08cdbe-47f1-4b21-9d81-ef6ac249131e","issue_id":"a9b5dd08-c6ae-4add-99f1-275289e43f0c","timestamp":"2026-07-25T21:35:34.514333167Z","type":"issue_updated","updated_by":"doc-remove"}
 {"fields":["documents"],"id":"b5e71d0b-9b14-4539-98bf-377cab3ce1cb","issue_id":"a9b5dd08-c6ae-4add-99f1-275289e43f0c","timestamp":"2026-07-25T21:35:34.646200529Z","type":"issue_updated","updated_by":"doc-add"}
+{"gate_key":"repo-validate","id":"0c66dd4c-d835-479c-8e08-4c5668730193","issue_id":"b4d1a2c8-d408-46d0-b0b6-dc3e30283420","timestamp":"2026-07-25T21:37:12.159602149Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"760261f0-0697-4e88-a141-d764c8aee66d","issue_id":"b4d1a2c8-d408-46d0-b0b6-dc3e30283420","timestamp":"2026-07-25T21:37:25.663725002Z","to":"done","type":"issue_state_changed"}
+{"id":"55b74b5c-88d7-42ea-82a5-f73890e46f86","issue_id":"b4d1a2c8-d408-46d0-b0b6-dc3e30283420","timestamp":"2026-07-25T21:37:25.663725002Z","type":"issue_completed"}
