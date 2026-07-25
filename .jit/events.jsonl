@@ -9391,3 +9391,4 @@
 {"gate_key":"plan-review","id":"75bb04b2-84d9-4f52-a805-db62cb9fefa2","issue_id":"55fe8ec2-880f-4380-91f2-97f4daf71bda","timestamp":"2026-07-25T10:15:33.448726151Z","type":"gate_failed","updated_by":"auto:executor"}
 {"fields":["description"],"id":"7e1e0224-bdd1-4168-bfd4-43aa0807a515","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-25T10:25:06.417635763Z","type":"issue_updated","updated_by":"issue-update"}
 {"gate_key":"plan-review","id":"7c763d82-b7c0-4b23-9697-d0f08582419f","issue_id":"55fe8ec2-880f-4380-91f2-97f4daf71bda","timestamp":"2026-07-25T10:55:17.169385547Z","type":"gate_failed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"e0763c3b-c2d3-4c24-a662-16dbd7bf6230","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-25T11:16:31.749113397Z","type":"issue_updated","updated_by":"issue-update"}
