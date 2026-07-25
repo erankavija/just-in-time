@@ -21,6 +21,11 @@
     "holistic-review"
   ],
   "gates_status": {
+    "holistic-review": {
+      "status": "failed",
+      "updated_at": "2026-07-25T05:31:31.239042064Z",
+      "updated_by": "auto:executor"
+    },
     "repo-validate": {
       "status": "passed",
       "updated_at": "2026-07-25T05:27:33.206961893Z",
@@ -36,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Repository-state quality hardening",
-  "updated_at": "2026-07-25T05:27:33.206961893Z"
+  "updated_at": "2026-07-25T05:31:31.239042064Z"
 }

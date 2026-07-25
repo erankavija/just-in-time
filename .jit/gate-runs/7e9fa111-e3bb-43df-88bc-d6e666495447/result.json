@@ -1,0 +1,59 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "807e8c69f5c03bfde22d4ad6078b7770430ab2ea",
+  "completed_at": "2026-07-25T05:31:30.965403543Z",
+  "duration_ms": 206573,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/gate.rs",
+        "id": "F1",
+        "line": 246,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/success_criteria/REQ-08"
+        ],
+        "severity": "high",
+        "summary": "REQ-08 is unmet: config/gate-presets remains a repeated runtime path and ALL_KNOWN is a non-enforced manual mirror."
+      },
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/storage/memory.rs",
+        "id": "F2",
+        "line": 334,
+        "origin": "pre-existing",
+        "severity": "medium",
+        "summary": "InMemoryStorage can panic on an invalid issue ID while constructing an issue VirtualPath instead of returning an error."
+      },
+      {
+        "disposition": "advisory",
+        "file": ".jit/config.toml",
+        "id": "F3",
+        "line": 12,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/success_criteria/REQ-16"
+        ],
+        "severity": "medium",
+        "summary": "Presentation archival bypassed the supported archival workflow because dev/presentations is not an archive-managed path."
+      }
+    ],
+    "summary": "REQ-08 is unmet because a fixed repository path remains runtime-string-based and the claimed known-path inventory is manually mirrored.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "1cc809de-4669-45d4-960f-f881e716663d",
+  "message": null,
+  "run_id": "7e9fa111-e3bb-43df-88bc-d6e666495447",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T05:28:04.391709830Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10423 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f97be-b0ea-7bf2-9218-72eedde4f5dd\n--------\nuser\n--- 10410 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. [High, blocking] REQ-08 is not fully met: the fixed `.jit/config/gate-presets` path remains repeatedly constructed from runtime strings (for example [gate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/gate.rs:246)), while [VirtualPath::ALL_KNOWN](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/path.rs:237) is a hand-maintained mirror that cannot enforce complete coverage. This contradicts the criterion that well-known repository paths are compile-time constants.\n\n2. [Medium, advisory, pre-existing] The default library still has a reachable panic path: [InMemoryStorage::issue_vpath](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/memory.rs:334) uses `expect` after incorporating an ID into a path. An invalid ID containing a separator/control character makes `VirtualPath::data` fail and panics rather than returning an error.\n\n3. [Medium, advisory] The deck archive was performed outside JIT’s archival mechanism. [config.toml](/home/vkaskivuo/Projects/just-in-time/.jit/config.toml:12) excludes `dev/presentations` from managed paths, and the archival planner rejects such selected roots. The tombstone and reference repair are present, but future presentation archives cannot use the repository’s supported archival workflow.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-08 is unmet because a fixed repository path remains runtime-string-based and the claimed known-path inventory is manually mirrored.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-08 is unmet: config/gate-presets remains a repeated runtime path and ALL_KNOWN is a non-enforced manual mirror.\",\"file\":\"crates/jit/src/commands/gate.rs\",\"line\":246,\"references\":[\"@/issue/1cc809de/success_criteria/REQ-08\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"InMemoryStorage can panic on an invalid issue ID while constructing an issue VirtualPath instead of returning an error.\",\"file\":\"crates/jit/src/storage/memory.rs\",\"line\":334},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Presentation archival bypassed the supported archival workflow because dev/presentations is not an archive-managed path.\",\"file\":\".jit/config.toml\",\"line\":12,\"references\":[\"@/issue/1cc809de/success_criteria/REQ-16\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

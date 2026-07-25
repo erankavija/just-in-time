@@ -9343,3 +9343,4 @@
 {"from":"in_progress","id":"c92834b9-940b-4706-ab4c-4d80f39cfe00","issue_id":"9ee14023-67cc-4b2a-9902-e6bb32a2e5fc","timestamp":"2026-07-25T05:26:35.177293395Z","to":"done","type":"issue_state_changed"}
 {"id":"23fbccd1-1422-42b2-911f-442b995736e0","issue_id":"9ee14023-67cc-4b2a-9902-e6bb32a2e5fc","timestamp":"2026-07-25T05:26:35.177293395Z","type":"issue_completed"}
 {"gate_key":"repo-validate","id":"80b5e143-2a08-4d60-8663-4c51b85ffb81","issue_id":"1cc809de-4669-45d4-960f-f881e716663d","timestamp":"2026-07-25T05:27:33.206961893Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"1b24ec8a-007c-4838-a8b1-d3323087f3de","issue_id":"1cc809de-4669-45d4-960f-f881e716663d","timestamp":"2026-07-25T05:31:31.239042064Z","type":"gate_failed","updated_by":"auto:executor"}
