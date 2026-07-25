@@ -1,0 +1,26 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-25T05:35:44.910193342Z",
+  "context": {},
+  "created_at": "2026-07-25T05:34:41.613797888Z",
+  "dependencies": [],
+  "description": "Close REQ-08's compile-time-constant clause for the one well-known repository path that still reaches production as a runtime string, and make the known-path inventory structurally self-enforcing rather than hand-maintained.\n\n## Background\n\nThe independent `holistic-review` gate on epic `1cc809de` failed with one blocking finding against `@/issue/1cc809de/success_criteria/REQ-08`:\n\n> REQ-08 is not fully met: the fixed `.jit/config/gate-presets` path remains repeatedly constructed from runtime strings (for example `crates/jit/src/commands/gate.rs:246`), while `VirtualPath::ALL_KNOWN` (`crates/jit/src/repository_state/path.rs:237`) is a hand-maintained mirror that cannot enforce complete coverage. This contradicts the criterion that well-known repository paths are compile-time constants.\n\nBoth halves were recorded as deferred follow-ups during wave 6 on the reasoning that the approved plan enumerated the const set. That reasoning does not make the criterion met: REQ-08 says well-known repository file paths are compile-time constants, and `config/gate-presets` is one.\n\n`ALL_KNOWN`'s own doc comment states the defect: \"Adding a new const without listing it here leaves it unproven.\" That is the same hand-maintained-mirror class REQ-08 already fixed for repair-target coverage by deriving it from the repair planner's declaration, left standing in the very type wave 5 introduced.\n\n## Production sites\n\n`config/gate-presets` reaches production as a runtime string at:\n\n- `crates/jit/src/commands/gate.rs:246` — `VirtualPath::data(\"config/gate-presets\")?`\n- `crates/jit/src/commands/gate.rs:255` — `format!(\"config/gate-presets/{name}\")`\n- `crates/jit/src/commands/gate.rs:284` — `\"config/gate-presets\".to_string()`\n- `crates/jit/src/commands/gate.rs:301` — `VirtualPath::data(\"config/gate-presets\")?`\n- `crates/jit/src/commands/gate.rs:337` — `format!(\"config/gate-presets/{name}.json\")`\n- `crates/jit/src/repository_state/mutation.rs:991` — the same prefix rebuilt via `format!`\n\nVerify this inventory yourself with `git grep -n \"config/gate-presets\" -- crates/jit/src`; treat the list above as a starting point, not an authority, and migrate every production site it finds. Test-only occurrences may keep literals where that is clearer, but they must not be the reason a production site keeps one.\n\n## Success Criteria\n\n- [hard] REQ-01: The `config/gate-presets` directory is a compile-time `VirtualPath` associated const, and no production code path constructs that directory from a runtime string literal.\n- [hard] REQ-02: Paths beneath that directory derive from the const rather than re-spelling the prefix in a `format!` string.\n- [hard] REQ-03: The well-known-path inventory and the associated consts originate from a single declaration, so adding a const without adding it to the inventory is impossible at compile time rather than merely untested. `ALL_KNOWN`'s doc comment no longer describes a coverage gap, because none exists.\n- [hard] REQ-04: The existing round-trip proof over the inventory still holds, and every well-known const is proven canonical and non-reserved through the fallible constructor.\n\n## Non-goals\n\n- A general `join`/`child` composite-path API for `VirtualPath` is out of scope; ~78 composite sites keep the fallible constructor. Add only what these criteria need.\n- The `InMemoryStorage::issue_vpath` panic path (`storage/memory.rs:334,346`) is out of scope. The same holistic review classified it advisory and pre-existing; it is recorded as a follow-up.\n\n## Notes\n\nThe enforcement mechanism must not be source-text matching. Wave 6 deliberately replaced a source-text-substring guard with visibility enforcement (`67a77503`), and a guard bound to a hand-written mirror of the thing it checks is circular. Bind the inventory to the declaration itself — a single macro or equivalent that emits both the consts and the inventory is the intended shape.\n\nCross-cutting: `@/inv/single-source-prose`, `@/inv/semantic-test-assertions`.",
+  "documents": [],
+  "first_ready_at": "2026-07-25T05:34:41.613797888Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "293ce118-0a69-44f9-a4c2-eb3330e2a00f",
+  "labels": [
+    "epic:repository-state-quality",
+    "milestone:v1.0",
+    "satisfies:REQ-08",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Make the gate-presets path a constant and the known-path inventory self-enforcing",
+  "updated_at": "2026-07-25T05:35:44.910193342Z"
+}

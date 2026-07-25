@@ -9344,3 +9344,8 @@
 {"id":"23fbccd1-1422-42b2-911f-442b995736e0","issue_id":"9ee14023-67cc-4b2a-9902-e6bb32a2e5fc","timestamp":"2026-07-25T05:26:35.177293395Z","type":"issue_completed"}
 {"gate_key":"repo-validate","id":"80b5e143-2a08-4d60-8663-4c51b85ffb81","issue_id":"1cc809de-4669-45d4-960f-f881e716663d","timestamp":"2026-07-25T05:27:33.206961893Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"1b24ec8a-007c-4838-a8b1-d3323087f3de","issue_id":"1cc809de-4669-45d4-960f-f881e716663d","timestamp":"2026-07-25T05:31:31.239042064Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"22a37923-456b-4e68-89b1-1d7611ab99f7","issue_id":"293ce118-0a69-44f9-a4c2-eb3330e2a00f","priority":"high","timestamp":"2026-07-25T05:34:41.613797888Z","title":"Make the gate-presets path a constant and the known-path inventory self-enforcing","type":"issue_created"}
+{"fields":["dependencies"],"id":"6bc4b3d3-3fdd-4b98-8e0f-30be065ffdd8","issue_id":"1cc809de-4669-45d4-960f-f881e716663d","timestamp":"2026-07-25T05:34:55.541421302Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["labels"],"id":"e84f2567-ac35-4521-96c9-50fa4bd7e264","issue_id":"293ce118-0a69-44f9-a4c2-eb3330e2a00f","timestamp":"2026-07-25T05:35:15.013502369Z","type":"issue_updated","updated_by":"issue-update"}
+{"from":"ready","id":"55ffb4eb-44e3-40eb-96a5-e474675163ef","issue_id":"293ce118-0a69-44f9-a4c2-eb3330e2a00f","timestamp":"2026-07-25T05:35:44.910193342Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"efb1c658-d716-476b-bddc-b00faad493a3","issue_id":"293ce118-0a69-44f9-a4c2-eb3330e2a00f","timestamp":"2026-07-25T05:35:44.910193342Z","type":"issue_claimed"}

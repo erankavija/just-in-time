@@ -1,7 +1,7 @@
 {
   "epic_id": "1cc809de-4669-45d4-960f-f881e716663d",
   "epic_short_id": "1cc809de",
-  "current_wave": 8,
+  "current_wave": 9,
   "notes": "Bracket (planning 02dc4bac, breakdown 24bab642) done. All 8 waves COMPLETE; all 5 stories done; 35 impl-interior issues + 2 bracket nodes = 37-node closure. Remaining: epic completion (Section 10) — map all 16 REQs, run epic gates repo-validate + holistic-review, completion report, archive + link. Session 4 handoff: dev/active/1cc809de-handoff-4.md.",
   "incident_log": [
     "Session 1: stale-worktree prune force-removed the 6 active wave-1 worktrees due to a zsh word-splitting bug in the exclusion filter (for p in $UNQUOTED does not split under zsh). No committed work lost (0 commits); no leak into main (verified). Recovery: stopped agents, deleted 6 anchor-only branches, recreated worktrees at a95dd58a, RESUMED all 6 agents from transcript (context preserved). Genuinely-stale worktrees (50) successfully pruned. See handoff Traps."
@@ -406,9 +406,32 @@
           "note": "Story checkpoint. Lead pre-gate sweep against REQ-16 literally (not the union of task criteria): successor deck present at 31 sections, tombstone's three links resolve, successor carries no residual reference to the moved predecessor path, no presentations index to update, historical 'showcase' references in dev/active plans and dev/archive left intact as dated artifacts. Both gates passed first round (docs-mechanical a920f175, doc-review d42fb56b)."
         }
       ]
+    },
+    {
+      "wave_number": 9,
+      "rationale": "Post-wave remediation. The independent holistic-review gate on the epic FAILED with one blocking finding: REQ-08 is unmet because config/gate-presets still reaches production as a runtime string and VirtualPath::ALL_KNOWN is a hand-maintained mirror that cannot enforce coverage. Both halves were recorded as deferred follow-ups in wave 6 on plan-authority reasoning; that reasoning does not make the criterion met. No-argue discipline applies: comply or escalate, not argue.",
+      "issues": [
+        {
+          "id": "293ce118",
+          "short_id": "293ce118",
+          "title": "Make the gate-presets path a constant and the known-path inventory self-enforcing",
+          "story": "S2 (criterion owner; DAG-parented on the epic)",
+          "classification": "implementation",
+          "status": "dispatched",
+          "agent": "worker-293ce118",
+          "model": "opus"
+        }
+      ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "short_id": "293ce118",
+      "title": "Make the gate-presets path a constant and the known-path inventory self-enforcing",
+      "created_during_wave": 9,
+      "reason": "Blocking F1 from the epic's independent holistic-review: REQ-08 unmet (config/gate-presets a runtime string in 6 production sites; ALL_KNOWN a hand-maintained mirror). Wired as a direct dependency of the epic rather than under Done story 2958105e, because making a completed gated story depend on new work would leave it with an unmet dependency. The story:enforced-guarantees label was removed after jit query divergence flagged it as unbacked by the DAG -- satisfies:REQ-08 carries the criterion linkage instead."
+    }
+  ],
   "escalations": [
     {
       "category": "blocker-outside-epic-scope",
@@ -439,6 +462,12 @@
       "issue": "73d9070f",
       "status": "resolved_authorized",
       "summary": "REQ-02 named ValidationCaptureClosure/validate_capture_closure for demotion on the stated premise that they have no consumer outside repository_state. False: tests/fast_rules/derived_state_repair_tests.rs is an external-crate consumer. Invoker chose the test-support twin (pub under the feature, pub(crate) without), satisfying REQ-02 on the default surface with no criteria amendment. The lead then applied the same approved resolution to DefaultRuleMembershipDiff/default_rule_membership_diff, which the worker showed has the same conflict via its own doctest."
+    },
+    {
+      "category": "gate-failure-expanding-scope",
+      "issue": "1cc809de",
+      "status": "handled_autonomously",
+      "summary": "Epic holistic-review FAILED (blocking F1, REQ-08). Two prior review gates appeared to conflict: breakdown-review held the plan authoritative and the plan enumerated a const set excluding config/gate-presets, while holistic-review reads REQ-08's text literally. Resolved without escalation on the grounds that the plan binds the fan-out shape but cannot make an unmet criterion met; remediation task 293ce118 created and wired to the epic. Advisory F2 (memory.rs panic path, pre-existing) and F3 (dev/presentations outside managed_paths) recorded as follow-ups, not blocking."
     }
   ],
   "rework_counts": {
