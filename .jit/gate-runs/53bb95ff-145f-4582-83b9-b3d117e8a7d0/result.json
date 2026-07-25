@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "d0df87ca95235a5e6328dcf90dd7a1ae36906bd5",
+  "completed_at": "2026-07-25T00:09:40.240846554Z",
+  "duration_ms": 188746,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard requirements are met and the prior splice-property finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2958105e-d9ea-4ba6-8594-35d01e504b07",
+  "message": null,
+  "run_id": "53bb95ff-145f-4582-83b9-b3d117e8a7d0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T00:06:31.494647290Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4015630d, 0e980987, f78cd738, 70e45a1f, d0df87ca (f78/70 modify the splice property; others record gate results)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/2958105e/requirement/REQ-05–REQ-08 (issue description); @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/charter/D-15 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-24T23:59:56Z); prior code-review failed (exit 1) finding verified resolved\nTruncation recovery: narrowed tagged patch, property, plan-hash, contention, cutover, repair, and VirtualPath reads; excluded unrelated broad-search output outside the impact cone\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard requirements are met and the prior splice-property finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
