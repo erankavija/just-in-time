@@ -1,25 +1,26 @@
 {
-  "id": "0735879a-ed40-450e-9959-5cfe80653745",
-  "title": "Version 1.1 Release",
-  "description": "Deliver the post-v1.0 release through explicit DAG membership, beginning with the complete profile lifecycle, composition, and upgrade work. This milestone is the strategic home for accepted v1.1 epics; milestone labels describe release intent but do not substitute for dependency-based hierarchy.\n\n## Success Criteria\n\n- [hard] REQ-01: The complete profile lifecycle epic is delivered through its approved plan and breakdown on top of the finished v1.0 repository-materialization foundation.\n- [hard] REQ-02: Every v1.1 child uses canonical long-term architecture and source-of-truth boundaries; no temporary command, adapter, dual format, fallback, compatibility layer, or deferred cleanup is accepted.\n- [hard] REQ-03: All attached v1.1 epics and their required gates are effectively terminal before this milestone completes, with release evidence reviewed on the exact integrated candidate.\n\n## Decisions\n\n- D-01: Dependency edges are authoritative for milestone membership; milestone labels are projections and filters only.\n- D-02: General profile removal remains deferred beyond v1.1.\n\n## Notes\n\nAdditional accepted v1.1 epics may be attached directly to this milestone. Unrelated issues carrying a historical milestone:v1.1 label are not silently adopted without an explicit DAG decision.",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-18T12:55:41.530699291Z",
   "dependencies": [
-    "c639cfb5-8356-4c54-b45c-860064432560",
-    "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3"
+    "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3",
+    "be005f64-76e8-4fe9-9d53-bf11a0ff0043",
+    "c639cfb5-8356-4c54-b45c-860064432560"
   ],
+  "description": "Deliver the post-v1.0 release through explicit DAG membership, beginning with the complete profile lifecycle, composition, and upgrade work. This milestone is the strategic home for accepted v1.1 epics; milestone labels describe release intent but do not substitute for dependency-based hierarchy.\n\n## Success Criteria\n\n- [hard] REQ-01: The complete profile lifecycle epic is delivered through its approved plan and breakdown on top of the finished v1.0 repository-materialization foundation.\n- [hard] REQ-02: Every v1.1 child uses canonical long-term architecture and source-of-truth boundaries; no temporary command, adapter, dual format, fallback, compatibility layer, or deferred cleanup is accepted.\n- [hard] REQ-03: All attached v1.1 epics and their required gates are effectively terminal before this milestone completes, with release evidence reviewed on the exact integrated candidate.\n\n## Decisions\n\n- D-01: Dependency edges are authoritative for milestone membership; milestone labels are projections and filters only.\n- D-02: General profile removal remains deferred beyond v1.1.\n\n## Notes\n\nAdditional accepted v1.1 epics may be attached directly to this milestone. Unrelated issues carrying a historical milestone:v1.1 label are not silently adopted without an explicit DAG decision.",
+  "documents": [],
+  "first_ready_at": "2026-07-18T12:55:41.530701561Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "0735879a-ed40-450e-9959-5cfe80653745",
   "labels": [
     "milestone:v1.1",
     "type:milestone"
   ],
-  "created_at": "2026-07-18T12:55:41.530699291Z",
-  "updated_at": "2026-07-18T16:58:50.935348868Z",
-  "first_ready_at": "2026-07-18T12:55:41.530701561Z"
+  "priority": "high",
+  "state": "backlog",
+  "title": "Version 1.1 Release",
+  "updated_at": "2026-07-25T22:52:08.132187471Z"
 }
