@@ -309,6 +309,10 @@ impl ValidationConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DocumentationConfig {
     /// Root directory for development documentation (default: "dev").
+    ///
+    /// Archival planning classifies by this root as well: a linked artifact it
+    /// does not contain is permanent, so the artifact is mirrored by copy while
+    /// its source stays in place.
     pub development_root: Option<String>,
     /// Paths subject to archival (default: ["dev/active", "dev/studies", "dev/sessions"]).
     pub managed_paths: Option<Vec<String>>,
