@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "a920f175c309fd94ffbfe72eb03a224cd8c6ffa4",
+  "completed_at": "2026-07-25T05:25:41.990891661Z",
+  "duration_ms": 100599,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No issue-impact documentation defects; the combined successor deck, archive, and tombstone contract is accurate and internally linked.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "9ee14023-67cc-4b2a-9902-e6bb32a2e5fc",
+  "message": null,
+  "run_id": "1f0e1cff-e1e1-4f85-9fdc-2e4bead9867f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T05:24:01.391600114Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: container story `9ee14023` with delivered resolved children `f87e3273` and `cba48167`; all had tagged commits, inspected individually with rename detection. The current successor deck, archive, and tombstone form a consistent, air-gapped internal presentation contract. No adopter-facing documentation impact requires an update.\n\n1. None — no blocking or advisory findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact documentation defects; the combined successor deck, archive, and tombstone contract is accurate and internally linked.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
