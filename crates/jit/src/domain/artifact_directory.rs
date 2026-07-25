@@ -1,7 +1,7 @@
 //! The canonical artifact directory an issue owns inside a named issue-scoped area.
 //!
 //! A repository declares which development areas organize their artifacts one
-//! directory per issue ([`DocumentationConfig::issue_scoped_areas`]). Several
+//! directory per issue ([`DocumentationConfig::issue_scoped_areas()`]). Several
 //! areas adopt the convention at once, so the area is an input: a caller names
 //! the area it wants and [`resolve_artifact_directory`] returns the directory
 //! the issue owns inside it. An area the registry does not declare is an error
