@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "8afdb018f052059ff2a79c86c4623effdc925e72",
+  "completed_at": "2026-07-25T22:29:25.972171215Z",
+  "duration_ms": 194022,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped requirements are satisfied in the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6aa82c0b-13d9-4d91-ba2e-f0fc50158716",
+  "message": null,
+  "run_id": "73cbdd6c-4ae7-409d-8322-8dd94a390055",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T22:26:11.949580670Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6a943def, 967685af (merge first-parent patch; same three-file implementation)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-16 (issue description); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: passed (exit 0, 2026-07-25T22:17:53.422885530+00:00; stdout unavailable)\nTruncation recovery: recovered truncated search output with focused reads of configuration, policy-status logic, cited tests, and individual merge first-parent patches.\n\n1. No findings. `citation_scan_roots` accepts authored roots and otherwise derives the development root plus permanent paths; authorization remains limited to its three existing fields ([config.rs](crates/jit/src/config.rs:331), [artifact_plan.rs](crates/jit/src/domain/artifact_plan.rs:85)). Tests cover defaults, replacement semantics outside the development root, exact-file/prefix matching, and configured-status invariance ([config.rs](crates/jit/src/config.rs:2503), [artifact_plan_model_tests.rs](crates/jit/tests/fast_docs_templates/artifact_plan_model_tests.rs:164)).\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped requirements are satisfied in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

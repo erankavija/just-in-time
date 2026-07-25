@@ -1,7 +1,7 @@
 {
   "epic_id": "8e071e18-d786-43ff-b424-a283fecb11f8",
   "epic_short_id": "8e071e18",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -140,7 +140,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "b4d1a2c8-d408-46d0-b0b6-dc3e30283420",
@@ -150,7 +150,7 @@
           "gates": [
             "repo-validate"
           ],
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "22c11e40-43b8-42c2-a075-14860cc12d03",
@@ -161,9 +161,11 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "done"
         }
-      ]
+      ],
+      "status": "complete",
+      "outcome": "All three closed, every gate first-time green. 22c11e40 and 6aa82c0b dispatched to worktrees (Opus); b4d1a2c8 executed by the lead directly on main per N1. Both code-reviews returned zero findings. The predicted F1 recurrence on 6aa82c0b's new citation_scan_roots key did NOT occur: the reviewer distinguishes a key jit init writes into every adopter config (issue_scoped_areas, which triggered F1) from an optional key the scaffold deliberately does not emit. The worker's scaffold-emission decision structurally avoided the finding."
     },
     {
       "wave_number": 5,
@@ -1068,6 +1070,20 @@
       "subject": "the epic's own description cites the title-slugged directory as evidence",
       "detail": "8e071e18's Background and Notes name `dev/archive/a9b5dd08-use-strategic-label-slugs-in-archive-directory-n/` as the counter-example proving the naming defect. After b4d1a2c8 renames it, that path no longer exists. dev/active/8e071e18-investigation.md cites it too.",
       "decision": "Leave both. The investigation is a dated planning record, and editing the epic's description is an escalation (policy item 3) for a historical evidence citation whose point survives the rename. Raise it only if a reviewer or the holistic-review gate cites it."
+    },
+    {
+      "id": "N3",
+      "raised_at": "wave 4 merge",
+      "subject": "verify-commit-builds.sh does not compile test code",
+      "detail": "6aa82c0b added citation_scan_roots to DocumentationConfig while 22c11e40 constructed that struct in a test helper in the new domain/artifact_directory.rs. Each branch was green alone; the merge did not compile its test code. scripts/verify-commit-builds.sh still exited 0, because it runs cargo build --workspace, which never compiles #[cfg(test)] items. The break surfaced only as an editor diagnostic and was fixed by the lead in 8afdb018.",
+      "decision": "After merging a wave, run an actual cargo test compile before gating. The merge-commit verifier is necessary but not sufficient. Worth considering whether the worktree-dispatch protocol's Step 5 should name a test-compiling verifier."
+    },
+    {
+      "id": "N4",
+      "raised_at": "wave 4",
+      "subject": "host disk exhaustion from accumulated worktree build artifacts",
+      "detail": "The host root filesystem reached 100% (0 bytes free) mid-wave. cargo-ci's provenance and budget steps are the only ones needing multi-GB scratch; both failed with EMPTY diagnostic files, which is the signature of failed writes rather than assertions. 39 agent worktrees held ~170G of target/, plus 1365 stale scratch dirs in ~/.cache/jit-cargo-ci-tmp. Lead reclaimed 153G.",
+      "decision": "48 worktrees remain registered and nothing prunes them, so this recurs. Before any wave, check df /. Reclaim with rm -rf .agents/worktrees/agent-*/target for non-live workers (target/ is gitignored at .gitignore:2) after confirming ps -eo comm | grep -cE '^(cargo|rustc)$' is 0."
     }
   ]
 }

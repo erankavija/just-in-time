@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "8afdb018f052059ff2a79c86c4623effdc925e72",
+  "completed_at": "2026-07-25T22:26:10.630605958Z",
+  "duration_ms": 172169,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The pure, configuration-driven resolver meets all hard success criteria and is adequately covered.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "22c11e40-43b8-42c2-a075-14860cc12d03",
+  "message": null,
+  "run_id": "089faceb-809e-4f1e-86e7-83cc715e4434",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T22:23:18.461197782Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1cbc0f06, bba94958, cb363c4d, 8afdb018 (`jit:22c11e40`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/22c11e40/requirement/REQ-03, @/issue/8e071e18/decision/D-1, @/issue/8e071e18/decision/D-3, @/issue/8e071e18/decision/D-4 (issue Markdown); @/invariant/domain-agnostic, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: narrowed item-source/config reads and merge-parent/current-code patch reads after a broad registry search truncated\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The pure, configuration-driven resolver meets all hard success criteria and is adequately covered.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
