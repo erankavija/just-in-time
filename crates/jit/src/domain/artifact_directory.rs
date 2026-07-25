@@ -128,6 +128,7 @@ mod tests {
             managed_paths: None,
             archive_root: None,
             permanent_paths: None,
+            citation_scan_roots: None,
             issue_scoped_areas: areas
                 .map(|areas| areas.iter().map(|area| (*area).to_string()).collect()),
         }
