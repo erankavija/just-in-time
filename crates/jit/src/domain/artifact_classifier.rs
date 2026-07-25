@@ -1358,7 +1358,10 @@ mod tests {
                 legacy.clone(),
                 directory(ArtifactListingScope::MetadataOnly, &[]),
             ),
-            (format!("{legacy}/.jit-container"), ArtifactEvidence::Missing),
+            (
+                format!("{legacy}/.jit-container"),
+                ArtifactEvidence::Missing,
+            ),
         ]);
         let adopted =
             resolve_container_destination(&preferred, &legacy, &issue.id, &occupied).unwrap();
@@ -1777,8 +1780,7 @@ mod tests {
         );
         assert_eq!(archive_container_slug("@/._-/._-"), None);
         assert_eq!(
-            archive_container_slug(&"a".repeat(80))
-                .map(|slug| slug.chars().count()),
+            archive_container_slug(&"a".repeat(80)).map(|slug| slug.chars().count()),
             Some(48)
         );
         assert!(archive_container_slug(&format!("{}-", "a".repeat(48)))
