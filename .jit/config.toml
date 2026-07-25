@@ -7,11 +7,56 @@
 schema = 2
 
 [documentation]
-# Documentation lifecycle management configuration
+# Documentation lifecycle management configuration: adopts the shipped
+# classification verbatim (SHIPPED_DOCUMENTATION_POLICY, crates/jit/src/config.rs).
 development_root = "dev"
-managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
 archive_root = "dev/archive"
-permanent_paths = ["docs/"]
+# Revision-specific work products of terminal issues: archiving the owning
+# issue takes them with it.
+managed_paths = [
+    "dev/active",
+    "dev/studies",
+    "dev/sessions",
+    "dev/plans",
+    "dev/presentations",
+    "dev/design",
+    "dev/benchmarks",
+    "dev/experiments",
+]
+# Living documentation, a configured item-kind source, or documented
+# invocation paths. The trailing three entries are the development-root files
+# that belong to no area, classified one path at a time. `docs/` is not
+# listed here: it sits outside development_root, so it already archives by
+# copy under the automatic outside-development-root fallback
+# (@/issue/8e071e18/decision/D-14) without needing an explicit entry.
+permanent_paths = [
+    "dev/architecture",
+    "dev/eval",
+    "dev/vision",
+    "dev/index.md",
+    "dev/TESTING.md",
+    "dev/authoring-conventions.md",
+]
+# Areas whose contents are per-issue work products, so one issue owns a
+# whole directory; the remaining managed areas hold dated or generated
+# output that no single issue owns, and stay flat.
+issue_scoped_areas = ["dev/active", "dev/studies", "dev/plans", "dev/presentations"]
+# Roots the in-content citation scan reads. Authored explicitly because an
+# authored list replaces the fallback (development_root + permanent_paths)
+# rather than extending it: "dev" and "docs" preserve the coverage the
+# fallback used to give; "scripts", "crates", the root "Cargo.toml", the
+# "CHANGELOG.md", and the agent-facing "CLAUDE.md"/"AGENTS.md" root files
+# carry in-content artifact citations the fallback never reached.
+citation_scan_roots = [
+    "dev",
+    "docs",
+    "scripts",
+    "crates",
+    "Cargo.toml",
+    "CHANGELOG.md",
+    "CLAUDE.md",
+    "AGENTS.md",
+]
 
 [type_hierarchy]
 # Type name to hierarchy level mapping (lower = more strategic)
