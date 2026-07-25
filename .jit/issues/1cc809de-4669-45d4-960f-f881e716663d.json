@@ -20,7 +20,7 @@
       "doc_type": "report",
       "format": "markdown",
       "label": "Completion report",
-      "path": "dev/active/1cc809de-completion-report.md"
+      "path": "dev/archive/1cc809de-completion-report.md"
     }
   ],
   "done_at": "2026-07-25T06:32:35.869622377Z",
@@ -50,5 +50,5 @@
   "priority": "high",
   "state": "done",
   "title": "Repository-state quality hardening",
-  "updated_at": "2026-07-25T06:32:35.869622377Z"
+  "updated_at": "2026-07-25T06:33:47.907795760Z"
 }

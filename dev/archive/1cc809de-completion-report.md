@@ -90,3 +90,11 @@ Fourteen further findings are recorded as `surfaced_pitfalls` in the progress fi
 - **Link checkers only see links out of a document.** A move also needs a check for references *into* the moved paths (`git grep` plus `jit validate`). The tombstone worker verified its own outbound links three ways and still could not have caught the inbound break.
 - **`28254964` carries a label/parent mismatch.** It satisfies REQ-12, an S4 criterion, but is DAG-parented under story `2958105e` in S2. Structurally harmless — the ordering is correct because it is a shared foundation consumed by S2's cutover guard and S4's demotions — but the membership label disagrees with the hierarchy parent. `jit query divergence` reports the tree clean, because this pairing predates that check's scope.
 - **`cargo audit` has no CLI severity-threshold override**, so a machine-local `~/.cargo/audit.toml` could suppress low-CVSS advisories. Flagged by a worker; unfixable from the script.
+
+## Archival note
+
+The epic's session artifacts (this report, the progress file, the reviewed plan, the breakdown manifest and keymap, and the four session handoffs) are archived flat under `dev/archive/`, matching the predecessor epic's shape, and the three inbound document references were repointed to their archived paths.
+
+Four artifacts deliberately stayed in place because live deliverables cite them by path: `dev/studies/cdc840ad-audit-2026-07-23.md` (cited by the successor deck and the tombstone), both `dev/studies/perf/session-cost-*.json` profiles (cited by the deck for every timing figure, per REQ-03), and `dev/architecture/repository-state-materialization.md` (a living contributor document).
+
+`jit archive container 1cc809de` was previewed rather than executed. It reports `eligible: false` with three `unmanaged-selected-root` blockers — the architecture document, the successor deck, and the tombstone — which is advisory finding F2 reproduced against this epic's own archival. Two further reasons not to force it: its plan would relocate the audit and both performance artifacts, and while it remaps issue document references it does not rewrite citations inside document content, so the deck's artifact-traced timing claims would have silently broken. Closing F2 by widening `managed_paths` would make this path usable for a future epic.
