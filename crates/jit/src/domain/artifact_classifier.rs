@@ -1128,7 +1128,10 @@ pub fn preferred_container_destination_root(
 
 /// Normalize one label value into a bounded path component.
 ///
-/// This is the crate's single slug normalizer for archive directory names.
+/// This is the crate's single slug normalizer for archive directory names. It
+/// is crate-visible rather than module-private so that every resolver naming
+/// such a directory, including one in a sibling module, derives its slug from
+/// this implementation instead of a second copy (`@/inv/single-source-prose`).
 /// Lowercases Unicode alphanumeric characters, collapses every other run into a
 /// single `-`, and bounds the result at 48 characters so an arbitrarily long
 /// label value cannot name an unwieldy directory. Returns `None` when the value
