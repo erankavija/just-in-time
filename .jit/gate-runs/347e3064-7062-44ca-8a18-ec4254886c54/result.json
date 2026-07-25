@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "4f341268734876df3d95d905a16af4028be2688f",
+  "completed_at": "2026-07-25T04:45:49.955532374Z",
+  "duration_ms": 188748,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/presentations/1cc809de/talk.html",
+        "id": "F1",
+        "line": 441,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The Completion evidence slide makes falsifiable dependency, test-result, and gate claims without citing their repository artifacts."
+      }
+    ],
+    "summary": "The successor deck leaves its completion-evidence claims uncited, violating its artifact-traceability contract.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "f87e3273-f0a1-4e75-a79b-d719ae1a3813",
+  "message": null,
+  "run_id": "347e3064-7062-44ca-8a18-ec4254886c54",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T04:42:41.206840056Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.PSuK9KN2aT: binary file matches\n--- agent stderr (first 12 of 12317 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9795-2370-7930-ae1d-c63143247a85\n--------\n--- 12305 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `f87e3273` is a leaf task; I reviewed its five individually inspected `jit:f87e3273` commits. The current deck is otherwise consistent with the cited implementation and artifact evidence.\n\n1. **[blocking][issue-impact][high]** The “Completion evidence” slide makes several falsifiable claims without citing their repository artifacts, contrary to the deck’s stated evidence policy. This includes the 15 delivered dependencies and the 3,784-test result at [talk.html](dev/presentations/1cc809de/talk.html:441). Add a concise caption citing the DAG command/result and `.jit/gate-runs/da57b282-7e6a-47df-994d-614a68fad942/result.json`; also cite the issue records/configuration supporting the two gate claims.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The successor deck leaves its completion-evidence claims uncited, violating its artifact-traceability contract.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The Completion evidence slide makes falsifiable dependency, test-result, and gate claims without citing their repository artifacts.\",\"file\":\"dev/presentations/1cc809de/talk.html\",\"line\":441}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
