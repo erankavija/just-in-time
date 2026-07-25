@@ -81,7 +81,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-25T04:42:07.646158256Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f87e3273-f0a1-4e75-a79b-d719ae1a3813",
   "labels": [
     "type:task",
@@ -92,5 +98,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Corrected successor deck for the repository-materialization story",
-  "updated_at": "2026-07-25T00:35:17.582825563Z"
+  "updated_at": "2026-07-25T04:42:07.646158256Z"
 }
