@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-25T19:02:39.368140284Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-25T19:20:40.186193950Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "1f80212b-4c96-477c-9ed8-a008656bfdde",
@@ -32,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Guarantee archive execution retains sources outside the development root",
-  "updated_at": "2026-07-25T19:02:39.368140284Z"
+  "updated_at": "2026-07-25T19:20:40.186193950Z"
 }

@@ -565,6 +565,40 @@ fn test_archive_execute_retains_out_of_root_source_and_publishes_mirror_without_
     let source_bytes = b"#!/bin/sh\necho archived\n".to_vec();
     fs::write(repo.path().join("scripts/install.sh"), &source_bytes).unwrap();
 
+    // The criterion is scoped to a *linked* artifact, so give the script a
+    // terminal owner. Without a document reference the terminal-owner check is
+    // vacuously true and the scenario REQ-01 names is never exercised.
+    let owner = jit(
+        &repo,
+        &[
+            "issue",
+            "create",
+            "--title",
+            "Owner of the installer script",
+            "--json",
+        ],
+    );
+    assert_success(&owner);
+    let owner_id = serde_json::from_slice::<Value>(&owner.stdout).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_success(&jit(
+        &repo,
+        &[
+            "doc",
+            "add",
+            &owner_id,
+            "scripts/install.sh",
+            "--skip-scan",
+            "--json",
+        ],
+    ));
+    assert_success(&jit(
+        &repo,
+        &["issue", "update", &owner_id, "--state", "done", "--json"],
+    ));
+
     let preview = jit(
         &repo,
         &["archive", "document", "scripts/install.sh", "--json"],

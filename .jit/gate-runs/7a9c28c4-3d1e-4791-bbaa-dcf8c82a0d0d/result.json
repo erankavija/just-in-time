@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "c9f0c839a7f57f098b924d4dfa3c1a427949df2c",
+  "completed_at": "2026-07-25T19:23:03.615849724Z",
+  "duration_ms": 142589,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied: every accessor derives from the shipped declaration, comments contain no duplicate path lists, and authored-policy status remains non-authorizing. The prior documentation finding does not apply because the reference explicitly identifies its values as an adopter example rather than shipped defaults.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b3fc1a92-9d6c-43f6-9309-5be17adfbd98",
+  "message": null,
+  "run_id": "7a9c28c4-3d1e-4791-bbaa-dcf8c82a0d0d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T19:20:41.026201921Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 57e28a57, 28c4730d, 2d80ceab\nPolicy sources: AGENTS.md\nResolved items: @/issue/b3fc1a92/requirement/REQ-01 (issue description); @/issue/8e071e18/decision/D-13,D-19 (issue description); @/invariant/domain-agnostic,@/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-25T17:50:11.976542108+00:00); prior code-review failed (exit 1), reassessed\nTruncation recovery: narrowed per-commit and merge-parent patches, policy sources, current config/docs, and direct callers\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied: every accessor derives from the shipped declaration, comments contain no duplicate path lists, and authored-policy status remains non-authorizing. The prior documentation finding does not apply because the reference explicitly identifies its values as an adopter example rather than shipped defaults.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

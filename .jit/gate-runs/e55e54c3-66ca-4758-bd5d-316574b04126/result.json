@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "c9f0c839a7f57f098b924d4dfa3c1a427949df2c",
+  "completed_at": "2026-07-25T19:20:39.922793706Z",
+  "duration_ms": 162397,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs",
+        "id": "F1",
+        "line": 564,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1f80212b/requirement/REQ-01",
+          "@/issue/8e071e18/decision/D-14"
+        ],
+        "severity": "high",
+        "summary": "The test archives an unowned direct path, so it does not verify REQ-01 for a linked artifact."
+      }
+    ],
+    "summary": "The regression test omits the required linked-artifact precondition.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1f80212b-4c96-477c-9ed8-a008656bfdde",
+  "message": null,
+  "run_id": "e55e54c3-66ca-4758-bd5d-316574b04126",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T19:17:57.525492446Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5891 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9ab6-7964-7b32-bf64-4a7619ae1a2b\n--------\nuser\n--- 5878 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 50183650 (`jit:1f80212b`; 88 additions in `crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/1f80212b/requirement/REQ-01–03 (issue Markdown); @/issue/8e071e18/decision/D-14 and D-17 (issue Markdown); @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-25T18:58:30Z); code-review pending\nTruncation recovery: narrowed truncated searches to registry entries, classifier/execution slices, and affected test ranges\n\n1. **F1 — blocking, issue-impact:** The new test does not make `scripts/install.sh` a linked artifact: it only creates the file and archives it directly at `crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs:564`. With no document owner, the terminal-owner check is vacuously true (`artifact_classifier.rs:1005-1012`), so this cannot prove hard REQ-01’s linked-artifact scenario. Add a terminal issue document reference to the script before executing the same assertions. References: `@/issue/1f80212b/requirement/REQ-01`, `@/issue/8e071e18/decision/D-14`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The regression test omits the required linked-artifact precondition.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The test archives an unowned direct path, so it does not verify REQ-01 for a linked artifact.\",\"file\":\"crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs\",\"line\":564,\"references\":[\"@/issue/1f80212b/requirement/REQ-01\",\"@/issue/8e071e18/decision/D-14\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

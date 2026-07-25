@@ -20,8 +20,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-25T18:05:57.731982304Z",
+      "status": "passed",
+      "updated_at": "2026-07-25T19:23:03.864373924Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derive the runtime documentation defaults from the shipped declaration",
-  "updated_at": "2026-07-25T18:49:32.520594253Z"
+  "updated_at": "2026-07-25T19:23:03.864373924Z"
 }
