@@ -1781,6 +1781,78 @@ epic = "epic"
         )));
     }
 
+    /// A repository whose development root is authored explicitly, holding one
+    /// terminal-owned artifact outside that root and one inside it that matches
+    /// no configured area.
+    fn development_root_repo() -> (TempDir, CommandExecutor<JsonFileStorage>) {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        fs::create_dir_all(storage.root()).unwrap();
+        fs::write(
+            storage.root().join("config.toml"),
+            concat!(
+                "[documentation]\n",
+                "development_root = \"workspace\"\n",
+                "managed_paths = [\"workspace/active\"]\n",
+                "permanent_paths = []\n",
+                "archive_root = \"workspace/archive\"\n"
+            ),
+        )
+        .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
+        fs::create_dir_all(repo.path().join("scripts")).unwrap();
+        fs::create_dir_all(repo.path().join("workspace/scratch")).unwrap();
+        fs::write(repo.path().join("scripts/install.sh"), "#!/bin/sh\n").unwrap();
+        fs::write(repo.path().join("workspace/scratch/notes.md"), "# Notes\n").unwrap();
+        for path in ["scripts/install.sh", "workspace/scratch/notes.md"] {
+            let mut issue =
+                crate::domain::types::fixture_issue(format!("Owner of {path}"), String::new());
+            issue.state = State::Done;
+            issue.documents = vec![DocumentReference::new(path.into())];
+            seed_archive_issue_precondition(&storage, issue);
+        }
+        let executor = executor(&repo, storage);
+        (repo, executor)
+    }
+
+    #[test]
+    fn test_preview_document_classifies_selected_roots_by_the_configured_development_root() {
+        let (_repo, executor) = development_root_repo();
+
+        let outside = executor
+            .preview_archive_document("scripts/install.sh")
+            .unwrap();
+        assert!(outside
+            .blockers()
+            .iter()
+            .all(|blocker| blocker.code != BlockerCode::UnmanagedSelectedRoot));
+        assert!(outside.eligible());
+        let artifact = outside
+            .artifacts()
+            .iter()
+            .find(|artifact| artifact.source() == "scripts/install.sh")
+            .unwrap();
+        assert_eq!(artifact.action(), ArtifactAction::Copy);
+        assert_eq!(
+            artifact.destination(),
+            Some(
+                artifact_mirror_destination(outside.destination_root(), artifact.source()).as_str()
+            )
+        );
+        assert!(artifact.pending_deletions().is_empty());
+
+        let inside = executor
+            .preview_archive_document("workspace/scratch/notes.md")
+            .unwrap();
+        assert!(inside
+            .blockers()
+            .iter()
+            .any(|blocker| blocker.code == BlockerCode::UnmanagedSelectedRoot));
+        assert!(!inside.eligible());
+    }
+
     #[test]
     fn test_preview_non_terminal_container_and_foreign_destination_are_blocked() {
         let (repo, executor, id) = configured_repo();

@@ -678,7 +678,7 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
         .unwrap()
         .iter()
         .any(|blocker| blocker["code"] == "destination-conflict"));
-    let unmanaged = evaluated_plan["artifacts"]
+    let source_retaining = evaluated_plan["artifacts"]
         .as_array()
         .unwrap()
         .iter()
@@ -687,11 +687,11 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
                 .as_array()
                 .unwrap()
                 .iter()
-                .any(|evidence| evidence == "unmanaged-path")
+                .any(|evidence| evidence == "permanent-path" || evidence == "unmanaged-path")
         })
         .collect::<Vec<_>>();
-    assert!(!unmanaged.is_empty());
-    assert!(unmanaged
+    assert!(!source_retaining.is_empty());
+    assert!(source_retaining
         .iter()
         .all(|artifact| matches!(artifact["action"].as_str(), Some("copy" | "retain"))));
     assert!(evaluated_plan["blockers"]

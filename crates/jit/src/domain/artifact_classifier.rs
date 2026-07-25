@@ -24,10 +24,23 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 /// Explicit documentation policy used by the classifier.
+///
+/// The configured areas classify one repository-relative source: the archive
+/// root marks an already-archived source, a permanent root retains its source
+/// beside the mirror, and a managed root may relocate it. A source that none of
+/// those roots claims and the configured development root does not contain is
+/// permanent as well, so a linked source file, script, or repository-root
+/// document is archived by copy instead of defeating the whole plan
+/// (`@/issue/8e071e18/decision/D-14`). Inside the development root, a source
+/// that matches no configured area still raises
+/// [`BlockerCode::UnmanagedSelectedRoot`], keeping a mistyped area entry
+/// diagnosable.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactClassificationPolicy {
     /// Whether every mutation-authorizing policy field was explicitly set.
     pub status: PolicyStatus,
+    /// Repository-relative root holding the development areas under archival.
+    pub development_root: String,
     /// Repository-relative roots eligible for archival.
     pub managed_paths: Vec<String>,
     /// Repository-relative roots whose sources must remain available.
@@ -41,6 +54,9 @@ impl ArtifactClassificationPolicy {
     pub fn from_documentation(documentation: Option<&DocumentationConfig>) -> Self {
         Self {
             status: PolicyStatus::from_documentation(documentation),
+            development_root: documentation
+                .map(DocumentationConfig::development_root)
+                .unwrap_or_default(),
             managed_paths: documentation
                 .map(DocumentationConfig::managed_paths)
                 .unwrap_or_default(),
@@ -56,12 +72,14 @@ impl ArtifactClassificationPolicy {
 
     /// Construct an explicit configured policy, primarily for embedded callers and tests.
     pub fn configured(
+        development_root: impl Into<String>,
         managed_paths: Vec<String>,
         permanent_paths: Vec<String>,
         archive_root: impl Into<String>,
     ) -> Self {
         Self {
             status: PolicyStatus::Configured,
+            development_root: development_root.into(),
             managed_paths,
             permanent_paths,
             archive_root: archive_root.into(),
@@ -69,7 +87,45 @@ impl ArtifactClassificationPolicy {
         .normalized()
     }
 
+    /// Whether the configured archive root already contains this source.
+    fn is_archived(&self, path: &str) -> bool {
+        contains_path(&self.archive_root, path)
+    }
+
+    /// Whether a configured managed root makes this source eligible to relocate.
+    fn is_managed(&self, path: &str) -> bool {
+        self.managed_paths
+            .iter()
+            .any(|root| contains_path(root, path))
+    }
+
+    /// Whether this source is mirrored while the working-tree source is retained.
+    ///
+    /// A configured permanent root is permanent, and so is a source that no
+    /// other configured area claims and the development root does not contain:
+    /// such a source is archived by copy rather than relocated out of the tree
+    /// that builds, runs, or documents the repository.
+    fn is_permanent(&self, path: &str) -> bool {
+        self.permanent_paths
+            .iter()
+            .any(|root| contains_path(root, path))
+            || (!self.is_archived(path)
+                && !self.is_managed(path)
+                && self.is_outside_development_root(path))
+    }
+
+    /// Whether the configured development root fails to contain this source.
+    ///
+    /// A policy with no authored development root leaves every source inside
+    /// it, so an unconfigured or repository-wide root keeps reporting a
+    /// selected root that matches no configured area as
+    /// [`BlockerCode::UnmanagedSelectedRoot`] instead of silently copying it.
+    fn is_outside_development_root(&self, path: &str) -> bool {
+        !self.development_root.is_empty() && !contains_path(&self.development_root, path)
+    }
+
     fn normalized(mut self) -> Self {
+        self.development_root = normalize_artifact_path(&self.development_root);
         self.managed_paths = normalized_paths(self.managed_paths);
         self.permanent_paths = normalized_paths(self.permanent_paths);
         self.archive_root = normalize_artifact_path(&self.archive_root);
@@ -608,15 +664,9 @@ fn classify_entry(
 
     let source = entry.source().to_string();
     let location = locations.get(&source).cloned().unwrap_or_default();
-    let archived_source = contains_path(&policy.archive_root, &source);
-    let permanent = policy
-        .permanent_paths
-        .iter()
-        .any(|root| contains_path(root, &source));
-    let managed = policy
-        .managed_paths
-        .iter()
-        .any(|root| contains_path(root, &source));
+    let archived_source = policy.is_archived(&source);
+    let permanent = policy.is_permanent(&source);
+    let managed = policy.is_managed(&source);
     let explicit = entry.provenance().contains(&ArtifactProvenance::Explicit);
     let embedded = entry.provenance().contains(&ArtifactProvenance::Embedded);
 
@@ -830,15 +880,9 @@ fn selected_destination_roots(
         })
         .filter_map(|entry| {
             let source = entry.source();
-            let archived = contains_path(&policy.archive_root, source);
-            let permanent = policy
-                .permanent_paths
-                .iter()
-                .any(|root| contains_path(root, source));
-            let managed = policy
-                .managed_paths
-                .iter()
-                .any(|root| contains_path(root, source));
+            let archived = policy.is_archived(source);
+            let permanent = policy.is_permanent(source);
+            let managed = policy.is_managed(source);
             let selected = match target {
                 PlanTarget::Container { .. } => entry.owners().iter().any(|owner| {
                     owner.inside_subtree && owner.is_effectively_terminal() && !owner.pinned
@@ -1356,7 +1400,7 @@ mod tests {
             },
             "archive",
             &[artifact],
-            &ArtifactClassificationPolicy::configured(vec![], vec![], "archive"),
+            &ArtifactClassificationPolicy::configured("dev", vec![], vec![], "archive"),
             Vec::new(),
             &evidence,
         )
@@ -1397,7 +1441,7 @@ mod tests {
                 },
                 "archive",
                 std::slice::from_ref(&artifact),
-                &ArtifactClassificationPolicy::configured(vec![], vec![], "archive"),
+                &ArtifactClassificationPolicy::configured("dev", vec![], vec![], "archive"),
                 Vec::new(),
                 &evidence,
             )
@@ -1482,34 +1526,75 @@ mod tests {
         }
     }
 
-    fn classify(
+    fn default_policy() -> ArtifactClassificationPolicy {
+        ArtifactClassificationPolicy::configured(
+            "dev",
+            vec!["dev/active".into()],
+            vec!["docs".into()],
+            "dev/archive",
+        )
+    }
+
+    fn classify_with_policy(
+        policy: ArtifactClassificationPolicy,
         target: PlanTarget,
         artifacts: Vec<ArtifactPlanEntry>,
         facts: ArtifactClassificationFacts,
     ) -> ArtifactPlan {
         classify_artifacts(
             ArtifactClassificationInventory::new(target, artifacts, Vec::new()),
-            ArtifactClassificationPolicy::configured(
-                vec!["dev/active".into()],
-                vec!["docs".into()],
-                "dev/archive",
-            ),
+            policy,
             facts,
         )
         .unwrap()
     }
 
-    fn container(
+    fn classify(
+        target: PlanTarget,
         artifacts: Vec<ArtifactPlanEntry>,
         facts: ArtifactClassificationFacts,
     ) -> ArtifactPlan {
-        classify(
+        classify_with_policy(default_policy(), target, artifacts, facts)
+    }
+
+    fn container_with_policy(
+        policy: ArtifactClassificationPolicy,
+        artifacts: Vec<ArtifactPlanEntry>,
+        facts: ArtifactClassificationFacts,
+    ) -> ArtifactPlan {
+        classify_with_policy(
+            policy,
             PlanTarget::Container {
                 id: CONTAINER.into(),
             },
             artifacts,
             facts,
         )
+    }
+
+    fn container(
+        artifacts: Vec<ArtifactPlanEntry>,
+        facts: ArtifactClassificationFacts,
+    ) -> ArtifactPlan {
+        container_with_policy(default_policy(), artifacts, facts)
+    }
+
+    fn present_source(path: &str) -> ArtifactClassificationFacts {
+        locations(&[(
+            path,
+            ArtifactLocation::Regular(identity(path.as_bytes())),
+            ArtifactLocation::Missing,
+        )])
+    }
+
+    fn selected_root(path: &str) -> Vec<ArtifactPlanEntry> {
+        vec![explicit(path, vec![owner("i", State::Done, true)])]
+    }
+
+    fn raises_unmanaged_selected_root(plan: &ArtifactPlan) -> bool {
+        plan.blockers()
+            .iter()
+            .any(|blocker| blocker.code == BlockerCode::UnmanagedSelectedRoot)
     }
 
     fn entry<'a>(plan: &'a ArtifactPlan, source: &str) -> &'a ArtifactPlanEntry {
@@ -1761,23 +1846,99 @@ mod tests {
     }
 
     #[test]
-    fn test_unmanaged_root_blocks_but_unmanaged_embedded_never_moves() {
+    fn test_selected_root_inside_development_root_matching_no_area_blocks_the_plan() {
         let plan = container(
-            vec![explicit(
-                "misc/root.md",
-                vec![owner("i", State::Done, true)],
-            )],
-            locations(&[(
-                "misc/root.md",
-                ArtifactLocation::Regular(identity(b"root")),
-                ArtifactLocation::Missing,
-            )]),
+            selected_root("dev/scratch/root.md"),
+            present_source("dev/scratch/root.md"),
         );
-        assert!(plan
-            .blockers()
-            .iter()
-            .any(|blocker| blocker.code == BlockerCode::UnmanagedSelectedRoot));
+        assert!(raises_unmanaged_selected_root(&plan));
         assert!(!plan.eligible());
+        let artifact = entry(&plan, "dev/scratch/root.md");
+        assert_eq!(artifact.action(), ArtifactAction::Retain);
+        assert_eq!(artifact.destination(), None);
+    }
+
+    #[test]
+    fn test_selected_root_outside_development_root_is_permanent_and_gets_a_destination() {
+        let plan = container(
+            selected_root("scripts/install.sh"),
+            present_source("scripts/install.sh"),
+        );
+        assert!(!raises_unmanaged_selected_root(&plan));
+        assert!(plan.eligible());
+        let artifact = entry(&plan, "scripts/install.sh");
+        assert_eq!(artifact.action(), ArtifactAction::Copy);
+        assert_eq!(
+            artifact.destination(),
+            Some(artifact_mirror_destination(plan.destination_root(), artifact.source()).as_str())
+        );
+        assert!(artifact.evidence().contains(&EvidenceCode::PermanentPath));
+        assert!(artifact.pending_deletions().is_empty());
+    }
+
+    #[test]
+    fn test_selected_root_classification_follows_the_configured_development_root() {
+        let source = "workspace/notes/plan.md";
+        let inside = container_with_policy(
+            ArtifactClassificationPolicy::configured(
+                "workspace",
+                vec!["workspace/active".into()],
+                vec![],
+                "workspace/archive",
+            ),
+            selected_root(source),
+            present_source(source),
+        );
+        assert!(raises_unmanaged_selected_root(&inside));
+        assert_eq!(entry(&inside, source).destination(), None);
+
+        let outside = container_with_policy(
+            ArtifactClassificationPolicy::configured(
+                "dev",
+                vec!["dev/active".into()],
+                vec![],
+                "dev/archive",
+            ),
+            selected_root(source),
+            present_source(source),
+        );
+        assert!(!raises_unmanaged_selected_root(&outside));
+        assert_eq!(entry(&outside, source).action(), ArtifactAction::Copy);
+        assert!(entry(&outside, source).destination().is_some());
+    }
+
+    #[test]
+    fn test_managed_root_outside_development_root_still_relocates_its_source() {
+        let plan = container_with_policy(
+            ArtifactClassificationPolicy::configured(
+                "dev",
+                vec!["fixtures".into()],
+                vec![],
+                "archive",
+            ),
+            selected_root("fixtures/root.md"),
+            present_source("fixtures/root.md"),
+        );
+        let artifact = entry(&plan, "fixtures/root.md");
+        assert_eq!(artifact.action(), ArtifactAction::Move);
+        assert!(!artifact.evidence().contains(&EvidenceCode::PermanentPath));
+        assert_eq!(artifact.pending_deletions().len(), 1);
+    }
+
+    #[test]
+    fn test_unconfigured_development_root_keeps_blocking_every_unmatched_selected_root() {
+        let plan = container_with_policy(
+            ArtifactClassificationPolicy::configured(
+                "",
+                vec!["dev/active".into()],
+                vec![],
+                "dev/archive",
+            ),
+            selected_root("scripts/install.sh"),
+            present_source("scripts/install.sh"),
+        );
+        assert!(raises_unmanaged_selected_root(&plan));
+        assert_eq!(entry(&plan, "scripts/install.sh").destination(), None);
     }
 
     #[test]
