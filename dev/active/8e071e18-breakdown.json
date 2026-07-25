@@ -382,7 +382,7 @@
       "repo-validate"
     ],
     "depends_on": [
-      "plan-template-path-adoption",
+      "template-directory-documentation",
       "directory-conformance-report"
     ],
     "planning": {
@@ -558,7 +558,7 @@
   {
     "key": "template-directory-interpolation",
     "title": "Interpolate the canonical artifact directory into template document paths",
-    "description": "A graph template's document path can name the owning container's canonical artifact directory in an area the declaration states, so an instantiated template writes into the convention instead of a flat pattern.\n\n## Background\n\nTemplate document paths are interpolated from container fields, and the only field available for a path today is the short id, which forces every declaration to spell out a flat area-plus-prefix pattern. Two independent interpolation engines and one plan-document resolver consume the same field set, so exposing the directory once serves all of them.\n\nBecause a development root holds several issue-scoped areas, a declaration states which area its document belongs in and the interpolated field resolves the canonical directory inside that area. A declaration naming an area the configured registry does not declare fails at application time with a descriptive error rather than producing a path outside the convention.\n\nThe interpolated value is the resolved directory, so a declaration names a filename relative to it and that filename carries no short-id prefix.\n\n## Success Criteria\n\n- [hard] REQ-01: A template document declaration states the issue-scoped area its document belongs in.\n- [hard] REQ-02: Document-path interpolation exposes a field carrying the container's canonical artifact directory in the stated area.\n- [hard] REQ-03: A declaration that names the field followed by a filename produces a path inside the canonical directory.\n- [hard] REQ-04: A declaration naming an area the configured registry does not declare fails application with a descriptive error.\n- [hard] REQ-05: The interpolated value comes from the domain resolver rather than from a second derivation.\n- [hard] REQ-06: Every interpolation consumer of container fields resolves the new field consistently.\n- [hard] REQ-07: Adopter-facing template documentation lists the field and the area declaration.\n",
+    "description": "A graph template's document node states the issue-scoped area its document belongs in, and apply-time interpolation exposes a field carrying the container's canonical artifact directory inside that area.\n\n## Background\n\nTemplate document paths are interpolated from container fields, and the only field available for a path today is the short id, which forces every declaration to spell out a flat area-plus-prefix pattern. The apply engine builds one fixed token-substitution context per container and resolves each declaration against it, so the field belongs in that context and the node schema gains the area declaration that selects which area to resolve in.\n\nBecause a development root holds several issue-scoped areas, the declaration states its area rather than leaving the engine to guess. A declaration naming an area the configured registry does not declare fails at application time with a descriptive error rather than producing a path outside the convention.\n\nThe interpolated value is the resolved directory, so a declaration names a filename relative to it and that filename carries no short-id prefix. The value comes from the domain resolver, which keeps the composition rule in one place.\n\nDerivations of the same declaration also exist outside the apply engine. They are held at their current behaviour here: the context construction they call changes shape, so their call sites travel with it while what they resolve stays as it is.\n\n## Success Criteria\n\n- [hard] REQ-01: A template document node declares the issue-scoped area its document belongs in.\n- [hard] REQ-02: Apply-time document-path interpolation exposes a field carrying the container's canonical artifact directory in the declared area.\n- [hard] REQ-03: A declaration that names the field followed by a filename produces a path inside the canonical directory.\n- [hard] REQ-04: A declaration naming an area the configured registry does not declare fails application with a descriptive error.\n- [hard] REQ-05: The interpolated value comes from the domain resolver rather than from a second derivation.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -570,15 +570,13 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review",
-      "doc-review",
-      "docs-mechanical"
+      "code-review"
     ],
     "depends_on": [
       "artifact-directory-command"
     ],
     "planning": {
-      "outcome": "A template document path can name the container's canonical artifact directory in a stated area.",
+      "outcome": "A template document node declares its area and its path names the container's canonical artifact directory.",
       "contract_refs": [
         "canonical-artifact-directory",
         "issue-scoped-area-registry"
@@ -589,18 +587,58 @@
         "dev/active/8e071e18-investigation.md"
       ],
       "terminal": {
-        "consumer_family": "template document-path interpolation callers",
-        "test_boundary": "template interpolation unit assertions on the produced path",
-        "worker_sized_reason": "One interpolation context gains a field consumed by the existing renderers.",
+        "consumer_family": "graph-template apply-time document-path interpolation",
+        "test_boundary": "apply-time interpolation assertions over the produced document path",
+        "worker_sized_reason": "One interpolation context gains one field the node schema selects an area for.",
         "footprint": {
           "touches": [
+            "crates/jit/src/templates.rs",
             "crates/jit/src/commands/template_expand.rs",
             "crates/jit/src/commands/template.rs",
-            "crates/jit/src/commands/plan_doc.rs",
-            "crates/jit/tests/fast_docs_templates/template_apply_tests.rs",
-            "docs/how-to/adopt-planning-bracket.md",
-            "docs/examples/sdd/templates.toml",
-            "docs/examples/research/templates.toml"
+            "crates/jit/tests/fast_docs_templates/template_apply_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "template-path-derivation-parity",
+    "title": "Resolve the artifact-directory field in the path derivations outside the apply engine",
+    "description": "Two derivations of a template document path live outside the apply engine, and a third resolves the plan-document location when a plan reference is first written. Each substitutes the artifact-directory field to the path the apply engine produces.\n\n## Background\n\nThe apply engine resolves a document declaration against one fixed token-substitution context. Three other places derive the same path from the same declaration: the capture-path computation that pre-declares which files a template operation writes, the refresh derivation that rebuilds the context when reconciling an already-applied template, and the plan-document location resolver that substitutes a container identifier into the declaration.\n\nA field the apply engine resolves and these derivations do not becomes a literal token in a written path, a capture set that misses the file the operation writes, or a reconciliation that rewrites a resolved path into a broken one. The capture-path computation composes its token substitution by hand rather than sharing the engine's context, which is what lets the two drift.\n\nThe plan-document resolver receives a container identifier rather than the container, so resolving the field at that boundary needs the resolved directory reachable from what the resolver is handed. Area validation behaves as it does at application time: an area the configured registry does not declare yields a descriptive error rather than an unsubstituted or out-of-convention path.\n\n## Success Criteria\n\n- [hard] REQ-01: The capture-path computation resolves the artifact-directory field to the path the apply engine produces for the same declaration.\n- [hard] REQ-02: The refresh derivation that rebuilds the interpolation context resolves the artifact-directory field to that same path.\n- [hard] REQ-03: The plan-document location resolver substitutes the artifact-directory field rather than leaving the token literal.\n- [hard] REQ-04: A derivation handed an area the configured registry does not declare reports a descriptive error rather than an unsubstituted path.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:artifact-directory-convention",
+      "per:@/issue/8e071e18/decision/D-2"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "template-directory-interpolation"
+    ],
+    "planning": {
+      "outcome": "The document-path derivations outside the template apply engine resolve the artifact-directory field to the same path.",
+      "contract_refs": [
+        "canonical-artifact-directory",
+        "issue-scoped-area-registry"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "D-2",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "template document-path derivations outside the apply engine",
+        "test_boundary": "unit assertions that each derivation yields the apply-engine path",
+        "worker_sized_reason": "Three known derivations of one path template adopt one existing field lookup.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/template.rs",
+            "crates/jit/src/commands/plan_doc.rs"
           ]
         }
       }
@@ -626,7 +664,7 @@
       "repo-validate"
     ],
     "depends_on": [
-      "template-directory-interpolation"
+      "template-path-derivation-parity"
     ],
     "planning": {
       "outcome": "The plan template's document path resolves inside the container's canonical directory with an unprefixed filename.",
@@ -648,6 +686,50 @@
           "touches": [
             ".jit/templates.toml",
             "profiles/jit-dogfood/manifest.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "template-directory-documentation",
+    "title": "State the artifact-directory template field in the adopter template documentation",
+    "description": "The adopter planning-bracket guide and the two example template registries carry the area declaration together with the artifact-directory field, so an adopter copying either one produces a document path inside the convention.\n\n## Background\n\nThe planning-bracket how-to teaches the template document declaration by quoting the software-design example registry, and the research example registry declares the same shape for its own bracket. Both spell out a flat area-plus-identifier pattern, so an adopter following the guide reproduces the layout the convention replaces.\n\nThe guide's quoted block and the registry it quotes are one fact in two places, so they move together or the guide teaches a declaration no example carries.\n\nThese registries are adopter-facing samples rather than this repository's own configuration, so they carry the shape an adopter should copy and no repository-local path.\n\n## Success Criteria\n\n- [hard] REQ-01: The adopter planning-bracket guide names the area declaration a template document node carries.\n- [hard] REQ-02: The adopter planning-bracket guide names the interpolation field that resolves to the container's canonical artifact directory.\n- [hard] REQ-03: The software-design example registry declares its planning document path through the artifact-directory field with a filename carrying no short-id prefix.\n- [hard] REQ-04: The research example registry declares its planning document path the same way.\n- [hard] REQ-05: The declaration quoted in the guide matches the example registry it quotes.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:artifact-directory-convention",
+      "satisfies:REQ-05",
+      "per:@/issue/8e071e18/decision/D-2"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "plan-template-path-adoption"
+    ],
+    "planning": {
+      "outcome": "The adopter planning-bracket guide plus both example registries carry the area declaration with the artifact-directory field.",
+      "contract_refs": [
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "D-2",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "adopters authoring graph-template document declarations",
+        "test_boundary": "the documented field shape checked against the shipped template declaration",
+        "worker_sized_reason": "One guide section plus two example declarations restate one field shape.",
+        "footprint": {
+          "touches": [
+            "docs/how-to/adopt-planning-bracket.md",
+            "docs/examples/sdd/templates.toml",
+            "docs/examples/research/templates.toml"
           ]
         }
       }
