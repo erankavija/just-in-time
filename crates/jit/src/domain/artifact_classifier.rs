@@ -1126,14 +1126,15 @@ pub fn preferred_container_destination_root(
     join_path(archive_root, &directory)
 }
 
-/// Normalize one membership-label value into a bounded path component.
+/// Normalize one label value into a bounded path component.
 ///
+/// This is the crate's single slug normalizer for archive directory names.
 /// Lowercases Unicode alphanumeric characters, collapses every other run into a
 /// single `-`, and bounds the result at 48 characters so an arbitrarily long
 /// label value cannot name an unwieldy directory. Returns `None` when the value
 /// holds no alphanumeric character and therefore names nothing, leaving the
 /// caller with the bare short-id directory.
-fn archive_container_slug(value: &str) -> Option<String> {
+pub(crate) fn archive_container_slug(value: &str) -> Option<String> {
     const MAX_CHARS: usize = 48;
 
     let mut slug = String::new();
@@ -1778,6 +1779,7 @@ mod tests {
             archive_container_slug("Platform/Archive_V2").as_deref(),
             Some("platform-archive-v2")
         );
+        assert_eq!(archive_container_slug("///"), None);
         assert_eq!(archive_container_slug("@/._-/._-"), None);
         assert_eq!(
             archive_container_slug(&"a".repeat(80)).map(|slug| slug.chars().count()),
