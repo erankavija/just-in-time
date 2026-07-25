@@ -1542,7 +1542,7 @@ mod tests {
 
         let executor = executor(&repo, storage);
         let result = executor.execute_archive_container(&container_id).unwrap();
-        let destination = format!("archive/{}-container/fixtures/root.md", &container_id[..8]);
+        let destination = format!("archive/{}/fixtures/root.md", &container_id[..8]);
         let container = executor.storage.load_issue(&container_id).unwrap();
         let outside = executor.storage.load_issue(&outside_id).unwrap();
         assert_eq!(container.documents[0].path, destination);

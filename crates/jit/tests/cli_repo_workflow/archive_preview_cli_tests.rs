@@ -522,7 +522,7 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
     let result: Value = serde_json::from_slice(&container.stdout).unwrap();
     assert_eq!(result["target"]["kind"], "container");
     assert_eq!(result["event_appended"], true);
-    let destination_root = format!("archive/{}-container", &id[..8]);
+    let destination_root = format!("archive/{}", &id[..8]);
     assert_eq!(
         fs::read_to_string(
             container_repo
