@@ -353,6 +353,69 @@ impl DocumentationConfig {
     }
 }
 
+/// The development-area classification an initialized repository is shipped with.
+///
+/// Configuration the tool writes for an adopter, not classifier logic
+/// (`@/invariant/domain-agnostic`): the `jit init` scaffold renders this
+/// declaration as the `[documentation]` table of a fresh `.jit/config.toml`
+/// (`HierarchyTemplate::generate_config_toml`), so the repository reports a
+/// configured archival policy without hand-editing. An adopter is free to
+/// reclassify any area afterwards.
+///
+/// A managed area's artifacts move under the archive root when their owning
+/// issue is archived; a permanent area's artifacts are copied there and the
+/// source is retained. Entries are matched with
+/// [`contains_path`](crate::domain::artifact_classifier::contains_path), which
+/// covers everything beneath a directory entry and exactly one file for a file
+/// entry, so development-root files belonging to no area are named individually
+/// rather than reached through an entry for the root itself
+/// (`@/issue/8e071e18/decision/D-13`).
+#[derive(Debug, Clone, Copy)]
+pub struct ShippedDocumentationPolicy {
+    /// Root directory holding development documentation.
+    pub development_root: &'static str,
+    /// Root the archived artifacts are published under.
+    pub archive_root: &'static str,
+    /// Areas whose artifacts move on archival.
+    pub managed_paths: &'static [&'static str],
+    /// Areas whose artifacts archive by copy, retaining their source.
+    pub permanent_paths: &'static [&'static str],
+}
+
+/// The shipped documentation policy: the one declaration of which development
+/// areas are managed and which are permanent.
+///
+/// See [`ShippedDocumentationPolicy`] for the matching semantics and for why the
+/// classification is scaffolded configuration.
+pub const SHIPPED_DOCUMENTATION_POLICY: ShippedDocumentationPolicy = ShippedDocumentationPolicy {
+    development_root: "dev",
+    archive_root: "dev/archive",
+    // Revision-specific work products of terminal issues: archiving the owning
+    // issue takes them with it.
+    managed_paths: &[
+        "dev/active",
+        "dev/studies",
+        "dev/sessions",
+        "dev/plans",
+        "dev/presentations",
+        "dev/design",
+        "dev/benchmarks",
+        "dev/experiments",
+    ],
+    // Living documentation, a configured item-kind source, or documented
+    // invocation paths: each keeps its source where readers and configuration
+    // already point. The trailing entries are the development-root files that
+    // belong to no area, classified one path at a time.
+    permanent_paths: &[
+        "dev/architecture",
+        "dev/eval",
+        "dev/vision",
+        "dev/index.md",
+        "dev/TESTING.md",
+        "dev/authoring-conventions.md",
+    ],
+};
+
 /// Label namespace configuration from TOML.
 /// Replaces the namespace definitions in labels.json.
 ///
