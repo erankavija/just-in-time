@@ -178,7 +178,9 @@
           "gates": [
             "repo-validate"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "sonnet",
+          "worktree": ".agents/worktrees/agent-f2cac2bd"
         },
         {
           "id": "3559ca25-4d31-4e57-9eb1-0853ccd60996",
@@ -190,7 +192,9 @@
             "code-review",
             "mcp-ci"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "opus",
+          "worktree": ".agents/worktrees/agent-3559ca25"
         },
         {
           "id": "2ac35e8e-01ca-446a-a70c-d9313ddba624",
@@ -201,9 +205,14 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "opus",
+          "worktree": ".agents/worktrees/agent-2ac35e8e"
         }
-      ]
+      ],
+      "status": "dispatched",
+      "dispatch_base": "bb401f1d",
+      "notes": "Three isolated worktrees anchored at bb401f1d; footprints disjoint per the manifest (.jit/config.toml | cli.rs+commands/document.rs+output.rs+doc_show_tests.rs+mcp-server/curated-tools.json | storage/artifact_planning.rs+domain/artifact_classifier.rs). f2cac2bd is authorized to edit .jit/config.toml, which is its entire footprint; the standing worker .jit/ prohibition is waived for that one file only."
     },
     {
       "wave_number": 6,
@@ -996,6 +1005,15 @@
       "situation": "code-review F1 (blocking, medium, origin issue-impact) cited @/charter/D-13 and @/invariant/single-source-prose: the new issue_scoped_areas key is absent from docs/reference/configuration.md. Root cause is structural - that file and example-config.toml have shown 3 managed paths and permanent_paths=[docs/] since wave 1 while jit init writes 8 and 6, and are not repaired until 58c56743 in wave 11, which cannot move earlier (it depends on 0b3840f1, 35499d1e, 89b5899a and documents a command that does not exist yet).",
       "lead_analysis": "Third review round lost to this same root cause (E2 on b3fc1a92 was the same two files), meeting escalation policy 5a MAX_SAME_FINDING_REPEATS independent of the rework counter. 6aa82c0b in wave 4 adds another config key and would have hit it again. No-argue discipline forbids softening the reviewer's reading.",
       "resolution": "Owner chose the remediation task. Created fd88adda (task, story:area-classification, doc-review + docs-mechanical) to sync both adopter documents to the shipped [documentation] table - all three stale facts at once. Wired onto 69dd4e36 (done) rather than f88a16d9, because depending on f88a16d9 deadlocked it against the very review it unblocks; f88a16d9's key is already merged on main. 35499d1e depends on fd88adda. f88a16d9 code-review re-runs once fd88adda lands; F1 is a repo-state observation and evaporates when the key is documented."
+    },
+    {
+      "id": "E5",
+      "wave": 5,
+      "issue": "f2cac2bd, 3559ca25, 2ac35e8e",
+      "category": "standing owner approval applied (E3), not a new escalation",
+      "situation": "All three wave-5 issues carried a satisfies: label reaching past their own criteria. f2cac2bd (satisfies:REQ-08) declares this repository's scan roots but ships no scan; 2ac35e8e (satisfies:REQ-08) ships the scan mechanism but neither the version-control-independence proof nor the no-rewrite-on-execute lock; 3559ca25 (satisfies:REQ-04) ships the command but not the tooling and documentation adoption the criterion also names.",
+      "lead_analysis": "Same shape that cost review rounds on 30595d22 (E1), b3fc1a92 (E2), 8cd6eb73/6aa82c0b/22c11e40 (E3). Siblings still credit both criteria: REQ-08 by 9ca124f9, ef2bd13c, 3be32cad; REQ-04 by 58c56743. 3be32cad (wave 8) is the last REQ-08 issue and 58c56743 (wave 11) the last REQ-04 issue, so each criterion's remaining credit sits on the issue closing its final clause.",
+      "resolution": "Dropped satisfies:REQ-08 from f2cac2bd and 2ac35e8e and satisfies:REQ-04 from 3559ca25 under E3's standing approval, before dispatch. Recorded in commit bb401f1d."
     }
   ],
   "rework_counts": {
