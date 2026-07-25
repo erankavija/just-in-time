@@ -13,6 +13,38 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/8e071e18-investigation.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "39bb431a5a0de1692279d3a06ee05c95ffe58a4ee57a06b56b0cd7beec460189",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "8e071e18-investigation.md",
+          "resolved_path": "dev/active/8e071e18-investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8f327a196a1e582282438179e072772d531de581efb6a9f91f983435b1860046",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "8e071e18-breakdown.json",
+          "resolved_path": "dev/active/8e071e18-breakdown.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/8e071e18-plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/8e071e18-breakdown.json"
     }
   ],
   "first_ready_at": "2026-07-25T07:52:48.923758675Z",
@@ -35,5 +67,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: Issue-based development artifact layout and serviceable archival",
-  "updated_at": "2026-07-25T08:35:40.236100797Z"
+  "updated_at": "2026-07-25T08:57:59.285401289Z"
 }

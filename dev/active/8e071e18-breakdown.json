@@ -1,0 +1,1535 @@
+[
+  {
+    "key": "area-classification",
+    "title": "Serviceable archival for every configured development area",
+    "description": "Archival classifies each development area explicitly and stops refusing artifacts it was never meant to block, so a repository can archive a presentation deck through the supported workflow.\n\n## Background\n\nThe archival planner refuses any selected root that is neither managed, permanent, nor already archived. The `[documentation]` block that repository initialization scaffolds is emitted commented out, names a subset of the areas under a development root, and advertises two keys the configuration type no longer carries. Policy completeness is computed from authored fields alone and ignores the runtime accessor fallbacks, so an adopter who never edits the scaffolded block gets an unconfigured policy and archival is refused whatever the fallbacks say.\n\nTwo further gaps compound it. A linked artifact outside the development root — source code, a script, an agent asset, a repository-root file — is blocked rather than archived by copy. A markdown link whose target resolves to a directory is treated as an unsupported artifact and blocks the plan that reaches it. Plan eligibility is all-or-nothing, so one blocker anywhere in a container subtree makes the whole plan ineligible.\n\nClassification is explicit per area rather than a blanket rule over the development root, so an area holding living documentation archives by copy and retains its source while an area holding revision-specific work products moves.\n\n## Success Criteria\n\n- [hard] REQ-01: A freshly initialized repository classifies every area under its development root as managed or permanent and reports a configured documentation policy without hand-editing.\n- [hard] REQ-02: A presentation deck owned by a terminal issue previews as an eligible plan through both archive target forms, and no configured development area produces an unmanaged-selected-root blocker.\n- [hard] REQ-03: A linked artifact outside the development root is classified permanent rather than blocked, and executing a plan that contains one relocates no file outside the development root.\n- [hard] REQ-04: A link target that resolves to a directory produces no unsupported-artifact-type blocker, and a container whose remaining blockers were all directory targets yields an eligible plan.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:area-classification"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical",
+      "repo-validate"
+    ],
+    "depends_on": [
+      "documentation-default-alignment",
+      "deck-archival-eligibility"
+    ],
+    "planning": {
+      "outcome": "Development areas are explicitly classified and the planner stops blocking artifacts it should copy or skip.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "development-root-scoped-classification",
+        "directory-target-navigation"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "REQ-02",
+        "REQ-14",
+        "REQ-15",
+        "D-5",
+        "D-6",
+        "D-13",
+        "D-14",
+        "D-17",
+        "D-18",
+        "D-19",
+        "dev/active/8e071e18-investigation.md"
+      ]
+    }
+  },
+  {
+    "key": "shipped-area-classification",
+    "title": "Ship the development-area classification in the initialization scaffold",
+    "description": "The repository-initialization scaffold declares each development area as managed or permanent from one authoritative declaration, so a freshly initialized repository reports a configured documentation policy.\n\n## Background\n\nThe documentation block the scaffold writes is commented out, covers a subset of the areas under a development root, and advertises two keys the configuration type no longer carries. Policy completeness is computed from authored fields alone, so an adopter who leaves the scaffolded block untouched gets an unconfigured policy and archival refuses to run. Making policy completeness honour the runtime fallbacks instead was rejected: it would change archive eligibility for every existing repository that has no authored table.\n\nClassification is explicit per area. Areas holding revision-specific work products of terminal issues are managed and move on archive. Areas holding living documentation, a configured item-kind source, or documented invocation paths are permanent, archive by copy, and retain their source. Files that sit at the development root and belong to no area are classified individually as exact path entries, which the path matcher supports. A single entry for the development root itself is wrong, because matching is by path prefix and it would silently make every managed area permanent.\n\nThe declaration is configuration the tool writes for an adopter rather than engine policy, so it belongs in the scaffold instead of in classifier logic.\n\n## Success Criteria\n\n- [hard] REQ-01: A repository created by initialization carries an authored documentation policy that names each development area as managed or permanent, with the presentation area managed and the architecture area permanent.\n- [hard] REQ-02: The scaffolded documentation block is active configuration rather than commented-out guidance, and names only keys the configuration type carries.\n- [hard] REQ-03: Development-root files that belong to no area are classified as exact path entries rather than swept in by a prefix.\n- [hard] REQ-04: The managed and permanent area sets exist as one declaration that the scaffold emitter consumes, not as a restated literal list.\n- [hard] REQ-05: Archive planning in a freshly initialized repository reports a configured policy status.\n\n## Notes\n\nThe shipped classification is derived from initialization code and templates. This repository's live configuration is repository-local policy and is not the source of the shipped default.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:area-classification",
+      "satisfies:REQ-01",
+      "per:@/issue/8e071e18/decision/D-13",
+      "per:@/issue/8e071e18/decision/D-19",
+      "enforces:@/invariant/domain-agnostic"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A single shipped declaration of managed and permanent development areas lands in the initialization scaffold.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-01",
+        "D-5",
+        "D-13",
+        "D-19",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "produces_contracts": [
+        "shipped-area-declaration"
+      ],
+      "landing_group": "shipped-classification",
+      "terminal": {
+        "consumer_family": "the repository initialization scaffold",
+        "test_boundary": "initialization CLI integration assertions on the scaffolded policy",
+        "worker_sized_reason": "One scaffold emitter and its golden assertions change in a single file pair.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/hierarchy_templates.rs",
+            "crates/jit/tests/cli_repo_workflow/init_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "documentation-default-alignment",
+    "title": "Derive the runtime documentation defaults from the shipped declaration",
+    "description": "The runtime configuration accessors fall back to the same shipped area declaration the initialization scaffold writes, so the two can no longer disagree.\n\n## Background\n\nThe documentation accessors return hard-coded fallback lists when no table is authored, and doc comments beside them restate those lists a second time. The scaffolded block, the accessor fallbacks, the adopter example configuration, and the adopter reference are four copies of one fact, and they already disagree with each other. Reducing them to one declaration removes the staleness defect rather than adding a fifth copy.\n\nThe fallbacks stay non-authorizing. Policy completeness is judged from authored fields alone, so a repository with no documentation table still reports an incomplete or unconfigured policy and archival still refuses to mutate. Changing that judgement is out of scope, because it would alter archive eligibility for existing repositories.\n\n## Success Criteria\n\n- [hard] REQ-01: The managed-path, permanent-path, archive-root, and development-root fallbacks return values read from the shipped area declaration rather than from literals of their own.\n- [hard] REQ-02: Doc comments describing the fallbacks carry no second copy of the path lists.\n- [hard] REQ-03: A repository with no authored documentation table still reports an unconfigured or incomplete policy status, unchanged by the fallbacks.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:area-classification",
+      "satisfies:REQ-01",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shipped-area-classification"
+    ],
+    "planning": {
+      "outcome": "Configuration accessor fallbacks read the one shipped area declaration instead of restating it.",
+      "contract_refs": [
+        "shipped-area-declaration"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "D-19",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "shipped-classification",
+      "terminal": {
+        "consumer_family": "configuration accessor callers",
+        "test_boundary": "configuration unit assertions over the accessor fallbacks",
+        "worker_sized_reason": "One module's fallback accessors and their doc comments change together.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/config.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "outside-root-classification",
+    "title": "Classify linked artifacts outside the development root as permanent",
+    "description": "A selected root that lies outside the configured development root is classified permanent instead of raising a blocker, so archival stops refusing plans over source files, scripts, agent assets, and repository-root documents.\n\n## Background\n\nThe planner blocks a selected root that is neither managed, permanent, nor already archived, and returns no destination for it. Linked artifacts outside the development root fall into that gap: they are legitimately linked to terminal issues and archiving them by copy is the correct treatment, yet they defeat the whole plan because eligibility is all-or-nothing.\n\nThe relaxation is scoped to artifacts outside the configured development root, not to any artifact that matches no configured area. A blanket relaxation would turn a mistyped managed-path entry into silent copying with no diagnostic, discarding the signal the blocker exists to raise. Enumerating each outside root as permanent was rejected as a maintenance treadmill that re-blocks on the first unlisted root, and prefix matching would make an entry such as the crate source root permanent wholesale.\n\nThe classification policy value does not currently carry the development root, although the configuration accessor for it exists. Threading it in is the structural part of this work and stays inside the pure domain layer. The blocker code remains part of the stable wire vocabulary even though it fires less often; removing it would break the schema.\n\n## Success Criteria\n\n- [hard] REQ-01: A selected root outside the configured development root is classified permanent and receives a destination instead of an unmanaged-selected-root blocker.\n- [hard] REQ-02: A selected root inside the development root that matches no configured area still raises the blocker, so a mistyped area entry stays diagnosable.\n- [hard] REQ-03: The classification policy value carries the configured development root, and the comparison uses that configured value rather than a built-in path literal.\n- [hard] REQ-04: The unmanaged-selected-root code remains in the published blocker vocabulary.\n- [hard] REQ-05: Adopter-facing command reference text describes the scoped behaviour.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:area-classification",
+      "satisfies:REQ-14",
+      "per:@/issue/8e071e18/decision/D-14",
+      "per:@/issue/8e071e18/decision/D-17",
+      "enforces:@/invariant/domain-agnostic"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A selected root outside the configured development root classifies permanent instead of raising a blocker.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-14",
+        "D-14",
+        "D-17",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "produces_contracts": [
+        "development-root-scoped-classification"
+      ],
+      "terminal": {
+        "consumer_family": "archive planning for out-of-root linked artifacts",
+        "test_boundary": "archive plan preview blocker assertions",
+        "worker_sized_reason": "One classifier function gains a threaded policy field with focused unit coverage.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/domain/artifact_classifier.rs",
+            "docs/reference/cli-commands.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "outside-root-source-retention",
+    "title": "Guarantee archive execution retains sources outside the development root",
+    "description": "Executing a plan that contains an out-of-root linked artifact copies it into the mirror and leaves the original where it is, proven by regression coverage rather than by narration.\n\n## Background\n\nPermanent classification already implies a copy action, and a copy schedules no pending deletion, so source retention follows from the existing action model. That guarantee is currently unasserted: nothing fails if a future change turns one of those copies into a move and starts relocating source files, scripts, or agent assets out of the tree.\n\nBecause plan eligibility is all-or-nothing, the assertion is written against the retention property directly rather than against whole-plan eligibility, which can be false for unrelated reasons.\n\n## Success Criteria\n\n- [hard] REQ-01: Executing a plan whose artifact set includes a linked file outside the development root leaves that file at its original path.\n- [hard] REQ-02: The same execution publishes the mirrored copy under the archive root, so retention is not achieved by skipping the artifact.\n- [hard] REQ-03: No pending deletion is scheduled for an artifact outside the development root.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:area-classification",
+      "satisfies:REQ-14",
+      "per:@/issue/8e071e18/decision/D-14"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "outside-root-classification"
+    ],
+    "planning": {
+      "outcome": "Executing a plan that contains an out-of-root linked artifact leaves that file in place.",
+      "contract_refs": [
+        "development-root-scoped-classification"
+      ],
+      "source_refs": [
+        "REQ-14",
+        "D-14",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "archive execution over out-of-root artifacts",
+        "test_boundary": "archive execution regression assertions on retained sources",
+        "worker_sized_reason": "One regression suite exercises an existing copy path with no production change.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "directory-link-target-skip",
+    "title": "Skip directory link targets during artifact discovery",
+    "description": "A markdown link whose target resolves to a directory is treated as navigation and skipped by artifact discovery, so it stops blocking the plans that reach it.\n\n## Background\n\nArtifact discovery follows document link edges and resolves each target. A trailing-slash link to a sibling directory resolves to something that is not a regular file, and the planner records it as an unsupported artifact with a blocking action. Index documents that link their sibling directories are legitimate markdown, and they are reached transitively as embedded artifacts from documents that are themselves linked, so the blockers land in container plans that have nothing to do with those index files. This is the largest blocker population in the repository and it is independent of any path classification.\n\nRewriting the offending links was rejected: they are valid markdown, one of the index documents is adopter-facing, and the defect would stay shipped for every adopter. Narrowing the cleanup criterion was rejected because it would leave the epic's acceptance evidence partial and the defect unrecorded.\n\nA directory is navigation rather than a document, so skipping it is the correct semantics and not a suppression.\n\n## Success Criteria\n\n- [hard] REQ-01: A link target that resolves to a directory produces no unsupported-artifact-type blocker and contributes no artifact entry.\n- [hard] REQ-02: A link target that resolves to a regular file or symbolic link is unaffected.\n- [hard] REQ-03: A container whose remaining blockers were all directory targets yields an eligible plan.\n- [hard] REQ-04: Adopter-facing command reference text describes directory targets as navigation rather than as blocked artifacts.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:area-classification",
+      "satisfies:REQ-15",
+      "per:@/issue/8e071e18/decision/D-18"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A link target that resolves to a directory is navigation and raises no unsupported-artifact-type blocker.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-15",
+        "D-18",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "produces_contracts": [
+        "directory-target-navigation"
+      ],
+      "terminal": {
+        "consumer_family": "artifact discovery over document link edges",
+        "test_boundary": "artifact discovery unit assertions on directory targets",
+        "worker_sized_reason": "One discovery branch changes with coverage in the existing discovery suite.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/domain/artifact_classifier.rs",
+            "crates/jit/tests/fast_docs_templates/artifact_discovery_tests.rs",
+            "docs/reference/cli-commands.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "repository-config-adoption",
+    "title": "Adopt the shipped area classification in this repository's configuration",
+    "description": "This repository's documentation policy names the same managed and permanent areas as the shipped scaffold, so the cleanup that follows runs against the product's own default rather than a bespoke local table.\n\n## Background\n\nThe change ships as a product default and this repository then adopts it. The live policy today names three managed areas and one permanent prefix, leaving eight areas under the development root unclassified. Adoption reclassifies them: work-product areas become managed and move on archive, while an area holding living contributor documentation, a configured item-kind source, or a documented invocation path becomes permanent and archives by copy. Development-root files that belong to no area are listed individually.\n\nAdoption is what makes the repository-level acceptance evidence real, and it must land before any archival execution so that the executions run under the intended classification.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository documentation policy classifies each area under the development root as managed or permanent, matching the shipped declaration.\n- [hard] REQ-02: Development-root files that belong to no area are listed as exact path entries.\n- [hard] REQ-03: No entry covers the development root as a whole.\n- [hard] REQ-04: The container candidate report shows no unmanaged-selected-root blocker for any area under the development root.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:area-classification",
+      "per:@/issue/8e071e18/decision/D-5",
+      "per:@/issue/8e071e18/decision/D-13"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "shipped-area-classification"
+    ],
+    "planning": {
+      "outcome": "This repository's documentation policy names the same managed and permanent areas as the shipped scaffold.",
+      "contract_refs": [
+        "shipped-area-declaration"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "D-5",
+        "D-6",
+        "D-13",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "this repository's archival policy",
+        "test_boundary": "archive candidate eligibility over this repository's containers",
+        "worker_sized_reason": "One configuration table changes and one candidate report run verifies it.",
+        "footprint": {
+          "touches": [
+            ".jit/config.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "deck-archival-eligibility",
+    "title": "Prove deck archival is eligible through both archive target forms",
+    "description": "A presentation deck owned by a terminal issue previews as an eligible plan through the document target form and the container target form, closing the gap that forced the predecessor deck to be relocated by hand.\n\n## Background\n\nArchiving the predecessor showcase deck had to be hand-rolled because the presentation area was outside the managed paths. That bypass skipped the planner's reference remapping, left a document reference dangling, and caused a validation failure that had to be repaired by hand. A preview over the predecessor container reproduces the gap with blockers on an architecture document, a successor deck, and a tombstone.\n\nWith the areas classified, out-of-root artifacts classified permanent, and directory targets skipped, both target forms should reach eligibility. The assertion reads the target-level blocker array as well as the per-artifact one, because a selected-root blocker is recorded at target level and never appears in artifact action counts.\n\n## Success Criteria\n\n- [hard] REQ-01: A document-target preview of a deck asset owned by a terminal issue reports an eligible plan.\n- [hard] REQ-02: A container-target preview whose subtree contains a deck owned by a terminal issue reports an eligible plan.\n- [hard] REQ-03: Neither preview reports an unmanaged-selected-root blocker for a path under a configured development area, asserted against the target-level blocker array.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:area-classification",
+      "satisfies:REQ-02"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "repository-config-adoption",
+      "outside-root-source-retention",
+      "directory-link-target-skip"
+    ],
+    "planning": {
+      "outcome": "A presentation deck owned by a terminal issue previews eligible through either archive target form.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "development-root-scoped-classification",
+        "directory-target-navigation"
+      ],
+      "source_refs": [
+        "REQ-02",
+        "D-6",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "archive preview callers targeting presentation decks",
+        "test_boundary": "archive preview CLI integration assertions",
+        "worker_sized_reason": "One integration suite gains two assertions against an existing fixture shape.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "artifact-directory-convention",
+    "title": "Canonical issue artifact directory convention",
+    "description": "An issue's artifacts live in one canonical directory derived from its identity, resolved by a command that tooling and documentation call instead of spelling the pattern out.\n\n## Background\n\nDevelopment artifacts are named as flat files at area root with the owning issue's short id as a filename prefix. The layout does not scale, and the one place that derives a directory name from an issue falls back to the issue title, which yields long names truncated mid-word.\n\nThe convention is a directory per issue named from the issue's membership label, falling back to a bare short id, with filenames inside the directory carrying no redundant short-id prefix. Directory-per-issue precedents already exist in the repository. The convention governs newly created artifacts; pre-existing flat files are tolerated rather than restructured in place.\n\nEnforcement is a resolver plus an advisory report. A blocking validation rule was rejected because legacy flat artifacts are deliberately tolerated and a cutover predicate would be a false-positive source.\n\n## Success Criteria\n\n- [hard] REQ-01: An issue's canonical artifact directory is the area root joined with its short id and membership slug when the issue carries a membership label, and with the bare short id otherwise, with no name derived from an issue title.\n- [hard] REQ-02: A command resolves the canonical directory, and tooling and documentation obtain the path from it rather than composing it from a spelled-out pattern.\n- [hard] REQ-03: Artifact filenames inside an issue directory carry no short-id prefix.\n- [hard] REQ-04: An advisory report lists artifacts under managed issue-scoped areas that sit outside their owning issue's canonical directory, and the report blocks no state transition.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:artifact-directory-convention"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical",
+      "mcp-ci",
+      "repo-validate"
+    ],
+    "depends_on": [
+      "plan-template-path-adoption",
+      "directory-conformance-report"
+    ],
+    "planning": {
+      "outcome": "One resolver, one command, and one advisory report establish the issue artifact directory convention.",
+      "contract_refs": [
+        "canonical-artifact-directory",
+        "membership-slug-precedence",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-03",
+        "REQ-04",
+        "REQ-05",
+        "REQ-06",
+        "D-1",
+        "D-2",
+        "D-3",
+        "D-4",
+        "D-7",
+        "dev/active/8e071e18-investigation.md"
+      ]
+    }
+  },
+  {
+    "key": "canonical-directory-resolver",
+    "title": "Resolve an issue's canonical artifact directory in the domain layer",
+    "description": "A pure domain function maps an issue to its canonical artifact directory, so every consumer derives the path from one rule instead of restating it.\n\n## Background\n\nTwo independent naming rules exist today and neither answers the question for a source-side artifact. The archive planner derives a destination directory from a membership label and falls back to the issue title; template interpolation composes a flat filename from a short id. The convention needs one derivation: the area root joined with the short id and the membership slug, or with the bare short id when no single membership value is available.\n\nPrecedence has three steps. Collect the issue's type labels; only when exactly one type label exists, look up its configured membership namespace; collect that namespace's values on the issue and only when exactly one exists, use it as the slug. Both ambiguous cases collapse to the bare short-id directory, which needs no new tie-breaking policy and matches the legacy directory shape the archive resolver already adopts.\n\nThe area root comes from configuration and the namespace from the configured type-to-namespace mapping, so the function carries no development-root literal. Slug normalization reuses the existing bounded, Unicode-safe slug helper rather than adding a second one. Legacy flat and suffix-form filenames stay resolvable; the function names where a new artifact belongs and never restructures an existing one.\n\n## Success Criteria\n\n- [hard] REQ-01: An issue with exactly one type label and exactly one value in that type's membership namespace resolves to the area root joined with its short id and that value's slug.\n- [hard] REQ-02: An issue with no membership label, several type labels, or several membership values resolves to the area root joined with its bare short id.\n- [hard] REQ-03: No resolved directory name is derived from an issue title.\n- [hard] REQ-04: The area root is read from configuration and the membership namespace from the configured type mapping, with no path literal in the function.\n- [hard] REQ-05: The function performs no input or output and reuses the existing slug normalizer.\n- [hard] REQ-06: Resolving a directory for an issue whose artifacts are stored flat reports the canonical location and moves nothing.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:artifact-directory-convention",
+      "satisfies:REQ-03",
+      "satisfies:REQ-13",
+      "per:@/issue/8e071e18/decision/D-1",
+      "per:@/issue/8e071e18/decision/D-4",
+      "enforces:@/invariant/domain-agnostic"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A pure function maps an issue to its canonical artifact directory from a membership label or a bare short id.",
+      "contract_refs": [
+        "membership-slug-precedence",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-03",
+        "REQ-13",
+        "D-1",
+        "D-3",
+        "D-4",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "produces_contracts": [
+        "canonical-artifact-directory"
+      ],
+      "terminal": {
+        "consumer_family": "domain callers needing an issue artifact directory",
+        "test_boundary": "domain unit assertions over the resolver",
+        "worker_sized_reason": "One pure function reuses the existing slug helper and membership lookup.",
+        "footprint": {
+          "creates": [
+            "crates/jit/src/domain/artifact_directory.rs"
+          ],
+          "touches": [
+            "crates/jit/src/domain/mod.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "artifact-directory-command",
+    "title": "Expose the canonical artifact directory as a command",
+    "description": "A document subcommand prints an issue's canonical artifact directory, giving agents, scripts, and prose one place to obtain the path instead of composing it from a spelled-out pattern.\n\n## Background\n\nNothing in the command surface derives a document path today; every document subcommand operates on a path the caller already knows. The archive group is defined as producing archival plans, so a pure path resolver does not belong there, while the document group already owns the document-path vocabulary.\n\nThe output is a single value, so it uses the established flat named-object shape for machine-readable output rather than the list envelope. Argument parsing and rendering stay in the command-line and output layers, orchestration in the command layer, and the derivation itself stays in the domain resolver.\n\nAdding a command changes the generated bridge surface, which requires an explicit curation entry with a one-line rationale before its coverage check passes.\n\n## Success Criteria\n\n- [hard] REQ-01: A subcommand accepts an issue identifier and prints its canonical artifact directory.\n- [hard] REQ-02: Machine-readable output is a flat named object carrying the issue identity and the resolved path.\n- [hard] REQ-03: An unknown issue identifier produces a descriptive error and a non-zero exit status rather than a fabricated path.\n- [hard] REQ-04: The command is curated in the generated bridge manifest with a rationale.\n- [hard] REQ-05: The adopter-facing command reference documents the subcommand.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:artifact-directory-convention",
+      "satisfies:REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical",
+      "mcp-ci"
+    ],
+    "depends_on": [
+      "canonical-directory-resolver"
+    ],
+    "planning": {
+      "outcome": "A subcommand prints an issue's canonical artifact directory in human and machine-readable form.",
+      "contract_refs": [
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-04",
+        "D-7",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "callers resolving an issue artifact path",
+        "test_boundary": "command CLI integration assertions on the resolved path",
+        "worker_sized_reason": "One subcommand wires an existing resolver through parsing and rendering.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/commands/document.rs",
+            "crates/jit/src/output.rs",
+            "crates/jit/tests/cli_repo_workflow/doc_show_tests.rs",
+            "docs/reference/cli-commands.md",
+            "mcp-server/curated-tools.json"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "template-directory-interpolation",
+    "title": "Interpolate the canonical artifact directory into template document paths",
+    "description": "A graph template's document path can name the owning container's canonical artifact directory, so an instantiated template writes into the convention instead of a flat pattern.\n\n## Background\n\nTemplate document paths are interpolated from container fields, and the only field available for a path today is the short id, which forces every declaration to spell out a flat area-plus-prefix pattern. Two independent interpolation engines and one plan-document resolver consume the same field set, so exposing the directory once serves all of them.\n\nThe interpolation field is the resolved canonical directory, so a declaration names a filename relative to it and carries no short-id prefix on that filename.\n\n## Success Criteria\n\n- [hard] REQ-01: Template document-path interpolation exposes a field carrying the container's canonical artifact directory.\n- [hard] REQ-02: A template declaration that names the field followed by a filename produces a path inside the canonical directory.\n- [hard] REQ-03: The interpolated value comes from the domain resolver rather than from a second derivation.\n- [hard] REQ-04: Every interpolation consumer of container fields resolves the new field consistently.\n- [hard] REQ-05: Adopter-facing template documentation lists the field.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:artifact-directory-convention",
+      "satisfies:REQ-05",
+      "per:@/issue/8e071e18/decision/D-2"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "artifact-directory-command"
+    ],
+    "planning": {
+      "outcome": "A template document path can name an issue's canonical artifact directory instead of a spelled-out flat pattern.",
+      "contract_refs": [
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "D-2",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "template document-path interpolation callers",
+        "test_boundary": "template interpolation unit assertions on the produced path",
+        "worker_sized_reason": "One interpolation context gains a field consumed by the existing renderers.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/template_expand.rs",
+            "crates/jit/src/commands/template.rs",
+            "crates/jit/src/commands/plan_doc.rs",
+            "crates/jit/tests/fast_docs_templates/template_apply_tests.rs",
+            "docs/how-to/adopt-planning-bracket.md",
+            "docs/examples/sdd/templates.toml",
+            "docs/examples/research/templates.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "plan-template-path-adoption",
+    "title": "Point the planning-bracket template at the canonical artifact directory",
+    "description": "The planning-bracket template's plan-document path resolves inside the container's canonical artifact directory with an unprefixed filename, in this repository's declaration and in its packaged profile twin.\n\n## Background\n\nThe planning-bracket template declares its plan-document path as a flat area-plus-short-id-prefix pattern. The same declaration exists twice: once in this repository's template registry and once inside the packaged profile manifest that ships the same bracket to adopters. The two are asserted to agree, so they change together or the suite fails.\n\nThe filename inside the directory drops the redundant short id, matching the conformant directory-per-issue precedent already in the archive.\n\n## Success Criteria\n\n- [hard] REQ-01: The plan-document path in the repository template registry resolves inside the container's canonical artifact directory.\n- [hard] REQ-02: The filename produced by that declaration carries no short-id prefix.\n- [hard] REQ-03: The packaged profile declaration carries the same path shape as the repository declaration.\n- [hard] REQ-04: Applying the template to a container produces a document path under the canonical directory.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:artifact-directory-convention",
+      "satisfies:REQ-05",
+      "per:@/issue/8e071e18/decision/D-2",
+      "per:@/issue/8e071e18/decision/D-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "repo-validate"
+    ],
+    "depends_on": [
+      "template-directory-interpolation"
+    ],
+    "planning": {
+      "outcome": "The plan template's document path resolves inside the container's canonical directory with an unprefixed filename.",
+      "contract_refs": [
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "D-2",
+        "D-11",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "template-path-cutover",
+      "terminal": {
+        "consumer_family": "planning-bracket template instantiation",
+        "test_boundary": "template application assertions on the produced document path",
+        "worker_sized_reason": "Two declarations of one template document path change in lockstep.",
+        "footprint": {
+          "touches": [
+            ".jit/templates.toml",
+            "profiles/jit-dogfood/manifest.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "directory-conformance-report",
+    "title": "Report artifacts sitting outside their owning issue's canonical directory",
+    "description": "A read-only report lists artifacts under managed issue-scoped areas whose location disagrees with their owning issue's canonical directory, as advice rather than as enforcement.\n\n## Background\n\nLegacy flat artifacts are deliberately tolerated, so a blocking rule would be a false-positive source. A non-enforced validation rule would technically not block, but it rides inside the validation exit code that a repository gate consumes. A dedicated read-only report satisfies the non-blocking requirement by construction: a command that only prints cannot gate anything.\n\nThe report walks the configured issue-scoped areas, resolves each prefixed artifact's owning issue, compares its location with the canonical directory, and lists the differences. An artifact whose owner cannot be resolved is reported as unattributed rather than as nonconforming. A shell-level area scan already exists in the repository as a precedent for this kind of advisory sweep, and it reads its root from configuration rather than hard-coding one.\n\n## Success Criteria\n\n- [hard] REQ-01: The report lists each artifact under a managed issue-scoped area whose location differs from its owning issue's canonical directory.\n- [hard] REQ-02: The report exits successfully whatever it finds and performs no mutation.\n- [hard] REQ-03: No state transition is blocked by a nonconforming artifact.\n- [hard] REQ-04: Machine-readable output wraps the collection in the standard count-and-collection envelope.\n- [hard] REQ-05: Areas scanned are read from configuration rather than from a built-in list.\n- [hard] REQ-06: The command is curated in the generated bridge manifest and documented in the adopter-facing command reference.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:artifact-directory-convention",
+      "satisfies:REQ-06",
+      "per:@/issue/8e071e18/decision/D-7",
+      "enforces:@/invariant/domain-agnostic"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical",
+      "mcp-ci"
+    ],
+    "depends_on": [
+      "artifact-directory-command"
+    ],
+    "planning": {
+      "outcome": "An advisory report lists nonconforming artifacts under managed issue-scoped areas and blocks no transition.",
+      "contract_refs": [
+        "canonical-artifact-directory",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-06",
+        "D-7",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "maintainers auditing artifact layout conformance",
+        "test_boundary": "report CLI integration assertions over a fixture repository",
+        "worker_sized_reason": "One read-only report composes the resolver with an area walk.",
+        "footprint": {
+          "creates": [
+            "crates/jit/tests/cli_repo_workflow/artifact_conformance_cli_tests.rs"
+          ],
+          "touches": [
+            "crates/jit/src/commands/document.rs",
+            "crates/jit/tests/cli_repo_workflow/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "archive-naming-and-warnings",
+    "title": "Archive directory naming and citation breakage warnings",
+    "description": "The archival planner names its destination directory without falling back to an issue title and warns about in-content path citations that a move would break, without ever rewriting document content.\n\n## Background\n\nThe planner derives a destination directory name from a membership label and falls back to the issue title when no single membership value exists. The fallback produces long names truncated mid-word, and one such directory exists in the archive as its own counter-example. Removing the fallback reverses a shipped, reviewed decision rather than fixing a bug; the reversal is deliberate.\n\nSeparately, the planner relinks issue document records when artifacts move, but it does not see path mentions in the text of ordinary files. Shell scripts, operator-facing error strings, a production module doc comment, adopter tutorials, and changelog entries all cite artifact paths inline, and none of them is a document link record, so validation stays silent when a move breaks them. Those citations must be reported as plan warnings.\n\nContent is never rewritten. A citation inside a dated historical document must survive verbatim, so the planner warns and a human decides.\n\n## Success Criteria\n\n- [hard] REQ-01: The archive directory name is derived from a membership label or a bare short id with no title fallback, and the one pre-existing title-slugged directory is renamed with its container marker still resolving it.\n- [hard] REQ-02: An archival plan reports, as plan warnings, occurrences of a moving artifact's path in the text of tracked files anywhere in the repository, including code comments and shell scripts.\n- [hard] REQ-03: Execution rewrites no document content.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:archive-naming-and-warnings"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical",
+      "repo-validate"
+    ],
+    "depends_on": [
+      "legacy-archive-directory-rename",
+      "execution-content-immutability"
+    ],
+    "planning": {
+      "outcome": "Archive directory names drop the title fallback and plans warn about in-content citations a move would break.",
+      "contract_refs": [
+        "membership-slug-precedence",
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-07",
+        "REQ-08",
+        "D-8",
+        "D-9",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ]
+    }
+  },
+  {
+    "key": "archive-slug-fallback-removal",
+    "title": "Derive the archive directory name without a title fallback",
+    "description": "The archival planner names a destination directory from a membership label or a bare short id, never from an issue title.\n\n## Background\n\nDestination naming has three steps: collect the issue's type labels, and only when exactly one exists look up its configured membership namespace; collect that namespace's values on the issue, and only when exactly one exists use it as the slug. Both ambiguous cases currently fall through to the issue title, which is normalized and cut at a fixed character bound with no word boundary, producing names truncated mid-word.\n\nThe replacement for the fallback is the bare short-id directory. It needs no new tie-breaking policy, it is the shape the resolver already adopts for legacy directories, and it converges on an existing supported form rather than inventing one.\n\nThis reverses a shipped, reviewed naming decision. The properties that make the reversal safe are also already shipped: a destination name is frozen at first archive and re-adopted by marker, and legacy identifier-only directories are adopted without data movement.\n\n## Success Criteria\n\n- [hard] REQ-01: An issue with exactly one type label and exactly one value in that type's membership namespace yields a destination directory named from the short id and that value.\n- [hard] REQ-02: An issue with several type labels, several membership values, or no membership label yields a destination directory named from the bare short id.\n- [hard] REQ-03: No destination directory name is derived from an issue title.\n- [hard] REQ-04: A pre-existing archive directory named with an identifier only is still adopted, with no data movement.\n- [hard] REQ-05: The adopter-facing command reference states the naming rule without the title fallback.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:archive-naming-and-warnings",
+      "satisfies:REQ-07",
+      "satisfies:REQ-13",
+      "per:@/issue/8e071e18/decision/D-1",
+      "per:@/issue/8e071e18/decision/D-9"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The planner names an archive directory from a membership label or a bare short id and never from an issue title.",
+      "contract_refs": [
+        "membership-slug-precedence",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-07",
+        "REQ-13",
+        "D-1",
+        "D-9",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "archive destination-root naming",
+        "test_boundary": "classifier unit assertions on the preferred destination root",
+        "worker_sized_reason": "One naming function loses a branch with focused unit coverage.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/domain/artifact_classifier.rs",
+            "docs/reference/cli-commands.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "legacy-archive-directory-rename",
+    "title": "Rename the title-slugged archive directory to its bare short id",
+    "description": "The one pre-existing archive directory whose name came from an issue title is renamed to its bare short id, and its container marker still resolves the renamed directory.\n\n## Background\n\nExactly one archive directory carries a title-derived name, truncated mid-word. Its owning issue's type has no configured membership namespace, so under the naming rule without a title fallback its name becomes the bare short id — the same shape a second, older archive directory already uses and that the resolver already adopts.\n\nThe container marker holds the owning container's full identifier and nothing else; it encodes no directory name. That independence is what makes the rename safe: after the move, the marker still matches, the resolver re-adopts the directory by marker, and a rerun of the plan converges instead of creating a second destination.\n\nThe hand-made semantic subdirectories elsewhere in the archive are legacy and are not migrated. They carry no marker and are not identifier-shaped, so they are outside this work.\n\n## Success Criteria\n\n- [hard] REQ-01: The title-slugged archive directory is renamed to its bare short id with its contents intact.\n- [hard] REQ-02: The container marker file is unchanged and still names the owning container's full identifier.\n- [hard] REQ-03: A preview for that container resolves the renamed directory as its destination and plans no second destination.\n- [hard] REQ-04: The hand-made semantic subdirectories under the archive root are left as they are.\n- [hard] REQ-05: Whole-repository validation passes after the rename.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:archive-naming-and-warnings",
+      "satisfies:REQ-07",
+      "per:@/issue/8e071e18/decision/D-9"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "archive-slug-fallback-removal"
+    ],
+    "planning": {
+      "outcome": "The one title-slugged archive directory carries a conformant name and its container marker still resolves it.",
+      "contract_refs": [
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-07",
+        "D-9",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "archive directory adoption by container marker",
+        "test_boundary": "container archive preview convergence on the renamed directory",
+        "worker_sized_reason": "One directory moves and one preview run confirms re-adoption.",
+        "footprint": {
+          "touches": [
+            "dev/archive"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "citation-warning-vocabulary",
+    "title": "Add a plan-warning code for in-content path citations",
+    "description": "The archival plan's warning vocabulary gains a stable code for an in-content citation of a moving artifact's path, extending a closed schema contract deliberately.\n\n## Background\n\nPlan warnings are a closed vocabulary: a fixed enumeration, a fixed-length exhaustive array, stable wire spellings, and a golden assertion that compares the array against those spellings. Adding a code touches all four and is an explicit schema decision rather than a free addition. The warning channel itself already exists at both target level and per-artifact level and is already present in the machine-readable envelope, so no new channel is needed.\n\nThis issue adds the vocabulary entry and its contract coverage only. Producing the warning from a content scan is separate work.\n\n## Success Criteria\n\n- [hard] REQ-01: The warning vocabulary carries a new code for an in-content path citation of a moving artifact.\n- [hard] REQ-02: The exhaustive warning array and its length include the new code.\n- [hard] REQ-03: The new code has a stable kebab-case wire spelling.\n- [hard] REQ-04: The golden contract assertion covers the new code and continues to derive both comparison sides from the enumeration.\n- [hard] REQ-05: The adopter-facing command reference lists the new warning code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:archive-naming-and-warnings",
+      "satisfies:REQ-08",
+      "enforces:@/invariant/semantic-test-assertions"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The archive plan warning vocabulary carries a stable code for a citation of a moving artifact's path.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-08",
+        "D-8",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "produces_contracts": [
+        "citation-warning-code"
+      ],
+      "terminal": {
+        "consumer_family": "archive plan JSON consumers",
+        "test_boundary": "the archive plan schema golden contract suite",
+        "worker_sized_reason": "One enumeration variant extends a closed vocabulary with its golden assertion.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/domain/artifact_plan.rs",
+            "crates/jit/tests/fast_docs_templates/artifact_plan_model_tests.rs",
+            "docs/reference/cli-commands.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "tracked-file-citation-scan",
+    "title": "Warn on tracked-file occurrences of a moving artifact's path",
+    "description": "An archival plan reports a warning for each occurrence of a moving artifact's path in the text of a tracked file, anywhere in the repository, so a move that would break an inline citation is visible before it happens.\n\n## Background\n\nThe planner reads structured document edges, which are link records and asset relationships, not mentions of a path in arbitrary prose or code. Matching only markdown link targets would reach a small minority of the citations that actually exist: it misses every shell-script line, an operator-facing error string, a production module doc comment, and both adopter-facing citations, all of which are inline code spans. Restricting the scan to the development root would miss the script and changelog citations entirely.\n\nEvidence acquisition needs file bytes, so it belongs at the storage and planning boundary where other plan evidence is gathered, while constructing the warning stays pure. Untracked and ignored files are outside the scan.\n\n## Success Criteria\n\n- [hard] REQ-01: A plan reports one warning per occurrence of a moving artifact's path in the text of a tracked file, with the citing path identified.\n- [hard] REQ-02: The scan covers tracked files anywhere in the repository, not only those under the development root.\n- [hard] REQ-03: Occurrences inside code comments, inline code spans, and shell scripts are reported.\n- [hard] REQ-04: An artifact that retains its location produces no citation warning.\n- [hard] REQ-05: The warning is advisory and changes no plan action, blocker, or eligibility.\n- [hard] REQ-06: The adopter-facing command reference describes the warning's scope.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:archive-naming-and-warnings",
+      "satisfies:REQ-08",
+      "per:@/issue/8e071e18/decision/D-16"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "citation-warning-vocabulary"
+    ],
+    "planning": {
+      "outcome": "An archive plan reports a warning for each occurrence of a moving artifact's path in tracked file text.",
+      "contract_refs": [
+        "citation-warning-code"
+      ],
+      "source_refs": [
+        "REQ-08",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "archive plan warning consumers",
+        "test_boundary": "archive plan preview assertions over a fixture citation set",
+        "worker_sized_reason": "One evidence pass over tracked file text feeds an existing warning channel.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/storage/artifact_planning.rs",
+            "crates/jit/src/domain/artifact_classifier.rs",
+            "crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs",
+            "docs/reference/cli-commands.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "execution-content-immutability",
+    "title": "Lock in that archive execution rewrites no document content",
+    "description": "Regression coverage proves that archival execution relocates and relinks artifacts without altering the bytes of any document, so the warning channel stays the only response to an inline citation.\n\n## Background\n\nExecution emits file writes, file deletions, and directory creations, and the only synthesized bytes it produces are the container marker. No content rewriting exists anywhere in the archival path, so the guarantee holds today but is unasserted. A citation inside a dated historical document must survive verbatim, which is why the planner warns instead of rewriting; without a regression test that boundary can erode silently.\n\nThe assertion distinguishes the two things execution legitimately changes — file location and the issue's document link records — from the one it must not change, which is file content.\n\n## Success Criteria\n\n- [hard] REQ-01: After execution, every relocated artifact's content is byte-identical to its pre-execution content.\n- [hard] REQ-02: After execution, a tracked file that cites a relocated artifact's path is byte-identical to its pre-execution content.\n- [hard] REQ-03: The issue document link records are still relinked to the new locations, so immutability is not achieved by skipping work.\n- [hard] REQ-04: The container marker remains the only file whose bytes execution synthesizes.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:archive-naming-and-warnings",
+      "satisfies:REQ-08",
+      "per:@/issue/8e071e18/decision/D-8",
+      "enforces:@/invariant/derived-state-coherence"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "tracked-file-citation-scan"
+    ],
+    "planning": {
+      "outcome": "A regression suite proves archive execution leaves relocated bytes untouched while relinking issue records.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-08",
+        "D-8",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "archive execution over linked documents",
+        "test_boundary": "archive execution regression assertions on document bytes",
+        "worker_sized_reason": "One regression suite asserts an existing execution property with no production change.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "skill-path-adoption",
+    "title": "Agent skills obtain artifact paths from the convention",
+    "description": "Every agent skill prompt and reference template that reads or writes an issue artifact path obtains it from the convention, and each edited file's packaged twin travels with it.\n\n## Background\n\nThe agent skill prompts in this repository spell out a flat area-plus-short-id-prefix pattern for plan documents, progress files, handoffs, investigations, research notes, and per-issue design documents. One of them derives a document slug from the issue title, which is exactly the anti-pattern the convention removes. Two of the project-tier references already name hard-coded roots as a mistake to avoid, so the change generalizes a rule the prompts already believe in.\n\nThe skill files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so editing a prompt without its twin fails the test suite outright. Deferring the twins was rejected for that reason, and restricting the change to files that are not declared assets was rejected because that excludes nearly every skill document and would leave the shipped skills carrying the flat path.\n\nEvaluation fixtures, transcripts, and git worktree directory patterns are out of scope: they are recorded material or working directories rather than live artifact-path instructions.\n\n## Success Criteria\n\n- [hard] REQ-01: No agent skill prompt or reference template instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: No skill document derives an artifact filename or directory from an issue title.\n- [hard] REQ-03: Every edited file that is a declared profile asset carries identical content in its packaged twin.\n- [hard] REQ-04: Evaluation fixtures, transcripts, and worktree directory patterns are unchanged.\n",
+    "type": "story",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:skill-path-adoption"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "execution-lead-skill-paths",
+      "planning-lead-skill-paths",
+      "worker-tier-skill-paths",
+      "project-lead-skill-paths"
+    ],
+    "planning": {
+      "outcome": "Skill prompts obtain issue artifact paths from the convention, with each packaged twin updated in lockstep.",
+      "contract_refs": [
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-11",
+        "D-11",
+        "dev/active/8e071e18-investigation.md"
+      ]
+    }
+  },
+  {
+    "key": "execution-lead-skill-paths",
+    "title": "Convert the execution-lead skill to the artifact directory convention",
+    "description": "The execution-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThe execution-lead skill spells out flat plan, progress, and handoff paths in its main prompt and in its progress-file, handoff, architect, explorer, and documentation-agent references. Handoff numbering and progress persistence both read and write those paths, so the instructions must name the resolved directory and an unprefixed filename instead.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: Instructions that name an artifact filename use an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:skill-path-adoption",
+      "satisfies:REQ-11",
+      "per:@/issue/8e071e18/decision/D-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "artifact-directory-command"
+    ],
+    "planning": {
+      "outcome": "The execution-lead skill prompts name the canonical artifact directory instead of a flat short-id-prefixed path.",
+      "contract_refs": [
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-11",
+        "D-11",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "skill-twin-cutover",
+      "terminal": {
+        "consumer_family": "the execution-lead skill prompt set",
+        "test_boundary": "profile asset equality assertions over the edited files",
+        "worker_sized_reason": "One skill's prompt files change alongside their packaged twins.",
+        "footprint": {
+          "touches": [
+            ".agents/skills/jit-execution-lead",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-execution-lead"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "planning-lead-skill-paths",
+    "title": "Convert the planning-lead skill to the artifact directory convention",
+    "description": "The planning-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThe planning-lead skill spells out flat plan, breakdown, investigation, and research paths in its main prompt and in its investigator, researcher, and plan-document-template references. The plan-document template also carries a relative link whose filename repeats the short id.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: Instructions that name an artifact filename use an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:skill-path-adoption",
+      "satisfies:REQ-11",
+      "per:@/issue/8e071e18/decision/D-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "artifact-directory-command"
+    ],
+    "planning": {
+      "outcome": "The planning-lead skill prompts name the canonical artifact directory instead of a flat short-id-prefixed path.",
+      "contract_refs": [
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-11",
+        "D-11",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "skill-twin-cutover",
+      "terminal": {
+        "consumer_family": "the planning-lead skill prompt set",
+        "test_boundary": "profile asset equality assertions over the edited files",
+        "worker_sized_reason": "One skill's prompt files change alongside their packaged twins.",
+        "footprint": {
+          "touches": [
+            ".agents/skills/jit-planning-lead",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-planning-lead"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "worker-tier-skill-paths",
+    "title": "Convert the worker-tier skills to the artifact directory convention",
+    "description": "The worker-tier skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThe single-issue and parallel-execution skills instruct an agent to write a design document at a managed root with a short-id-prefixed filename, and one of them derives that filename's slug from the issue title — the anti-pattern the convention exists to remove. The breakdown skill locates a manifest by the same flat pattern.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: Instructions that name an artifact filename use an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:skill-path-adoption",
+      "satisfies:REQ-11",
+      "per:@/issue/8e071e18/decision/D-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "artifact-directory-command"
+    ],
+    "planning": {
+      "outcome": "The worker-tier skill prompts name the canonical artifact directory instead of a flat short-id-prefixed path.",
+      "contract_refs": [
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-11",
+        "D-11",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "skill-twin-cutover",
+      "terminal": {
+        "consumer_family": "the worker-tier skill prompt set",
+        "test_boundary": "profile asset equality assertions over the edited files",
+        "worker_sized_reason": "One skill's prompt files change alongside their packaged twins.",
+        "footprint": {
+          "touches": [
+            ".agents/skills/jit-manage",
+            ".agents/skills/jit-breakdown",
+            ".agents/skills/jit-parallel",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-manage",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-breakdown",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-parallel"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "project-lead-skill-paths",
+    "title": "Convert the project-lead skill to the artifact directory convention",
+    "description": "The project-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThe project-lead skill already composes its roots from configuration rather than hard-coding them, so what remains is the artifact-name shape: progress files, charters, and the standards-sweep report are still spelled out as a root joined with a short-id-prefixed filename. Two of its references already name hard-coded roots as a mistake, so this generalizes a rule the prompts already state.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: Instructions that name an artifact filename use an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:skill-path-adoption",
+      "satisfies:REQ-11",
+      "per:@/issue/8e071e18/decision/D-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "artifact-directory-command"
+    ],
+    "planning": {
+      "outcome": "The project-lead skill prompts name the canonical artifact directory instead of a flat short-id-prefixed path.",
+      "contract_refs": [
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-11",
+        "D-11",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "skill-twin-cutover",
+      "terminal": {
+        "consumer_family": "the project-lead skill prompt set",
+        "test_boundary": "profile asset equality assertions over the edited files",
+        "worker_sized_reason": "One skill's prompt files change alongside their packaged twins.",
+        "footprint": {
+          "touches": [
+            ".agents/skills/jit-project-lead",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "development-root-cleanup",
+    "title": "Development root cleanup through the repaired mechanism",
+    "description": "The development root is cleaned up by running the product's own archival execution over terminal-owned artifacts and by recording a disposition for every artifact that carries no issue prefix.\n\n## Background\n\nMost of the active area is owned by terminal issues and should have been archived long ago; a large majority of its files fall into that set. Running the cleanup through the archival mechanism rather than by hand is deliberate: it exercises the repaired reference remapping on real artifacts, and the run is itself the acceptance evidence that the mechanism works.\n\nArtifacts carrying no issue prefix need a different treatment. The active area's unprefixed files are mixed design documents and plans that need individual judgement, while the session and study areas hold uniformly dated records where one recorded call each is the honest disposition. One measurement record inside the study area is read at runtime by a committed self-test script and is carved out of the blanket call.\n\nMoving artifacts breaks inline path citations that no validation sees, because they are prose and code mentions rather than document link records. Those citations are repointed as part of the cleanup.\n\n## Success Criteria\n\n- [hard] REQ-01: Every active-area artifact owned by a terminal issue is archived through the archival execution path, and whole-repository validation passes afterwards with every document reference resolving.\n- [hard] REQ-02: Every artifact in the active, study, and session areas that carries no issue prefix has a recorded disposition — an assigned owning issue, a project-scoped reclassification, or an archived location — and none is left undecided.\n- [hard] REQ-03: Inline path citations of relocated artifacts resolve to their new locations.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup"
+    ],
+    "gates": [
+      "repo-validate",
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "moved-artifact-citation-repoint",
+      "active-unprefixed-disposition",
+      "session-record-reclassification",
+      "study-record-reclassification"
+    ],
+    "planning": {
+      "outcome": "The development root is cleaned up by the repaired archival mechanism, with a recorded disposition for the rest.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "REQ-10",
+        "REQ-13",
+        "D-10",
+        "D-15",
+        "dev/active/8e071e18-investigation.md"
+      ]
+    }
+  },
+  {
+    "key": "archive-sweep-execution",
+    "title": "Archive the terminal-owned artifacts of the active area",
+    "description": "Terminal-owned artifacts in the active area reach the archive through the product's own execution path, and whole-repository validation passes afterwards with every document reference resolving.\n\n## Background\n\nRunning the cleanup through the archival execution rather than by hand is the point: the previous hand-rolled move skipped the planner's reference remapping, left a document reference dangling, and forced a hand repair of a validation failure. Executing the real mechanism exercises the remapping on real artifacts and makes the run its own acceptance evidence.\n\nThe sweep is per container. A preview identifies each effectively terminal container whose subtree holds active-area artifacts, execution runs for each, and the plan for each must be eligible before it will run at all. Two hazards need attention while sequencing: containers that cross-reference each other's artifacts will move one side before the other, and the plan warnings that report inline citations are the input to the repoint that follows.\n\nPre-existing flat artifacts elsewhere stay where they are; the sweep archives, it does not restructure.\n\n## Success Criteria\n\n- [hard] REQ-01: No artifact owned by a terminal issue remains in the active area.\n- [hard] REQ-02: Each relocation was performed by the archival execution path, evidenced by the recorded execution events and the container markers.\n- [hard] REQ-03: Whole-repository validation passes afterwards and every document reference resolves.\n- [hard] REQ-04: Artifacts owned by live issues remain in the active area untouched.\n- [hard] REQ-05: The plan warnings naming inline citations of relocated artifacts are captured for repointing.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "satisfies:REQ-13",
+      "per:@/issue/8e071e18/decision/D-10",
+      "enforces:@/invariant/derived-state-coherence"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "deck-archival-eligibility",
+      "legacy-archive-directory-rename",
+      "tracked-file-citation-scan"
+    ],
+    "planning": {
+      "outcome": "Terminal-owned active-area artifacts reach the archive through the product's own execution path.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "development-root-scoped-classification",
+        "directory-target-navigation",
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "REQ-13",
+        "D-10",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "this repository's active-area artifacts",
+        "test_boundary": "whole-repository validation after the execution runs",
+        "worker_sized_reason": "One execution runs per terminal container with one validation run confirming it.",
+        "footprint": {
+          "touches": [
+            "dev/active",
+            "dev/archive"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "moved-artifact-citation-repoint",
+    "title": "Repoint in-content citations of relocated artifacts",
+    "description": "Each inline citation of a relocated artifact names its new location, including shell-script comments, an operator-facing error string, a production module doc comment, adopter tutorials, and changelog entries.\n\n## Background\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact moves. The archival plan warnings enumerate these occurrences, and that list is the working set. Concentration is high: two artifacts attract most of the citations, so the repoint is bounded and well identified rather than a broad sweep.\n\nTwo of the citations are adopter-facing and one is a production module doc comment, so accuracy matters more than volume here. Citations inside dated historical records under the archive are left verbatim; the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\nThe contributor index and authoring-convention guides are outside this work; their narrative is realigned separately.\n\n## Success Criteria\n\n- [hard] REQ-01: Each warned inline citation of a relocated artifact outside the archive root names the artifact's new location.\n- [hard] REQ-02: Executable script defaults and operator-facing messages that name a relocated path resolve to an existing path.\n- [hard] REQ-03: Adopter-facing citations of relocated design documents resolve.\n- [hard] REQ-04: Citations inside dated historical records under the archive root are unchanged.\n- [hard] REQ-05: Mechanical documentation checks over the touched surface pass.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "satisfies:REQ-13",
+      "per:@/issue/8e071e18/decision/D-8"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "archive-sweep-execution"
+    ],
+    "planning": {
+      "outcome": "Each inline citation of a relocated artifact names its new path, including script comments and adopter references.",
+      "contract_refs": [
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "REQ-13",
+        "D-8",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "inline citations of relocated artifacts",
+        "test_boundary": "citation existence checks over the cited paths",
+        "worker_sized_reason": "A bounded warned-citation list is repointed file by file.",
+        "footprint": {
+          "touches": [
+            "scripts/rust-build-budget.sh",
+            "scripts/cargo-ci.sh",
+            "scripts/benchmark-rust-build.sh",
+            "docs/tutorials/parallel-work-worktrees.md",
+            "docs/how-to/multi-agent-coordination.md",
+            "crates/jit/src/storage/claim_coordinator.rs",
+            "CHANGELOG.md",
+            "dev/TESTING.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "active-unprefixed-disposition",
+    "title": "Record a per-file disposition for unprefixed active-area artifacts",
+    "description": "Each artifact in the active area that carries no issue prefix receives an individually recorded disposition: an assigned owning issue, a project-scoped reclassification, or an archived location.\n\n## Background\n\nThe active area holds design documents, plans, and scope briefs that predate the issue-prefix convention. They are heterogeneous, several are already marked superseded by a banner in their own text, and at least one is only partly superseded, so a blanket call over the area would sweep genuinely issue-owned design documents into a project-scoped bucket without inspection. Per-file inspection is the honest treatment here, and it is why this area is separated from the uniformly dated record areas.\n\nAssigning an owning issue makes an artifact archivable by the ordinary mechanism. A project-scoped reclassification keeps a document that describes standing project knowledge rather than one issue's work. An archived location retires a superseded document.\n\n## Success Criteria\n\n- [hard] REQ-01: Each unprefixed artifact in the active area carries exactly one recorded disposition of the three kinds.\n- [hard] REQ-02: No unprefixed active-area artifact is left undecided.\n- [hard] REQ-03: A document marked superseded in its own text is not left as live active-area content.\n- [hard] REQ-04: Artifacts assigned an owning issue are linked to it so the archival mechanism can service them.\n- [hard] REQ-05: Whole-repository validation passes afterwards.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-10",
+      "per:@/issue/8e071e18/decision/D-15"
+    ],
+    "gates": [
+      "repo-validate",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "archive-sweep-execution"
+    ],
+    "planning": {
+      "outcome": "Each unprefixed artifact in the active area has an owning issue, a reclassification, or an archived location.",
+      "contract_refs": [
+        "shipped-area-declaration"
+      ],
+      "source_refs": [
+        "REQ-10",
+        "D-15",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "unprefixed active-area artifacts",
+        "test_boundary": "the recorded disposition inventory for the active area",
+        "worker_sized_reason": "One area's unprefixed files are inspected individually in one pass.",
+        "footprint": {
+          "touches": [
+            "dev/active"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "session-record-reclassification",
+    "title": "Reclassify the unprefixed session records in one blanket call",
+    "description": "The session area's unprefixed dated records receive one recorded blanket disposition, because they are a uniform record set where per-file inspection would be volume without added signal.\n\n## Background\n\nThe session area holds only dated session records following a single naming shape, none carrying an issue prefix. They are a homogeneous historical log rather than issue-owned work products, so one recorded reclassification for the whole set is the honest call. Per-file dispositions across this area were rejected as volume without added signal.\n\nThe call is recorded so that the decision, its scope, and its rationale are auditable rather than implicit in a file move.\n\n## Success Criteria\n\n- [hard] REQ-01: The unprefixed dated records in the session area carry one recorded blanket disposition covering the whole set.\n- [hard] REQ-02: The recorded disposition names its scope and rationale.\n- [hard] REQ-03: No record in the area is left undecided.\n- [hard] REQ-04: Whole-repository validation passes afterwards.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-10",
+      "per:@/issue/8e071e18/decision/D-15"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "repository-config-adoption"
+    ],
+    "planning": {
+      "outcome": "The session area's unprefixed dated records carry one recorded blanket disposition.",
+      "contract_refs": [
+        "shipped-area-declaration"
+      ],
+      "source_refs": [
+        "REQ-10",
+        "D-15",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "unprefixed session records",
+        "test_boundary": "the recorded disposition inventory for the session area",
+        "worker_sized_reason": "One uniform record set takes a single recorded call.",
+        "footprint": {
+          "touches": [
+            "dev/sessions"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "study-record-reclassification",
+    "title": "Reclassify the unprefixed study records with a runtime-read carve-out",
+    "description": "The study area's unprefixed records receive one recorded blanket disposition, with the measurement subtree that a committed self-test script reads at runtime carved out and retained where it is.\n\n## Background\n\nThe study area is close to homogeneous — dated investigation records, almost none carrying an issue prefix — so a blanket call is appropriate. It is not uniform, though. A measurement subtree inside it holds a record that a committed self-test script opens by path at runtime, so relocating it would break an executable. That subtree is carved out of the blanket call and retained. One study document is also cited by a contributor authoring guide, so the disposition has to account for that reference.\n\nThe call is recorded so its scope, its carve-out, and its rationale are auditable.\n\n## Success Criteria\n\n- [hard] REQ-01: The unprefixed records in the study area carry one recorded blanket disposition covering the set.\n- [hard] REQ-02: The measurement subtree read at runtime by a committed script is retained at its current path.\n- [hard] REQ-03: The self-test script still resolves the measurement record it reads.\n- [hard] REQ-04: The recorded disposition names its scope, its carve-out, and its rationale.\n- [hard] REQ-05: Whole-repository validation passes afterwards.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-10",
+      "per:@/issue/8e071e18/decision/D-15"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "repository-config-adoption"
+    ],
+    "planning": {
+      "outcome": "The study area's unprefixed records carry one blanket disposition while the runtime-read subtree stays put.",
+      "contract_refs": [
+        "shipped-area-declaration"
+      ],
+      "source_refs": [
+        "REQ-10",
+        "D-15",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "unprefixed study records",
+        "test_boundary": "the recorded disposition inventory for the study area",
+        "worker_sized_reason": "One record set takes a single recorded call plus one carve-out.",
+        "footprint": {
+          "touches": [
+            "dev/studies"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "canonical-documentation-home",
+    "title": "One canonical home for the layout and classification facts",
+    "description": "The artifact directory convention and the development-area classification are stated once in a single adopter-facing home, and other documents cite that home instead of restating it.\n\n## Background\n\nThe area classification is currently duplicated across an adopter reference, an example configuration, a runtime fallback, and a scaffold, and those copies already disagree. The directory convention is stated in only one adopter document, and that document is a how-to rather than a reference. Meanwhile a contributor index narrates a retention-window and category-subfolder lifecycle that the shipped mechanism does not implement, and a contributor authoring guide contradicts itself about whether archival takes a category.\n\nThe classification also grows under this work, which strengthens the case for stating it once and citing it everywhere else.\n\n## Success Criteria\n\n- [hard] REQ-01: Adopter-facing documentation states the directory convention and the area classification once, in a single canonical home.\n- [hard] REQ-02: Other adopter-facing documents cite that home rather than restating either fact.\n- [hard] REQ-03: Contributor guides describe the shipped mechanism and carry no lifecycle narrative the mechanism does not implement.\n",
+    "type": "story",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:canonical-documentation-home"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "contributor-doc-alignment"
+    ],
+    "planning": {
+      "outcome": "The layout convention and area classification get one canonical adopter home that other documents cite.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-12",
+        "D-5",
+        "dev/active/8e071e18-investigation.md"
+      ]
+    }
+  },
+  {
+    "key": "configuration-reference-home",
+    "title": "State the artifact layout facts in one adopter reference",
+    "description": "The configuration reference becomes the single adopter-facing home for the issue artifact directory convention and the development-area classification, and the other adopter documents that restate either fact become pointers to it.\n\n## Background\n\nThe configuration reference is already the strongest anchor: it owns the documentation configuration keys, the move-versus-copy semantics, and the three-state policy status, and it already disclaims its own example as illustration rather than vocabulary. What it lacks is the path convention, which currently appears only in a how-to, and a statement of the area classification as a classification rather than as an example list.\n\nSeveral other adopter documents carry partial copies: an example configuration file, a glossary, a command reference, a planning-bracket how-to, and the project readme. Each keeps whatever is genuinely its own — command mechanics belong to the command reference — and cites the canonical home for the rest.\n\nWhere a fact has one source of truth, prose reaches it by citation rather than by a hand-maintained copy, and a duplicated list is a staleness defect rather than a convenience.\n\n## Success Criteria\n\n- [hard] REQ-01: The configuration reference states the issue artifact directory convention, including how the directory name is derived and that filenames inside it carry no short-id prefix.\n- [hard] REQ-02: The configuration reference states the development-area classification as the canonical statement of which areas are managed and which are permanent.\n- [hard] REQ-03: The configuration reference names the command that resolves an issue's canonical artifact directory as the way to obtain the path.\n- [hard] REQ-04: Other adopter-facing documents that previously restated either fact cite the canonical home instead.\n- [hard] REQ-05: Repository-local examples are identified as this project's configuration rather than as the shipped default.\n- [hard] REQ-06: Mechanical documentation checks over the adopter surface pass.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:canonical-documentation-home",
+      "satisfies:REQ-12",
+      "satisfies:REQ-04",
+      "per:@/charter/D-13",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "area-classification",
+      "artifact-directory-convention",
+      "archive-naming-and-warnings"
+    ],
+    "planning": {
+      "outcome": "The configuration reference is the single adopter-facing home for the directory convention and area classification.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "canonical-artifact-directory",
+        "membership-slug-precedence",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-12",
+        "REQ-04",
+        "D-5",
+        "D-13",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "documentation-cutover",
+      "terminal": {
+        "consumer_family": "adopters configuring artifact layout",
+        "test_boundary": "mechanical documentation checks over the adopter surface",
+        "worker_sized_reason": "One reference section absorbs the facts while siblings become pointers.",
+        "footprint": {
+          "touches": [
+            "docs/reference/configuration.md",
+            "docs/reference/example-config.toml",
+            "docs/reference/glossary.md",
+            "docs/how-to/adopt-planning-bracket.md",
+            "README.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "contributor-doc-alignment",
+    "title": "Align contributor guides with the shipped archival mechanism",
+    "description": "The contributor index and the authoring guide describe the mechanism the tool actually implements and cite the canonical adopter reference instead of narrating a lifecycle of their own.\n\n## Background\n\nThe contributor index independently narrates a retention-window and category-subfolder lifecycle. The shipped mechanism has no age, retention, category, suggestion, or default-target behaviour, and its destination is a container-owned directory under the archive root. The authoring guide contradicts itself: one section demonstrates moving a document into a category subfolder by hand, while a later section states that archival takes no category input.\n\nBoth guides also describe the area split, which this work changes, so their text is stale by construction once the classification lands and the cleanup has run.\n\n## Success Criteria\n\n- [hard] REQ-01: The contributor index describes the archival destination and lifecycle the tool implements, with no retention-window or category-subfolder narrative.\n- [hard] REQ-02: The authoring guide's archival guidance is internally consistent and carries no hand-moved category example.\n- [hard] REQ-03: Both guides cite the canonical adopter reference for the area classification and the directory convention rather than restating them.\n- [hard] REQ-04: Path references in both guides resolve after the cleanup.\n- [hard] REQ-05: Mechanical documentation checks over the development root pass.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:canonical-documentation-home",
+      "satisfies:REQ-12",
+      "per:@/charter/D-13",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "configuration-reference-home",
+      "archive-sweep-execution"
+    ],
+    "planning": {
+      "outcome": "Contributor guides cite the canonical adopter reference instead of narrating a lifecycle the tool does not implement.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-12",
+        "D-13",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "documentation-cutover",
+      "terminal": {
+        "consumer_family": "contributor-facing development guides",
+        "test_boundary": "mechanical documentation checks over the development root",
+        "worker_sized_reason": "Two contributor guides drop stale narrative and gain pointers.",
+        "footprint": {
+          "touches": [
+            "dev/index.md",
+            "dev/authoring-conventions.md"
+          ]
+        }
+      }
+    }
+  }
+]
