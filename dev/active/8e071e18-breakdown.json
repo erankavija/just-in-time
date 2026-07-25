@@ -644,7 +644,9 @@
           ],
           "touches": [
             "crates/jit/src/commands/document.rs",
-            "crates/jit/tests/cli_repo_workflow/main.rs"
+            "crates/jit/tests/cli_repo_workflow/main.rs",
+            "docs/reference/cli-commands.md",
+            "mcp-server/curated-tools.json"
           ]
         }
       }
