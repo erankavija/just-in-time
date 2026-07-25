@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-25T19:41:41.688063773Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
@@ -19,13 +20,11 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:archive-naming-and-warnings",
-    "satisfies:REQ-07",
-    "satisfies:REQ-13",
     "per:@/issue/8e071e18/decision/D-1",
     "per:@/issue/8e071e18/decision/D-9"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Derive the archive directory name without a title fallback",
-  "updated_at": "2026-07-25T19:33:19.840546329Z"
+  "updated_at": "2026-07-25T19:41:41.688063773Z"
 }
