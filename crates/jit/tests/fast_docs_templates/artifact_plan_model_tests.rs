@@ -126,6 +126,7 @@ fn test_policy_status_preserves_three_explicitness_states() {
         managed_paths: Some(vec!["dev/active".to_string()]),
         archive_root: None,
         permanent_paths: Some(vec!["docs".to_string()]),
+        issue_scoped_areas: None,
     };
     assert_eq!(
         PolicyStatus::from_documentation(Some(&partial)),
@@ -134,10 +135,28 @@ fn test_policy_status_preserves_three_explicitness_states() {
 
     let configured = DocumentationConfig {
         archive_root: Some("dev/archive".to_string()),
-        ..partial
+        ..partial.clone()
     };
     assert_eq!(
         PolicyStatus::from_documentation(Some(&configured)),
+        PolicyStatus::Configured
+    );
+
+    // Issue-directory adoption is independent of archival classification
+    // (`@/issue/8e071e18/decision/D-3`): declaring the issue-scoped areas
+    // neither completes an incomplete policy nor unsettles a configured one.
+    assert_eq!(
+        PolicyStatus::from_documentation(Some(&DocumentationConfig {
+            issue_scoped_areas: Some(vec!["dev/active".to_string()]),
+            ..partial
+        })),
+        PolicyStatus::Incomplete
+    );
+    assert_eq!(
+        PolicyStatus::from_documentation(Some(&DocumentationConfig {
+            issue_scoped_areas: Some(vec!["dev/active".to_string()]),
+            ..configured
+        })),
         PolicyStatus::Configured
     );
 

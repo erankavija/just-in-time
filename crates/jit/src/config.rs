@@ -2307,6 +2307,7 @@ enforced-by = "dag-no-cycles"
             managed_paths: None,
             archive_root: None,
             permanent_paths: None,
+            issue_scoped_areas: None,
         };
         assert_eq!(
             unauthored.development_root(),
@@ -2332,6 +2333,86 @@ enforced-by = "dag-no-cycles"
                 .map(|path| path.to_string())
                 .collect::<Vec<_>>()
         );
+        assert_eq!(
+            unauthored.issue_scoped_areas(),
+            SHIPPED_DOCUMENTATION_POLICY
+                .issue_scoped_areas
+                .iter()
+                .map(|area| area.to_string())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_is_issue_scoped_area_matches_a_declared_area_exactly_rather_than_by_prefix() {
+        use crate::domain::artifact_classifier::contains_path;
+
+        let unauthored = DocumentationConfig {
+            development_root: None,
+            managed_paths: None,
+            archive_root: None,
+            permanent_paths: None,
+            issue_scoped_areas: None,
+        };
+        let declared = unauthored
+            .issue_scoped_areas()
+            .into_iter()
+            .next()
+            .expect("the shipped registry should declare at least one area");
+        assert!(unauthored.is_issue_scoped_area(&declared));
+
+        // The same area written with redundant path syntax names the same area.
+        assert!(unauthored.is_issue_scoped_area(&format!("./{declared}/")));
+
+        // Exact-area matching: a path *inside* a declared area is not itself a
+        // declared area, so a caller cannot pass an issue's own directory where
+        // an area is expected. Not vacuous — prefix containment, which the
+        // archival classifier applies to its own path lists, does accept it.
+        let inside = format!("{declared}/abcd1234-example");
+        assert!(!unauthored.is_issue_scoped_area(&inside));
+        assert!(contains_path(&declared, &inside));
+
+        // A sibling whose name merely starts with a declared area's name is not
+        // that area either.
+        assert!(!unauthored.is_issue_scoped_area(&format!("{declared}-other")));
+    }
+
+    #[test]
+    fn test_is_issue_scoped_area_follows_an_authored_registry_instead_of_the_shipped_one() {
+        let shipped = DocumentationConfig {
+            development_root: None,
+            managed_paths: None,
+            archive_root: None,
+            permanent_paths: None,
+            issue_scoped_areas: None,
+        };
+        let shipped_area = shipped
+            .issue_scoped_areas()
+            .into_iter()
+            .next()
+            .expect("the shipped registry should declare at least one area");
+
+        // An authored registry is the whole registry: it replaces the shipped
+        // declaration rather than extending it, and its entries need no
+        // relationship to the shipped area names (`@/invariant/domain-agnostic`).
+        let authored_area = "workspace/notes".to_string();
+        let authored = DocumentationConfig {
+            issue_scoped_areas: Some(vec![authored_area.clone()]),
+            ..shipped.clone()
+        };
+        assert_eq!(authored.issue_scoped_areas(), vec![authored_area.clone()]);
+        assert!(authored.is_issue_scoped_area(&authored_area));
+        assert!(!authored.is_issue_scoped_area(&shipped_area));
+
+        // An authored empty registry declares that no area adopts the
+        // convention, which is distinct from leaving the list unauthored.
+        let opted_out = DocumentationConfig {
+            issue_scoped_areas: Some(Vec::new()),
+            ..shipped.clone()
+        };
+        assert!(opted_out.issue_scoped_areas().is_empty());
+        assert!(!opted_out.is_issue_scoped_area(&shipped_area));
+        assert!(shipped.is_issue_scoped_area(&shipped_area));
     }
 
     #[test]
@@ -2353,6 +2434,7 @@ enforced-by = "dag-no-cycles"
             managed_paths: None,
             archive_root: None,
             permanent_paths: None,
+            issue_scoped_areas: None,
         };
         assert_eq!(
             PolicyStatus::from_documentation(Some(&unauthored)),
