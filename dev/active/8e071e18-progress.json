@@ -998,6 +998,13 @@
       "subject": "docs/reference/cli-commands.md:251 states a directory link target warns unsupported-edge-target",
       "detail": "False since 7d6d2783: a directory link target now yields no warning and no edge. The preceding sentence at :245-248 (an issue-linked path that is not a regular file or symlink blocks as unsupported-artifact-type) stays accurate for issue-linked ROOTS, so this needs a narrow correction rather than a rewrite.",
       "disposition": "covered \u2014 4a6fb8c1 (command-reference-surface) declares docs/reference/cli-commands.md and carries REQ-15"
+    },
+    {
+      "id": "P5",
+      "raised_by": "8cd6eb73",
+      "subject": "docs/reference/cli-commands.md:304-307 states the archive slug falls back to the issue title",
+      "detail": "Two sentences become false when 8cd6eb73 lands: \"Otherwise the issue title supplies the slug\" and \"uses `container` when no usable character remains\". After the change an ambiguous or absent membership label yields a bare `<short-id>` directory, and the `container` empty-fallback no longer exists.",
+      "disposition": "covered - 4a6fb8c1 (command-reference-surface, wave 12) declares docs/reference/cli-commands.md and carries doc-review + docs-mechanical. VERIFY at wave 12 that 4a6fb8c1 closes BOTH sentences. Same shape as P4 on the same file; both are live adopter-facing falsehoods from wave 3 until wave 12, and P2 proved a 'covered by a later issue' pitfall is not inert."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00"
