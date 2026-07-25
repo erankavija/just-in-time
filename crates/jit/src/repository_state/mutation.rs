@@ -970,12 +970,12 @@ pub(super) fn finalize_delta(
                     preset.name.clone(),
                 ));
             }
-            for parent in ["config", "config/gate-presets"] {
-                let path = VirtualPath::data(parent)?;
-                match image.entry(&path)? {
+            // Nearest-root-first, so each parent exists before its child.
+            for parent in [VirtualPath::CONFIG_DIR, VirtualPath::GATE_PRESETS] {
+                match image.entry(&parent)? {
                     crate::repository_state::RepositoryEntry::Absent => {
                         actions.push(RepositoryAction::CreateDirectory {
-                            path,
+                            path: parent,
                             owner: OWNER.to_string(),
                             expected: ExpectedPreimage::Absent,
                         });
@@ -983,12 +983,17 @@ pub(super) fn finalize_delta(
                     crate::repository_state::RepositoryEntry::Directory { .. } => {}
                     _ => {
                         return Err(MutationError::GatePresetParentNotDirectory(
-                            parent.to_string(),
+                            parent.relative().as_str().to_string(),
                         ))
                     }
                 }
             }
-            let path = VirtualPath::data(format!("config/gate-presets/{}.json", preset.name))?;
+            let presets_dir = VirtualPath::GATE_PRESETS;
+            let path = VirtualPath::data(format!(
+                "{}/{}.json",
+                presets_dir.relative().as_str(),
+                preset.name
+            ))?;
             if !matches!(
                 image.entry(&path)?,
                 crate::repository_state::RepositoryEntry::Absent

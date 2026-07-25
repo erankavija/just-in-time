@@ -379,21 +379,18 @@ struct FreshTemplateDerivation {
     lease_targets: Vec<String>,
 }
 
-fn template_fixed_paths() -> Result<Vec<VirtualPath>> {
-    [
-        "config.toml",
-        "index.json",
-        "events.jsonl",
-        "gates.toml",
-        "templates.toml",
-        "rules.toml",
-        "invariants.toml",
-        "issues",
-        "config/gate-presets",
+fn template_fixed_paths() -> Vec<VirtualPath> {
+    vec![
+        VirtualPath::CONFIG,
+        VirtualPath::INDEX,
+        VirtualPath::EVENTS,
+        VirtualPath::GATES,
+        VirtualPath::TEMPLATES,
+        VirtualPath::RULES,
+        VirtualPath::INVARIANTS,
+        VirtualPath::ISSUES,
+        VirtualPath::GATE_PRESETS,
     ]
-    .into_iter()
-    .map(|path| VirtualPath::data(path).map_err(Into::into))
-    .collect()
 }
 
 fn capture_template_image(
@@ -402,9 +399,9 @@ fn capture_template_image(
     request: &TemplateRequest<'_>,
     container_id: &str,
 ) -> Result<Option<RepositoryImage>> {
-    let presets_dir = VirtualPath::data("config/gate-presets")?;
+    let presets_dir = VirtualPath::GATE_PRESETS;
     let issues_dir = VirtualPath::ISSUES;
-    let mut first_spec = CaptureSpec::phase_one(template_fixed_paths()?, TEMPLATE_CAPTURE_BUDGET)?;
+    let mut first_spec = CaptureSpec::phase_one(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
     first_spec.discover_listing(presets_dir.clone())?;
     let Some(first) = capture_or_retry(session.capture(first_spec))? else {
         return Ok(None);
@@ -413,7 +410,7 @@ fn capture_template_image(
     let discovered_presets = listed_json_paths(&first, &presets_dir)?;
     let closure = template_declaration_closure(&first)?;
 
-    let mut spec = CaptureSpec::phase_one(template_fixed_paths()?, TEMPLATE_CAPTURE_BUDGET)?;
+    let mut spec = CaptureSpec::phase_one(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
     let mut discovered_paths = discovered_index
         .all_ids
         .iter()
@@ -704,7 +701,7 @@ fn parse_template_gate_registry(
 fn parse_template_presets(
     image: &RepositoryImage,
 ) -> Result<HashMap<String, crate::gate_presets::GatePresetDefinition>> {
-    let dir = VirtualPath::data("config/gate-presets")?;
+    let dir = VirtualPath::GATE_PRESETS;
     let files = listed_json_paths(image, &dir)?
         .into_iter()
         .map(|path| {
