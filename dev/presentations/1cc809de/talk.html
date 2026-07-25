@@ -433,27 +433,36 @@ jit validate          # exact, idempotent clean result</code></pre>
 <!-- ── EVIDENCE ────────────────────────────────────────────────────────── -->
 <section>
   <span class="seclabel">Quality</span>
-  <h2>Completion evidence, and what counts as evidence</h2>
-  <div class="two-col">
-    <div>
-      <h3>What is recorded</h3>
-      <ul>
-        <li>15 dependencies in the epic's transitive closure, all Done</li>
-        <li><code>cargo-ci</code> recorded 3,784 passed, 0 failed, 14 ignored at commit <code>3dd32960</code></li>
-        <li>the multi-category gate sweep is recorded on the cutover child <code>661d6be2</code>, which requires
-            11 gate keys; the epic record itself requires <code>repo-validate</code></li>
-      </ul>
-    </div>
-    <div>
-      <h3>What makes it evidence</h3>
-      <ul>
-        <li><code>.jit/gates.toml</code> declares <code>holistic-review</code>, whose checker runs a reviewer
-            distinct from the building agent</li>
-        <li>the current hardening epic <code>1cc809de</code> lists that gate in <code>gates_required</code></li>
-        <li>a review authored by the agent that built the work is self-attestation, whatever it concludes</li>
-      </ul>
-    </div>
-  </div>
+  <h2>Completion evidence: what is recorded</h2>
+  <ul>
+    <li>15 dependencies in the epic's transitive closure, all Done</li>
+    <li><code>cargo-ci</code> recorded 3,784 passed, 0 failed, 14 ignored at commit <code>3dd32960</code></li>
+    <li>the multi-category gate sweep is recorded on the cutover child <code>661d6be2</code>, which requires
+        11 gate keys; the epic record itself requires <code>repo-validate</code></li>
+  </ul>
+  <p class="small">Closure: <code>jit graph deps cdc840ad --depth 10 --json</code> &gt; <code>summary</code>
+     &gt; <code>total</code> 15, <code>by_state.done</code> 15. Test result:
+     <code>.jit/gate-runs/da57b282-7e6a-47df-994d-614a68fad942/result.json</code> &gt; <code>stdout</code>,
+     line "test: 3784 passed, 0 failed, 14 ignored", with the same record's <code>commit</code> field
+     <code>3dd32960</code>. Gate keys: field <code>gates_required</code> in
+     <code>.jit/issues/661d6be2-e28b-463d-be93-58ee3e20e663.json</code> (11 entries) and
+     <code>.jit/issues/cdc840ad-9332-4936-9381-772318967f0f.json</code>.</p>
+</section>
+
+<!-- ── EVIDENCE (CONT.) ────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Quality</span>
+  <h2>Completion evidence: what makes it evidence</h2>
+  <ul>
+    <li><code>.jit/gates.toml</code> declares <code>holistic-review</code>, whose checker runs a reviewer
+        distinct from the building agent</li>
+    <li>the current hardening epic <code>1cc809de</code> lists that gate in <code>gates_required</code></li>
+    <li>a review authored by the agent that built the work is self-attestation, whatever it concludes</li>
+  </ul>
+  <p class="small">Declaration and reviewer independence:
+     <code>.jit/gates.toml</code> &gt; <code>[[gates]] key = "holistic-review"</code> &gt;
+     <code>description</code>. Requirement: field <code>gates_required</code> in
+     <code>.jit/issues/1cc809de-4669-45d4-960f-f881e716663d.json</code>.</p>
 </section>
 
 <!-- ── FUTURE ──────────────────────────────────────────────────────────── -->
@@ -461,9 +470,8 @@ jit validate          # exact, idempotent clean result</code></pre>
   <span class="seclabel">Future development</span>
   <h2>Where this goes next</h2>
   <ol>
-    <li><strong>Performance as a maintained contract:</strong> the session-cost profile is a checked-in artifact
-        with recorded machine, method, and per-command statistics, and session-open budgets are asserted by
-        tests rather than by recollection.</li>
+    <li><strong>Performance as a maintained contract:</strong> regenerate the recorded session-cost profile as
+        the surface grows; keep session-open budgets under test.</li>
     <li><strong>Explainability:</strong> expose plan and repair previews from the existing pure planner, on the
         path that already emits a dry run.</li>
     <li><strong>Profile lifecycle:</strong> build safe upgrade and removal on captured ownership and provenance,
@@ -471,6 +479,11 @@ jit validate          # exact, idempotent clean result</code></pre>
     <li><strong>Typed integrations:</strong> let new consumers contribute typed intent rather than acquire
         private publication logic.</li>
   </ol>
+  <p class="small">Today's baseline for item 1:
+     <code>dev/studies/perf/session-cost-c488ef85.json</code> &gt; <code>machine</code>,
+     <code>method</code>, <code>commands[]</code>, plus the two session-open budget tests named in full on
+     the "What bounds the work" slides (<code>crates/jit/src/commands/issue.rs</code>,
+     <code>crates/jit/src/commands/bulk_update.rs</code>).</p>
 </section>
 
 <!-- ── CORRECTION INVENTORY: A1 (1/2) ──────────────────────────────────── -->
@@ -500,8 +513,9 @@ jit validate          # exact, idempotent clean result</code></pre>
   <table>
     <thead><tr><th>Id</th><th>Corrected claim, and where it appears</th><th>Evidence</th></tr></thead>
     <tbody>
-      <tr><td>A1-4</td><td>No holistic-review verdict is claimed anywhere in this deck. "Completion evidence"
-          claims only that a gate with an independent reviewer is declared and required.</td>
+      <tr><td>A1-4</td><td>No holistic-review verdict is claimed anywhere in this deck. "Completion evidence:
+          what makes it evidence" claims only that a gate with an independent reviewer is declared and
+          required.</td>
           <td><code>.jit/gates.toml</code>; <code>gates_required</code> of <code>1cc809de</code></td></tr>
       <tr><td>A1-5</td><td>"A closed final repository view" shows all six <code>RepositoryImage</code> fields,
           with root evidence located inside <code>RepositoryLayout</code>.</td>
