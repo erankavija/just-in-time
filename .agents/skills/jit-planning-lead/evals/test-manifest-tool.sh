@@ -33,6 +33,9 @@ python3 -c 'import json,sys; result=json.load(open(sys.argv[1])); assert result[
 ! "$tool" validate "$fixtures/manifest-malformed-types.json" --config "$config" --known-source REQ-01 --json > "$tmp_result"
 python3 -c 'import json,sys; result=json.load(open(sys.argv[1])); assert result["errors"]' "$tmp_result"
 ! "$tool" validate "$fixtures/manifest-cyclic.json" --config "$config" --known-source REQ-01
+assert_rejects "already implies" "$tool" validate "$fixtures/manifest-redundant-edge.json" --config "$config" --known-source REQ-01
+# A cyclic graph reports the cycle alone; reachability would otherwise imply nearly every edge.
+assert_rejects "contains a cycle" "$tool" validate "$fixtures/manifest-cyclic.json" --config "$config" --known-source REQ-01
 ! "$tool" validate "$fixtures/manifest-oversized.json" --config "$config" --known-source REQ-03 --deny-warnings
 ! "$tool" validate "$fixtures/manifest-independent-verbs.json" --config "$config" --known-source REQ-04 --deny-warnings
 "$tool" validate "$fixtures/manifest-indivisible-evidence.json" --config "$config" --known-source REQ-05 --deny-warnings --json > "$tmp_result"

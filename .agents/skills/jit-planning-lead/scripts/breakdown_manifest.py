@@ -82,6 +82,40 @@ def cycle(keys, entries):
     return any(visit(node) for node in graph)
 
 
+def redundant_edges(keys, entries):
+    """Edges the graph already implies through a longer path.
+
+    Repository integrity requires a transitively reduced dependency graph, so a
+    manifest carrying an implied edge creates a graph that fails validation the
+    moment it is published. Returns the offending (key, dependency) pairs.
+    """
+    graph = {
+        entry["key"]: [dep for dep in entry.get("depends_on", []) if isinstance(dep, str) and dep in keys]
+        for entry in entries
+        if isinstance(entry, dict)
+        and isinstance(entry.get("key"), str)
+        and entry["key"] in keys
+        and isinstance(entry.get("depends_on"), list)
+    }
+
+    def reachable_without(node, skipped):
+        seen, stack = set(), [dep for dep in graph.get(node, []) if dep != skipped]
+        while stack:
+            current = stack.pop()
+            if current in seen:
+                continue
+            seen.add(current)
+            stack.extend(graph.get(current, []))
+        return seen
+
+    return [
+        (node, dep)
+        for node, deps in graph.items()
+        for dep in deps
+        if dep in reachable_without(node, dep)
+    ]
+
+
 def structural_codes(entries):
     if not isinstance(entries, list):
         return ["invalid-root"]
@@ -329,7 +363,15 @@ def validate(entries, terminal_types, type_levels, known_sources, required_sourc
                 if unused:
                     errors.append(f"{at}.planning.terminal.warning_overrides has unused codes: {', '.join(sorted(unused))}")
     if cycle(key_set, entries):
+        # Reachability in a cyclic graph makes almost every edge look implied, so the
+        # reduction check would bury the cycle under noise. Report the cycle alone.
         errors.append("depends_on graph contains a cycle")
+    else:
+        for node, dep in redundant_edges(key_set, entries):
+            errors.append(
+                f"{node}.depends_on lists '{dep}', which a longer path already implies; "
+                "repository integrity requires a transitively reduced graph"
+            )
     by_key = {entry["key"]: entry for entry in entries if isinstance(entry, dict) and isinstance(entry.get("key"), str)}
     if contracts is not None:
         producers = {}

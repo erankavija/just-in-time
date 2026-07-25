@@ -1,0 +1,14 @@
+[
+  {
+    "key":"foundation-work","title":"Foundation","description":"Foundation.\n\n## Success Criteria\n\n- Done.","type":"task","priority":"normal","labels":[],"gates":["cargo-ci"],"depends_on":[],
+    "planning":{"outcome":"Foundation","contract_refs":[],"source_refs":["REQ-01"],"terminal":{"consumer_family":"foundation","test_boundary":"foundation test","worker_sized_reason":"One change.","footprint":{"touches":["foundation"]}}}
+  },
+  {
+    "key":"middle-work","title":"Middle","description":"Middle.\n\n## Success Criteria\n\n- Done.","type":"task","priority":"normal","labels":[],"gates":["cargo-ci"],"depends_on":["foundation-work"],
+    "planning":{"outcome":"Middle","contract_refs":[],"source_refs":["REQ-01"],"terminal":{"consumer_family":"middle","test_boundary":"middle test","worker_sized_reason":"One change.","footprint":{"touches":["middle"]}}}
+  },
+  {
+    "key":"consumer-work","title":"Consumer","description":"Consumer.\n\n## Success Criteria\n\n- Done.","type":"task","priority":"normal","labels":[],"gates":["cargo-ci"],"depends_on":["middle-work","foundation-work"],
+    "planning":{"outcome":"Consumer","contract_refs":[],"source_refs":["REQ-01"],"terminal":{"consumer_family":"consumer","test_boundary":"consumer test","worker_sized_reason":"One change.","footprint":{"touches":["consumer"]}}}
+  }
+]
