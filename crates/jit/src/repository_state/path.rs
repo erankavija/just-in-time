@@ -110,20 +110,29 @@ pub enum RepositoryRootClass {
     Data,
 }
 
-pub use self::virtual_path::VirtualPath;
+pub use self::identity::VirtualPath;
 
-/// Sole defining scope of `VirtualPath` and of its well-known const identities.
+/// Sole defining scope of the [`VirtualPath`] identity and of its well-known
+/// const paths.
 ///
-/// The struct's fields are private to this module, so a `Cow::Borrowed` const
-/// identity — the one shape that reaches a `VirtualPath` without the fallible
-/// constructor's guard — cannot be spelled anywhere else, including elsewhere in
-/// this file. Within the module, only the nested `well_known` module owns the
-/// const-construction primitive, and that module contains nothing but the single
-/// declaration which emits both the consts and their inventory.
-mod virtual_path {
+/// The struct's fields are declared here and nowhere else, so a `Cow::Borrowed`
+/// const identity — the one shape that reaches a `VirtualPath` without the
+/// fallible guard — cannot be spelled outside this module: everywhere else in the
+/// crate, including the rest of this file, a struct literal is a privacy error.
+/// What the module hands its parent is [`from_parts`](VirtualPath::from_parts)
+/// and the two field accessors. `from_parts` returns a `Result`, so it cannot
+/// serve a const initializer, and every identity minted elsewhere has passed
+/// `checked`.
+///
+/// One route survives by construction: a raw struct literal written inside this
+/// module, which no Rust construct can deny a type's own defining scope. The
+/// module is therefore kept to the identity's accessors, its fallible
+/// constructor, the reserved-namespace guard, the const-construction primitive,
+/// and the declaration list that emits every const together with its inventory.
+mod identity {
     use super::{RepositoryLayoutError, RepositoryRootClass, RootRelativePath};
     use serde::Serialize;
-    use std::path::Path;
+    use std::borrow::Cow;
 
     /// A canonical semantic path qualified by its selected root.
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
@@ -133,26 +142,13 @@ mod virtual_path {
     }
 
     impl VirtualPath {
-        /// Construct a worktree-relative semantic identity.
-        pub fn worktree(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
-            Self::from_root(
-                RepositoryRootClass::Worktree,
-                RootRelativePath::parse(path)?,
-            )
-        }
-
-        /// Construct a data-root-relative semantic identity.
-        pub fn data(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
-            Self::from_root(RepositoryRootClass::Data, RootRelativePath::parse(path)?)
-        }
-
-        /// Construct a virtual identity from an explicit selected-root class.
+        /// Construct a guarded identity from its parts.
         ///
-        /// Every fallible constructor funnels through here, so live mutation
-        /// planning, storage journal decoding, and layout classification all
-        /// re-apply the same canonicality and reserved-namespace checks instead of
-        /// accepting a string path and inferring its root.
-        pub(crate) fn from_root(
+        /// The only route out of this module to a `VirtualPath`, and fallible by
+        /// design: a `Result` cannot initialize a const, so no caller can mint an
+        /// unguarded identity and no well-known const can be declared outside the
+        /// declaration list below.
+        pub(super) fn from_parts(
             root: RepositoryRootClass,
             relative: RootRelativePath,
         ) -> Result<Self, RepositoryLayoutError> {
@@ -169,23 +165,6 @@ mod virtual_path {
             &self.relative
         }
 
-        /// Canonical descendant directories above this path, nearest root first.
-        pub(crate) fn ancestor_directories(&self) -> Result<Vec<Self>, RepositoryLayoutError> {
-            let RootRelativePath::Descendant(relative) = &self.relative else {
-                return Ok(Vec::new());
-            };
-            let components = relative.split('/').collect::<Vec<_>>();
-            (1..components.len())
-                .map(|length| {
-                    let relative = components[..length].join("/");
-                    match self.root {
-                        RepositoryRootClass::Worktree => Self::worktree(relative),
-                        RepositoryRootClass::Data => Self::data(relative),
-                    }
-                })
-                .collect()
-        }
-
         fn checked(self) -> Result<Self, RepositoryLayoutError> {
             let path = self.relative.as_str();
             let reserved = match self.root {
@@ -200,96 +179,129 @@ mod virtual_path {
                 Ok(self)
             }
         }
+    }
 
-        pub(crate) fn ensure_semantic(&self) -> Result<(), RepositoryLayoutError> {
-            self.clone().checked().map(drop)
+    /// Const-construct a well-known identity, bypassing the `checked` guard.
+    ///
+    /// Callers must supply a canonical, non-reserved path. The declared entries do,
+    /// which the round-trip test over the emitted inventory proves.
+    const fn borrowed_identity(root: RepositoryRootClass, relative: &'static str) -> VirtualPath {
+        VirtualPath {
+            root,
+            relative: RootRelativePath::Descendant(Cow::Borrowed(relative)),
         }
     }
 
-    /// The single declaration of the well-known repository paths.
-    ///
-    /// `declare_well_known_paths!` emits one `pub const` per entry and the
-    /// `VirtualPath::ALL_KNOWN` inventory from the same list, so a const and its
-    /// enumeration cannot diverge. `borrowed_identity` is private to this module
-    /// and is the only const route to a `VirtualPath`, so a well-known const
-    /// cannot be declared outside the list below.
-    mod well_known {
-        use super::{RepositoryRootClass, RootRelativePath, VirtualPath};
-        use std::borrow::Cow;
+    /// Emit every well-known path const, and the inventory of them, from one
+    /// declaration list of `NAME: RootClass = "relative path";` entries.
+    macro_rules! declare_well_known_paths {
+        ($(
+            $(#[$doc:meta])*
+            $name:ident: $root:ident = $relative:literal;
+        )+) => {
+            impl VirtualPath {
+                $(
+                    $(#[$doc])*
+                    pub const $name: Self =
+                        borrowed_identity(RepositoryRootClass::$root, $relative);
+                )+
 
-        /// Const-construct a well-known identity, bypassing the `checked` guard.
-        ///
-        /// Callers must supply a canonical, non-reserved path. The declared entries
-        /// do, which the round-trip test over the emitted inventory proves.
-        const fn borrowed_identity(
-            root: RepositoryRootClass,
-            relative: &'static str,
-        ) -> VirtualPath {
-            VirtualPath {
-                root,
-                relative: RootRelativePath::Descendant(Cow::Borrowed(relative)),
+                /// Every well-known associated-const path, in declaration order.
+                ///
+                /// The inventory and the consts are emitted from one declaration,
+                /// so the inventory enumerates all of them by construction: a const
+                /// absent from it cannot be declared. One test iterates the
+                /// inventory and proves each entry canonical and non-reserved by
+                /// round-tripping it through the fallible constructor for its root
+                /// class, which is what licenses these consts to skip that
+                /// constructor.
+                pub const ALL_KNOWN: &'static [Self] = &[$(Self::$name,)+];
             }
-        }
+        };
+    }
 
-        /// Emit every well-known path const, and the inventory of them, from one
-        /// declaration list of `NAME: RootClass = "relative path";` entries.
-        macro_rules! declare_well_known_paths {
-            ($(
-                $(#[$doc:meta])*
-                $name:ident: $root:ident = $relative:literal;
-            )+) => {
-                impl VirtualPath {
-                    $(
-                        $(#[$doc])*
-                        pub const $name: Self =
-                            borrowed_identity(RepositoryRootClass::$root, $relative);
-                    )+
+    declare_well_known_paths! {
+        /// The issue index under the data root (`.jit/index.json`).
+        INDEX: Data = "index.json";
+        /// Repository configuration under the data root (`.jit/config.toml`).
+        CONFIG: Data = "config.toml";
+        /// Gate registry definitions under the data root (`.jit/gates.toml`).
+        GATES: Data = "gates.toml";
+        /// Graph template registry under the data root (`.jit/templates.toml`).
+        TEMPLATES: Data = "templates.toml";
+        /// Validation rules under the data root (`.jit/rules.toml`).
+        RULES: Data = "rules.toml";
+        /// Invariants registry under the data root (`.jit/invariants.toml`).
+        INVARIANTS: Data = "invariants.toml";
+        /// Append-only event log under the data root (`.jit/events.jsonl`).
+        EVENTS: Data = "events.jsonl";
+        /// Per-issue record directory under the data root (`.jit/issues`).
+        ISSUES: Data = "issues";
+        /// Recorded gate-run directory under the data root (`.jit/gate-runs`).
+        GATE_RUNS: Data = "gate-runs";
+        /// Applied-profile provenance directory under the data root (`.jit/profiles`).
+        PROFILES: Data = "profiles";
+        /// JSON Schema directory under the data root (`.jit/schemas`).
+        SCHEMAS: Data = "schemas";
+        /// Nested configuration directory under the data root (`.jit/config`).
+        CONFIG_DIR: Data = "config";
+        /// Project-defined gate-preset directory under the data root
+        /// (`.jit/config/gate-presets`).
+        GATE_PRESETS: Data = "config/gate-presets";
+        /// Managed gitattributes file at the worktree root (`.gitattributes`).
+        GITATTRIBUTES: Worktree = ".gitattributes";
+    }
+}
 
-                    /// Every well-known associated-const path, in declaration order.
-                    ///
-                    /// The inventory and the consts are emitted from one
-                    /// declaration, so the inventory enumerates all of them by
-                    /// construction: a const absent from it cannot be declared.
-                    /// One test iterates the inventory and proves each entry
-                    /// canonical and non-reserved by round-tripping it through the
-                    /// fallible constructor for its root class, which is what
-                    /// licenses these consts to skip that constructor.
-                    pub const ALL_KNOWN: &'static [Self] = &[$(Self::$name,)+];
+/// Constructors and derived queries over the identity, written without field
+/// access so the defining module above stays the only const-capable scope.
+impl VirtualPath {
+    /// Construct a worktree-relative semantic identity.
+    pub fn worktree(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
+        Self::from_parts(
+            RepositoryRootClass::Worktree,
+            RootRelativePath::parse(path)?,
+        )
+    }
+
+    /// Construct a data-root-relative semantic identity.
+    pub fn data(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
+        Self::from_parts(RepositoryRootClass::Data, RootRelativePath::parse(path)?)
+    }
+
+    /// Construct a virtual identity from an explicit selected-root class.
+    ///
+    /// Every fallible constructor funnels through the same canonicality and
+    /// reserved-namespace guard, so live mutation planning, storage journal
+    /// decoding, and layout classification all re-apply it instead of accepting a
+    /// string path and inferring its root.
+    pub(crate) fn from_root(
+        root: RepositoryRootClass,
+        relative: RootRelativePath,
+    ) -> Result<Self, RepositoryLayoutError> {
+        Self::from_parts(root, relative)
+    }
+
+    /// Canonical descendant directories above this path, nearest root first.
+    pub(crate) fn ancestor_directories(&self) -> Result<Vec<Self>, RepositoryLayoutError> {
+        let RootRelativePath::Descendant(relative) = self.relative() else {
+            return Ok(Vec::new());
+        };
+        let components = relative.split('/').collect::<Vec<_>>();
+        (1..components.len())
+            .map(|length| {
+                let relative = components[..length].join("/");
+                match self.root_class() {
+                    RepositoryRootClass::Worktree => Self::worktree(relative),
+                    RepositoryRootClass::Data => Self::data(relative),
                 }
-            };
-        }
+            })
+            .collect()
+    }
 
-        declare_well_known_paths! {
-            /// The issue index under the data root (`.jit/index.json`).
-            INDEX: Data = "index.json";
-            /// Repository configuration under the data root (`.jit/config.toml`).
-            CONFIG: Data = "config.toml";
-            /// Gate registry definitions under the data root (`.jit/gates.toml`).
-            GATES: Data = "gates.toml";
-            /// Graph template registry under the data root (`.jit/templates.toml`).
-            TEMPLATES: Data = "templates.toml";
-            /// Validation rules under the data root (`.jit/rules.toml`).
-            RULES: Data = "rules.toml";
-            /// Invariants registry under the data root (`.jit/invariants.toml`).
-            INVARIANTS: Data = "invariants.toml";
-            /// Append-only event log under the data root (`.jit/events.jsonl`).
-            EVENTS: Data = "events.jsonl";
-            /// Per-issue record directory under the data root (`.jit/issues`).
-            ISSUES: Data = "issues";
-            /// Recorded gate-run directory under the data root (`.jit/gate-runs`).
-            GATE_RUNS: Data = "gate-runs";
-            /// Applied-profile provenance directory under the data root (`.jit/profiles`).
-            PROFILES: Data = "profiles";
-            /// JSON Schema directory under the data root (`.jit/schemas`).
-            SCHEMAS: Data = "schemas";
-            /// Nested configuration directory under the data root (`.jit/config`).
-            CONFIG_DIR: Data = "config";
-            /// Project-defined gate-preset directory under the data root
-            /// (`.jit/config/gate-presets`).
-            GATE_PRESETS: Data = "config/gate-presets";
-            /// Managed gitattributes file at the worktree root (`.gitattributes`).
-            GITATTRIBUTES: Worktree = ".gitattributes";
-        }
+    /// Re-apply the reserved-namespace guard to an existing identity.
+    pub(crate) fn ensure_semantic(&self) -> Result<(), RepositoryLayoutError> {
+        Self::from_parts(self.root_class(), self.relative().clone()).map(drop)
     }
 }
 
