@@ -1083,7 +1083,7 @@
       "raised_at": "wave 4",
       "subject": "host disk exhaustion from accumulated worktree build artifacts",
       "detail": "The host root filesystem reached 100% (0 bytes free) mid-wave. cargo-ci's provenance and budget steps are the only ones needing multi-GB scratch; both failed with EMPTY diagnostic files, which is the signature of failed writes rather than assertions. 39 agent worktrees held ~170G of target/, plus 1365 stale scratch dirs in ~/.cache/jit-cargo-ci-tmp. Lead reclaimed 153G.",
-      "decision": "48 worktrees remain registered and nothing prunes them, so this recurs. Before any wave, check df /. Reclaim with rm -rf .agents/worktrees/agent-*/target for non-live workers (target/ is gitignored at .gitignore:2) after confirming ps -eo comm | grep -cE '^(cargo|rustc)$' is 0."
+      "decision": "RESOLVED this session. Reclaimed 153G of build artifacts, then removed 49 worktrees whose branches are fully merged into main (branches preserved - all 113 worktree-agent-* branches still exist; only checkouts removed). Disk 0 -> 168G free. .agents/worktrees/ now holds only lead-install-clean and steward-v1-readiness (unmerged salvage). The mechanism is unchanged, so prune at the end of every wave: confirm no cargo/rustc processes, check git branch --no-merged main for salvage commits, remove only worktrees whose branch is merged, and clear ~/.cache/jit-cargo-ci-tmp/*. Structural fix filed as be005f64 under milestone v1.1, outside this epic. tmpfs was evaluated and rejected: the workspace exceeds this host's 31G RAM and a prior session already recorded /tmp (16G) being exhausted by large builds."
     }
   ]
 }
