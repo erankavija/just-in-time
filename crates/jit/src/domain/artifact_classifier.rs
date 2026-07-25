@@ -1709,8 +1709,8 @@ mod tests {
     #[test]
     fn test_preferred_container_destination_root_uses_the_bare_short_id_for_ambiguous_or_absent_membership_labels(
     ) {
-        // Each shape names a genuinely slug-worthy title, so a title-derived
-        // name would be distinguishable from the bare short-id directory.
+        // The fixture title is slug-worthy in every shape below, so a
+        // title-derived name stays distinguishable from the bare short id.
         let ambiguous = [
             vec!["type:epic", "type:task", "epic:artifact-archival"],
             vec!["type:epic", "epic:first", "epic:second"],
