@@ -1014,5 +1014,21 @@
       "disposition": "covered - 58c56743 (wave 11) declares both files and already owes them the 8-area managed/permanent correction from P2. VERIFY at wave 11 that it also adds issue_scoped_areas. If 58c56743's criteria name only the managed/permanent lists, this key needs an explicit addition rather than an assumed one."
     }
   ],
-  "started_at": "2026-07-25T14:24:30.011076+00:00"
+  "started_at": "2026-07-25T14:24:30.011076+00:00",
+  "lead_notes": [
+    {
+      "id": "N1",
+      "raised_at": "wave 3 prep for wave 4",
+      "subject": "b4d1a2c8 cannot run as a standard worktree worker",
+      "detail": "Renaming dev/archive/a9b5dd08-use-strategic-label-slugs-in-archive-directory-n to dev/archive/a9b5dd08 orphans the one document link on issue a9b5dd08 (`jit doc list a9b5dd08` -> path under the old directory), so REQ-05's whole-repository validation fails unless the link is repointed. That repoint is a .jit/ write, which the standard worker constraint forbids, and .jit/issues/*.json diverging on a branch does not merge. The manifest footprint (creates dev/archive/a9b5dd08, touches the old dir) omits the .jit change.",
+      "decision": "The lead executes b4d1a2c8 directly on main: git mv, repoint the document link, `jit archive` preview to confirm single-destination convergence (REQ-03), then `jit validate` (REQ-05). Same reasoning that sends wave 8's 24 archive-sweep issues to sequential execution on main."
+    },
+    {
+      "id": "N2",
+      "raised_at": "wave 3 prep for wave 4",
+      "subject": "the epic's own description cites the title-slugged directory as evidence",
+      "detail": "8e071e18's Background and Notes name `dev/archive/a9b5dd08-use-strategic-label-slugs-in-archive-directory-n/` as the counter-example proving the naming defect. After b4d1a2c8 renames it, that path no longer exists. dev/active/8e071e18-investigation.md cites it too.",
+      "decision": "Leave both. The investigation is a dated planning record, and editing the epic's description is an escalation (policy item 3) for a historical evidence citation whose point survives the rename. Raise it only if a reviewer or the holistic-review gate cites it."
+    }
+  ]
 }
