@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-07-25T18:01:03.738494413Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-25T18:08:36.023921267Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "7d6d2783-9f0d-4a28-9880-9f9f510ecd27",
@@ -32,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Skip directory link targets during artifact discovery",
-  "updated_at": "2026-07-25T18:01:03.738494413Z"
+  "updated_at": "2026-07-25T18:08:36.023921267Z"
 }

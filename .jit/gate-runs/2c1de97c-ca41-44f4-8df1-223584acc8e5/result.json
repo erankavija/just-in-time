@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "7522917a4fe50ee395070a46e65a45e8f1468eb6",
+  "completed_at": "2026-07-25T18:05:57.486245498Z",
+  "duration_ms": 246457,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/configuration.md",
+        "id": "F1",
+        "line": 50,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Direct adopter documentation still hard-codes obsolete documentation-policy paths instead of deriving from or citing the shipped declaration."
+      }
+    ],
+    "summary": "Runtime defaults meet the three hard criteria, but the issue's single-source-prose enforcement claim remains contradicted by stale adopter configuration docs.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b3fc1a92-9d6c-43f6-9309-5be17adfbd98",
+  "message": null,
+  "run_id": "2c1de97c-ca41-44f4-8df1-223584acc8e5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T18:01:51.028396288Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2116 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9a70-ce6d-7e81-86cb-8ff8c3ed3d81\n--------\nuser\n--- 2103 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 57e28a57 and 28c4730d (merge repeats the same `config.rs` patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/b3fc1a92/requirement/REQ-01 and @/issue/8e071e18/decision/D-13,D-19 (.jit issue descriptions); @/invariant/single-source-prose, @/invariant/domain-agnostic, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-25T17:50:11.976542108+00:00)\nTruncation recovery: none\n\n1. **F1 — blocking, issue-impact, medium:** The issue’s `enforces:@/invariant/single-source-prose` claim remains unsupported. Although the runtime accessors now derive from `SHIPPED_DOCUMENTATION_POLICY`, the direct adopter documentation still hard-codes the obsolete three managed paths and `[\"docs/\"]` permanent path at [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:50) and [example-config.toml](/home/vkaskivuo/Projects/just-in-time/docs/reference/example-config.toml:21), contradicting the shipped declaration in [config.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:405). The issue background identifies these as copies of the same fact; leaving them stale violates `@/invariant/single-source-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Runtime defaults meet the three hard criteria, but the issue's single-source-prose enforcement claim remains contradicted by stale adopter configuration docs.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Direct adopter documentation still hard-codes obsolete documentation-policy paths instead of deriving from or citing the shipped declaration.\",\"file\":\"docs/reference/configuration.md\",\"line\":50,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
