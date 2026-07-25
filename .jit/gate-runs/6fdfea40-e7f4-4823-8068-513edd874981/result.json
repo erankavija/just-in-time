@@ -1,0 +1,87 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "11ebd662393d67cf2f149ba008fbf758146f1911",
+  "completed_at": "2026-07-25T09:46:52.039518407Z",
+  "duration_ms": 179960,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/8e071e18-plan.md",
+        "id": "F1",
+        "line": 62,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/decision/D-3"
+        ],
+        "severity": "high",
+        "summary": "The canonical-directory design has no deterministic area-selection contract, config surface, or command input."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F2",
+        "line": 1171,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/decision/D-10"
+        ],
+        "severity": "high",
+        "summary": "archive-sweep-execution bundles multiple terminal-container executions and aggregate validation into one terminal leaf."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F3",
+        "line": 1279,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/decision/D-15"
+        ],
+        "severity": "high",
+        "summary": "active-unprefixed-disposition leaves a heterogeneous per-file migration undecomposed behind a directory footprint."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F4",
+        "line": 1223,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/decision/D-8",
+          "@/issue/8e071e18/decision/D-16"
+        ],
+        "severity": "high",
+        "summary": "moved-artifact-citation-repoint mixes independent script, code, documentation, changelog, and contributor-guide changes."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F5",
+        "line": 1038,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/decision/D-11"
+        ],
+        "severity": "medium",
+        "summary": "worker-tier-skill-paths combines three skill/twin families and hides its actual targets behind directory footprints."
+      }
+    ],
+    "summary": "The manifest validates natively but contains one unresolved architecture contract and four non-worker-sized terminal leaves.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "55fe8ec2-880f-4380-91f2-97f4daf71bda",
+  "message": null,
+  "run_id": "6fdfea40-e7f4-4823-8068-513edd874981",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T09:43:52.078873093Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6230 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f98a8-e7b7-7710-9a65-efdf2918a6ef\n--------\nuser\n--- 6217 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 (high, blocking):** The canonical-directory contract never defines how `<area>` is selected. The plan says the resolver uses an “area root from `development_root`” ([plan](dev/active/8e071e18-plan.md:62)), but the configuration only supplies one development root, not an issue-to-area mapping ([config](.jit/config.toml:11)); the resolver and single-argument command therefore cannot deterministically choose between D-3’s issue-scoped areas. Add a visible area-selection contract, its config/API input and producer before the resolver, then update the command, template interpolation, and conformance report tests. ([manifest](dev/active/8e071e18-breakdown.json:404))\n\n2. **F2 (high, blocking):** `archive-sweep-execution` is a tier-laundered leaf: it requires an execution for every terminal container, validation, citation capture, and broad `dev/active`/`dev/archive` changes in one assignment. Its own rationale confirms multiple executions, not one focused cycle. Replace it with bounded container-specific execution leaves that name their container/artifact universe and evidence, plus a separate aggregate validation/repoint landing task. ([manifest](dev/active/8e071e18-breakdown.json:1171))\n\n3. **F3 (high, blocking):** `active-unprefixed-disposition` is likewise an undecomposed per-file migration: it promises an individual decision for every heterogeneous active-area artifact while exposing only the whole directory as its footprint. Split it into bounded disposition leaves keyed to the investigated files (or homogeneous, explicitly enumerated groups), each with one recorded outcome and observable validation boundary. ([manifest](dev/active/8e071e18-breakdown.json:1279))\n\n4. **F4 (high, blocking):** `moved-artifact-citation-repoint` combines independent script, production-code, adopter-documentation, changelog, and contributor-guide changes across eight files under a broad “each citation” outcome. `landing_group` does not make this one worker-sized cycle. Split by consumer family with exact citation inventories and focused tests/checks for each leaf. ([manifest](dev/active/8e071e18-breakdown.json:1223))\n\n5. **F5 (medium, blocking):** `worker-tier-skill-paths` combines three independent skills and their three packaged twins, while its directory-level footprints conceal the actual files. Split it into one leaf per skill/twin family and enumerate the edited paths so overlap and byte-equality verification remain credible. ([manifest](dev/active/8e071e18-breakdown.json:1038))\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The manifest validates natively but contains one unresolved architecture contract and four non-worker-sized terminal leaves.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The canonical-directory design has no deterministic area-selection contract, config surface, or command input.\",\"file\":\"dev/active/8e071e18-plan.md\",\"line\":62,\"references\":[\"@/issue/8e071e18/decision/D-3\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"archive-sweep-execution bundles multiple terminal-container executions and aggregate validation into one terminal leaf.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":1171,\"references\":[\"@/issue/8e071e18/decision/D-10\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"active-unprefixed-disposition leaves a heterogeneous per-file migration undecomposed behind a directory footprint.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":1279,\"references\":[\"@/issue/8e071e18/decision/D-15\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"moved-artifact-citation-repoint mixes independent script, code, documentation, changelog, and contributor-guide changes.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":1223,\"references\":[\"@/issue/8e071e18/decision/D-8\",\"@/issue/8e071e18/decision/D-16\"]},{\"id\":\"F5\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"worker-tier-skill-paths combines three skill/twin families and hides its actual targets behind directory footprints.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":1038,\"references\":[\"@/issue/8e071e18/decision/D-11\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

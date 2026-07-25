@@ -271,13 +271,14 @@
   {
     "key": "repository-config-adoption",
     "title": "Adopt the shipped area classification in this repository's configuration",
-    "description": "This repository's documentation policy names the same managed and permanent areas as the shipped scaffold, so the cleanup that follows runs against the product's own default rather than a bespoke local table.\n\n## Background\n\nThe change ships as a product default and this repository then adopts it. The live policy today names three managed areas and one permanent prefix, leaving eight areas under the development root unclassified. Adoption reclassifies them: work-product areas become managed and move on archive, while an area holding living contributor documentation, a configured item-kind source, or a documented invocation path becomes permanent and archives by copy. Development-root files that belong to no area are listed individually.\n\nAdoption is what makes the repository-level acceptance evidence real, and it must land before any archival execution so that the executions run under the intended classification.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository documentation policy classifies each area under the development root as managed or permanent, matching the shipped declaration.\n- [hard] REQ-02: Development-root files that belong to no area are listed as exact path entries.\n- [hard] REQ-03: No entry covers the development root as a whole.\n- [hard] REQ-04: The container candidate report shows no unmanaged-selected-root blocker for any area under the development root.\n",
+    "description": "This repository's documentation policy names the same managed and permanent areas as the shipped scaffold and declares its issue-scoped areas, so the cleanup that follows runs against the product's own default rather than a bespoke local table.\n\n## Background\n\nThe change ships as a product default and this repository then adopts it. The live policy today names three managed areas and one permanent prefix, leaving eight areas under the development root unclassified. Adoption reclassifies them: work-product areas become managed and move on archive, while an area holding living contributor documentation, a configured item-kind source, or a documented invocation path becomes permanent and archives by copy. Development-root files that belong to no area are listed individually.\n\nAdoption also declares which of the areas organize their artifacts by issue. That declaration is independent of the archival classification: a managed area that stays flat still archives its linked artifacts, and only the naming differs.\n\nAdoption is what makes the repository-level acceptance evidence real, and it must land before any archival execution so that the executions run under the intended classification.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository documentation policy classifies each area under the development root as managed or permanent, matching the shipped declaration.\n- [hard] REQ-02: Development-root files that belong to no area are listed as exact path entries.\n- [hard] REQ-03: No entry covers the development root as a whole.\n- [hard] REQ-04: The repository declares its issue-scoped areas as the active, study, plan, and presentation areas.\n- [hard] REQ-05: The container candidate report shows no unmanaged-selected-root blocker for any area under the development root.\n",
     "type": "task",
     "priority": "high",
     "labels": [
       "epic:dev-artifact-layout",
       "milestone:v1.0",
       "story:area-classification",
+      "per:@/issue/8e071e18/decision/D-3",
       "per:@/issue/8e071e18/decision/D-5",
       "per:@/issue/8e071e18/decision/D-13"
     ],
@@ -285,15 +286,18 @@
       "repo-validate"
     ],
     "depends_on": [
-      "shipped-area-classification"
+      "shipped-area-classification",
+      "issue-scoped-area-registry"
     ],
     "planning": {
       "outcome": "This repository's documentation policy names the same managed and permanent areas as the shipped scaffold.",
       "contract_refs": [
-        "shipped-area-declaration"
+        "shipped-area-declaration",
+        "issue-scoped-area-registry"
       ],
       "source_refs": [
         "REQ-01",
+        "D-3",
         "D-5",
         "D-6",
         "D-13",
@@ -359,7 +363,7 @@
   {
     "key": "artifact-directory-convention",
     "title": "Canonical issue artifact directory convention",
-    "description": "An issue's artifacts live in one canonical directory derived from its identity, resolved by a command that tooling and documentation call instead of spelling the pattern out.\n\n## Background\n\nDevelopment artifacts are named as flat files at area root with the owning issue's short id as a filename prefix. The layout does not scale, and the one place that derives a directory name from an issue falls back to the issue title, which yields long names truncated mid-word.\n\nThe convention is a directory per issue named from the issue's membership label, falling back to a bare short id, with filenames inside the directory carrying no redundant short-id prefix. Directory-per-issue precedents already exist in the repository. The convention governs newly created artifacts; pre-existing flat files are tolerated rather than restructured in place.\n\nEnforcement is a resolver plus an advisory report. A blocking validation rule was rejected because legacy flat artifacts are deliberately tolerated and a cutover predicate would be a false-positive source.\n\n## Success Criteria\n\n- [hard] REQ-01: An issue's canonical artifact directory is the area root joined with its short id and membership slug when the issue carries a membership label, and with the bare short id otherwise, with no name derived from an issue title.\n- [hard] REQ-02: A command resolves the canonical directory, and tooling and documentation obtain the path from it rather than composing it from a spelled-out pattern.\n- [hard] REQ-03: Artifact filenames inside an issue directory carry no short-id prefix.\n- [hard] REQ-04: An advisory report lists artifacts under managed issue-scoped areas that sit outside their owning issue's canonical directory, and the report blocks no state transition.\n",
+    "description": "An issue's artifacts live in one canonical directory derived from its identity inside an area configuration declares, resolved by a command that tooling and documentation call instead of spelling the pattern out.\n\n## Background\n\nDevelopment artifacts are named as flat files at area root with the owning issue's short id as a filename prefix. The layout does not scale, and the one place that derives a directory name from an issue falls back to the issue title, which yields long names truncated mid-word.\n\nThe convention is a directory per issue named from the issue's membership label, falling back to a bare short id, with filenames inside the directory carrying no redundant short-id prefix. Only some areas under a development root organize their artifacts by issue, so configuration declares which ones do and every resolution names one of them. Directory-per-issue precedents already exist in the repository. The convention governs newly created artifacts; pre-existing flat files are tolerated rather than restructured in place.\n\nEnforcement is a resolver plus an advisory report. A blocking validation rule was rejected because legacy flat artifacts are deliberately tolerated and a cutover predicate would be a false-positive source.\n\n## Success Criteria\n\n- [hard] REQ-01: The development areas that adopt the convention are declared in configuration, and every canonical-directory resolution names one of them.\n- [hard] REQ-02: An issue's canonical artifact directory is the named area joined with its short id and membership slug when the issue carries a membership label, and with the bare short id otherwise, with no name derived from an issue title.\n- [hard] REQ-03: A command resolves the canonical directory, and tooling and documentation obtain the path from it rather than composing it from a spelled-out pattern.\n- [hard] REQ-04: Artifact filenames inside an issue directory carry no short-id prefix.\n- [hard] REQ-05: An advisory report lists artifacts under the declared issue-scoped areas that sit outside their owning issue's canonical directory, and the report blocks no state transition.\n",
     "type": "story",
     "priority": "high",
     "labels": [
@@ -383,6 +387,7 @@
       "outcome": "One resolver, one command, and one advisory report establish the issue artifact directory convention.",
       "contract_refs": [
         "canonical-artifact-directory",
+        "issue-scoped-area-registry",
         "membership-slug-precedence",
         "flat-layout-tolerance"
       ],
@@ -401,9 +406,52 @@
     }
   },
   {
+    "key": "issue-scoped-area-registry",
+    "title": "Declare the development areas that adopt the issue directory convention",
+    "description": "Configuration declares which areas under the development root organize their artifacts by issue, so every path resolution names the area it wants instead of inferring one.\n\n## Background\n\nA development root holds many areas and only some of them are organized by issue. The rest hold living documentation, dated records, or generated output that no single issue owns. Configuration today declares one development root plus the managed and permanent path lists, and none of those answers which areas are issue-scoped. A resolver handed only an issue therefore cannot decide which area a new artifact belongs to, and any answer it invented would be a guess.\n\nThe registry is an explicit list of area paths. A resolver, a command, a template declaration, and a conformance report each name one of the registered areas and receive the issue-scoped directory inside it. Naming an area the registry does not declare is an error rather than a silently accepted path. The registry is also what the conformance report walks, so the scanned area set comes from configuration rather than from a built-in list.\n\nAreas outside the registry keep their flat shape and are unaffected by the convention.\n\n## Success Criteria\n\n- [hard] REQ-01: Configuration carries a declared list of the development areas that adopt the issue directory convention.\n- [hard] REQ-02: An accessor returns the declared areas and falls back to a shipped default when no list is authored.\n- [hard] REQ-03: Membership is queryable, so a caller can reject an area the registry does not declare.\n- [hard] REQ-04: The repository-initialization scaffold emits the registry as active configuration rather than as commented-out guidance.\n- [hard] REQ-05: The area paths appear once in the shipped default and nowhere else in engine logic.\n\n## Notes\n\nThe shipped default is derived from initialization code and templates. This repository's live configuration is repository-local policy and is not the source of the shipped default.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:artifact-directory-convention",
+      "per:@/issue/8e071e18/decision/D-3",
+      "enforces:@/invariant/domain-agnostic"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Configuration declares which development areas adopt the issue artifact directory convention.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-03",
+        "D-3",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "produces_contracts": [
+        "issue-scoped-area-registry"
+      ],
+      "terminal": {
+        "consumer_family": "callers resolving a path inside an issue-scoped area",
+        "test_boundary": "configuration unit assertions over the declared area set",
+        "worker_sized_reason": "One configuration key gains an accessor plus its shipped scaffold entry.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/config.rs",
+            "crates/jit/src/hierarchy_templates.rs",
+            "crates/jit/tests/cli_repo_workflow/init_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "canonical-directory-resolver",
-    "title": "Resolve an issue's canonical artifact directory in the domain layer",
-    "description": "A pure domain function maps an issue to its canonical artifact directory, so every consumer derives the path from one rule instead of restating it.\n\n## Background\n\nTwo independent naming rules exist today and neither answers the question for a source-side artifact. The archive planner derives a destination directory from a membership label and falls back to the issue title; template interpolation composes a flat filename from a short id. The convention needs one derivation: the area root joined with the short id and the membership slug, or with the bare short id when no single membership value is available.\n\nPrecedence has three steps. Collect the issue's type labels; only when exactly one type label exists, look up its configured membership namespace; collect that namespace's values on the issue and only when exactly one exists, use it as the slug. Both ambiguous cases collapse to the bare short-id directory, which needs no new tie-breaking policy and matches the legacy directory shape the archive resolver already adopts.\n\nThe area root comes from configuration and the namespace from the configured type-to-namespace mapping, so the function carries no development-root literal. Slug normalization reuses the existing bounded, Unicode-safe slug helper rather than adding a second one. Legacy flat and suffix-form filenames stay resolvable; the function names where a new artifact belongs and never restructures an existing one.\n\n## Success Criteria\n\n- [hard] REQ-01: An issue with exactly one type label and exactly one value in that type's membership namespace resolves to the area root joined with its short id and that value's slug.\n- [hard] REQ-02: An issue with no membership label, several type labels, or several membership values resolves to the area root joined with its bare short id.\n- [hard] REQ-03: No resolved directory name is derived from an issue title.\n- [hard] REQ-04: The area root is read from configuration and the membership namespace from the configured type mapping, with no path literal in the function.\n- [hard] REQ-05: The function performs no input or output and reuses the existing slug normalizer.\n- [hard] REQ-06: Resolving a directory for an issue whose artifacts are stored flat reports the canonical location and moves nothing.\n",
+    "title": "Resolve an issue's canonical artifact directory inside a named area",
+    "description": "A pure domain function maps an issue and a registered issue-scoped area to the issue's canonical artifact directory in that area, so every consumer derives the path from one rule instead of restating it.\n\n## Background\n\nTwo independent naming rules exist today and neither answers the question for a source-side artifact. The archival planner derives a destination directory from a membership label and falls back to the issue title; template interpolation composes a flat filename from a short id. The convention needs one derivation: the named area joined with the short id and the membership slug, or with the bare short id when no single membership value is available.\n\nThe area is an input rather than an inference. A development root holds several issue-scoped areas, so the caller states which one it wants and the function rejects an area the configured registry does not declare. What a caller never composes is the directory name itself.\n\nName precedence has three steps. Collect the issue's type labels; only when exactly one type label exists, look up that type's configured membership namespace; collect that namespace's values on the issue and only when exactly one exists, use it as the slug. Both ambiguous cases collapse to the bare short-id directory, which needs no new tie-breaking policy and matches the legacy directory shape the archival resolver already adopts.\n\nThe area set comes from the configured registry and the namespace from the configured type mapping, so the function carries no path literal. Slug normalization reuses the existing bounded, Unicode-safe slug helper rather than adding a second one. Legacy flat and suffix-form filenames stay resolvable; the function names where a new artifact belongs and never restructures an existing one.\n\n## Success Criteria\n\n- [hard] REQ-01: An issue with exactly one type label and exactly one value in that type's membership namespace resolves to the named area joined with its short id and that value's slug.\n- [hard] REQ-02: An issue with no membership label, several type labels, or several membership values resolves to the named area joined with its bare short id.\n- [hard] REQ-03: An area the configured registry does not declare produces a descriptive error rather than a resolved path.\n- [hard] REQ-04: No resolved directory name is derived from an issue title.\n- [hard] REQ-05: The area set is read from the configured registry and the membership namespace from the configured type mapping, with no path literal in the function.\n- [hard] REQ-06: The function performs no input or output and reuses the existing slug normalizer.\n- [hard] REQ-07: Resolving a directory for an issue whose artifacts are stored flat reports the canonical location and moves nothing.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -420,10 +468,13 @@
       "cargo-ci",
       "code-review"
     ],
-    "depends_on": [],
+    "depends_on": [
+      "issue-scoped-area-registry"
+    ],
     "planning": {
-      "outcome": "A pure function maps an issue to its canonical artifact directory from a membership label or a bare short id.",
+      "outcome": "A pure function maps an issue and a named area to the issue's canonical artifact directory.",
       "contract_refs": [
+        "issue-scoped-area-registry",
         "membership-slug-precedence",
         "flat-layout-tolerance"
       ],
@@ -456,7 +507,7 @@
   {
     "key": "artifact-directory-command",
     "title": "Expose the canonical artifact directory as a command",
-    "description": "A document subcommand prints an issue's canonical artifact directory, giving agents, scripts, and prose one place to obtain the path instead of composing it from a spelled-out pattern.\n\n## Background\n\nNothing in the command surface derives a document path today; every document subcommand operates on a path the caller already knows. The archive group is defined as producing archival plans, so a pure path resolver does not belong there, while the document group already owns the document-path vocabulary.\n\nThe output is a single value, so it uses the established flat named-object shape for machine-readable output rather than the list envelope. Argument parsing and rendering stay in the command-line and output layers, orchestration in the command layer, and the derivation itself stays in the domain resolver.\n\nAdding a command changes the generated bridge surface, which requires an explicit curation entry with a one-line rationale before its coverage check passes.\n\n## Success Criteria\n\n- [hard] REQ-01: A subcommand accepts an issue identifier and prints its canonical artifact directory.\n- [hard] REQ-02: Machine-readable output is a flat named object carrying the issue identity and the resolved path.\n- [hard] REQ-03: An unknown issue identifier produces a descriptive error and a non-zero exit status rather than a fabricated path.\n- [hard] REQ-04: The command is curated in the generated bridge manifest with a rationale.\n- [hard] REQ-05: The adopter-facing command reference documents the subcommand.\n",
+    "description": "A document subcommand prints an issue's canonical artifact directory in a named issue-scoped area, giving agents, scripts, and prose one place to obtain the path instead of composing it from a spelled-out pattern.\n\n## Background\n\nNothing in the command surface derives a document path today; every document subcommand operates on a path the caller already knows. The archival group is defined as producing archival plans, so a pure path resolver does not belong there, while the document group already owns the document-path vocabulary.\n\nThe command takes the issue and the area it wants. Supplying the area is the caller's only contribution to the path; the directory name inside that area comes from the domain resolver. An area the configured registry does not declare is rejected with a descriptive error instead of producing a path.\n\nThe output is a single value, so it uses the established flat named-object shape for machine-readable output rather than the list envelope. Argument parsing and rendering stay in the command-line and output layers, orchestration in the command layer, and the derivation itself in the domain resolver.\n\nAdding a command changes the generated bridge surface, which requires an explicit curation entry with a one-line rationale before its coverage check passes.\n\n## Success Criteria\n\n- [hard] REQ-01: A subcommand accepts an issue identifier and an issue-scoped area, and prints the issue's canonical artifact directory in that area.\n- [hard] REQ-02: An area the configured registry does not declare produces a descriptive error and a non-zero exit status.\n- [hard] REQ-03: Machine-readable output is a flat named object carrying the issue identity, the named area, and the resolved path.\n- [hard] REQ-04: An unknown issue identifier produces a descriptive error and a non-zero exit status rather than a fabricated path.\n- [hard] REQ-05: The command is curated in the generated bridge manifest with a rationale.\n- [hard] REQ-06: The adopter-facing command reference documents the subcommand and its area argument.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -478,7 +529,8 @@
     "planning": {
       "outcome": "A subcommand prints an issue's canonical artifact directory in human and machine-readable form.",
       "contract_refs": [
-        "canonical-artifact-directory"
+        "canonical-artifact-directory",
+        "issue-scoped-area-registry"
       ],
       "source_refs": [
         "REQ-04",
@@ -505,7 +557,7 @@
   {
     "key": "template-directory-interpolation",
     "title": "Interpolate the canonical artifact directory into template document paths",
-    "description": "A graph template's document path can name the owning container's canonical artifact directory, so an instantiated template writes into the convention instead of a flat pattern.\n\n## Background\n\nTemplate document paths are interpolated from container fields, and the only field available for a path today is the short id, which forces every declaration to spell out a flat area-plus-prefix pattern. Two independent interpolation engines and one plan-document resolver consume the same field set, so exposing the directory once serves all of them.\n\nThe interpolation field is the resolved canonical directory, so a declaration names a filename relative to it and carries no short-id prefix on that filename.\n\n## Success Criteria\n\n- [hard] REQ-01: Template document-path interpolation exposes a field carrying the container's canonical artifact directory.\n- [hard] REQ-02: A template declaration that names the field followed by a filename produces a path inside the canonical directory.\n- [hard] REQ-03: The interpolated value comes from the domain resolver rather than from a second derivation.\n- [hard] REQ-04: Every interpolation consumer of container fields resolves the new field consistently.\n- [hard] REQ-05: Adopter-facing template documentation lists the field.\n",
+    "description": "A graph template's document path can name the owning container's canonical artifact directory in an area the declaration states, so an instantiated template writes into the convention instead of a flat pattern.\n\n## Background\n\nTemplate document paths are interpolated from container fields, and the only field available for a path today is the short id, which forces every declaration to spell out a flat area-plus-prefix pattern. Two independent interpolation engines and one plan-document resolver consume the same field set, so exposing the directory once serves all of them.\n\nBecause a development root holds several issue-scoped areas, a declaration states which area its document belongs in and the interpolated field resolves the canonical directory inside that area. A declaration naming an area the configured registry does not declare fails at application time with a descriptive error rather than producing a path outside the convention.\n\nThe interpolated value is the resolved directory, so a declaration names a filename relative to it and that filename carries no short-id prefix.\n\n## Success Criteria\n\n- [hard] REQ-01: A template document declaration states the issue-scoped area its document belongs in.\n- [hard] REQ-02: Document-path interpolation exposes a field carrying the container's canonical artifact directory in the stated area.\n- [hard] REQ-03: A declaration that names the field followed by a filename produces a path inside the canonical directory.\n- [hard] REQ-04: A declaration naming an area the configured registry does not declare fails application with a descriptive error.\n- [hard] REQ-05: The interpolated value comes from the domain resolver rather than from a second derivation.\n- [hard] REQ-06: Every interpolation consumer of container fields resolves the new field consistently.\n- [hard] REQ-07: Adopter-facing template documentation lists the field and the area declaration.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -525,9 +577,10 @@
       "artifact-directory-command"
     ],
     "planning": {
-      "outcome": "A template document path can name an issue's canonical artifact directory instead of a spelled-out flat pattern.",
+      "outcome": "A template document path can name the container's canonical artifact directory in a stated area.",
       "contract_refs": [
-        "canonical-artifact-directory"
+        "canonical-artifact-directory",
+        "issue-scoped-area-registry"
       ],
       "source_refs": [
         "REQ-05",
@@ -602,7 +655,7 @@
   {
     "key": "directory-conformance-report",
     "title": "Report artifacts sitting outside their owning issue's canonical directory",
-    "description": "A read-only report lists artifacts under managed issue-scoped areas whose location disagrees with their owning issue's canonical directory, as advice rather than as enforcement.\n\n## Background\n\nLegacy flat artifacts are deliberately tolerated, so a blocking rule would be a false-positive source. A non-enforced validation rule would technically not block, but it rides inside the validation exit code that a repository gate consumes. A dedicated read-only report satisfies the non-blocking requirement by construction: a command that only prints cannot gate anything.\n\nThe report walks the configured issue-scoped areas, resolves each prefixed artifact's owning issue, compares its location with the canonical directory, and lists the differences. An artifact whose owner cannot be resolved is reported as unattributed rather than as nonconforming. A shell-level area scan already exists in the repository as a precedent for this kind of advisory sweep, and it reads its root from configuration rather than hard-coding one.\n\n## Success Criteria\n\n- [hard] REQ-01: The report lists each artifact under a managed issue-scoped area whose location differs from its owning issue's canonical directory.\n- [hard] REQ-02: The report exits successfully whatever it finds and performs no mutation.\n- [hard] REQ-03: No state transition is blocked by a nonconforming artifact.\n- [hard] REQ-04: Machine-readable output wraps the collection in the standard count-and-collection envelope.\n- [hard] REQ-05: Areas scanned are read from configuration rather than from a built-in list.\n- [hard] REQ-06: The command is curated in the generated bridge manifest and documented in the adopter-facing command reference.\n",
+    "description": "A read-only report lists artifacts under the declared issue-scoped areas whose location disagrees with their owning issue's canonical directory, as advice rather than as enforcement.\n\n## Background\n\nLegacy flat artifacts are deliberately tolerated, so a blocking rule would be a false-positive source. A non-enforced validation rule would technically not block, but it rides inside the validation exit code that a repository gate consumes. A dedicated read-only report satisfies the non-blocking requirement by construction: a command that only prints cannot gate anything.\n\nThe report walks the issue-scoped areas the configuration registry declares, resolves each prefixed artifact's owning issue, compares its location with the canonical directory for the area it sits in, and lists the differences. An artifact whose owner cannot be resolved is reported as unattributed rather than as nonconforming. A shell-level area scan already exists in the repository as a precedent for this kind of advisory sweep, and it reads its root from configuration rather than hard-coding one.\n\n## Success Criteria\n\n- [hard] REQ-01: The report lists each artifact under a declared issue-scoped area whose location differs from its owning issue's canonical directory for that area.\n- [hard] REQ-02: The scanned areas are exactly the areas the configuration registry declares, with no built-in list.\n- [hard] REQ-03: The report exits successfully whatever it finds and performs no mutation.\n- [hard] REQ-04: No state transition is blocked by a nonconforming artifact.\n- [hard] REQ-05: An artifact whose owning issue cannot be resolved is reported as unattributed rather than as nonconforming.\n- [hard] REQ-06: Machine-readable output wraps the collection in the standard count-and-collection envelope.\n- [hard] REQ-07: The command is curated in the generated bridge manifest and documented in the adopter-facing command reference.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -624,9 +677,10 @@
       "artifact-directory-command"
     ],
     "planning": {
-      "outcome": "An advisory report lists nonconforming artifacts under managed issue-scoped areas and blocks no transition.",
+      "outcome": "An advisory report lists nonconforming artifacts under the declared issue-scoped areas.",
       "contract_refs": [
         "canonical-artifact-directory",
+        "issue-scoped-area-registry",
         "flat-layout-tolerance"
       ],
       "source_refs": [
@@ -773,8 +827,11 @@
         "test_boundary": "container archive preview convergence on the renamed directory",
         "worker_sized_reason": "One directory moves and one preview run confirms re-adoption.",
         "footprint": {
+          "creates": [
+            "dev/archive/a9b5dd08"
+          ],
           "touches": [
-            "dev/archive"
+            "dev/archive/a9b5dd08-use-strategic-label-slugs-in-archive-directory-n"
           ]
         }
       }
@@ -931,7 +988,9 @@
     "depends_on": [
       "execution-lead-skill-paths",
       "planning-lead-skill-paths",
-      "worker-tier-skill-paths",
+      "manage-skill-paths",
+      "breakdown-skill-paths",
+      "parallel-skill-paths",
       "project-lead-skill-paths"
     ],
     "planning": {
@@ -949,7 +1008,7 @@
   {
     "key": "execution-lead-skill-paths",
     "title": "Convert the execution-lead skill to the artifact directory convention",
-    "description": "The execution-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThe execution-lead skill spells out flat plan, progress, and handoff paths in its main prompt and in its progress-file, handoff, architect, explorer, and documentation-agent references. Handoff numbering and progress persistence both read and write those paths, so the instructions must name the resolved directory and an unprefixed filename instead.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: Instructions that name an artifact filename use an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+    "description": "The execution-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and each packaged profile twin carries the identical content.\n\n## Background\n\nThe execution-lead skill spells out flat plan, progress, and handoff paths in its main prompt and in its progress-file, handoff, architect, explorer, and documentation-agent references. Handoff numbering and progress persistence both read and write those paths, so the instructions name the resolved directory and an unprefixed filename instead.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -980,11 +1039,21 @@
       "terminal": {
         "consumer_family": "the execution-lead skill prompt set",
         "test_boundary": "profile asset equality assertions over the edited files",
-        "worker_sized_reason": "One skill's prompt files change alongside their packaged twins.",
+        "worker_sized_reason": "Six prompt files change alongside their packaged twins.",
         "footprint": {
           "touches": [
-            ".agents/skills/jit-execution-lead",
-            "profiles/jit-dogfood/assets/live/.agents/skills/jit-execution-lead"
+            ".agents/skills/jit-execution-lead/SKILL.md",
+            ".agents/skills/jit-execution-lead/references/progress-file.md",
+            ".agents/skills/jit-execution-lead/references/handoff-template.md",
+            ".agents/skills/jit-execution-lead/references/architect-agent-prompt.md",
+            ".agents/skills/jit-execution-lead/references/explorer-agent-prompt.md",
+            ".agents/skills/jit-execution-lead/references/doc-agent-prompt.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-execution-lead/SKILL.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-execution-lead/references/progress-file.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-execution-lead/references/handoff-template.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-execution-lead/references/architect-agent-prompt.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-execution-lead/references/explorer-agent-prompt.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-execution-lead/references/doc-agent-prompt.md"
           ]
         }
       }
@@ -993,7 +1062,7 @@
   {
     "key": "planning-lead-skill-paths",
     "title": "Convert the planning-lead skill to the artifact directory convention",
-    "description": "The planning-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThe planning-lead skill spells out flat plan, breakdown, investigation, and research paths in its main prompt and in its investigator, researcher, and plan-document-template references. The plan-document template also carries a relative link whose filename repeats the short id.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: Instructions that name an artifact filename use an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+    "description": "The planning-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and each packaged profile twin carries the identical content.\n\n## Background\n\nThe planning-lead skill spells out flat plan, breakdown, investigation, and research paths in its main prompt and in its investigator and researcher references. Its plan-document template also carries a relative link whose filename repeats the short id, which the unprefixed filename rule removes.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1024,20 +1093,26 @@
       "terminal": {
         "consumer_family": "the planning-lead skill prompt set",
         "test_boundary": "profile asset equality assertions over the edited files",
-        "worker_sized_reason": "One skill's prompt files change alongside their packaged twins.",
+        "worker_sized_reason": "Four prompt files change alongside their packaged twins.",
         "footprint": {
           "touches": [
-            ".agents/skills/jit-planning-lead",
-            "profiles/jit-dogfood/assets/live/.agents/skills/jit-planning-lead"
+            ".agents/skills/jit-planning-lead/SKILL.md",
+            ".agents/skills/jit-planning-lead/references/investigator-prompt.md",
+            ".agents/skills/jit-planning-lead/references/researcher-prompt.md",
+            ".agents/skills/jit-planning-lead/references/plan-doc-template.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-planning-lead/SKILL.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-planning-lead/references/investigator-prompt.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-planning-lead/references/researcher-prompt.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-planning-lead/references/plan-doc-template.md"
           ]
         }
       }
     }
   },
   {
-    "key": "worker-tier-skill-paths",
-    "title": "Convert the worker-tier skills to the artifact directory convention",
-    "description": "The worker-tier skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThe single-issue and parallel-execution skills instruct an agent to write a design document at a managed root with a short-id-prefixed filename, and one of them derives that filename's slug from the issue title — the anti-pattern the convention exists to remove. The breakdown skill locates a manifest by the same flat pattern.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: Instructions that name an artifact filename use an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+    "key": "manage-skill-paths",
+    "title": "Convert the single-issue skill to the artifact directory convention",
+    "description": "The single-issue skill's prompt and its extraction reference name the canonical artifact directory instead of a flat short-id-prefixed path, and each packaged profile twin carries the identical content.\n\n## Background\n\nThis skill instructs an agent to write a design document at a managed root with a short-id-prefixed filename, and it derives that filename's slug from the issue title. The title-derived slug is the clearest instance of the anti-pattern the convention exists to remove.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1055,7 +1130,7 @@
       "artifact-directory-command"
     ],
     "planning": {
-      "outcome": "The worker-tier skill prompts name the canonical artifact directory instead of a flat short-id-prefixed path.",
+      "outcome": "The single-issue skill prompts name the canonical artifact directory instead of a flat short-id-prefixed path.",
       "contract_refs": [
         "canonical-artifact-directory"
       ],
@@ -1066,17 +1141,103 @@
       ],
       "landing_group": "skill-twin-cutover",
       "terminal": {
-        "consumer_family": "the worker-tier skill prompt set",
+        "consumer_family": "the single-issue skill prompt set",
         "test_boundary": "profile asset equality assertions over the edited files",
-        "worker_sized_reason": "One skill's prompt files change alongside their packaged twins.",
+        "worker_sized_reason": "Two prompt files change alongside their packaged twins.",
         "footprint": {
           "touches": [
-            ".agents/skills/jit-manage",
-            ".agents/skills/jit-breakdown",
-            ".agents/skills/jit-parallel",
-            "profiles/jit-dogfood/assets/live/.agents/skills/jit-manage",
-            "profiles/jit-dogfood/assets/live/.agents/skills/jit-breakdown",
-            "profiles/jit-dogfood/assets/live/.agents/skills/jit-parallel"
+            ".agents/skills/jit-manage/SKILL.md",
+            ".agents/skills/jit-manage/references/issue-extraction-prompt.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-manage/SKILL.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-manage/references/issue-extraction-prompt.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "breakdown-skill-paths",
+    "title": "Convert the breakdown skill to the artifact directory convention",
+    "description": "The breakdown skill's prompt names the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThis skill locates an approved manifest by the flat area-plus-prefix pattern, so it is the one instruction that has to find an existing artifact rather than create one. It names the resolved directory and an unprefixed filename instead, which keeps it working for a container whose artifacts already follow the convention.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:skill-path-adoption",
+      "satisfies:REQ-11",
+      "per:@/issue/8e071e18/decision/D-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "artifact-directory-command"
+    ],
+    "planning": {
+      "outcome": "The breakdown skill prompt names the canonical artifact directory instead of a flat short-id-prefixed path.",
+      "contract_refs": [
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-11",
+        "D-11",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "skill-twin-cutover",
+      "terminal": {
+        "consumer_family": "the breakdown skill prompt set",
+        "test_boundary": "profile asset equality assertions over the edited files",
+        "worker_sized_reason": "One prompt file changes alongside its packaged twin.",
+        "footprint": {
+          "touches": [
+            ".agents/skills/jit-breakdown/SKILL.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-breakdown/SKILL.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "parallel-skill-paths",
+    "title": "Convert the parallel-execution skill to the artifact directory convention",
+    "description": "The parallel-execution skill's agent prompt template names the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThe template tells a dispatched agent where to write its implementation plan and repeats the same path in the document declaration it hands back, so both occurrences name the resolved directory and an unprefixed filename.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:skill-path-adoption",
+      "satisfies:REQ-11",
+      "per:@/issue/8e071e18/decision/D-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "artifact-directory-command"
+    ],
+    "planning": {
+      "outcome": "The parallel-execution skill template names the canonical artifact directory instead of a flat short-id-prefixed path.",
+      "contract_refs": [
+        "canonical-artifact-directory"
+      ],
+      "source_refs": [
+        "REQ-11",
+        "D-11",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "skill-twin-cutover",
+      "terminal": {
+        "consumer_family": "the parallel-execution skill prompt set",
+        "test_boundary": "profile asset equality assertions over the edited files",
+        "worker_sized_reason": "One reference template changes alongside its packaged twin.",
+        "footprint": {
+          "touches": [
+            ".agents/skills/jit-parallel/references/agent-prompt-template.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-parallel/references/agent-prompt-template.md"
           ]
         }
       }
@@ -1085,7 +1246,7 @@
   {
     "key": "project-lead-skill-paths",
     "title": "Convert the project-lead skill to the artifact directory convention",
-    "description": "The project-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThe project-lead skill already composes its roots from configuration rather than hard-coding them, so what remains is the artifact-name shape: progress files, charters, and the standards-sweep report are still spelled out as a root joined with a short-id-prefixed filename. Two of its references already name hard-coded roots as a mistake, so this generalizes a rule the prompts already state.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: Instructions that name an artifact filename use an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
+    "description": "The project-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and each packaged profile twin carries the identical content.\n\n## Background\n\nThis skill already composes its roots from configuration rather than hard-coding them, so what remains is the artifact-name shape: progress files, charters, and the standards-sweep report are still spelled out as a root joined with a short-id-prefixed filename. Two of its references already name hard-coded roots as a mistake, so this generalizes a rule the prompts already state.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1116,11 +1277,23 @@
       "terminal": {
         "consumer_family": "the project-lead skill prompt set",
         "test_boundary": "profile asset equality assertions over the edited files",
-        "worker_sized_reason": "One skill's prompt files change alongside their packaged twins.",
+        "worker_sized_reason": "Seven prompt files change alongside their packaged twins.",
         "footprint": {
           "touches": [
-            ".agents/skills/jit-project-lead",
-            "profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead"
+            ".agents/skills/jit-project-lead/SKILL.md",
+            ".agents/skills/jit-project-lead/references/progress-artifact.md",
+            ".agents/skills/jit-project-lead/references/vision-charter.md",
+            ".agents/skills/jit-project-lead/references/templates/vision-charter.md",
+            ".agents/skills/jit-project-lead/references/standards-scan.md",
+            ".agents/skills/jit-project-lead/references/standards-sweep.md",
+            ".agents/skills/jit-project-lead/references/standards-fix.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead/SKILL.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead/references/progress-artifact.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead/references/vision-charter.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead/references/templates/vision-charter.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead/references/standards-scan.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead/references/standards-sweep.md",
+            "profiles/jit-dogfood/assets/live/.agents/skills/jit-project-lead/references/standards-fix.md"
           ]
         }
       }
@@ -1129,7 +1302,7 @@
   {
     "key": "development-root-cleanup",
     "title": "Development root cleanup through the repaired mechanism",
-    "description": "The development root is cleaned up by running the product's own archival execution over terminal-owned artifacts and by recording a disposition for every artifact that carries no issue prefix.\n\n## Background\n\nMost of the active area is owned by terminal issues and should have been archived long ago; a large majority of its files fall into that set. Running the cleanup through the archival mechanism rather than by hand is deliberate: it exercises the repaired reference remapping on real artifacts, and the run is itself the acceptance evidence that the mechanism works.\n\nArtifacts carrying no issue prefix need a different treatment. The active area's unprefixed files are mixed design documents and plans that need individual judgement, while the session and study areas hold uniformly dated records where one recorded call each is the honest disposition. One measurement record inside the study area is read at runtime by a committed self-test script and is carved out of the blanket call.\n\nMoving artifacts breaks inline path citations that no validation sees, because they are prose and code mentions rather than document link records. Those citations are repointed as part of the cleanup.\n\n## Success Criteria\n\n- [hard] REQ-01: Every active-area artifact owned by a terminal issue is archived through the archival execution path, and whole-repository validation passes afterwards with every document reference resolving.\n- [hard] REQ-02: Every artifact in the active, study, and session areas that carries no issue prefix has a recorded disposition — an assigned owning issue, a project-scoped reclassification, or an archived location — and none is left undecided.\n- [hard] REQ-03: Inline path citations of relocated artifacts resolve to their new locations.\n",
+    "description": "The development root is cleaned up by running the product's own archival execution over terminal-owned artifacts and by recording a disposition for every artifact that carries no issue prefix.\n\n## Background\n\nMost of the active area is owned by terminal issues and should have been archived long ago. Running the cleanup through the archival mechanism rather than by hand is deliberate: it exercises the repaired reference remapping on real artifacts, and the runs are themselves the acceptance evidence that the mechanism works. The runs are grouped into bounded assignments over named containers, with one pass afterwards judging the active area as a whole.\n\nArtifacts carrying no issue prefix need a different treatment. The active area's unprefixed files are mixed design documents, plans, guides, and briefs that need individual judgement, while the session and study areas hold uniformly dated records where one recorded call each is the honest disposition. One measurement record inside the study area is read at runtime by a committed self-test script and is carved out of the blanket call.\n\nMoving artifacts breaks inline path citations that no validation sees, because they are prose and code mentions rather than document link records. Those citations are resolved as part of the cleanup, one consumer family at a time.\n\n## Success Criteria\n\n- [hard] REQ-01: Each active-area artifact owned by a terminal issue is archived through the archival execution path, and whole-repository validation passes afterwards with every document reference resolving.\n- [hard] REQ-02: Each artifact in the active, study, and session areas that carries no issue prefix has a recorded disposition — an assigned owning issue, a project-scoped reclassification, or an archived location — and none is left undecided.\n- [hard] REQ-03: Inline path citations of relocated artifacts resolve after the cleanup.\n",
     "type": "story",
     "priority": "high",
     "labels": [
@@ -1145,8 +1318,15 @@
       "docs-mechanical"
     ],
     "depends_on": [
-      "moved-artifact-citation-repoint",
-      "active-unprefixed-disposition",
+      "build-tooling-citation-repoint",
+      "rust-source-citation-repoint",
+      "adopter-guide-citation-repoint",
+      "changelog-citation-repoint",
+      "testing-guide-citation-repoint",
+      "worktree-study-citation-repoint",
+      "active-design-document-disposition",
+      "active-plan-document-disposition",
+      "active-reference-material-disposition",
       "session-record-reclassification",
       "study-record-reclassification"
     ],
@@ -1168,9 +1348,332 @@
     }
   },
   {
-    "key": "archive-sweep-execution",
-    "title": "Archive the terminal-owned artifacts of the active area",
-    "description": "Terminal-owned artifacts in the active area reach the archive through the product's own execution path, and whole-repository validation passes afterwards with every document reference resolving.\n\n## Background\n\nRunning the cleanup through the archival execution rather than by hand is the point: the previous hand-rolled move skipped the planner's reference remapping, left a document reference dangling, and forced a hand repair of a validation failure. Executing the real mechanism exercises the remapping on real artifacts and makes the run its own acceptance evidence.\n\nThe sweep is per container. A preview identifies each effectively terminal container whose subtree holds active-area artifacts, execution runs for each, and the plan for each must be eligible before it will run at all. Two hazards need attention while sequencing: containers that cross-reference each other's artifacts will move one side before the other, and the plan warnings that report inline citations are the input to the repoint that follows.\n\nPre-existing flat artifacts elsewhere stay where they are; the sweep archives, it does not restructure.\n\n## Success Criteria\n\n- [hard] REQ-01: No artifact owned by a terminal issue remains in the active area.\n- [hard] REQ-02: Each relocation was performed by the archival execution path, evidenced by the recorded execution events and the container markers.\n- [hard] REQ-03: Whole-repository validation passes afterwards and every document reference resolves.\n- [hard] REQ-04: Artifacts owned by live issues remain in the active area untouched.\n- [hard] REQ-05: The plan warnings naming inline citations of relocated artifacts are captured for repointing.\n",
+    "key": "archive-sweep-audit-and-maintenance",
+    "title": "Archive the active-area artifacts of the audit and maintenance containers",
+    "description": "Named terminal containers reach the archive through the product's own execution path, and the plan warnings each run reports are recorded for the citation work that follows.\n\n## Background\n\nRunning the cleanup through archival execution rather than by hand is the point: an earlier hand-rolled move skipped the planner's reference remapping, left a document reference dangling, and forced a hand repair of a validation failure. Executing the real mechanism exercises the remapping on real artifacts and makes the run its own acceptance evidence.\n\nThis assignment covers the documentation-audit container `2d109173` and the core-maintenance container `6eb585bc`. Their artifact sets are disjoint from the other archival assignments, so the runs never contend for a destination.\n\nAn execution refuses to run unless its plan is eligible, so an ineligible preview is a stop rather than a partial move. Each run reports plan warnings naming in-content citations of the artifacts it relocates; those warnings are the input to the citation work that follows and are recorded rather than discarded.\n\nEach run also services its container's linked artifacts in the other configured areas, as that container's own plan determines. Pre-existing flat artifacts elsewhere stay where they are: this archives, it does not restructure.\n\n## Success Criteria\n\n- [hard] REQ-01: Each named container previews an eligible plan before its execution runs.\n- [hard] REQ-02: Each active-area artifact a named container's plan schedules for relocation reaches its destination under the archive root.\n- [hard] REQ-03: Each relocation was performed by the archival execution path, evidenced by the recorded execution events and the container markers.\n- [hard] REQ-04: The plan warnings naming in-content citations of the relocated artifacts are recorded for the containers in this assignment.\n- [hard] REQ-05: Whole-repository validation passes after the runs and every document reference resolves.\n- [hard] REQ-06: Artifacts owned by live issues are left where they are.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-10",
+      "enforces:@/invariant/derived-state-coherence"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "deck-archival-eligibility",
+      "legacy-archive-directory-rename",
+      "tracked-file-citation-scan"
+    ],
+    "planning": {
+      "outcome": "Two named terminal containers relocate their active-area artifacts through the archival execution path.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "development-root-scoped-classification",
+        "directory-target-navigation",
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-10",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "the active-area artifacts of two named terminal containers",
+        "test_boundary": "the archive destination inventory for the named containers",
+        "worker_sized_reason": "Two container executions run in one pass with a single validation run confirming them.",
+        "footprint": {
+          "creates": [
+            "dev/archive/2d109173-docs-exhaustive-audit",
+            "dev/archive/6eb585bc-core-maintenance"
+          ],
+          "touches": [
+            "dev/active/2b9a80fb-audit-notes.md",
+            "dev/active/36d5451e-audit-notes.md",
+            "dev/active/36d5451e-review-round-4.md",
+            "dev/active/36d5451e-review-round-5.md",
+            "dev/active/36d5451e-review-round-6.md",
+            "dev/active/4c33d0e5-audit-notes.md",
+            "dev/active/6d82de03-followup-manifest.md",
+            "dev/active/6d82de03-lead-review.md",
+            "dev/active/736a069e-audit-notes.md",
+            "dev/active/7c283e95-audit-notes.md",
+            "dev/active/8682e95a-gapfill-notes.md",
+            "dev/active/99f4a2b4-req02-evidence.md",
+            "dev/active/a70bac75-audit-notes.md",
+            "dev/active/adc4c6ef-relocation-notes.md",
+            "dev/active/b8924a6d-audit-notes.md",
+            "dev/active/d24008f0-req01-evidence.md",
+            "dev/active/3e12ffbd-batch-export-design.md",
+            "dev/active/3e12ffbd-batch-export-use-cases.md",
+            "dev/active/450db193-generic-projection-design.md",
+            "dev/active/45a140ae-archived-semantics.md",
+            "dev/active/71be6ae9-code-review-reliability.md",
+            "dev/active/71be6ae9-live-review-report.md",
+            "dev/active/73482aa1-completion-report.md",
+            "dev/active/76cb968b-citation-check.md",
+            "dev/active/76cb968b-ssot-adoption-sweep.md",
+            "dev/active/76cb968b-sweep-table.md",
+            "dev/active/949cd9d0-gate-verb-semantics.md",
+            "dev/active/af4c901a-derive-default-rules-at-load.md",
+            "dev/active/b4e55aa2-code-review-live-verification.md",
+            "dev/active/b4e55aa2-ground-code-review-policy.md",
+            "dev/active/d74a9ed1-write-through-namespace-unique-membership.md"
+          ],
+          "uncertainty": "Each run also relocates its container's linked artifacts in the other configured areas, as that container's plan determines."
+        }
+      }
+    }
+  },
+  {
+    "key": "archive-sweep-addressing-and-leads",
+    "title": "Archive the active-area artifacts of the addressing and lead-skill containers",
+    "description": "Named terminal containers reach the archive through the product's own execution path, and the plan warnings each run reports are recorded for the citation work that follows.\n\n## Background\n\nRunning the cleanup through archival execution rather than by hand is the point: an earlier hand-rolled move skipped the planner's reference remapping, left a document reference dangling, and forced a hand repair of a validation failure. Executing the real mechanism exercises the remapping on real artifacts and makes the run its own acceptance evidence.\n\nThis assignment covers the addressing container `2821e177`, the profiles container `9b7b5f9c`, the graph-templates container `9ac9fdac`, and the project-lead container `f2532a2d`. Their artifact sets are disjoint from the other archival assignments, so the runs never contend for a destination.\n\nAn execution refuses to run unless its plan is eligible, so an ineligible preview is a stop rather than a partial move. Each run reports plan warnings naming in-content citations of the artifacts it relocates; those warnings are the input to the citation work that follows and are recorded rather than discarded.\n\nEach run also services its container's linked artifacts in the other configured areas, as that container's own plan determines. Pre-existing flat artifacts elsewhere stay where they are: this archives, it does not restructure.\n\n## Success Criteria\n\n- [hard] REQ-01: Each named container previews an eligible plan before its execution runs.\n- [hard] REQ-02: Each active-area artifact a named container's plan schedules for relocation reaches its destination under the archive root.\n- [hard] REQ-03: Each relocation was performed by the archival execution path, evidenced by the recorded execution events and the container markers.\n- [hard] REQ-04: The plan warnings naming in-content citations of the relocated artifacts are recorded for the containers in this assignment.\n- [hard] REQ-05: Whole-repository validation passes after the runs and every document reference resolves.\n- [hard] REQ-06: Artifacts owned by live issues are left where they are.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-10",
+      "enforces:@/invariant/derived-state-coherence"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "deck-archival-eligibility",
+      "legacy-archive-directory-rename",
+      "tracked-file-citation-scan"
+    ],
+    "planning": {
+      "outcome": "Four named terminal containers relocate their active-area artifacts through the archival execution path.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "development-root-scoped-classification",
+        "directory-target-navigation",
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-10",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "the active-area artifacts of four named terminal containers",
+        "test_boundary": "the archive destination inventory for the named containers",
+        "worker_sized_reason": "Four container executions run in one pass with a single validation run confirming them.",
+        "footprint": {
+          "creates": [
+            "dev/archive/2821e177-addressing-v2",
+            "dev/archive/9b7b5f9c-jit-profiles",
+            "dev/archive/9ac9fdac-graph-templates",
+            "dev/archive/f2532a2d-jit-project-lead"
+          ],
+          "touches": [
+            "dev/active/0efbc594-breakdown-spec.md",
+            "dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md",
+            "dev/active/2821e177-investigation.md",
+            "dev/active/37506c12-breakdown-spec.md",
+            "dev/active/637764ef-acceptance-evidence.md",
+            "dev/active/71ebd1e8-breakdown-spec.md",
+            "dev/active/7f22d6cf-breakdown-spec.md",
+            "dev/active/9a7106ae-breakdown-spec.md",
+            "dev/active/bb7d57a2-breakdown-spec.md",
+            "dev/active/8b05a612-investigation.md",
+            "dev/active/8b05a612-plan.md",
+            "dev/active/8b05a612-research.md",
+            "dev/active/9b7b5f9c-investigation.md",
+            "dev/active/9b7b5f9c-mvp-scope-brief.md",
+            "dev/active/9b7b5f9c-plan.md",
+            "dev/active/9b7b5f9c-research.md",
+            "dev/active/57269494-apply-plan-doc.md",
+            "dev/active/9ac9fdac-828a-40f2-9d73-71af14f44ff8-plan.md",
+            "dev/active/9ac9fdac-completion-report.md",
+            "dev/active/9ac9fdac-graph-templates-showcase/base.css",
+            "dev/active/9ac9fdac-graph-templates-showcase/talk.html",
+            "dev/active/9ac9fdac-graph-templates-showcase/themes/rust.css",
+            "dev/active/304f6d94-breakdown-spec.md",
+            "dev/active/3c192f5e-breakdown-spec.md",
+            "dev/active/c23dfe71-breakdown-spec.md",
+            "dev/active/e8b1cee3-breakdown-spec.md",
+            "dev/active/eed6750c-handoff.md",
+            "dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md"
+          ],
+          "uncertainty": "Each run also relocates its container's linked artifacts in the other configured areas, as that container's plan determines."
+        }
+      }
+    }
+  },
+  {
+    "key": "archive-sweep-product-epics",
+    "title": "Archive the active-area artifacts of the seven product-epic containers",
+    "description": "Named terminal containers reach the archive through the product's own execution path, and the plan warnings each run reports are recorded for the citation work that follows.\n\n## Background\n\nRunning the cleanup through archival execution rather than by hand is the point: an earlier hand-rolled move skipped the planner's reference remapping, left a document reference dangling, and forced a hand repair of a validation failure. Executing the real mechanism exercises the remapping on real artifacts and makes the run its own acceptance evidence.\n\nThis assignment covers the containers `14303b30`, `25064508`, `5fe00921`, `2fbd2a82`, `7d3a3a47`, `94f873c8`, and `9d427a6b`. Their artifact sets are disjoint from the other archival assignments, so the runs never contend for a destination.\n\nAn execution refuses to run unless its plan is eligible, so an ineligible preview is a stop rather than a partial move. Each run reports plan warnings naming in-content citations of the artifacts it relocates; those warnings are the input to the citation work that follows and are recorded rather than discarded.\n\nEach run also services its container's linked artifacts in the other configured areas, as that container's own plan determines. Pre-existing flat artifacts elsewhere stay where they are: this archives, it does not restructure.\n\n## Success Criteria\n\n- [hard] REQ-01: Each named container previews an eligible plan before its execution runs.\n- [hard] REQ-02: Each active-area artifact a named container's plan schedules for relocation reaches its destination under the archive root.\n- [hard] REQ-03: Each relocation was performed by the archival execution path, evidenced by the recorded execution events and the container markers.\n- [hard] REQ-04: The plan warnings naming in-content citations of the relocated artifacts are recorded for the containers in this assignment.\n- [hard] REQ-05: Whole-repository validation passes after the runs and every document reference resolves.\n- [hard] REQ-06: Artifacts owned by live issues are left where they are.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-10",
+      "enforces:@/invariant/derived-state-coherence"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "deck-archival-eligibility",
+      "legacy-archive-directory-rename",
+      "tracked-file-citation-scan"
+    ],
+    "planning": {
+      "outcome": "Seven named terminal containers relocate their active-area artifacts through the archival execution path.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "development-root-scoped-classification",
+        "directory-target-navigation",
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-10",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "the active-area artifacts of seven named terminal containers",
+        "test_boundary": "the archive destination inventory for the named containers",
+        "worker_sized_reason": "Seven container executions run in one pass with a single validation run confirming them.",
+        "footprint": {
+          "creates": [
+            "dev/archive/14303b30-phase5-2",
+            "dev/archive/25064508-structured-knowledge",
+            "dev/archive/5fe00921-production-stability",
+            "dev/archive/2fbd2a82-planning-bracket",
+            "dev/archive/7d3a3a47",
+            "dev/archive/94f873c8-docs-lifecycle-p2",
+            "dev/archive/9d427a6b-production-polish"
+          ],
+          "touches": [
+            "dev/active/bulk-operations-plan.md",
+            "dev/active/ci-gate-integration-design.md",
+            "dev/active/gate-examples.md",
+            "dev/active/gate-modification-flags-plan.md",
+            "dev/active/quiet-mode-plan.md",
+            "dev/active/0d593d90-invariant-projection-design.md",
+            "dev/active/1e1ea81d-item-kind-six-tuple.md",
+            "dev/active/21558ace-invariants-registry.md",
+            "dev/active/56ab0224-item-model-design.md",
+            "dev/active/93480b00-invariant-registry-first-kind.md",
+            "dev/active/config-consolidation-documentation-requirements.md",
+            "dev/active/config-consolidation-plan.md",
+            "dev/active/multi-issue-bulk-operations-plan.md",
+            "dev/active/production-stability-design.md",
+            "dev/active/transitive-reduction-validation-plan.md",
+            "dev/active/planning-bracket-design.md",
+            "dev/active/planning-bracket-showcase/base.css",
+            "dev/active/planning-bracket-showcase/talk.html",
+            "dev/active/planning-bracket-showcase/themes/rust.css",
+            "dev/active/7d3a3a47-investigation.md",
+            "dev/active/7d3a3a47-plan.md",
+            "dev/active/7d3a3a47-planning-brief.md",
+            "dev/active/5c060496-raw-assets-design.md",
+            "dev/active/abfd6016-multi-format-doc-rendering-design.md",
+            "dev/active/documentation-lifecycle-phase2-design.md",
+            "dev/active/dependency-display-improvements-plan.md",
+            "dev/active/gate-presets-implementation-plan.md",
+            "dev/active/production-polish-design.md"
+          ],
+          "uncertainty": "Each run also relocates its container's linked artifacts in the other configured areas, as that container's plan determines."
+        }
+      }
+    }
+  },
+  {
+    "key": "archive-sweep-remaining-containers",
+    "title": "Archive the active-area artifacts of the eight remaining terminal containers",
+    "description": "Named terminal containers reach the archive through the product's own execution path, and the plan warnings each run reports are recorded for the citation work that follows.\n\n## Background\n\nRunning the cleanup through archival execution rather than by hand is the point: an earlier hand-rolled move skipped the planner's reference remapping, left a document reference dangling, and forced a hand repair of a validation failure. Executing the real mechanism exercises the remapping on real artifacts and makes the run its own acceptance evidence.\n\nThis assignment covers the containers `2e926e39`, `71373e37`, `90a2dbfd`, `4a00b2b0`, `53e3fa36`, `7095769d`, `93f3e4df`, and `d7bfd4a4`. Their artifact sets are disjoint from the other archival assignments, so the runs never contend for a destination.\n\nAn execution refuses to run unless its plan is eligible, so an ineligible preview is a stop rather than a partial move. Each run reports plan warnings naming in-content citations of the artifacts it relocates; those warnings are the input to the citation work that follows and are recorded rather than discarded.\n\nEach run also services its container's linked artifacts in the other configured areas, as that container's own plan determines. Pre-existing flat artifacts elsewhere stay where they are: this archives, it does not restructure.\n\n## Success Criteria\n\n- [hard] REQ-01: Each named container previews an eligible plan before its execution runs.\n- [hard] REQ-02: Each active-area artifact a named container's plan schedules for relocation reaches its destination under the archive root.\n- [hard] REQ-03: Each relocation was performed by the archival execution path, evidenced by the recorded execution events and the container markers.\n- [hard] REQ-04: The plan warnings naming in-content citations of the relocated artifacts are recorded for the containers in this assignment.\n- [hard] REQ-05: Whole-repository validation passes after the runs and every document reference resolves.\n- [hard] REQ-06: Artifacts owned by live issues are left where they are.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-10",
+      "enforces:@/invariant/derived-state-coherence"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "deck-archival-eligibility",
+      "legacy-archive-directory-rename",
+      "tracked-file-citation-scan"
+    ],
+    "planning": {
+      "outcome": "Eight named terminal containers relocate their active-area artifacts through the archival execution path.",
+      "contract_refs": [
+        "shipped-area-declaration",
+        "development-root-scoped-classification",
+        "directory-target-navigation",
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-10",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "the active-area artifacts of eight named terminal containers",
+        "test_boundary": "the archive destination inventory for the named containers",
+        "worker_sized_reason": "Eight container executions run in one pass with a single validation run confirming them.",
+        "footprint": {
+          "creates": [
+            "dev/archive/2e926e39-agent-seamlessness",
+            "dev/archive/71373e37-docs-lifecycle",
+            "dev/archive/90a2dbfd-item-sources",
+            "dev/archive/4a00b2b0-agent-validation",
+            "dev/archive/53e3fa36-agent-ergonomics",
+            "dev/archive/7095769d-code-smell-cleanup",
+            "dev/archive/93f3e4df-rejection-state",
+            "dev/archive/d7bfd4a4-observability"
+          ],
+          "touches": [
+            "dev/active/2e926e39-906e-4952-8ae0-38215a7e5aac-plan.md",
+            "dev/active/2e926e39-completion-report.md",
+            "dev/active/doc-archive-implementation-guide.md",
+            "dev/active/snapshot-export-implementation-plan.md",
+            "dev/active/90a2dbfd-be54-46f2-b84a-b19382c6b0f2-plan.md",
+            "dev/active/90a2dbfd-kinds-over-sources.md",
+            "dev/active/agent-validation-design.md",
+            "dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md",
+            "dev/active/7095769d-smell-hunt-report.md",
+            "dev/active/rejection-state-design.md",
+            "dev/active/observability-design.md"
+          ],
+          "uncertainty": "Each run also relocates its container's linked artifacts in the other configured areas, as that container's plan determines."
+        }
+      }
+    }
+  },
+  {
+    "key": "cleanup-completeness-landing",
+    "title": "Confirm the archival runs serviced the terminal-owned active-area artifacts",
+    "description": "The archival runs are judged complete against the active area, and the in-content citation warnings they reported are consolidated into one working list.\n\n## Background\n\nThe cleanup runs as several bounded executions over named containers. Each one proves its own containers moved; none of them proves the active area as a whole is finished. That judgement needs a single pass over the post-run tree, and it is also the backstop for a container whose artifact set grew after the assignments were measured.\n\nTwo outcomes are both legitimate and must be told apart. An artifact whose owner sits wholly inside the archived subtree relocates, leaving nothing behind. An artifact an owner outside that subtree also claims is mirrored into the archive while its source stays in place, which is the copy semantics permanence and outside ownership both imply. Recording which artifacts took which outcome is what makes the cleanup auditable.\n\nCitations inside records the runs themselves relocated stay verbatim. A historical document's citation is part of its record, which is why the planner warns rather than rewriting content.\n\n## Success Criteria\n\n- [hard] REQ-01: Each active-area artifact owned by a terminal issue is present under the archive root after the runs.\n- [hard] REQ-02: An artifact the runs mirrored without relocating is recorded as such, so no artifact's outcome is unaccounted for.\n- [hard] REQ-03: Whole-repository validation passes and every document reference resolves.\n- [hard] REQ-04: A container whose artifacts an earlier run already relocated converges on its existing destination rather than producing a second one.\n- [hard] REQ-05: Artifacts owned by live issues remain in the active area.\n- [hard] REQ-06: In-content citations inside records the runs relocated are unchanged.\n- [hard] REQ-07: The in-content citation warnings the runs reported are consolidated into one working list.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1186,65 +1689,15 @@
       "repo-validate"
     ],
     "depends_on": [
-      "deck-archival-eligibility",
-      "legacy-archive-directory-rename",
-      "tracked-file-citation-scan"
+      "archive-sweep-audit-and-maintenance",
+      "archive-sweep-addressing-and-leads",
+      "archive-sweep-product-epics",
+      "archive-sweep-remaining-containers"
     ],
     "planning": {
-      "outcome": "Terminal-owned active-area artifacts reach the archive through the product's own execution path.",
+      "outcome": "The archival runs are confirmed complete against the active area with their citation warnings consolidated.",
       "contract_refs": [
         "shipped-area-declaration",
-        "development-root-scoped-classification",
-        "directory-target-navigation",
-        "citation-warning-code",
-        "flat-layout-tolerance"
-      ],
-      "source_refs": [
-        "REQ-09",
-        "REQ-13",
-        "D-10",
-        "dev/active/8e071e18-investigation.md"
-      ],
-      "landing_group": "cleanup-run",
-      "terminal": {
-        "consumer_family": "this repository's active-area artifacts",
-        "test_boundary": "whole-repository validation after the execution runs",
-        "worker_sized_reason": "One execution runs per terminal container with one validation run confirming it.",
-        "footprint": {
-          "touches": [
-            "dev/active",
-            "dev/archive"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "moved-artifact-citation-repoint",
-    "title": "Repoint in-content citations of relocated artifacts",
-    "description": "Each inline citation of a relocated artifact names its new location, including shell-script comments, an operator-facing error string, a production module doc comment, adopter tutorials, and changelog entries.\n\n## Background\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact moves. The archival plan warnings enumerate these occurrences, and that list is the working set. Concentration is high: two artifacts attract most of the citations, so the repoint is bounded and well identified rather than a broad sweep.\n\nTwo of the citations are adopter-facing and one is a production module doc comment, so accuracy matters more than volume here. Citations inside dated historical records under the archive are left verbatim; the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\nThe contributor index and authoring-convention guides are outside this work; their narrative is realigned separately.\n\n## Success Criteria\n\n- [hard] REQ-01: Each warned inline citation of a relocated artifact outside the archive root names the artifact's new location.\n- [hard] REQ-02: Executable script defaults and operator-facing messages that name a relocated path resolve to an existing path.\n- [hard] REQ-03: Adopter-facing citations of relocated design documents resolve.\n- [hard] REQ-04: Citations inside dated historical records under the archive root are unchanged.\n- [hard] REQ-05: Mechanical documentation checks over the touched surface pass.\n",
-    "type": "task",
-    "priority": "high",
-    "labels": [
-      "epic:dev-artifact-layout",
-      "milestone:v1.0",
-      "story:development-root-cleanup",
-      "satisfies:REQ-09",
-      "satisfies:REQ-13",
-      "per:@/issue/8e071e18/decision/D-8"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review",
-      "doc-review",
-      "docs-mechanical"
-    ],
-    "depends_on": [
-      "archive-sweep-execution"
-    ],
-    "planning": {
-      "outcome": "Each inline citation of a relocated artifact names its new path, including script comments and adopter references.",
-      "contract_refs": [
         "citation-warning-code",
         "flat-layout-tolerance"
       ],
@@ -1252,23 +1705,246 @@
         "REQ-09",
         "REQ-13",
         "D-8",
+        "D-10",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "maintainers auditing the cleanup outcome",
+        "test_boundary": "whole-repository validation over the post-run tree",
+        "worker_sized_reason": "One inventory pass plus one validation run judge the completed executions.",
+        "footprint": {
+          "creates": [
+            "dev/active/8e071e18-cleanup-citation-warnings.md"
+          ],
+          "uncertainty": "The judgement reads the whole active area and the archive root; the consolidated warning list is the only file it writes."
+        }
+      }
+    }
+  },
+  {
+    "key": "build-tooling-citation-repoint",
+    "title": "Resolve the build tooling's citations of relocated artifacts",
+    "description": "The build scripts and the workspace manifest cite an artifact path that resolves after the cleanup, including the two operator-facing error strings that print the path.\n\n## Background\n\nThe build-efficiency record is cited from a budget checker's two operator-facing error messages, from a comment in each of two scripts, and from a comment in the workspace manifest. The error strings are the sharpest case: an operator reading a budget failure is sent to a path that must exist.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named files resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: The budget checker's operator-facing error strings name a path that exists.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-8"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "cleanup-completeness-landing"
+    ],
+    "planning": {
+      "outcome": "The build scripts and the workspace manifest cite paths that resolve after the cleanup.",
+      "contract_refs": [
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-8",
         "D-16",
         "dev/active/8e071e18-investigation.md"
       ],
       "landing_group": "cleanup-run",
       "terminal": {
-        "consumer_family": "inline citations of relocated artifacts",
-        "test_boundary": "citation existence checks over the cited paths",
-        "worker_sized_reason": "A bounded warned-citation list is repointed file by file.",
+        "consumer_family": "build tooling that cites a development artifact",
+        "test_boundary": "path existence checks over the cited paths in the build tooling",
+        "worker_sized_reason": "Three named files carry one short enumerated citation list.",
         "footprint": {
           "touches": [
             "scripts/rust-build-budget.sh",
             "scripts/cargo-ci.sh",
-            "scripts/benchmark-rust-build.sh",
-            "docs/tutorials/parallel-work-worktrees.md",
-            "docs/how-to/multi-agent-coordination.md",
+            "Cargo.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "rust-source-citation-repoint",
+    "title": "Resolve the Rust sources' citations of relocated artifacts",
+    "description": "A production module doc comment and a test comment cite a design-document path that resolves after the cleanup.\n\n## Background\n\nOne production storage module points readers at the design document describing its own algorithm, and one integration test comment cites the same document beside the configuration reference. Neither is a document link record, so nothing fails when the target moves.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named files resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: The production module doc comment names a path that exists.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-8"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "cleanup-completeness-landing"
+    ],
+    "planning": {
+      "outcome": "The production module comment and the test comment cite a path that resolves after the cleanup.",
+      "contract_refs": [
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-8",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "Rust sources citing a development design document",
+        "test_boundary": "path existence checks over the cited paths in the Rust sources",
+        "worker_sized_reason": "Two named files carry one citation each.",
+        "footprint": {
+          "touches": [
             "crates/jit/src/storage/claim_coordinator.rs",
-            "CHANGELOG.md",
+            "crates/jit/tests/cli_repo_workflow/config_get_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "adopter-guide-citation-repoint",
+    "title": "Resolve the adopter guides' citations of relocated artifacts",
+    "description": "The adopter tutorial and the adopter how-to cite a design-document path that resolves after the cleanup.\n\n## Background\n\nBoth guides close with a pointer to the same architecture design document. These are the only adopter-facing citations in the working set, so accuracy matters more here than volume.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named files resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: Mechanical documentation checks over the two named guides pass.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-8"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "cleanup-completeness-landing"
+    ],
+    "planning": {
+      "outcome": "The adopter tutorial and how-to cite a design-document path that resolves after the cleanup.",
+      "contract_refs": [
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-8",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "adopter guides citing a development design document",
+        "test_boundary": "mechanical documentation checks over the two named guides",
+        "worker_sized_reason": "Two named files carry one citation each.",
+        "footprint": {
+          "touches": [
+            "docs/tutorials/parallel-work-worktrees.md",
+            "docs/how-to/multi-agent-coordination.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "changelog-citation-repoint",
+    "title": "Resolve the changelog's citations of relocated artifacts",
+    "description": "The changelog entries that name a development artifact cite a path that resolves after the cleanup.\n\n## Background\n\nTwo released entries cite the build-efficiency record as the evidence behind a behaviour change. A changelog entry is a dated statement about a release, so the citation is corrected in place rather than rewritten into a new narrative.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named files resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: The changelog's entry text is otherwise unchanged.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-8"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "cleanup-completeness-landing"
+    ],
+    "planning": {
+      "outcome": "The changelog entries cite an artifact path that resolves after the cleanup.",
+      "contract_refs": [
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-8",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "the changelog as a dated project record",
+        "test_boundary": "path existence checks over the cited paths in the changelog",
+        "worker_sized_reason": "One file carries two enumerated citations.",
+        "footprint": {
+          "touches": [
+            "CHANGELOG.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "testing-guide-citation-repoint",
+    "title": "Resolve the testing guide's citations of relocated artifacts",
+    "description": "The contributor testing guide's citations of the build-efficiency record and the benchmark report resolve after the cleanup.\n\n## Background\n\nThe guide carries one citation of the build-efficiency record and two relative markdown links to the benchmark report. The relative links are the fragile ones: they resolve today and break the moment their target moves, with no validation failure to announce it.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named files resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: Mechanical link checks over the testing guide pass.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-8"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "cleanup-completeness-landing"
+    ],
+    "planning": {
+      "outcome": "The contributor testing guide cites artifact paths that resolve after the cleanup.",
+      "contract_refs": [
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-8",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "the contributor testing guide",
+        "test_boundary": "mechanical link checks over the testing guide",
+        "worker_sized_reason": "One file carries three enumerated citations.",
+        "footprint": {
+          "touches": [
             "dev/TESTING.md"
           ]
         }
@@ -1276,9 +1952,54 @@
     }
   },
   {
-    "key": "active-unprefixed-disposition",
-    "title": "Record a per-file disposition for unprefixed active-area artifacts",
-    "description": "Each artifact in the active area that carries no issue prefix receives an individually recorded disposition: an assigned owning issue, a project-scoped reclassification, or an archived location.\n\n## Background\n\nThe active area holds design documents, plans, and scope briefs that predate the issue-prefix convention. They are heterogeneous, several are already marked superseded by a banner in their own text, and at least one is only partly superseded, so a blanket call over the area would sweep genuinely issue-owned design documents into a project-scoped bucket without inspection. Per-file inspection is the honest treatment here, and it is why this area is separated from the uniformly dated record areas.\n\nAssigning an owning issue makes an artifact archivable by the ordinary mechanism. A project-scoped reclassification keeps a document that describes standing project knowledge rather than one issue's work. An archived location retires a superseded document.\n\n## Success Criteria\n\n- [hard] REQ-01: Each unprefixed artifact in the active area carries exactly one recorded disposition of the three kinds.\n- [hard] REQ-02: No unprefixed active-area artifact is left undecided.\n- [hard] REQ-03: A document marked superseded in its own text is not left as live active-area content.\n- [hard] REQ-04: Artifacts assigned an owning issue are linked to it so the archival mechanism can service them.\n- [hard] REQ-05: Whole-repository validation passes afterwards.\n",
+    "key": "worktree-study-citation-repoint",
+    "title": "Resolve the worktree study's citations of relocated artifacts",
+    "description": "The worktree-compatibility study's citations of the architecture design document and the coordination experiment resolve after the cleanup.\n\n## Background\n\nThis one study carries more of the working set's citations than any other file: three of the architecture design document and one of the coordination experiment. Its own disposition keeps it in place, so its citations are repointed rather than left as a historical record.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named files resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: Mechanical link checks over the study pass.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-09",
+      "per:@/issue/8e071e18/decision/D-8"
+    ],
+    "gates": [
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "cleanup-completeness-landing",
+      "study-record-reclassification"
+    ],
+    "planning": {
+      "outcome": "The worktree-compatibility study cites artifact paths that resolve after the cleanup.",
+      "contract_refs": [
+        "citation-warning-code",
+        "flat-layout-tolerance"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "D-8",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "landing_group": "cleanup-run",
+      "terminal": {
+        "consumer_family": "the worktree-compatibility contributor study",
+        "test_boundary": "path existence checks over the cited paths in the study",
+        "worker_sized_reason": "One file carries four enumerated citations.",
+        "footprint": {
+          "touches": [
+            "dev/studies/ai-tool-worktree-compatibility.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "active-design-document-disposition",
+    "title": "Record a disposition for the unprefixed active-area design documents",
+    "description": "Each design document in the active area that carries no issue prefix receives an individually recorded disposition: an assigned owning issue, a project-scoped reclassification, or an archived location.\n\n## Background\n\nThe active area holds design documents that predate the issue-prefix convention. Most already carry a document link to an owning issue, so their disposition is recorded rather than invented; a few carry none and need an individual call. Several are marked superseded by a banner in their own text and at least one is only partly superseded, which is why this area gets a per-file treatment instead of the blanket call the uniformly dated record areas take.\n\nThree outcomes are available. An assigned owning issue makes an artifact archivable by the ordinary mechanism. A project-scoped reclassification keeps a document that describes standing project knowledge rather than one issue's work. An archived location retires a superseded document.\n\nThe files in this assignment are named individually so that each one's outcome is recorded and none is decided by inference from the group.\n\n## Success Criteria\n\n- [hard] REQ-01: Each named file carries exactly one recorded disposition of the three kinds.\n- [hard] REQ-02: A file already linked to a terminal issue records the archived location the archival runs produced for it.\n- [hard] REQ-03: A file with no owning issue records an assigned owner or a project-scoped reclassification, and none is left undecided.\n- [hard] REQ-04: A file marked superseded in its own text is not left as live active-area content.\n- [hard] REQ-05: A file assigned an owning issue is linked to it so the archival mechanism can service it.\n- [hard] REQ-06: Whole-repository validation passes afterwards.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1289,15 +2010,13 @@
       "per:@/issue/8e071e18/decision/D-15"
     ],
     "gates": [
-      "repo-validate",
-      "doc-review",
-      "docs-mechanical"
+      "repo-validate"
     ],
     "depends_on": [
-      "archive-sweep-execution"
+      "cleanup-completeness-landing"
     ],
     "planning": {
-      "outcome": "Each unprefixed artifact in the active area has an owning issue, a reclassification, or an archived location.",
+      "outcome": "Each unprefixed design document in the active area carries one recorded disposition.",
       "contract_refs": [
         "shipped-area-declaration"
       ],
@@ -1307,12 +2026,114 @@
         "dev/active/8e071e18-investigation.md"
       ],
       "terminal": {
-        "consumer_family": "unprefixed active-area artifacts",
-        "test_boundary": "the recorded disposition inventory for the active area",
-        "worker_sized_reason": "One area's unprefixed files are inspected individually in one pass.",
+        "consumer_family": "unprefixed active-area design documents",
+        "test_boundary": "the recorded disposition inventory for the named design documents",
+        "worker_sized_reason": "Nine named files are inspected individually in one pass.",
         "footprint": {
           "touches": [
-            "dev/active"
+            "dev/active/agent-validation-design.md",
+            "dev/active/ci-gate-integration-design.md",
+            "dev/active/documentation-lifecycle-design.md",
+            "dev/active/documentation-lifecycle-phase2-design.md",
+            "dev/active/observability-design.md",
+            "dev/active/planning-bracket-design.md",
+            "dev/active/production-polish-design.md",
+            "dev/active/production-stability-design.md",
+            "dev/active/rejection-state-design.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "active-plan-document-disposition",
+    "title": "Record a disposition for the unprefixed active-area implementation plans",
+    "description": "Each implementation plan in the active area that carries no issue prefix receives an individually recorded disposition: an assigned owning issue, a project-scoped reclassification, or an archived location.\n\n## Background\n\nThe active area holds implementation plans that predate the issue-prefix convention. Most already carry a document link to an owning issue, so their disposition is recorded rather than invented; a few carry none and need an individual call. Several are marked superseded by a banner in their own text and at least one is only partly superseded, which is why this area gets a per-file treatment instead of the blanket call the uniformly dated record areas take.\n\nThree outcomes are available. An assigned owning issue makes an artifact archivable by the ordinary mechanism. A project-scoped reclassification keeps a document that describes standing project knowledge rather than one issue's work. An archived location retires a superseded document.\n\nThe files in this assignment are named individually so that each one's outcome is recorded and none is decided by inference from the group.\n\n## Success Criteria\n\n- [hard] REQ-01: Each named file carries exactly one recorded disposition of the three kinds.\n- [hard] REQ-02: A file already linked to a terminal issue records the archived location the archival runs produced for it.\n- [hard] REQ-03: A file with no owning issue records an assigned owner or a project-scoped reclassification, and none is left undecided.\n- [hard] REQ-04: A file marked superseded in its own text is not left as live active-area content.\n- [hard] REQ-05: A file assigned an owning issue is linked to it so the archival mechanism can service it.\n- [hard] REQ-06: Whole-repository validation passes afterwards.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-10",
+      "per:@/issue/8e071e18/decision/D-15"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "cleanup-completeness-landing"
+    ],
+    "planning": {
+      "outcome": "Each unprefixed implementation plan in the active area carries one recorded disposition.",
+      "contract_refs": [
+        "shipped-area-declaration"
+      ],
+      "source_refs": [
+        "REQ-10",
+        "D-15",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "unprefixed active-area implementation plans",
+        "test_boundary": "the recorded disposition inventory for the named plans",
+        "worker_sized_reason": "Ten named files are inspected individually in one pass.",
+        "footprint": {
+          "touches": [
+            "dev/active/bulk-operations-plan.md",
+            "dev/active/config-consolidation-plan.md",
+            "dev/active/dependency-display-improvements-plan.md",
+            "dev/active/gate-modification-flags-plan.md",
+            "dev/active/gate-presets-implementation-plan.md",
+            "dev/active/json-output-standardization-plan.md",
+            "dev/active/multi-issue-bulk-operations-plan.md",
+            "dev/active/quiet-mode-plan.md",
+            "dev/active/snapshot-export-implementation-plan.md",
+            "dev/active/transitive-reduction-validation-plan.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "active-reference-material-disposition",
+    "title": "Record a disposition for the unprefixed active-area guides and briefs",
+    "description": "Each guide, requirement list, example set, and scope brief in the active area that carries no issue prefix receives an individually recorded disposition: an assigned owning issue, a project-scoped reclassification, or an archived location.\n\n## Background\n\nThe active area holds guides, requirement lists, example sets, and scope briefs that predate the issue-prefix convention. Most already carry a document link to an owning issue, so their disposition is recorded rather than invented; a few carry none and need an individual call. Several are marked superseded by a banner in their own text and at least one is only partly superseded, which is why this area gets a per-file treatment instead of the blanket call the uniformly dated record areas take.\n\nThree outcomes are available. An assigned owning issue makes an artifact archivable by the ordinary mechanism. A project-scoped reclassification keeps a document that describes standing project knowledge rather than one issue's work. An archived location retires a superseded document.\n\nThe files in this assignment are named individually so that each one's outcome is recorded and none is decided by inference from the group.\n\n## Success Criteria\n\n- [hard] REQ-01: Each named file carries exactly one recorded disposition of the three kinds.\n- [hard] REQ-02: A file already linked to a terminal issue records the archived location the archival runs produced for it.\n- [hard] REQ-03: A file with no owning issue records an assigned owner or a project-scoped reclassification, and none is left undecided.\n- [hard] REQ-04: A file marked superseded in its own text is not left as live active-area content.\n- [hard] REQ-05: A file assigned an owning issue is linked to it so the archival mechanism can service it.\n- [hard] REQ-06: Whole-repository validation passes afterwards.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:development-root-cleanup",
+      "satisfies:REQ-10",
+      "per:@/issue/8e071e18/decision/D-15"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "cleanup-completeness-landing"
+    ],
+    "planning": {
+      "outcome": "Each unprefixed guide or brief in the active area carries one recorded disposition.",
+      "contract_refs": [
+        "shipped-area-declaration"
+      ],
+      "source_refs": [
+        "REQ-10",
+        "D-15",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "the unprefixed active-area reference material",
+        "test_boundary": "the recorded disposition inventory for the named files",
+        "worker_sized_reason": "Four named files are inspected individually in one pass.",
+        "footprint": {
+          "touches": [
+            "dev/active/config-consolidation-documentation-requirements.md",
+            "dev/active/doc-archive-implementation-guide.md",
+            "dev/active/gate-examples.md",
+            "dev/active/v1-production-readiness-scope-brief.md"
           ]
         }
       }
@@ -1507,7 +2328,7 @@
     ],
     "depends_on": [
       "configuration-reference-home",
-      "archive-sweep-execution"
+      "cleanup-completeness-landing"
     ],
     "planning": {
       "outcome": "Contributor guides cite the canonical adopter reference instead of narrating a lifecycle the tool does not implement.",
