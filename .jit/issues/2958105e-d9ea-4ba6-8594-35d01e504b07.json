@@ -13,6 +13,7 @@
   ],
   "description": "Property-based, visibility-based, and contention tests replace narrated guarantees in the repository-materialization subsystem, and well-known repository paths become compile-time constants with repair coverage derived from the repair planner.\n\n## Background\n\nThe adversarial audit in `dev/studies/cdc840ad-audit-2026-07-23.md` found the subsystem's strongest guarantees narrated rather than enforced. The plan-derivation core has zero property-based coverage. The cutover guard is a substring test (`tests/provenance_contract/repository_state_cutover_tests.rs:39-66`) that greps four command modules for 14 forbidden literals — defeated by reformatting or by moving a raw write one file over. `ActiveLayoutTracker` (`storage/repository_state_store.rs:79-114`), which rejects reentry under a different layout, has no concurrent test, and there is no multi-threaded stress over `open_mutation_session` contention. Well-known paths are constructed stringly at ~100 fallible `VirtualPath::data(\"literal\")` sites, and `tests/fast_rules/derived_state_repair_tests.rs:85-108` re-lists 11 repair paths by hand paired with a loose `assert!(count >= 5)`, so a new derived target silently under-covers.\n\nThe property targets are `plan_hash` determinism under action reordering and managed-document splice round-trip. The visibility replacement tightens the in-repository writers and the `FileTransactionKernel` from `pub(crate)` to `pub(in crate::storage)` so `crate::commands` can no longer name them, retaining the deleted-module and renderer-owner assertions and one narrow retained scan of the four cutover modules for raw `std::fs` publisher calls. `VirtualPath` becomes `Cow<'static, str>`-backed so well-known paths are `pub const` associated items, and a new `repair_target_paths` introspection API on `repository_state` supplies the drift-independent set from which repair coverage is derived.\n\n## Success Criteria\n\n- [hard] REQ-05: Property-based tests cover plan-hash determinism under action reordering and managed-document splice round-trip.\n- [hard] REQ-06: The cutover guard enforces publisher visibility restrictions instead of source-text substring matching, while the deleted-module assertions are retained.\n- [hard] REQ-07: Multi-threaded contention tests cover concurrent mutation-session opening and active-layout reentry rejection.\n- [hard] REQ-08: Well-known repository file paths are compile-time constants, and repair-path test coverage derives from the repair planner's own declaration rather than a hand-maintained list.\n\n## Notes\n\nProperty tests use contract-valid generators and assert observable semantic properties, not copied constants. Contention tests use real threads over a shared `InMemoryStorage` through the public store trait, not failure injection. The suite must not add integration-test targets.",
   "documents": [],
+  "done_at": "2026-07-25T00:10:30.005913882Z",
   "first_ready_at": "2026-07-24T23:02:06.852803484Z",
   "gates_required": [
     "cargo-ci",
@@ -42,7 +43,7 @@
     "satisfies:REQ-08"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Convert narrated materialization guarantees into enforced tests",
-  "updated_at": "2026-07-25T00:09:40.484573506Z"
+  "updated_at": "2026-07-25T00:10:30.005913882Z"
 }
