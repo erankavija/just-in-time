@@ -1091,10 +1091,11 @@ pub fn artifact_destination_root(target: &PlanTarget, archive_root: &str) -> Str
 
 /// Compute a container's preferred human-readable destination before storage reconciliation.
 ///
-/// An unambiguous label in the issue type's configured membership namespace
-/// takes precedence. Missing or ambiguous type/membership labels fall back to
-/// the title, while the short id remains the authoritative collision-resistant
-/// prefix.
+/// The short id is the authoritative collision-resistant prefix. It gains a
+/// slug suffix only when the issue carries exactly one type label and exactly
+/// one label in that type's configured membership namespace; every other shape,
+/// including a membership value that normalizes to nothing, resolves to the
+/// bare short-id directory.
 pub fn preferred_container_destination_root(
     issue: &Issue,
     hierarchy: &HierarchyConfig,
@@ -1117,15 +1118,22 @@ pub fn preferred_container_destination_root(
                 .collect::<Vec<_>>();
             (values.len() == 1).then(|| values[0])
         });
-    let slug = archive_container_slug(strategic_value.unwrap_or(&issue.title));
-    join_path(
-        archive_root,
-        &format!("{}-{slug}", container_short_id(&issue.id)),
-    )
+    let short_id = container_short_id(&issue.id);
+    let directory = strategic_value
+        .and_then(archive_container_slug)
+        .map(|slug| format!("{short_id}-{slug}"))
+        .unwrap_or(short_id);
+    join_path(archive_root, &directory)
 }
 
-/// Normalize user-authored label or title text into one bounded path component.
-pub fn archive_container_slug(value: &str) -> String {
+/// Normalize one membership-label value into a bounded path component.
+///
+/// Lowercases Unicode alphanumeric characters, collapses every other run into a
+/// single `-`, and bounds the result at 48 characters so an arbitrarily long
+/// label value cannot name an unwieldy directory. Returns `None` when the value
+/// holds no alphanumeric character and therefore names nothing, leaving the
+/// caller with the bare short-id directory.
+fn archive_container_slug(value: &str) -> Option<String> {
     const MAX_CHARS: usize = 48;
 
     let mut slug = String::new();
@@ -1143,11 +1151,7 @@ pub fn archive_container_slug(value: &str) -> String {
     }
     let bounded = slug.chars().take(MAX_CHARS).collect::<String>();
     let bounded = bounded.trim_end_matches('-');
-    if bounded.is_empty() {
-        "container".to_string()
-    } else {
-        bounded.to_string()
-    }
+    (!bounded.is_empty()).then(|| bounded.to_string())
 }
 
 fn target_document_path(target: &PlanTarget) -> Option<String> {
@@ -1762,15 +1766,36 @@ mod tests {
     }
 
     #[test]
-    fn test_archive_container_slug_is_unicode_safe_bounded_and_nonempty() {
-        assert_eq!(archive_container_slug("Résumé Δοκιμή !!!"), "résumé-δοκιμή");
+    fn test_archive_container_slug_is_unicode_safe_bounded_and_absent_without_alphanumerics() {
         assert_eq!(
-            archive_container_slug("Platform/Archive_V2"),
-            "platform-archive-v2"
+            archive_container_slug("Résumé Δοκιμή !!!").as_deref(),
+            Some("résumé-δοκιμή")
         );
-        assert_eq!(archive_container_slug("///"), "container");
-        assert_eq!(archive_container_slug(&"a".repeat(80)).chars().count(), 48);
-        assert!(!archive_container_slug(&format!("{}-", "a".repeat(48))).ends_with('-'));
+        assert_eq!(
+            archive_container_slug("Platform/Archive_V2").as_deref(),
+            Some("platform-archive-v2")
+        );
+        assert_eq!(archive_container_slug("@/._-/._-"), None);
+        assert_eq!(
+            archive_container_slug(&"a".repeat(80))
+                .map(|slug| slug.chars().count()),
+            Some(48)
+        );
+        assert!(archive_container_slug(&format!("{}-", "a".repeat(48)))
+            .is_some_and(|slug| !slug.ends_with('-')));
+    }
+
+    #[test]
+    fn test_preferred_container_destination_root_uses_the_bare_short_id_for_a_slugless_membership_value(
+    ) {
+        // An item-address label value built only from punctuation segments is
+        // format-valid yet normalizes to nothing, leaving no slug to carry.
+        let issue = container_issue("Stable Title Fallback", &["type:epic", "epic:@/._-/._-"]);
+
+        assert_eq!(
+            preferred_container_destination_root(&issue, &archive_hierarchy(), "archive"),
+            bare_short_id_root()
+        );
     }
 
     #[test]
