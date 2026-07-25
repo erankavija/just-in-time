@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-25T18:01:03.738494413Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7d6d2783-9f0d-4a28-9880-9f9f510ecd27",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Skip directory link targets during artifact discovery",
-  "updated_at": "2026-07-25T16:53:27.623615105Z"
+  "updated_at": "2026-07-25T18:01:03.738494413Z"
 }

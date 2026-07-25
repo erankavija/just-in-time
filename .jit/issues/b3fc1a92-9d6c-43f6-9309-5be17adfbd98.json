@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-25T17:55:38.182316998Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b3fc1a92-9d6c-43f6-9309-5be17adfbd98",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derive the runtime documentation defaults from the shipped declaration",
-  "updated_at": "2026-07-25T16:53:19.979339453Z"
+  "updated_at": "2026-07-25T17:55:38.182316998Z"
 }
