@@ -1091,10 +1091,11 @@ pub fn artifact_destination_root(target: &PlanTarget, archive_root: &str) -> Str
 
 /// Compute a container's preferred human-readable destination before storage reconciliation.
 ///
-/// An unambiguous label in the issue type's configured membership namespace
-/// takes precedence. Missing or ambiguous type/membership labels fall back to
-/// the title, while the short id remains the authoritative collision-resistant
-/// prefix.
+/// The short id is the authoritative collision-resistant prefix. It gains a
+/// slug suffix only when the issue carries exactly one type label and exactly
+/// one label in that type's configured membership namespace; every other shape,
+/// including a membership value that normalizes to nothing, resolves to the
+/// bare short-id directory.
 pub fn preferred_container_destination_root(
     issue: &Issue,
     hierarchy: &HierarchyConfig,
@@ -1117,15 +1118,23 @@ pub fn preferred_container_destination_root(
                 .collect::<Vec<_>>();
             (values.len() == 1).then(|| values[0])
         });
-    let slug = archive_container_slug(strategic_value.unwrap_or(&issue.title));
-    join_path(
-        archive_root,
-        &format!("{}-{slug}", container_short_id(&issue.id)),
-    )
+    let short_id = container_short_id(&issue.id);
+    let directory = strategic_value
+        .and_then(archive_container_slug)
+        .map(|slug| format!("{short_id}-{slug}"))
+        .unwrap_or(short_id);
+    join_path(archive_root, &directory)
 }
 
-/// Normalize user-authored label or title text into one bounded path component.
-pub fn archive_container_slug(value: &str) -> String {
+/// Normalize one label value into a bounded path component.
+///
+/// This is the crate's single slug normalizer for archive directory names.
+/// Lowercases Unicode alphanumeric characters, collapses every other run into a
+/// single `-`, and bounds the result at 48 characters so an arbitrarily long
+/// label value cannot name an unwieldy directory. Returns `None` when the value
+/// holds no alphanumeric character and therefore names nothing, leaving the
+/// caller with the bare short-id directory.
+pub(crate) fn archive_container_slug(value: &str) -> Option<String> {
     const MAX_CHARS: usize = 48;
 
     let mut slug = String::new();
@@ -1143,11 +1152,7 @@ pub fn archive_container_slug(value: &str) -> String {
     }
     let bounded = slug.chars().take(MAX_CHARS).collect::<String>();
     let bounded = bounded.trim_end_matches('-');
-    if bounded.is_empty() {
-        "container".to_string()
-    } else {
-        bounded.to_string()
-    }
+    (!bounded.is_empty()).then(|| bounded.to_string())
 }
 
 fn target_document_path(target: &PlanTarget) -> Option<String> {
@@ -1325,6 +1330,68 @@ mod tests {
             assert_eq!(resolved.destination_root, expected);
             assert_eq!(resolved.conflicting_roots, conflicts);
         }
+    }
+
+    #[test]
+    fn test_resolve_container_destination_adopts_a_preexisting_identifier_only_directory_without_relocating_it(
+    ) {
+        let issue = container_issue("Mutable title", &["type:epic", "epic:artifact-archival"]);
+        let preferred =
+            preferred_container_destination_root(&issue, &archive_hierarchy(), "archive");
+        let legacy = artifact_destination_root(
+            &PlanTarget::Container {
+                id: issue.id.clone(),
+            },
+            "archive",
+        );
+        assert_ne!(
+            preferred, legacy,
+            "the precondition needs a preferred name the legacy directory does not already carry"
+        );
+
+        // The identifier-only directory exists and carries no ownership marker.
+        let occupied = ArtifactEvidenceMap::from([
+            (
+                "archive".to_string(),
+                directory(ArtifactListingScope::ImmediateChildren, &[legacy.as_str()]),
+            ),
+            (
+                legacy.clone(),
+                directory(ArtifactListingScope::MetadataOnly, &[]),
+            ),
+            (
+                format!("{legacy}/.jit-container"),
+                ArtifactEvidence::Missing,
+            ),
+        ]);
+        let adopted =
+            resolve_container_destination(&preferred, &legacy, &issue.id, &occupied).unwrap();
+        assert_eq!(adopted.destination_root, legacy);
+        assert!(adopted.conflicting_roots.is_empty());
+        assert!(
+            matches!(
+                occupied.get(&adopted.destination_root),
+                Some(ArtifactEvidence::Directory { .. })
+            ),
+            "adoption resolves onto the directory that already exists, so nothing relocates"
+        );
+
+        // The same container against an archive root without that directory
+        // takes the preferred branch, so the adoption above is the legacy
+        // branch rather than a coincidence of the expected name.
+        let vacant = ArtifactEvidenceMap::from([
+            (
+                "archive".to_string(),
+                directory(ArtifactListingScope::ImmediateChildren, &[]),
+            ),
+            (legacy.clone(), ArtifactEvidence::Missing),
+        ]);
+        assert_eq!(
+            resolve_container_destination(&preferred, &legacy, &issue.id, &vacant)
+                .unwrap()
+                .destination_root,
+            preferred
+        );
     }
 
     #[test]
@@ -1619,53 +1686,120 @@ mod tests {
         .unwrap()
     }
 
-    #[test]
-    fn test_preferred_container_destination_uses_unambiguous_strategic_label_slug() {
-        let mut issue =
-            crate::domain::types::fixture_issue("A title that may change".into(), String::new());
+    fn container_issue(title: &str, labels: &[&str]) -> Issue {
+        let mut issue = crate::domain::types::fixture_issue(title.into(), String::new());
         issue.id = CONTAINER.into();
-        issue.labels = vec!["type:epic".into(), "epic:artifact-archival".into()];
+        issue.labels = labels.iter().map(|label| (*label).to_string()).collect();
+        issue
+    }
+
+    fn bare_short_id_root() -> String {
+        format!("archive/{}", &CONTAINER[..SHORT_ID_LENGTH])
+    }
+
+    #[test]
+    fn test_preferred_container_destination_root_uses_the_single_membership_label_value_as_slug() {
+        let issue = container_issue(
+            "A title that may change",
+            &["type:epic", "epic:artifact-archival"],
+        );
 
         assert_eq!(
             preferred_container_destination_root(&issue, &archive_hierarchy(), "archive"),
-            "archive/abcdef12-artifact-archival"
+            format!("{}-artifact-archival", bare_short_id_root())
         );
     }
 
     #[test]
-    fn test_preferred_container_destination_falls_back_to_title_for_missing_or_ambiguous_label() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Stable Title Fallback".into(), String::new());
-        issue.id = CONTAINER.into();
-        issue.labels = vec!["type:epic".into()];
-
-        assert_eq!(
-            preferred_container_destination_root(&issue, &archive_hierarchy(), "archive"),
-            "archive/abcdef12-stable-title-fallback"
-        );
-
-        issue.labels = vec![
-            "type:epic".into(),
-            "epic:first".into(),
-            "epic:second".into(),
+    fn test_preferred_container_destination_root_uses_the_bare_short_id_for_ambiguous_or_absent_membership_labels(
+    ) {
+        // The fixture title is slug-worthy in every shape below, so a
+        // title-derived name stays distinguishable from the bare short id.
+        let ambiguous = [
+            vec!["type:epic", "type:task", "epic:artifact-archival"],
+            vec!["type:epic", "epic:first", "epic:second"],
+            vec!["type:epic"],
         ];
 
-        assert_eq!(
-            preferred_container_destination_root(&issue, &archive_hierarchy(), "archive"),
-            "archive/abcdef12-stable-title-fallback"
-        );
+        ambiguous.into_iter().for_each(|labels| {
+            assert_eq!(
+                preferred_container_destination_root(
+                    &container_issue("Stable Title Fallback", &labels),
+                    &archive_hierarchy(),
+                    "archive",
+                ),
+                bare_short_id_root(),
+                "{labels:?} names no single membership value"
+            );
+        });
     }
 
     #[test]
-    fn test_archive_container_slug_is_unicode_safe_bounded_and_nonempty() {
-        assert_eq!(archive_container_slug("Résumé Δοκιμή !!!"), "résumé-δοκιμή");
+    fn test_preferred_container_destination_root_ignores_the_title_for_labelled_and_ambiguous_issues(
+    ) {
+        let titles = ["Stable Title Fallback", "Entirely Renamed Container"];
+        let shapes = [
+            vec!["type:epic", "epic:artifact-archival"],
+            vec!["type:epic"],
+        ];
+
+        shapes.into_iter().for_each(|labels| {
+            let roots = titles
+                .iter()
+                .map(|title| {
+                    preferred_container_destination_root(
+                        &container_issue(title, &labels),
+                        &archive_hierarchy(),
+                        "archive",
+                    )
+                })
+                .collect::<Vec<_>>();
+            assert!(
+                roots.windows(2).all(|pair| pair[0] == pair[1]),
+                "renaming the issue must not rename its destination: {roots:?}"
+            );
+            assert!(
+                titles
+                    .iter()
+                    .flat_map(|title| title.split_whitespace())
+                    .all(|word| !roots[0].contains(&word.to_lowercase())),
+                "no title word may reach the destination name: {}",
+                roots[0]
+            );
+        });
+    }
+
+    #[test]
+    fn test_archive_container_slug_is_unicode_safe_bounded_and_absent_without_alphanumerics() {
         assert_eq!(
-            archive_container_slug("Platform/Archive_V2"),
-            "platform-archive-v2"
+            archive_container_slug("Résumé Δοκιμή !!!").as_deref(),
+            Some("résumé-δοκιμή")
         );
-        assert_eq!(archive_container_slug("///"), "container");
-        assert_eq!(archive_container_slug(&"a".repeat(80)).chars().count(), 48);
-        assert!(!archive_container_slug(&format!("{}-", "a".repeat(48))).ends_with('-'));
+        assert_eq!(
+            archive_container_slug("Platform/Archive_V2").as_deref(),
+            Some("platform-archive-v2")
+        );
+        assert_eq!(archive_container_slug("///"), None);
+        assert_eq!(archive_container_slug("@/._-/._-"), None);
+        assert_eq!(
+            archive_container_slug(&"a".repeat(80)).map(|slug| slug.chars().count()),
+            Some(48)
+        );
+        assert!(archive_container_slug(&format!("{}-", "a".repeat(48)))
+            .is_some_and(|slug| !slug.ends_with('-')));
+    }
+
+    #[test]
+    fn test_preferred_container_destination_root_uses_the_bare_short_id_for_a_slugless_membership_value(
+    ) {
+        // An item-address label value built only from punctuation segments is
+        // format-valid yet normalizes to nothing, leaving no slug to carry.
+        let issue = container_issue("Stable Title Fallback", &["type:epic", "epic:@/._-/._-"]);
+
+        assert_eq!(
+            preferred_container_destination_root(&issue, &archive_hierarchy(), "archive"),
+            bare_short_id_root()
+        );
     }
 
     #[test]
