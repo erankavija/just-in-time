@@ -9375,3 +9375,4 @@
 {"gate_key":"coverage-preview","id":"b01e8366-7632-497d-a54b-c48572802e49","issue_id":"644bfae1-d872-4174-9838-0055bf6d29b8","timestamp":"2026-07-25T07:52:48.923758675Z","type":"gate_added"}
 {"id":"992d0537-c2be-433d-9104-f979057ec600","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","new_count":1,"old_count":2,"removed_deps":["1cc809de-4669-45d4-960f-f881e716663d"],"timestamp":"2026-07-25T07:52:48.923758675Z","type":"dependency_reduced"}
 {"fields":["description"],"id":"4edef611-ec91-4d46-9a47-6137cc021246","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-25T08:32:14.481832812Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["documents"],"id":"e27b9a57-5fa1-464a-82c4-7cba991dee25","issue_id":"55fe8ec2-880f-4380-91f2-97f4daf71bda","timestamp":"2026-07-25T08:35:40.236100797Z","type":"issue_updated","updated_by":"doc-add"}
