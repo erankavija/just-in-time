@@ -1,0 +1,36 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "28b23895f9b320018e9272a8fe9879cc2ccb9b0e",
+  "completed_at": "2026-07-25T12:01:23.205096648Z",
+  "duration_ms": 175229,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "file": "dev/active/8e071e18-plan.md",
+        "id": "F1",
+        "line": 104,
+        "references": [
+          "@/issue/8e071e18/decision/D-16"
+        ],
+        "severity": "high",
+        "summary": "The declared Git-free scan universe contradicts D-16's required repository-wide tracked-file scan; amend D-16 authoritatively or implement D-16 as written."
+      }
+    ],
+    "summary": "The plan contradicts its cited settled D-16 citation-scan decision.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "55fe8ec2-880f-4380-91f2-97f4daf71bda",
+  "message": null,
+  "run_id": "df77d105-d395-4951-95d8-6f7299e9d348",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T11:58:27.975946228Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10242 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9924-1b79-7fa1-99f4-cf597a167fb1\n--------\nuser\n--- 10229 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 (high):** The plan and `repository-citation-scan` replace D-16’s settled “tracked file anywhere in the repository” contract with an adopter-declared, explicitly Git-free root set. The plan acknowledges this is a change to D-16 rather than implementing it. Amend D-16 through its authoritative container source before planning this new policy, or replace the contract/task with an implementation that scans every tracked file as D-16 requires. [dev/active/8e071e18-plan.md:104](dev/active/8e071e18-plan.md:104), [dev/active/8e071e18-plan.md:451](dev/active/8e071e18-plan.md:451), [dev/active/8e071e18-breakdown.json:882](dev/active/8e071e18-breakdown.json:882) (`@/issue/8e071e18/decision/D-16`).\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan contradicts its cited settled D-16 citation-scan decision.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The declared Git-free scan universe contradicts D-16's required repository-wide tracked-file scan; amend D-16 authoritatively or implement D-16 as written.\",\"file\":\"dev/active/8e071e18-plan.md\",\"line\":104,\"references\":[\"@/issue/8e071e18/decision/D-16\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
