@@ -1,0 +1,928 @@
+{
+  "epic_id": "8e071e18-d786-43ff-b424-a283fecb11f8",
+  "epic_short_id": "8e071e18",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "30595d22-d00b-4eb0-a25d-53ce21bb8847",
+          "short_id": "30595d22",
+          "title": "Add a plan-warning code for in-content path citations",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "4f9af089-9699-4b8a-9dd6-b245c14daca2",
+          "short_id": "4f9af089",
+          "title": "Classify linked artifacts outside the development root as permanent",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "69dd4e36-f4d9-4f11-b1b3-fa7af71e6f34",
+          "short_id": "69dd4e36",
+          "title": "Ship the development-area classification in the initialization scaffold",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "b3fc1a92-9d6c-43f6-9309-5be17adfbd98",
+          "short_id": "b3fc1a92",
+          "title": "Derive the runtime documentation defaults from the shipped declaration",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "1f80212b-4c96-477c-9ed8-a008656bfdde",
+          "short_id": "1f80212b",
+          "title": "Guarantee archive execution retains sources outside the development root",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "7d6d2783-9f0d-4a28-9880-9f9f510ecd27",
+          "short_id": "7d6d2783",
+          "title": "Skip directory link targets during artifact discovery",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "id": "f88a16d9-3975-44da-9040-68653fe691da",
+          "short_id": "f88a16d9",
+          "title": "Declare the development areas that adopt the issue directory convention",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "8cd6eb73-abb3-4531-90c2-4048a13cbd92",
+          "short_id": "8cd6eb73",
+          "title": "Derive the archive directory name without a title fallback",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "6aa82c0b-13d9-4d91-ba2e-f0fc50158716",
+          "short_id": "6aa82c0b",
+          "title": "Declare the citation scan universe in the documentation policy",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "b4d1a2c8-d408-46d0-b0b6-dc3e30283420",
+          "short_id": "b4d1a2c8",
+          "title": "Rename the title-slugged archive directory to its bare short id",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "22c11e40-43b8-42c2-a075-14860cc12d03",
+          "short_id": "22c11e40",
+          "title": "Resolve an issue's canonical artifact directory inside a named area",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "id": "f2cac2bd-9883-4e13-ac3e-f8b779ba0298",
+          "short_id": "f2cac2bd",
+          "title": "Adopt the shipped area classification in this repository's configuration",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "3559ca25-4d31-4e57-9eb1-0853ccd60996",
+          "short_id": "3559ca25",
+          "title": "Expose the canonical artifact directory as a command",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "mcp-ci"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "2ac35e8e-01ca-446a-a70c-d9313ddba624",
+          "short_id": "2ac35e8e",
+          "title": "Warn on in-content citations of a moving artifact's path",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "id": "e993f158-4bb2-4186-a07f-f4f2e8b5544e",
+          "short_id": "e993f158",
+          "title": "Convert the breakdown skill to the artifact directory convention",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "1373e042-4756-43df-ac63-7eca36cedf74",
+          "short_id": "1373e042",
+          "title": "Convert the execution-lead skill to the artifact directory convention",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "ecaf5c92-f33e-4dea-be2b-5562338db6bf",
+          "short_id": "ecaf5c92",
+          "title": "Convert the parallel-execution skill to the artifact directory convention",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "5c70f0cb-438b-4578-a402-a2304cf9bbe7",
+          "short_id": "5c70f0cb",
+          "title": "Convert the planning-lead skill to the artifact directory convention",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "935b51da-6596-4565-8153-ed0e7c60d0d2",
+          "short_id": "935b51da",
+          "title": "Convert the project-lead skill to the artifact directory convention",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "7b282e85-f46e-446d-bf50-8a32403f1d0f",
+          "short_id": "7b282e85",
+          "title": "Convert the single-issue skill to the artifact directory convention",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "67345efd-b94a-439d-bdf4-7a9c3dbcba19",
+          "short_id": "67345efd",
+          "title": "Interpolate the canonical artifact directory into template document paths",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "d9e70703-4338-441d-9769-2be4942bc28f",
+          "short_id": "d9e70703",
+          "title": "Pin the runtime-read measurement records so archival retains them",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "9ca124f9-4b16-4d0c-b966-17f17fca989b",
+          "short_id": "9ca124f9",
+          "title": "Prove citation warnings hold outside version control without altering the plan",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "e2902949-e14d-4307-b2c3-3fc3c5ad07a5",
+          "short_id": "e2902949",
+          "title": "Report artifacts sitting outside their owning issue's canonical directory",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "mcp-ci"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "cf0f0014-1f42-49af-87d5-a3d5840a7c96",
+          "short_id": "cf0f0014",
+          "title": "Resolve the parallel-work research records' citations before their archival runs",
+          "classification": "implementation",
+          "gates": [
+            "doc-review",
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "80e08e0f-2e61-4fc4-8cc4-736b9e93f868",
+          "short_id": "80e08e0f",
+          "title": "Resolve the phase design records' citations before their archival run",
+          "classification": "implementation",
+          "gates": [
+            "doc-review",
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "ef2bd13c-4901-45d3-98c4-5b9b55e35975",
+          "short_id": "ef2bd13c",
+          "title": "State the citation scan universe in the adopter configuration reference",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "id": "2bc344fc-8b03-4378-921a-40aa9dd65fef",
+          "short_id": "2bc344fc",
+          "title": "Agent skills obtain artifact paths from the convention",
+          "classification": "checkpoint",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "daf4fa46-8785-41f6-a992-9bf844fb5aa3",
+          "short_id": "daf4fa46",
+          "title": "Prove deck archival is eligible through both archive target forms",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "d2870182-68c3-4b0e-a1ee-fdd3ca127d5d",
+          "short_id": "d2870182",
+          "title": "Resolve the artifact-directory field in the path derivations outside the apply engine",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "id": "e536ea5a-54cb-45ea-a757-0d94dba0a001",
+          "short_id": "e536ea5a",
+          "title": "Archive the CLI ergonomics phase container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "39757bb3-666a-465c-97ff-9e5d8dd03246",
+          "short_id": "39757bb3",
+          "title": "Archive the addressable-item container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "6f6fe80e-1606-4d25-859d-c9434264ec43",
+          "short_id": "6f6fe80e",
+          "title": "Archive the agent ergonomics container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "6116d362-ccaa-45e1-aed6-40e7130efbbe",
+          "short_id": "6116d362",
+          "title": "Archive the agent seamlessness container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "5c09146f-32de-423a-accf-02c4631944ef",
+          "short_id": "5c09146f",
+          "title": "Archive the agent validation container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "a45bc29c-d53d-42c5-8bc7-47196c7490b6",
+          "short_id": "a45bc29c",
+          "title": "Archive the code smell cleanup container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "fccedb73-b4b4-4990-a26d-b99a2cda7739",
+          "short_id": "fccedb73",
+          "title": "Archive the core maintenance container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "95b01080-0be9-4e9a-ba94-9c4279fc8d66",
+          "short_id": "95b01080",
+          "title": "Archive the documentation lifecycle container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "a21185df-4053-498c-a413-a4dbdb6ba71f",
+          "short_id": "a21185df",
+          "title": "Archive the documentation lifecycle phase two container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "d1ae9782-3bc9-42b6-bb1c-315cc41dd1e8",
+          "short_id": "d1ae9782",
+          "title": "Archive the documentation reorganization container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "1c4b7a3c-74f5-4ad1-ab2f-a26012b73cab",
+          "short_id": "1c4b7a3c",
+          "title": "Archive the documentation tooling evaluation task's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "8ea5b13d-676b-4727-acaf-f73e2e75a370",
+          "short_id": "8ea5b13d",
+          "title": "Archive the exhaustive documentation audit container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "f320923c-702d-4910-b046-0817375de510",
+          "short_id": "f320923c",
+          "title": "Archive the graph templates container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "89b7f534-e6ff-4fce-867d-eec5033bf988",
+          "short_id": "89b7f534",
+          "title": "Archive the item sources container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "74a51f37-96af-49a0-816d-3f03958fbff7",
+          "short_id": "74a51f37",
+          "title": "Archive the observability container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "60c398d3-16aa-471e-a412-cd1df6f3e0f1",
+          "short_id": "60c398d3",
+          "title": "Archive the parallel work container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "deb50576-7598-4b01-8cad-338824f22a92",
+          "short_id": "deb50576",
+          "title": "Archive the planning bracket container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "f2f05554-e2a5-4cfd-87a2-6ce24eb1a766",
+          "short_id": "f2f05554",
+          "title": "Archive the production polish container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "edf71346-61e2-4836-8eff-8acf1e343f9e",
+          "short_id": "edf71346",
+          "title": "Archive the production stability container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "83c61de0-9820-4f48-80f9-6b17ded0c467",
+          "short_id": "83c61de0",
+          "title": "Archive the project-lead skill container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "3c36ffa1-1ad3-4382-bba1-1ab209ce1685",
+          "short_id": "3c36ffa1",
+          "title": "Archive the rejection state container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "f3ddbf55-7a94-4e2d-bfef-8b575bd301c5",
+          "short_id": "f3ddbf55",
+          "title": "Archive the repository profiles container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "3ef329f3-10a4-4110-92cc-56e8788c5f69",
+          "short_id": "3ef329f3",
+          "title": "Archive the repository-state quality container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "2f524511-8176-4c9a-862f-06de7c3de21c",
+          "short_id": "2f524511",
+          "title": "Archive the structured knowledge container's linked artifacts",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "3be32cad-63cc-4f69-b2dc-c54e40e66358",
+          "short_id": "3be32cad",
+          "title": "Lock in that archive execution rewrites no document content",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "429995e1-7413-41a0-bb67-fd069022968d",
+          "short_id": "429995e1",
+          "title": "Point the planning-bracket template at the canonical artifact directory",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "35499d1e-ca3e-4f66-a1e3-2c62c09f9cf3",
+          "short_id": "35499d1e",
+          "title": "Serviceable archival for every configured development area",
+          "classification": "checkpoint",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "doc-review",
+            "docs-mechanical",
+            "repo-validate"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "id": "89b5899a-ae6e-4bae-82eb-460fb5fccaf7",
+          "short_id": "89b5899a",
+          "title": "Archive directory naming and citation breakage warnings",
+          "classification": "checkpoint",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "doc-review",
+            "docs-mechanical",
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "aa38b236-4f45-4e28-b80a-b8beaca88642",
+          "short_id": "aa38b236",
+          "title": "Confirm the archival runs serviced the development root",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "8ff4cff3-a36d-4ac0-8cfd-9f61fac6f41f",
+          "short_id": "8ff4cff3",
+          "title": "State the artifact-directory template field in the adopter template documentation",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {
+          "id": "0b3840f1-fa19-4b9c-8591-3d8c287f9f8f",
+          "short_id": "0b3840f1",
+          "title": "Canonical issue artifact directory convention",
+          "classification": "checkpoint",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "doc-review",
+            "docs-mechanical",
+            "mcp-ci",
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "5a19fffb-4218-4b2f-99cc-91bc637c587e",
+          "short_id": "5a19fffb",
+          "title": "Record the blanket disposition of the session records",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "66c467c1-1611-46ed-92b2-838afc51274a",
+          "short_id": "66c467c1",
+          "title": "Record the blanket disposition of the study records with the runtime-read carve-out",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "93aaa2b2-abab-4b21-af6b-3b8bff5df3b5",
+          "short_id": "93aaa2b2",
+          "title": "Record the decided disposition of the unprefixed active-area design documents",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "2d7ae27e-cfcf-4669-8469-7b20ccf29c30",
+          "short_id": "2d7ae27e",
+          "title": "Record the decided disposition of the unprefixed active-area guides and briefs",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "079ea42e-136b-4856-9192-e825382787bd",
+          "short_id": "079ea42e",
+          "title": "Record the decided disposition of the unprefixed active-area implementation plans",
+          "classification": "mechanical",
+          "gates": [
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "834a78a8-b55b-4549-ac06-aa6438a1332e",
+          "short_id": "834a78a8",
+          "title": "Resolve the Rust sources' citations of relocated artifacts",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "623e4c46-e113-40fa-b1ac-df07da9f19ff",
+          "short_id": "623e4c46",
+          "title": "Resolve the adopter guides' citations of relocated artifacts",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "c7e3ac1b-79ae-49c5-9f94-d544d53bad4d",
+          "short_id": "c7e3ac1b",
+          "title": "Resolve the benchmark generators' citations of their own output areas",
+          "classification": "implementation",
+          "gates": [
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "d52bd541-9984-449c-bd74-1866143159ff",
+          "short_id": "d52bd541",
+          "title": "Resolve the benchmark report's citations of its own area",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "4790367e-76ca-495f-a176-2f9178011340",
+          "short_id": "4790367e",
+          "title": "Resolve the build tooling's citations of relocated artifacts",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "6e963a7f-3a47-433d-a6fe-55c7406d6dd9",
+          "short_id": "6e963a7f",
+          "title": "Resolve the changelog's citations of relocated artifacts",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "aa5db9a1-0c8c-43e3-870b-dfef59419905",
+          "short_id": "aa5db9a1",
+          "title": "Resolve the retained working notes' citations of relocated artifacts",
+          "classification": "implementation",
+          "gates": [
+            "docs-mechanical",
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "560c2adb-e4b6-469d-baaa-518abafdb01d",
+          "short_id": "560c2adb",
+          "title": "Resolve the testing guide's citations of relocated artifacts",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 11,
+      "issues": [
+        {
+          "id": "143388dc-f58e-48ca-9b36-dbe58a527489",
+          "short_id": "143388dc",
+          "title": "Development root cleanup through the repaired mechanism",
+          "classification": "checkpoint",
+          "gates": [
+            "repo-validate",
+            "cargo-ci",
+            "code-review",
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "58c56743-b5e6-4fe3-90af-1910974faefc",
+          "short_id": "58c56743",
+          "title": "State the artifact layout facts in one adopter reference",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 12,
+      "issues": [
+        {
+          "id": "5e9305ec-7363-4649-8475-6dda0ec05714",
+          "short_id": "5e9305ec",
+          "title": "Align contributor guides with the shipped archival mechanism",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "4a6fb8c1-2283-4e4a-bb0d-af2baa3e8c13",
+          "short_id": "4a6fb8c1",
+          "title": "Document the epic's command-surface changes in the adopter command reference",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 13,
+      "issues": [
+        {
+          "id": "af264b06-10bc-4176-a98c-16956c8a5372",
+          "short_id": "af264b06",
+          "title": "Canonical adopter homes for the layout, classification, and command facts",
+          "classification": "checkpoint",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "surfaced_pitfalls": [],
+  "started_at": "2026-07-25T14:24:30.011076+00:00"
+}
