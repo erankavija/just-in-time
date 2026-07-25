@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "7193f150c08349dd03fe59c1c067114564afbbc5",
+  "completed_at": "2026-07-25T05:01:29.525084194Z",
+  "duration_ms": 113743,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue’s current successor deck and its corrected evidence citations are accurate; no documentation findings remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "f87e3273-f0a1-4e75-a79b-d719ae1a3813",
+  "message": null,
+  "run_id": "44843f0f-3eb9-4f61-ab9e-ea29988e0917",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T04:59:35.781501784Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `f87e3273` is a level-4 leaf with no resolved children. I reviewed its nine individually tagged commit patches and verified the current successor deck plus its cited artifacts. The previous F1 is resolved by the cited completion-evidence slides.\n\nThe deck accurately documents its corrected claims, timing evidence, vendored offline assets, and correction inventory. No adopter-facing documentation update is required.\n\n1. None — no blocking or advisory findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue’s current successor deck and its corrected evidence citations are accurate; no documentation findings remain.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

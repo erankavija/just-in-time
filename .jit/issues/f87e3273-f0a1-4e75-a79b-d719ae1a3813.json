@@ -83,8 +83,8 @@
   ],
   "gates_status": {
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-07-25T04:45:50.238576669Z",
+      "status": "passed",
+      "updated_at": "2026-07-25T05:01:29.821917332Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -103,5 +103,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Corrected successor deck for the repository-materialization story",
-  "updated_at": "2026-07-25T04:59:04.132690931Z"
+  "updated_at": "2026-07-25T05:01:29.821917332Z"
 }
