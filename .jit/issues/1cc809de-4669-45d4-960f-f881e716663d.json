@@ -20,7 +20,13 @@
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-25T05:27:33.206961893Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1cc809de-4669-45d4-960f-f881e716663d",
   "labels": [
     "type:epic",
@@ -30,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Repository-state quality hardening",
-  "updated_at": "2026-07-24T08:15:09.113411291Z"
+  "updated_at": "2026-07-25T05:27:33.206961893Z"
 }
