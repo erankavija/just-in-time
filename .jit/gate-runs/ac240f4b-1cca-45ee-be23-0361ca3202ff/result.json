@@ -1,0 +1,47 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "35ba4eb0af4ea7a37065533642eef6ea30a551d0",
+  "completed_at": "2026-07-25T06:30:03.994365291Z",
+  "duration_ms": 194854,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/storage/memory.rs",
+        "id": "F1",
+        "line": 340,
+        "origin": "pre-existing",
+        "severity": "medium",
+        "summary": "InMemoryStorage panics when an invalid issue ID is used to construct an issue VirtualPath instead of returning an error."
+      },
+      {
+        "disposition": "advisory",
+        "file": ".jit/config.toml",
+        "id": "F2",
+        "line": 12,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cc809de/success_criteria/REQ-16"
+        ],
+        "severity": "medium",
+        "summary": "The predecessor deck archival is outside configured managed paths and therefore lacks supported archive-workflow provenance, although its tombstone and archived copy satisfy REQ-16."
+      }
+    ],
+    "summary": "All 16 hard criteria are verifiably met; two non-blocking advisories remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "1cc809de-4669-45d4-960f-f881e716663d",
+  "message": null,
+  "run_id": "ac240f4b-1cca-45ee-be23-0361ca3202ff",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T06:26:49.139368016Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. F1 [medium, advisory, pre-existing] `InMemoryStorage::issue_vpath` panics on an invalid issue ID instead of returning an error. Evidence: `crates/jit/src/storage/memory.rs:340`.\n\n2. F2 [medium, advisory, issue-impact] The predecessor deck’s archival is outside configured managed paths, so it lacks supported archive-workflow provenance. The tombstone and archived successor references still satisfy REQ-16. Evidence: `.jit/config.toml:12`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All 16 hard criteria are verifiably met; two non-blocking advisories remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"InMemoryStorage panics when an invalid issue ID is used to construct an issue VirtualPath instead of returning an error.\",\"file\":\"crates/jit/src/storage/memory.rs\",\"line\":340},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The predecessor deck archival is outside configured managed paths and therefore lacks supported archive-workflow provenance, although its tombstone and archived copy satisfy REQ-16.\",\"file\":\".jit/config.toml\",\"line\":12,\"references\":[\"@/issue/1cc809de/success_criteria/REQ-16\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
