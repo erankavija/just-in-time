@@ -9378,3 +9378,11 @@
 {"fields":["documents"],"id":"e27b9a57-5fa1-464a-82c4-7cba991dee25","issue_id":"55fe8ec2-880f-4380-91f2-97f4daf71bda","timestamp":"2026-07-25T08:35:40.236100797Z","type":"issue_updated","updated_by":"doc-add"}
 {"fields":["documents"],"id":"4c48de14-761a-417b-8198-3a04450406e0","issue_id":"55fe8ec2-880f-4380-91f2-97f4daf71bda","timestamp":"2026-07-25T08:57:59.154820399Z","type":"issue_updated","updated_by":"doc-add"}
 {"fields":["documents"],"id":"720b4de4-2d26-4ee1-b4fa-3c99c864af04","issue_id":"55fe8ec2-880f-4380-91f2-97f4daf71bda","timestamp":"2026-07-25T08:57:59.285401289Z","type":"issue_updated","updated_by":"doc-add"}
+{"id":"c02c30f1-3376-4532-a6a0-98aa3f71edc6","issue_id":"533da2df-b2b3-4977-9e01-0b8b4c569b5a","priority":"high","timestamp":"2026-07-25T09:08:01.479980685Z","title":"Blocking dependency addition does not demote the dependent out of Ready","type":"issue_created"}
+{"gate_key":"cargo-ci","id":"e79bd869-eb49-4fa6-937b-1e26a66a1c3f","issue_id":"533da2df-b2b3-4977-9e01-0b8b4c569b5a","timestamp":"2026-07-25T09:08:06.492377811Z","type":"gate_added"}
+{"gate_key":"code-review","id":"d74e3202-e111-4be4-8d33-b68ee128befc","issue_id":"533da2df-b2b3-4977-9e01-0b8b4c569b5a","timestamp":"2026-07-25T09:08:06.619740706Z","type":"gate_added"}
+{"fields":["dependencies"],"id":"5190d23a-832c-4e69-83c7-32884c75fe5c","issue_id":"8b05a612-91e6-43c8-b36e-557e2417c88e","timestamp":"2026-07-25T09:08:09.110242454Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"70c484c3-cd57-457a-9542-d455a664fda9","issue_id":"644bfae1-d872-4174-9838-0055bf6d29b8","timestamp":"2026-07-25T09:08:19.124306680Z","to":"backlog","type":"issue_state_changed"}
+{"from":"ready","id":"87e103cf-a003-470d-9caf-7bb05b683eaf","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-25T09:08:22.805085224Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["labels"],"id":"705cb035-d567-4b1e-b5a0-270d30f9aa50","issue_id":"533da2df-b2b3-4977-9e01-0b8b4c569b5a","timestamp":"2026-07-25T09:08:53.328392206Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["labels"],"id":"851af73d-60e8-49d5-aec8-ffc3461df378","issue_id":"533da2df-b2b3-4977-9e01-0b8b4c569b5a","timestamp":"2026-07-25T09:08:57.043360414Z","type":"issue_updated","updated_by":"issue-update"}
