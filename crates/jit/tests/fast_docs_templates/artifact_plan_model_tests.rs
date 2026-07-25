@@ -340,6 +340,7 @@ fn test_archive_plan_schema_v1_golden_fields_and_codes() {
             "not-selected-sibling",
             "dynamic-loading-suspected",
             "unsupported-edge-target",
+            "moving-path-citation",
         ]
     );
 }

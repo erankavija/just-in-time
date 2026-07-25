@@ -500,11 +500,12 @@ pub enum WarningCode {
     NotSelectedSibling,
     DynamicLoadingSuspected,
     UnsupportedEdgeTarget,
+    MovingPathCitation,
 }
 
 impl WarningCode {
     /// Complete schema-v1 warning vocabulary, in binding contract order.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::MissingEdgeTarget,
         Self::ExternalEdge,
         Self::NoOwner,
@@ -513,6 +514,7 @@ impl WarningCode {
         Self::NotSelectedSibling,
         Self::DynamicLoadingSuspected,
         Self::UnsupportedEdgeTarget,
+        Self::MovingPathCitation,
     ];
 
     /// Stable kebab-case wire spelling.
@@ -526,6 +528,7 @@ impl WarningCode {
             Self::NotSelectedSibling => "not-selected-sibling",
             Self::DynamicLoadingSuspected => "dynamic-loading-suspected",
             Self::UnsupportedEdgeTarget => "unsupported-edge-target",
+            Self::MovingPathCitation => "moving-path-citation",
         }
     }
 }
