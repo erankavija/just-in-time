@@ -1,3 +1,4 @@
+use jit::domain::artifact_classifier::artifact_mirror_destination;
 use jit::domain::artifact_plan::{ArchiveCandidates, ArtifactPlan};
 use jit::output::{render_archive_candidates, render_archive_plan};
 use serde_json::Value;
@@ -537,6 +538,93 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
         .join(destination_root)
         .join("fixtures/root.md")
         .exists());
+}
+
+#[test]
+fn test_archive_execute_retains_out_of_root_source_and_publishes_mirror_without_pending_deletion() {
+    // A linked file outside the configured development root classifies
+    // permanent (`@/issue/8e071e18/decision/D-14`): it is archived by copy, so
+    // the working-tree source is never relocated. Guard that guarantee at both
+    // the plan level (REQ-03: no pending deletion is scheduled) and the
+    // execution level (REQ-01: source retained, REQ-02: mirror published),
+    // pinned together so the retention cannot be satisfied by silently
+    // dropping the artifact from the plan.
+    let repo = TempDir::new().unwrap();
+    assert_success(&jit(&repo, &["init", "--json"]));
+    set_documentation_policy(
+        &repo,
+        concat!(
+            "[documentation]\n",
+            "development_root = \"workspace\"\n",
+            "managed_paths = [\"workspace/active\"]\n",
+            "permanent_paths = []\n",
+            "archive_root = \"workspace/archive\"\n",
+        ),
+    );
+    fs::create_dir_all(repo.path().join("scripts")).unwrap();
+    let source_bytes = b"#!/bin/sh\necho archived\n".to_vec();
+    fs::write(repo.path().join("scripts/install.sh"), &source_bytes).unwrap();
+
+    let preview = jit(
+        &repo,
+        &["archive", "document", "scripts/install.sh", "--json"],
+    );
+    assert_success(&preview);
+    let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+    assert_eq!(plan["eligible"], true);
+    let destination_root = plan["destination_root"].as_str().unwrap().to_string();
+    let expected_mirror = artifact_mirror_destination(&destination_root, "scripts/install.sh");
+    let artifact = plan["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|artifact| artifact["source"] == "scripts/install.sh")
+        .unwrap();
+    assert_eq!(artifact["action"], "copy");
+    assert_eq!(artifact["destination"], expected_mirror);
+    assert_eq!(
+        artifact["pending_deletions"],
+        serde_json::json!([]),
+        "an out-of-root permanent source must not schedule a pending deletion"
+    );
+
+    let executed = jit(
+        &repo,
+        &[
+            "archive",
+            "document",
+            "scripts/install.sh",
+            "--execute",
+            "--json",
+        ],
+    );
+    assert_success(&executed);
+    let result: Value = serde_json::from_slice(&executed.stdout).unwrap();
+    assert!(result["planned_deletions"].as_array().unwrap().is_empty());
+    assert!(result["deleted_sources"].as_array().unwrap().is_empty());
+    assert!(
+        result["publications"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|publication| publication["source"] == "scripts/install.sh"
+                && publication["destination"] == expected_mirror),
+        "execution must publish the mirrored copy under the archive root: {result}"
+    );
+
+    let source_path = repo.path().join("scripts/install.sh");
+    assert!(
+        source_path.exists(),
+        "source outside the development root must remain at its original path"
+    );
+    assert_eq!(fs::read(&source_path).unwrap(), source_bytes);
+
+    let mirror_path = repo.path().join(&expected_mirror);
+    assert!(
+        mirror_path.exists(),
+        "archive execution must publish a mirrored copy under the archive root"
+    );
+    assert_eq!(fs::read(&mirror_path).unwrap(), source_bytes);
 }
 
 #[test]
