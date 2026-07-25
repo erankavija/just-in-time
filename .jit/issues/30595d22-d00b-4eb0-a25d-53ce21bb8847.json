@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-25T16:31:51.507655926Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "30595d22-d00b-4eb0-a25d-53ce21bb8847",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Add a plan-warning code for in-content path citations",
-  "updated_at": "2026-07-25T14:24:41.859373019Z"
+  "updated_at": "2026-07-25T16:31:51.507655926Z"
 }

@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-25T16:26:33.448176046Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4f9af089-9699-4b8a-9dd6-b245c14daca2",
   "labels": [
     "type:task",
@@ -28,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Classify linked artifacts outside the development root as permanent",
-  "updated_at": "2026-07-25T14:24:45.686216598Z"
+  "updated_at": "2026-07-25T16:26:33.448176046Z"
 }
