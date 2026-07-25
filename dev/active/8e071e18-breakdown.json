@@ -284,7 +284,7 @@
     ],
     "depends_on": [
       "issue-scoped-area-registry",
-      "repository-citation-scan",
+      "citation-scan-universe-config",
       "shipped-area-classification"
     ],
     "planning": {
@@ -335,7 +335,8 @@
     "depends_on": [
       "repository-config-adoption",
       "outside-root-source-retention",
-      "directory-link-target-skip"
+      "directory-link-target-skip",
+      "citation-warning-preview-parity"
     ],
     "planning": {
       "outcome": "A presentation deck owned by a terminal issue previews eligible through either archive target form.",
@@ -723,7 +724,8 @@
     ],
     "depends_on": [
       "legacy-archive-directory-rename",
-      "execution-content-immutability"
+      "execution-content-immutability",
+      "citation-scan-configuration-reference"
     ],
     "planning": {
       "outcome": "Archive directory names drop the title fallback and plans warn about in-content citations a move would break.",
@@ -877,9 +879,9 @@
     }
   },
   {
-    "key": "repository-citation-scan",
-    "title": "Warn on in-content citations of a moving artifact's path",
-    "description": "An archival plan reports a warning for each occurrence of a moving artifact's path in the text of a file in the declared scan universe, so a move that would break an inline citation is visible before it happens.\n\n## Background\n\nThe planner reads structured document edges, which are link records and asset relationships, not mentions of a path in arbitrary prose or code. Matching only markdown link targets would reach a small minority of the citations that actually exist: it misses every shell-script line, an operator-facing error string, a production module doc comment, and both adopter-facing citations, all of which are inline code spans. Restricting the scan to the development root would miss the script and changelog citations entirely.\n\nWhich files the scan reads is declared in configuration rather than taken from a Git index. Archival is a core command that must behave the same in a working tree that is not a Git repository, and the archive preview integration suite already runs entirely in plain temporary directories that are not Git repositories, so an index-derived universe would leave the primary behaviour untested and environment-dependent. A whole-worktree walk is not the alternative: without Git there is no ignore information to bound it, and it would descend into build output.\n\nA new optional documentation-policy key names repository-relative prefixes and exact files, matched the same way the area classification is matched. Its default is the development root together with the permanent paths, and a repository whose citations live elsewhere declares those roots as well. The key is optional and policy completeness reads only the three fields it already reads, so archive eligibility is unchanged.\n\nEvidence acquisition needs file bytes, so it belongs at the storage and planning boundary where other plan evidence is gathered, while constructing the warning stays pure.\n\nThe adopter command reference is not edited here. This epic's command-surface changes are documented together in that one reference, so this issue writes the configuration reference only.\n\n## Success Criteria\n\n- [hard] REQ-01: A plan reports one warning per occurrence of a moving artifact's path in the text of a file in the scan universe, naming the citing path.\n- [hard] REQ-02: The scan universe is the declared root set, whose default is the development root together with the permanent paths.\n- [hard] REQ-03: A declared root outside the development root is scanned.\n- [hard] REQ-04: Occurrences inside code comments, inline code spans, and shell scripts are reported.\n- [hard] REQ-05: A plan previewed in a working tree that is not a Git repository reports the same citation warnings as the same tree inside one, and the scan starts no external process.\n- [hard] REQ-06: A declared root that is absent, a path component that is a symbolic link, and a file whose bytes are not valid UTF-8 are skipped without failing the plan.\n- [hard] REQ-07: An artifact that retains its location produces no citation warning.\n- [hard] REQ-08: The warning is advisory and changes no plan action, blocker, or eligibility.\n- [hard] REQ-09: The adopter-facing configuration reference documents the new key and its default root set.\n",
+    "key": "citation-scan-universe-config",
+    "title": "Declare the citation scan universe in the documentation policy",
+    "description": "The documentation policy gains an optional key naming the repository-relative roots that an in-content citation scan reads, so the scanned file set is configuration rather than an assumption baked into the planner.\n\n## Background\n\nArchival planning warns when a move would break a citation of an artifact's path written in the text of some other file. Reaching those citations needs a declared file set: the citations that matter live in shell scripts, a workspace manifest, a changelog, adopter guides, and production module comments, so a set scoped to the development root would miss most of them.\n\nDeriving the set from version-control tracking is rejected. Archival is a core command that behaves the same in a working tree that is under no version control, so a tracking-derived set would silently empty there. A whole-worktree walk is not the alternative either: with no tracking data there is no ignore information to bound it, and it would descend into build output.\n\nThe key holds repository-relative path prefixes and exact file entries, matched the way the managed and permanent area entries are matched. Its default is the development root together with the permanent paths, which is the set an adopter who declares nothing should get. The key is optional, and the three fields that authorize archival mutation are unchanged, so a repository that omits it keeps the archive eligibility it has today.\n\nThe surface here is the configuration one: the key, its accessor, and the resolved root set. Reading file bytes and building warnings happen further along the planning pipeline.\n\n## Success Criteria\n\n- [hard] REQ-01: The documentation policy accepts an optional key whose entries are repository-relative path prefixes and exact file paths.\n- [hard] REQ-02: With the key absent, the resolved root set is the development root together with the configured permanent paths.\n- [hard] REQ-03: With the key present, the resolved root set is exactly the declared entries, including an entry that lies outside the development root.\n- [hard] REQ-04: Policy status is unaffected by the key: a documentation table supplying the three mutation-authorizing fields reports a configured policy whether or not the key is present.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -887,25 +889,19 @@
       "milestone:v1.0",
       "story:archive-naming-and-warnings",
       "satisfies:REQ-08",
-      "per:@/issue/8e071e18/decision/D-16",
-      "per:@/charter/D-4"
+      "per:@/issue/8e071e18/decision/D-16"
     ],
     "gates": [
       "cargo-ci",
-      "code-review",
-      "doc-review",
-      "docs-mechanical"
+      "code-review"
     ],
     "depends_on": [
-      "citation-warning-vocabulary",
-      "archive-slug-fallback-removal",
-      "issue-scoped-area-registry",
-      "outside-root-source-retention"
+      "issue-scoped-area-registry"
     ],
     "planning": {
-      "outcome": "An archive plan warns on each occurrence of a moving artifact's path in the declared scan universe.",
+      "outcome": "The documentation policy declares the roots a citation scan reads, defaulting to the development root together with the permanent paths.",
       "contract_refs": [
-        "citation-warning-code"
+        "shipped-area-declaration"
       ],
       "source_refs": [
         "REQ-08",
@@ -913,22 +909,154 @@
         "dev/active/8e071e18-investigation.md"
       ],
       "terminal": {
-        "consumer_family": "archive plan warning consumers",
-        "test_boundary": "archive plan preview assertions over a fixture citation set outside a Git repository",
-        "worker_sized_reason": "One declared-root evidence pass over file text feeds an existing warning channel.",
+        "consumer_family": "archive plan citation-scan callers",
+        "test_boundary": "configuration accessor unit assertions over declared roots against the resolved default root set",
+        "worker_sized_reason": "One optional configuration key with one accessor resolving its default root set.",
         "footprint": {
           "touches": [
-            "crates/jit/src/config.rs",
-            "crates/jit/src/storage/artifact_planning.rs",
-            "crates/jit/src/domain/artifact_classifier.rs",
-            "crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs",
-            "docs/reference/configuration.md"
+            "crates/jit/src/config.rs"
           ]
         }
       },
       "produces_contracts": [
         "citation-scan-universe"
       ]
+    }
+  },
+  {
+    "key": "citation-scan-warnings",
+    "title": "Warn on in-content citations of a moving artifact's path",
+    "description": "An archival plan reports a warning for each occurrence of a moving artifact's path in the text of a file in the declared scan universe, so a move that would break an inline citation is visible before it happens.\n\n## Background\n\nThe planner reads structured document edges, which are link records and asset relationships, not mentions of a path in arbitrary prose or code. Matching only markdown link targets would reach a small minority of the citations that actually exist: it misses every shell-script line, an operator-facing error string, a production module doc comment, and both adopter-facing citations, all of which are inline code spans.\n\nEvidence acquisition needs file bytes, so it belongs at the storage and planning boundary where the other plan evidence is gathered; turning that evidence into a warning stays pure and domain-side.\n\nThe scan walks each declared root with the planner's existing no-follow recursive listing, so it starts no external process and follows no symbolic link out of the tree. A declared root that is absent, a path component that is a symbolic link, and a file whose bytes are not valid UTF-8 are skipped rather than turned into a planning failure: the scan is advisory evidence, and a plan is still produced without it.\n\nThe warning rides the plan's existing warning channel, which carries no action and no blocker, so an artifact the plan leaves in place contributes nothing at all.\n\n## Success Criteria\n\n- [hard] REQ-01: A plan reports one warning per occurrence of a moving artifact's path in the text of a scanned file, naming the citing path.\n- [hard] REQ-02: Occurrences inside code comments, inline code spans, and shell scripts are reported.\n- [hard] REQ-03: A declared root outside the development root is scanned.\n- [hard] REQ-04: A declared root that is absent, a path component that is a symbolic link, and a file whose bytes are not valid UTF-8 are skipped without failing the plan.\n- [hard] REQ-05: An artifact the plan leaves in place produces no citation warning.\n- [hard] REQ-06: The scan reads file bytes through the planner's existing no-follow directory listing and starts no external process.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:archive-naming-and-warnings",
+      "satisfies:REQ-08",
+      "per:@/issue/8e071e18/decision/D-8",
+      "per:@/issue/8e071e18/decision/D-16"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "citation-scan-universe-config",
+      "citation-warning-vocabulary",
+      "archive-slug-fallback-removal"
+    ],
+    "planning": {
+      "outcome": "An archive plan warns on each occurrence of a moving artifact's path in the text of a file in the declared scan universe.",
+      "contract_refs": [
+        "citation-warning-code",
+        "citation-scan-universe"
+      ],
+      "source_refs": [
+        "REQ-08",
+        "D-8",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "archive plan warning consumers",
+        "test_boundary": "in-crate unit assertions over citation warnings built from declared-root file evidence",
+        "worker_sized_reason": "One no-follow evidence pass over declared roots feeding one pure warning constructor.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/storage/artifact_planning.rs",
+            "crates/jit/src/domain/artifact_classifier.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "citation-warning-preview-parity",
+    "title": "Prove citation warnings hold outside version control without altering the plan",
+    "description": "An archival preview reports the same in-content citation warnings whether or not the working tree is under version control, and a plan carrying those warnings has the same actions, blockers, and eligibility as one carrying none.\n\n## Background\n\nArchival is a core command, and core commands do not require version control. The citation scan reads a declared root set for exactly that reason, and the property only holds if it is asserted where a plan is actually produced: the archive preview suite runs in plain temporary directories that are no repositories, so a scan that quietly depended on tracking data would pass every in-crate unit test and still fail an adopter.\n\nThe second property is the warning's advisory contract. A citation warning records that a move would break a mention of a path in some other file; it changes nothing about what the plan does, adds no blocker, and never flips eligibility. Both properties are observable over one preview fixture pair, so they are asserted together at the plan boundary.\n\n## Success Criteria\n\n- [hard] REQ-01: A preview over a fixture citation set in a working tree that is under no version control reports the citation warnings for the moving artifact's path.\n- [hard] REQ-02: The same fixture inside an initialized version-control repository reports the same citation warnings.\n- [hard] REQ-03: A previewed plan carrying citation warnings reports the same actions, blockers, and eligibility as the same plan whose scan universe holds no citation.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:archive-naming-and-warnings",
+      "satisfies:REQ-08",
+      "per:@/charter/D-4",
+      "per:@/issue/8e071e18/decision/D-8"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "citation-scan-warnings",
+      "outside-root-source-retention"
+    ],
+    "planning": {
+      "outcome": "An archive preview reports the same citation warnings with no version control present, altering no action, blocker, or eligibility.",
+      "contract_refs": [
+        "citation-warning-code",
+        "citation-scan-universe"
+      ],
+      "source_refs": [
+        "REQ-08",
+        "D-8",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "archive preview consumers",
+        "test_boundary": "archive plan preview assertions over a fixture citation set outside a version-control repository",
+        "worker_sized_reason": "One preview fixture pair asserted through the existing archive preview suite.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "citation-scan-configuration-reference",
+    "title": "State the citation scan universe in the adopter configuration reference",
+    "description": "The adopter-facing configuration reference states the citation scan key, the entry forms it accepts, and the root set it resolves to when nothing is declared.\n\n## Background\n\nAn adopter who wants archival to warn about citations living outside the development root has to know that the scanned file set is configurable at all, what an entry may be, and what the default already covers. That fact gets one canonical home in the adopter surface, and the configuration reference is it: the key sits inside the documentation policy block that reference already describes.\n\nThe command reference is not edited here. This epic's command-surface changes are documented together in that one reference, so the writing here stays inside the configuration reference.\n\n## Success Criteria\n\n- [hard] REQ-01: The configuration reference names the citation scan key, states that its entries are repository-relative path prefixes and exact file paths, and states the root set it resolves to when the key is absent.\n- [hard] REQ-02: The reference states that the key is optional and that omitting it leaves archive eligibility unchanged.\n- [hard] REQ-03: The default root set is stated once in the adopter surface, and any other adopter page that needs it links to that statement.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:dev-artifact-layout",
+      "milestone:v1.0",
+      "story:archive-naming-and-warnings",
+      "satisfies:REQ-08",
+      "per:@/charter/D-13",
+      "per:@/issue/8e071e18/decision/D-16"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "citation-scan-warnings"
+    ],
+    "planning": {
+      "outcome": "The adopter configuration reference is the single home for the citation scan key with its default root set.",
+      "contract_refs": [
+        "citation-scan-universe"
+      ],
+      "source_refs": [
+        "REQ-08",
+        "D-16",
+        "dev/active/8e071e18-investigation.md"
+      ],
+      "terminal": {
+        "consumer_family": "adopters configuring archival",
+        "test_boundary": "documentation link resolution over the adopter configuration reference",
+        "worker_sized_reason": "One configuration key stated in one existing reference section.",
+        "footprint": {
+          "touches": [
+            "docs/reference/configuration.md"
+          ]
+        }
+      }
     }
   },
   {
@@ -950,7 +1078,7 @@
       "code-review"
     ],
     "depends_on": [
-      "repository-citation-scan",
+      "citation-scan-warnings",
       "deck-archival-eligibility"
     ],
     "planning": {
@@ -1416,7 +1544,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The exhaustive documentation audit container relocates its linked artifacts through the archival execution path.",
@@ -1486,7 +1614,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The core maintenance container relocates its linked artifacts through the archival execution path.",
@@ -1557,7 +1685,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The documentation reorganization container relocates its linked artifacts through the archival execution path.",
@@ -1612,7 +1740,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The project-lead skill container relocates its linked artifacts through the archival execution path.",
@@ -1677,7 +1805,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The addressable item container relocates its linked artifacts through the archival execution path.",
@@ -1742,7 +1870,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The repository profiles container relocates its linked artifacts through the archival execution path.",
@@ -1806,7 +1934,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The graph templates container relocates its linked artifacts through the archival execution path.",
@@ -1866,7 +1994,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The CLI ergonomics phase container relocates its linked artifacts through the archival execution path.",
@@ -1928,7 +2056,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The structured knowledge container relocates its linked artifacts through the archival execution path.",
@@ -1987,7 +2115,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The production stability container relocates its linked artifacts through the archival execution path.",
@@ -2055,7 +2183,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The planning bracket container relocates its linked artifacts through the archival execution path.",
@@ -2113,7 +2241,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The documentation lifecycle phase two container relocates its linked artifacts through the archival execution path.",
@@ -2170,7 +2298,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The production polish container relocates its linked artifacts through the archival execution path.",
@@ -2236,7 +2364,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The agent seamlessness container relocates its linked artifacts through the archival execution path.",
@@ -2295,7 +2423,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The documentation lifecycle container relocates its linked artifacts through the archival execution path.",
@@ -2355,7 +2483,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The item sources container relocates its linked artifacts through the archival execution path.",
@@ -2411,7 +2539,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The agent validation container relocates its linked artifacts through the archival execution path.",
@@ -2468,7 +2596,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The agent ergonomics container relocates its linked artifacts through the archival execution path.",
@@ -2524,7 +2652,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The code smell cleanup container relocates its linked artifacts through the archival execution path.",
@@ -2579,7 +2707,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The rejection state container relocates its linked artifacts through the archival execution path.",
@@ -2634,7 +2762,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The observability container relocates its linked artifacts through the archival execution path.",
@@ -2691,7 +2819,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The parallel work container relocates its linked artifacts through the archival execution path.",
@@ -2760,7 +2888,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan",
+      "citation-scan-warnings",
       "perf-fixture-carve-out"
     ],
     "planning": {
@@ -2834,7 +2962,7 @@
     "depends_on": [
       "deck-archival-eligibility",
       "legacy-archive-directory-rename",
-      "repository-citation-scan"
+      "citation-scan-warnings"
     ],
     "planning": {
       "outcome": "The documentation tooling evaluation container relocates its linked artifacts through the archival execution path.",
