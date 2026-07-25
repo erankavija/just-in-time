@@ -21,7 +21,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-24T23:36:52.787496576Z",
+      "updated_at": "2026-07-25T00:05:57.405406179Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Convert narrated materialization guarantees into enforced tests",
-  "updated_at": "2026-07-24T23:40:39.802429986Z"
+  "updated_at": "2026-07-25T00:05:57.405406179Z"
 }
