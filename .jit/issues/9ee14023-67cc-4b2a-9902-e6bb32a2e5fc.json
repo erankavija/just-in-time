@@ -13,7 +13,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-25T05:23:29.307946681Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9ee14023-67cc-4b2a-9902-e6bb32a2e5fc",
   "labels": [
     "type:story",
@@ -25,5 +31,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Replace the repository-materialization showcase with a corrected successor",
-  "updated_at": "2026-07-25T05:22:37.137239501Z"
+  "updated_at": "2026-07-25T05:23:29.307946681Z"
 }
