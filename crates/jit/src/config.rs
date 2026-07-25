@@ -308,52 +308,63 @@ impl ValidationConfig {
 /// Documentation lifecycle management configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DocumentationConfig {
-    /// Root directory for development documentation (default: "dev").
+    /// Root directory for development documentation. Absent falls back to
+    /// [`SHIPPED_DOCUMENTATION_POLICY`]'s development root.
     ///
     /// Archival planning classifies by this root as well: a linked artifact it
     /// does not contain is permanent, so the artifact is mirrored by copy while
     /// its source stays in place.
     pub development_root: Option<String>,
-    /// Paths subject to archival (default: ["dev/active", "dev/studies", "dev/sessions"]).
+    /// Paths subject to archival. Absent falls back to
+    /// [`SHIPPED_DOCUMENTATION_POLICY`]'s managed paths.
     pub managed_paths: Option<Vec<String>>,
-    /// Where archived docs are stored (default: "dev/archive").
+    /// Where archived docs are stored. Absent falls back to
+    /// [`SHIPPED_DOCUMENTATION_POLICY`]'s archive root.
     pub archive_root: Option<String>,
-    /// Paths whose artifacts archive by copy while the source is retained
-    /// (default: ["docs/"]).
+    /// Paths whose artifacts archive by copy while the source is retained.
+    /// Absent falls back to [`SHIPPED_DOCUMENTATION_POLICY`]'s permanent paths.
     pub permanent_paths: Option<Vec<String>>,
 }
 
 impl DocumentationConfig {
-    /// Get development root with default fallback.
+    /// Development root, falling back to [`SHIPPED_DOCUMENTATION_POLICY`]'s
+    /// declared root when unauthored.
     pub fn development_root(&self) -> String {
         self.development_root
             .clone()
-            .unwrap_or_else(|| "dev".to_string())
+            .unwrap_or_else(|| SHIPPED_DOCUMENTATION_POLICY.development_root.to_string())
     }
 
-    /// Get managed paths with default fallback.
+    /// Managed paths, falling back to [`SHIPPED_DOCUMENTATION_POLICY`]'s
+    /// declared managed paths when unauthored.
     pub fn managed_paths(&self) -> Vec<String> {
         self.managed_paths.clone().unwrap_or_else(|| {
-            vec![
-                "dev/active".to_string(),
-                "dev/studies".to_string(),
-                "dev/sessions".to_string(),
-            ]
+            SHIPPED_DOCUMENTATION_POLICY
+                .managed_paths
+                .iter()
+                .map(|path| path.to_string())
+                .collect()
         })
     }
 
-    /// Get archive root with default fallback.
+    /// Archive root, falling back to [`SHIPPED_DOCUMENTATION_POLICY`]'s
+    /// declared archive root when unauthored.
     pub fn archive_root(&self) -> String {
         self.archive_root
             .clone()
-            .unwrap_or_else(|| "dev/archive".to_string())
+            .unwrap_or_else(|| SHIPPED_DOCUMENTATION_POLICY.archive_root.to_string())
     }
 
-    /// Get permanent paths with default fallback.
+    /// Permanent paths, falling back to [`SHIPPED_DOCUMENTATION_POLICY`]'s
+    /// declared permanent paths when unauthored.
     pub fn permanent_paths(&self) -> Vec<String> {
-        self.permanent_paths
-            .clone()
-            .unwrap_or_else(|| vec!["docs/".to_string()])
+        self.permanent_paths.clone().unwrap_or_else(|| {
+            SHIPPED_DOCUMENTATION_POLICY
+                .permanent_paths
+                .iter()
+                .map(|path| path.to_string())
+                .collect()
+        })
     }
 }
 
@@ -2284,6 +2295,74 @@ enforced-by = "dag-no-cycles"
             .invariants
             .invariants
             .is_empty());
+    }
+
+    #[test]
+    fn test_documentation_config_fallbacks_derive_from_shipped_policy() {
+        // No table authored at all: every accessor must fall back to the SAME
+        // shipped declaration `jit init` scaffolds, rather than a literal of
+        // its own (REQ-01).
+        let unauthored = DocumentationConfig {
+            development_root: None,
+            managed_paths: None,
+            archive_root: None,
+            permanent_paths: None,
+        };
+        assert_eq!(
+            unauthored.development_root(),
+            SHIPPED_DOCUMENTATION_POLICY.development_root
+        );
+        assert_eq!(
+            unauthored.managed_paths(),
+            SHIPPED_DOCUMENTATION_POLICY
+                .managed_paths
+                .iter()
+                .map(|path| path.to_string())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            unauthored.archive_root(),
+            SHIPPED_DOCUMENTATION_POLICY.archive_root
+        );
+        assert_eq!(
+            unauthored.permanent_paths(),
+            SHIPPED_DOCUMENTATION_POLICY
+                .permanent_paths
+                .iter()
+                .map(|path| path.to_string())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_unauthored_documentation_table_stays_non_configured_despite_fallbacks() {
+        // The fallbacks stay non-authorizing (REQ-03): a repository with no
+        // `[documentation]` table, or one that authors none of the required
+        // fields, must still report Unconfigured/Incomplete from
+        // `PolicyStatus::from_documentation` — which judges authored fields
+        // only, never what the accessors above would fall back to.
+        use crate::domain::artifact_plan::PolicyStatus;
+
+        assert_eq!(
+            PolicyStatus::from_documentation(None),
+            PolicyStatus::Unconfigured
+        );
+
+        let unauthored = DocumentationConfig {
+            development_root: None,
+            managed_paths: None,
+            archive_root: None,
+            permanent_paths: None,
+        };
+        assert_eq!(
+            PolicyStatus::from_documentation(Some(&unauthored)),
+            PolicyStatus::Incomplete
+        );
+
+        // Not vacuous: the fallbacks themselves are non-empty (derived from
+        // the real shipped declaration), yet still don't count as authored.
+        assert!(!unauthored.managed_paths().is_empty());
+        assert!(!unauthored.permanent_paths().is_empty());
     }
 
     #[test]
