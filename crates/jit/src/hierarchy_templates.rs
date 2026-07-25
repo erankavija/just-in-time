@@ -15,6 +15,17 @@ pub struct HierarchyTemplate {
     pub label_associations: HashMap<String, String>,
 }
 
+/// Render policy paths as the indented entries of a multi-line TOML array.
+///
+/// Each entry occupies its own line, so an adopter adds or drops one without
+/// reflowing the array. The caller supplies the surrounding brackets.
+fn render_policy_paths(paths: &[&str]) -> String {
+    paths
+        .iter()
+        .map(|path| format!("  \"{path}\",\n"))
+        .collect()
+}
+
 impl HierarchyTemplate {
     /// Get all available templates
     pub fn all() -> Vec<HierarchyTemplate> {
@@ -257,6 +268,27 @@ source = {{ toml = ".jit/gates.toml", table = "gates", id-field = "key", text-fi
 source-of-truth = "registry-first"
 
 # =============================================================================
+# DOCUMENTATION LIFECYCLE
+# =============================================================================
+# Where development documents live, and what archiving one does. An artifact
+# under a managed path MOVES under `archive_root` when its owning issue is
+# archived; an artifact under a permanent path is COPIED there and keeps its
+# source. Paths match by prefix: a directory entry classifies everything beneath
+# it, a file entry classifies that one file. The development-root files below are
+# named one at a time because an entry for the root itself would cover every area
+# under it.
+#
+# Reclassify freely: these are your areas, not engine policy.
+
+[documentation]
+development_root = "{development_root}"
+archive_root = "{archive_root}"
+managed_paths = [
+{managed_paths}]
+permanent_paths = [
+{permanent_paths}]
+
+# =============================================================================
 # ADVANCED (uncomment to enable)
 # =============================================================================
 
@@ -272,15 +304,6 @@ source-of-truth = "registry-first"
 # max_indefinite_leases_per_agent = 2
 # max_indefinite_leases_per_repo = 10
 
-# Development document lifecycle (design docs, session notes, etc.).
-# [documentation]
-# development_root = "dev"
-# managed_paths = ["dev/active", "dev/sessions"]
-# permanent_paths = ["docs/"]         # never archived
-# archive_root = "dev/archive"
-# design = "features"
-# session = "sessions"
-
 # Branches permitted to modify global config (default: ["main"]).
 # [global_operations]
 # require_main_history = true
@@ -295,6 +318,12 @@ source-of-truth = "registry-first"
             types_inline = types_inline,
             strategic_array = strategic_array,
             label_assoc_lines = label_assoc_lines,
+            development_root = crate::config::SHIPPED_DOCUMENTATION_POLICY.development_root,
+            archive_root = crate::config::SHIPPED_DOCUMENTATION_POLICY.archive_root,
+            managed_paths =
+                render_policy_paths(crate::config::SHIPPED_DOCUMENTATION_POLICY.managed_paths),
+            permanent_paths =
+                render_policy_paths(crate::config::SHIPPED_DOCUMENTATION_POLICY.permanent_paths),
             coord_ttl_secs = crate::runtime_defaults::CLAIM_TTL_SECS,
             coord_stale_secs = crate::storage::lease::DEFAULT_STALE_THRESHOLD_SECS,
         )

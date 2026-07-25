@@ -1,6 +1,11 @@
 //! Integration tests for `jit init`
 
+use jit::config::{DocumentationConfig, SHIPPED_DOCUMENTATION_POLICY};
+use jit::declarations::parse_configuration;
+use jit::domain::artifact_classifier::contains_path;
+use std::collections::BTreeSet;
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -755,4 +760,210 @@ fn test_init_template_config_is_valid_toml() {
             parsed.err()
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// Scaffolded documentation policy: the shipped development-area classification
+// ---------------------------------------------------------------------------
+
+/// The `[documentation]` policy a freshly initialized repository carries.
+///
+/// Read through the configuration parser, so a commented-out block resolves to
+/// no policy at all rather than to a table this helper could inspect.
+fn scaffolded_documentation_policy(dir: &Path) -> DocumentationConfig {
+    let bytes = fs::read(dir.join(".jit/config.toml")).expect("init should write config.toml");
+    parse_configuration(&bytes)
+        .expect("scaffolded config.toml should parse")
+        .documentation
+        .expect("init should scaffold an authored [documentation] policy")
+}
+
+/// Every area the scaffolded policy classifies, managed and permanent alike.
+fn classified_areas(policy: &DocumentationConfig) -> Vec<String> {
+    policy
+        .managed_paths
+        .iter()
+        .chain(policy.permanent_paths.iter())
+        .flatten()
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn test_init_scaffolds_a_documentation_policy_classifying_every_development_area() {
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path(), &[]).status.success());
+
+    let policy = scaffolded_documentation_policy(temp.path());
+    let development_root = policy.development_root();
+    let managed = policy
+        .managed_paths
+        .clone()
+        .expect("the scaffolded policy should author its managed areas");
+    let permanent = policy
+        .permanent_paths
+        .clone()
+        .expect("the scaffolded policy should author its permanent areas");
+    assert!(
+        policy.archive_root.is_some(),
+        "the scaffolded policy should author its archive root"
+    );
+
+    // Each classified entry is a distinct area beneath the development root. A
+    // bare root entry would match every other area by prefix.
+    for area in classified_areas(&policy) {
+        assert!(
+            contains_path(&development_root, &area) && area != development_root,
+            "{area} should be a distinct area under {development_root}"
+        );
+    }
+
+    // The two areas the criterion names, observed through the matcher the
+    // classifier itself applies.
+    let deck = format!("{development_root}/presentations/showcase.md");
+    let architecture_note = format!("{development_root}/architecture/overview.md");
+    let matches = |areas: &[String], path: &str| areas.iter().any(|area| contains_path(area, path));
+    assert!(
+        matches(&managed, &deck) && !matches(&permanent, &deck),
+        "the presentation area should be managed, not permanent"
+    );
+    assert!(
+        matches(&permanent, &architecture_note) && !matches(&managed, &architecture_note),
+        "the architecture area should be permanent, not managed"
+    );
+}
+
+#[test]
+fn test_init_documentation_block_is_active_configuration_naming_only_typed_keys() {
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path(), &[]).status.success());
+
+    let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
+    let scaffolded: toml::Table = content.parse().expect("config.toml should be valid TOML");
+    let emitted = scaffolded
+        .get("documentation")
+        .and_then(toml::Value::as_table)
+        .expect("the documentation block should be active configuration, not commented guidance");
+
+    // Every key the type carries, derived from the type rather than restated.
+    let typed = toml::Value::try_from(DocumentationConfig {
+        development_root: Some(String::new()),
+        managed_paths: Some(Vec::new()),
+        archive_root: Some(String::new()),
+        permanent_paths: Some(Vec::new()),
+    })
+    .unwrap();
+    let carried = typed
+        .as_table()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for key in emitted.keys() {
+        assert!(
+            carried.contains(key),
+            "[documentation].{key} is not a key DocumentationConfig carries"
+        );
+    }
+}
+
+#[test]
+fn test_init_classifies_development_root_files_as_exact_path_entries() {
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path(), &[]).status.success());
+
+    let policy = scaffolded_documentation_policy(temp.path());
+    let development_root = policy.development_root();
+    let areas = classified_areas(&policy);
+    let root_files = areas
+        .iter()
+        .filter(|area| Path::new(area).parent() == Some(Path::new(&development_root)))
+        .filter(|area| Path::new(area).extension().is_some())
+        .collect::<Vec<_>>();
+    assert!(
+        !root_files.is_empty(),
+        "development-root files should be classified individually"
+    );
+
+    // An exact entry classifies its own file and nothing else: no entry reaches
+    // it by prefix.
+    for file in root_files {
+        let matching = areas
+            .iter()
+            .filter(|area| contains_path(area, file))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            matching,
+            vec![file],
+            "{file} should be classified by its own exact entry alone"
+        );
+    }
+
+    // A development-root file that belongs to no area is classified by nothing,
+    // which a prefix entry over the root would contradict.
+    let unclassified = format!("{development_root}/unclassified-note.md");
+    assert!(
+        !areas.iter().any(|area| contains_path(area, &unclassified)),
+        "no entry should sweep in development-root files by prefix"
+    );
+}
+
+#[test]
+fn test_init_documentation_policy_is_the_shipped_area_declaration() {
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path(), &[]).status.success());
+
+    let policy = scaffolded_documentation_policy(temp.path());
+    assert_eq!(
+        policy.development_root(),
+        SHIPPED_DOCUMENTATION_POLICY.development_root
+    );
+    assert_eq!(
+        policy.archive_root(),
+        SHIPPED_DOCUMENTATION_POLICY.archive_root
+    );
+    assert_eq!(
+        policy.managed_paths(),
+        SHIPPED_DOCUMENTATION_POLICY.managed_paths
+    );
+    assert_eq!(
+        policy.permanent_paths(),
+        SHIPPED_DOCUMENTATION_POLICY.permanent_paths
+    );
+}
+
+#[test]
+fn test_init_repository_plans_archival_under_a_configured_policy() {
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path(), &[]).status.success());
+
+    let policy = scaffolded_documentation_policy(temp.path());
+    let area = policy
+        .managed_paths()
+        .into_iter()
+        .next()
+        .expect("the scaffolded policy should classify at least one managed area");
+    fs::create_dir_all(temp.path().join(&area)).unwrap();
+    let document = format!("{area}/note.md");
+    fs::write(temp.path().join(&document), "note").unwrap();
+
+    let out = Command::new(jit_binary())
+        .args(["archive", "document", &document, "--json"])
+        .current_dir(temp.path())
+        .output()
+        .expect("failed to run jit archive document");
+    assert!(out.status.success(), "archive preview failed: {out:?}");
+
+    let plan: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(plan["policy_status"], "configured");
+    assert!(
+        !plan["blockers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|blocker| blocker["code"]
+                .as_str()
+                .is_some_and(|code| code.starts_with("policy-"))),
+        "a configured policy should raise no policy blocker: {plan}"
+    );
 }

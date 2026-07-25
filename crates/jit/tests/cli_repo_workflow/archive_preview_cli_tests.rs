@@ -90,22 +90,31 @@ fn assert_success(output: &std::process::Output) {
     );
 }
 
+/// Replace the scaffolded documentation policy with a test-specific one.
+///
+/// `jit init` authors a complete `[documentation]` policy, so a test that needs
+/// its own classification overrides that table instead of adding a second one.
+fn set_documentation_policy(repo: &TempDir, policy: &str) {
+    let path = repo.path().join(".jit/config.toml");
+    let mut config = fs::read_to_string(&path)
+        .unwrap()
+        .parse::<toml::Table>()
+        .unwrap();
+    config.extend(policy.parse::<toml::Table>().unwrap());
+    fs::write(&path, config.to_string()).unwrap();
+}
+
 fn configured_bundle(repo: &TempDir) {
     assert_success(&jit(repo, &["init", "--json"]));
-    let shipped_config = fs::read_to_string(repo.path().join(".jit/config.toml")).unwrap();
-    fs::write(
-        repo.path().join(".jit/config.toml"),
-        format!(
-            r#"
+    set_documentation_policy(
+        repo,
+        r#"
 [documentation]
 managed_paths = ["fixtures"]
 permanent_paths = []
 archive_root = "archive"
-
-{shipped_config}"#
-        ),
-    )
-    .unwrap();
+"#,
+    );
     fs::create_dir_all(repo.path().join("fixtures/bundle/theme")).unwrap();
     fs::write(
         repo.path().join("fixtures/root.md"),
@@ -466,14 +475,10 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
 
     let container_repo = TempDir::new().unwrap();
     assert_success(&jit(&container_repo, &["init", "--json"]));
-    let shipped = fs::read_to_string(container_repo.path().join(".jit/config.toml")).unwrap();
-    fs::write(
-        container_repo.path().join(".jit/config.toml"),
-        format!(
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n\n{shipped}"
-        ),
-    )
-    .unwrap();
+    set_documentation_policy(
+        &container_repo,
+        "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+    );
     fs::create_dir(container_repo.path().join("fixtures")).unwrap();
     fs::write(container_repo.path().join("fixtures/root.md"), "container").unwrap();
     let created = jit(
@@ -608,16 +613,10 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
         &["issue", "update", &leaf, "--state", "rejected", "--json"],
     ));
 
-    let config_path = repo.path().join(".jit/config.toml");
-    let config = fs::read_to_string(&config_path).unwrap();
-    fs::write(
-        &config_path,
-        config.replace(
-            "managed_paths = [\"fixtures\"]",
-            "managed_paths = [\"fixtures/root.md\"]",
-        ),
-    )
-    .unwrap();
+    set_documentation_policy(
+        &repo,
+        "[documentation]\nmanaged_paths = [\"fixtures/root.md\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+    );
     let occupied = repo.path().join("archive").join(&evaluated[..8]);
     fs::create_dir_all(&occupied).unwrap();
     fs::write(occupied.join("foreign.txt"), "unaccounted").unwrap();
@@ -720,15 +719,10 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
 fn test_archive_candidates_cli_reports_directory_root_and_continues_without_mutation() {
     let repo = TempDir::new().unwrap();
     assert_success(&jit(&repo, &["init", "--json"]));
-    let config_path = repo.path().join(".jit/config.toml");
-    let shipped = fs::read_to_string(&config_path).unwrap();
-    fs::write(
-        &config_path,
-        format!(
-            "[documentation]\nmanaged_paths = [\"dev/active\"]\npermanent_paths = []\narchive_root = \"dev/archive\"\n\n{shipped}"
-        ),
-    )
-    .unwrap();
+    set_documentation_policy(
+        &repo,
+        "[documentation]\nmanaged_paths = [\"dev/active\"]\npermanent_paths = []\narchive_root = \"dev/archive\"\n",
+    );
     fs::create_dir_all(repo.path().join("dev/active")).unwrap();
     fs::write(repo.path().join("dev/index.md"), "[active](active/)").unwrap();
     fs::write(repo.path().join("dev/active/regular.md"), "regular").unwrap();
@@ -901,14 +895,10 @@ fn test_archive_candidates_cli_preserves_all_three_policy_states_without_mutatio
 fn test_container_archive_slug_is_consistent_and_frozen_by_marker() {
     let repo = TempDir::new().unwrap();
     assert_success(&jit(&repo, &["init", "--json"]));
-    let shipped = fs::read_to_string(repo.path().join(".jit/config.toml")).unwrap();
-    fs::write(
-        repo.path().join(".jit/config.toml"),
-        format!(
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n\n{shipped}"
-        ),
-    )
-    .unwrap();
+    set_documentation_policy(
+        &repo,
+        "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+    );
     fs::create_dir(repo.path().join("fixtures")).unwrap();
     fs::write(repo.path().join("fixtures/root.md"), "archive me").unwrap();
 
