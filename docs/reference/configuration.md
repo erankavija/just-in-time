@@ -47,15 +47,44 @@ Schema version. Required for newer features like namespace registry and document
 ```toml
 [documentation]
 development_root = "dev"
-managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
 archive_root = "dev/archive"
-permanent_paths = ["docs/"]
+managed_paths = [
+  "dev/active",
+  "dev/studies",
+  "dev/sessions",
+  "dev/plans",
+  "dev/presentations",
+  "dev/design",
+  "dev/benchmarks",
+  "dev/experiments",
+]
+permanent_paths = [
+  "dev/architecture",
+  "dev/eval",
+  "dev/vision",
+  "dev/index.md",
+  "dev/TESTING.md",
+  "dev/authoring-conventions.md",
+]
+issue_scoped_areas = [
+  "dev/active",
+  "dev/studies",
+  "dev/plans",
+  "dev/presentations",
+]
 ```
 
-Controls document lifecycle management. Selected documents in `managed_paths`
-may move to the archive mirror. Selected documents in `permanent_paths` are
-copied to the mirror while their source remains in place; “permanent” prevents
-source deletion, not mirror publication.
+Controls document lifecycle management; `jit init` scaffolds the table above
+into a new repository. Selected documents in `managed_paths` may move to the
+archive mirror. Selected documents in `permanent_paths` are copied to the mirror
+while their source remains in place; “permanent” prevents source deletion, not
+mirror publication.
+
+An entry in either path list names a directory or an individual file. A
+directory entry classifies every artifact beneath it; a file entry classifies
+exactly that one path. Development-root documents that belong to no area are
+therefore listed one file at a time, since an entry for the root itself would
+classify every area under it and collapse the managed/permanent split.
 
 Dependency-aware `jit archive document` and `jit archive container` planning
 and `--execute` classify this table by authored completeness. The read-only
@@ -81,10 +110,23 @@ The `DocumentationConfig` accessors retain fallback values for display callers,
 but archive planning and execution never use those fallbacks to claim
 eligibility. This prevents a partial policy from silently authorizing mutation.
 
-The values above are an adopter-facing example, not universal engine constants.
-Repositories choose their own component-aware paths. For example, this
-repository's `.jit/config.toml` is dogfood configuration and must not be read as
-the shipped path vocabulary.
+`issue_scoped_areas` declares which areas organize their artifacts one directory
+per issue; every other area keeps its artifacts flat. An area is named whole:
+membership is exact-area equality under lexical path normalization, so
+`dev/plans`, `./dev/plans`, and `dev/plans/` name the same area while a path
+*inside* a declared area is not itself one. An absent key resolves to the
+shipped declaration shown above; an authored list replaces that declaration
+whole, so an empty list opts every area out of the convention. Adoption is
+independent of the archival classification — an area may be managed and
+issue-scoped, managed and flat, permanent and issue-scoped, or neither — and an
+issue-scoped area archives its artifacts exactly as a flat one does. The key is
+not part of the three-key completeness that authorizes archival mutation.
+
+Path vocabulary is repository policy: an adopter reclassifies any area, adds
+areas of their own, or drops a convention entirely, and every command reads the
+table in front of it. This repository's `.jit/config.toml` is the dogfood policy
+under which jit itself is developed and must not be read as the shipped
+declaration.
 
 ### `[type_hierarchy]`
 

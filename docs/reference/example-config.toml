@@ -16,15 +16,46 @@ schema = 2
 # Root directory for development documentation
 development_root = "dev"
 
-# Component roots whose selected artifacts `jit archive` may move to the archive
-# mirror (archival is always explicit; nothing archives automatically)
-managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
-
 # Where archived documents go
 archive_root = "dev/archive"
 
-# Paths copied to the archive mirror while their source remains in place
-permanent_paths = ["docs/"]
+# Component roots whose selected artifacts `jit archive` may move to the archive
+# mirror (archival is always explicit; nothing archives automatically). A
+# directory entry classifies everything beneath it; a file entry classifies that
+# one file.
+managed_paths = [
+  "dev/active",
+  "dev/studies",
+  "dev/sessions",
+  "dev/plans",
+  "dev/presentations",
+  "dev/design",
+  "dev/benchmarks",
+  "dev/experiments",
+]
+
+# Paths copied to the archive mirror while their source remains in place. The
+# individual files are development-root documents belonging to no area; an entry
+# for the root itself would classify every area under it.
+permanent_paths = [
+  "dev/architecture",
+  "dev/eval",
+  "dev/vision",
+  "dev/index.md",
+  "dev/TESTING.md",
+  "dev/authoring-conventions.md",
+]
+
+# Areas organizing their artifacts one directory per issue; every other area
+# stays flat. An area is named whole — a path inside one is not itself an area —
+# and adoption is independent of the classification above. An absent key adopts
+# the shipped areas; an empty list opts every area out.
+issue_scoped_areas = [
+  "dev/active",
+  "dev/studies",
+  "dev/plans",
+  "dev/presentations",
+]
 
 # =============================================================================
 # TYPE HIERARCHY
