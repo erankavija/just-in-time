@@ -127,6 +127,7 @@ fn test_policy_status_preserves_three_explicitness_states() {
         archive_root: None,
         permanent_paths: Some(vec!["docs".to_string()]),
         issue_scoped_areas: None,
+        citation_scan_roots: None,
     };
     assert_eq!(
         PolicyStatus::from_documentation(Some(&partial)),
@@ -148,13 +149,32 @@ fn test_policy_status_preserves_three_explicitness_states() {
     assert_eq!(
         PolicyStatus::from_documentation(Some(&DocumentationConfig {
             issue_scoped_areas: Some(vec!["dev/active".to_string()]),
-            ..partial
+            ..partial.clone()
         })),
         PolicyStatus::Incomplete
     );
     assert_eq!(
         PolicyStatus::from_documentation(Some(&DocumentationConfig {
             issue_scoped_areas: Some(vec!["dev/active".to_string()]),
+            ..configured.clone()
+        })),
+        PolicyStatus::Configured
+    );
+
+    // The citation scan universe is independent of archival authorization
+    // (`@/issue/8e071e18/decision/D-16`): a table supplying the three
+    // authorizing fields is configured whether or not it declares the scan
+    // roots, and declaring them alone authorizes nothing.
+    assert_eq!(
+        PolicyStatus::from_documentation(Some(&DocumentationConfig {
+            citation_scan_roots: Some(vec!["scripts".to_string()]),
+            ..partial
+        })),
+        PolicyStatus::Incomplete
+    );
+    assert_eq!(
+        PolicyStatus::from_documentation(Some(&DocumentationConfig {
+            citation_scan_roots: Some(vec!["scripts".to_string()]),
             ..configured
         })),
         PolicyStatus::Configured

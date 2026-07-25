@@ -852,6 +852,7 @@ fn test_init_documentation_block_is_active_configuration_naming_only_typed_keys(
         archive_root: Some(String::new()),
         permanent_paths: Some(Vec::new()),
         issue_scoped_areas: Some(Vec::new()),
+        citation_scan_roots: Some(Vec::new()),
     })
     .unwrap();
     let carried = typed
