@@ -206,6 +206,12 @@ impl InMemoryStorage {
         std::collections::HashMap<String, crate::gate_presets::GatePresetDefinition>,
         std::collections::HashSet<String>,
     )> {
+        let presets_prefix = format!(
+            "{}/",
+            crate::repository_state::VirtualPath::GATE_PRESETS
+                .relative()
+                .as_str()
+        );
         let files = self
             .repository_state()
             .entries
@@ -217,7 +223,7 @@ impl InMemoryStorage {
                 let filename = path
                     .relative()
                     .as_str()
-                    .strip_prefix("config/gate-presets/")?;
+                    .strip_prefix(presets_prefix.as_str())?;
                 if filename.contains('/') || !filename.ends_with(".json") {
                     return None;
                 }

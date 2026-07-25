@@ -243,16 +243,17 @@ fn listed_gate_preset_paths(
     image: &crate::repository_state::RepositoryImage,
 ) -> Result<Vec<crate::repository_state::VirtualPath>> {
     use crate::repository_state::VirtualPath;
-    let directory = VirtualPath::data("config/gate-presets")?;
+    let directory = VirtualPath::GATE_PRESETS;
     let listing = image
         .listing_fingerprints()
         .get(&directory)
         .ok_or_else(|| anyhow!("complete custom gate preset listing is absent"))?;
+    let prefix = directory.relative().as_str();
     listing
         .children()
         .keys()
         .filter(|name| name.ends_with(".json"))
-        .map(|name| VirtualPath::data(format!("config/gate-presets/{name}")).map_err(Into::into))
+        .map(|name| VirtualPath::data(format!("{prefix}/{name}")).map_err(Into::into))
         .collect()
 }
 
@@ -271,22 +272,19 @@ fn parse_captured_gate_presets(
     crate::gate_presets::load_presets_from_custom_files(files).map(|(presets, _)| presets)
 }
 
-fn captured_gate_preset_fixed_paths() -> Result<Vec<crate::repository_state::VirtualPath>> {
+fn captured_gate_preset_fixed_paths() -> Vec<crate::repository_state::VirtualPath> {
     use crate::repository_state::VirtualPath;
-    [
-        "config.toml".to_string(),
-        "index.json".to_string(),
-        "invariants.toml".to_string(),
-        "rules.toml".to_string(),
-        "gates.toml".to_string(),
-        "events.jsonl".to_string(),
-        "config".to_string(),
-        "config/gate-presets".to_string(),
-        "issues".to_string(),
+    vec![
+        VirtualPath::CONFIG,
+        VirtualPath::INDEX,
+        VirtualPath::INVARIANTS,
+        VirtualPath::RULES,
+        VirtualPath::GATES,
+        VirtualPath::EVENTS,
+        VirtualPath::CONFIG_DIR,
+        VirtualPath::GATE_PRESETS,
+        VirtualPath::ISSUES,
     ]
-    .into_iter()
-    .map(|path| VirtualPath::data(path).map_err(Into::into))
-    .collect()
 }
 
 fn capture_gate_preset_image(
@@ -298,10 +296,10 @@ fn capture_gate_preset_image(
         assemble_config, render_capture_closure, CaptureSpec, VirtualPath,
     };
 
-    let presets_dir = VirtualPath::data("config/gate-presets")?;
+    let presets_dir = VirtualPath::GATE_PRESETS;
     let issues_dir = VirtualPath::ISSUES;
     let mut first_spec = CaptureSpec::phase_one(
-        captured_gate_preset_fixed_paths()?,
+        captured_gate_preset_fixed_paths(),
         GATE_PRESET_CAPTURE_BUDGET,
     )?;
     first_spec.discover_listing(presets_dir.clone())?;
@@ -330,11 +328,12 @@ fn capture_gate_preset_image(
     };
 
     let mut spec = CaptureSpec::phase_one(
-        captured_gate_preset_fixed_paths()?,
+        captured_gate_preset_fixed_paths(),
         GATE_PRESET_CAPTURE_BUDGET,
     )?;
+    let presets_prefix = presets_dir.relative().as_str();
     let create_path = create_target
-        .map(|name| VirtualPath::data(format!("config/gate-presets/{name}.json")))
+        .map(|name| VirtualPath::data(format!("{presets_prefix}/{name}.json")))
         .transpose()?;
     spec.discover_paths(
         discovered_presets
@@ -1466,8 +1465,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let issues = super::captured_active_issues(&image)?;
             let full_id = super::resolve_issue_from_capture(&issues, from_issue_id)?;
+            let presets_dir = crate::repository_state::VirtualPath::GATE_PRESETS;
             let target = crate::repository_state::VirtualPath::data(format!(
-                "config/gate-presets/{preset_name}.json"
+                "{}/{preset_name}.json",
+                presets_dir.relative().as_str()
             ))?;
             if !matches!(
                 image.entry(&target)?,
@@ -1510,13 +1511,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 preset: Box::new(preset),
             }];
             let plan = crate::repository_state::finalize(&layout, &image, &context, &intents)?;
-            Ok(SessionStep::Apply(
-                plan,
-                layout
-                    .data_root()
-                    .join("config/gate-presets")
-                    .join(format!("{preset_name}.json")),
-            ))
+            Ok(SessionStep::Apply(plan, layout.resolve(&target)?))
         })
     }
 }
