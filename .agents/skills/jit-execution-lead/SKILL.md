@@ -265,7 +265,7 @@ After all waves are complete:
 
 2. **Map success criteria.** For each criterion in the epic's description, identify which child issue(s) deliver it. If any criterion is not covered, stop and assess — create an additional task if needed, or escalate if the gap is significant.
 
-3. **Run epic gates.** `jit gate evaluate-all <epic-id>` runs the checkers; `jit gate status-all <epic-id>` then reports readiness without re-running anything. Handle gate results per jit-manage Workflow E.
+3. **Run epic gates.** First reconcile `surfaced_pitfalls` against the epic's criteria per `references/lead-review-protocol.md` — a deferred finding whose subject a criterion names is a criterion violation, not a follow-up. Then `jit gate evaluate-all <epic-id>` runs the checkers; `jit gate status-all <epic-id>` then reports readiness without re-running anything. Handle gate results per jit-manage Workflow E.
 
 4. **Produce completion report.** Read `references/completion-report-template.md`. Fill it with:
    - Metrics: children completed, waves, rework cycles, escalations, dispatches

@@ -118,6 +118,20 @@ This tier catches issues that per-issue gates and criteria cannot: problems that
 - Did the agent make changes outside the issue's scope? (Unrelated refactors, formatting changes to other files, modifications to other agents' work.)
 - If out-of-scope changes exist, they should be reverted or split into a separate issue.
 
+## Before a container's final gate: reconcile pitfalls against criteria
+
+A container review — a story checkpoint, or the container's own completion gate — must reconcile the findings the lead deferred during execution against the container's own criteria. Those findings are recorded in the progress file's `surfaced_pitfalls` (`progress-file.md`). Recording a finding there does not make it out of scope.
+
+Before running a container-level gate:
+
+1. Re-read every `[hard]` criterion on the container.
+2. Read every entry in `surfaced_pitfalls`.
+3. For each pitfall, ask whether any criterion names its subject. If one does, the pitfall is a criterion violation rather than a follow-up, and it must be closed before the gate runs.
+
+**The plan cannot settle this.** A plan that scoped a criterion's subject out of the fan-out binds the fan-out shape only; it cannot make an unmet criterion met. When a container gate fails on a criterion the plan deliberately deferred, the resolution is to create a remediation task inside the container and close the criterion. Softening the criterion's reading instead is argue mode — see No-argue discipline below.
+
+Observed cost of skipping this: an epic's independent holistic review failed on a hard criterion whose two halves were both sitting in `surfaced_pitfalls` marked "natural follow-up", after all eight waves had closed. Remediation cost a full extra wave — one new task, two review rounds, two gates, and a re-run of the container gate. The reviewer drew all three of its findings from that same list, which the lead had already read and classified entirely as future work.
+
 ## Before dispatching rework
 
 Before dispatching any rework, the lead must have completed Tiers 1.5 and 2.75 in addition to the other tiers. The 6-cycle loop pattern observed in practice (each round surfacing a different subset of findings) is preventable only if the lead audits holistically on every round — reviewers have no memory across rounds, so the lead must supply it.
