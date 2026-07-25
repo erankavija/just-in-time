@@ -1005,6 +1005,13 @@
       "subject": "docs/reference/cli-commands.md:304-307 states the archive slug falls back to the issue title",
       "detail": "Two sentences become false when 8cd6eb73 lands: \"Otherwise the issue title supplies the slug\" and \"uses `container` when no usable character remains\". After the change an ambiguous or absent membership label yields a bare `<short-id>` directory, and the `container` empty-fallback no longer exists.",
       "disposition": "covered - 4a6fb8c1 (command-reference-surface, wave 12) declares docs/reference/cli-commands.md and carries doc-review + docs-mechanical. VERIFY at wave 12 that 4a6fb8c1 closes BOTH sentences. Same shape as P4 on the same file; both are live adopter-facing falsehoods from wave 3 until wave 12, and P2 proved a 'covered by a later issue' pitfall is not inert."
+    },
+    {
+      "id": "P6",
+      "raised_by": "f88a16d9",
+      "subject": "adopter configuration reference gains no issue_scoped_areas key",
+      "detail": "f88a16d9 adds issue_scoped_areas to the [documentation] table that `jit init` authors. docs/reference/configuration.md and docs/reference/example-config.toml document that table and will not mention the new key.",
+      "disposition": "covered - 58c56743 (wave 11) declares both files and already owes them the 8-area managed/permanent correction from P2. VERIFY at wave 11 that it also adds issue_scoped_areas. If 58c56743's criteria name only the managed/permanent lists, this key needs an explicit addition rather than an assumed one."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00"
