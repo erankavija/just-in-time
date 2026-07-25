@@ -89,7 +89,7 @@
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-07-25T04:42:07.646158256Z",
+      "updated_at": "2026-07-25T04:59:04.132690931Z",
       "updated_by": "auto:executor"
     }
   },
@@ -103,5 +103,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Corrected successor deck for the repository-materialization story",
-  "updated_at": "2026-07-25T04:45:50.238576669Z"
+  "updated_at": "2026-07-25T04:59:04.132690931Z"
 }
