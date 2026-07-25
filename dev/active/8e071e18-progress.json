@@ -26,7 +26,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "merged-pending-gates"
         },
         {
           "id": "69dd4e36-f4d9-4f11-b1b3-fa7af71e6f34",
@@ -37,7 +37,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "merged-pending-gates"
         }
       ]
     },
@@ -923,6 +923,28 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {},
-  "surfaced_pitfalls": [],
+  "surfaced_pitfalls": [
+    {
+      "id": "P1",
+      "raised_by": "69dd4e36",
+      "subject": "CHANGELOG entry for the epic's user-visible shipped-behaviour changes",
+      "detail": "jit init now authors a live [documentation] policy; archival classifies out-of-root artifacts as permanent and skips directory link targets. No epic issue owns a CHANGELOG entry (6e963a7f touches CHANGELOG.md but is scoped to citation-path repointing only). Repository convention records user-visible behaviour changes in CHANGELOG.md.",
+      "disposition": "open \u2014 lead to create one epic-wide CHANGELOG task in a late wave; reconcile against epic criteria before the epic gate"
+    },
+    {
+      "id": "P2",
+      "raised_by": "69dd4e36",
+      "subject": "stale adopter examples of the documentation policy",
+      "detail": "docs/reference/configuration.md:45-88 and docs/reference/example-config.toml:15-26 still show the old three-area managed set and permanent_paths=[\"docs/\"].",
+      "disposition": "covered \u2014 58c56743 (configuration-reference-home) declares both files in its footprint"
+    },
+    {
+      "id": "P3",
+      "raised_by": "69dd4e36",
+      "subject": "config.rs accessor doc comments restate the old default path lists",
+      "detail": "crates/jit/src/config.rs:313-352 restate (default: [\"dev/active\",...]) and (default: [\"docs/\"]).",
+      "disposition": "covered \u2014 b3fc1a92 REQ-02 requires the fallback doc comments carry no second copy"
+    }
+  ],
   "started_at": "2026-07-25T14:24:30.011076+00:00"
 }
