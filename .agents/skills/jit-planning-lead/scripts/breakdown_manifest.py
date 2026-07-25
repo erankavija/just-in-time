@@ -405,10 +405,14 @@ def overview(entries):
     for entry in entries:
         p = entry["planning"]
         footprint = p.get("terminal", {}).get("footprint", {})
-        footprint_text = "; ".join([
-            *(f"creates {path}" for path in footprint.get("creates", [])),
-            *(f"touches {path}" for path in footprint.get("touches", [])),
-            *([f"uncertain: {footprint['uncertainty']}"] if footprint.get("uncertainty") else []),
+        # Counts, not paths: the manifest is the authority for exact footprints, and
+        # rendering them inline scales the overview with the graph until the plan stops
+        # being concise.
+        creates, touches = footprint.get("creates", []), footprint.get("touches", [])
+        footprint_text = ", ".join([
+            *([f"creates {len(creates)}"] if creates else []),
+            *([f"touches {len(touches)}"] if touches else []),
+            *(["uncertain"] if footprint.get("uncertainty") else []),
         ]) or "—"
         values = (entry["key"], entry["title"], entry["type"], p["outcome"], ", ".join(p["contract_refs"]) or "—", ", ".join(p["source_refs"]), footprint_text, p.get("landing_group", "—"), ", ".join(entry["depends_on"]) or "—")
         rows.append("| " + " | ".join(map(cell, values)) + " |")

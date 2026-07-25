@@ -1,0 +1,50 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "be6b9c840fe607227e5abaf97cb83f1869b55aea",
+  "completed_at": "2026-07-25T12:09:22.758164744Z",
+  "duration_ms": 221213,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "file": "dev/active/8e071e18-plan.md",
+        "id": "F1",
+        "line": 123,
+        "severity": "high",
+        "summary": "The generated overview embeds exhaustive per-container file inventories, so the plan is not concise."
+      },
+      {
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F2",
+        "line": 320,
+        "severity": "high",
+        "summary": "Deck eligibility and citation scanning both touch the archive-preview suite without a dependency path between them."
+      },
+      {
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F3",
+        "line": 880,
+        "references": [
+          "@/issue/8e071e18/decision/D-16"
+        ],
+        "severity": "high",
+        "summary": "The repository-citation-scan leaf combines configuration, storage, domain, integration, and documentation work beyond one focused cycle."
+      }
+    ],
+    "summary": "The plan has an oversized generated inventory, an unresolved concurrent footprint overlap, and an oversized citation-scan leaf.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "55fe8ec2-880f-4380-91f2-97f4daf71bda",
+  "message": null,
+  "run_id": "130a2c0e-a806-4769-bf0a-be2eada8f95d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T12:05:41.544695410Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4625 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f992a-b8eb-7d22-8a6b-6284b03caa0a\n--------\nuser\n--- 4612 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 (high)** `dev/active/8e071e18-plan.md:123` is not concise: its generated overview is 326 lines / ~59 KB and embeds exhaustive per-container file inventories from the manifest. Keep exact footprints in the authoritative JSON and investigation; make the rendered overview compact (counts plus manifest/investigation references) so renderer `--check` still passes.\n\n2. **F2 (high)** `deck-archival-eligibility` and `repository-citation-scan` both touch `crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs` (`dev/active/8e071e18-breakdown.json:320`, `:880`) but neither is transitively dependent on the other. This contradicts the plan’s claim at `dev/active/8e071e18-plan.md:458` that every overlapping writer is ordered. Add the missing ordering edge—consistent with the stated sequence, make deck eligibility depend on the citation scan—or give the file one owner.\n\n3. **F3 (high)** `repository-citation-scan` (`dev/active/8e071e18-breakdown.json:880`) is not worker-sized: it combines configuration schema/defaults, recursive storage scanning, domain warning construction, Git-free integration behavior, edge-case handling, and documentation across five component families and nine acceptance clusters. Split it into bounded configuration-contract, scan/warning implementation, and documentation/test leaves, preserving one producer for `citation-scan-universe`.\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan has an oversized generated inventory, an unresolved concurrent footprint overlap, and an oversized citation-scan leaf.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The generated overview embeds exhaustive per-container file inventories, so the plan is not concise.\",\"file\":\"dev/active/8e071e18-plan.md\",\"line\":123},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Deck eligibility and citation scanning both touch the archive-preview suite without a dependency path between them.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":320},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"The repository-citation-scan leaf combines configuration, storage, domain, integration, and documentation work beyond one focused cycle.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":880,\"references\":[\"@/issue/8e071e18/decision/D-16\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
