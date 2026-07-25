@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-25T23:05:57.642142790Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
@@ -21,12 +22,11 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:archive-naming-and-warnings",
-    "satisfies:REQ-08",
     "per:@/issue/8e071e18/decision/D-8",
     "per:@/issue/8e071e18/decision/D-16"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Warn on in-content citations of a moving artifact's path",
-  "updated_at": "2026-07-25T22:30:11.447123549Z"
+  "updated_at": "2026-07-25T23:05:57.642142790Z"
 }

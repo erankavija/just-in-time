@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-25T23:05:50.116051368Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
@@ -20,11 +21,10 @@
     "story:area-classification",
     "per:@/issue/8e071e18/decision/D-3",
     "per:@/issue/8e071e18/decision/D-5",
-    "per:@/issue/8e071e18/decision/D-13",
-    "satisfies:REQ-08"
+    "per:@/issue/8e071e18/decision/D-13"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Adopt the shipped area classification in this repository's configuration",
-  "updated_at": "2026-07-25T22:30:15.212163438Z"
+  "updated_at": "2026-07-25T23:05:50.116051368Z"
 }
