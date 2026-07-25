@@ -9682,3 +9682,11 @@
 {"from":"backlog","id":"a1ac504d-97cb-4377-ac01-92e38522b54d","issue_id":"6aa82c0b-13d9-4d91-ba2e-f0fc50158716","timestamp":"2026-07-25T21:31:28.054535353Z","to":"ready","type":"issue_state_changed"}
 {"from":"in_progress","id":"26ec618b-05b5-4265-a637-6a5f88ec35d5","issue_id":"fd88adda-e3c5-4ba0-b31d-00d6f1feb92b","timestamp":"2026-07-25T21:31:31.752671855Z","to":"done","type":"issue_state_changed"}
 {"id":"84a744b3-50b1-4f11-a1b3-285e88dc909e","issue_id":"fd88adda-e3c5-4ba0-b31d-00d6f1feb92b","timestamp":"2026-07-25T21:31:31.752671855Z","type":"issue_completed"}
+{"fields":["labels"],"id":"4cb46f2b-9c31-47bc-a980-1b8839417eea","issue_id":"6aa82c0b-13d9-4d91-ba2e-f0fc50158716","timestamp":"2026-07-25T21:32:56.423430927Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["labels"],"id":"c12b307d-f894-4d2a-a49c-044cda100552","issue_id":"22c11e40-43b8-42c2-a075-14860cc12d03","timestamp":"2026-07-25T21:33:00.127824519Z","type":"issue_updated","updated_by":"issue-update"}
+{"from":"ready","id":"ac883f83-10e0-4b90-8530-c7b57c824934","issue_id":"22c11e40-43b8-42c2-a075-14860cc12d03","timestamp":"2026-07-25T21:33:04.063421742Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"1af86257-5fbf-4197-b6ab-8cc2c9a3ef43","issue_id":"22c11e40-43b8-42c2-a075-14860cc12d03","timestamp":"2026-07-25T21:33:04.063421742Z","type":"issue_claimed"}
+{"from":"ready","id":"097bc3f2-79b5-4678-a662-93558bea0ae9","issue_id":"6aa82c0b-13d9-4d91-ba2e-f0fc50158716","timestamp":"2026-07-25T21:33:07.788791508Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"62a77c6c-5c7e-4c3b-96a0-c3bc751d206e","issue_id":"6aa82c0b-13d9-4d91-ba2e-f0fc50158716","timestamp":"2026-07-25T21:33:07.788791508Z","type":"issue_claimed"}
+{"from":"ready","id":"57271ae4-cfc0-4d2f-8de3-90dea01ad3ef","issue_id":"b4d1a2c8-d408-46d0-b0b6-dc3e30283420","timestamp":"2026-07-25T21:33:11.510763518Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"aa3ee4dd-372b-4ab2-b25f-e2089ece8867","issue_id":"b4d1a2c8-d408-46d0-b0b6-dc3e30283420","timestamp":"2026-07-25T21:33:11.510763518Z","type":"issue_claimed"}

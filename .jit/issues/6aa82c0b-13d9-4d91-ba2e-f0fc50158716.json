@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-25T21:33:07.788791508Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
@@ -19,11 +20,10 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:archive-naming-and-warnings",
-    "satisfies:REQ-08",
     "per:@/issue/8e071e18/decision/D-16"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Declare the citation scan universe in the documentation policy",
-  "updated_at": "2026-07-25T21:31:28.054535353Z"
+  "updated_at": "2026-07-25T21:33:07.788791508Z"
 }
