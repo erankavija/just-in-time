@@ -196,6 +196,11 @@ pub fn expand_artifact_closure(
 }
 
 /// Derive selected inventory and repository-wide embedded owners from the same closed evidence.
+///
+/// Link targets that [`is_navigation_target`] identifies are skipped: they
+/// contribute no edge, no artifact entry, and no traversal. An explicitly
+/// selected root is inventoried whatever its filesystem kind, so a directory
+/// named as a root still reaches classification and blocks there.
 pub fn discover_archive_artifacts(
     inventory: ExplicitRootInventory,
     issues: &[Issue],
@@ -245,7 +250,7 @@ pub fn discover_archive_artifacts(
                 }
                 continue;
             }
-            Some(ArtifactEvidence::Unsupported | ArtifactEvidence::Directory { .. }) => {
+            Some(ArtifactEvidence::Unsupported) => {
                 for parent in referencing.get(&path).into_iter().flatten() {
                     append_warning(
                         working.get_mut(parent).ok_or_else(|| {
@@ -256,6 +261,11 @@ pub fn discover_archive_artifacts(
                 }
                 continue;
             }
+            // A directory enters the graph only as an explicit root, because
+            // navigation targets are skipped before they are enqueued. Its
+            // entry stays in the inventory and classification blocks it from
+            // its own location evidence.
+            Some(ArtifactEvidence::Directory { .. }) => continue,
             Some(ArtifactEvidence::InvalidPath) => {
                 append_blocker(
                     working
@@ -292,6 +302,9 @@ pub fn discover_archive_artifacts(
                             entry_blockers.push(blocker);
                         }
                         ReferenceResolution::Local { edge, target } => {
+                            if is_navigation_target(&target, evidence) {
+                                continue;
+                            }
                             edges.push(edge);
                             referencing
                                 .entry(target.clone())
@@ -340,6 +353,23 @@ pub fn discover_archive_artifacts(
         ArtifactClassificationInventory::new(target, historical, blockers),
         owners,
     ))
+}
+
+/// Whether a resolved local target is navigation rather than a document.
+///
+/// A link whose target is a directory addresses a place to browse, not an
+/// artifact the parent depends on (`@/issue/8e071e18/decision/D-18`). A
+/// symbolic link keeps its own treatment even when it points at a directory,
+/// because captured evidence reports the link itself.
+///
+/// Absent evidence is never navigation: the closure contract supplies a fact
+/// for every reachable local target, so an uncaptured path stays a graph error
+/// rather than becoming a silent skip.
+fn is_navigation_target(target: &str, evidence: &ArtifactEvidenceMap) -> bool {
+    matches!(
+        evidence.get(target),
+        Some(ArtifactEvidence::Directory { .. })
+    )
 }
 
 /// Derive repository-wide embedded ownership from the same closed artifact evidence.

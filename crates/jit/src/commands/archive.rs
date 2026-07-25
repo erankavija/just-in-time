@@ -2000,6 +2000,98 @@ epic = "epic"
         )));
     }
 
+    /// A configured repository whose one terminal container owns a document
+    /// linking the sibling path `fixtures/section`. The caller decides what that
+    /// path is on disk.
+    fn directory_link_repo() -> (TempDir, JsonFileStorage, String) {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        fs::create_dir_all(storage.root()).unwrap();
+        fs::write(
+            storage.root().join("config.toml"),
+            r#"
+[documentation]
+managed_paths = ["fixtures"]
+permanent_paths = []
+archive_root = "archive"
+
+[type_hierarchy]
+types = { epic = 1, task = 2 }
+[type_hierarchy.label_associations]
+epic = "epic"
+"#,
+        )
+        .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
+        fs::create_dir_all(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/index.md"), "[section](section/)").unwrap();
+
+        let mut epic =
+            crate::domain::types::fixture_issue("Directory link container".into(), String::new());
+        epic.state = State::Done;
+        epic.labels = vec!["type:epic".into(), "epic:directory-link".into()];
+        epic.documents = vec![DocumentReference::new("fixtures/index.md".into())];
+        let id = epic.id.clone();
+        seed_archive_issue_precondition(&storage, epic);
+        (repo, storage, id)
+    }
+
+    #[test]
+    fn test_preview_container_directory_link_target_contributes_no_artifact_and_stays_eligible() {
+        let (repo, storage, id) = directory_link_repo();
+        fs::create_dir_all(repo.path().join("fixtures/section")).unwrap();
+        fs::write(repo.path().join("fixtures/section/child.md"), "child").unwrap();
+
+        let plan = executor(&repo, storage)
+            .preview_archive_container(&id)
+            .unwrap();
+
+        assert!(plan
+            .artifacts()
+            .iter()
+            .all(|artifact| artifact.source() != "fixtures/section"));
+        assert!(plan
+            .blockers()
+            .iter()
+            .chain(
+                plan.artifacts()
+                    .iter()
+                    .flat_map(crate::domain::artifact_plan::ArtifactPlanEntry::blockers)
+            )
+            .all(|blocker| blocker.code != BlockerCode::UnsupportedArtifactType));
+        assert!(plan.eligible());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_preview_container_symlinked_directory_link_target_still_blocks_as_symlink_artifact() {
+        use std::os::unix::fs::symlink;
+
+        let (repo, storage, id) = directory_link_repo();
+        fs::create_dir_all(repo.path().join("referents/section")).unwrap();
+        symlink(
+            repo.path().join("referents/section"),
+            repo.path().join("fixtures/section"),
+        )
+        .unwrap();
+
+        let plan = executor(&repo, storage)
+            .preview_archive_container(&id)
+            .unwrap();
+
+        assert!(plan
+            .artifacts()
+            .iter()
+            .find(|artifact| artifact.source() == "fixtures/section")
+            .expect("a symlinked target stays an artifact")
+            .blockers()
+            .iter()
+            .any(|blocker| blocker.code == BlockerCode::SymlinkArtifact));
+        assert!(!plan.eligible());
+    }
+
     // === Coupled retirement workflow (jit:45a140ae) ===
 
     /// A repo with one container issue in `state` owning `fixtures/root.md`.

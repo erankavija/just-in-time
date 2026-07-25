@@ -716,7 +716,7 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
 }
 
 #[test]
-fn test_archive_candidates_cli_reports_directory_root_and_continues_without_mutation() {
+fn test_archive_candidates_cli_reports_directory_root_but_skips_directory_link_targets() {
     let repo = TempDir::new().unwrap();
     assert_success(&jit(&repo, &["init", "--json"]));
     set_documentation_policy(
@@ -771,23 +771,21 @@ fn test_archive_candidates_cli_reports_directory_root_and_continues_without_muta
         .find(|candidate| candidate["target"]["id"] == directory_candidate)
         .unwrap();
     assert_eq!(directory_plan["eligible"], false);
-    let directory_artifact = directory_plan["artifacts"]
+    assert!(directory_plan["blockers"]
         .as_array()
         .unwrap()
         .iter()
-        .find(|artifact| artifact["source"] == "dev/active")
-        .unwrap();
-    assert_eq!(directory_artifact["action"], "block");
-    assert!(directory_artifact["blockers"]
-        .as_array()
-        .unwrap()
+        .any(|blocker| blocker["code"] == "unmanaged-selected-root"));
+    let directory_artifacts = directory_plan["artifacts"].as_array().unwrap();
+    assert!(directory_artifacts
         .iter()
-        .any(|blocker| {
-            blocker["code"] == "unsupported-artifact-type" && blocker["path"] == "dev/active"
-        }));
-    let parent_artifact = directory_plan["artifacts"]
-        .as_array()
-        .unwrap()
+        .all(|artifact| artifact["source"] != "dev/active"));
+    assert!(directory_artifacts
+        .iter()
+        .flat_map(|artifact| artifact["blockers"].as_array().unwrap())
+        .chain(directory_plan["blockers"].as_array().unwrap())
+        .all(|blocker| blocker["code"] != "unsupported-artifact-type"));
+    let parent_artifact = directory_artifacts
         .iter()
         .find(|artifact| artifact["source"] == "dev/index.md")
         .unwrap();
@@ -795,9 +793,12 @@ fn test_archive_candidates_cli_reports_directory_root_and_continues_without_muta
         .as_array()
         .unwrap()
         .iter()
-        .any(|warning| {
-            warning["code"] == "unsupported-edge-target" && warning["path"] == "dev/active"
-        }));
+        .all(|warning| warning["code"] != "unsupported-edge-target"));
+    assert!(parent_artifact["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|edge| edge["target"] != "dev/active"));
 
     let preview = jit(
         &repo,

@@ -264,6 +264,94 @@ fn test_repository_escape_blocks_and_missing_embedded_target_warns() {
 }
 
 #[test]
+fn test_directory_link_target_is_navigation_while_regular_link_target_stays_an_artifact() {
+    let repo = Repo::new();
+    repo.write("docs/index.md", "[section](section/) [guide](guide.md)");
+    repo.write("docs/guide.md", "guide");
+    repo.write("docs/section/child.md", "child");
+
+    let discovered = repo.discover("docs/index.md");
+
+    assert_eq!(
+        discovered
+            .artifacts()
+            .iter()
+            .map(|entry| entry.source())
+            .collect::<Vec<_>>(),
+        ["docs/guide.md", "docs/index.md"]
+    );
+    let root = discovered
+        .artifacts()
+        .iter()
+        .find(|entry| entry.source() == "docs/index.md")
+        .unwrap();
+    assert!(root
+        .edges()
+        .iter()
+        .any(|edge| edge.target.as_deref() == Some("docs/guide.md")));
+    assert!(!root
+        .edges()
+        .iter()
+        .any(|edge| edge.target.as_deref() == Some("docs/section")));
+    assert!(!root
+        .warnings()
+        .iter()
+        .any(|warning| warning.code == WarningCode::UnsupportedEdgeTarget));
+    assert!(discovered
+        .artifacts()
+        .iter()
+        .all(|entry| entry.blockers().is_empty()));
+    assert!(discovered.blockers.is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_symlinked_directory_link_target_is_inventoried_rather_than_skipped_as_navigation() {
+    use std::os::unix::fs::symlink;
+
+    let repo = Repo::new();
+    repo.write("docs/index.md", "[plain](plain/) [linked](linked/)");
+    repo.write("docs/plain/child.md", "child");
+    repo.write("referents/bundle/secret.md", "must not be discovered");
+    symlink(
+        repo.root.join("referents/bundle"),
+        repo.root.join("docs/linked"),
+    )
+    .unwrap();
+
+    let discovered = repo.discover("docs/index.md");
+
+    assert_eq!(
+        discovered
+            .artifacts()
+            .iter()
+            .map(|entry| entry.source())
+            .collect::<Vec<_>>(),
+        ["docs/index.md", "docs/linked"]
+    );
+    let root = discovered
+        .artifacts()
+        .iter()
+        .find(|entry| entry.source() == "docs/index.md")
+        .unwrap();
+    assert!(root
+        .edges()
+        .iter()
+        .any(|edge| edge.target.as_deref() == Some("docs/linked")));
+    assert!(!root
+        .edges()
+        .iter()
+        .any(|edge| edge.target.as_deref() == Some("docs/plain")));
+    assert!(discovered
+        .artifacts()
+        .iter()
+        .find(|entry| entry.source() == "docs/linked")
+        .unwrap()
+        .edges()
+        .is_empty());
+}
+
+#[test]
 fn test_supported_text_format_matrix_warns_for_local_loader_text() {
     let cases = [
         ("format/example.md", "Example: `fetch('./payload.json')`."),
