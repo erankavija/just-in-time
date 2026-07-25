@@ -328,6 +328,9 @@ pub struct DocumentationConfig {
     /// falls back to [`SHIPPED_DOCUMENTATION_POLICY`]'s issue-scoped areas; an
     /// authored empty list declares that no area adopts the convention.
     pub issue_scoped_areas: Option<Vec<String>>,
+    /// Roots an in-content citation scan reads. Absent falls back to the
+    /// development root together with the configured permanent paths.
+    pub citation_scan_roots: Option<Vec<String>>,
 }
 
 impl DocumentationConfig {
@@ -384,6 +387,27 @@ impl DocumentationConfig {
                 .issue_scoped_areas
                 .iter()
                 .map(|area| area.to_string())
+                .collect()
+        })
+    }
+
+    /// The repository-relative roots an in-content citation scan reads, falling
+    /// back to the development root together with the configured permanent
+    /// paths when unauthored (`@/issue/8e071e18/decision/D-16`).
+    ///
+    /// The fallback is derived from this table's own values, so reclassifying an
+    /// area carries the scanned set with it. Entries are matched with
+    /// [`contains_path`](crate::domain::artifact_classifier::contains_path), the
+    /// matcher the classification lists use: a directory entry reaches
+    /// everything beneath it and a file entry reaches exactly one file. An
+    /// authored list is the whole universe — it replaces the fallback rather
+    /// than extending it, and its entries need not lie under the development
+    /// root, since the citations a move can break live wherever the adopter
+    /// writes them.
+    pub fn citation_scan_roots(&self) -> Vec<String> {
+        self.citation_scan_roots.clone().unwrap_or_else(|| {
+            std::iter::once(self.development_root())
+                .chain(self.permanent_paths())
                 .collect()
         })
     }
@@ -2366,6 +2390,7 @@ enforced-by = "dag-no-cycles"
             archive_root: None,
             permanent_paths: None,
             issue_scoped_areas: None,
+            citation_scan_roots: None,
         };
         assert_eq!(
             unauthored.development_root(),
@@ -2411,6 +2436,7 @@ enforced-by = "dag-no-cycles"
             archive_root: None,
             permanent_paths: None,
             issue_scoped_areas: None,
+            citation_scan_roots: None,
         };
         let declared = unauthored
             .issue_scoped_areas()
@@ -2443,6 +2469,7 @@ enforced-by = "dag-no-cycles"
             archive_root: None,
             permanent_paths: None,
             issue_scoped_areas: None,
+            citation_scan_roots: None,
         };
         let shipped_area = shipped
             .issue_scoped_areas()
@@ -2474,6 +2501,109 @@ enforced-by = "dag-no-cycles"
     }
 
     #[test]
+    fn test_citation_scan_roots_resolve_to_the_development_root_with_the_permanent_paths_when_unauthored(
+    ) {
+        // The default is computed from the table it sits in rather than frozen
+        // into a declaration of its own (`@/issue/8e071e18/decision/D-16`).
+        let derived_universe = |config: &DocumentationConfig| {
+            std::iter::once(config.development_root())
+                .chain(config.permanent_paths())
+                .collect::<std::collections::BTreeSet<_>>()
+        };
+        let resolved_universe = |config: &DocumentationConfig| {
+            config
+                .citation_scan_roots()
+                .into_iter()
+                .collect::<std::collections::BTreeSet<_>>()
+        };
+
+        let unauthored = DocumentationConfig {
+            development_root: None,
+            managed_paths: None,
+            archive_root: None,
+            permanent_paths: None,
+            issue_scoped_areas: None,
+            citation_scan_roots: None,
+        };
+        assert_eq!(
+            resolved_universe(&unauthored),
+            derived_universe(&unauthored)
+        );
+
+        // Reclassifying the table moves the default with it: a repository that
+        // renames its development root and declares its own permanent areas
+        // scans those, not the shipped ones.
+        let reclassified = DocumentationConfig {
+            development_root: Some("workspace".to_string()),
+            permanent_paths: Some(vec![
+                "workspace/guides".to_string(),
+                "README.md".to_string(),
+            ]),
+            ..unauthored.clone()
+        };
+        assert_eq!(
+            resolved_universe(&reclassified),
+            derived_universe(&reclassified)
+        );
+        assert!(resolved_universe(&reclassified).is_disjoint(&resolved_universe(&unauthored)));
+    }
+
+    #[test]
+    fn test_citation_scan_roots_replace_the_default_with_an_authored_universe_reaching_outside_the_development_root(
+    ) {
+        use crate::domain::artifact_classifier::contains_path;
+
+        let unauthored = DocumentationConfig {
+            development_root: None,
+            managed_paths: None,
+            archive_root: None,
+            permanent_paths: None,
+            issue_scoped_areas: None,
+            citation_scan_roots: None,
+        };
+        let development_root = unauthored.development_root();
+
+        // A directory entry and a file entry, both outside the development
+        // root: the universe is not bounded by it.
+        let outside_directory = "scripts".to_string();
+        let outside_file = "CHANGELOG.md".to_string();
+        assert!(!contains_path(&development_root, &outside_directory));
+        assert!(!contains_path(&development_root, &outside_file));
+
+        let authored_entries = vec![
+            development_root.clone(),
+            outside_directory.clone(),
+            outside_file.clone(),
+        ];
+        let authored = DocumentationConfig {
+            citation_scan_roots: Some(authored_entries.clone()),
+            ..unauthored.clone()
+        };
+        let resolved = authored.citation_scan_roots();
+        assert!(resolved.contains(&outside_directory) && resolved.contains(&outside_file));
+
+        // The authored list is the whole universe: it replaces the default
+        // instead of extending it, so a default root it omits is gone.
+        let omitted = unauthored
+            .citation_scan_roots()
+            .into_iter()
+            .find(|root| !authored_entries.contains(root))
+            .expect("the default universe should reach roots this fixture omits");
+        assert!(!resolved.contains(&omitted));
+        assert_eq!(resolved.len(), authored_entries.len());
+
+        // Entries are matched the way the classification lists are: a directory
+        // entry reaches everything beneath it, a file entry reaches that one
+        // file, and a sibling whose name merely starts the same way is outside.
+        let scanned = |path: &str| resolved.iter().any(|root| contains_path(root, path));
+        assert!(scanned(&format!("{outside_directory}/ci/check.sh")));
+        assert!(scanned(&outside_file));
+        assert!(!scanned(&format!("{outside_file}.bak")));
+        assert!(!scanned(&format!("{outside_directory}-legacy/check.sh")));
+        assert!(!scanned("target/debug/build.log"));
+    }
+
+    #[test]
     fn test_unauthored_documentation_table_stays_non_configured_despite_fallbacks() {
         // The fallbacks stay non-authorizing (REQ-03): a repository with no
         // `[documentation]` table, or one that authors none of the required
@@ -2493,6 +2623,7 @@ enforced-by = "dag-no-cycles"
             archive_root: None,
             permanent_paths: None,
             issue_scoped_areas: None,
+            citation_scan_roots: None,
         };
         assert_eq!(
             PolicyStatus::from_documentation(Some(&unauthored)),
