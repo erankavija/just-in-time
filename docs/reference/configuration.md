@@ -74,11 +74,12 @@ issue_scoped_areas = [
 ]
 ```
 
-Controls document lifecycle management; `jit init` scaffolds the table above
-into a new repository. Selected documents in `managed_paths` may move to the
-archive mirror. Selected documents in `permanent_paths` are copied to the mirror
-while their source remains in place; “permanent” prevents source deletion, not
-mirror publication.
+Controls document lifecycle management. `jit init` scaffolds the table above
+into a new repository from the `SHIPPED_DOCUMENTATION_POLICY` declaration in
+`crates/jit/src/config.rs`, the single source of that classification. Selected
+documents in `managed_paths` may move to the archive mirror. Selected documents
+in `permanent_paths` are copied to the mirror while their source remains in
+place; “permanent” prevents source deletion, not mirror publication.
 
 An entry in either path list names a directory or an individual file. A
 directory entry classifies every artifact beneath it; a file entry classifies
