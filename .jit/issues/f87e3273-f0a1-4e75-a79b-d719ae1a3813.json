@@ -76,6 +76,7 @@
       "path": "dev/presentations/1cc809de/talk.html"
     }
   ],
+  "done_at": "2026-07-25T05:02:21.663281301Z",
   "first_ready_at": "2026-07-25T00:10:33.793532047Z",
   "gates_required": [
     "doc-review",
@@ -101,7 +102,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Corrected successor deck for the repository-materialization story",
-  "updated_at": "2026-07-25T05:01:29.821917332Z"
+  "updated_at": "2026-07-25T05:02:21.663281301Z"
 }
