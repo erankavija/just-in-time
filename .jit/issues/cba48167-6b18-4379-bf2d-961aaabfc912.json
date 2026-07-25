@@ -7,7 +7,41 @@
     "f87e3273-f0a1-4e75-a79b-d719ae1a3813"
   ],
   "description": "Move the predecessor repository-materialization showcase deck into the feature archive and leave a tombstone at its original path pointing to the corrected successor deck and to the audit.\n\n## Background\n\nThe predecessor showcase deck lives at `dev/presentations/cdc840ad/` (`talk.html`, `base.css`, and a `themes/` directory). An adversarial audit found nine falsifiable errors in it, and a corrected successor deck now lives at `dev/presentations/1cc809de/`. The predecessor must be retired without breaking existing links to its location: the deck files move to the established feature-archive shape `dev/archive/features/cdc840ad/showcase/`, and a tombstone document takes their place at the original directory so any reader or link arriving there is redirected to the corrected successor and the audit that motivated the succession.\n\n## Success Criteria\n\n- [hard] REQ-01: The predecessor deck files (`talk.html`, `base.css`, and the `themes/` directory) are relocated from `dev/presentations/cdc840ad/` to `dev/archive/features/cdc840ad/showcase/` with their contents unchanged.\n- [hard] REQ-02: A tombstone document remains at `dev/presentations/cdc840ad/` that links to the successor deck at `dev/presentations/1cc809de/` and to the audit at `dev/studies/cdc840ad-audit-2026-07-23.md`, and states that the deck it replaced was retired for containing falsifiable claims.\n- [hard] REQ-03: The tombstone occupies the original deck directory path so that prior references to `dev/presentations/cdc840ad/` resolve to it, and every link in the tombstone resolves to an existing repository path.\n\n## Notes\n\nThe archive destination `dev/archive/features/cdc840ad/showcase/` follows the established feature-archive shape under `dev/archive/features/`. The tombstone is the sole content remaining at the original path.",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "af039f225925320f259517b75a646f45ba786e8ecba1679573c90abf416abd1d",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../studies/cdc840ad-audit-2026-07-23.md",
+          "resolved_path": "dev/studies/cdc840ad-audit-2026-07-23.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "92f970be609ef130f71c83e2514c3241b2a2a00567f59c1b0c24703694f56695",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../1cc809de/talk.html",
+          "resolved_path": "dev/presentations/1cc809de/talk.html"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "d2319c2c47a5a177d79ba1396aa8f9ab186e4904bcfd61f9aed7f275624dcc2c",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../archive/features/cdc840ad/showcase/talk.html",
+          "resolved_path": "dev/archive/features/cdc840ad/showcase/talk.html"
+        }
+      ],
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Tombstone: predecessor deck retired",
+      "path": "dev/presentations/cdc840ad/README.md"
+    }
+  ],
   "first_ready_at": "2026-07-25T05:02:25.329636482Z",
   "gates_required": [
     "doc-review",
@@ -24,5 +58,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Archive the predecessor deck behind a tombstone",
-  "updated_at": "2026-07-25T05:02:46.035365014Z"
+  "updated_at": "2026-07-25T05:04:58.229237277Z"
 }
