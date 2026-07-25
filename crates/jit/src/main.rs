@@ -5094,6 +5094,19 @@ fn run() -> Result<()> {
                     println!("{}", result.content);
                 }
             }
+            DocCommands::Dir { id, area, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                let response = executor.resolve_issue_artifact_directory(&id, &area)?;
+
+                if json {
+                    use jit::output::JsonOutput;
+                    println!("{}", JsonOutput::success(&response).to_json_string()?);
+                } else {
+                    // The bare path, so the command composes into a shell
+                    // substitution without anything to strip off it.
+                    output_ctx.print_data(&response.directory)?;
+                }
+            }
             DocCommands::History { id, path, json } => {
                 use jit::output::JsonOutput;
 

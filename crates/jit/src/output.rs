@@ -2260,6 +2260,34 @@ impl From<crate::declarations::GateDefinition> for GateDefinition {
 }
 
 // ============================================================================
+// Document Response Types
+// ============================================================================
+
+/// Response for `doc dir` command.
+///
+/// One resolved value rather than a collection, so the shape is a flat named
+/// object: the issue whose directory this is, the area the caller named, and
+/// the repository-relative directory
+/// ([`resolve_artifact_directory`](crate::domain::artifact_directory::resolve_artifact_directory)
+/// derives the name inside the area). `area` echoes the caller's spelling
+/// rather than a normalized one, so a response is readable against the request
+/// that produced it, while `directory` is normalized.
+///
+/// The directory is a name: it is reported whether or not anything has been
+/// written there, and producing this response creates nothing.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ArtifactDirectoryResponse {
+    /// Full identifier of the issue the directory belongs to.
+    pub issue_id: String,
+    /// Short identifier the directory name is built from.
+    pub short_id: String,
+    /// Issue-scoped area the caller named.
+    pub area: String,
+    /// Repository-relative directory the issue owns in that area.
+    pub directory: String,
+}
+
+// ============================================================================
 // Label Response Types
 // ============================================================================
 

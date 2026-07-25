@@ -72,6 +72,49 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
+    /// Resolve the canonical artifact directory `issue_id` owns in `area`.
+    ///
+    /// The caller names the area; the directory inside it is derived by
+    /// [`resolve_artifact_directory`](crate::domain::artifact_directory::resolve_artifact_directory)
+    /// from the issue's labels and the repository's configured type-to-namespace
+    /// mapping, so no caller composes the name itself. The answer is a name:
+    /// nothing is read from or written to the directory, and an issue whose
+    /// artifacts still sit flat in the area resolves the same directory.
+    ///
+    /// # Errors
+    ///
+    /// An [`InvalidArgumentError`](crate::errors::InvalidArgumentError)
+    /// carrying [`ArtifactDirectoryError`](crate::domain::artifact_directory::ArtifactDirectoryError)'s
+    /// message when `area` is absent from the configured issue-scoped registry,
+    /// so an undeclared area is an argument failure rather than a path. Also
+    /// errors when `issue_id` resolves to no issue, when the issue cannot be
+    /// loaded, or when the repository's configuration cannot be read.
+    pub fn resolve_issue_artifact_directory(
+        &self,
+        issue_id: &str,
+        area: &str,
+    ) -> Result<crate::output::ArtifactDirectoryResponse> {
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
+        let documentation = self.config_manager.load()?.documentation.unwrap_or_default();
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
+
+        let directory = crate::domain::artifact_directory::resolve_artifact_directory(
+            &issue,
+            area,
+            &documentation,
+            &hierarchy,
+        )
+        .map_err(|error| crate::errors::InvalidArgumentError::new(error.to_string()))?;
+
+        Ok(crate::output::ArtifactDirectoryResponse {
+            short_id: issue.short_id(),
+            issue_id: issue.id,
+            area: area.to_string(),
+            directory,
+        })
+    }
+
     pub fn remove_document_reference(
         &self,
         issue_id: &str,

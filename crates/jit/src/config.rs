@@ -306,7 +306,11 @@ impl ValidationConfig {
 }
 
 /// Documentation lifecycle management configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+///
+/// Every field is optional and falls back to [`SHIPPED_DOCUMENTATION_POLICY`],
+/// so the default value is the wholly unauthored table: what a repository
+/// whose configuration omits `[documentation]` declares.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct DocumentationConfig {
     /// Root directory for development documentation. Absent falls back to
     /// [`SHIPPED_DOCUMENTATION_POLICY`]'s development root.

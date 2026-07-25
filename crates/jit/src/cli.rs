@@ -1930,6 +1930,31 @@ pub enum DocCommands {
         json: bool,
     },
 
+    /// Print the canonical artifact directory an issue owns in an area
+    ///
+    /// `<area>` is one of the issue-scoped areas the repository declares under
+    /// `[documentation]`; naming the area is the caller's whole contribution to
+    /// the path, since the directory name inside it is derived from the issue.
+    /// An area the registry does not declare is rejected rather than resolved.
+    ///
+    /// The directory is a name, not a location on disk: it resolves the same
+    /// whether or not anything has been written there yet, and this command
+    /// creates nothing.
+    ///
+    /// Human output is the bare repository-relative directory, so it composes
+    /// directly: mkdir -p "$(jit doc dir \<id\> \<area\>)". JSON output is the
+    /// flat object {"issue_id", "short_id", "area", "directory"}.
+    Dir {
+        /// Issue ID
+        id: String,
+
+        /// Declared issue-scoped area to resolve the directory in
+        area: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// List commit history for a document
     History {
         /// Issue ID
@@ -3026,6 +3051,7 @@ impl DocCommands {
             | Self::Rm { .. }
             | Self::Delete { .. }
             | Self::Show { .. }
+            | Self::Dir { .. }
             | Self::History { .. }
             | Self::Diff { .. }
             | Self::CheckLinks { .. } => false,
@@ -3203,6 +3229,7 @@ impl DocCommands {
             | Self::Rm { .. }
             | Self::Delete { .. }
             | Self::Show { .. }
+            | Self::Dir { .. }
             | Self::History { .. }
             | Self::Diff { .. }
             | Self::CheckLinks { .. } => false,
