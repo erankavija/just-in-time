@@ -1,0 +1,65 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "d11489915c88fdce3d959fb3e07ab49a4c7e21cd",
+  "completed_at": "2026-07-25T10:15:33.136700978Z",
+  "duration_ms": 265736,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F1",
+        "line": 1351,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/requirement/REQ-09",
+          "@/issue/8e071e18/decision/D-10"
+        ],
+        "severity": "high",
+        "summary": "The four archive-sweep terminal leaves each bundle multiple independent container executions and cannot be assigned to one focused worker cycle."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F2",
+        "line": 1429,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/requirement/REQ-09",
+          "@/issue/8e071e18/decision/D-10"
+        ],
+        "severity": "high",
+        "summary": "Archive-sweep footprints leave artifacts in other configured areas unresolved, preventing complete footprint and overlap review."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/8e071e18-breakdown.json",
+        "id": "F3",
+        "line": 2000,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/requirement/REQ-10",
+          "@/issue/8e071e18/decision/D-15"
+        ],
+        "severity": "high",
+        "summary": "REQ-10 disposition leaves group independent per-file outcomes without mappings and do not define a durable record surface or credible exact footprints."
+      }
+    ],
+    "summary": "The native graph validates, but cleanup execution and unprefixed-artifact disposition remain non-decomposable with unresolved footprints.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "55fe8ec2-880f-4380-91f2-97f4daf71bda",
+  "message": null,
+  "run_id": "90125269-8628-4fde-a5a8-a2a3b1c66230",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T10:11:07.400035722Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 25923 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f98c1-d4e9-75e1-9813-b0eafe6d0aa9\n--------\nuser\n--- 25910 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — High, blocking, issue-impact:** The four archive-sweep leaves still bundle 2, 4, 7, and 8 independent `jit archive container --execute` outcomes, respectively. Each has multiple container-specific acceptance checks and destinations, so none is one worker-sized implementation/review cycle; this is the prior F2 reintroduced under new keys. Split to one terminal leaf per container execution and retain a separate aggregate completeness leaf. [dev/active/8e071e18-breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/8e071e18-breakdown.json:1351)\n\n2. **F2 — High, blocking, issue-impact:** Every archive-sweep leaf explicitly leaves part of its footprint unknown (“other configured areas, as that container's plan determines”). This prevents review of all created/touched paths and leaves collision/dispatch analysis incomplete. Enumerate each execution’s complete source and destination footprint; remove the uncertainty rather than treating it as an advisory. [dev/active/8e071e18-breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/8e071e18-breakdown.json:1429)\n\n3. **F3 — High, blocking, issue-impact:** REQ-10 remains tier-laundered. The three active-area leaves group 9, 10, and 4 independent files whose required outcomes may be assignment, project reclassification, or archival, but specify no per-file outcome or target owner. The session and study leaves also promise a “recorded” disposition without defining a durable record surface or exact paths. Replace these with explicit disposition records/mappings, exact owners or archive destinations, and credible footprints; split any remaining independent outcome decisions. [dev/active/8e071e18-breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/8e071e18-breakdown.json:2000)\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The native graph validates, but cleanup execution and unprefixed-artifact disposition remain non-decomposable with unresolved footprints.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The four archive-sweep terminal leaves each bundle multiple independent container executions and cannot be assigned to one focused worker cycle.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":1351,\"references\":[\"@/issue/8e071e18/requirement/REQ-09\",\"@/issue/8e071e18/decision/D-10\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Archive-sweep footprints leave artifacts in other configured areas unresolved, preventing complete footprint and overlap review.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":1429,\"references\":[\"@/issue/8e071e18/requirement/REQ-09\",\"@/issue/8e071e18/decision/D-10\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-10 disposition leaves group independent per-file outcomes without mappings and do not define a durable record surface or credible exact footprints.\",\"file\":\"dev/active/8e071e18-breakdown.json\",\"line\":2000,\"references\":[\"@/issue/8e071e18/requirement/REQ-10\",\"@/issue/8e071e18/decision/D-15\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
