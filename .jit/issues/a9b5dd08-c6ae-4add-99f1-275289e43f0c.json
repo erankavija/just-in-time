@@ -1,11 +1,20 @@
 {
-  "id": "a9b5dd08-c6ae-4add-99f1-275289e43f0c",
-  "title": "Use strategic label slugs in archive directory names",
-  "description": "Archive container directories use a human-readable suffix derived from the container's curated strategic label while retaining the JIT short ID as the stable identity prefix. This makes archived artifacts navigable from the filesystem and aligns directory names with the vocabulary used by labels and queries.\n\n## Background\n\nContainer archives currently use an ID-only directory such as `dev/archive/7d3a3a47/`. Strategic labels already provide concise, stable handles such as `epic:artifact-archival`; using that label value produces the more readable `dev/archive/7d3a3a47-artifact-archival/` without making prose titles part of identity. Existing archives and repositories without a usable strategic label must remain valid.\n\n## Success Criteria\n\n- [hard] REQ-01: Selects the value of exactly one label in the namespace associated with the container's own configured type as the preferred archive slug; for example, `epic:artifact-archival` produces `<archive-root>/7d3a3a47-artifact-archival/`.\n- [hard] REQ-02: Keeps the short ID and marker-recorded full issue ID authoritative; the human-readable suffix never participates in identity matching.\n- [hard] REQ-03: Freezes the chosen directory name when an archive is first created, so later title or label changes reuse the marker-backed destination instead of renaming it or creating a second archive.\n- [hard] REQ-04: Recognizes and reconciles existing ID-only archive directories without migration, data movement, or duplicate destination creation.\n- [hard] REQ-05: Falls back deterministically to a normalized, length-bounded title slug when no unambiguous own-type strategic label exists, while preserving collision and overwrite protection for the resolved destination.\n- [hard] REQ-06: Shows the resolved slugged destination consistently in document/container previews, candidate reports, execution results, JSON output, and human output.\n- [hard] REQ-07: Verifies label selection, ambiguous and missing labels, normalization, title and label changes, legacy ID-only adoption, destination conflicts, repeat execution, and representative Unicode titles without mutating during preview.\n- [hard] REQ-08: Documents the naming, stability, fallback, marker-authority, and backward-compatibility contract in the canonical archive reference.\n\n## Notes\n\nThe strategic label is a curated display handle, not a replacement identifier. Directory lookup and adoption must continue to trust the container marker and full issue ID rather than parsing or trusting the suffix.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-13T23:48:25.450189321Z",
+  "context": {},
+  "created_at": "2026-07-13T23:43:56.890660860Z",
   "dependencies": [],
+  "description": "Archive container directories use a human-readable suffix derived from the container's curated strategic label while retaining the JIT short ID as the stable identity prefix. This makes archived artifacts navigable from the filesystem and aligns directory names with the vocabulary used by labels and queries.\n\n## Background\n\nContainer archives currently use an ID-only directory such as `dev/archive/7d3a3a47/`. Strategic labels already provide concise, stable handles such as `epic:artifact-archival`; using that label value produces the more readable `dev/archive/7d3a3a47-artifact-archival/` without making prose titles part of identity. Existing archives and repositories without a usable strategic label must remain valid.\n\n## Success Criteria\n\n- [hard] REQ-01: Selects the value of exactly one label in the namespace associated with the container's own configured type as the preferred archive slug; for example, `epic:artifact-archival` produces `<archive-root>/7d3a3a47-artifact-archival/`.\n- [hard] REQ-02: Keeps the short ID and marker-recorded full issue ID authoritative; the human-readable suffix never participates in identity matching.\n- [hard] REQ-03: Freezes the chosen directory name when an archive is first created, so later title or label changes reuse the marker-backed destination instead of renaming it or creating a second archive.\n- [hard] REQ-04: Recognizes and reconciles existing ID-only archive directories without migration, data movement, or duplicate destination creation.\n- [hard] REQ-05: Falls back deterministically to a normalized, length-bounded title slug when no unambiguous own-type strategic label exists, while preserving collision and overwrite protection for the resolved destination.\n- [hard] REQ-06: Shows the resolved slugged destination consistently in document/container previews, candidate reports, execution results, JSON output, and human output.\n- [hard] REQ-07: Verifies label selection, ambiguous and missing labels, normalization, title and label changes, legacy ID-only adoption, destination conflicts, repeat execution, and representative Unicode titles without mutating during preview.\n- [hard] REQ-08: Documents the naming, stability, fallback, marker-authority, and backward-compatibility contract in the canonical archive reference.\n\n## Notes\n\nThe strategic label is a curated display handle, not a replacement identifier. Directory lookup and adoption must continue to trust the container marker and full issue ID rather than parsing or trusting the suffix.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "label": "Archive directory slug design",
+      "path": "dev/archive/a9b5dd08/dev/active/a9b5dd08-archive-directory-slugs.md"
+    }
+  ],
+  "done_at": "2026-07-14T00:12:12.729169854Z",
+  "first_ready_at": "2026-07-13T23:43:56.890673860Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -13,37 +22,28 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "doc-review": {
+    "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T00:10:34.010873378Z"
-    },
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T00:11:50.193102296Z"
+      "updated_at": "2026-07-14T00:04:23.432474202Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T00:06:57.117285278Z"
+      "updated_at": "2026-07-14T00:06:57.117285278Z",
+      "updated_by": "auto:executor"
     },
-    "cargo-ci": {
+    "doc-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T00:04:23.432474202Z"
+      "updated_at": "2026-07-14T00:10:34.010873378Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-14T00:11:50.193102296Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/archive/a9b5dd08-use-strategic-label-slugs-in-archive-directory-n/dev/active/a9b5dd08-archive-directory-slugs.md",
-      "commit": null,
-      "label": "Archive directory slug design",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "a9b5dd08-c6ae-4add-99f1-275289e43f0c",
   "labels": [
     "epic:core-maintenance",
     "milestone:v1.0",
@@ -51,9 +51,8 @@
     "component:docs",
     "type:enhancement"
   ],
-  "created_at": "2026-07-13T23:43:56.890660860Z",
-  "updated_at": "2026-07-14T00:12:31.437402288Z",
-  "first_ready_at": "2026-07-13T23:43:56.890673860Z",
-  "claimed_at": "2026-07-13T23:48:25.450189321Z",
-  "done_at": "2026-07-14T00:12:12.729169854Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Use strategic label slugs in archive directory names",
+  "updated_at": "2026-07-25T21:35:34.646200529Z"
 }
