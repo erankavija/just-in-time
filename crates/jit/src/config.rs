@@ -324,6 +324,10 @@ pub struct DocumentationConfig {
     /// Paths whose artifacts archive by copy while the source is retained.
     /// Absent falls back to [`SHIPPED_DOCUMENTATION_POLICY`]'s permanent paths.
     pub permanent_paths: Option<Vec<String>>,
+    /// Areas that organize their artifacts one directory per issue. Absent
+    /// falls back to [`SHIPPED_DOCUMENTATION_POLICY`]'s issue-scoped areas; an
+    /// authored empty list declares that no area adopts the convention.
+    pub issue_scoped_areas: Option<Vec<String>>,
 }
 
 impl DocumentationConfig {
@@ -366,6 +370,42 @@ impl DocumentationConfig {
                 .collect()
         })
     }
+
+    /// The areas that organize their artifacts one directory per issue, falling
+    /// back to [`SHIPPED_DOCUMENTATION_POLICY`]'s declared areas when
+    /// unauthored.
+    ///
+    /// An authored list is the whole registry: it replaces the shipped
+    /// declaration rather than extending it, so an empty list opts every area
+    /// out of the convention.
+    pub fn issue_scoped_areas(&self) -> Vec<String> {
+        self.issue_scoped_areas.clone().unwrap_or_else(|| {
+            SHIPPED_DOCUMENTATION_POLICY
+                .issue_scoped_areas
+                .iter()
+                .map(|area| area.to_string())
+                .collect()
+        })
+    }
+
+    /// Whether `area` is one of the declared issue-scoped areas.
+    ///
+    /// Membership is exact-area matching under lexical path normalization, so
+    /// `dev/x`, `./dev/x` and `dev/x/` all name the same area while a path
+    /// *inside* a declared area does not. This is deliberately narrower than
+    /// the prefix containment the archival classifier applies to its own path
+    /// lists ([`contains_path`](crate::domain::artifact_classifier::contains_path)):
+    /// a caller names one area and receives the issue-scoped directory inside
+    /// it, so accepting a path beneath a declared area would accept an
+    /// already-resolved directory as an area and defeat the rejection of
+    /// undeclared ones.
+    pub fn is_issue_scoped_area(&self, area: &str) -> bool {
+        let area = crate::domain::artifact_plan::normalize_artifact_path(area);
+        !area.is_empty()
+            && self.issue_scoped_areas().iter().any(|declared| {
+                crate::domain::artifact_plan::normalize_artifact_path(declared) == area
+            })
+    }
 }
 
 /// The development-area classification an initialized repository is shipped with.
@@ -395,10 +435,19 @@ pub struct ShippedDocumentationPolicy {
     pub managed_paths: &'static [&'static str],
     /// Areas whose artifacts archive by copy, retaining their source.
     pub permanent_paths: &'static [&'static str],
+    /// Areas that organize their artifacts one directory per issue.
+    ///
+    /// Matched as whole areas rather than by prefix (see
+    /// [`DocumentationConfig::is_issue_scoped_area`]). Adoption is independent
+    /// of the managed/permanent split: an area may appear here, there, both, or
+    /// neither, and a flat managed area still archives its artifacts normally
+    /// (`@/issue/8e071e18/decision/D-3`).
+    pub issue_scoped_areas: &'static [&'static str],
 }
 
 /// The shipped documentation policy: the one declaration of which development
-/// areas are managed and which are permanent.
+/// areas are managed, which are permanent, and which organize their artifacts
+/// by issue.
 ///
 /// See [`ShippedDocumentationPolicy`] for the matching semantics and for why the
 /// classification is scaffolded configuration.
@@ -428,6 +477,15 @@ pub const SHIPPED_DOCUMENTATION_POLICY: ShippedDocumentationPolicy = ShippedDocu
         "dev/index.md",
         "dev/TESTING.md",
         "dev/authoring-conventions.md",
+    ],
+    // Areas whose contents are per-issue work products, so one issue owns a
+    // whole directory. The remaining areas hold living documentation, dated
+    // records, or generated output that no single issue owns, and stay flat.
+    issue_scoped_areas: &[
+        "dev/active",
+        "dev/studies",
+        "dev/plans",
+        "dev/presentations",
     ],
 };
 
