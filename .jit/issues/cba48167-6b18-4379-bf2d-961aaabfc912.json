@@ -48,6 +48,11 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-25T05:10:52.810770563Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-07-25T05:08:50.921809744Z",
@@ -64,5 +69,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Archive the predecessor deck behind a tombstone",
-  "updated_at": "2026-07-25T05:08:50.921809744Z"
+  "updated_at": "2026-07-25T05:10:52.810770563Z"
 }

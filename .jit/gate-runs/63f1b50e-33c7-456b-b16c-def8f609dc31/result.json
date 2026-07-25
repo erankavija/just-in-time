@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "fc969f66783c42bd65746378d0df3e0235dd810e",
+  "completed_at": "2026-07-25T05:10:52.539456946Z",
+  "duration_ms": 84726,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No issue-impact documentation defects; the repository-internal tombstone and archive are accurate and linked.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "cba48167-6b18-4379-bf2d-961aaabfc912",
+  "message": null,
+  "run_id": "63f1b50e-33c7-456b-b16c-def8f609dc31",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-25T05:09:27.812610183Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task (level-4 `task`, no resolved children). Reviewed its four reachable `jit:cba48167` commits individually; the archival rename and tombstone are current, links resolve, and `jit validate --json` passes. The work affects only `dev/` repository-internal presentation material, not adopter-facing documentation.\n\nFindings: none.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact documentation defects; the repository-internal tombstone and archive are accurate and linked.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
