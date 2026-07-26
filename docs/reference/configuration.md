@@ -123,6 +123,21 @@ issue-scoped, managed and flat, permanent and issue-scoped, or neither — and a
 issue-scoped area archives its artifacts exactly as a flat one does. The key is
 not part of the three-key completeness that authorizes archival mutation.
 
+`citation_scan_roots` names the repository-relative roots an in-content
+citation scan reads: it matches a moving artifact's path anywhere in a scanned
+file's text — a shell-script line, a doc comment, an inline code span, or a
+markdown link target alike. Each entry is a directory, reaching every file
+beneath it, or an individual file, reaching exactly that path, matched the
+same way as `managed_paths` and `permanent_paths` above. The key is optional;
+`jit init` does not scaffold it, so a fresh repository's `[documentation]`
+table omits it, and an absent key resolves to the development root together
+with `permanent_paths` (both shown above). An authored list replaces that
+default outright rather than extending it, and its entries need not lie under
+the development root, since a citation a move can break may live wherever the
+repository writes it. Like `issue_scoped_areas`, the key is not part of the
+three-key completeness that authorizes archival mutation, so omitting it
+leaves archive eligibility unchanged.
+
 Path vocabulary is repository policy: an adopter reclassifies any area, adds
 areas of their own, or drops a convention entirely, and every command reads the
 table in front of it. This repository's `.jit/config.toml` is the dogfood policy
