@@ -53,9 +53,10 @@ These rules apply across **all** workflows. Never violate them.
 
 8. **Link artifacts for discoverability.** Every durable artifact produced for
    an issue — plans and design docs, research findings, completion reports,
-   figures, slide decks, generated datasets, benchmark outputs — is saved under
-   the project's doc paths (plans/designs in `dev/active/`) and linked to its
-   issue via `jit doc add <id> <path> --doc-type <type> --label "..."`. Link the
+   figures, slide decks, generated datasets, benchmark outputs — is saved
+   under the issue's resolved artifact directory (`jit doc dir <id> <area>`;
+   plans/designs use `dev/active`) and linked to its issue via
+   `jit doc add <id> <path> --doc-type <type> --label "..."`. Link the
    artifact at its **final** path (re-link if you later move/archive it).
    `jit doc list <id>` is how downstream readers and future sessions discover an
    issue's plan, outputs, and outcome — an unlinked artifact is effectively
@@ -210,19 +211,19 @@ Full lifecycle from claim through completion.
    [references/design-doc-template.md](references/design-doc-template.md).
    Include the issue's success criteria in the document.
 
-2. Read `[documentation]` in `.jit/config.toml` and save to
-   `<managed-docs-root>/<short-id>-<slug>.md` (derive slug from title:
-   lowercase, hyphens, max 30 chars).
+2. Resolve the issue's artifact directory with
+   `mkdir -p "$(jit doc dir <id> dev/active)"` and save the document there
+   as `design.md`.
 
 3. Commit the plan file:
    ```bash
-   git add <managed-docs-root>/<short-id>-<slug>.md
+   git add "$(jit doc dir <id> dev/active)/design.md"
    git commit -m "docs: add plan for <short-id>"
    ```
 
 4. Link to the issue:
    ```bash
-   jit doc add <id> <managed-docs-root>/<short-id>-<slug>.md \
+   jit doc add <id> "$(jit doc dir <id> dev/active)/design.md" \
      --doc-type design --label "Design Document"
    ```
 
