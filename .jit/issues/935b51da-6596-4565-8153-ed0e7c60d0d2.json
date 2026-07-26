@@ -7,6 +7,7 @@
   ],
   "description": "The project-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and each packaged profile twin carries the identical content.\n\n## Background\n\nThis skill already composes its roots from configuration rather than hard-coding them, so what remains is the artifact-name shape: progress files, charters, and the standards-sweep report are still spelled out as a root joined with a short-id-prefixed filename. Two of its references already name hard-coded roots as a mistake, so this generalizes a rule the prompts already state.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
   "documents": [],
+  "first_ready_at": "2026-07-26T03:45:23.664233502Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "per:@/issue/8e071e18/decision/D-11"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Convert the project-lead skill to the artifact directory convention",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-26T03:45:23.664233502Z"
 }

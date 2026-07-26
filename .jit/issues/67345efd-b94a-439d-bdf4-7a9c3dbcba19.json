@@ -7,6 +7,7 @@
   ],
   "description": "A graph template's document node states the issue-scoped area its document belongs in, and apply-time interpolation exposes a field carrying the container's canonical artifact directory inside that area.\n\n## Background\n\nTemplate document paths are interpolated from container fields, and the only field available for a path today is the short id, which forces every declaration to spell out a flat area-plus-prefix pattern. The apply engine builds one fixed token-substitution context per container and resolves each declaration against it, so the field belongs in that context and the node schema gains the area declaration that selects which area to resolve in.\n\nBecause a development root holds several issue-scoped areas, the declaration states its area rather than leaving the engine to guess. A declaration naming an area the configured registry does not declare fails at application time with a descriptive error rather than producing a path outside the convention.\n\nThe interpolated value is the resolved directory, so a declaration names a filename relative to it and that filename carries no short-id prefix. The value comes from the domain resolver, which keeps the composition rule in one place.\n\nDerivations of the same declaration also exist outside the apply engine. They are held at their current behaviour here: the context construction they call changes shape, so their call sites travel with it while what they resolve stays as it is.\n\n## Success Criteria\n\n- [hard] REQ-01: A template document node declares the issue-scoped area its document belongs in.\n- [hard] REQ-02: Apply-time document-path interpolation exposes a field carrying the container's canonical artifact directory in the declared area.\n- [hard] REQ-03: A declaration that names the field followed by a filename produces a path inside the canonical directory.\n- [hard] REQ-04: A declaration naming an area the configured registry does not declare fails application with a descriptive error.\n- [hard] REQ-05: The interpolated value comes from the domain resolver rather than from a second derivation.\n",
   "documents": [],
+  "first_ready_at": "2026-07-26T03:45:16.177930324Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "per:@/issue/8e071e18/decision/D-2"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Interpolate the canonical artifact directory into template document paths",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-26T03:45:16.177930324Z"
 }

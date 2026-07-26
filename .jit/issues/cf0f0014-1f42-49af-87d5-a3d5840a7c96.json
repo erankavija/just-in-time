@@ -7,6 +7,7 @@
   ],
   "description": "The two parallel-work research records cite records that one archival run relocates, while a different run relocates one of the citing records itself, so both are corrected before either run moves them.\n\n## Background\n\nArchival never rewrites the content of a record it relocates. A citation left uncorrected when its own file moves is therefore frozen at its stale value for good, which is why these records are corrected first and relocated afterwards.\n\nThe two records sit in different areas and are relocated by different runs, while every path they cite is relocated by the parallel work run. Correcting them together is what keeps the pair consistent across that split: the study cites the experiment record, so a correction to one that lagged the other would leave the pair naming two generations of the same path.\n\nValidation resolves document link records only, so an inline path mention in prose breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences.\n\nThe enumerated citations are:\n\n- `dev/studies/ai-tool-worktree-compatibility.md` — three citations of `dev/design/worktree-parallel-work.md`, one of `dev/experiments/worktree-manual-coordination-experiment.md`\n- `dev/experiments/worktree-manual-coordination-experiment.md` — cites `dev/design/worktree-parallel-work.md`\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation names the archived location the parallel work run produces for the record it cites.\n- [hard] REQ-02: Both citing records carry their corrected citations before either run relocates them.\n- [hard] REQ-03: No other content in either record is changed.\n- [hard] REQ-04: Whole-repository validation passes afterwards.\n",
   "documents": [],
+  "first_ready_at": "2026-07-26T03:45:50.001866408Z",
   "gates_required": [
     "doc-review",
     "repo-validate"
@@ -22,7 +23,7 @@
     "per:@/issue/8e071e18/decision/D-8"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Resolve the parallel-work research records' citations before their archival runs",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-26T03:45:50.001866408Z"
 }

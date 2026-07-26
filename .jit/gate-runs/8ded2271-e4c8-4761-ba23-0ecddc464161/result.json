@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "5c5cc16915ff690261ae7bc9665034f17442909a",
+  "completed_at": "2026-07-26T03:40:48.304358949Z",
+  "duration_ms": 156607,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard criteria are met, and the prior JSON-error finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3559ca25-4d31-4e57-9eb1-0853ccd60996",
+  "message": null,
+  "run_id": "8ded2271-e4c8-4761-ba23-0ecddc464161",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T03:38:11.697203087Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6d0d181e, cb7cc4dd, 1a9a0eab, 2f265f85, cf371ccf, 8a864ce7 (`jit:3559ca25`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; .jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json\nResolved items: @/issue/8e071e18/decision/D-1 and D-4 (.jit issue markdown); @/invariant/domain-agnostic, @/invariant/gate-semantics, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T03:28:22Z); mcp-ci passed (exit 0, 2026-07-26T03:38:08Z)\nTruncation recovery: reread merge diffs, resolver, output/error handling, tests, and curation coverage in commit- and path-scoped ranges\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are met, and the prior JSON-error finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

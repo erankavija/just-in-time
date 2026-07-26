@@ -10,6 +10,7 @@
   ],
   "description": "An archival plan reports a warning for each occurrence of a moving artifact's path in the text of a file in the declared scan universe, so a move that would break an inline citation is visible before it happens.\n\n## Background\n\nThe planner reads structured document edges, which are link records and asset relationships, not mentions of a path in arbitrary prose or code. Matching only markdown link targets would reach a small minority of the citations that actually exist: it misses every shell-script line, an operator-facing error string, a production module doc comment, and both adopter-facing citations, all of which are inline code spans.\n\nEvidence acquisition needs file bytes, so it belongs at the storage and planning boundary where the other plan evidence is gathered; turning that evidence into a warning stays pure and domain-side.\n\nThe scan walks each declared root with the planner's existing no-follow recursive listing, so it starts no external process and follows no symbolic link out of the tree. A declared root that is absent, a path component that is a symbolic link, and a file whose bytes are not valid UTF-8 are skipped rather than turned into a planning failure: the scan is advisory evidence, and a plan is still produced without it.\n\nThe warning rides the plan's existing warning channel, which carries no action and no blocker, so an artifact the plan leaves in place contributes nothing at all.\n\n## Success Criteria\n\n- [hard] REQ-01: A plan reports one warning per occurrence of a moving artifact's path in the text of a scanned file, naming the citing path.\n- [hard] REQ-02: Occurrences inside code comments, inline code spans, and shell scripts are reported.\n- [hard] REQ-03: A declared root outside the development root is scanned.\n- [hard] REQ-04: A declared root that is absent, a path component that is a symbolic link, and a file whose bytes are not valid UTF-8 are skipped without failing the plan.\n- [hard] REQ-05: An artifact the plan leaves in place produces no citation warning.\n- [hard] REQ-06: The scan reads file bytes through the planner's existing no-follow directory listing and starts no external process.\n",
   "documents": [],
+  "done_at": "2026-07-26T03:45:38.701460862Z",
   "first_ready_at": "2026-07-25T22:30:11.447123549Z",
   "gates_required": [
     "cargo-ci",
@@ -18,12 +19,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-26T02:51:12.283298990Z",
+      "updated_at": "2026-07-26T03:38:08.216223795Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-26T02:57:34.224659137Z",
+      "status": "passed",
+      "updated_at": "2026-07-26T03:44:29.327592607Z",
       "updated_by": "auto:executor"
     }
   },
@@ -37,7 +38,7 @@
     "per:@/issue/8e071e18/decision/D-16"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Warn on in-content citations of a moving artifact's path",
-  "updated_at": "2026-07-26T02:57:34.224659137Z"
+  "updated_at": "2026-07-26T03:45:38.701460862Z"
 }

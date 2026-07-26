@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "5c5cc16915ff690261ae7bc9665034f17442909a",
+  "completed_at": "2026-07-26T03:44:29.079882648Z",
+  "duration_ms": 219462,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior overlapping-occurrence finding is fixed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2ac35e8e-01ca-446a-a70c-d9313ddba624",
+  "message": null,
+  "run_id": "4d44067a-1987-4d62-a553-864435c99bda",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T03:40:49.617705802Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:2ac35e8e commits d58f47b6, 3c62fb8d, 36defd8a, 09334528, 5c5cc169\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-8 and D-16 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json); @/invariant/semantic-test-assertions (AGENTS.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T03:33:22Z)\nTruncation recovery: re-read each affected patch by commit/path and current implementation, caller, configuration, and focused tests\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior overlapping-occurrence finding is fixed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

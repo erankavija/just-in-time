@@ -8,6 +8,7 @@
   ],
   "description": "A document subcommand prints an issue's canonical artifact directory in a named issue-scoped area, giving agents, scripts, and prose one place to obtain the path instead of composing it from a spelled-out pattern.\n\n## Background\n\nNothing in the command surface derives a document path today; every document subcommand operates on a path the caller already knows. The archival group is defined as producing archival plans, so a pure path resolver does not belong there, while the document group already owns the document-path vocabulary.\n\nThe command takes the issue and the area it wants. Supplying the area is the caller's only contribution to the path; the directory name inside that area comes from the domain resolver. An area the configured registry does not declare is rejected with a descriptive error instead of producing a path.\n\nThe output is a single value, so it uses the established flat named-object shape for machine-readable output rather than the list envelope. Argument parsing and rendering stay in the command-line and output layers, orchestration in the command layer, and the derivation itself in the domain resolver.\n\nAdding a command changes the generated bridge surface, which requires an explicit curation entry with a one-line rationale before its coverage check passes.\n\nThe adopter command reference is not edited here. This epic's command-surface changes are documented together in that one reference, so this issue's footprint names only the files it mutates.\n\n## Success Criteria\n\n- [hard] REQ-01: A subcommand accepts an issue identifier and an issue-scoped area, and prints the issue's canonical artifact directory in that area.\n- [hard] REQ-02: An area the configured registry does not declare produces a descriptive error and a non-zero exit status.\n- [hard] REQ-03: Machine-readable output is a flat named object carrying the issue identity, the named area, and the resolved path.\n- [hard] REQ-04: An unknown issue identifier produces a descriptive error and a non-zero exit status rather than a fabricated path.\n- [hard] REQ-05: The command is curated in the generated bridge manifest with a rationale.\n",
   "documents": [],
+  "done_at": "2026-07-26T03:45:04.966855702Z",
   "first_ready_at": "2026-07-25T22:30:03.870650456Z",
   "gates_required": [
     "cargo-ci",
@@ -17,17 +18,17 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-26T02:46:05.237791975Z",
+      "updated_at": "2026-07-26T03:33:21.611397976Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-26T02:54:31.193308951Z",
+      "status": "passed",
+      "updated_at": "2026-07-26T03:40:48.554004631Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-07-26T02:51:14.940766897Z",
+      "updated_at": "2026-07-26T03:38:10.895766588Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,7 +40,7 @@
     "story:artifact-directory-convention"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Expose the canonical artifact directory as a command",
-  "updated_at": "2026-07-26T02:54:31.193308951Z"
+  "updated_at": "2026-07-26T03:45:04.966855702Z"
 }
