@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "1bdae2f5092da8175aea2dfd2ca089b7a2161934",
+  "completed_at": "2026-07-26T08:33:14.533479316Z",
+  "duration_ms": 251949,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/document.rs",
+        "id": "F1",
+        "line": 177,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e2902949/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "The RecursiveFiles scan omits empty nonconforming artifact directories, missing REQ-01."
+      }
+    ],
+    "summary": "Empty misplaced prefixed directories are omitted from the advisory report.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e2902949-e14d-4307-b2c3-3fc3c5ad07a5",
+  "message": null,
+  "run_id": "71c37ec3-8c7b-4f32-8654-b1f972a116da",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T08:29:02.583584857Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 18209 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9d8a-bc10-7d03-8e33-dbec0a1ad075\n--------\nuser\n--- 18196 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 6a99d49b, 3f719c85, 76e26a84, 6d94dfa1, 1bdae2f5 (`jit:e2902949`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e2902949/requirement/REQ-01 and @/issue/8e071e18/decision/D-7 (.jit issue descriptions, markdown-first); @/invariant/domain-agnostic, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first); @/charter/D-1 and @/charter/D-4 (dev/vision/9db27a3a-charter.md, markdown-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T07:48:52Z); mcp-ci passed (exit 0, 2026-07-26T07:48:49Z)\nTruncation recovery: path-bounded rereads of current domain and integration sources, rework deltas, and source records; each tagged merge’s first-parent delta matched its corresponding non-merge patch\n\n1. [blocking][issue-impact][high] `doc conformance` requests `RecursiveFiles` at `crates/jit/src/commands/document.rs:177`. That walker only returns files, so a misplaced but empty short-ID-prefixed directory is never passed to the conformance reporter or listed, despite being a nonconforming artifact directory. This misses hard REQ-01. References: `@/issue/e2902949/requirement/REQ-01`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Empty misplaced prefixed directories are omitted from the advisory report.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The RecursiveFiles scan omits empty nonconforming artifact directories, missing REQ-01.\",\"file\":\"crates/jit/src/commands/document.rs\",\"line\":177,\"references\":[\"@/issue/e2902949/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
