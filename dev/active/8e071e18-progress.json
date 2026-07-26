@@ -1271,7 +1271,7 @@
     "f88a16d9": 1,
     "3559ca25": 1,
     "2ac35e8e": 1,
-    "0e5dff57": 1
+    "0e5dff57": 2
   },
   "surfaced_pitfalls": [
     {
@@ -1500,6 +1500,20 @@
       "subject": "real-data measurement is necessary but not sufficient; it misses unexercised configuration paths",
       "detail": "The lead measured all 24 containers against the worker's branch and every criterion held: 175 moves with identical move SETS in 24/24, copies 684->20, artifacts 993->278, 0 blockers. code-review then found two blocking defects anyway. F1 lived on a path this repository never exercises - all 8 of its managed paths are inside dev/, so a managed-path carve-out on the out-of-root rule is inert here and would only harm an adopter. F2 was invisible to any check that inspects the resulting plan, because the plan was correct and only the read volume was wrong.",
       "decision": "Keep measuring real data - it is what caught the Copy-to-Move flip and what grounded both owner decisions - but never treat it as review. When a change keys on configuration, ask what this repository's configuration does NOT exercise, and read the diff for carve-outs that the local config makes inert."
+    },
+    {
+      "id": "N14",
+      "raised_at": "session 5, 0e5dff57 rework round 1",
+      "subject": "a superseding directive can lose a race with the worker it supersedes",
+      "detail": "The lead sent a rework message directing F2, then learned from the worker's own delayed completion report that F2 costs 8 Copy-to-Move flips, then sent a hold, then an owner ruling amending REQ-03 so F2 was moot. The worker had already implemented F2 by the time the hold landed, and commit 4ab2213d shipped 183 moves - the exact outcome the owner declined. One full rework attempt was spent producing work that had to be reverted, and the counter is now at 2 of 2 for reasons unrelated to worker quality.",
+      "decision": "Two changes. (1) When a worker's completion report is outstanding, do not dispatch rework until it arrives or is explicitly abandoned - the report is the cheapest source of exactly the constraint that invalidates the dispatch. (2) When an escalation is opened on a finding, tell the worker to HOLD that finding in the same message that opens the escalation, not in a follow-up. Do not let the rework counter penalise a worker for following a directive the lead later withdrew: on the next round, judge the work, and if a third round is needed escalate the counter's reset rather than the worker."
+    },
+    {
+      "id": "N15",
+      "raised_at": "session 5, 0e5dff57 rework round 1",
+      "subject": "encode the reason a tempting optimisation is refused, as a test",
+      "detail": "Bounding evidence acquisition at the out-of-root frontier is an obvious improvement that reads as strictly better: it shrinks reads as well as plans. It is refused because the repository-wide ownership relation derives outside-owner evidence from chains that leave and re-enter the development root, so bounding it silently converts 8 artifacts from copy to relocation and deletes live files other issues' documents still reach. The worker implemented it twice, correctly reasoning both times, and reverted once on its own measurement.",
+      "decision": "A doc comment saying 'deliberately unbounded' was not enough - it did not survive a reviewer asking for the opposite. Directed a regression test that fails if acquisition is bounded: an artifact whose only outside-owner claim arrives through an out-of-root hub must classify as Copy with outside-owner evidence. Generally: when a change is refused for a non-local reason, pin the reason with a test, not with prose."
     }
   ],
   "handoffs": [
