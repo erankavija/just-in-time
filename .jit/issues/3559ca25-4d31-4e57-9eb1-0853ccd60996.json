@@ -14,7 +14,23 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T02:46:05.237791975Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-26T02:54:31.193308951Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T02:51:14.940766897Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3559ca25-4d31-4e57-9eb1-0853ccd60996",
   "labels": [
     "type:task",
@@ -25,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Expose the canonical artifact directory as a command",
-  "updated_at": "2026-07-25T23:05:53.882296009Z"
+  "updated_at": "2026-07-26T02:54:31.193308951Z"
 }

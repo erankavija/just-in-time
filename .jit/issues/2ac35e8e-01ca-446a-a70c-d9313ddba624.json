@@ -15,7 +15,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T02:51:12.283298990Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-26T02:57:34.224659137Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2ac35e8e-01ca-446a-a70c-d9313ddba624",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Warn on in-content citations of a moving artifact's path",
-  "updated_at": "2026-07-25T23:05:57.642142790Z"
+  "updated_at": "2026-07-26T02:57:34.224659137Z"
 }

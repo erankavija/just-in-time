@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "36defd8abb5762f19fdefae27f2ba8f0b575ecfc",
+  "completed_at": "2026-07-26T02:57:33.967401083Z",
+  "duration_ms": 181688,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/artifact_classifier.rs",
+        "id": "F1",
+        "line": 951,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/decision/D-16"
+        ],
+        "severity": "medium",
+        "summary": "Non-overlapping match_indices omits a second overlapping occurrence of a moving artifact path, violating the required any-occurrence warning behavior."
+      }
+    ],
+    "summary": "Citation matching omits overlapping occurrences, so the warning set can miss an in-content path occurrence.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2ac35e8e-01ca-446a-a70c-d9313ddba624",
+  "message": null,
+  "run_id": "12026bd5-e6a7-4fb1-a80f-5c4b3d313144",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T02:54:32.279289238Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6043 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9c58-7c4a-7350-978a-5fd1eed0bead\n--------\nuser\n--- 6030 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: d58f47b6, 3c62fb8d, 36defd8a (`jit:2ac35e8e`); uncommitted JIT metadata excluded\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-8, @/issue/8e071e18/decision/D-16 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T02:46:05Z); code-review pending\nTruncation recovery: narrowed individual d58f47b6/3c62fb8d patches, merge-parent stats, and storage/classifier/config/test reads; excluded merge first-parent changes attributable to other tagged issues.\n\n1. **[blocking][issue-impact][medium]** `match_indices` reports only non-overlapping matches, so the implementation can miss a required occurrence. For example, a moving path `a/a` occurs at columns 1 and 3 in `a/a/a`, but this produces one warning; the test’s `matches` count shares the same non-overlapping behavior. This violates the required “any occurrence” scan behavior. `crates/jit/src/domain/artifact_classifier.rs:951` [@/issue/8e071e18/decision/D-16]\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Citation matching omits overlapping occurrences, so the warning set can miss an in-content path occurrence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Non-overlapping match_indices omits a second overlapping occurrence of a moving artifact path, violating the required any-occurrence warning behavior.\",\"file\":\"crates/jit/src/domain/artifact_classifier.rs\",\"line\":951,\"references\":[\"@/issue/8e071e18/decision/D-16\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

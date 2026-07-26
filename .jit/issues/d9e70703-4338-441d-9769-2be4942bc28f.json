@@ -7,6 +7,7 @@
   ],
   "description": "The two measurement records that a committed self-test script depends on are pinned to their current commit, so container archival retains them at their present paths instead of relocating them.\n\n## Background\n\n`scripts/benchmark-session-cost-selftest.sh` opens `dev/studies/perf/session-cost-27ffbd2d.json` by path at runtime. That record and its sibling `dev/studies/perf/session-cost-c488ef85.json` are linked to terminal issues inside a container whose archival run would otherwise move them out from under the script.\n\nThe mechanism already has the right instrument: a document reference pinned to a commit is treated as a historical reference and retained rather than relocated. Pinning keeps the traceability from the owning issues to the records they produced, which unlinking would destroy.\n\nThe pin is:\n\n- `dev/studies/perf/session-cost-27ffbd2d.json` on issue `73981310` — pinned to the commit that holds its current content.\n- `dev/studies/perf/session-cost-c488ef85.json` on issue `a4b0fadf` — pinned to the commit that holds its current content.\n\n## Success Criteria\n\n- [hard] REQ-01: Both named document references are pinned to a commit and still name their owning issues.\n- [hard] REQ-02: An archival preview for the container that owns them reports both records as retained rather than relocated.\n- [hard] REQ-03: The self-test script resolves the measurement record it opens at runtime.\n- [hard] REQ-04: Whole-repository validation passes afterwards.\n",
   "documents": [],
+  "first_ready_at": "2026-07-26T03:04:18.474105965Z",
   "gates_required": [
     "repo-validate"
   ],
@@ -21,7 +22,7 @@
     "per:@/issue/8e071e18/decision/D-15"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Pin the runtime-read measurement records so archival retains them",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-26T03:04:18.474105965Z"
 }

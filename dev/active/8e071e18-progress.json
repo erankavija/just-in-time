@@ -178,9 +178,10 @@
           "gates": [
             "repo-validate"
           ],
-          "status": "dispatched",
+          "status": "done",
           "model": "sonnet",
-          "worktree": ".agents/worktrees/agent-f2cac2bd"
+          "worktree": ".agents/worktrees/agent-f2cac2bd",
+          "outcome": "repo-validate passed first time. Lead verified all six criteria against artifacts: baseline on main was 55 unmanaged-selected-root blockers across 23 of 127 candidates; after the change 0 blockers and 127/127 eligible. Every declared citation-scan root has a real census citation behind it. Surfaced E6/P8 (docs-mechanical scope inversion)."
         },
         {
           "id": "3559ca25-4d31-4e57-9eb1-0853ccd60996",
@@ -192,7 +193,7 @@
             "code-review",
             "mcp-ci"
           ],
-          "status": "dispatched",
+          "status": "rework-1",
           "model": "opus",
           "worktree": ".agents/worktrees/agent-3559ca25"
         },
@@ -205,7 +206,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "rework-1",
           "model": "opus",
           "worktree": ".agents/worktrees/agent-2ac35e8e"
         }
@@ -1029,7 +1030,9 @@
     "30595d22": 1,
     "b3fc1a92": 1,
     "1f80212b": 1,
-    "f88a16d9": 1
+    "f88a16d9": 1,
+    "3559ca25": 1,
+    "2ac35e8e": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1118,6 +1121,13 @@
       "subject": "host disk exhaustion from accumulated worktree build artifacts",
       "detail": "The host root filesystem reached 100% (0 bytes free) mid-wave. cargo-ci's provenance and budget steps are the only ones needing multi-GB scratch; both failed with EMPTY diagnostic files, which is the signature of failed writes rather than assertions. 39 agent worktrees held ~170G of target/, plus 1365 stale scratch dirs in ~/.cache/jit-cargo-ci-tmp. Lead reclaimed 153G.",
       "decision": "RESOLVED this session. Reclaimed 153G of build artifacts, then removed 49 worktrees whose branches are fully merged into main (branches preserved - all 113 worktree-agent-* branches still exist; only checkouts removed). Disk 0 -> 168G free. .agents/worktrees/ now holds only lead-install-clean and steward-v1-readiness (unmerged salvage). The mechanism is unchanged, so prune at the end of every wave: confirm no cargo/rustc processes, check git branch --no-merged main for salvage commits, remove only worktrees whose branch is merged, and clear ~/.cache/jit-cargo-ci-tmp/*. Structural fix filed as be005f64 under milestone v1.1, outside this epic. tmpfs was evaluated and rejected: the workspace exceeds this host's 31G RAM and a prior session already recorded /tmp (16G) being exhausted by large builds."
+    },
+    {
+      "id": "N5",
+      "raised_at": "wave 5 review",
+      "subject": "lead shell cwd drifted into a worker worktree and wrote .jit there",
+      "detail": "After `cd .agents/worktrees/agent-2ac35e8e && git merge main`, the Bash tool's cwd persisted. Every later command ran in that worktree. `jit issue update f2cac2bd --state done` transitioned the issue inside the WORKTREE's .jit, and the follow-up `jit issue status` read the worktree's .jit \u2014 where the wave-5 gate runs do not exist, because .jit/gate-runs records are tracked but the new ones were not yet committed, so a worktree checked out at 36defd8a has none of them. The reported symptom was alarming and completely false: every wave-5 gate appeared to revert from passed/failed to pending and ~2h of gate evidence looked deleted. Nothing was lost; main was intact throughout. The tell was `git reflog` showing the worker branch's history instead of main's, and the worktree carrying the same two modified .jit files main appeared to carry.",
+      "decision": "Reverted the two stray files in the worktree with `git checkout --` before its rework worker could commit them, and notified that worker. Use `git -C <path>` for worktree git operations rather than `cd`, since it never mutates the shell's cwd. For `jit`, which has no -C equivalent, prefix the command with an explicit `cd /home/vkaskivuo/Projects/just-in-time &&` every time. Before trusting any surprising .jit reading, run `pwd` first. This is the session-2 trap recurring in the same session that recorded it."
     }
   ]
 }

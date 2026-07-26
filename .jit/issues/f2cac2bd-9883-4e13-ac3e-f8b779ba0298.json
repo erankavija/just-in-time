@@ -8,11 +8,18 @@
   ],
   "description": "This repository's documentation policy names the same managed and permanent areas as the shipped scaffold and declares its issue-scoped areas, so the cleanup that follows runs against the product's own default rather than a bespoke local table.\n\n## Background\n\nThe change ships as a product default and this repository then adopts it. The live policy today names three managed areas and one permanent prefix, leaving eight areas under the development root unclassified. Adoption reclassifies them: work-product areas become managed and move on archive, while an area holding living contributor documentation, a configured item-kind source, or a documented invocation path becomes permanent and archives by copy. Development-root files that belong to no area are listed individually.\n\nAdoption also declares the roots the in-content citation scan reads. This repository cites artifact paths from build scripts, crate sources, the workspace manifest, the changelog, and agent-facing files at the repository root, none of which the default root set reaches, so each is declared.\n\nAdoption also declares which of the areas organize their artifacts by issue. That declaration is independent of the archival classification: a managed area that stays flat still archives its linked artifacts, and only the naming differs.\n\nAdoption is what makes the repository-level acceptance evidence real, and it must land before any archival execution so that the executions run under the intended classification.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository documentation policy classifies each area under the development root as managed or permanent, matching the shipped declaration.\n- [hard] REQ-02: Development-root files that belong to no area are listed as exact path entries.\n- [hard] REQ-03: No entry covers the development root as a whole.\n- [hard] REQ-04: The repository declares its issue-scoped areas as the active, study, plan, and presentation areas.\n- [hard] REQ-05: The citation-scan roots cover the build scripts, the crate sources, the workspace manifest, the changelog, and the agent-facing repository-root files that carry in-content artifact citations.\n- [hard] REQ-06: The container candidate report shows no unmanaged-selected-root blocker for any area under the development root.\n",
   "documents": [],
+  "done_at": "2026-07-26T03:04:14.757871314Z",
   "first_ready_at": "2026-07-25T22:30:15.212163438Z",
   "gates_required": [
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-26T02:41:03.735685351Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f2cac2bd-9883-4e13-ac3e-f8b779ba0298",
   "labels": [
     "type:task",
@@ -24,7 +31,7 @@
     "per:@/issue/8e071e18/decision/D-13"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Adopt the shipped area classification in this repository's configuration",
-  "updated_at": "2026-07-25T23:05:50.116051368Z"
+  "updated_at": "2026-07-26T03:04:14.757871314Z"
 }
