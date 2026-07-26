@@ -31,6 +31,13 @@ const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
 /// `container` anchor (REQ-13). A fresh apply wires the `depends_on` edge (B→P),
 /// the `anchor_edge` (C→B), and runs the `move-upstream-to-role` transform onto P.
 fn plan_template() -> GraphTemplate {
+    plan_template_document("dev/active/{container.id}-plan.md", None)
+}
+
+/// The same `plan`-shaped template with its planning node's document
+/// declaration supplied: the `doc` path template, and the issue-scoped area it
+/// is resolved in (absent for a declaration that names no area).
+fn plan_template_document(doc: &str, doc_area: Option<&str>) -> GraphTemplate {
     let toml = r#"
 [[template]]
 name        = "plan"
@@ -44,8 +51,8 @@ applies_to  = ["epic"]
   role        = "planning"
   type        = "planning"
   gates       = ["plan-review"]
-  doc         = "dev/active/{container.id}-plan.md"
-  description = "Planning node for {container.title} ({container.short_id}). Doc: {doc}. Cover: {container.hard_criteria}."
+  doc         = "@DOC@"
+@AREA@  description = "Planning node for {container.title} ({container.short_id}). Doc: {doc}. Cover: {container.hard_criteria}."
 
   [[template.nodes]]
   role        = "breakdown"
@@ -62,12 +69,34 @@ applies_to  = ["epic"]
   [[template.transforms]]
   kind = "move-upstream-to-role"
   role = "planning"
-"#;
-    TemplateRegistry::from_toml_str(toml, &HIERARCHY)
+"#
+    .replace("@DOC@", doc)
+    .replace(
+        "@AREA@",
+        &doc_area
+            .map(|area| format!("  doc_area    = \"{area}\"\n"))
+            .unwrap_or_default(),
+    );
+    TemplateRegistry::from_toml_str(&toml, &HIERARCHY)
         .unwrap()
         .get("plan")
         .unwrap()
         .clone()
+}
+
+/// The issue-scoped area this suite's document declarations name. Unrelated to
+/// the shipped vocabulary, so an area the engine assumed rather than read from
+/// the registry fails these tests.
+const DOCUMENT_AREA: &str = "workspace/notes";
+
+/// Declare [`DOCUMENT_AREA`] as this repository's one issue-scoped area, in both
+/// the captured aggregate the apply engine reads and the config file the query
+/// paths load, so the two views of the registry agree.
+fn declare_document_area(h: &TestHarness) {
+    let config = format!("[documentation]\nissue_scoped_areas = [\"{DOCUMENT_AREA}\"]\n");
+    h.storage.add_data_file("config.toml", &config);
+    std::fs::create_dir_all(h.storage.root()).unwrap();
+    std::fs::write(h.storage.root().join("config.toml"), &config).unwrap();
 }
 
 fn type_of(issue: &jit::domain::Issue) -> Option<String> {
@@ -225,6 +254,67 @@ fn test_apply_resolves_node_doc_location() {
         .documents
         .iter()
         .any(|d| d.label.as_deref() == Some("plan")));
+}
+
+#[test]
+fn test_apply_resolves_the_declared_document_area_into_the_node_doc_location() {
+    let h = TestHarness::new();
+    declare_document_area(&h);
+    let template = plan_template_document("{container.dir}/plan.md", Some(DOCUMENT_AREA));
+    let epic = create_epic(&h, "Area epic");
+
+    let (result, _w) = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    // `jit doc dir` reports the same resolver's answer, so the applied document
+    // path is that canonical directory plus the declared filename — a filename
+    // that repeats no short id, because the directory already names the issue.
+    let directory = h
+        .executor
+        .resolve_issue_artifact_directory(&epic, DOCUMENT_AREA)
+        .unwrap()
+        .directory;
+    let planning = h.get_issue(&result.created_node_ids_by_role["planning"]);
+    assert!(
+        planning
+            .description
+            .contains(&format!("{directory}/plan.md")),
+        "planning description must carry the document path inside {directory}: {}",
+        planning.description
+    );
+    assert!(
+        directory.starts_with(&format!("{DOCUMENT_AREA}/")) && directory != DOCUMENT_AREA,
+        "the declared area holds a directory the container owns: {directory}"
+    );
+    assert!(
+        !planning.description.contains("{container."),
+        "no declaration field may survive interpolation: {}",
+        planning.description
+    );
+}
+
+#[test]
+fn test_apply_rejects_a_document_area_the_registry_does_not_declare_and_creates_nothing() {
+    let h = TestHarness::new();
+    declare_document_area(&h);
+    let undeclared = format!("{DOCUMENT_AREA}-drafts");
+    let template = plan_template_document("{container.dir}/plan.md", Some(&undeclared));
+    let epic = create_epic(&h, "Undeclared area epic");
+
+    let before = h.all_issues().len();
+    let error = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap_err();
+
+    // The application fails naming the area it was handed and the registry it
+    // was matched against, rather than composing a path outside the convention.
+    let message = error.to_string();
+    assert!(message.contains(&undeclared), "{message}");
+    assert!(message.contains(DOCUMENT_AREA), "{message}");
+    assert_eq!(h.all_issues().len(), before, "no node may be created");
 }
 
 #[test]
