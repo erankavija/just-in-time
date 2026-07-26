@@ -105,7 +105,7 @@ pub enum ArtifactEvidence {
     Unsupported,
     /// A directory captured with the stated listing completeness.
     Directory {
-        /// Whether no entries, immediate children, or recursive files were captured.
+        /// Which of [`ArtifactListingScope`]'s completeness levels the entries cover.
         scope: ArtifactListingScope,
         /// Canonical repository-relative paths covered by `scope`.
         entries: Vec<String>,
@@ -122,7 +122,18 @@ pub enum ArtifactListingScope {
     /// Every immediate child path was captured.
     ImmediateChildren,
     /// Every recursive non-directory entry was captured.
+    ///
+    /// A directory is descended through without being named, so a subtree
+    /// holding no file contributes nothing. This is what a reader wanting file
+    /// bytes asks for.
     RecursiveFiles,
+    /// Every recursive entry was captured, the directories descended through
+    /// included.
+    ///
+    /// This is what a reader asks for when a directory is evidence in its own
+    /// right rather than a container to look inside: an empty one, and one
+    /// holding nothing but further directories, are both named.
+    RecursiveEntries,
 }
 
 /// Archive-specific captured evidence keyed by normalized worktree path.

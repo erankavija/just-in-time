@@ -125,10 +125,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The walked registry is
     /// [`DocumentationConfig::issue_scoped_areas`](crate::config::DocumentationConfig::issue_scoped_areas)
     /// and nothing else, so a repository that declares no issue-scoped area is
-    /// reported over no areas at all. Each area is listed with the same
-    /// no-follow recursive walk the archival planner reads its evidence with,
-    /// and the verdicts come from
-    /// [`report_area_artifacts`](crate::domain::artifact_conformance::report_area_artifacts).
+    /// reported over no areas at all. Each area is listed with the archival
+    /// planner's no-follow recursive walk at
+    /// [`ArtifactListingScope::RecursiveEntries`](crate::domain::artifact_discovery::ArtifactListingScope::RecursiveEntries),
+    /// which names the directories it descends through: a misplaced directory
+    /// is an artifact whether or not it holds a file, and one holding nothing
+    /// but further directories is reported the same way. The verdicts come from
+    /// [`report_area_artifacts`](crate::domain::artifact_conformance::report_area_artifacts),
+    /// which names the topmost offending component, so naming a directory and
+    /// the files beneath it still reports that directory once.
     ///
     /// Read-only and advisory (`@/issue/8e071e18/decision/D-7`): the findings
     /// are the return value rather than a status a caller could gate on, and
@@ -174,7 +179,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let paths = match crate::storage::artifact_planning::inspect_artifact_evidence(
                     &self.storage,
                     area,
-                    ArtifactListingScope::RecursiveFiles,
+                    ArtifactListingScope::RecursiveEntries,
                 )? {
                     ArtifactEvidence::Directory { entries, .. } => entries,
                     // An area that is absent, a file, or a symlink holds no
