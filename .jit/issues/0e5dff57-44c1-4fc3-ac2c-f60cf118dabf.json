@@ -16,12 +16,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-26T21:07:28.308280498Z",
+      "updated_at": "2026-07-26T21:57:10.362119695Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-26T21:10:18.784432299Z",
+      "status": "passed",
+      "updated_at": "2026-07-26T22:00:56.308029055Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Retain artifacts outside the development root and stop discovery at them",
-  "updated_at": "2026-07-26T21:20:06.351460434Z"
+  "updated_at": "2026-07-26T22:00:56.308029055Z"
 }

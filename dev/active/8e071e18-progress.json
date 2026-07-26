@@ -1406,6 +1406,13 @@
       "subject": "the proposed-layout check still diverges from discovery on backslash separators",
       "detail": "ac45f567 aligned validate_proposed_layout with resolve_reference on the query/fragment split, but resolve_reference (crates/jit/src/domain/artifact_discovery.rs:538-542) also applies .replace('\\\\', \"/\") to the path component and validate_proposed_layout (artifact_classifier.rs:648) does not. A reference written with backslash separators would therefore resolve to a target during discovery and then fail the proposed-layout check - the same defect shape ac45f567 closed, one separator further.",
       "disposition": "OPEN as a product observation, NOT a criterion violation and NOT a rework trigger. ac45f567's REQ-01 and REQ-02 name anchor fragments and query strings; REQ-04 scopes itself to fragment-bearing edges. Latent today: all 24 containers execute cleanly at the merge commit, so no repository reference currently takes this path. The durable fix is to share ONE reference-path normalizer between the two call sites rather than to add a second .replace() - two hand-aligned resolvers is what produced both defects. Reconcile against the epic's criteria before the epic gate; expected to be a genuine follow-up."
+    },
+    {
+      "id": "P20",
+      "raised_by": "worker 0e5dff57 on recount, confirmed by the lead",
+      "subject": "only relative citations break under retention; root-relative ones survive by construction",
+      "detail": "The lead's first count of archive-side citation breakage ignored reference resolution mode and reported 12 across 4 containers. A root-relative reference resolves as normalize(reference.trim_start_matches('/')) independently of the parent's location (artifact_classifier.rs:693), and a retained target's available set is exactly its source, so the two always match: the citation resolves from the archived copy as readily as from the original. Corrected count is 11, all relative: 9 on copied parents (snapshot-only) and 2 on one relocated document.",
+      "disposition": "CLOSED as a measurement correction, and turned into a design input. 84c4e956 was rescoped from 3 citations across 2 documents to 2 in dev/active/2b9a80fb-audit-notes.md, its dependency from e536ea5a was dropped, and D-14's recorded numbers were corrected. The mechanism is now the REPAIR FORM in 84c4e956's Notes: rewriting a relative citation as root-relative satisfies both its criteria by construction, because the repository root is the one anchor archival does not move."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
@@ -1514,6 +1521,13 @@
       "subject": "encode the reason a tempting optimisation is refused, as a test",
       "detail": "Bounding evidence acquisition at the out-of-root frontier is an obvious improvement that reads as strictly better: it shrinks reads as well as plans. It is refused because the repository-wide ownership relation derives outside-owner evidence from chains that leave and re-enter the development root, so bounding it silently converts 8 artifacts from copy to relocation and deletes live files other issues' documents still reach. The worker implemented it twice, correctly reasoning both times, and reverted once on its own measurement.",
       "decision": "A doc comment saying 'deliberately unbounded' was not enough - it did not survive a reviewer asking for the opposite. Directed a regression test that fails if acquisition is bounded: an artifact whose only outside-owner claim arrives through an out-of-root hub must classify as Copy with outside-owner evidence. Generally: when a change is refused for a non-local reason, pin the reason with a test, not with prose."
+    },
+    {
+      "id": "N16",
+      "raised_at": "session 5, 0e5dff57 merge",
+      "subject": "`git stash push <path>` then `git stash pop` around a merge can pop an unrelated stash",
+      "detail": "The lead's merge ritual was: stash the uncommitted .jit claim, merge, pop. On the third merge the stash push was a NO-OP, because the claim had already been committed in the preceding step, so nothing was saved and no new stash entry was created. The pop then applied stash@{0}, a pre-existing unrelated WIP ('deletion bug investigation') left in this repository long before this session. It conflicted, leaving UU markers in crates/jit/src/storage/json.rs and integration_test.rs and foreign edits in two more files. Because the pop conflicted, git KEPT the stash entry, so nothing was destroyed.",
+      "decision": "Recovered with `git reset --hard HEAD` back to the merge commit; all 3 pre-existing stashes intact and the merge itself verified uncontaminated (8 files, none of them json.rs). Stop using stash around merges entirely: commit the claim BEFORE merging, which N12 already requires for the install step anyway. If a stash is ever unavoidable, capture the ref from `git stash create` and apply that specific ref - never bare `pop`, which is positional and silently targets someone else's work when your own push was a no-op."
     }
   ],
   "handoffs": [

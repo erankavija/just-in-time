@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "fdf564d5c03337e6894f45e2c376ae08913e50be",
+  "completed_at": "2026-07-26T22:00:56.050394081Z",
+  "duration_ms": 216190,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The current implementation satisfies the issue criteria; prior blocking findings F1 and F2 are addressed under the amended REQ-03 semantics.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0e5dff57-44c1-4fc3-ac2c-f60cf118dabf",
+  "message": null,
+  "run_id": "2a364175-1471-4674-99bf-041f74fc0427",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T21:57:19.860258401Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 68b760dc, bc4e3584, d72526cc, 2b5cab98, 4ab2213d, 5b90120f, 733937b4, fdf564d5 (reachable from HEAD)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-14 and @/issue/8e071e18/requirement/REQ-14 (markdown-first issue sections); @/gate/cargo-ci (.jit/gates.toml); @/invariant/semantic-test-assertions and @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T21:50:58Z); prior code-review failed (exit 1, F1/F2 re-verified)\nTruncation recovery: reread 68b760dc’s classifier patch separately; inspected current discovery, storage, command, and focused test ranges; inspected merge commits with combined diffs\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current implementation satisfies the issue criteria; prior blocking findings F1 and F2 are addressed under the amended REQ-03 semantics.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
