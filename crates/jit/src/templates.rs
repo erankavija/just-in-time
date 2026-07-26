@@ -332,8 +332,19 @@ pub struct TemplateNode {
     pub gates: Vec<String>,
     /// Plan-doc location template for the node, with `{...}` interpolation
     /// tokens resolved at apply time (e.g. `"dev/active/{container.id}-plan.md"`).
+    /// A node that declares a [`doc_area`](Self::doc_area) names its document
+    /// relative to `{container.dir}` (e.g. `"{container.dir}/plan.md"`).
     #[serde(default)]
     pub doc: Option<String>,
+    /// Issue-scoped area the node's document belongs in (e.g. `"dev/active"`),
+    /// selecting the area `{container.dir}` resolves in at apply time.
+    ///
+    /// The area is matched against the repository's issue-scoped area registry
+    /// ([`DocumentationConfig::issue_scoped_areas`](crate::config::DocumentationConfig::issue_scoped_areas)),
+    /// so an undeclared area fails the apply rather than producing a path
+    /// outside the convention. Absent leaves `{container.dir}` out of scope.
+    #[serde(default)]
+    pub doc_area: Option<String>,
     /// Interpolated description seeded onto the created node.
     #[serde(default)]
     pub description: Option<String>,
@@ -746,6 +757,31 @@ applies_to  = ["epic"]
             reg.get("anchored").unwrap().anchors[0].gates,
             vec!["plan-review", "coverage-preview"]
         );
+    }
+
+    #[test]
+    fn test_node_doc_area_parses_and_defaults_to_absent() {
+        // A node states the area its document belongs in; the shared fixture's
+        // node declares none, so the declaration is the node's own choice.
+        let toml = r#"
+[[template]]
+name        = "plan"
+applies_to  = ["epic"]
+
+  [[template.nodes]]
+  role     = "planning"
+  type     = "planning"
+  doc_area = "workspace/notes"
+  doc      = "{container.dir}/plan.md"
+"#;
+        let reg = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap();
+        assert_eq!(
+            reg.get("plan").unwrap().nodes[0].doc_area.as_deref(),
+            Some("workspace/notes")
+        );
+
+        let undeclared = TemplateRegistry::from_toml_str(plan_template_toml(), &HIERARCHY).unwrap();
+        assert!(undeclared.get("plan").unwrap().nodes[0].doc_area.is_none());
     }
 
     #[test]

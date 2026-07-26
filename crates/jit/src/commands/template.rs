@@ -825,11 +825,19 @@ fn derive_template_apply(
             lease_targets: Vec::new(),
         }
     } else {
+        // The declarations a node's document area is resolved against, read from
+        // the same captured configuration as the rest of the derivation.
+        let documentation = config.documentation.clone().unwrap_or_default();
+        let hierarchy = crate::repository_state::hierarchy_config(
+            &crate::config_manager::namespaces_from_config(config),
+        );
         let delta = expand_template(
             template,
             &container,
             &resolved_bindings,
             &anchor_dependency_snapshots,
+            &documentation,
+            &hierarchy,
         )?;
         prevalidate_captured_delta(template, &delta, issues)?;
         derive_fresh_template(
@@ -1018,7 +1026,8 @@ fn derive_template_refresh(
             )
         })?;
         let mut issue = template_issue(issues, id)?.clone();
-        let description = node_description(node, &context.with_doc(node));
+        // Prose reconciliation: the artifact-directory field is out of scope here.
+        let description = node_description(node, &context.with_doc(node, None));
         if issue.description == description {
             continue;
         }
