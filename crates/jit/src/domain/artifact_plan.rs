@@ -500,6 +500,10 @@ pub enum WarningCode {
     NotSelectedSibling,
     DynamicLoadingSuspected,
     UnsupportedEdgeTarget,
+    /// One occurrence of a relocating artifact's path in the text of a scanned
+    /// file. Its [`PlanWarning::path`] names the citing file with the
+    /// occurrence's 1-based line and column, spelled
+    /// `<citing path>:<line>:<column>`.
     MovingPathCitation,
 }
 

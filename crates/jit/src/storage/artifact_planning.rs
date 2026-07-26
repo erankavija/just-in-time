@@ -3,7 +3,8 @@
 use crate::domain::artifact_classifier::{
     artifact_mirror_destination, classification_facts_from_evidence,
     resolve_container_destination as derive_container_destination, ArtifactClassificationFacts,
-    ArtifactClassificationPolicy, EmbeddedArtifactOwner, ResolvedContainerDestination,
+    ArtifactClassificationPolicy, CitationScanEvidence, EmbeddedArtifactOwner,
+    ResolvedContainerDestination,
 };
 use crate::domain::artifact_discovery::{
     ArtifactEvidence, ArtifactEvidenceMap, ArtifactListingScope,
@@ -74,7 +75,8 @@ pub fn resolve_container_destination<S: IssueStore>(
     )?)
 }
 
-/// Acquire every source, mirror, marker, and destination listing used by classification.
+/// Acquire every source, mirror, marker, and destination listing used by
+/// classification, plus the text of the declared citation scan universe.
 pub fn collect_artifact_classification_facts<S: IssueStore>(
     storage: &S,
     target: &PlanTarget,
@@ -121,14 +123,60 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
         }
         evidence.insert(destination_root.to_string(), destination);
     }
-    classification_facts_from_evidence(
-        target,
-        destination_root,
-        artifacts,
-        policy,
-        embedded_owners,
-        &evidence,
-    )
+    Ok(ArtifactClassificationFacts {
+        citations: collect_citation_scan_evidence(storage, &policy.citation_scan_roots),
+        ..classification_facts_from_evidence(
+            target,
+            destination_root,
+            artifacts,
+            policy,
+            embedded_owners,
+            &evidence,
+        )?
+    })
+}
+
+/// Read the text of every file the declared citation scan roots reach.
+///
+/// Advisory plan evidence, so no path failure reaches the caller: a declared
+/// root that is absent, a path component that is a symbolic link, a file whose
+/// bytes are not valid UTF-8, and any other unreadable path are skipped, and the
+/// plan is produced from whatever the scan did reach. A root naming one file
+/// contributes that file; a root naming a directory contributes every file
+/// beneath it.
+///
+/// The walk is [`inspect_artifact_evidence`]'s recursive listing, which opens
+/// every component with the no-follow directory handles the rest of the planner
+/// uses, so the scan escapes the repository through no symbolic link and starts
+/// no external process.
+pub(crate) fn collect_citation_scan_evidence<S: IssueStore>(
+    storage: &S,
+    roots: &[String],
+) -> CitationScanEvidence {
+    roots
+        .iter()
+        .map(|root| normalize_artifact_path(root))
+        .filter(|root| !root.is_empty())
+        .flat_map(|root| {
+            match inspect_artifact_evidence(storage, &root, ArtifactListingScope::RecursiveFiles) {
+                Ok(ArtifactEvidence::File(bytes)) => vec![(root, bytes)],
+                Ok(ArtifactEvidence::Directory { entries, .. }) => entries
+                    .into_iter()
+                    .filter_map(|entry| read_scanned_file(storage, entry))
+                    .collect(),
+                _ => Vec::new(),
+            }
+        })
+        .filter_map(|(path, bytes)| String::from_utf8(bytes).ok().map(|text| (path, text)))
+        .collect()
+}
+
+/// Read one listed scan path, skipping everything that is not a regular file.
+fn read_scanned_file<S: IssueStore>(storage: &S, path: String) -> Option<(String, Vec<u8>)> {
+    match inspect_artifact_evidence(storage, &path, ArtifactListingScope::MetadataOnly) {
+        Ok(ArtifactEvidence::File(bytes)) => Some((path, bytes)),
+        _ => None,
+    }
 }
 
 /// Inspect one repository-relative path without following any symlink component.
@@ -256,20 +304,121 @@ fn other(error: impl Into<anyhow::Error>) -> PathReadError {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    use crate::domain::artifact_classifier::{classify_artifacts, ArtifactClassificationInventory};
+    use crate::domain::artifact_plan::{
+        ArtifactAction, ArtifactOwner, ArtifactPlan, ArtifactProvenance, WarningCode,
+    };
+    use crate::domain::State;
     use crate::storage::JsonFileStorage;
+    use std::collections::BTreeSet;
     use std::fs;
     use std::os::unix::fs::symlink;
     use tempfile::TempDir;
 
-    #[test]
-    fn test_inspect_artifact_evidence_distinguishes_complete_listing_scopes_without_following_symlinks(
-    ) {
+    const CONTAINER: &str = "abcdef12-3456-7890-abcd-ef1234567890";
+    const CITED_SOURCE: &str = "dev/active/plan.md";
+    const DESTINATION_ROOT: &str = "dev/archive/abcdef12";
+
+    fn repository() -> (TempDir, JsonFileStorage) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         fs::create_dir(storage.root()).unwrap();
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         storage.configure_repository_layout(&layout);
+        (repo, storage)
+    }
+
+    fn write(repo: &TempDir, path: &str, contents: impl AsRef<[u8]>) {
+        let file = repo.path().join(path);
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(file, contents).unwrap();
+    }
+
+    /// A shell-comment citation of the artifact the fixture plan relocates.
+    fn citation() -> String {
+        format!("#!/usr/bin/env bash\n# see {CITED_SOURCE} for the design\n")
+    }
+
+    fn scan_policy(roots: &[&str]) -> ArtifactClassificationPolicy {
+        ArtifactClassificationPolicy::configured(
+            "dev",
+            vec!["dev/active".into()],
+            vec!["docs".into()],
+            "dev/archive",
+        )
+        .with_citation_scan_roots(roots.iter().map(|root| (*root).to_string()).collect())
+    }
+
+    /// Plan the relocation of one cited artifact with `roots` declared as the
+    /// citation scan universe, acquiring evidence exactly as an archive preview
+    /// does.
+    fn plan_with_scan(storage: &JsonFileStorage, roots: &[&str]) -> ArtifactPlan {
+        let target = PlanTarget::Container {
+            id: CONTAINER.to_string(),
+        };
+        let artifacts = vec![ArtifactPlanEntry::new(
+            CITED_SOURCE,
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Retain,
+        )
+        .with_provenance(vec![ArtifactProvenance::Explicit])
+        .with_owners(vec![ArtifactOwner {
+            issue: "owner".to_string(),
+            document_index: 0,
+            state: State::Done,
+            archived_from: None,
+            inside_subtree: true,
+            pinned: false,
+            selected_for_relink: false,
+        }])];
+        let policy = scan_policy(roots);
+        let facts = collect_artifact_classification_facts(
+            storage,
+            &target,
+            DESTINATION_ROOT,
+            &artifacts,
+            &policy,
+            Vec::new(),
+        )
+        .unwrap();
+        classify_artifacts(
+            ArtifactClassificationInventory::new(target, artifacts, Vec::new())
+                .with_destination_root(DESTINATION_ROOT),
+            policy,
+            facts,
+        )
+        .unwrap()
+    }
+
+    /// The scanned files a produced plan reports citations in, having confirmed
+    /// the plan does relocate the cited artifact — a plan that leaves it in
+    /// place would report nothing whatever the scan reached.
+    fn citing_files(plan: &ArtifactPlan) -> BTreeSet<String> {
+        assert!(
+            plan.artifacts()
+                .iter()
+                .any(|artifact| artifact.action() == ArtifactAction::Move),
+            "the planned artifact must relocate for its citations to be reported"
+        );
+        plan.artifacts()
+            .iter()
+            .flat_map(ArtifactPlanEntry::warnings)
+            .filter(|warning| warning.code == WarningCode::MovingPathCitation)
+            .filter_map(|warning| warning.path.as_deref())
+            .filter_map(|location| location.rsplitn(3, ':').nth(2))
+            .map(str::to_string)
+            .collect()
+    }
+
+    fn paths(paths: &[&str]) -> BTreeSet<String> {
+        paths.iter().map(|path| (*path).to_string()).collect()
+    }
+
+    #[test]
+    fn test_inspect_artifact_evidence_distinguishes_complete_listing_scopes_without_following_symlinks(
+    ) {
+        let (repo, storage) = repository();
         fs::create_dir_all(repo.path().join("archive/sub")).unwrap();
         fs::write(repo.path().join("archive/sub/nested.md"), "nested").unwrap();
         fs::create_dir(repo.path().join("outside")).unwrap();
@@ -307,5 +456,86 @@ mod tests {
                 entries: vec!["archive/link".into(), "archive/sub/nested.md".into()],
             }
         );
+    }
+
+    #[test]
+    fn test_collect_citation_scan_evidence_reads_a_declared_root_outside_the_development_root() {
+        let (repo, storage) = repository();
+        write(&repo, CITED_SOURCE, "plan");
+        write(&repo, "scripts/nested/benchmark.sh", citation());
+        write(&repo, "CHANGELOG.md", citation());
+        write(&repo, "dev/notes.md", citation());
+
+        let plan = plan_with_scan(&storage, &["scripts", "CHANGELOG.md"]);
+
+        // Both declared roots sit outside the configured development root, one
+        // of them naming a single file rather than a directory. The citing file
+        // inside the development root that no root declares stays unread, so the
+        // universe is the declared list and not the development root.
+        assert_eq!(
+            citing_files(&plan),
+            paths(&["CHANGELOG.md", "scripts/nested/benchmark.sh"])
+        );
+    }
+
+    #[test]
+    fn test_collect_citation_scan_evidence_skips_an_absent_declared_root_without_failing_the_plan()
+    {
+        let (repo, storage) = repository();
+        write(&repo, CITED_SOURCE, "plan");
+        write(&repo, "scripts/present.sh", citation());
+
+        let plan = plan_with_scan(&storage, &["docs/absent", "scripts"]);
+
+        // The plan is produced and the readable root still contributes, so the
+        // absent root skipped rather than emptying or failing the scan.
+        assert_eq!(citing_files(&plan), paths(&["scripts/present.sh"]));
+    }
+
+    #[test]
+    fn test_collect_citation_scan_evidence_skips_a_symbolic_link_path_component_without_failing_the_plan(
+    ) {
+        let (repo, storage) = repository();
+        write(&repo, CITED_SOURCE, "plan");
+        write(&repo, "outside/cited.sh", citation());
+        write(&repo, "scripts/real.sh", citation());
+        symlink(
+            repo.path().join("outside"),
+            repo.path().join("scripts/linked"),
+        )
+        .unwrap();
+        symlink(repo.path().join("outside"), repo.path().join("linked-root")).unwrap();
+
+        let plan = plan_with_scan(&storage, &["linked-root", "scripts"]);
+
+        // The same citing file sits behind a symlinked declared root and behind
+        // a symlinked component of a walked root; neither reaches it, while the
+        // regular file beside the link is still read.
+        assert_eq!(citing_files(&plan), paths(&["scripts/real.sh"]));
+        // Declared by its real path, that same file is read, so the skip is the
+        // symbolic link and not the file behind it.
+        assert_eq!(
+            citing_files(&plan_with_scan(&storage, &["outside"])),
+            paths(&["outside/cited.sh"])
+        );
+    }
+
+    #[test]
+    fn test_collect_citation_scan_evidence_skips_a_file_whose_bytes_are_not_valid_utf8_without_failing_the_plan(
+    ) {
+        let (repo, storage) = repository();
+        write(&repo, CITED_SOURCE, "plan");
+        write(&repo, "scripts/real.sh", citation());
+        write(
+            &repo,
+            "scripts/deck.pdf",
+            [b"\xff", citation().as_bytes(), b"\xfe"].concat(),
+        );
+
+        let plan = plan_with_scan(&storage, &["scripts"]);
+
+        // The undecodable file carries the cited path in its bytes, so a lossy
+        // read would report it; the plan is produced and only the text file is.
+        assert_eq!(citing_files(&plan), paths(&["scripts/real.sh"]));
     }
 }
