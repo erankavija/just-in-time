@@ -19,11 +19,10 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:skill-path-adoption",
-    "satisfies:REQ-11",
     "per:@/issue/8e071e18/decision/D-11"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Convert the execution-lead skill to the artifact directory convention",
-  "updated_at": "2026-07-26T03:45:08.712349099Z"
+  "updated_at": "2026-07-26T05:21:52.734080994Z"
 }

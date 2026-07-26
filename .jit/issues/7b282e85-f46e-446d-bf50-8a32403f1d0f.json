@@ -19,11 +19,10 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:skill-path-adoption",
-    "satisfies:REQ-11",
     "per:@/issue/8e071e18/decision/D-11"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Convert the single-issue skill to the artifact directory convention",
-  "updated_at": "2026-07-26T03:45:19.917531472Z"
+  "updated_at": "2026-07-26T05:22:03.977286638Z"
 }

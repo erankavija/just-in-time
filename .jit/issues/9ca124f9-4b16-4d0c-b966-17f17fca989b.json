@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-26T05:23:26.803125261Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
@@ -20,12 +21,11 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:archive-naming-and-warnings",
-    "satisfies:REQ-08",
     "per:@/charter/D-4",
     "per:@/issue/8e071e18/decision/D-8"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Prove citation warnings hold outside version control without altering the plan",
-  "updated_at": "2026-07-26T03:45:46.241448086Z"
+  "updated_at": "2026-07-26T05:23:26.803125261Z"
 }
