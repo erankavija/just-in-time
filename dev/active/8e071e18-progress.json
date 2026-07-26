@@ -1090,6 +1090,13 @@
       "subject": "docs-mechanical's fallback footprint derives an adopter-docs scope from permanent_paths",
       "detail": "scripts/docs-mechanical.sh resolve_footprint() reads [documentation].permanent_paths as the default adopter documentation surface (scripts/docs-mechanical.sh:50-66). Those are different sets by design after D-13 and D-14. The gate no longer reaches the fallback \u2014 DOCS_FOOTPRINT is pinned ahead of it in the resolution order \u2014 but any future caller invoking the script bare gets the contributor dev areas.",
       "disposition": "MITIGATED at the gate, OPEN in the checker. Not a criterion violation: none of the epic's 15 [hard] criteria names the docs-mechanical checker, and the script is repository-local rather than shipped (absent from profiles/ and from the binary's gate presets), so it is outside the dogfooding boundary's shipped surface. Reconcile against the criteria before the epic gate; expected to remain a genuine follow-up."
+    },
+    {
+      "id": "P9",
+      "raised_by": "3559ca25 rework Sweep 3",
+      "subject": "every other --json-bearing doc subcommand renders its failures as plain text",
+      "detail": "The rework worker's mandated per-finding workspace sweep found that the defect code-review raised against `doc dir` is repository-wide across the `doc` namespace. All eight other `--json`-bearing arms propagate failure with a bare `?` to the top-level plain-text printer: doc add (crates/jit/src/main.rs:4980, ? at :4987), doc list (:5022), doc remove (:5057), doc show (:5077), doc history (:5150), doc diff (:5175), doc assets list (:5197), doc check-links (:5331 scope parse and :5332). `doc rm` and `doc delete` are verb hints carrying no --json and are not affected. The established fix already exists in the tree: classify by downcast, then hand the envelope to the `handle_json_error!` macro (crates/jit/src/output_macros.rs:70), which is what doc dir now does.",
+      "disposition": "OUT OF SCOPE for this epic and deliberately left unfixed. None of the epic's 15 [hard] criteria names the doc namespace's error rendering, and the defect predates the epic; the worker was instructed not to touch the other arms because that is scope creep re-review would flag. Surface to the owner as a candidate follow-up over the whole doc namespace. Filing it is not a lead decision: it sits outside this epic, so it needs the owner's call on where it lands."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
