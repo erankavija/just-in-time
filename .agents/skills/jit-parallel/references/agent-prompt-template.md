@@ -28,7 +28,7 @@ Cited concrete qualified addresses are resolvable project knowledge, not opaque 
 
 1. Explore the codebase to understand the current state — find relevant files, existing patterns, and constraints.
 2. Read the repository's documentation configuration and write a concrete
-   implementation plan to `<managed-docs-root>/<short-id>-<slug>.md`. The plan must include:
+   implementation plan to `$(jit doc dir [SHORT-ID] dev/active)/plan.md`. The plan must include:
    - Problem statement and goals
    - Ordered implementation steps
    - Files to create or modify (with rationale)
@@ -38,7 +38,7 @@ Cited concrete qualified addresses are resolvable project knowledge, not opaque 
    - Any risks or unknowns that need resolution before implementation begins
 3. Link the document to the issue using `jit doc add`:
    - id: "[SHORT-ID]"
-   - path: "<managed-docs-root>/<short-id>-<slug>.md"
+   - path: "$(jit doc dir [SHORT-ID] dev/active)/plan.md"
    - doc_type: "implementation-plan"
    - label: "Implementation Plan"
 4. Commit the plan file (and any updated `.jit/` files) so the document has a commit hash. Use a commit message that references the issue and the plan adhering to the project's commit message conventions.
