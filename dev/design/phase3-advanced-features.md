@@ -294,5 +294,5 @@ Since Phase 3 is optional, success criteria depend on which features are impleme
 
 ## Related Documentation
 
-- `dev/design/subgraph-clustering-layout.md` - Overall design
-- `dev/design/phase2-collapse-expand.md` - Phase 2 plan (prerequisite)
+- `dev/archive/9d427a6b-production-polish/dev/design/subgraph-clustering-layout.md` - Overall design
+- `dev/archive/9d427a6b-production-polish/dev/design/phase2-collapse-expand.md` - Phase 2 plan (prerequisite)
