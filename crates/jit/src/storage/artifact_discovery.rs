@@ -34,7 +34,7 @@ pub enum ArtifactDiscoveryError {
 /// `policy` bounds the derived inventory at every artifact it retains outside
 /// the development root. The acquired evidence itself stays repository-wide,
 /// because the same closure backs the ownership relation that keeps such an
-/// artifact's dependents from being deleted.
+/// artifact's descendants from being deleted.
 pub fn discover_archive_artifacts<S: IssueStore>(
     storage: &S,
     inventory: ExplicitRootInventory,

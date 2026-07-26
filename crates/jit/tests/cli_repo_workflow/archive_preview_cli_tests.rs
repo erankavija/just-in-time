@@ -105,12 +105,20 @@ fn set_documentation_policy(repo: &TempDir, policy: &str) {
     fs::write(&path, config.to_string()).unwrap();
 }
 
+/// A bundle repository that declares no development-root boundary, so its
+/// `fixtures` area classifies by the managed/permanent split alone.
+///
+/// The empty `development_root` is deliberate: an omitted key falls back to the
+/// shipped `dev` root, which would place this whole fixture outside the
+/// boundary and retain every artifact, leaving nothing to archive. The tests
+/// whose subject is that boundary configure a real root of their own.
 fn configured_bundle(repo: &TempDir) {
     assert_success(&jit(repo, &["init", "--json"]));
     set_documentation_policy(
         repo,
         r#"
 [documentation]
+development_root = ""
 managed_paths = ["fixtures"]
 permanent_paths = []
 archive_root = "archive"
@@ -478,7 +486,7 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
     assert_success(&jit(&container_repo, &["init", "--json"]));
     set_documentation_policy(
         &container_repo,
-        "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+        "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
     );
     fs::create_dir(container_repo.path().join("fixtures")).unwrap();
     fs::write(container_repo.path().join("fixtures/root.md"), "container").unwrap();
@@ -1016,7 +1024,7 @@ fn test_container_archive_slug_is_consistent_and_frozen_by_marker() {
     assert_success(&jit(&repo, &["init", "--json"]));
     set_documentation_policy(
         &repo,
-        "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+        "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
     );
     fs::create_dir(repo.path().join("fixtures")).unwrap();
     fs::write(repo.path().join("fixtures/root.md"), "archive me").unwrap();
@@ -1142,6 +1150,7 @@ fn citation_scan_repo(vcs: bool, citing_text: &str) -> TempDir {
         &repo,
         concat!(
             "[documentation]\n",
+            "development_root = \"\"\n",
             "managed_paths = [\"fixtures\"]\n",
             "permanent_paths = []\n",
             "archive_root = \"archive\"\n",

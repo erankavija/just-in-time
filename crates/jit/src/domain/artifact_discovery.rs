@@ -5,11 +5,11 @@
 //! repository-component semantics. The storage layer owns the recursive read
 //! loop and feeds bytes through this pure core.
 //!
-//! The inventory walk is bounded by the classification policy: an artifact the
-//! policy retains outside the development root is a frontier. It enters the
-//! plan when a scanned artifact links it, but its own references are never
-//! resolved, so the plan stops there instead of absorbing everything a
-//! repository-root hub cites (`@/issue/8e071e18/decision/D-14`).
+//! The plan's walk is bounded by the classification policy: an artifact the
+//! policy retains outside the development root contributes no descendants. It
+//! enters the plan when a scanned artifact links it, but nothing reached only
+//! through its links joins it there, so one repository-root hub no longer draws
+//! the set it cites into the plan (`@/issue/8e071e18/decision/D-14`).
 
 use crate::domain::artifact_classifier::{
     ArtifactClassificationInventory, ArtifactClassificationPolicy, EmbeddedArtifactOwner,
@@ -171,12 +171,14 @@ pub enum ArtifactDiscoveryError {
 
 /// Expand all supported local edges from roots using one explicit evidence map.
 ///
-/// This closure is deliberately unbounded. It answers "what does the repository
-/// still reach", which both the selected inventory and the repository-wide
-/// ownership relation read: an ownership claim only ever retains a source, so
-/// a claim reached through an artifact outside the development root is worth
-/// keeping even though [`discover_archive_artifacts`] refuses to take that
-/// artifact's dependents into a plan.
+/// This closure is deliberately unbounded, and the development root does not
+/// narrow it. It answers "what does the repository still reach", which both the
+/// selected inventory and the repository-wide ownership relation read. An
+/// ownership claim only ever retains a source, so a claim reached through an
+/// artifact outside the development root is worth keeping even though
+/// [`discover_archive_artifacts`] refuses to take that artifact's descendants
+/// into a plan: bounding the read here would instead delete live files another
+/// issue's document still reaches (`@/issue/8e071e18/decision/D-14`).
 pub fn expand_artifact_closure(
     mut state: ArtifactClosureState,
     evidence: &ArtifactEvidenceMap,
@@ -221,11 +223,11 @@ pub fn expand_artifact_closure(
     }
 }
 
-/// The references of one parsed artifact that the inventory walk resolves.
+/// The references of one parsed artifact that the plan's walk resolves.
 ///
 /// An artifact the policy retains outside the development root contributes
-/// none: the walk stops at it, so it names no edge and admits no further
-/// artifact to the plan (`@/issue/8e071e18/decision/D-14`).
+/// none: the walk stops at it, so it names no edge and admits no descendant of
+/// it to the plan (`@/issue/8e071e18/decision/D-14`).
 fn followed_references<'a>(
     path: &str,
     artifact: &'a ParsedArtifact,
@@ -246,7 +248,7 @@ fn followed_references<'a>(
 /// contribute no edge, no artifact entry, and no traversal. An explicitly
 /// selected root is inventoried whatever its filesystem kind, so a directory
 /// named as a root still reaches classification and blocks there. `policy`
-/// bounds the walk through [`followed_references`].
+/// bounds this walk through [`followed_references`].
 pub fn discover_archive_artifacts(
     inventory: ExplicitRootInventory,
     issues: &[Issue],

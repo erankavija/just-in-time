@@ -115,8 +115,7 @@ impl Repo {
 }
 
 #[test]
-fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_without_resolving_its_own_links()
-{
+fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_but_none_of_its_descendants() {
     let repo = Repo::new();
     repo.write("dev/active/plan.md", "[hub](../../README.md)");
     repo.write("README.md", "[guide](docs/guide.md)");
@@ -138,7 +137,7 @@ fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_without_resolv
     assert_eq!(
         Repo::sources(&bounded),
         ["README.md", "dev/active/plan.md"],
-        "the walk must stop at the out-of-root hub rather than passing through it"
+        "no artifact reached only through the out-of-root hub may join the plan"
     );
     let hub = bounded
         .artifacts()

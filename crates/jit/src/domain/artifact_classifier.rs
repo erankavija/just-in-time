@@ -25,16 +25,18 @@ use std::path::Path;
 
 /// Explicit documentation policy used by the classifier.
 ///
-/// The configured areas classify one repository-relative source: the archive
-/// root marks an already-archived source, a permanent root retains its source
-/// beside the mirror, and a managed root may relocate it. A source that none of
-/// those roots claims and the configured development root does not contain is
-/// retained where it is, so a linked source file, script, or repository-root
-/// document keeps its single copy instead of defeating the whole plan
-/// (`@/issue/8e071e18/decision/D-14`). Inside the development root, a source
-/// that matches no configured area still raises
-/// [`BlockerCode::UnmanagedSelectedRoot`], keeping a mistyped area entry
-/// diagnosable.
+/// The development root is the outer boundary: a source it does not contain is
+/// retained where it is, whichever areas claim it, so a linked source file,
+/// script, or repository-root document keeps its single copy instead of
+/// defeating the whole plan (`@/issue/8e071e18/decision/D-14`). The archive
+/// root is read first, because a source already beneath it is a published
+/// mirror rather than a working-tree artifact.
+///
+/// Inside the development root the configured areas classify one
+/// repository-relative source: a permanent root retains its source beside the
+/// mirror, and a managed root may relocate it. A source there that matches no
+/// configured area raises [`BlockerCode::UnmanagedSelectedRoot`], keeping a
+/// mistyped area entry diagnosable.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactClassificationPolicy {
     /// Whether every mutation-authorizing policy field was explicitly set.
@@ -140,13 +142,18 @@ impl ArtifactClassificationPolicy {
     /// Such a source — a source file, a script, an agent asset, a
     /// repository-root document — is not the repository's development record,
     /// so an archive neither relocates nor duplicates it: the plan schedules no
-    /// destination for it, and artifact discovery stops following links at it
-    /// rather than pulling everything it cites into the plan
-    /// (`@/issue/8e071e18/decision/D-14`). The archive root and the managed
-    /// roots keep their own treatment, so an already-archived source and a
-    /// managed area declared outside the development root are unaffected.
+    /// destination for it and admits no descendant of it, so one linked
+    /// repository-root hub no longer draws the set it cites into the plan
+    /// (`@/issue/8e071e18/decision/D-14`).
+    ///
+    /// The boundary admits no area carve-out. A managed or permanent root the
+    /// development root does not contain is retained just the same, so no
+    /// configured area can schedule a source outside that root for relocation.
+    /// The archive root is the one path this leaves alone, because a source
+    /// already beneath it is a published mirror rather than a working-tree
+    /// artifact and carries its own already-archived treatment.
     pub fn retains_outside_development_root(&self, path: &str) -> bool {
-        !self.is_archived(path) && !self.is_managed(path) && self.is_outside_development_root(path)
+        !self.is_archived(path) && self.is_outside_development_root(path)
     }
 
     /// Whether the configured development root fails to contain this source.
@@ -2591,7 +2598,11 @@ mod tests {
     }
 
     #[test]
-    fn test_managed_root_outside_development_root_still_relocates_its_source() {
+    fn test_managed_root_outside_development_root_is_retained_rather_than_relocated() {
+        // The development-root boundary admits no area carve-out: a managed
+        // root the development root does not contain is still left where it is,
+        // so no configured area can schedule a source outside that root for
+        // relocation.
         let plan = container_with_policy(
             ArtifactClassificationPolicy::configured(
                 "dev",
@@ -2603,9 +2614,12 @@ mod tests {
             present_source("fixtures/root.md"),
         );
         let artifact = entry(&plan, "fixtures/root.md");
-        assert_eq!(artifact.action(), ArtifactAction::Move);
-        assert!(!artifact.evidence().contains(&EvidenceCode::PermanentPath));
-        assert_eq!(artifact.pending_deletions().len(), 1);
+        assert_eq!(artifact.action(), ArtifactAction::Retain);
+        assert_eq!(artifact.destination(), None);
+        assert!(artifact
+            .evidence()
+            .contains(&EvidenceCode::OutsideDevelopmentRoot));
+        assert!(artifact.pending_deletions().is_empty());
     }
 
     #[test]

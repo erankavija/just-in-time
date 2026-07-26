@@ -320,14 +320,16 @@ pub struct DocumentationConfig {
     /// destination for it and artifact discovery stops following links at it
     /// (`@/issue/8e071e18/decision/D-14`).
     pub development_root: Option<String>,
-    /// Paths subject to archival. Absent falls back to
-    /// [`SHIPPED_DOCUMENTATION_POLICY`]'s managed paths.
+    /// Paths inside the development root whose artifacts are subject to
+    /// archival. Absent falls back to [`SHIPPED_DOCUMENTATION_POLICY`]'s
+    /// managed paths.
     pub managed_paths: Option<Vec<String>>,
     /// Where archived docs are stored. Absent falls back to
     /// [`SHIPPED_DOCUMENTATION_POLICY`]'s archive root.
     pub archive_root: Option<String>,
-    /// Paths whose artifacts archive by copy while the source is retained.
-    /// Absent falls back to [`SHIPPED_DOCUMENTATION_POLICY`]'s permanent paths.
+    /// Paths inside the development root whose artifacts archive by copy while
+    /// the source is retained. Absent falls back to
+    /// [`SHIPPED_DOCUMENTATION_POLICY`]'s permanent paths.
     pub permanent_paths: Option<Vec<String>>,
     /// Areas that organize their artifacts one directory per issue. Absent
     /// falls back to [`SHIPPED_DOCUMENTATION_POLICY`]'s issue-scoped areas; an
@@ -460,9 +462,12 @@ pub struct ShippedDocumentationPolicy {
     pub development_root: &'static str,
     /// Root the archived artifacts are published under.
     pub archive_root: &'static str,
-    /// Areas whose artifacts move on archival.
+    /// Areas whose artifacts move on archival. Declared inside the development
+    /// root, because a source that root does not contain is retained whichever
+    /// areas claim it (`@/issue/8e071e18/decision/D-14`).
     pub managed_paths: &'static [&'static str],
-    /// Areas whose artifacts archive by copy, retaining their source.
+    /// Areas whose artifacts archive by copy, retaining their source. Declared
+    /// inside the development root, for the same reason as `managed_paths`.
     pub permanent_paths: &'static [&'static str],
     /// Areas that organize their artifacts one directory per issue.
     ///

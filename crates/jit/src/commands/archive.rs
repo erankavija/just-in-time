@@ -991,6 +991,15 @@ mod tests {
         );
     }
 
+    /// A repository whose configuration declares no development-root boundary,
+    /// so its areas classify by the managed/permanent split alone.
+    ///
+    /// The empty `development_root` is deliberate and is what the omitted key
+    /// would not give: an absent key falls back to the shipped `dev` root,
+    /// which would place this fixture's whole `fixtures` area outside the
+    /// boundary and retain everything, leaving nothing to archive. Tests whose
+    /// subject *is* that boundary declare a real root of their own —
+    /// `development_root_repo` below, and the classifier's own suite.
     fn executable_document_repo(
         owner_count: usize,
         content: &str,
@@ -1000,7 +1009,7 @@ mod tests {
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
         )
         .unwrap();
         executor(&repo, storage.clone())
@@ -1089,7 +1098,7 @@ mod tests {
         let (repo, executor, _) = executable_document_repo(1, "source");
         fs::write(
             repo.path().join(".jit/config.toml"),
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \".jit/archive\"\n",
+            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \".jit/archive\"\n",
         )
         .unwrap();
 
@@ -1130,7 +1139,7 @@ mod tests {
         let (repo, executor, id) = configured_repo();
         fs::write(
             repo.path().join(".jit/config.toml"),
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"safe/archive\"\n\n[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n[type_hierarchy.label_associations]\nepic = \"epic\"\n",
+            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"safe/archive\"\n\n[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n[type_hierarchy.label_associations]\nepic = \"epic\"\n",
         )
         .unwrap();
         fs::create_dir(repo.path().join("outside")).unwrap();
@@ -1313,7 +1322,7 @@ mod tests {
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"shared\"]\narchive_root = \"archive\"\n",
+            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"shared\"]\narchive_root = \"archive\"\n",
         )
         .unwrap();
         executor(&repo, storage.clone())
@@ -1532,7 +1541,7 @@ mod tests {
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n\n[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n[type_hierarchy.label_associations]\nepic = \"epic\"\n",
+            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n\n[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n[type_hierarchy.label_associations]\nepic = \"epic\"\n",
         )
         .unwrap();
         executor(&repo, storage.clone())
@@ -1579,6 +1588,9 @@ mod tests {
         assert!(result.planned_deletions.is_empty());
     }
 
+    /// A container-bearing repository that, like [`executable_document_repo`],
+    /// declares no development-root boundary so its managed and permanent areas
+    /// are the whole classification.
     fn configured_repo() -> (TempDir, CommandExecutor<JsonFileStorage>, String) {
         let repo = TempDir::new().unwrap();
         let jit = repo.path().join(".jit");
@@ -1588,6 +1600,7 @@ mod tests {
             jit.join("config.toml"),
             r#"
 [documentation]
+development_root = ""
 managed_paths = ["fixtures"]
 permanent_paths = ["docs"]
 archive_root = "archive"
@@ -1912,7 +1925,7 @@ epic = "epic"
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
         )
         .unwrap();
         executor(&repo, storage.clone())
@@ -1951,7 +1964,7 @@ epic = "epic"
         fs::create_dir_all(regular_storage.root()).unwrap();
         fs::write(
             regular_storage.root().join("config.toml"),
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
         )
         .unwrap();
         executor(&regular_repo, regular_storage.clone())
@@ -1978,7 +1991,7 @@ epic = "epic"
         fs::create_dir_all(owner_storage.root()).unwrap();
         fs::write(
             owner_storage.root().join("config.toml"),
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
         )
         .unwrap();
         executor(&owner_repo, owner_storage.clone())
@@ -2030,6 +2043,7 @@ epic = "epic"
             storage.root().join("config.toml"),
             r#"
 [documentation]
+development_root = ""
 managed_paths = ["fixtures"]
 permanent_paths = []
 archive_root = "archive"
@@ -2124,7 +2138,7 @@ epic = "epic"
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
         )
         .unwrap();
         executor(&repo, storage.clone())
