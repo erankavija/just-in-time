@@ -891,6 +891,7 @@ impl CommandExecutor<JsonFileStorage> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::artifact_plan::EvidenceCode;
     use crate::domain::{DocumentReference, State};
     use crate::hierarchy_templates::HierarchyTemplate;
     use crate::storage::JsonFileStorage;
@@ -1852,6 +1853,86 @@ epic = "epic"
         }
         let executor = executor(&repo, storage);
         (repo, executor)
+    }
+
+    /// Guards the deliberately unbounded closure expansion in
+    /// [`crate::domain::artifact_discovery::expand_artifact_closure`].
+    ///
+    /// The only claim on `workspace/active/target.md` from outside its own
+    /// document arrives along `workspace/notes/other.md` -> `HUB.md` ->
+    /// `docs/relay.md` -> the target: a chain that leaves the development root,
+    /// stays out for two hops, and re-enters. That claim is what makes the
+    /// artifact a copy instead of a relocation, and the plan's own walk cannot
+    /// see it, because the plan stops at `HUB.md` by design.
+    ///
+    /// Bounding evidence acquisition at the development root — an inviting
+    /// optimisation, since the plan discards those descendants anyway — deletes
+    /// the chain and with it the evidence, and this test fails with the
+    /// artifact relocating. `docs/relay.md` is reachable only through the hub
+    /// on purpose, so the test also fails if only the ownership walk is bounded.
+    #[test]
+    fn test_document_preview_copies_an_artifact_whose_only_outside_owner_arrives_through_an_out_of_root_hub(
+    ) {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        fs::create_dir_all(storage.root()).unwrap();
+        fs::write(
+            storage.root().join("config.toml"),
+            concat!(
+                "[documentation]\n",
+                "development_root = \"workspace\"\n",
+                "managed_paths = [\"workspace/active\"]\n",
+                "permanent_paths = []\n",
+                "archive_root = \"workspace/archive\"\n"
+            ),
+        )
+        .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
+        for (path, content) in [
+            ("workspace/active/target.md", "# Target\n"),
+            ("workspace/notes/other.md", "[hub](../../HUB.md)\n"),
+            ("HUB.md", "[relay](docs/relay.md)\n"),
+            ("docs/relay.md", "[target](../workspace/active/target.md)\n"),
+        ] {
+            let file = repo.path().join(path);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(file, content).unwrap();
+        }
+        for path in ["workspace/active/target.md", "workspace/notes/other.md"] {
+            let mut issue =
+                crate::domain::types::fixture_issue(format!("Owner of {path}"), String::new());
+            issue.state = State::Done;
+            issue.documents = vec![DocumentReference::new(path.into())];
+            seed_archive_issue_precondition(&storage, issue);
+        }
+        let executor = executor(&repo, storage);
+
+        let plan = executor
+            .preview_archive_document("workspace/active/target.md")
+            .unwrap();
+        let artifact = plan
+            .artifacts()
+            .iter()
+            .find(|artifact| artifact.source() == "workspace/active/target.md")
+            .unwrap();
+        assert!(
+            artifact.evidence().contains(&EvidenceCode::OutsideOwner),
+            "the claim reaching the target through the hub must survive"
+        );
+        assert_eq!(
+            artifact.action(),
+            ArtifactAction::Copy,
+            "an artifact another document still reaches must keep its source"
+        );
+        assert!(artifact.pending_deletions().is_empty());
+        // The hub bounds the plan even though it does not bound the ownership
+        // chain: nothing reached only through it joins the artifacts.
+        assert!(plan
+            .artifacts()
+            .iter()
+            .all(|artifact| artifact.source() == "workspace/active/target.md"));
     }
 
     #[test]

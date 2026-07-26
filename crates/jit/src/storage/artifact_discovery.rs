@@ -32,9 +32,12 @@ pub enum ArtifactDiscoveryError {
 /// Acquire one shared closure and derive selected artifacts plus embedded owners.
 ///
 /// `policy` bounds the derived inventory at every artifact it retains outside
-/// the development root. The acquired evidence itself stays repository-wide,
-/// because the same closure backs the ownership relation that keeps such an
-/// artifact's descendants from being deleted.
+/// the development root. Acquisition itself stays repository-wide on purpose:
+/// the same closure backs the ownership relation, which derives its
+/// outside-owner evidence from chains that leave the development root and
+/// re-enter it, and that evidence is what keeps the artifacts those chains
+/// reach from being relocated. [`expand_artifact_closure`] carries the full
+/// reasoning.
 pub fn discover_archive_artifacts<S: IssueStore>(
     storage: &S,
     inventory: ExplicitRootInventory,
