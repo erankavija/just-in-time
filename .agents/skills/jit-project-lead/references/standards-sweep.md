@@ -83,12 +83,15 @@ does (`references/progress-artifact.md`):
 
 - **Active root** — `<development_root>/active`, the `[documentation]` key of the
   same name.
-- **Report path** — `<development_root>/active/standards-sweep-report.md`. One
-  project-wide report; a later run overwrites it (the fix and scan are
-  idempotent, so a re-run on unchanged content reproduces the same file).
+- **Report directory** — obtained from `jit doc dir <strategic-container-id>
+  <development_root>/active`, the steward's own progress directory.
+- **Report path** — `<report-directory>/standards-sweep.md`. One project-wide
+  report; a later run overwrites it (the fix and scan are idempotent, so a
+  re-run on unchanged content reproduces the same file).
 
-> Example: with `development_root = "notes"`, the report lands at
-> `notes/active/standards-sweep-report.md`. Derive it from configuration.
+> Example: with `development_root = "notes"`, `jit doc dir <container-id>
+> notes/active` prints the directory the report lands in; `standards-sweep.md`
+> lands inside it. Derive the root from configuration.
 
 Link the report to the steward's strategic container so it surfaces under
 `jit doc list`:
@@ -202,8 +205,9 @@ standalone) when:
 - **Fixer exit 2** — the same class of bad invocation for the fixer (missing
   `.jit/`, missing `python3`/`base64`/`gawk`/`jit`, or an internal scan failing). Mechanical
   corrections did not complete; report the scan result and stop.
-- **Report path cannot be resolved** — `development_root` is missing or
-  `[documentation]` is unreadable, so the active root has no location. Stop
+- **Report path cannot be resolved** — `development_root` is missing,
+  `[documentation]` is unreadable, or `jit doc dir` rejects the active root as an
+  undeclared issue-scoped area, so the report directory has no location. Stop
   rather than write to a guessed directory (as `references/progress-artifact.md`
   stops on the same condition).
 
@@ -222,5 +226,8 @@ standalone) when:
   mode. Mechanical fixes go through the fixer; judgment items are reported, never
   silently changed.
 - Hardcoding `dev/` or `dev/active` instead of reading `development_root`.
+- Composing the report path as
+  `<development_root>/active/standards-sweep-report.md` directly instead of
+  resolving the directory with `jit doc dir` first.
 - Piping scanner or fixer stderr (the one-line count summary) into the report or
   into the JSONL files. Only stdout is data.
