@@ -22,7 +22,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Retain artifacts outside the development root and stop discovery at them",
-  "updated_at": "2026-07-26T19:30:26.774032080Z"
+  "updated_at": "2026-07-26T20:00:17.076933616Z"
 }

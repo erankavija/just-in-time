@@ -513,7 +513,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "ready"
         },
         {
           "short_id": "ac45f567",
@@ -523,7 +523,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "e536ea5a-54cb-45ea-a757-0d94dba0a001",
@@ -1389,6 +1389,13 @@
       "subject": "an eligible archival plan can still refuse at execution, and preview gives no warning",
       "detail": "Plan eligibility does not run validate_proposed_layout, so a container previews eligible with zero blockers and then refuses at execution. Measured by executing all 24 wave-8 containers in a throwaway worktree at HEAD b78ee738: 8 refuse with exit 4, 16 succeed. All 8 fail on an anchor fragment (artifact_classifier.rs:644-653 compares a fragment-bearing reference against fragment-free paths). The refusal is atomic - a failed run leaves a clean git status and creates no destination directory.",
       "disposition": "FILED as ac45f567 inside this epic (E10), wired ahead of 0e5dff57 and therefore ahead of all 24 sweeps. REQ-04 of that task closes the preview/execute disagreement for resolving fragment-bearing edges. The broader question - whether eligibility should run the proposed-layout check at all, so that preview and execute agree in general - is NOT covered by ac45f567's criteria and remains open. Reconcile it against the epic's criteria before the epic gate; expected to be a genuine follow-up."
+    },
+    {
+      "id": "P19",
+      "raised_by": "lead review of ac45f567 (Tier 3)",
+      "subject": "the proposed-layout check still diverges from discovery on backslash separators",
+      "detail": "ac45f567 aligned validate_proposed_layout with resolve_reference on the query/fragment split, but resolve_reference (crates/jit/src/domain/artifact_discovery.rs:538-542) also applies .replace('\\\\', \"/\") to the path component and validate_proposed_layout (artifact_classifier.rs:648) does not. A reference written with backslash separators would therefore resolve to a target during discovery and then fail the proposed-layout check - the same defect shape ac45f567 closed, one separator further.",
+      "disposition": "OPEN as a product observation, NOT a criterion violation and NOT a rework trigger. ac45f567's REQ-01 and REQ-02 name anchor fragments and query strings; REQ-04 scopes itself to fragment-bearing edges. Latent today: all 24 containers execute cleanly at the merge commit, so no repository reference currently takes this path. The durable fix is to share ONE reference-path normalizer between the two call sites rather than to add a second .replace() - two hand-aligned resolvers is what produced both defects. Reconcile against the epic's criteria before the epic gate; expected to be a genuine follow-up."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
@@ -1469,6 +1476,13 @@
       "subject": "execute the plan in a throwaway worktree before believing a preview",
       "detail": "A preview reporting eligible with zero blockers is NOT evidence that execution succeeds; eligibility skips the proposed-layout check entirely. `git worktree add --detach <scratch> HEAD` then running the real --execute inside it exposed 8 refusals that 24 clean previews had hidden, at zero risk: the main tree was untouched throughout and the probe was removed afterwards. It also produced the per-container copy census that answered E9.",
       "decision": "Before dispatching any wave whose issues are single pre-enumerated mutating commands, rehearse the whole wave in a detached probe worktree at HEAD and compare against the preview. Capture per-item stdout and stderr to SEPARATE FILES - a first attempt at this used `out=$(... ; echo \"$out\")` inside a loop, which reads the PREVIOUS iteration's variable and misattributed every error message. Exit codes were unaffected."
+    },
+    {
+      "id": "N12",
+      "raised_at": "session 5, ac45f567 gate run",
+      "subject": "installing with ANY uncommitted change makes the build dirty and the guard refuses",
+      "detail": "cargo-ci was refused with exit 10, reason 'this jit binary predates the tree under review', because install-jit.sh ran while the lead's own `jit issue claim` was still uncommitted in .jit/. The guard reported 'built from commit 556b504f with a dirty working tree at build time'. .jit/ is NOT a declared build input, which is exactly why this is easy to get wrong.",
+      "decision": "N9 covers a dirty tree at GATE time and remains correct: gates ran fine with dev/ artifacts uncommitted. This is the different case of a dirty tree at BUILD time, where the dirty flag is recorded into the binary's provenance and no later cleanup clears it. Sequence for every wave close: merge, commit EVERYTHING including .jit/, then install, then evaluate. Re-installing after committing cleared it and both gates passed."
     }
   ],
   "handoffs": [

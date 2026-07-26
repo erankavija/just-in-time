@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "97695f0d5054bdfe464d2ebfca7f883733937d39",
+  "completed_at": "2026-07-26T19:59:21.695279729Z",
+  "duration_ms": 105739,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard success criteria are satisfied by the attributed implementation and recorded cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ac45f567-a8b0-489e-b1d5-1a73a7f9920c",
+  "message": null,
+  "run_id": "0fbe0b0e-2113-429e-8261-4b38f21e289b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T19:57:35.955334619Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 81e772b4 (implementation), 556b504f (merge), 97695f0d (issue metadata)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-1, @/charter/D-3, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0; fmt, clippy, 3959 tests); code-review pending\nTruncation recovery: re-read narrow configuration, policy, archive, and reference-resolution slices after a combined search was truncated\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard success criteria are satisfied by the attributed implementation and recorded cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
