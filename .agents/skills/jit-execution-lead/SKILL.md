@@ -26,7 +26,7 @@ All 8 invariants from jit-manage are inherited and apply without modification. I
 5. **Wave discipline.** Work is dispatched in topological waves. A wave must complete (all issues done or rejected) before the next begins.
 6. **Single epic scope.** Drive exactly one epic to completion, then stop. Do not pick up additional work.
 7. **Rework before escalation.** Retry failed work with specific feedback up to MAX_REWORK_ATTEMPTS (`references/escalation-policy.md`) before escalating.
-8. **Resumable state.** Persist progress to `dev/active/<short-id>-progress.json` (`references/progress-file.md`) so execution can resume across sessions.
+8. **Resumable state.** Persist progress to `progress.json` in the epic's artifact directory, resolved via `jit doc dir <epic-id> dev/active` (`references/progress-file.md`), so execution can resume across sessions.
 9. **Project discovery.** All conventions, gates, documentation standards, and type hierarchies are discovered from the project's own configuration. Assume nothing about language, domain, or tooling.
 10. **Direct-main delivery.** Dependency-ordered waves land reviewed final-form changes on `main`. Per-issue worktree branches are temporary isolation only; do not create or treat a long-lived epic integration branch as the delivery authority.
 
@@ -89,11 +89,11 @@ Hold all discovered context in working memory for the duration of the session.
 
 4. **Claim the epic.** `jit issue claim <epic-id> agent:jit-execution-lead`. Commit JIT state.
 
-5. **Resume check.** If `dev/active/<short-id>-progress.json` exists:
+5. **Resume check.** If `progress.json` exists in the epic's artifact directory (`jit doc dir <epic-id> dev/active`):
    - Load it. It contains the wave plan and per-issue status.
    - Jump to the appropriate phase and wave.
    - Verify loaded state matches current JIT state (children may have changed).
-   - Also read every `dev/active/<short-id>-handoff*.md` in order (oldest to newest). Every trap in every **Traps — do not repeat these** section remains in force unless a later handoff records its resolution.
+   - Also read every `handoff*.md` in that directory, in order (oldest to newest). Every trap in every **Traps — do not repeat these** section remains in force unless a later handoff records its resolution.
 
 6. **Inform the user.** Briefly state: which epic you're leading, how many success criteria, whether children exist, and what phase you're entering. This is informational — do not wait for approval.
 
@@ -138,7 +138,7 @@ Convert the epic's children into ordered execution waves.
 
 5. **Assess parallelism within each wave.** Read `.agents/skills/jit-parallel/references/conflict-heuristics.md` if present. Serialize issues likely to touch the same files (move one to a sub-wave). Dispatch any wave needing filesystem isolation through the worktree steps in Section 6 (`references/worktree-dispatch-protocol.md`) — never through Agent's `isolation: "worktree"` parameter.
 
-6. **Persist the wave plan** to `dev/active/<short-id>-progress.json` per `references/progress-file.md`.
+6. **Persist the wave plan** to `progress.json` in the epic's artifact directory (`jit doc dir <epic-id> dev/active`) per `references/progress-file.md`.
 
 ## Section 5: Orchestration Loop
 
@@ -248,11 +248,11 @@ Everything else is handled autonomously.
 
 If the session ends without completing the epic (budget exhausted, wave still in progress, waiting for the invoker's input on an escalation, or a graceful stop mid-wave):
 
-1. **Write a session handoff.** Follow `references/handoff-template.md` verbatim. Save to `dev/active/<epic-short-id>-handoff-<N>.md` where `<N>` is 1 more than the highest existing handoff index for this epic (or omit `-<N>` for the first handoff). Do not overwrite a prior handoff.
+1. **Write a session handoff.** Follow `references/handoff-template.md` verbatim. Save to `handoff-<N>.md` in the epic's artifact directory (`jit doc dir <epic-id> dev/active`), where `<N>` is 1 more than the highest existing handoff index for this epic (or omit `-<N>` for the first handoff, i.e. `handoff.md`). Do not overwrite a prior handoff.
 
 2. **Populate the Traps section from the session's actual experience** — mandatory, empty only when nothing wrong was tried or considered: every approach tried and rejected (with the evidence it was wrong), every misleading reference in the handoff chain or spec docs, every dispatch line that led a worker astray (quote it, state the correct alternative). Link unresolved traps from prior handoffs forward; do not copy-paste them.
 
-3. **Update the progress file.** Ensure `dev/active/<epic-short-id>-progress.json` reflects the current wave number, per-issue statuses, rework counts, and any open escalations.
+3. **Update the progress file.** Ensure `progress.json` in the epic's artifact directory (`jit doc dir <epic-id> dev/active`) reflects the current wave number, per-issue statuses, rework counts, and any open escalations.
 
 4. **Commit the handoff + progress file together.** Follow jit-manage state-commit-patterns for the commit scope.
 

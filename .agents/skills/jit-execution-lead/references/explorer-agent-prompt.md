@@ -45,8 +45,9 @@ Cited concrete qualified addresses in the description and conventions above are 
    - **Recommendations** — Concrete, actionable recommendations based on findings. If there are multiple options, present them with trade-offs and state your recommendation.
    - **Open questions** — Anything that could not be resolved and may need further investigation
 
-4. **Save the findings.** Write to the configured managed documentation path
-   as `<managed-docs-root>/<short-id>-<slug>.md`.
+4. **Save the findings.** Get the issue's artifact directory with
+   `jit doc dir [SHORT_ID] dev/active` (create it — the command creates
+   nothing) and write the document there as `findings.md`.
 
 5. **Link to the issue.** Run:
    ```

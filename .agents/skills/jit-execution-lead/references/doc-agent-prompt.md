@@ -51,7 +51,7 @@ Cited concrete qualified addresses in the description and conventions above are 
 
 4. **Save the documentation.** Write to the correct location per the project's documentation config:
    - User-facing docs → the project's permanent doc paths (typically `docs/`)
-   - Development docs → the project's managed paths (typically `dev/active/`)
+   - Development docs → the issue's artifact directory, resolved via `jit doc dir [SHORT_ID] dev/active` (create it — the command creates nothing)
    - Check `.jit/config.toml` `[documentation]` for exact paths
 
 5. **Link to the issue.** Run:

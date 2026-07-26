@@ -47,8 +47,9 @@ Cited concrete qualified addresses in the description and conventions above are 
 
    If the project has a design doc template (check `jit-manage/references/design-doc-template.md` or the project's own template), use it.
 
-4. **Save the design document.** Write to the configured managed documentation
-   path as `<managed-docs-root>/<short-id>-<slug>.md`.
+4. **Save the design document.** Get the issue's artifact directory with
+   `jit doc dir [SHORT_ID] dev/active` (create it — the command creates
+   nothing) and write the document there as `design.md`.
 
 5. **Link to the issue.** Run:
    ```
