@@ -592,6 +592,22 @@ impl JsonFileStorage {
         })
     }
 
+    /// Load every issue the aggregated index membership names, under an
+    /// already-held `.index.lock`.
+    ///
+    /// This is the enumeration both read-all paths share: an id the fallback
+    /// chain cannot load is skipped rather than failing the read.
+    fn read_indexed_issues(&self) -> Result<Vec<Issue>> {
+        // Use aggregated index to see all issues across sources, then load
+        // through the fallback chain (`load_issue` handles local/git/main).
+        Ok(self
+            .load_aggregated_index()?
+            .all_ids
+            .iter()
+            .filter_map(|id| self.load_issue(id).ok())
+            .collect())
+    }
+
     /// Load index from git HEAD.
     fn load_index_from_git(&self) -> Result<Option<Index>> {
         let layout = self.configured_layout()?;
@@ -1079,20 +1095,17 @@ impl IssueStore for JsonFileStorage {
             );
         }
 
-        // Use aggregated index to see all issues across sources
-        let index = self.load_aggregated_index()?;
+        self.read_indexed_issues()
+    }
 
-        // Load issues using fallback chain (load_issue handles local/git/main)
-        let issues = index
-            .all_ids
-            .iter()
-            .filter_map(|id| {
-                // Use load_issue which has fallback logic
-                self.load_issue(id).ok()
-            })
-            .collect();
+    fn read_issues(&self) -> Result<Vec<Issue>> {
+        let index_lock_path = self.root.join(".index.lock");
+        let _lock = self.locker.lock_shared(&index_lock_path)?;
 
-        Ok(issues)
+        // The enumeration alone: the sidecar sweep `list_issues` carries is
+        // index maintenance, and this is the path a caller that must leave the
+        // repository untouched reads through.
+        self.read_indexed_issues()
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
@@ -2113,6 +2126,53 @@ mod tests {
             assert!(
                 sidecar.exists(),
                 "cleanup must run only once for a storage and its clones"
+            );
+        }
+
+        #[test]
+        fn test_read_issues_enumerates_the_same_issues_without_removing_an_orphaned_sidecar() {
+            // The read-only enumeration a strictly read-only command reads
+            // through: same issue set as `list_issues`, and the sidecar sweep
+            // that path carries stays on that path.
+            let (_temp, storage) = setup_storage();
+            let issue = crate::domain::types::fixture_issue(
+                "Read without maintenance".to_string(),
+                "Description".to_string(),
+            );
+            seed_issue_preimage(&storage, &issue);
+            let sidecar = storage
+                .root
+                .join(ISSUES_DIR)
+                .join(format!("{}.lock", issue.id));
+            fs::write(&sidecar, "").unwrap();
+
+            let ids = |issues: Vec<Issue>| {
+                issues
+                    .into_iter()
+                    .map(|issue| issue.id)
+                    .collect::<Vec<String>>()
+            };
+            let read = ids(storage.read_issues().unwrap());
+            assert!(
+                sidecar.exists(),
+                "read_issues must leave an orphaned sidecar in place"
+            );
+            assert!(
+                read.contains(&issue.id),
+                "read_issues enumerates the seeded issue"
+            );
+
+            // Non-vacuous: the surviving sidecar is one the maintenance path
+            // does collect, so its survival is the read path's doing rather
+            // than the plant missing the sweep's shape.
+            assert_eq!(
+                read,
+                ids(storage.list_issues().unwrap()),
+                "read_issues enumerates what list_issues enumerates"
+            );
+            assert!(
+                !sidecar.exists(),
+                "the planted sidecar is a sweep target, so read_issues declined to remove one"
             );
         }
 

@@ -55,7 +55,9 @@ separate recovery-aware control plane described below.
 Issue reads do not create per-issue lock files. On the first read-all through a
 storage instance, JIT removes empty UUID-shaped `.lock` sidecars left in
 `issues/` by versions that predate this format. That sweep is legacy cleanup,
-not part of read correctness or the current storage layout. Pending recoverable
+not part of read correctness or the current storage layout, so a command that
+reports without changing the repository enumerates issues through a read path
+that skips it and leaves any remaining sidecars in place. Pending recoverable
 multi-file transactions use `.jit/tmp/transactions/`. All of these are runtime
 state, not part of the versioned data format.
 
