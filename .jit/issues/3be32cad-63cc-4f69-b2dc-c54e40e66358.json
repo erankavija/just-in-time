@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-26T12:44:07.824012430Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
@@ -24,7 +25,7 @@
     "enforces:@/invariant/derived-state-coherence"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Lock in that archive execution rewrites no document content",
-  "updated_at": "2026-07-26T12:41:01.896542782Z"
+  "updated_at": "2026-07-26T12:44:07.824012430Z"
 }
