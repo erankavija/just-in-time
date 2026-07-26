@@ -343,6 +343,7 @@ fn test_archive_plan_schema_v1_golden_fields_and_codes() {
         EvidenceCode::ALL.map(EvidenceCode::as_str),
         [
             "permanent-path",
+            "outside-development-root",
             "outside-owner",
             "active-owner",
             "unmanaged-path",

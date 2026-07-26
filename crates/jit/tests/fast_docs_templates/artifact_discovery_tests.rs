@@ -1,3 +1,4 @@
+use jit::domain::artifact_classifier::ArtifactClassificationPolicy;
 use jit::domain::artifact_discovery::{
     expand_artifact_closure, ArtifactClosure, ArtifactClosureState, ArtifactEvidence,
     ArtifactEvidenceMap,
@@ -15,6 +16,23 @@ use std::fs;
 use tempfile::TempDir;
 
 const OID: &str = "0123456789abcdef0123456789abcdef01234567";
+
+/// A policy that declares no development root, so no source lies outside one
+/// and discovery follows every local link it resolves.
+fn unbounded_policy() -> ArtifactClassificationPolicy {
+    ArtifactClassificationPolicy::configured("", vec![], vec![], "")
+}
+
+/// A policy whose development root is `dev`, so every other repository path is
+/// a frontier discovery stops at.
+fn development_root_policy() -> ArtifactClassificationPolicy {
+    ArtifactClassificationPolicy::configured(
+        "dev",
+        vec!["dev/active".to_string()],
+        vec![],
+        "dev/archive",
+    )
+}
 
 #[test]
 fn test_terminal_evidence_closes_without_parsing_or_more_needs() {
@@ -65,6 +83,14 @@ impl Repo {
         &self,
         root: &str,
     ) -> jit::domain::artifact_classifier::ArtifactClassificationInventory {
+        self.discover_with_policy(root, &unbounded_policy())
+    }
+
+    fn discover_with_policy(
+        &self,
+        root: &str,
+        policy: &ArtifactClassificationPolicy,
+    ) -> jit::domain::artifact_classifier::ArtifactClassificationInventory {
         let inventory = inventory_explicit_roots(
             &[],
             &HierarchyConfig::default(),
@@ -72,10 +98,68 @@ impl Repo {
             &PinnedRootEvidenceMap::new(),
         )
         .unwrap();
-        discover_archive_artifacts(&self.storage, inventory, &[])
+        discover_archive_artifacts(&self.storage, inventory, &[], policy)
             .unwrap()
             .0
     }
+
+    fn sources(
+        inventory: &jit::domain::artifact_classifier::ArtifactClassificationInventory,
+    ) -> Vec<&str> {
+        inventory
+            .artifacts()
+            .iter()
+            .map(|entry| entry.source())
+            .collect()
+    }
+}
+
+#[test]
+fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_without_resolving_its_own_links()
+{
+    let repo = Repo::new();
+    repo.write("dev/active/plan.md", "[hub](../../README.md)");
+    repo.write("README.md", "[guide](docs/guide.md)");
+    repo.write("docs/guide.md", "[deeper](reference/deeper.md)");
+    repo.write("docs/reference/deeper.md", "deeper");
+
+    let unbounded = repo.discover_with_policy("dev/active/plan.md", &unbounded_policy());
+    assert_eq!(
+        Repo::sources(&unbounded),
+        [
+            "README.md",
+            "dev/active/plan.md",
+            "docs/guide.md",
+            "docs/reference/deeper.md"
+        ]
+    );
+
+    let bounded = repo.discover_with_policy("dev/active/plan.md", &development_root_policy());
+    assert_eq!(
+        Repo::sources(&bounded),
+        ["README.md", "dev/active/plan.md"],
+        "the walk must stop at the out-of-root hub rather than passing through it"
+    );
+    let hub = bounded
+        .artifacts()
+        .iter()
+        .find(|entry| entry.source() == "README.md")
+        .unwrap();
+    assert!(hub.edges().is_empty());
+    let scanned = bounded
+        .artifacts()
+        .iter()
+        .find(|entry| entry.source() == "dev/active/plan.md")
+        .unwrap();
+    assert!(scanned
+        .edges()
+        .iter()
+        .any(|edge| edge.target.as_deref() == Some("README.md")));
+    assert!(bounded
+        .artifacts()
+        .iter()
+        .all(|entry| entry.blockers().is_empty()));
+    assert!(bounded.blockers.is_empty());
 }
 
 #[test]
@@ -609,9 +693,10 @@ fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_worki
     )
     .unwrap();
 
-    let discovered = discover_archive_artifacts(&repo.storage, inventory, &issues)
-        .unwrap()
-        .0;
+    let discovered =
+        discover_archive_artifacts(&repo.storage, inventory, &issues, &unbounded_policy())
+            .unwrap()
+            .0;
     assert_eq!(discovered.artifacts.len(), 1);
     let historical = &discovered.artifacts[0];
     assert!(historical.version().is_pinned());
@@ -633,9 +718,10 @@ fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallbac
     )
     .unwrap();
 
-    let discovered = discover_archive_artifacts(&repo.storage, inventory, &issues)
-        .unwrap()
-        .0;
+    let discovered =
+        discover_archive_artifacts(&repo.storage, inventory, &issues, &unbounded_policy())
+            .unwrap()
+            .0;
     assert!(discovered.artifacts.is_empty());
     assert_eq!(discovered.blockers.len(), 1);
     assert_eq!(discovered.blockers[0].code, BlockerCode::PinnedReadFailed);

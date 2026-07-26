@@ -372,6 +372,7 @@ pub struct PendingDeletion {
 #[serde(rename_all = "kebab-case")]
 pub enum EvidenceCode {
     PermanentPath,
+    OutsideDevelopmentRoot,
     OutsideOwner,
     ActiveOwner,
     UnmanagedPath,
@@ -381,8 +382,9 @@ pub enum EvidenceCode {
 
 impl EvidenceCode {
     /// Complete schema-v1 evidence vocabulary, in binding contract order.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::PermanentPath,
+        Self::OutsideDevelopmentRoot,
         Self::OutsideOwner,
         Self::ActiveOwner,
         Self::UnmanagedPath,
@@ -394,6 +396,7 @@ impl EvidenceCode {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::PermanentPath => "permanent-path",
+            Self::OutsideDevelopmentRoot => "outside-development-root",
             Self::OutsideOwner => "outside-owner",
             Self::ActiveOwner => "active-owner",
             Self::UnmanagedPath => "unmanaged-path",

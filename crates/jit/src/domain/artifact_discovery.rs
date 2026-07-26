@@ -4,8 +4,16 @@
 //! deterministic set of textual references and resolves each reference with
 //! repository-component semantics. The storage layer owns the recursive read
 //! loop and feeds bytes through this pure core.
+//!
+//! The inventory walk is bounded by the classification policy: an artifact the
+//! policy retains outside the development root is a frontier. It enters the
+//! plan when a scanned artifact links it, but its own references are never
+//! resolved, so the plan stops there instead of absorbing everything a
+//! repository-root hub cites (`@/issue/8e071e18/decision/D-14`).
 
-use crate::domain::artifact_classifier::{ArtifactClassificationInventory, EmbeddedArtifactOwner};
+use crate::domain::artifact_classifier::{
+    ArtifactClassificationInventory, ArtifactClassificationPolicy, EmbeddedArtifactOwner,
+};
 use crate::domain::artifact_inventory::ExplicitRootInventory;
 use crate::domain::artifact_plan::{
     ArtifactAction, ArtifactEdge, ArtifactPlanEntry, ArtifactProvenance, ArtifactVersion,
@@ -162,6 +170,13 @@ pub enum ArtifactDiscoveryError {
 }
 
 /// Expand all supported local edges from roots using one explicit evidence map.
+///
+/// This closure is deliberately unbounded. It answers "what does the repository
+/// still reach", which both the selected inventory and the repository-wide
+/// ownership relation read: an ownership claim only ever retains a source, so
+/// a claim reached through an artifact outside the development root is worth
+/// keeping even though [`discover_archive_artifacts`] refuses to take that
+/// artifact's dependents into a plan.
 pub fn expand_artifact_closure(
     mut state: ArtifactClosureState,
     evidence: &ArtifactEvidenceMap,
@@ -206,17 +221,38 @@ pub fn expand_artifact_closure(
     }
 }
 
+/// The references of one parsed artifact that the inventory walk resolves.
+///
+/// An artifact the policy retains outside the development root contributes
+/// none: the walk stops at it, so it names no edge and admits no further
+/// artifact to the plan (`@/issue/8e071e18/decision/D-14`).
+fn followed_references<'a>(
+    path: &str,
+    artifact: &'a ParsedArtifact,
+    policy: &ArtifactClassificationPolicy,
+) -> std::slice::Iter<'a, String> {
+    const BOUNDED: &[String] = &[];
+
+    if policy.retains_outside_development_root(path) {
+        BOUNDED.iter()
+    } else {
+        artifact.references().iter()
+    }
+}
+
 /// Derive selected inventory and repository-wide embedded owners from the same closed evidence.
 ///
 /// Link targets that [`is_navigation_target`] identifies are skipped: they
 /// contribute no edge, no artifact entry, and no traversal. An explicitly
 /// selected root is inventoried whatever its filesystem kind, so a directory
-/// named as a root still reaches classification and blocks there.
+/// named as a root still reaches classification and blocks there. `policy`
+/// bounds the walk through [`followed_references`].
 pub fn discover_archive_artifacts(
     inventory: ExplicitRootInventory,
     issues: &[Issue],
     evidence: &ArtifactEvidenceMap,
     parsed_by_path: &BTreeMap<String, ParsedArtifact>,
+    policy: &ArtifactClassificationPolicy,
 ) -> Result<(ArtifactClassificationInventory, Vec<EmbeddedArtifactOwner>), ArtifactDiscoveryError> {
     let (target, member_ids, roots, blockers) = inventory.into_discovery_parts();
     let working_roots = roots
@@ -300,7 +336,7 @@ pub fn discover_archive_artifacts(
                         Some(&path),
                     ));
                 }
-                for reference in parsed.references() {
+                for reference in followed_references(&path, parsed, policy) {
                     match resolve_reference(&path, reference) {
                         ReferenceResolution::Ignored => {}
                         ReferenceResolution::External(edge) => {
@@ -384,6 +420,11 @@ fn is_navigation_target(target: &str, evidence: &ArtifactEvidenceMap) -> bool {
 }
 
 /// Derive repository-wide embedded ownership from the same closed artifact evidence.
+///
+/// Ownership is not bounded by the development root. A claim it reports only
+/// ever retains a source, so reaching an artifact through one the plan retains
+/// outside that root is the safe direction to err in: a missed claim would let
+/// an archive delete a file another issue's document still reaches.
 fn discover_embedded_owners(
     issues: &[Issue],
     selected_member_ids: &BTreeSet<String>,

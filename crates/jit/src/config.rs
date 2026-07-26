@@ -316,8 +316,9 @@ pub struct DocumentationConfig {
     /// [`SHIPPED_DOCUMENTATION_POLICY`]'s development root.
     ///
     /// Archival planning classifies by this root as well: a linked artifact it
-    /// does not contain is permanent, so the artifact is mirrored by copy while
-    /// its source stays in place.
+    /// does not contain is retained where it is, so the plan schedules no
+    /// destination for it and artifact discovery stops following links at it
+    /// (`@/issue/8e071e18/decision/D-14`).
     pub development_root: Option<String>,
     /// Paths subject to archival. Absent falls back to
     /// [`SHIPPED_DOCUMENTATION_POLICY`]'s managed paths.
