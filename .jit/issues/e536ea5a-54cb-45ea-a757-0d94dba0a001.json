@@ -3,7 +3,6 @@
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
-    "84c4e956-5ccd-468a-8db8-ecc6958af538",
     "b4d1a2c8-d408-46d0-b0b6-dc3e30283420",
     "daf4fa46-8785-41f6-a992-9bf844fb5aa3"
   ],
@@ -26,7 +25,7 @@
     "per:@/issue/8e071e18/decision/D-21"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive the CLI ergonomics phase container's linked artifacts",
-  "updated_at": "2026-07-26T21:21:01.392653003Z"
+  "updated_at": "2026-07-26T21:46:05.942944501Z"
 }
