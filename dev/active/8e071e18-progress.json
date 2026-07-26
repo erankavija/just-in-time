@@ -1,7 +1,7 @@
 {
   "epic_id": "8e071e18-d786-43ff-b424-a283fecb11f8",
   "epic_short_id": "8e071e18",
-  "current_wave": 5,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -193,9 +193,10 @@
             "code-review",
             "mcp-ci"
           ],
-          "status": "rework-1",
+          "status": "done",
           "model": "opus",
-          "worktree": ".agents/worktrees/agent-3559ca25"
+          "worktree": ".agents/worktrees/agent-3559ca25",
+          "outcome": "Rework round 1. code-review F1: --json rejection paths emitted plain text, violating the AGENTS.md --json contract. Fixed by routing typed errors through the existing handle_json_error! macro; exit codes 2 and 3 unchanged, untyped failures still return to the top-level handler. Round-2 review: pass, zero findings. Footprint widened by main.rs (unavoidable dispatch), schema.rs (6 lines), config.rs (one Default derive) \u2014 all disclosed by the worker before review. Surfaced P9."
         },
         {
           "id": "2ac35e8e-01ca-446a-a70c-d9313ddba624",
@@ -206,14 +207,16 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "rework-1",
+          "status": "done",
           "model": "opus",
-          "worktree": ".agents/worktrees/agent-2ac35e8e"
+          "worktree": ".agents/worktrees/agent-2ac35e8e",
+          "outcome": "Rework round 1. code-review F1: match_indices is non-overlapping, so a self-overlapping path was under-reported and the test oracle (str::matches) shared the defect. Fixed with a character-advancing search; lead verified the algorithm independently by transliteration (a/a in a/a/a -> [1,3]; multibyte column reads back exactly). Worker supplied four mutation probes including a real char-boundary panic for a one-byte advance. Cost measured: 32.23s -> 31.16s, no regression. Round-2 review: pass, zero findings."
         }
       ],
-      "status": "dispatched",
+      "status": "complete",
       "dispatch_base": "bb401f1d",
-      "notes": "Three isolated worktrees anchored at bb401f1d; footprints disjoint per the manifest (.jit/config.toml | cli.rs+commands/document.rs+output.rs+doc_show_tests.rs+mcp-server/curated-tools.json | storage/artifact_planning.rs+domain/artifact_classifier.rs). f2cac2bd is authorized to edit .jit/config.toml, which is its entire footprint; the standing worker .jit/ prohibition is waived for that one file only."
+      "notes": "Three isolated worktrees anchored at bb401f1d; footprints disjoint per the manifest (.jit/config.toml | cli.rs+commands/document.rs+output.rs+doc_show_tests.rs+mcp-server/curated-tools.json | storage/artifact_planning.rs+domain/artifact_classifier.rs). f2cac2bd is authorized to edit .jit/config.toml, which is its entire footprint; the standing worker .jit/ prohibition is waived for that one file only.",
+      "outcome": "All three Done. f2cac2bd first-time green. 3559ca25 and 2ac35e8e each took exactly one rework round; both round-2 reviews returned zero findings and explicitly confirmed the prior finding closed. Every gate on each issue was re-run after rework rather than reusing the pre-rework cargo-ci/mcp-ci passes. Integration check neither worker could run: f2cac2bd's widened citation_scan_roots against 2ac35e8e's scanner gives 127/127 candidates eligible, 0 blockers, 1161 moving-path-citation warnings in ~31s. Worktrees reclaimed (8.8G), branches preserved."
     },
     {
       "wave_number": 6,
