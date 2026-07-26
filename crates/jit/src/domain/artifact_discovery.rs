@@ -171,14 +171,23 @@ pub enum ArtifactDiscoveryError {
 
 /// Expand all supported local edges from roots using one explicit evidence map.
 ///
-/// This closure is deliberately unbounded, and the development root does not
-/// narrow it. It answers "what does the repository still reach", which both the
-/// selected inventory and the repository-wide ownership relation read. An
-/// ownership claim only ever retains a source, so a claim reached through an
-/// artifact outside the development root is worth keeping even though
-/// [`discover_archive_artifacts`] refuses to take that artifact's descendants
-/// into a plan: bounding the read here would instead delete live files another
-/// issue's document still reaches (`@/issue/8e071e18/decision/D-14`).
+/// This closure is deliberately unbounded, and the development root must not
+/// narrow it. Stopping the read at that boundary looks like free work to skip,
+/// because [`discover_archive_artifacts`] discards the descendants anyway, but
+/// the two walks read this map for different questions.
+///
+/// The plan asks what an archive takes with it, and bounds itself. The
+/// repository-wide ownership relation asks what still reaches an artifact, and
+/// derives [`crate::domain::artifact_plan::EvidenceCode::OutsideOwner`] from
+/// chains that leave the development root and re-enter it — an issue's document
+/// citing a repository-root hub that cites a development file. That evidence
+/// is what keeps such an artifact a copy. Bounding the read here deletes those
+/// chains, and with them the only reason those artifacts were not relocated:
+/// measured over this repository, eight of them silently turn from copy into
+/// relocation and their live sources are deleted while another issue's document
+/// still reaches them (`@/issue/8e071e18/decision/D-14`).
+/// `test_document_preview_copies_an_artifact_whose_only_outside_owner_arrives_through_an_out_of_root_hub`
+/// in [`crate::commands::archive`] fails if this walk is bounded.
 pub fn expand_artifact_closure(
     mut state: ArtifactClosureState,
     evidence: &ArtifactEvidenceMap,
