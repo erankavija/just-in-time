@@ -5096,15 +5096,51 @@ fn run() -> Result<()> {
             }
             DocCommands::Dir { id, area, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let response = executor.resolve_issue_artifact_directory(&id, &area)?;
 
-                if json {
-                    use jit::output::JsonOutput;
-                    println!("{}", JsonOutput::success(&response).to_json_string()?);
-                } else {
-                    // The bare path, so the command composes into a shell
-                    // substitution without anything to strip off it.
-                    output_ctx.print_data(&response.directory)?;
+                match executor.resolve_issue_artifact_directory(&id, &area) {
+                    Ok(response) => {
+                        if json {
+                            use jit::output::JsonOutput;
+                            println!("{}", JsonOutput::success(&response).to_json_string()?);
+                        } else {
+                            // The bare path, so the command composes into a shell
+                            // substitution without anything to strip off it.
+                            output_ctx.print_data(&response.directory)?;
+                        }
+                    }
+                    Err(e) => {
+                        // Every rejection this command states is typed, so the `--json`
+                        // envelope carries the code whose `ErrorCode::to_exit_code`
+                        // mapping is the exit status `error_to_exit_code` already gives
+                        // that same typed error on the plain-text path: an undeclared
+                        // area is the resolver's `InvalidArgumentError`
+                        // (`INVALID_ARGUMENT`, exit 2), and an id naming no issue is
+                        // `IssueNotFoundError` (`ISSUE_NOT_FOUND`, exit 3).
+                        // `handle_json_error!` refines an ambiguous or too-short prefix
+                        // to its own code, exit 2 on both paths. Any other failure (an
+                        // unreadable `config.toml`, say) is untyped here and returns to
+                        // the top-level handler rather than being relabelled under a code
+                        // whose exit class would disagree with it.
+                        use jit::output::{ErrorCode, JsonError};
+
+                        let json_error = if e
+                            .downcast_ref::<jit::errors::InvalidArgumentError>()
+                            .is_some()
+                        {
+                            JsonError::new(ErrorCode::INVALID_ARGUMENT, e.to_string())
+                        } else if e
+                            .downcast_ref::<jit::storage::IssueNotFoundError>()
+                            .is_some()
+                            || e.downcast_ref::<jit::storage::AmbiguousIdError>().is_some()
+                            || e.downcast_ref::<jit::storage::InvalidIdPrefixError>()
+                                .is_some()
+                        {
+                            JsonError::issue_not_found(&id)
+                        } else {
+                            return Err(e);
+                        };
+                        handle_json_error!(json, e, json_error);
+                    }
                 }
             }
             DocCommands::History { id, path, json } => {

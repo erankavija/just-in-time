@@ -242,6 +242,56 @@ fn membership_type_and_namespace() -> (String, String) {
         .expect("the scaffolded hierarchy maps a type to a membership namespace")
 }
 
+/// Every string leaf in `payload`, so a rejection can be asserted to carry a
+/// diagnostic naming the offending input without pinning the envelope's member
+/// names.
+fn string_leaves(payload: &serde_json::Value) -> Vec<&str> {
+    match payload {
+        serde_json::Value::String(text) => vec![text.as_str()],
+        serde_json::Value::Array(items) => items.iter().flat_map(string_leaves).collect(),
+        serde_json::Value::Object(members) => members.values().flat_map(string_leaves).collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Assert the `--json` counterpart of a `doc dir` rejection: rerunning `args`
+/// with `--json` fails with the same exit status `plain` reported, and prints a
+/// parseable diagnostic on stdout naming each string in `named`. A machine
+/// caller therefore reads the same classification the human path reports,
+/// rather than an unparseable line.
+fn assert_json_rejection_agrees(
+    repo: &Path,
+    args: &[&str],
+    plain: &Output,
+    named: &[&str],
+    shape: &str,
+) {
+    let json_args = args.iter().copied().chain(["--json"]).collect::<Vec<_>>();
+    let output = jit(repo, &json_args);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        !output.status.success(),
+        "{shape} must not resolve a directory under --json"
+    );
+    assert_eq!(
+        output.status.code(),
+        plain.status.code(),
+        "{shape} exits alike with and without --json: {stdout}"
+    );
+
+    let payload: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|error| {
+        panic!("{shape} prints a machine-readable rejection on stdout ({error}): {stdout}")
+    });
+    let diagnostic = string_leaves(&payload);
+    named.iter().for_each(|expected| {
+        assert!(
+            diagnostic.iter().any(|text| text.contains(expected)),
+            "the {shape} rejection carries a diagnostic naming {expected}: {payload}"
+        );
+    });
+}
+
 /// The directory `doc dir` names for `id` in `area`, requiring the run to
 /// succeed.
 fn resolve_directory(repo: &Path, id: &str, area: &str) -> String {
@@ -327,7 +377,8 @@ fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
     ]
     .iter()
     .for_each(|(shape, undeclared)| {
-        let output = jit(repo.path(), &["doc", "dir", &issue.short_id, undeclared]);
+        let args = ["doc", "dir", issue.short_id.as_str(), undeclared.as_str()];
+        let output = jit(repo.path(), &args);
         let stderr = String::from_utf8_lossy(&output.stderr);
 
         assert!(
@@ -345,6 +396,16 @@ fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
         assert!(
             String::from_utf8_lossy(&output.stdout).trim().is_empty(),
             "{shape} prints no path"
+        );
+
+        // The same rejection under --json, so a machine caller reads the
+        // registry's refusal instead of an unparseable line.
+        assert_json_rejection_agrees(
+            repo.path(),
+            &args,
+            &output,
+            &[undeclared.as_str(), area],
+            shape,
         );
     });
 }
@@ -472,7 +533,8 @@ fn test_doc_dir_rejects_an_unknown_issue_identifier() {
     // is the identifier and not the area.
     resolve_directory(repo.path(), &known.short_id, area);
 
-    let output = jit(repo.path(), &["doc", "dir", unknown, area]);
+    let args = ["doc", "dir", unknown, area];
+    let output = jit(repo.path(), &args);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     assert!(
@@ -486,5 +548,15 @@ fn test_doc_dir_rejects_an_unknown_issue_identifier() {
     assert!(
         String::from_utf8_lossy(&output.stdout).trim().is_empty(),
         "no path is printed for an issue that does not exist"
+    );
+
+    // The same rejection under --json, so a machine caller reads the failed
+    // lookup instead of an unparseable line.
+    assert_json_rejection_agrees(
+        repo.path(),
+        &args,
+        &output,
+        &[unknown],
+        "an identifier naming no issue",
     );
 }
