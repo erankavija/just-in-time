@@ -2,7 +2,7 @@ use jit::domain::artifact_classifier::artifact_mirror_destination;
 use jit::domain::artifact_plan::{ArchiveCandidates, ArtifactPlan};
 use jit::output::{render_archive_candidates, render_archive_plan};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -1478,4 +1478,372 @@ fn test_archive_preview_reports_unmanaged_selected_root_for_deck_outside_configu
             "{args:?} plan: {plan}"
         );
     }
+}
+
+/// The one file of the citation-scan fixture's declared scan universe.
+const CITING_FILE: &str = "notes/mention.md";
+
+/// The moving artifact whose path [`CITING_FILE`] names in its text.
+const CITED_ARTIFACT: &str = "fixtures/root.md";
+
+/// Every repository document, keyed by its normalized relative path.
+///
+/// `.jit/` records jit's own state rather than document content, and relinking
+/// an issue's document list rewrites it by design (`jit:3be32cad` REQ-03), so an
+/// inventory that answers "which document bytes did execution synthesize"
+/// leaves it out. Everything else [`snapshot_files`] reaches stays in scope.
+fn document_contents(root: &Path) -> BTreeMap<String, Vec<u8>> {
+    snapshot_files(root)
+        .into_iter()
+        .filter(|(path, _)| !path.starts_with(".jit/"))
+        .collect()
+}
+
+/// What one execution did to every document in the tree.
+///
+/// The four buckets partition the post-execution tree, and `lost` reports the
+/// pre-execution content that survived nowhere. Classification is by content,
+/// not by path: a file that kept its bytes under a new name is `relocated`,
+/// while `synthesized` holds exactly those post-execution paths whose bytes no
+/// pre-execution file held. That is what turns "the marker is synthesized" into
+/// "the marker is the *only* thing synthesized".
+#[derive(Debug)]
+struct ExecutionEffect {
+    /// Paths present before and after, with identical bytes.
+    unchanged: BTreeSet<String>,
+    /// Paths present before and after, with differing bytes.
+    rewritten: BTreeSet<String>,
+    /// New paths, mapped to a pre-execution path that held the same bytes.
+    relocated: BTreeMap<String, String>,
+    /// New paths whose bytes no pre-execution path held.
+    synthesized: BTreeSet<String>,
+    /// Pre-execution paths whose bytes are held by no post-execution path.
+    lost: BTreeSet<String>,
+}
+
+/// Classify every document in `after` against the tree captured in `before`.
+fn classify_execution_effect(
+    before: &BTreeMap<String, Vec<u8>>,
+    after: &BTreeMap<String, Vec<u8>>,
+) -> ExecutionEffect {
+    let origin_of = |bytes: &[u8]| {
+        before
+            .iter()
+            .find(|(_, held)| held.as_slice() == bytes)
+            .map(|(path, _)| path.clone())
+    };
+    let arrivals = || after.iter().filter(|(path, _)| !before.contains_key(*path));
+    ExecutionEffect {
+        unchanged: after
+            .iter()
+            .filter(|(path, bytes)| before.get(*path) == Some(*bytes))
+            .map(|(path, _)| path.clone())
+            .collect(),
+        rewritten: after
+            .iter()
+            .filter(|(path, bytes)| before.get(*path).is_some_and(|held| held != *bytes))
+            .map(|(path, _)| path.clone())
+            .collect(),
+        relocated: arrivals()
+            .filter_map(|(path, bytes)| Some((path.clone(), origin_of(bytes)?)))
+            .collect(),
+        synthesized: arrivals()
+            .filter(|(_, bytes)| origin_of(bytes).is_none())
+            .map(|(path, _)| path.clone())
+            .collect(),
+        lost: before
+            .iter()
+            .filter(|(_, bytes)| !after.values().any(|held| held == *bytes))
+            .map(|(path, _)| path.clone())
+            .collect(),
+    }
+}
+
+/// Sources the plan selects for relocation.
+fn planned_moves(plan: &Value) -> Vec<String> {
+    plan["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|artifact| artifact["action"] == "move")
+        .map(|artifact| artifact["source"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Destination the plan records for the artifact sourced at `source`.
+fn planned_destination(plan: &Value, source: &str) -> String {
+    find_artifact(plan, source)["destination"]
+        .as_str()
+        .unwrap_or_else(|| panic!("plan records no destination for {source}: {plan}"))
+        .to_string()
+}
+
+/// One executed container archival over the citation-scan fixture, captured
+/// either side of the run.
+struct ArchivedCitation {
+    repo: TempDir,
+    container: String,
+    destination_root: String,
+    preview: Value,
+    execution: Value,
+    before: BTreeMap<String, Vec<u8>>,
+    after: BTreeMap<String, Vec<u8>>,
+}
+
+/// Archive a terminal container holding two managed artifacts, one of which
+/// [`CITING_FILE`] names in its text, and capture the document tree either side.
+///
+/// Every guarantee `jit:3be32cad` locks in is a claim about this single
+/// execution, so the preconditions that keep those claims from passing
+/// vacuously are established here rather than in each test: both linked
+/// artifacts are genuinely selected for relocation, and the planner genuinely
+/// sees the citation. A run that relocated nothing, or one whose scan universe
+/// never reached the citing file, would satisfy immutability trivially.
+///
+/// The citing file sits outside `managed_paths` and is linked to no issue, so
+/// it is not itself an artifact of the plan: it stays put, and the only thing
+/// execution could do to it is rewrite the now-stale path in its text.
+fn archived_citation() -> ArchivedCitation {
+    let repo = citation_scan_repo(false, "See fixtures/root.md for the source of truth.\n");
+    fs::write(repo.path().join("fixtures/appendix.md"), "appendix body\n").unwrap();
+
+    let created = jit(
+        &repo,
+        &[
+            "issue",
+            "create",
+            "--title",
+            "Citing container",
+            "--type",
+            "epic",
+            "--json",
+        ],
+    );
+    assert_success(&created);
+    let container = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    for path in [CITED_ARTIFACT, "fixtures/appendix.md"] {
+        assert_success(&jit(
+            &repo,
+            &["doc", "add", &container, path, "--skip-scan", "--json"],
+        ));
+    }
+    assert_success(&jit(
+        &repo,
+        &[
+            "issue", "update", &container, "--state", "rejected", "--json",
+        ],
+    ));
+
+    let previewed = jit(&repo, &["archive", "container", &container, "--json"]);
+    assert_success(&previewed);
+    let preview: Value = serde_json::from_slice(&previewed.stdout).unwrap();
+    assert_eq!(
+        planned_moves(&preview).into_iter().collect::<BTreeSet<_>>(),
+        BTreeSet::from([
+            CITED_ARTIFACT.to_string(),
+            "fixtures/appendix.md".to_string()
+        ]),
+        "both linked artifacts must genuinely relocate, or immutability holds trivially: {preview}"
+    );
+    assert!(
+        citation_warning_paths(&preview, CITED_ARTIFACT)
+            .iter()
+            .any(|occurrence| occurrence.starts_with(CITING_FILE)),
+        "the scan must genuinely see the citation, or nothing observes the rewrite it declines to make: {preview}"
+    );
+
+    let before = document_contents(repo.path());
+    let executed = jit(
+        &repo,
+        &["archive", "container", &container, "--execute", "--json"],
+    );
+    assert_success(&executed);
+    let execution: Value = serde_json::from_slice(&executed.stdout).unwrap();
+    let after = document_contents(repo.path());
+    let destination_root = execution["destination_root"].as_str().unwrap().to_string();
+
+    ArchivedCitation {
+        repo,
+        container,
+        destination_root,
+        preview,
+        execution,
+        before,
+        after,
+    }
+}
+
+/// REQ-01 (`jit:3be32cad`): execution relocates artifacts, so every artifact
+/// the plan selects for `move` vacates its source path and arrives at its
+/// planned destination holding byte-identical content.
+///
+/// The closing comparison against `deleted_sources` pins the vacated paths to
+/// execution's own record: the sources are gone because execution removed them
+/// after publishing, not because the plan quietly dropped them.
+#[test]
+fn test_archive_container_execution_relocates_every_artifact_byte_identically() {
+    let run = archived_citation();
+
+    let moves = planned_moves(&run.preview);
+    for source in &moves {
+        let destination = planned_destination(&run.preview, source);
+        let original = run
+            .before
+            .get(source)
+            .unwrap_or_else(|| panic!("fixture must hold {source} before execution"));
+        assert!(
+            !run.after.contains_key(source),
+            "a relocated artifact must vacate its source path: {source}"
+        );
+        assert_eq!(
+            run.after.get(&destination),
+            Some(original),
+            "relocation must preserve every byte: {source} -> {destination}"
+        );
+    }
+    assert_eq!(
+        run.execution["deleted_sources"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|source| source.as_str().unwrap().to_string())
+            .collect::<BTreeSet<_>>(),
+        moves.into_iter().collect::<BTreeSet<_>>(),
+        "execution must report removing exactly the sources it relocated: {}",
+        run.execution
+    );
+}
+
+/// REQ-02 (`jit:3be32cad`): the warning channel is the whole response to an
+/// in-content citation. The scanned file that names the moving artifact's path
+/// survives execution byte for byte, so the citation it carries is left naming
+/// a path the tree no longer holds (`@/issue/8e071e18/decision/D-8`).
+#[test]
+fn test_archive_container_execution_leaves_a_citing_scanned_file_byte_identical() {
+    let run = archived_citation();
+
+    let original = run
+        .before
+        .get(CITING_FILE)
+        .unwrap_or_else(|| panic!("fixture must hold {CITING_FILE} before execution"));
+    assert_eq!(
+        run.after.get(CITING_FILE),
+        Some(original),
+        "a scanned citing file must survive execution byte for byte"
+    );
+    assert!(
+        !run.after.contains_key(CITED_ARTIFACT),
+        "the cited path must genuinely stop resolving, or the citation never broke"
+    );
+    assert!(
+        String::from_utf8(original.clone())
+            .unwrap()
+            .contains(CITED_ARTIFACT),
+        "the surviving text must still carry the stale citation verbatim"
+    );
+}
+
+/// REQ-03 (`jit:3be32cad`): immutability is not achieved by doing nothing.
+/// Every relocated artifact's document link record is relinked to the archived
+/// location, and each relinked path names a file the tree actually holds
+/// (`@/invariant/derived-state-coherence`).
+#[test]
+fn test_archive_container_execution_relinks_document_records_to_the_archived_locations() {
+    let run = archived_citation();
+
+    let shown = jit(&run.repo, &["issue", "show", &run.container, "--json"]);
+    assert_success(&shown);
+    let recorded = serde_json::from_slice::<Value>(&shown.stdout).unwrap()["documents"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|document| document["path"].as_str().unwrap().to_string())
+        .collect::<BTreeSet<_>>();
+
+    let changes = run.execution["reference_changes"].as_array().unwrap();
+    assert!(
+        !changes.is_empty(),
+        "execution must relink the records of the artifacts it relocated: {}",
+        run.execution
+    );
+    for change in changes {
+        let from = change["from_path"].as_str().unwrap();
+        let to = change["to_path"].as_str().unwrap();
+        assert_ne!(from, to, "a relink must move the record: {change}");
+        assert!(
+            recorded.contains(to) && !recorded.contains(from),
+            "the stored record must name {to} and drop {from}: {recorded:?}"
+        );
+        assert!(
+            run.after.contains_key(to),
+            "a relinked record must name a file the tree holds: {to}"
+        );
+    }
+    assert_eq!(
+        recorded,
+        planned_moves(&run.preview)
+            .iter()
+            .map(|source| planned_destination(&run.preview, source))
+            .collect::<BTreeSet<_>>(),
+        "every document record must point at its planned destination"
+    );
+}
+
+/// REQ-04 (`jit:3be32cad`): the container marker is the only file whose bytes
+/// execution synthesizes.
+///
+/// The claim is about the whole document tree, so it is asserted from a
+/// before/after inventory rather than from named paths. The buckets partition
+/// the post-execution tree — the totality check below is what makes
+/// `synthesized == {marker}` mean *only* the marker — and each of the three
+/// outcomes the criterion distinguishes is separately shown to be non-empty
+/// where it should be: files relocated, files stayed, and one file is new.
+#[test]
+fn test_archive_container_execution_synthesizes_no_document_bytes_beyond_the_container_marker() {
+    let run = archived_citation();
+    let marker = format!("{}/.jit-container", run.destination_root);
+    let effect = classify_execution_effect(&run.before, &run.after);
+
+    assert_eq!(
+        effect
+            .unchanged
+            .iter()
+            .chain(&effect.rewritten)
+            .chain(effect.relocated.keys())
+            .chain(&effect.synthesized)
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        run.after.keys().cloned().collect::<BTreeSet<_>>(),
+        "every post-execution document must be classified, or the claim below covers only part of the tree"
+    );
+    assert_eq!(
+        effect.synthesized,
+        BTreeSet::from([marker.clone()]),
+        "the container marker must be the only synthesized content: {effect:#?}"
+    );
+    assert!(
+        effect.rewritten.is_empty() && effect.lost.is_empty(),
+        "execution must rewrite and lose no document content: {effect:#?}"
+    );
+    assert!(
+        !effect.relocated.is_empty() && effect.unchanged.contains(CITING_FILE),
+        "the inventory must observe both a relocated and a stationary document: {effect:#?}"
+    );
+
+    let unsourced = run.execution["publications"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|publication| publication["source"].is_null())
+        .map(|publication| publication["destination"].as_str().unwrap().to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        unsourced,
+        vec![marker],
+        "the marker must be the one publication execution attributes to no source: {}",
+        run.execution
+    );
 }
