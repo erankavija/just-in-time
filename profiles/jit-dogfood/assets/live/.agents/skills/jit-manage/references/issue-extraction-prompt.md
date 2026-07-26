@@ -59,8 +59,9 @@ fences.
      batch variant with concurrency 8"),
    - (b) the acceptance tolerance (not "matches the baseline" — "p95 latency
      remains within 5% of the recorded reference"),
-   - (c) the artifact path and format (not "report it" — "JSON at
-     `<managed-docs-root>/benchmarks/batch-reference.json`"),
+   - (c) the artifact path and format (not "report it" — "JSON named
+     `batch-reference.json`, inside the directory `jit doc dir <this-issue-id>
+     dev/studies` resolves"),
    - (d) the spec section or prior-decision reference that resolves the choice.
 
    A criterion a worker has to guess at is a bug. Example of the transformation:
@@ -71,8 +72,8 @@ fences.
    **After (verifiable):**
    > - Variant: documented batch algorithm with concurrency 8.
    > - Minimum statistics: 30 warm runs and 100 measured runs.
-   > - Required artifacts: JSON samples and a Markdown summary under
-   >   `<managed-docs-root>/benchmarks/`.
+   > - Required artifacts: JSON samples and a Markdown summary, inside the
+   >   directory `jit doc dir <this-issue-id> dev/studies` resolves.
    > - Acceptance: output is byte-equivalent and p95 latency remains within 5%
    >   of the recorded reference.
    > - Reproducibility: the committed benchmark configuration regenerates every
