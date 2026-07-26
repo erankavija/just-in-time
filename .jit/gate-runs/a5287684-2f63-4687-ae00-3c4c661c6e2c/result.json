@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "d72526ccdb225b85b837adcf42711940175c0d34",
+  "completed_at": "2026-07-26T20:57:30.198590167Z",
+  "duration_ms": 344649,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "0e5dff57-44c1-4fc3-ac2c-f60cf118dabf",
+  "message": null,
+  "run_id": "a5287684-2f63-4687-ae00-3c4c661c6e2c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T20:51:45.549329975Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- clippy diagnostics ---\nerror: could not compile `jit` (lib test)\n  ✓ fmt: ok\n  ✗ clippy: FAILED (exit 101)\n  ✓ test: 3964 passed, 0 failed, 14 ignored\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1252 bytes=23244024)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1273798680/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

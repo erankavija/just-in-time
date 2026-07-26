@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T21:07:28.308280498Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-26T21:10:18.784432299Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0e5dff57-44c1-4fc3-ac2c-f60cf118dabf",
   "labels": [
     "epic:dev-artifact-layout",
@@ -25,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Retain artifacts outside the development root and stop discovery at them",
-  "updated_at": "2026-07-26T20:01:33.907065750Z"
+  "updated_at": "2026-07-26T21:10:18.784432299Z"
 }

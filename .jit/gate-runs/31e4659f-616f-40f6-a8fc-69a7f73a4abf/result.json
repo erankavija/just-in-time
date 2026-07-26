@@ -1,0 +1,50 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "d72526ccdb225b85b837adcf42711940175c0d34",
+  "completed_at": "2026-07-26T21:10:18.530937521Z",
+  "duration_ms": 155853,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/artifact_classifier.rs",
+        "id": "F1",
+        "line": 149,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/decision/D-14"
+        ],
+        "severity": "high",
+        "summary": "A managed path outside the development root is relocated instead of retained with no destination."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/artifact_discovery.rs",
+        "id": "F2",
+        "line": 55,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/decision/D-14"
+        ],
+        "severity": "high",
+        "summary": "Evidence acquisition still resolves links transitively through retained out-of-root artifacts before plan derivation filters them."
+      }
+    ],
+    "summary": "Two issue-impact defects leave managed out-of-root artifacts relocatable and retain the unbounded evidence traversal through out-of-root artifacts.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0e5dff57-44c1-4fc3-ac2c-f60cf118dabf",
+  "message": null,
+  "run_id": "31e4659f-616f-40f6-a8fc-69a7f73a4abf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T21:07:42.677125692Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5265 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa041-50fb-7ec2-87ab-99b145244ad2\n--------\nuser\n--- 5252 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: d72526cc (workflow metadata), bc4e3584 (merge), 68b760dc (implementation)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-14 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T21:00:53Z)\nTruncation recovery: split merge patch reads by path; reread artifact classifier, discovery, storage, and focused test ranges\n\n1. **F1 — blocking, issue-impact (high):** Out-of-root artifacts under a configured managed path are still relocated. `retains_outside_development_root` excludes managed paths at [artifact_classifier.rs:149](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/artifact_classifier.rs:149), so destination selection proceeds; the added test explicitly asserts that `fixtures/root.md` moves despite being outside `dev` at [artifact_classifier.rs:2593](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/artifact_classifier.rs:2593). This contradicts D-14 and REQ-01/REQ-04: an artifact outside the configured development root must have no destination and remain in place.\n\n2. **F2 — blocking, issue-impact (high):** The actual discovery pipeline still resolves the retained artifact’s links before the policy filter runs. [artifact_discovery.rs:55](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/artifact_discovery.rs:55) acquires an unbounded closure, whose parser enqueues every local reference at [artifact_discovery.rs:190](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/artifact_discovery.rs:190); only afterward does `followed_references` omit descendants from the returned plan. Thus a linked out-of-root hub is still read and traversed transitively, violating REQ-03 and D-14 even though the focused test observes only that those descendants are omitted from plan artifacts.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-impact defects leave managed out-of-root artifacts relocatable and retain the unbounded evidence traversal through out-of-root artifacts.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A managed path outside the development root is relocated instead of retained with no destination.\",\"file\":\"crates/jit/src/domain/artifact_classifier.rs\",\"line\":149,\"references\":[\"@/issue/8e071e18/decision/D-14\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Evidence acquisition still resolves links transitively through retained out-of-root artifacts before plan derivation filters them.\",\"file\":\"crates/jit/src/storage/artifact_discovery.rs\",\"line\":55,\"references\":[\"@/issue/8e071e18/decision/D-14\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
