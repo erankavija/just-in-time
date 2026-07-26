@@ -640,14 +640,20 @@ pub fn validate_proposed_layout(
                 }
             })?;
             let available = proposed_available_paths(target);
+            // Resolve on the reference's path component only: discovery strips
+            // the query string and fragment before computing a target (see
+            // `resolve_reference` in `artifact_discovery.rs`), but `available`
+            // never carries one either, so matching the raw reference here
+            // would reject every anchor- or query-bearing edge.
+            let reference_path = edge.reference.split(['?', '#']).next().unwrap_or_default();
             for parent_path in proposed_available_paths(parent) {
                 let resolved = match edge.resolution_mode {
                     EdgeResolutionMode::Relative => {
                         let parent_dir = Path::new(&parent_path).parent().unwrap_or(Path::new(""));
-                        normalize_artifact_path(&parent_dir.join(&edge.reference).to_string_lossy())
+                        normalize_artifact_path(&parent_dir.join(reference_path).to_string_lossy())
                     }
                     EdgeResolutionMode::RootRelative => {
-                        normalize_artifact_path(edge.reference.trim_start_matches('/'))
+                        normalize_artifact_path(reference_path.trim_start_matches('/'))
                     }
                     EdgeResolutionMode::External => continue,
                 };
@@ -1684,6 +1690,194 @@ mod tests {
                 ref resolved,
                 ..
             } if reference == "target.png"
+                && parent == "fixtures/root.md"
+                && resolved == "archive/fixtures/target.png"
+        ));
+    }
+
+    #[test]
+    fn test_validate_proposed_layout_accepts_relative_edge_with_anchor_fragment() {
+        // A relative reference carrying an anchor fragment (e.g. Markdown's
+        // `target.png#quick-start`) must resolve against the same location as
+        // the equivalent fragment-free reference once both parent and target
+        // land at their moved destinations.
+        let content_identity = identity(b"root");
+        let parent = ArtifactPlanEntry::new(
+            "fixtures/root.md",
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Move,
+        )
+        .with_content_identity(content_identity.clone())
+        .with_destination("archive/fixtures/root.md")
+        .with_edges(vec![edge(
+            "target.png#quick-start",
+            "fixtures/target.png",
+            EdgeResolutionMode::Relative,
+        )])
+        .with_pending_deletions(vec![PendingDeletion {
+            source: "fixtures/root.md".into(),
+            content_identity,
+        }]);
+        let target_identity = identity(b"target");
+        let target = ArtifactPlanEntry::new(
+            "fixtures/target.png",
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Move,
+        )
+        .with_content_identity(target_identity.clone())
+        .with_destination("archive/fixtures/target.png")
+        .with_pending_deletions(vec![PendingDeletion {
+            source: "fixtures/target.png".into(),
+            content_identity: target_identity,
+        }]);
+        let plan = ArtifactPlan::new(
+            PlanTarget::Document {
+                path: "fixtures/root.md".into(),
+            },
+            "archive",
+            PolicyStatus::Configured,
+            vec![parent, target],
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+        validate_proposed_layout(&plan).expect("anchor fragment must resolve like the bare path");
+    }
+
+    #[test]
+    fn test_validate_proposed_layout_accepts_relative_edge_with_query_string() {
+        // A relative reference carrying a query string must resolve the same
+        // way as the equivalent query-free reference.
+        let content_identity = identity(b"root");
+        let parent = ArtifactPlanEntry::new(
+            "fixtures/root.md",
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Move,
+        )
+        .with_content_identity(content_identity.clone())
+        .with_destination("archive/fixtures/root.md")
+        .with_edges(vec![edge(
+            "target.png?raw=true",
+            "fixtures/target.png",
+            EdgeResolutionMode::Relative,
+        )])
+        .with_pending_deletions(vec![PendingDeletion {
+            source: "fixtures/root.md".into(),
+            content_identity,
+        }]);
+        let target_identity = identity(b"target");
+        let target = ArtifactPlanEntry::new(
+            "fixtures/target.png",
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Move,
+        )
+        .with_content_identity(target_identity.clone())
+        .with_destination("archive/fixtures/target.png")
+        .with_pending_deletions(vec![PendingDeletion {
+            source: "fixtures/target.png".into(),
+            content_identity: target_identity,
+        }]);
+        let plan = ArtifactPlan::new(
+            PlanTarget::Document {
+                path: "fixtures/root.md".into(),
+            },
+            "archive",
+            PolicyStatus::Configured,
+            vec![parent, target],
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+        validate_proposed_layout(&plan).expect("query string must resolve like the bare path");
+    }
+
+    #[test]
+    fn test_validate_proposed_layout_accepts_root_relative_edge_with_anchor_fragment_and_query_string(
+    ) {
+        // Root-relative dependencies are retained at their source path rather
+        // than moved (see `test_root_relative_edge_retains_dependency_at_source`);
+        // an anchor fragment and query string on such a reference must still
+        // strip cleanly against that retained location.
+        let parent = ArtifactPlanEntry::new(
+            "dev/active/page.html",
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Retain,
+        )
+        .with_edges(vec![edge(
+            "/dev/active/theme.css?v=2#top",
+            "dev/active/theme.css",
+            EdgeResolutionMode::RootRelative,
+        )]);
+        let target = ArtifactPlanEntry::new(
+            "dev/active/theme.css",
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Retain,
+        );
+        let plan = ArtifactPlan::new(
+            PlanTarget::Document {
+                path: "dev/active/page.html".into(),
+            },
+            "archive",
+            PolicyStatus::Configured,
+            vec![parent, target],
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+        validate_proposed_layout(&plan)
+            .expect("root-relative fragment and query string must resolve like the bare path");
+    }
+
+    #[test]
+    fn test_validate_proposed_layout_rejects_broken_edge_with_anchor_fragment_and_reports_reference_verbatim(
+    ) {
+        // A path component that genuinely fails to resolve after the move
+        // must still fail even when the reference also carries an anchor
+        // fragment: fragment-stripping must not paper over a real mismatch.
+        // The reported reference must retain the fragment exactly as written.
+        let content_identity = identity(b"root");
+        let parent = ArtifactPlanEntry::new(
+            "fixtures/root.md",
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Move,
+        )
+        .with_content_identity(content_identity.clone())
+        .with_destination("archive/fixtures/root.md")
+        .with_edges(vec![edge(
+            "target.png#quick-start",
+            "fixtures/target.png",
+            EdgeResolutionMode::Relative,
+        )])
+        .with_pending_deletions(vec![PendingDeletion {
+            source: "fixtures/root.md".into(),
+            content_identity,
+        }]);
+        let target = ArtifactPlanEntry::new(
+            "fixtures/target.png",
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Retain,
+        );
+        let plan = ArtifactPlan::new(
+            PlanTarget::Document {
+                path: "fixtures/root.md".into(),
+            },
+            "archive",
+            PolicyStatus::Configured,
+            vec![parent, target],
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+        let error = validate_proposed_layout(&plan)
+            .expect_err("broken path component must still be rejected");
+        assert!(matches!(
+            error,
+            crate::repository_state::ProducerError::ProposedLayoutEdgeUnavailable {
+                ref reference,
+                ref parent,
+                ref resolved,
+                ..
+            } if reference == "target.png#quick-start"
                 && parent == "fixtures/root.md"
                 && resolved == "archive/fixtures/target.png"
         ));
