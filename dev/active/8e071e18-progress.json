@@ -1171,6 +1171,20 @@
       "subject": "the epic filed for P9 is not wired to this epic and must not be picked up here",
       "detail": "a2546471 (Structured failure reporting across the machine-readable CLI surface) was filed at the owner's direction from P9 and wired under milestone 9db27a3a. It is outside 8e071e18 entirely.",
       "disposition": "CLOSED as a lead action. No further work in this epic. Recorded so the completion report can name where P9 went."
+    },
+    {
+      "id": "P11",
+      "raised_by": "cf0f0014 and 80e08e0f (both independently), confirmed by the lead",
+      "subject": "a citation corrected to its archived destination still fires moving-path-citation",
+      "detail": "citation_columns (crates/jit/src/domain/artifact_classifier.rs:967) is a plain substring find of the moving artifact's repository-relative source path in each scanned line. Every destination is destination_root + \"/\" + source, so a citation that correctly names the archived destination still contains the bare source path as a trailing substring and still warns, at a column shifted by exactly the length of the inserted destination-root prefix. Measured on both repointing issues: warning counts unchanged (5 and 3), columns shifted by 35 and 39 characters respectively. The warning is advisory and changes no action, blocker, or eligibility, so nothing is blocked by it.",
+      "disposition": "OPEN as a product observation, NOT a criterion violation. REQ-08 requires reporting every occurrence of a moving artifact's path in the scan universe, and a corrected citation does contain such an occurrence, so the letter of the criterion is met by reporting it. Candidate follow-up: a warning that distinguishes a bare citation from one already naming the destination. LEAD TRAP: the wave-6 dispatch prompts for cf0f0014 and 80e08e0f told the workers to confirm the warnings disappear after the repoint. That test is unsatisfiable. The correct acceptance test is that the citation names the destination the plan reports."
+    },
+    {
+      "id": "P12",
+      "raised_by": "5c70f0cb (worker), grounded by the lead",
+      "subject": "planning-lead eval fixtures state the flat plan-doc path",
+      "detail": ".agents/skills/jit-planning-lead/evals/evals.json states, in three expected_output fields, \"A plan document exists at P's plan-doc path (dev/active/<container-short-id>-plan.md)\". The parenthetical mirrors .jit/templates.toml's plan template doc field, which 429995e1 repoints at the canonical artifact directory. When that lands, the parenthetical contradicts the template it describes. Eval fixtures are explicitly out of scope for every skill-conversion issue (their REQ-05) and for the story checkpoint 2bc344fc (its REQ-04).",
+      "disposition": "OPEN. Not a criterion violation: REQ-11 scopes to skill prompts and reference templates that read or write an artifact path, and an eval fixture expected_output is neither. VERIFY at wave 9 when 429995e1 lands, and reconcile against the epic criteria before the epic gate. Fixing it inside 429995e1 would widen that issue's declared footprint, which is an escalation rather than a lead call."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
