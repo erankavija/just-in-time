@@ -22,13 +22,16 @@ Read from `.jit/config.toml` `[documentation]`; never hardcode a directory.
 - **Active root** — `<development_root>/active`, where `development_root` is the
   `[documentation]` key of the same name. This matches the managed path the
   execution lead already writes its per-epic progress file under, one tier down.
-- **Progress path** —
-  `<development_root>/active/<strategic-container-short-id>-progress.json`.
+- **Progress directory** — obtained from `jit doc dir <strategic-container-id>
+  <development_root>/active`, never composed from a spelled-out pattern.
+- **Progress path** — `<progress-directory>/progress.json`.
 
-> Example: with `development_root = "notes"`, the
-> progress file for strategic container `<container-id>` lands at
-> `<development-root>/active/<container-id>-progress.json`, a sibling of the
-> execution lead's progress file. Derive the root from configuration.
+> Example: with `development_root = "notes"`, `jit doc dir <container-id>
+> notes/active` prints the directory the progress file for strategic container
+> `<container-id>` owns, a sibling of the execution lead's own progress
+> directory; `progress.json` lands inside it. Derive the root from
+> configuration; a literal directory name from an example is wrong for every
+> other project.
 
 ## Schema
 
@@ -135,7 +138,9 @@ re-point it if the file is later archived on container completion.
 A re-invoked steward loads prior progress before dispatching anything, so no wave
 is re-run and no accepted container is re-dispatched:
 
-1. **Resolve the progress path** from config (active root + anchor short id).
+1. **Resolve the progress directory** with `jit doc dir <anchor-id>
+   <development_root>/active`, then the progress path inside it
+   (`<directory>/progress.json`).
 2. **If it exists, read it in full.** Recover `current_wave`, every container's
    `status`, each wave's `coherence_review`, and open `escalations`. Resume the
    dispatch loop at `current_wave`, skipping containers already
@@ -155,6 +160,8 @@ is re-run and no accepted container is re-dispatched:
 
 - Active root cannot be resolved (`development_root` missing or `[documentation]`
   unreadable). Stop and report.
+- `jit doc dir` rejects the active root as an undeclared issue-scoped area. Stop
+  and report; do not fall back to composing the directory by hand.
 - The file exists but does not parse, or its `waves` no longer match the live DAG
   in a way re-derivation cannot reconcile (a child vanished mid-drive). Stop
   rather than overwrite; a blind rewrite loses recorded status and escalations.
@@ -165,6 +172,10 @@ is re-run and no accepted container is re-dispatched:
   should archive with the container; permanent placement leaves stale progress
   files accumulating forever.
 - Hardcoding `dev/` or `dev/active` instead of reading `development_root`.
+- Composing the progress path as
+  `<development_root>/active/<short-id>-progress.json` directly instead of
+  resolving the directory with `jit doc dir` first. The directory name is
+  derived by the tool, not spelled out here.
 - Per-issue rows. Rows are sub-strategic containers; a container's own issues are
   the dispatched lead's progress file, one tier down — never duplicated here.
 - Advancing `current_wave` before every container in the wave is `accepted` and
