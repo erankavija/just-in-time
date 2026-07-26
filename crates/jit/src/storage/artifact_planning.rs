@@ -248,7 +248,8 @@ fn inspect_artifact_from_root(
     let entries = match listing_scope {
         ArtifactListingScope::MetadataOnly => Vec::new(),
         ArtifactListingScope::ImmediateChildren => list_immediate_children(&directory, path)?,
-        ArtifactListingScope::RecursiveFiles => list_recursive_files(&directory, path)?,
+        ArtifactListingScope::RecursiveFiles => list_recursive(&directory, path, false)?,
+        ArtifactListingScope::RecursiveEntries => list_recursive(&directory, path, true)?,
     };
     Ok(ArtifactEvidence::Directory {
         scope: listing_scope,
@@ -269,9 +270,21 @@ fn list_immediate_children(directory: &Dir, relative: &str) -> Result<Vec<String
     Ok(entries)
 }
 
-fn list_recursive_files(directory: &Dir, relative: &str) -> Result<Vec<String>, PathReadError> {
+/// Walk `directory` with no-follow handles, naming every entry it reaches.
+///
+/// `name_directories` decides whether a directory is named as well as descended
+/// through, which is the difference between
+/// [`ArtifactListingScope::RecursiveFiles`] and
+/// [`ArtifactListingScope::RecursiveEntries`]: without it a subtree holding no
+/// file contributes nothing at all. A symbolic link is named as a leaf and
+/// never descended into under either.
+fn list_recursive(
+    directory: &Dir,
+    relative: &str,
+    name_directories: bool,
+) -> Result<Vec<String>, PathReadError> {
     let mut pending = vec![(directory.try_clone()?, relative.to_string())];
-    let mut files = Vec::new();
+    let mut listed = Vec::new();
     while let Some((current, prefix)) = pending.pop() {
         for entry in current.entries()? {
             let entry = entry?;
@@ -280,14 +293,17 @@ fn list_recursive_files(directory: &Dir, relative: &str) -> Result<Vec<String>, 
             let metadata = current.symlink_metadata(&name)?;
             if metadata.is_dir() && !metadata.is_symlink() {
                 let child = open_child_dir_nofollow(&current, &name).map_err(other)?;
-                pending.push((child, path));
+                pending.push((child, path.clone()));
+                if name_directories {
+                    listed.push(path);
+                }
             } else {
-                files.push(path);
+                listed.push(path);
             }
         }
     }
-    files.sort();
-    Ok(files)
+    listed.sort();
+    Ok(listed)
 }
 
 fn child_path(relative: &str, name: std::ffi::OsString) -> Result<String, PathReadError> {
@@ -421,6 +437,9 @@ mod tests {
         let (repo, storage) = repository();
         fs::create_dir_all(repo.path().join("archive/sub")).unwrap();
         fs::write(repo.path().join("archive/sub/nested.md"), "nested").unwrap();
+        // Holds no file at any depth, so only a listing that names the
+        // directories it descends through can see it.
+        fs::create_dir(repo.path().join("archive/empty")).unwrap();
         fs::create_dir(repo.path().join("outside")).unwrap();
         fs::write(repo.path().join("outside/hidden.md"), "hidden").unwrap();
         symlink(
@@ -436,7 +455,11 @@ mod tests {
             immediate,
             ArtifactEvidence::Directory {
                 scope: ArtifactListingScope::ImmediateChildren,
-                entries: vec!["archive/link".into(), "archive/sub".into()],
+                entries: vec![
+                    "archive/empty".into(),
+                    "archive/link".into(),
+                    "archive/sub".into()
+                ],
             }
         );
         assert_eq!(
@@ -454,6 +477,22 @@ mod tests {
             ArtifactEvidence::Directory {
                 scope: ArtifactListingScope::RecursiveFiles,
                 entries: vec!["archive/link".into(), "archive/sub/nested.md".into()],
+            }
+        );
+        // The same walk, naming the directories it descends through: the empty
+        // one the files-only listing above cannot see, and the populated one it
+        // reports only through the file inside.
+        assert_eq!(
+            inspect_artifact_evidence(&storage, "archive", ArtifactListingScope::RecursiveEntries)
+                .unwrap(),
+            ArtifactEvidence::Directory {
+                scope: ArtifactListingScope::RecursiveEntries,
+                entries: vec![
+                    "archive/empty".into(),
+                    "archive/link".into(),
+                    "archive/sub".into(),
+                    "archive/sub/nested.md".into(),
+                ],
             }
         );
     }

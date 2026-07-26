@@ -372,26 +372,34 @@ fn image_evidence(
                     .keys()
                     .map(|name| normalize_artifact_path(&format!("{path}/{name}")))
                     .collect(),
-                ArtifactListingScope::RecursiveFiles => image
-                    .entries()
-                    .iter()
-                    .filter(|(candidate, entry)| {
-                        image.layout().resolve(candidate).is_ok_and(|physical| {
-                            physical.starts_with(image.layout().worktree_root().join(path))
-                        }) && !matches!(
-                            entry,
-                            RepositoryEntry::Directory { .. } | RepositoryEntry::Absent
-                        )
-                    })
-                    .map(|(candidate, _)| {
-                        Ok(image
-                            .layout()
-                            .resolve(candidate)?
-                            .strip_prefix(image.layout().worktree_root())?
-                            .to_string_lossy()
-                            .replace('\\', "/"))
-                    })
-                    .collect::<Result<Vec<_>>>()?,
+                // The two recursive scopes differ only in whether a descended
+                // directory is named as well, so they share one traversal
+                // rather than diverging into two filters that could drift.
+                ArtifactListingScope::RecursiveFiles | ArtifactListingScope::RecursiveEntries => {
+                    let root = image.layout().worktree_root().join(path);
+                    let name_directories = matches!(scope, ArtifactListingScope::RecursiveEntries);
+                    image
+                        .entries()
+                        .iter()
+                        .filter(|(candidate, entry)| {
+                            image.layout().resolve(candidate).is_ok_and(|physical| {
+                                physical.starts_with(&root) && physical != root
+                            }) && match entry {
+                                RepositoryEntry::Absent => false,
+                                RepositoryEntry::Directory { .. } => name_directories,
+                                _ => true,
+                            }
+                        })
+                        .map(|(candidate, _)| {
+                            Ok(image
+                                .layout()
+                                .resolve(candidate)?
+                                .strip_prefix(image.layout().worktree_root())?
+                                .to_string_lossy()
+                                .replace('\\', "/"))
+                        })
+                        .collect::<Result<Vec<_>>>()?
+                }
             };
             ArtifactEvidence::Directory { scope, entries }
         }

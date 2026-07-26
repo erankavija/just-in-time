@@ -97,6 +97,11 @@ fn write_artifact(repo: &Path, path: &str) {
     fs::write(&absolute, format!("# {path}\n")).unwrap();
 }
 
+/// Create the repository-relative directory `path` and put no file in it.
+fn create_artifact_directory(repo: &Path, path: &str) {
+    fs::create_dir_all(repo.join(path)).unwrap();
+}
+
 /// An issue whose labels resolve a single membership value, so the directory it
 /// owns is distinguishable from the bare area it is written into.
 fn issue_owning_a_directory(repo: &Path, title: &str) -> CreatedIssue {
@@ -229,6 +234,11 @@ fn test_doc_conformance_names_an_artifact_sitting_outside_its_owning_issues_cano
         "an artifact already inside that directory is not reported: {:?}",
         report.paths()
     );
+    assert!(
+        report.entry(&canonical).is_none(),
+        "the directory its owner owns is not itself reported: {:?}",
+        report.paths()
+    );
 
     // The verdict follows the location and nothing else: relocating the same
     // bytes under the same owner empties the report.
@@ -242,6 +252,58 @@ fn test_doc_conformance_names_an_artifact_sitting_outside_its_owning_issues_cano
         relocated.artifacts.is_empty(),
         "moving the artifact into its canonical directory clears the report: {:?}",
         relocated.paths()
+    );
+}
+
+#[test]
+fn test_doc_conformance_names_a_misplaced_prefixed_directory_holding_no_file() {
+    let repo = initialized_repo();
+    let area = declared_area();
+    let issue = issue_owning_a_directory(repo.path(), "Owns directories rather than files");
+    let canonical = resolve_directory(repo.path(), &issue.short_id, area);
+
+    // Three misplaced directories carrying the owner's prefix, differing only
+    // in what they hold: nothing at all, directories alone at every depth, and
+    // one file. Their location is what makes them nonconforming, so what they
+    // contain must not decide whether they are named.
+    let empty = format!("{area}/legacy/{}-plan", issue.short_id);
+    let directories_only = format!("{area}/{}-notes", issue.short_id);
+    let populated = format!("{area}/{}-draft", issue.short_id);
+    create_artifact_directory(repo.path(), &empty);
+    create_artifact_directory(repo.path(), &format!("{directories_only}/part/section"));
+    write_artifact(repo.path(), &format!("{populated}/plan.md"));
+
+    let misplaced = [empty, directories_only, populated];
+    let report = conformance_report(repo.path());
+    misplaced.iter().for_each(|directory| {
+        let entry = report.require(directory);
+        assert_eq!(
+            entry["canonical_directory"].as_str(),
+            Some(canonical.as_str()),
+            "the directory is reported against the one its owner owns: {entry}"
+        );
+        assert_eq!(
+            entry["issue_id"].as_str(),
+            Some(issue.id.as_str()),
+            "the directory is attributed to the issue whose prefix it carries: {entry}"
+        );
+    });
+
+    // Each is one occurrence: no path beneath a reported directory is reported
+    // in its own right, and the enclosing `legacy/` carries no prefix to name.
+    assert!(
+        report
+            .paths()
+            .into_iter()
+            .all(|path| misplaced.contains(path)),
+        "a misplaced directory is named once rather than once per descendant: {:?}",
+        report.paths()
+    );
+    assert_eq!(
+        report.count,
+        misplaced.len(),
+        "the three misplaced directories are the whole report: {:?}",
+        report.paths()
     );
 }
 

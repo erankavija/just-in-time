@@ -75,14 +75,17 @@ pub struct ReportedArtifact {
 /// Report the artifacts among `paths` that disagree with their owner's
 /// canonical directory in `area`.
 ///
-/// `paths` are repository-relative file paths found beneath `area`; a path that
-/// lies outside `area` contributes nothing. `issues` is the repository's issue
-/// set, which is what a short-id prefix is resolved against: exactly one match
-/// attributes the artifact, and both zero matches and several land on
-/// [`ArtifactDisposition::Unattributed`].
+/// `paths` are repository-relative paths found beneath `area`, files and
+/// directories alike; a path that lies outside `area` contributes nothing.
+/// Naming a directory is what lets an empty one be reported, since it reaches
+/// this function through no path of its own otherwise. `issues` is the
+/// repository's issue set, which is what a short-id prefix is resolved against:
+/// exactly one match attributes the artifact, and both zero matches and several
+/// land on [`ArtifactDisposition::Unattributed`].
 ///
 /// Results are ordered by path and hold one entry per reported artifact, so a
-/// misplaced directory holding many files is named once.
+/// misplaced directory is named once however many of its own descendants also
+/// appear in `paths`.
 ///
 /// # Errors
 ///
