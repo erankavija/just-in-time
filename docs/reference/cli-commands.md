@@ -257,10 +257,12 @@ target behavior, and it has no `--execute` form. It never writes artifacts,
 issue records, or events. Missing and partial documentation policy therefore
 remain `unconfigured` and `incomplete`; they are reported rather than filled by
 mutation-authorizing defaults. The shared planner also preserves its detailed
-semantics here: a selected root outside managed paths is blocked as
-`unmanaged-selected-root`, while an unmanaged embedded dependency carries
-`unmanaged-path` evidence and can only copy or retain. Sources already beneath
-the configured archive root are evaluated as already existing: direct roots
+semantics here: a selected root inside the development root that matches no
+configured area is blocked as `unmanaged-selected-root`, a root outside that
+development root is retained at its source with no destination and carries
+`outside-development-root` evidence, and an unmanaged embedded dependency
+carries `unmanaged-path` evidence and can only copy or retain. Sources already
+beneath the configured archive root are evaluated as already existing: direct roots
 retain, relative dependencies of relocated parents copy to the current mirror,
 and root-relative or staying-parent dependencies retain.
 

@@ -541,14 +541,14 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
 }
 
 #[test]
-fn test_archive_execute_retains_out_of_root_source_and_publishes_mirror_without_pending_deletion() {
-    // A linked file outside the configured development root classifies
-    // permanent (`@/issue/8e071e18/decision/D-14`): it is archived by copy, so
-    // the working-tree source is never relocated. Guard that guarantee at both
-    // the plan level (REQ-03: no pending deletion is scheduled) and the
-    // execution level (REQ-01: source retained, REQ-02: mirror published),
-    // pinned together so the retention cannot be satisfied by silently
-    // dropping the artifact from the plan.
+fn test_archive_execute_leaves_an_out_of_root_source_where_it_is_without_scheduling_a_destination()
+{
+    // A linked file outside the configured development root is retained where
+    // it is (`@/issue/8e071e18/decision/D-14`): the plan schedules no
+    // destination for it and execution neither relocates nor duplicates it.
+    // Guard that at both the plan level and the execution level, pinned
+    // together so the retention cannot be satisfied by silently dropping the
+    // artifact from the plan.
     let repo = TempDir::new().unwrap();
     assert_success(&jit(&repo, &["init", "--json"]));
     set_documentation_policy(
@@ -614,12 +614,12 @@ fn test_archive_execute_retains_out_of_root_source_and_publishes_mirror_without_
         .iter()
         .find(|artifact| artifact["source"] == "scripts/install.sh")
         .unwrap();
-    assert_eq!(artifact["action"], "copy");
-    assert_eq!(artifact["destination"], expected_mirror);
+    assert_eq!(artifact["action"], "retain");
+    assert_eq!(artifact["destination"], Value::Null);
     assert_eq!(
         artifact["pending_deletions"],
         serde_json::json!([]),
-        "an out-of-root permanent source must not schedule a pending deletion"
+        "an out-of-root source must not schedule a pending deletion"
     );
 
     let executed = jit(
@@ -637,13 +637,8 @@ fn test_archive_execute_retains_out_of_root_source_and_publishes_mirror_without_
     assert!(result["planned_deletions"].as_array().unwrap().is_empty());
     assert!(result["deleted_sources"].as_array().unwrap().is_empty());
     assert!(
-        result["publications"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|publication| publication["source"] == "scripts/install.sh"
-                && publication["destination"] == expected_mirror),
-        "execution must publish the mirrored copy under the archive root: {result}"
+        result["publications"].as_array().unwrap().is_empty(),
+        "execution must publish nothing for a retained out-of-root source: {result}"
     );
 
     let source_path = repo.path().join("scripts/install.sh");
@@ -652,13 +647,10 @@ fn test_archive_execute_retains_out_of_root_source_and_publishes_mirror_without_
         "source outside the development root must remain at its original path"
     );
     assert_eq!(fs::read(&source_path).unwrap(), source_bytes);
-
-    let mirror_path = repo.path().join(&expected_mirror);
     assert!(
-        mirror_path.exists(),
-        "archive execution must publish a mirrored copy under the archive root"
+        !repo.path().join(&expected_mirror).exists(),
+        "execution must not duplicate a retained out-of-root source into the archive"
     );
-    assert_eq!(fs::read(&mirror_path).unwrap(), source_bytes);
 }
 
 #[test]
@@ -809,7 +801,11 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
                 .as_array()
                 .unwrap()
                 .iter()
-                .any(|evidence| evidence == "permanent-path" || evidence == "unmanaged-path")
+                .any(|evidence| {
+                    evidence == "permanent-path"
+                        || evidence == "outside-development-root"
+                        || evidence == "unmanaged-path"
+                })
         })
         .collect::<Vec<_>>();
     assert!(!source_retaining.is_empty());

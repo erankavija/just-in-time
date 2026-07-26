@@ -233,7 +233,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let inventory =
             inventory_explicit_roots(&inventory_issues, &hierarchy, explicit_target, &pinned)?;
         let (discovered, embedded_owners) =
-            discover_archive_artifacts(&self.storage, inventory, &issues)?;
+            discover_archive_artifacts(&self.storage, inventory, &issues, &policy)?;
         let plan_target = discovered.target;
         let artifacts = discovered.artifacts;
         let mut blockers = discovered.blockers;
@@ -756,7 +756,7 @@ impl CommandExecutor<JsonFileStorage> {
             }
         };
         let (discovered, embedded) =
-            derive_archive_artifacts(inventory, &issues, &evidence, &parsed)?;
+            derive_archive_artifacts(inventory, &issues, &evidence, &parsed, &policy)?;
         let mut blockers = discovered.blockers;
         blockers.extend(
             conflicts
@@ -1384,24 +1384,30 @@ mod tests {
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"archive\"\n",
+            concat!(
+                "[documentation]\n",
+                "development_root = \"dev\"\n",
+                "managed_paths = [\"fixtures\"]\n",
+                "permanent_paths = [\"dev/guides\"]\n",
+                "archive_root = \"archive\"\n"
+            ),
         )
         .unwrap();
         executor(&repo, storage.clone())
             .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
-        fs::create_dir(repo.path().join("docs")).unwrap();
-        fs::write(repo.path().join("docs/permanent.md"), b"permanent").unwrap();
+        fs::create_dir_all(repo.path().join("dev/guides")).unwrap();
+        fs::write(repo.path().join("dev/guides/permanent.md"), b"permanent").unwrap();
         let executor = executor(&repo, storage);
         let result = executor
-            .execute_archive_document("docs/permanent.md")
+            .execute_archive_document("dev/guides/permanent.md")
             .unwrap();
         assert!(result.event_appended);
         assert_eq!(result.publications.len(), 1);
         assert!(result.reference_changes.is_empty());
         assert!(result.planned_deletions.is_empty());
-        assert!(repo.path().join("docs/permanent.md").exists());
-        assert!(repo.path().join("archive/docs/permanent.md").exists());
+        assert!(repo.path().join("dev/guides/permanent.md").exists());
+        assert!(repo.path().join("archive/dev/guides/permanent.md").exists());
         assert_eq!(
             executor
                 .storage
@@ -1419,30 +1425,40 @@ mod tests {
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"archive\"\n",
+            concat!(
+                "[documentation]\n",
+                "development_root = \"dev\"\n",
+                "managed_paths = [\"fixtures\"]\n",
+                "permanent_paths = [\"dev/guides\"]\n",
+                "archive_root = \"archive\"\n"
+            ),
         )
         .unwrap();
         executor(&repo, storage.clone())
             .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
-        fs::create_dir_all(repo.path().join("archive/docs")).unwrap();
-        fs::create_dir(repo.path().join("docs")).unwrap();
-        fs::write(repo.path().join("docs/permanent.md"), b"permanent").unwrap();
-        fs::write(repo.path().join("archive/docs/permanent.md"), b"permanent").unwrap();
+        fs::create_dir_all(repo.path().join("archive/dev/guides")).unwrap();
+        fs::create_dir_all(repo.path().join("dev/guides")).unwrap();
+        fs::write(repo.path().join("dev/guides/permanent.md"), b"permanent").unwrap();
+        fs::write(
+            repo.path().join("archive/dev/guides/permanent.md"),
+            b"permanent",
+        )
+        .unwrap();
         let executor = executor(&repo, storage);
 
         let first = executor
-            .execute_archive_document("docs/permanent.md")
+            .execute_archive_document("dev/guides/permanent.md")
             .unwrap();
         assert!(first.event_appended);
         assert!(first.planned_deletions.is_empty());
         assert!(first.deleted_sources.is_empty());
         assert!(first.publications.iter().any(|publication| {
-            publication.destination == "archive/docs/permanent.md" && publication.adopted
+            publication.destination == "archive/dev/guides/permanent.md" && publication.adopted
         }));
-        assert!(repo.path().join("docs/permanent.md").exists());
+        assert!(repo.path().join("dev/guides/permanent.md").exists());
         let second = executor
-            .execute_archive_document("docs/permanent.md")
+            .execute_archive_document("dev/guides/permanent.md")
             .unwrap();
         assert!(!second.event_appended);
         assert!(second.publications.is_empty());
@@ -1842,13 +1858,8 @@ epic = "epic"
             .iter()
             .find(|artifact| artifact.source() == "scripts/install.sh")
             .unwrap();
-        assert_eq!(artifact.action(), ArtifactAction::Copy);
-        assert_eq!(
-            artifact.destination(),
-            Some(
-                artifact_mirror_destination(outside.destination_root(), artifact.source()).as_str()
-            )
-        );
+        assert_eq!(artifact.action(), ArtifactAction::Retain);
+        assert_eq!(artifact.destination(), None);
         assert!(artifact.pending_deletions().is_empty());
 
         let inside = executor

@@ -29,8 +29,8 @@ use std::path::Path;
 /// root marks an already-archived source, a permanent root retains its source
 /// beside the mirror, and a managed root may relocate it. A source that none of
 /// those roots claims and the configured development root does not contain is
-/// permanent as well, so a linked source file, script, or repository-root
-/// document is archived by copy instead of defeating the whole plan
+/// retained where it is, so a linked source file, script, or repository-root
+/// document keeps its single copy instead of defeating the whole plan
 /// (`@/issue/8e071e18/decision/D-14`). Inside the development root, a source
 /// that matches no configured area still raises
 /// [`BlockerCode::UnmanagedSelectedRoot`], keeping a mistyped area entry
@@ -120,19 +120,33 @@ impl ArtifactClassificationPolicy {
             .any(|root| contains_path(root, path))
     }
 
-    /// Whether this source is mirrored while the working-tree source is retained.
+    /// Whether a configured permanent root mirrors this source while retaining it.
     ///
-    /// A configured permanent root is permanent, and so is a source that no
-    /// other configured area claims and the development root does not contain:
-    /// such a source is archived by copy rather than relocated out of the tree
-    /// that builds, runs, or documents the repository.
+    /// Permanence is a property of an area the archive wants a frozen snapshot
+    /// of while readers keep the live file, so it schedules a destination and
+    /// leaves the source in place. It says nothing about the development-root
+    /// boundary: a source outside that root is retained by
+    /// [`retains_outside_development_root`](Self::retains_outside_development_root)
+    /// whether or not a permanent root also claims it.
     fn is_permanent(&self, path: &str) -> bool {
         self.permanent_paths
             .iter()
             .any(|root| contains_path(root, path))
-            || (!self.is_archived(path)
-                && !self.is_managed(path)
-                && self.is_outside_development_root(path))
+    }
+
+    /// Whether this source lies outside the development root and is therefore
+    /// left exactly where it is.
+    ///
+    /// Such a source — a source file, a script, an agent asset, a
+    /// repository-root document — is not the repository's development record,
+    /// so an archive neither relocates nor duplicates it: the plan schedules no
+    /// destination for it, and artifact discovery stops following links at it
+    /// rather than pulling everything it cites into the plan
+    /// (`@/issue/8e071e18/decision/D-14`). The archive root and the managed
+    /// roots keep their own treatment, so an already-archived source and a
+    /// managed area declared outside the development root are unaffected.
+    pub fn retains_outside_development_root(&self, path: &str) -> bool {
+        !self.is_archived(path) && !self.is_managed(path) && self.is_outside_development_root(path)
     }
 
     /// Whether the configured development root fails to contain this source.
@@ -140,7 +154,7 @@ impl ArtifactClassificationPolicy {
     /// A policy with no authored development root leaves every source inside
     /// it, so an unconfigured or repository-wide root keeps reporting a
     /// selected root that matches no configured area as
-    /// [`BlockerCode::UnmanagedSelectedRoot`] instead of silently copying it.
+    /// [`BlockerCode::UnmanagedSelectedRoot`] instead of silently retaining it.
     fn is_outside_development_root(&self, path: &str) -> bool {
         !self.development_root.is_empty() && !contains_path(&self.development_root, path)
     }
@@ -569,6 +583,7 @@ pub fn classify_artifacts(
     );
     propagate_relative_destinations(
         &inventory.artifacts,
+        &policy,
         &facts.locations,
         &paths,
         &mut needs_destination,
@@ -611,6 +626,16 @@ pub fn classify_artifacts(
 }
 
 /// Verify that every supported edge still resolves to an available path after execution.
+///
+/// An edge into an artifact the plan retains outside the development root
+/// imposes no constraint. Such a target is a fixed point the archive may
+/// neither relocate nor reproduce (`@/issue/8e071e18/decision/D-14`), so
+/// demanding that it stay reachable from every proposed parent location would
+/// forbid relocating anything that cites it — the layout cannot be preserved,
+/// and the plan already records the retention as
+/// [`EvidenceCode::OutsideDevelopmentRoot`]. A relative citation of such a
+/// target no longer resolves from the archived copy, which is the cost the
+/// decision accepts against duplicating the repository into every archive.
 pub fn validate_proposed_layout(
     plan: &ArtifactPlan,
 ) -> Result<(), crate::repository_state::ProducerError> {
@@ -639,6 +664,12 @@ pub fn validate_proposed_layout(
                     target: target_source.to_string(),
                 }
             })?;
+            if target
+                .evidence()
+                .contains(&EvidenceCode::OutsideDevelopmentRoot)
+            {
+                continue;
+            }
             let available = proposed_available_paths(target);
             // Resolve on the reference's path component only: discovery strips
             // the query string and fragment before computing a target (see
@@ -715,6 +746,7 @@ fn classify_entry(
     let location = locations.get(&source).cloned().unwrap_or_default();
     let archived_source = policy.is_archived(&source);
     let permanent = policy.is_permanent(&source);
+    let outside_development_root = policy.retains_outside_development_root(&source);
     let managed = policy.is_managed(&source);
     let explicit = entry.provenance().contains(&ArtifactProvenance::Explicit);
     let embedded = entry.provenance().contains(&ArtifactProvenance::Embedded);
@@ -743,12 +775,17 @@ fn classify_entry(
     let unselected_unpinned = owners
         .iter()
         .any(|owner| !owner.pinned && !owner.selected_for_relink);
-    let unmanaged_embedded = embedded && !managed && !permanent && !archived_source;
+    let unmanaged_embedded =
+        embedded && !managed && !permanent && !archived_source && !outside_development_root;
 
     let mut evidence = entry.evidence().to_vec();
     evidence.extend(
         [
             (permanent, EvidenceCode::PermanentPath),
+            (
+                outside_development_root,
+                EvidenceCode::OutsideDevelopmentRoot,
+            ),
             (outside_owner, EvidenceCode::OutsideOwner),
             (active_owner, EvidenceCode::ActiveOwner),
             (unmanaged_embedded, EvidenceCode::UnmanagedPath),
@@ -758,9 +795,12 @@ fn classify_entry(
         .filter_map(|(present, evidence)| present.then_some(evidence)),
     );
 
+    // A source outside the development root never earns a destination, so the
+    // pair below always selects `Retain` for it.
     let wants_destination = needs_destination.contains(&source);
     let needs_source = archived_source
         || permanent
+        || outside_development_root
         || outside_owner
         || active_owner
         || unselected_unpinned
@@ -999,6 +1039,12 @@ fn selected_destination_roots(
         })
         .filter_map(|entry| {
             let source = entry.source();
+            // A root outside the development root is retained where it is: it
+            // earns no destination, and its absence from the configured areas
+            // is the policy's intent rather than a mistyped area entry.
+            if policy.retains_outside_development_root(source) {
+                return None;
+            }
             let archived = policy.is_archived(source);
             let permanent = policy.is_permanent(source);
             let managed = policy.is_managed(source);
@@ -1020,8 +1066,16 @@ fn selected_destination_roots(
         .collect()
 }
 
+/// Extend `needs_destination` to every relatively linked target of an artifact
+/// that already has one, so a relative reference still resolves after the
+/// mirror reproduces the parent's directory depth.
+///
+/// A target the policy retains outside the development root is excluded: it
+/// keeps its single copy wherever it is, so no relocation drags it into the
+/// archive (`@/issue/8e071e18/decision/D-14`).
 fn propagate_relative_destinations(
     artifacts: &[ArtifactPlanEntry],
+    policy: &ArtifactClassificationPolicy,
     locations: &BTreeMap<String, ArtifactLocationFacts>,
     paths: &BTreeSet<String>,
     needs_destination: &mut BTreeSet<String>,
@@ -1035,6 +1089,7 @@ fn propagate_relative_destinations(
                     && edge.resolution_mode == EdgeResolutionMode::Relative
             })
             .filter_map(|(_, edge)| present_target(edge, locations, paths))
+            .filter(|target| !policy.retains_outside_development_root(target))
             .filter(|target| !needs_destination.contains(*target))
             .cloned()
             .collect::<BTreeSet<_>>();
@@ -1696,6 +1751,54 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_proposed_layout_accepts_a_relative_edge_into_an_artifact_retained_outside_the_development_root(
+    ) {
+        // A relocation may not be defeated by a target the plan is not allowed
+        // to reproduce. The exemption keys on the evidence naming that reason,
+        // so an otherwise identical retained target still rejects the layout.
+        let layout = |evidence: Vec<EvidenceCode>| {
+            let content_identity = identity(b"plan");
+            let parent = ArtifactPlanEntry::new(
+                "dev/active/plan.md",
+                ArtifactVersion::WorkingTree,
+                ArtifactAction::Move,
+            )
+            .with_content_identity(content_identity.clone())
+            .with_destination("dev/archive/abcdef12/dev/active/plan.md")
+            .with_edges(vec![edge(
+                "../../README.md",
+                "README.md",
+                EdgeResolutionMode::Relative,
+            )])
+            .with_pending_deletions(vec![PendingDeletion {
+                source: "dev/active/plan.md".into(),
+                content_identity,
+            }]);
+            let target = ArtifactPlanEntry::new(
+                "README.md",
+                ArtifactVersion::WorkingTree,
+                ArtifactAction::Retain,
+            )
+            .with_evidence(evidence);
+            let plan = ArtifactPlan::new(
+                PlanTarget::Container {
+                    id: CONTAINER.into(),
+                },
+                "dev/archive/abcdef12",
+                PolicyStatus::Configured,
+                vec![parent, target],
+                Vec::new(),
+                Vec::new(),
+            )
+            .unwrap();
+            validate_proposed_layout(&plan)
+        };
+
+        assert!(layout(vec![EvidenceCode::OutsideDevelopmentRoot]).is_ok());
+        assert!(layout(vec![EvidenceCode::PermanentPath]).is_err());
+    }
+
+    #[test]
     fn test_validate_proposed_layout_accepts_relative_edge_with_anchor_fragment() {
         // A relative reference carrying an anchor fragment (e.g. Markdown's
         // `target.png#quick-start`) must resolve against the same location as
@@ -2303,7 +2406,8 @@ mod tests {
     }
 
     #[test]
-    fn test_selected_root_outside_development_root_is_permanent_and_gets_a_destination() {
+    fn test_selected_root_outside_development_root_is_retained_at_its_source_without_a_destination()
+    {
         let plan = container(
             selected_root("scripts/install.sh"),
             present_source("scripts/install.sh"),
@@ -2311,13 +2415,68 @@ mod tests {
         assert!(!raises_unmanaged_selected_root(&plan));
         assert!(plan.eligible());
         let artifact = entry(&plan, "scripts/install.sh");
+        assert_eq!(artifact.action(), ArtifactAction::Retain);
+        assert_eq!(artifact.destination(), None);
+        assert!(artifact
+            .evidence()
+            .contains(&EvidenceCode::OutsideDevelopmentRoot));
+        assert!(artifact.pending_deletions().is_empty());
+    }
+
+    #[test]
+    fn test_classify_artifacts_retains_every_selected_root_outside_the_development_root_without_blocking_the_plan(
+    ) {
+        // Source, script, agent-asset, and repository-root paths all lie
+        // outside the configured development root, so each is left where it is
+        // and none defeats the plan.
+        for source in [
+            "crates/jit/src/main.rs",
+            "scripts/install-jit.sh",
+            ".agents/skills/jit-manage/SKILL.md",
+            "README.md",
+        ] {
+            let plan = container(selected_root(source), present_source(source));
+            assert!(
+                !raises_unmanaged_selected_root(&plan),
+                "{source} raised an unmanaged-selected-root blocker"
+            );
+            assert!(plan.eligible(), "{source} left the plan ineligible");
+            let artifact = entry(&plan, source);
+            assert_eq!(artifact.action(), ArtifactAction::Retain, "{source}");
+            assert_eq!(artifact.destination(), None, "{source}");
+            assert!(artifact.pending_deletions().is_empty(), "{source}");
+        }
+    }
+
+    #[test]
+    fn test_permanent_area_copies_inside_the_development_root_and_retains_outside_it() {
+        // Permanence and the development-root boundary are independent: a
+        // permanent area inside the root is mirrored while its source stays,
+        // and the same policy leaves a permanent area outside the root alone.
+        let policy = || {
+            ArtifactClassificationPolicy::configured(
+                "dev",
+                vec!["dev/active".into()],
+                vec!["dev/vision".into(), "docs".into()],
+                "dev/archive",
+            )
+        };
+        let inside = "dev/vision/charter.md";
+        let plan = container_with_policy(policy(), selected_root(inside), present_source(inside));
+        let artifact = entry(&plan, inside);
         assert_eq!(artifact.action(), ArtifactAction::Copy);
         assert_eq!(
             artifact.destination(),
-            Some(artifact_mirror_destination(plan.destination_root(), artifact.source()).as_str())
+            Some(artifact_mirror_destination(plan.destination_root(), inside).as_str())
         );
         assert!(artifact.evidence().contains(&EvidenceCode::PermanentPath));
         assert!(artifact.pending_deletions().is_empty());
+
+        let outside = "docs/reference/storage-format.md";
+        let plan = container_with_policy(policy(), selected_root(outside), present_source(outside));
+        let artifact = entry(&plan, outside);
+        assert_eq!(artifact.action(), ArtifactAction::Retain);
+        assert_eq!(artifact.destination(), None);
     }
 
     #[test]
@@ -2347,8 +2506,88 @@ mod tests {
             present_source(source),
         );
         assert!(!raises_unmanaged_selected_root(&outside));
-        assert_eq!(entry(&outside, source).action(), ArtifactAction::Copy);
-        assert!(entry(&outside, source).destination().is_some());
+        assert_eq!(entry(&outside, source).action(), ArtifactAction::Retain);
+        assert_eq!(entry(&outside, source).destination(), None);
+    }
+
+    #[test]
+    fn test_classify_artifacts_relocates_the_same_sources_whether_or_not_an_out_of_root_artifact_joins_the_graph(
+    ) {
+        // A multi-hop chain inside the development root: the selected root
+        // links a note and the note links a figure. Admitting a repository-root
+        // artifact that the same selected root links must leave every one of
+        // those relocations untouched.
+        let chain = || {
+            vec![
+                explicit("dev/active/plan.md", vec![owner("i", State::Done, true)]).with_edges(
+                    vec![edge(
+                        "notes.md",
+                        "dev/active/notes.md",
+                        EdgeResolutionMode::Relative,
+                    )],
+                ),
+                embedded("dev/active/notes.md").with_edges(vec![edge(
+                    "figure.png",
+                    "dev/active/figure.png",
+                    EdgeResolutionMode::Relative,
+                )]),
+                embedded("dev/active/figure.png"),
+            ]
+        };
+        let chain_facts = || {
+            locations(&[
+                (
+                    "dev/active/plan.md",
+                    ArtifactLocation::Regular(identity(b"plan")),
+                    ArtifactLocation::Missing,
+                ),
+                (
+                    "dev/active/notes.md",
+                    ArtifactLocation::Regular(identity(b"notes")),
+                    ArtifactLocation::Missing,
+                ),
+                (
+                    "dev/active/figure.png",
+                    ArtifactLocation::Regular(identity(b"figure")),
+                    ArtifactLocation::Missing,
+                ),
+            ])
+        };
+        let relocating = |plan: &ArtifactPlan| {
+            plan.artifacts()
+                .iter()
+                .filter(|entry| entry.action() == ArtifactAction::Move)
+                .map(|entry| entry.source().to_string())
+                .collect::<BTreeSet<_>>()
+        };
+
+        let without = container(chain(), chain_facts());
+        let mut artifacts = chain();
+        artifacts[0] = artifacts[0].clone().with_edges(vec![
+            edge(
+                "notes.md",
+                "dev/active/notes.md",
+                EdgeResolutionMode::Relative,
+            ),
+            edge("../../README.md", "README.md", EdgeResolutionMode::Relative),
+        ]);
+        artifacts.push(embedded("README.md"));
+        let mut facts = chain_facts();
+        facts.locations.insert(
+            "README.md".into(),
+            ArtifactLocationFacts {
+                source: ArtifactLocation::Regular(identity(b"readme")),
+                destination: ArtifactLocation::Missing,
+            },
+        );
+        let with = container(artifacts, facts);
+
+        // The chain relocates whole, and the out-of-root artifact neither joins
+        // it nor perturbs it.
+        assert!(relocating(&without).contains("dev/active/figure.png"));
+        assert_eq!(relocating(&without), relocating(&with));
+        assert_eq!(entry(&with, "README.md").action(), ArtifactAction::Retain);
+        assert_eq!(entry(&with, "README.md").destination(), None);
     }
 
     #[test]

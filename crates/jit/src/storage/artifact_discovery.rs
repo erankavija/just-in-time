@@ -1,6 +1,7 @@
 //! Thin no-follow evidence acquisition for pure artifact discovery.
 
 use crate::domain::artifact_classifier::ArtifactClassificationInventory;
+use crate::domain::artifact_classifier::ArtifactClassificationPolicy;
 use crate::domain::artifact_classifier::EmbeddedArtifactOwner;
 use crate::domain::artifact_discovery::{
     discover_archive_artifacts as derive_archive_artifacts, expand_artifact_closure,
@@ -29,10 +30,16 @@ pub enum ArtifactDiscoveryError {
 }
 
 /// Acquire one shared closure and derive selected artifacts plus embedded owners.
+///
+/// `policy` bounds the derived inventory at every artifact it retains outside
+/// the development root. The acquired evidence itself stays repository-wide,
+/// because the same closure backs the ownership relation that keeps such an
+/// artifact's dependents from being deleted.
 pub fn discover_archive_artifacts<S: IssueStore>(
     storage: &S,
     inventory: ExplicitRootInventory,
     issues: &[Issue],
+    policy: &ArtifactClassificationPolicy,
 ) -> Result<(ArtifactClassificationInventory, Vec<EmbeddedArtifactOwner>), ArtifactDiscoveryError> {
     let selected = inventory
         .artifacts()
@@ -46,7 +53,7 @@ pub fn discover_archive_artifacts<S: IssueStore>(
         .map(|document| crate::domain::artifact_plan::normalize_artifact_path(&document.path));
     let roots = selected.chain(owner_roots).collect::<BTreeSet<_>>();
     let (evidence, parsed) = collect_closure_evidence(storage, roots)?;
-    derive_archive_artifacts(inventory, issues, &evidence, &parsed).map_err(Into::into)
+    derive_archive_artifacts(inventory, issues, &evidence, &parsed, policy).map_err(Into::into)
 }
 
 fn collect_closure_evidence<S: IssueStore>(
