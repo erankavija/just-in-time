@@ -230,7 +230,11 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "haiku",
+          "group": "B",
+          "worktree": ".agents/worktrees/agent-e993f158",
+          "branch": "worktree-agent-e993f158"
         },
         {
           "id": "1373e042-4756-43df-ac63-7eca36cedf74",
@@ -241,7 +245,11 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "sonnet",
+          "group": "B",
+          "worktree": ".agents/worktrees/agent-1373e042",
+          "branch": "worktree-agent-1373e042"
         },
         {
           "id": "ecaf5c92-f33e-4dea-be2b-5562338db6bf",
@@ -252,7 +260,11 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "haiku",
+          "group": "B",
+          "worktree": ".agents/worktrees/agent-ecaf5c92",
+          "branch": "worktree-agent-ecaf5c92"
         },
         {
           "id": "5c70f0cb-438b-4578-a402-a2304cf9bbe7",
@@ -263,7 +275,11 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "sonnet",
+          "group": "B",
+          "worktree": ".agents/worktrees/agent-5c70f0cb",
+          "branch": "worktree-agent-5c70f0cb"
         },
         {
           "id": "935b51da-6596-4565-8153-ed0e7c60d0d2",
@@ -274,7 +290,11 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "sonnet",
+          "group": "B",
+          "worktree": ".agents/worktrees/agent-935b51da",
+          "branch": "worktree-agent-935b51da"
         },
         {
           "id": "7b282e85-f46e-446d-bf50-8a32403f1d0f",
@@ -285,7 +305,11 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "sonnet",
+          "group": "B",
+          "worktree": ".agents/worktrees/agent-7b282e85",
+          "branch": "worktree-agent-7b282e85"
         },
         {
           "id": "67345efd-b94a-439d-bdf4-7a9c3dbcba19",
@@ -296,7 +320,11 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "opus",
+          "group": "A",
+          "worktree": ".agents/worktrees/agent-67345efd",
+          "branch": "worktree-agent-67345efd"
         },
         {
           "id": "d9e70703-4338-441d-9769-2be4942bc28f",
@@ -306,7 +334,9 @@
           "gates": [
             "repo-validate"
           ],
-          "status": "pending"
+          "status": "implemented (lead, on main)",
+          "model": "lead",
+          "outcome": "Executed directly on main per N1: pinning two document references writes .jit/issues/*.json, which a worktree worker may not do. Both refs pinned (73981310 -> b38c5b94, a4b0fadf -> 4ead5f12). Preview of container 1cc809de reports both as retain with no destination. scripts/benchmark-session-cost-selftest.sh PASS. jit validate green. Commit 53eb56cf. repo-validate gate still to run."
         },
         {
           "id": "9ca124f9-4b16-4d0c-b966-17f17fca989b",
@@ -317,7 +347,11 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "sonnet",
+          "group": "A",
+          "worktree": ".agents/worktrees/agent-9ca124f9",
+          "branch": "worktree-agent-9ca124f9"
         },
         {
           "id": "e2902949-e14d-4307-b2c3-3fc3c5ad07a5",
@@ -329,7 +363,11 @@
             "code-review",
             "mcp-ci"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "opus",
+          "group": "A",
+          "worktree": ".agents/worktrees/agent-e2902949",
+          "branch": "worktree-agent-e2902949"
         },
         {
           "id": "cf0f0014-1f42-49af-87d5-a3d5840a7c96",
@@ -340,7 +378,11 @@
             "doc-review",
             "repo-validate"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "sonnet",
+          "group": "A",
+          "worktree": ".agents/worktrees/agent-cf0f0014",
+          "branch": "worktree-agent-cf0f0014"
         },
         {
           "id": "80e08e0f-2e61-4fc4-8cc4-736b9e93f868",
@@ -351,7 +393,11 @@
             "doc-review",
             "repo-validate"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "sonnet",
+          "group": "A",
+          "worktree": ".agents/worktrees/agent-80e08e0f",
+          "branch": "worktree-agent-80e08e0f"
         },
         {
           "id": "ef2bd13c-4901-45d3-98c4-5b9b55e35975",
@@ -362,9 +408,18 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "dispatched",
+          "model": "sonnet",
+          "group": "A",
+          "worktree": ".agents/worktrees/agent-ef2bd13c",
+          "branch": "worktree-agent-ef2bd13c"
         }
-      ]
+      ],
+      "dispatched_from_main_sha": {
+        "group_a": "59b39c2673262b8b63ca0ec0388e9cf0d5052724",
+        "group_b": "192cac9a349bafc97004428d85e6c01d3f19977e"
+      },
+      "status": "dispatched"
     },
     {
       "wave_number": 7,
@@ -1027,6 +1082,15 @@
       "situation": "f2cac2bd's adoption of the shipped area classification silently inverts the docs-mechanical gate's scope. The gate runs ./scripts/docs-mechanical.sh with no positional args and an empty [gates.checker.env], so the checker derives its footprint from [documentation].permanent_paths. That was [\"docs/\"]; after adoption it is dev/architecture, dev/eval, dev/vision, dev/index.md, dev/TESTING.md, dev/authoring-conventions.md. 93 issues repository-wide carry the gate, 15 of them still open in this epic, the next (ef2bd13c) in wave 6.",
       "lead_analysis": "The checker conflates two sets that D-13/D-14 deliberately separate: permanent_paths denotes archive-by-copy artifacts, not the adopter documentation surface. Measured, not assumed: docs-check-links.sh and docs-check-citations.sh both exit 0 over docs/ and both exit 1 over the six dev permanent paths (pre-existing illustrative sample paths in the architecture and eval docs). So keeping docs/ in permanent_paths \u2014 the one fix inside f2cac2bd's own footprint \u2014 was tested and rejected: the superset footprint would fail the gate for all 93 carriers. docs-mechanical is repository-local; it appears in no profile asset and no binary preset, so this is not a shipped-product defect.",
       "resolution": "Owner chose to pin the footprint. Added DOCS_FOOTPRINT = \"docs/\" to [gates.checker.env] for docs-mechanical in .jit/gates.toml, using the caller-supplied knob the checker already designates, and rewrote the gate description's now-false tail clause. The description is a projection source, so jit validate failed on stale docs/reference/rules-and-gates.md until jit project render ran. Landed as a2a8b9ac; docs-mechanical exits 0 with M2, M3, and M5 all green."
+    },
+    {
+      "id": "E7",
+      "wave": 6,
+      "issue": "9ca124f9, ef2bd13c, 67345efd, cf0f0014, 80e08e0f, and five of the six skill-conversion issues",
+      "category": "standing owner approval applied (E3), not a new escalation",
+      "situation": "Ten wave-6 issues carried a satisfies: label reaching past their own criteria. 9ca124f9 and ef2bd13c each deliver one clause of REQ-08; 67345efd delivers the template-interpolation clause of REQ-05; cf0f0014 and 80e08e0f repoint citations and archive nothing, while REQ-09 is about the archival runs; each of the six skill-conversion issues converts exactly one skill while REQ-11 spans every skill under .agents/skills.",
+      "lead_analysis": "Same shape as E1, E2, E3 and E5. Crediting siblings remain for every criterion: REQ-08 keeps 3be32cad (wave 8, closing clause), REQ-05 keeps 429995e1 and 8ff4cff3, REQ-09 keeps 33 issues, REQ-11 keeps 935b51da. REQ-11 was kept on exactly one of the six rather than dropped from all six, because dropping all six would leave the criterion with zero crediting issues; 935b51da is reviewed last in the wave, when every skill is converted at HEAD and the claim is supported (the b4d1a2c8 precedent).",
+      "resolution": "Dropped under E3 standing approval before dispatch, in commit 59b39c26. satisfies:REQ-06 on e2902949 and enforces:@/invariant/domain-agnostic were KEPT: e2902949 delivers REQ-06 whole, and the enforces label asserts the issue upholds the invariant, which its no-built-in-list criterion does."
     }
   ],
   "rework_counts": {
@@ -1100,6 +1164,13 @@
       "subject": "every other --json-bearing doc subcommand renders its failures as plain text",
       "detail": "The rework worker's mandated per-finding workspace sweep found that the defect code-review raised against `doc dir` is repository-wide across the `doc` namespace. All eight other `--json`-bearing arms propagate failure with a bare `?` to the top-level plain-text printer: doc add (crates/jit/src/main.rs:4980, ? at :4987), doc list (:5022), doc remove (:5057), doc show (:5077), doc history (:5150), doc diff (:5175), doc assets list (:5197), doc check-links (:5331 scope parse and :5332). `doc rm` and `doc delete` are verb hints carrying no --json and are not affected. The established fix already exists in the tree: classify by downcast, then hand the envelope to the `handle_json_error!` macro (crates/jit/src/output_macros.rs:70), which is what doc dir now does.",
       "disposition": "FILED as epic a2546471 (Structured failure reporting across the machine-readable CLI surface), milestone:v1.0, epic:json-error-contract, component:cli, gates repo-validate + holistic-review, wired under the v1.0 milestone 9db27a3a. Owner decided the scope is the whole command surface rather than the doc namespace alone, and that it ships in v1.0. Measurement that grounded the widening: 18 handle_json_error! call sites against ~63 arms accepting --json; verified by invocation that graph deps also emits plain text while issue show, gate status, item show and dep add emit the envelope. Remains OUT OF SCOPE for 8e071e18 - none of its 15 [hard] criteria names CLI error rendering."
+    },
+    {
+      "id": "P10",
+      "raised_by": "lead, wave 6 dispatch",
+      "subject": "the epic filed for P9 is not wired to this epic and must not be picked up here",
+      "detail": "a2546471 (Structured failure reporting across the machine-readable CLI surface) was filed at the owner's direction from P9 and wired under milestone 9db27a3a. It is outside 8e071e18 entirely.",
+      "disposition": "CLOSED as a lead action. No further work in this epic. Recorded so the completion report can name where P9 went."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
@@ -1138,6 +1209,13 @@
       "subject": "lead shell cwd drifted into a worker worktree and wrote .jit there",
       "detail": "After `cd .agents/worktrees/agent-2ac35e8e && git merge main`, the Bash tool's cwd persisted. Every later command ran in that worktree. `jit issue update f2cac2bd --state done` transitioned the issue inside the WORKTREE's .jit, and the follow-up `jit issue status` read the worktree's .jit \u2014 where the wave-5 gate runs do not exist, because .jit/gate-runs records are tracked but the new ones were not yet committed, so a worktree checked out at 36defd8a has none of them. The reported symptom was alarming and completely false: every wave-5 gate appeared to revert from passed/failed to pending and ~2h of gate evidence looked deleted. Nothing was lost; main was intact throughout. The tell was `git reflog` showing the worker branch's history instead of main's, and the worktree carrying the same two modified .jit files main appeared to carry.",
       "decision": "Reverted the two stray files in the worktree with `git checkout --` before its rework worker could commit them, and notified that worker. Use `git -C <path>` for worktree git operations rather than `cd`, since it never mutates the shell's cwd. For `jit`, which has no -C equivalent, prefix the command with an explicit `cd /home/vkaskivuo/Projects/just-in-time &&` every time. Before trusting any surprising .jit reading, run `pwd` first. This is the session-2 trap recurring in the same session that recorded it."
+    },
+    {
+      "id": "N6",
+      "raised_at": "wave 6 dispatch",
+      "subject": "wave 6 is dispatched in two groups against two different base SHAs",
+      "detail": "13 issues. Group A (e2902949, 67345efd, 9ca124f9, ef2bd13c, cf0f0014, 80e08e0f) is anchored at 59b39c26; group B (the six skill conversions) at 192cac9a, after the lead landed d9e70703 on main between the two dispatches. Footprints were checked across all 13 and collide nowhere. Models were chosen by difficulty: Opus for the two implementation issues that add a command and a schema field, Sonnet for the moderate ones, Haiku for the two single-file skill conversions.",
+      "decision": "Merge order does not matter for conflicts, but gate order does: run 935b51da code-review LAST among the skill issues, since it is the only one still claiming REQ-11 and that claim is supported only once every skill is converted at HEAD. Reinstall the binary from a clean tree after all merges and before any gate run."
     }
   ]
 }
