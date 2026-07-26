@@ -39,9 +39,8 @@ A markdown research doc with, per open question:
 
 ## Output and linking
 
-1. Write to the project's development docs path (e.g. `dev/active/<C-id>-research.md` —
-   read the live `[documentation]` config for the correct location). Keep it **separate**
-   from the plan doc.
+1. Write to `research.md` inside the directory `jit doc dir <C-id> dev/active` resolves.
+   Keep it **separate** from the plan doc.
 2. Link it to **P**: `jit doc add <P> <research-doc-path> --doc-type research`.
 3. Return a short summary: each question, the recommendation, and its provenance, so the
    synthesizer and the decision log can consume it.
