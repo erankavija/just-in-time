@@ -1118,3 +1118,174 @@ fn test_container_archive_slug_is_consistent_and_frozen_by_marker() {
         .join(format!("archive/{}-new-strategic-slug", &id[..8]))
         .exists());
 }
+
+/// A minimal configured repository whose citation scan universe is exactly
+/// `notes/`: `fixtures/root.md` is the moving artifact, and `notes/mention.md`
+/// carries `citing_text` verbatim. Archival is a core command (`@/charter/D-4`),
+/// so version control is opt-in here: `vcs` runs `git init` before `jit init`,
+/// mirroring `test_doc_show_with_git`'s setup, while its absence leaves the
+/// directory as bare as every other fixture in this suite.
+fn citation_scan_repo(vcs: bool, citing_text: &str) -> TempDir {
+    let repo = TempDir::new().unwrap();
+    if vcs {
+        for args in [
+            vec!["init"],
+            vec!["config", "user.name", "Test User"],
+            vec!["config", "user.email", "test@example.com"],
+        ] {
+            assert!(Command::new("git")
+                .current_dir(repo.path())
+                .args(&args)
+                .status()
+                .unwrap()
+                .success());
+        }
+    }
+    assert_success(&jit(&repo, &["init", "--json"]));
+    set_documentation_policy(
+        &repo,
+        concat!(
+            "[documentation]\n",
+            "managed_paths = [\"fixtures\"]\n",
+            "permanent_paths = []\n",
+            "archive_root = \"archive\"\n",
+            "citation_scan_roots = [\"notes\"]\n",
+        ),
+    );
+    fs::create_dir_all(repo.path().join("fixtures")).unwrap();
+    fs::create_dir_all(repo.path().join("notes")).unwrap();
+    fs::write(repo.path().join("fixtures/root.md"), "moving artifact\n").unwrap();
+    fs::write(repo.path().join("notes/mention.md"), citing_text).unwrap();
+    repo
+}
+
+/// Every `moving-path-citation` warning path recorded against `source` in `plan`.
+fn citation_warning_paths(plan: &Value, source: &str) -> Vec<String> {
+    plan["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|artifact| artifact["source"] == source)
+        .expect("plan carries the moving artifact")["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|warning| warning["code"] == "moving-path-citation")
+        .map(|warning| warning["path"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Blank out every warnings collection in `plan`, in place, leaving actions,
+/// blockers, and eligibility as the only remaining variables.
+fn clear_warnings(plan: &mut Value) {
+    plan["warnings"] = serde_json::json!([]);
+    for artifact in plan["artifacts"].as_array_mut().unwrap() {
+        artifact["warnings"] = serde_json::json!([]);
+    }
+}
+
+/// REQ-01 (`jit:9ca124f9`): the citation scan reads a declared root set, not
+/// tracking data, so a preview over a citing fixture reports the moving
+/// artifact's citation even when the working tree is under no version control
+/// at all (`@/charter/D-4` — archival is a core command).
+#[test]
+fn test_archive_document_preview_reports_moving_path_citation_without_version_control() {
+    let citing_text = "See fixtures/root.md for the source of truth.\n";
+    let repo = citation_scan_repo(false, citing_text);
+    assert!(
+        !repo.path().join(".git").exists(),
+        "fixture must genuinely lack version control to exercise REQ-01"
+    );
+
+    let preview = jit(
+        &repo,
+        &["archive", "document", "fixtures/root.md", "--json"],
+    );
+    assert_success(&preview);
+    let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+
+    let column = citing_text.find("fixtures/root.md").unwrap() + 1;
+    assert_eq!(
+        citation_warning_paths(&plan, "fixtures/root.md"),
+        vec![format!("notes/mention.md:1:{column}")]
+    );
+}
+
+/// REQ-02 (`jit:9ca124f9`): the identical fixture inside an initialized git
+/// repository reports the identical citation warnings as its untracked twin —
+/// the scan is indifferent to whether the tree is under version control.
+#[test]
+fn test_archive_document_preview_reports_same_moving_path_citation_inside_version_control() {
+    let citing_text = "See fixtures/root.md for the source of truth.\n";
+    let untracked = citation_scan_repo(false, citing_text);
+    let tracked = citation_scan_repo(true, citing_text);
+    assert!(
+        tracked.path().join(".git").is_dir(),
+        "fixture must genuinely sit under version control to exercise REQ-02"
+    );
+
+    let untracked_preview = jit(
+        &untracked,
+        &["archive", "document", "fixtures/root.md", "--json"],
+    );
+    let tracked_preview = jit(
+        &tracked,
+        &["archive", "document", "fixtures/root.md", "--json"],
+    );
+    assert_success(&untracked_preview);
+    assert_success(&tracked_preview);
+    let untracked_plan: Value = serde_json::from_slice(&untracked_preview.stdout).unwrap();
+    let tracked_plan: Value = serde_json::from_slice(&tracked_preview.stdout).unwrap();
+
+    let untracked_citations = citation_warning_paths(&untracked_plan, "fixtures/root.md");
+    assert!(
+        !untracked_citations.is_empty(),
+        "fixture must actually carry a citation for the comparison to be meaningful"
+    );
+    assert_eq!(
+        untracked_citations,
+        citation_warning_paths(&tracked_plan, "fixtures/root.md")
+    );
+}
+
+/// REQ-03 (`jit:9ca124f9`): a citation warning is purely advisory. A plan whose
+/// scan universe carries a citation of the moving artifact's path reports the
+/// same actions, blockers, and eligibility as the same plan whose scan universe
+/// holds no citation at all — the fixture pair differs only in the text of the
+/// citing file.
+#[test]
+fn test_archive_document_preview_actions_blockers_and_eligibility_match_regardless_of_citation() {
+    let with_citation =
+        citation_scan_repo(false, "See fixtures/root.md for the source of truth.\n");
+    let without_citation = citation_scan_repo(
+        false,
+        "See fixtures/unrelated.md for the source of truth.\n",
+    );
+
+    let with_output = jit(
+        &with_citation,
+        &["archive", "document", "fixtures/root.md", "--json"],
+    );
+    let without_output = jit(
+        &without_citation,
+        &["archive", "document", "fixtures/root.md", "--json"],
+    );
+    assert_success(&with_output);
+    assert_success(&without_output);
+    let mut with_plan: Value = serde_json::from_slice(&with_output.stdout).unwrap();
+    let mut without_plan: Value = serde_json::from_slice(&without_output.stdout).unwrap();
+
+    // Guard: the scan universe genuinely differs in whether it carries a citation.
+    assert!(!citation_warning_paths(&with_plan, "fixtures/root.md").is_empty());
+    assert!(citation_warning_paths(&without_plan, "fixtures/root.md").is_empty());
+
+    assert_eq!(with_plan["eligible"], without_plan["eligible"]);
+    assert_eq!(with_plan["blockers"], without_plan["blockers"]);
+    assert_eq!(with_plan["action_counts"], without_plan["action_counts"]);
+    clear_warnings(&mut with_plan);
+    clear_warnings(&mut without_plan);
+    assert_eq!(
+        with_plan, without_plan,
+        "a citation warning must change nothing but the plan's warnings"
+    );
+}
