@@ -31,10 +31,10 @@ pub enum ArtifactDiscoveryError {
 
 /// Acquire one shared closure and derive selected artifacts plus embedded owners.
 ///
-/// `policy` bounds the derived inventory at every artifact it retains outside
-/// the development root. The acquired evidence itself stays repository-wide,
-/// because the same closure backs the ownership relation that keeps such an
-/// artifact's dependents from being deleted.
+/// `policy` bounds the acquisition itself: the closure reads an artifact it
+/// retains outside the development root, because a scanned artifact links it,
+/// and then stops, so no file reachable only through that artifact is ever
+/// opened.
 pub fn discover_archive_artifacts<S: IssueStore>(
     storage: &S,
     inventory: ExplicitRootInventory,
@@ -52,18 +52,19 @@ pub fn discover_archive_artifacts<S: IssueStore>(
         .filter(|document| document.commit.is_none())
         .map(|document| crate::domain::artifact_plan::normalize_artifact_path(&document.path));
     let roots = selected.chain(owner_roots).collect::<BTreeSet<_>>();
-    let (evidence, parsed) = collect_closure_evidence(storage, roots)?;
+    let (evidence, parsed) = collect_closure_evidence(storage, roots, policy)?;
     derive_archive_artifacts(inventory, issues, &evidence, &parsed, policy).map_err(Into::into)
 }
 
 fn collect_closure_evidence<S: IssueStore>(
     storage: &S,
     roots: BTreeSet<String>,
+    policy: &ArtifactClassificationPolicy,
 ) -> Result<(ArtifactEvidenceMap, BTreeMap<String, ParsedArtifact>), ArtifactDiscoveryError> {
     let mut evidence = ArtifactEvidenceMap::new();
     let mut state = ArtifactClosureState::new(roots);
     loop {
-        let (paths, next) = match expand_artifact_closure(state, &evidence) {
+        let (paths, next) = match expand_artifact_closure(state, &evidence, policy) {
             ArtifactClosure::Complete(parsed) => return Ok((evidence, parsed)),
             ArtifactClosure::Needs { paths, state } => (paths, state),
         };

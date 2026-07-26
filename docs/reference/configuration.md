@@ -81,6 +81,14 @@ documents in `managed_paths` may move to the archive mirror. Selected documents
 in `permanent_paths` are copied to the mirror while their source remains in
 place; “permanent” prevents source deletion, not mirror publication.
 
+`development_root` is the outer boundary of both. A document it does not
+contain is retained exactly where it is — the plan schedules no destination for
+it, and artifact discovery stops following its links rather than drawing what it
+cites into the plan — so declare managed and permanent areas inside the
+development root. This is what keeps an archive from relocating source files,
+scripts, agent assets, and repository-root documents that a development
+document happens to link, and it applies whichever area claims the path.
+
 An entry in either path list names a directory or an individual file. A
 directory entry classifies every artifact beneath it; a file entry classifies
 exactly that one path. Development-root documents that belong to no area are
