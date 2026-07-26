@@ -174,23 +174,15 @@ pub fn expand_template(
     documentation: &DocumentationConfig,
     hierarchy: &HierarchyConfig,
 ) -> Result<TemplateDelta> {
-    let context = InterpolationContext::for_container(container);
     let inherited = inherited_membership_labels(container);
 
     let creates: Vec<PlannedNode> = template
         .nodes
         .iter()
         .map(|node| {
-            let directory = node_artifact_directory(node, container, documentation, hierarchy)
-                .map_err(|error| {
-                    // The rejection reports both what failed and where it is
-                    // declared, so the message the caller prints is actionable
-                    // on its own while the typed cause stays in the chain.
-                    let located =
-                        format!("template '{}' node '{}': {error}", template.name, node.role);
-                    anyhow::Error::new(error).context(located)
-                })?;
-            let node_context = context.with_doc(node, directory);
+            let node_context =
+                InterpolationContext::for_node(container, node, documentation, hierarchy)
+                    .map_err(|error| located_document_area_error(template, node, error))?;
             Ok(PlannedNode {
                 role: node.role.clone(),
                 title: node_title(node, container),
@@ -324,6 +316,47 @@ fn node_artifact_directory(
         .as_deref()
         .map(|area| resolve_artifact_directory(container, area, documentation, hierarchy))
         .transpose()
+}
+
+/// The repository-relative document path `node` declares for `container`, or
+/// `None` when the node declares no [`doc`](TemplateNode::doc).
+///
+/// This is the path an apply writes into the node's `{doc}` token: it resolves
+/// the same per-node context ([`InterpolationContext::for_node`]), so a
+/// derivation that pre-declares or reconciles the document names the file the
+/// apply produces instead of substituting the declaration a second time.
+///
+/// # Errors
+///
+/// [`ArtifactDirectoryError`] when the node's declared area is absent from the
+/// configured issue-scoped registry.
+pub(super) fn node_document_path(
+    node: &TemplateNode,
+    container: &Issue,
+    documentation: &DocumentationConfig,
+    hierarchy: &HierarchyConfig,
+) -> std::result::Result<Option<String>, ArtifactDirectoryError> {
+    node.doc
+        .is_some()
+        .then(|| {
+            InterpolationContext::for_node(container, node, documentation, hierarchy)
+                .map(|context| context.doc.unwrap_or_default())
+        })
+        .transpose()
+}
+
+/// Locate an artifact-directory failure at the declaration that produced it.
+///
+/// The reported message names the template, the node, the area, and the registry
+/// the area was matched against, so it is actionable on its own, while the typed
+/// cause stays in the chain for callers that match on it.
+pub(super) fn located_document_area_error(
+    template: &GraphTemplate,
+    node: &TemplateNode,
+    error: ArtifactDirectoryError,
+) -> anyhow::Error {
+    let located = format!("template '{}' node '{}': {error}", template.name, node.role);
+    anyhow::Error::new(error).context(located)
 }
 
 /// The full id bound to `anchor_name`, or an error naming the unbound anchor.
@@ -487,10 +520,9 @@ pub(super) fn node_description(node: &TemplateNode, context: &InterpolationConte
 /// `{container.id}`, `{container.short_id}`, `{container.title}`,
 /// `{container.hard_criteria}` — plus the per-node `{container.dir}` (the
 /// canonical artifact directory of the area the node declares) and `{doc}` (the
-/// node's own interpolated `doc`). Built once per apply via
-/// [`for_container`](InterpolationContext::for_container); a per-node copy adding
-/// the two per-node tokens is produced by
-/// [`with_doc`](InterpolationContext::with_doc). This is a simple `{token}`
+/// node's own interpolated `doc`). [`for_node`](InterpolationContext::for_node)
+/// is the one constructor, so every derivation of a node's prose, labels, and
+/// document path substitutes the same context. This is a simple `{token}`
 /// replace over a fixed map, and not a templating language.
 #[derive(Debug, Clone)]
 pub(super) struct InterpolationContext {
@@ -503,9 +535,31 @@ pub(super) struct InterpolationContext {
 }
 
 impl InterpolationContext {
+    /// Build the context `node`'s declarations are substituted into: the
+    /// container tokens, the `{container.dir}` directory of the area `node`
+    /// declares, and `node`'s own interpolated `{doc}`.
+    ///
+    /// Every derivation that resolves a template declaration for a node builds
+    /// its context here, so the apply engine and the derivations around it
+    /// resolve one declaration through one substitution.
+    ///
+    /// # Errors
+    ///
+    /// [`ArtifactDirectoryError`] when the node's declared area is absent from
+    /// the configured issue-scoped registry.
+    pub(super) fn for_node(
+        container: &Issue,
+        node: &TemplateNode,
+        documentation: &DocumentationConfig,
+        hierarchy: &HierarchyConfig,
+    ) -> std::result::Result<Self, ArtifactDirectoryError> {
+        let directory = node_artifact_directory(node, container, documentation, hierarchy)?;
+        Ok(Self::for_container(container).with_doc(node, directory))
+    }
+
     /// Build the container-derived context (the `{container.dir}` and `{doc}`
     /// tokens are unset until a node is selected via [`with_doc`](Self::with_doc)).
-    pub(super) fn for_container(container: &Issue) -> Self {
+    fn for_container(container: &Issue) -> Self {
         Self {
             id: container.id.clone(),
             short_id: container.short_id(),
@@ -526,7 +580,7 @@ impl InterpolationContext {
     /// node's `doc` is interpolated with `{container.dir}` already in scope and
     /// WITHOUT `{doc}`, so `{doc}` in a description always refers to the node's
     /// resolved doc path, never itself.
-    pub(super) fn with_doc(&self, node: &TemplateNode, directory: Option<String>) -> Self {
+    fn with_doc(&self, node: &TemplateNode, directory: Option<String>) -> Self {
         let scoped = Self {
             directory,
             ..self.clone()
@@ -579,21 +633,31 @@ fn extract_hard_criteria(description: &str) -> String {
         .join("\n")
 }
 
+/// The declarations shared by the tests of every derivation that resolves a
+/// template document declaration: the apply engine here, the capture-path and
+/// refresh derivations in [`super::template`], and the plan-doc location
+/// resolver in [`super::plan_doc`].
+///
+/// One area registry, one taxonomy, one container, and one bracket template for
+/// all of them, so a test comparing two derivations compares their answers to
+/// the same declaration rather than to a copied string
+/// (`@/inv/shared-test-contracts`).
 #[cfg(test)]
-mod tests {
+pub(crate) mod test_declarations {
     use super::*;
     use crate::templates::TemplateRegistry;
     use std::collections::HashMap;
 
-    const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
+    /// The type vocabulary the shared templates are loaded against.
+    pub(crate) const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
 
-    /// The one area these tests declare. Unrelated to the shipped vocabulary, so
-    /// a `dev/`-shaped assumption in the engine fails here rather than passing
-    /// by coincidence.
-    const AREA: &str = "workspace/notes";
+    /// The one area these declarations name. Unrelated to the shipped
+    /// vocabulary, so a `dev/`-shaped assumption in a derivation fails here
+    /// rather than passing by coincidence.
+    pub(crate) const AREA: &str = "workspace/notes";
 
     /// The area registry the `{container.dir}` field is resolved against.
-    fn documentation() -> DocumentationConfig {
+    pub(crate) fn documentation() -> DocumentationConfig {
         DocumentationConfig {
             issue_scoped_areas: Some(vec![AREA.to_string()]),
             ..Default::default()
@@ -601,8 +665,8 @@ mod tests {
     }
 
     /// The type taxonomy the resolver reads the membership namespace from: the
-    /// `epic` fixture's single `area:` value names its directory's slug.
-    fn hierarchy() -> HierarchyConfig {
+    /// container fixture's single `area:` value names its directory's slug.
+    pub(crate) fn hierarchy() -> HierarchyConfig {
         HierarchyConfig::new(
             HashMap::from([("epic".to_string(), 1)]),
             HashMap::from([("epic".to_string(), "area".to_string())]),
@@ -610,8 +674,89 @@ mod tests {
         .unwrap()
     }
 
-    /// Expand against this module's declarations.
-    fn expand(
+    /// The container every derivation resolves its declarations for.
+    pub(crate) fn container(id: &str) -> Issue {
+        let mut issue = crate::domain::types::fixture_issue(
+            "Auth epic".to_string(),
+            "- [hard] REQ-01: x".to_string(),
+        );
+        issue.labels = vec!["type:epic".to_string(), "area:auth".to_string()];
+        issue.id = id.to_string();
+        issue
+    }
+
+    /// The named template of `toml`, loaded against [`HIERARCHY`].
+    pub(crate) fn template_from(toml: &str, name: &str) -> GraphTemplate {
+        TemplateRegistry::from_toml_str(toml, &HIERARCHY)
+            .unwrap()
+            .get(name)
+            .unwrap()
+            .clone()
+    }
+
+    /// A bracket template whose planning node declares `doc` (resolved in
+    /// `doc_area`, absent for a declaration naming no area) and whose
+    /// description is exactly its interpolated document path, so a delta reports
+    /// the path the declaration produces ([`planned_document`]).
+    ///
+    /// The breakdown node carries the `brackets:` label that locates an applied
+    /// bracket, so the same template drives a fresh apply and a refresh.
+    pub(crate) fn document_template(doc: &str, doc_area: Option<&str>) -> GraphTemplate {
+        let toml = r#"
+[[template]]
+name       = "doc"
+applies_to = ["epic"]
+  [[template.anchors]]
+  name = "container"
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  doc         = "@DOC@"
+@AREA@  description = "{doc}"
+  [[template.nodes]]
+  role        = "breakdown"
+  type        = "breakdown"
+  labels      = ["brackets:{container.short_id}"]
+  depends_on  = ["planning"]
+  [[template.anchor_edges]]
+  from = "container"
+  to   = "breakdown"
+"#
+        .replace("@DOC@", doc)
+        .replace(
+            "@AREA@",
+            &doc_area
+                .map(|area| format!("  doc_area    = \"{area}\"\n"))
+                .unwrap_or_default(),
+        );
+        template_from(&toml, "doc")
+    }
+
+    /// The document path the planning node of a [`document_template`] resolved.
+    pub(crate) fn planned_document(delta: &TemplateDelta) -> &str {
+        &delta
+            .creates
+            .iter()
+            .find(|planned| planned.role == "planning")
+            .expect("the shared template declares a planning node")
+            .description
+    }
+
+    /// The anchor bindings a shared template is expanded under.
+    pub(crate) fn bindings(container_id: &str) -> BTreeMap<String, String> {
+        BTreeMap::from([("container".to_string(), container_id.to_string())])
+    }
+
+    /// The container anchor's pre-apply dependency snapshot.
+    pub(crate) fn snapshots(container_deps: &[&str]) -> BTreeMap<String, Vec<String>> {
+        BTreeMap::from([(
+            "container".to_string(),
+            container_deps.iter().map(|s| s.to_string()).collect(),
+        )])
+    }
+
+    /// Expand `template` against these declarations.
+    pub(crate) fn expand(
         template: &GraphTemplate,
         container: &Issue,
         resolved_bindings: &BTreeMap<String, String>,
@@ -626,14 +771,12 @@ mod tests {
             &hierarchy(),
         )
     }
+}
 
-    fn template_from(toml: &str, name: &str) -> GraphTemplate {
-        TemplateRegistry::from_toml_str(toml, &HIERARCHY)
-            .unwrap()
-            .get(name)
-            .unwrap()
-            .clone()
-    }
+#[cfg(test)]
+mod tests {
+    use super::test_declarations::*;
+    use super::*;
 
     fn plan_template() -> GraphTemplate {
         template_from(
@@ -666,30 +809,9 @@ applies_to = ["epic"]
         )
     }
 
-    fn epic(id: &str) -> Issue {
-        let mut issue = crate::domain::types::fixture_issue(
-            "Auth epic".to_string(),
-            "- [hard] REQ-01: x".to_string(),
-        );
-        issue.labels = vec!["type:epic".to_string(), "area:auth".to_string()];
-        issue.id = id.to_string();
-        issue
-    }
-
-    fn bindings(container_id: &str) -> BTreeMap<String, String> {
-        BTreeMap::from([("container".to_string(), container_id.to_string())])
-    }
-
-    fn snapshots(container_deps: &[&str]) -> BTreeMap<String, Vec<String>> {
-        BTreeMap::from([(
-            "container".to_string(),
-            container_deps.iter().map(|s| s.to_string()).collect(),
-        )])
-    }
-
     #[test]
     fn test_expand_template_produces_creates_edges_and_removals() {
-        let container = epic("c1");
+        let container = container("c1");
         let delta = expand(
             &plan_template(),
             &container,
@@ -752,7 +874,7 @@ applies_to = ["epic"]
     fn test_expand_template_moves_only_pre_apply_upstream_deps() {
         // The transform reads the SNAPSHOT, so an id absent from it is never
         // moved even when the same delta wires an edge to it (APPB-02).
-        let container = epic("c1");
+        let container = container("c1");
         let delta = expand(
             &plan_template(),
             &container,
@@ -769,7 +891,7 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_rejects_unbound_anchor() {
-        let container = epic("c1");
+        let container = container("c1");
         let err = expand(
             &plan_template(),
             &container,
@@ -787,7 +909,7 @@ applies_to = ["epic"]
         // before any write.
         let mut template = plan_template();
         template.transforms[0].kind = "teleport".to_string();
-        let container = epic("c1");
+        let container = container("c1");
         let err = expand(&template, &container, &bindings("c1"), &snapshots(&["u1"])).unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("teleport"), "{msg}");
@@ -820,13 +942,13 @@ applies_to = ["epic"]
     }
 
     /// The document path the single node of a [`document_template`] resolved.
-    fn resolved_document(delta: &TemplateDelta) -> &str {
+    fn planned_document(delta: &TemplateDelta) -> &str {
         &delta.creates[0].description
     }
 
     #[test]
     fn test_expand_template_resolves_a_declared_document_area_into_the_document_path() {
-        let container = epic("c1");
+        let container = container("c1");
         let template = document_template("{container.dir}/plan.md", Some(AREA));
 
         let delta = expand(&template, &container, &bindings("c1"), &snapshots(&[])).unwrap();
@@ -836,7 +958,7 @@ applies_to = ["epic"]
         // the declared filename rides along verbatim, inside that directory.
         let directory =
             resolve_artifact_directory(&container, AREA, &documentation(), &hierarchy()).unwrap();
-        assert_eq!(resolved_document(&delta), format!("{directory}/plan.md"));
+        assert_eq!(planned_document(&delta), format!("{directory}/plan.md"));
         assert!(
             directory.starts_with(&format!("{AREA}/")),
             "the declared area selects where the directory is resolved: {directory}"
@@ -845,7 +967,7 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_rejects_a_document_area_the_registry_does_not_declare() {
-        let container = epic("c1");
+        let container = container("c1");
         // A sibling of the declared area: close enough that only the registry
         // distinguishes it.
         let undeclared = format!("{AREA}-drafts");
@@ -880,7 +1002,7 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_resolves_a_node_that_declares_no_document_area_without_a_directory() {
-        let container = epic("c1");
+        let container = container("c1");
 
         // A flat area-plus-prefix declaration resolves from the container tokens
         // alone.
@@ -892,7 +1014,7 @@ applies_to = ["epic"]
         )
         .unwrap();
         assert_eq!(
-            resolved_document(&flat),
+            planned_document(&flat),
             format!("dev/active/{}-plan.md", container.short_id())
         );
 
@@ -905,12 +1027,12 @@ applies_to = ["epic"]
             &snapshots(&[]),
         )
         .unwrap();
-        assert_eq!(resolved_document(&unscoped), "{container.dir}/plan.md");
+        assert_eq!(planned_document(&unscoped), "{container.dir}/plan.md");
     }
 
     #[test]
     fn test_validate_delta_acyclic_accepts_the_plan_spine() {
-        let container = epic("c1");
+        let container = container("c1");
         let delta = expand(
             &plan_template(),
             &container,
@@ -954,7 +1076,7 @@ applies_to = ["epic"]
 "#,
             "cyclic",
         );
-        let container = epic("c1");
+        let container = container("c1");
         let bindings = BTreeMap::from([
             ("container".to_string(), "c1".to_string()),
             ("upstream".to_string(), "u1".to_string()),
@@ -989,7 +1111,7 @@ applies_to = ["epic"]
 "#,
             "mover",
         );
-        let container = epic("c1");
+        let container = container("c1");
         let delta = expand(&template, &container, &bindings("c1"), &snapshots(&["u1"])).unwrap();
         // u1 depends on c1, and c1 depends on u1: the store is already cyclic
         // EXCEPT that the transform removes c1→u1, leaving u1→c1 and P→u1.
@@ -1102,7 +1224,7 @@ applies_to = ["epic"]
         // membership labels (NOT the container's own `type:`), the node's own
         // `type:<node.type>`, and its interpolated `labels`. The `{container.short_id}`
         // token in a node label must resolve to the container's short id.
-        let container = epic("abc123def456");
+        let container = container("abc123def456");
         let short = container.short_id();
 
         let node = TemplateNode {

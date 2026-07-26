@@ -12,8 +12,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use super::template_expand::{
-    expand_template, node_description, validate_delta_acyclic, DeltaEndpoint, InterpolationContext,
-    PlannedNode, TemplateDelta,
+    expand_template, located_document_area_error, node_description, node_document_path,
+    validate_delta_acyclic, DeltaEndpoint, InterpolationContext, PlannedNode, TemplateDelta,
 };
 use super::*;
 use crate::repository_state::{
@@ -493,16 +493,15 @@ fn template_operation_capture_paths(
     let issues = parse_template_issues(image)?;
     let full_container_id = resolve_template_issue_id(&issues, container_id)?;
     let container = template_issue(&issues, &full_container_id)?;
-    let mut paths = template
-        .nodes
-        .iter()
-        .filter(|node| node.role == config.templates.roles.planning_role())
-        .filter_map(|node| node.doc.as_deref())
-        .map(|document| {
-            let rendered = render_template_document_path(document, container);
-            VirtualPath::worktree(rendered).map_err(Into::into)
-        })
-        .collect::<Result<Vec<_>>>()?;
+    let mut paths = template_document_paths(
+        &template,
+        &config.templates.roles,
+        container,
+        &DocumentDeclarations::from_config(&config),
+    )?
+    .into_iter()
+    .map(|document| VirtualPath::worktree(document).map_err(Into::into))
+    .collect::<Result<Vec<_>>>()?;
     let already_applied =
         find_captured_breakdown(&template, &config.templates.roles, container, &issues).is_some();
     if !already_applied {
@@ -523,20 +522,64 @@ fn template_operation_capture_paths(
     Ok(paths)
 }
 
-fn render_template_document_path(template: &str, container: &Issue) -> String {
-    let hard_criteria = container
-        .description
-        .lines()
-        .map(str::trim)
-        .map(|line| line.trim_start_matches(['-', '*', '+']).trim())
-        .filter(|line| line.starts_with("[hard]"))
-        .collect::<Vec<_>>()
-        .join("\n");
+/// The repository declarations a template document declaration is resolved
+/// against: the issue-scoped area registry and the type taxonomy the canonical
+/// artifact directory is composed from.
+///
+/// Read from the captured configuration once per operation, so the paths a
+/// derivation pre-declares and the paths the apply engine writes are resolved
+/// against the same repository view.
+struct DocumentDeclarations {
+    documentation: crate::config::DocumentationConfig,
+    hierarchy: crate::domain::type_taxonomy::HierarchyConfig,
+}
+
+impl DocumentDeclarations {
+    /// The declarations `config` carries: its documentation section (defaulted
+    /// when absent) and the taxonomy its namespace registry defines.
+    fn from_config(config: &crate::config::JitConfig) -> Self {
+        Self {
+            documentation: config.documentation.clone().unwrap_or_default(),
+            hierarchy: crate::repository_state::hierarchy_config(
+                &crate::config_manager::namespaces_from_config(config),
+            ),
+        }
+    }
+}
+
+/// The repository-relative document paths applying `template` to `container`
+/// writes: the interpolated document of every planning-role node that declares
+/// one.
+///
+/// Each path is the apply engine's own answer for the node's declaration
+/// ([`node_document_path`]), so the files an operation pre-declares are the
+/// files it writes.
+///
+/// # Errors
+///
+/// Names the template, the node, the area, and the declared registry when a
+/// node's document area is absent from the configured issue-scoped registry.
+fn template_document_paths(
+    template: &GraphTemplate,
+    roles: &RoleBindings,
+    container: &Issue,
+    declarations: &DocumentDeclarations,
+) -> Result<Vec<String>> {
     template
-        .replace("{container.id}", &container.id)
-        .replace("{container.short_id}", &container.short_id())
-        .replace("{container.title}", &container.title)
-        .replace("{container.hard_criteria}", &hard_criteria)
+        .nodes
+        .iter()
+        .filter(|node| node.role == roles.planning_role())
+        .filter_map(|node| {
+            node_document_path(
+                node,
+                container,
+                &declarations.documentation,
+                &declarations.hierarchy,
+            )
+            .map_err(|error| located_document_area_error(template, node, error))
+            .transpose()
+        })
+        .collect()
 }
 
 fn template_document_parent_paths(paths: &[VirtualPath]) -> Result<Vec<VirtualPath>> {
@@ -803,6 +846,10 @@ fn derive_template_apply(
         }
     }
 
+    // The declarations a node's document area is resolved against, read from the
+    // same captured configuration as the rest of the derivation, so a fresh
+    // application and a refresh resolve one declaration to one path.
+    let declarations = DocumentDeclarations::from_config(config);
     let mut events = Vec::new();
     let FreshTemplateDerivation {
         created: created_node_ids_by_role,
@@ -816,6 +863,7 @@ fn derive_template_apply(
             &breakdown_id,
             &container,
             issues,
+            &declarations,
             &mut events,
         )?;
         FreshTemplateDerivation {
@@ -825,19 +873,13 @@ fn derive_template_apply(
             lease_targets: Vec::new(),
         }
     } else {
-        // The declarations a node's document area is resolved against, read from
-        // the same captured configuration as the rest of the derivation.
-        let documentation = config.documentation.clone().unwrap_or_default();
-        let hierarchy = crate::repository_state::hierarchy_config(
-            &crate::config_manager::namespaces_from_config(config),
-        );
         let delta = expand_template(
             template,
             &container,
             &resolved_bindings,
             &anchor_dependency_snapshots,
-            &documentation,
-            &hierarchy,
+            &declarations.documentation,
+            &declarations.hierarchy,
         )?;
         prevalidate_captured_delta(template, &delta, issues)?;
         derive_fresh_template(
@@ -984,9 +1026,9 @@ fn derive_template_refresh(
     breakdown_id: &str,
     container: &Issue,
     issues: &[Issue],
+    declarations: &DocumentDeclarations,
     events: &mut Vec<(u8, Event)>,
 ) -> Result<(BTreeMap<String, String>, BTreeMap<String, Issue>)> {
-    let context = InterpolationContext::for_container(container);
     let mut mapping =
         BTreeMap::from([(roles.breakdown_role().to_string(), breakdown_id.to_string())]);
     if let Some(node) = template.breakdown_node(roles) {
@@ -1026,8 +1068,14 @@ fn derive_template_refresh(
             )
         })?;
         let mut issue = template_issue(issues, id)?.clone();
-        // Prose reconciliation: the artifact-directory field is out of scope here.
-        let description = node_description(node, &context.with_doc(node, None));
+        let context = InterpolationContext::for_node(
+            container,
+            node,
+            &declarations.documentation,
+            &declarations.hierarchy,
+        )
+        .map_err(|error| located_document_area_error(template, node, error))?;
+        let description = node_description(node, &context);
         if issue.description == description {
             continue;
         }
@@ -1403,6 +1451,211 @@ fn project_planned_issue(planned: &PlannedNode) -> Issue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::template_expand::test_declarations as declared;
+    use crate::domain::artifact_directory::ArtifactDirectoryError;
+
+    /// The declarations the shared fixtures resolve their document areas
+    /// against.
+    fn declarations() -> DocumentDeclarations {
+        DocumentDeclarations {
+            documentation: declared::documentation(),
+            hierarchy: declared::hierarchy(),
+        }
+    }
+
+    /// The document path a fresh apply writes for `declaration` resolved in
+    /// `area` — the answer every derivation around the apply must agree with.
+    fn applied_document(container: &Issue, declaration: &str, area: Option<&str>) -> String {
+        let delta = declared::expand(
+            &declared::document_template(declaration, area),
+            container,
+            &declared::bindings(&container.id),
+            &declared::snapshots(&[]),
+        )
+        .unwrap();
+        declared::planned_document(&delta).to_string()
+    }
+
+    /// An already-applied bracket over `container`: a planning node carrying
+    /// stale prose and the breakdown node that brackets the container and
+    /// depends on it, with their ids.
+    fn applied_bracket(container: &Issue) -> (Vec<Issue>, String, String) {
+        let mut planning = crate::domain::types::fixture_issue(
+            "planning: Auth epic".to_string(),
+            "prose from an earlier declaration".to_string(),
+        );
+        planning.labels = vec!["type:planning".to_string()];
+        let mut breakdown =
+            crate::domain::types::fixture_issue("breakdown: Auth epic".to_string(), String::new());
+        breakdown.labels = vec![
+            "type:breakdown".to_string(),
+            format!("brackets:{}", container.short_id()),
+        ];
+        breakdown.dependencies = vec![planning.id.clone()];
+        let (planning_id, breakdown_id) = (planning.id.clone(), breakdown.id.clone());
+        (
+            vec![container.clone(), planning, breakdown],
+            planning_id,
+            breakdown_id,
+        )
+    }
+
+    #[test]
+    fn test_template_document_paths_name_the_documents_the_apply_engine_writes() {
+        let container = declared::container("c1");
+        // Declarations spanning what a capture path has to resolve: the artifact
+        // directory alone, the directory beside another container field, and a
+        // flat declaration naming no area at all.
+        let cases = [
+            ("{container.dir}/plan.md", Some(declared::AREA)),
+            (
+                "{container.dir}/{container.short_id}-notes.md",
+                Some(declared::AREA),
+            ),
+            ("dev/active/{container.id}-plan.md", None),
+        ];
+
+        for (declaration, area) in cases {
+            let derived = template_document_paths(
+                &declared::document_template(declaration, area),
+                &RoleBindings::default(),
+                &container,
+                &declarations(),
+            )
+            .unwrap();
+
+            // The files the operation pre-declares are the files it writes, so
+            // the capture set cannot miss the document the apply resolves.
+            assert_eq!(
+                derived,
+                vec![applied_document(&container, declaration, area)],
+                "{declaration} must be pre-declared as the path the apply writes"
+            );
+            assert!(
+                !derived[0].contains('{'),
+                "no declaration field may survive into a captured path: {}",
+                derived[0]
+            );
+        }
+    }
+
+    #[test]
+    fn test_template_document_paths_reject_an_area_the_registry_does_not_declare() {
+        let container = declared::container("c1");
+        // A sibling of the declared area: close enough that only the registry
+        // distinguishes it.
+        let undeclared = format!("{}-drafts", declared::AREA);
+        let template = declared::document_template("{container.dir}/plan.md", Some(&undeclared));
+
+        let error = template_document_paths(
+            &template,
+            &RoleBindings::default(),
+            &container,
+            &declarations(),
+        )
+        .unwrap_err();
+
+        // The typed cause survives for callers that match on it, and the message
+        // locates the declaration and names the registry it was matched against.
+        assert!(
+            matches!(
+                error.downcast_ref::<ArtifactDirectoryError>(),
+                Some(ArtifactDirectoryError::UndeclaredArea { area, .. }) if area == &undeclared
+            ),
+            "expected the resolver's undeclared-area rejection, got {error:?}"
+        );
+        let message = error.to_string();
+        assert!(message.contains("planning"), "{message}");
+        assert!(message.contains(&undeclared), "{message}");
+        assert!(message.contains(declared::AREA), "{message}");
+
+        // The rejection is the registry's doing, and the apply engine refuses the
+        // same declaration: the two derivations agree on what is resolvable.
+        assert!(template_document_paths(
+            &declared::document_template("{container.dir}/plan.md", Some(declared::AREA)),
+            &RoleBindings::default(),
+            &container,
+            &declarations(),
+        )
+        .is_ok());
+        assert!(declared::expand(
+            &template,
+            &container,
+            &declared::bindings(&container.id),
+            &declared::snapshots(&[]),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn test_derive_template_refresh_reconciles_prose_to_the_apply_engine_description() {
+        let container = declared::container("c1");
+        let roles = RoleBindings::default();
+
+        for (declaration, area) in [
+            ("{container.dir}/plan.md", Some(declared::AREA)),
+            ("dev/active/{container.id}-plan.md", None),
+        ] {
+            let (issues, planning_id, breakdown_id) = applied_bracket(&container);
+            let mut events = Vec::new();
+
+            let (mapping, updates) = derive_template_refresh(
+                &declared::document_template(declaration, area),
+                &roles,
+                &breakdown_id,
+                &container,
+                &issues,
+                &declarations(),
+                &mut events,
+            )
+            .unwrap();
+
+            // Reconciling an applied bracket rewrites its prose to what a fresh
+            // application of the same declaration would have written, so a
+            // refresh cannot turn a resolved path into a broken one.
+            assert_eq!(mapping[roles.planning_role()], planning_id);
+            let refreshed = &updates
+                .get(&planning_id)
+                .expect("stale planning prose is reconciled")
+                .description;
+            assert_eq!(
+                refreshed,
+                &applied_document(&container, declaration, area),
+                "{declaration} must reconcile to the description a fresh apply writes"
+            );
+            assert!(
+                !refreshed.contains('{'),
+                "no declaration field may survive reconciliation: {refreshed}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_derive_template_refresh_rejects_an_area_the_registry_does_not_declare() {
+        let container = declared::container("c1");
+        let undeclared = format!("{}-drafts", declared::AREA);
+        let (issues, _planning_id, breakdown_id) = applied_bracket(&container);
+
+        let refresh = |area: &str| {
+            derive_template_refresh(
+                &declared::document_template("{container.dir}/plan.md", Some(area)),
+                &RoleBindings::default(),
+                &breakdown_id,
+                &container,
+                &issues,
+                &declarations(),
+                &mut Vec::new(),
+            )
+        };
+
+        // Reconciliation refuses rather than rewriting the applied prose to an
+        // unsubstituted path, naming the area and the registry.
+        let message = refresh(&undeclared).unwrap_err().to_string();
+        assert!(message.contains("planning"), "{message}");
+        assert!(message.contains(&undeclared), "{message}");
+        assert!(message.contains(declared::AREA), "{message}");
+        assert!(refresh(declared::AREA).is_ok());
+    }
 
     #[test]
     fn test_type_label_value_extracts_type() {

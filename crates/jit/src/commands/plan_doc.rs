@@ -7,9 +7,8 @@
 //! - the absence of a `doc` (modeled by the caller as the literal sentinel
 //!   `"inline"`) — the plan is the issue's own body
 //!   ([`Issue::description`](crate::domain::Issue)); or
-//! - an external path template — an `{id}` / `{container.id}` placeholder (if
-//!   present) is substituted with the container id and the resulting file is read
-//!   from disk.
+//! - an external path template — the container substitutions of
+//!   [`PlanDocContainer`] are applied and the resulting file is read from disk.
 //!
 //! This module is the **boundary**: the only place filesystem I/O happens. It
 //! resolves the location, loads the content, and feeds the resulting string to
@@ -28,7 +27,10 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::config::DocumentationConfig;
 use crate::document::{content_parser_for, ContentParserError};
+use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDirectoryError};
+use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{project, ContentFormat, Issue, Projection};
 
 /// The plan-doc location value that means "the plan is the issue body".
@@ -46,8 +48,10 @@ pub const INLINE_LOCATION: &str = "inline";
 /// That reference is the validation-time source of truth for the plan-doc
 /// location: `jit validate` reads the plan from this reference's `path`, so a
 /// plan that is moved/archived and re-linked keeps validating from its new
-/// location. The graph template's `plan_doc_location` is only the creation-time
-/// default used by `jit apply plan` when first writing this reference.
+/// location. The graph template's `plan_doc_location` resolves into the planning
+/// node's description as an instruction naming where to author the plan;
+/// applying a template attaches no document reference, and this one is created
+/// when the plan is authored and linked.
 pub const PLAN_DOC_LABEL: &str = "plan";
 
 /// The `{id}` placeholder substituted with the container id in an external
@@ -57,9 +61,91 @@ const ID_PLACEHOLDER: &str = "{id}";
 /// The `{container.id}` placeholder, an alias for [`ID_PLACEHOLDER`] used by
 /// graph-template `doc` strings (e.g. `dev/active/{container.id}-plan.md`). The
 /// apply engine interpolates the full `container.*` token family at apply time;
-/// at validation time the only available value is the container id, so the
-/// resolver substitutes this token with it exactly like `{id}`.
+/// this resolver substitutes this token with the container id exactly like
+/// `{id}`.
 const CONTAINER_ID_PLACEHOLDER: &str = "{container.id}";
+
+/// The `{container.dir}` placeholder used by graph-template `doc` strings that
+/// name an issue-scoped area (e.g. `{container.dir}/plan.md`): the canonical
+/// artifact directory the container owns inside that area
+/// ([`resolve_artifact_directory`]).
+const CONTAINER_DIR_PLACEHOLDER: &str = "{container.dir}";
+
+/// The container substitutions a plan-doc location template resolves against.
+///
+/// Carries the identifier `{id}` / `{container.id}` resolve to and, for a
+/// declaration that names an issue-scoped area, the directory
+/// `{container.dir}` resolves to. Resolving the area is what can fail, so it
+/// happens once here and [`resolve_plan_doc_location`] stays pure and total.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlanDocContainer {
+    id: String,
+    directory: Option<String>,
+}
+
+impl PlanDocContainer {
+    /// The substitutions for `container` under a declaration that names no
+    /// issue-scoped area.
+    ///
+    /// `{container.dir}` stays out of scope, which is what the apply engine
+    /// resolves a node declaring no area under.
+    pub fn unscoped(container: &Issue) -> Self {
+        Self {
+            id: container.id.clone(),
+            directory: None,
+        }
+    }
+
+    /// The substitutions for `container` under a declaration naming the
+    /// issue-scoped `area`, with `{container.dir}` resolved to the directory the
+    /// container owns there.
+    ///
+    /// The directory is the domain resolver's own answer
+    /// ([`resolve_artifact_directory`]), so a plan located before it is written
+    /// and a plan the apply engine writes name one directory.
+    ///
+    /// # Errors
+    ///
+    /// [`ArtifactDirectoryError::UndeclaredArea`] when `area` is absent from the
+    /// configured issue-scoped registry, naming both the area and the registry
+    /// it was matched against.
+    pub fn in_area(
+        container: &Issue,
+        area: &str,
+        documentation: &DocumentationConfig,
+        hierarchy: &HierarchyConfig,
+    ) -> Result<Self, ArtifactDirectoryError> {
+        Ok(Self {
+            id: container.id.clone(),
+            directory: Some(resolve_artifact_directory(
+                container,
+                area,
+                documentation,
+                hierarchy,
+            )?),
+        })
+    }
+
+    /// The container id this resolves `{id}` / `{container.id}` to.
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Substitute every supported placeholder in `template`.
+    ///
+    /// A placeholder this value does not carry — `{container.dir}` for a
+    /// declaration naming no area — is left verbatim, matching what the apply
+    /// engine leaves for a node declaring no area.
+    fn substitute(&self, template: &str) -> String {
+        let substituted = template
+            .replace(CONTAINER_ID_PLACEHOLDER, &self.id)
+            .replace(ID_PLACEHOLDER, &self.id);
+        match &self.directory {
+            Some(directory) => substituted.replace(CONTAINER_DIR_PLACEHOLDER, directory),
+            None => substituted,
+        }
+    }
+}
 
 /// Error raised while resolving or loading a container's plan document.
 ///
@@ -93,14 +179,15 @@ pub enum PlanDocError {
 ///
 /// Produced by [`resolve_plan_doc_location`], a pure function: an `"inline"`
 /// template yields [`PlanDocLocation::Inline`]; any other template yields
-/// [`PlanDocLocation::External`] with `{id}` already substituted. This split is
-/// pure (no I/O) so the location decision is independently testable; the actual
-/// file read happens later, at the boundary, in [`load_plan_content`].
+/// [`PlanDocLocation::External`] with the container substitutions already
+/// applied. This split is pure (no I/O) so the location decision is
+/// independently testable; the actual file read happens later, at the boundary,
+/// in [`load_plan_content`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlanDocLocation {
     /// The plan is the issue's own body ([`Issue::description`]).
     Inline,
-    /// The plan is an external file at this (already `{id}`-substituted) path.
+    /// The plan is an external file at this (already substituted) path.
     External(PathBuf),
 }
 
@@ -109,18 +196,15 @@ pub enum PlanDocLocation {
 /// The literal sentinel [`INLINE_LOCATION`] (`"inline"`) yields
 /// [`PlanDocLocation::Inline`]. Any other value is treated as a path template:
 /// every occurrence of the `{id}` placeholder — or its graph-template alias
-/// `{container.id}` — is replaced with `container_id` and the result wrapped in
-/// [`PlanDocLocation::External`]. A template with no placeholder is used verbatim
-/// (a fixed shared plan path).
-pub fn resolve_plan_doc_location(template: &str, container_id: &str) -> PlanDocLocation {
+/// `{container.id}` — is replaced with the container's id, `{container.dir}` is
+/// replaced with the canonical artifact directory `container` carries, and the
+/// result is wrapped in [`PlanDocLocation::External`]. A template with no
+/// placeholder is used verbatim (a fixed shared plan path).
+pub fn resolve_plan_doc_location(template: &str, container: &PlanDocContainer) -> PlanDocLocation {
     if template == INLINE_LOCATION {
         PlanDocLocation::Inline
     } else {
-        PlanDocLocation::External(PathBuf::from(
-            template
-                .replace(CONTAINER_ID_PLACEHOLDER, container_id)
-                .replace(ID_PLACEHOLDER, container_id),
-        ))
+        PlanDocLocation::External(PathBuf::from(container.substitute(template)))
     }
 }
 
@@ -140,10 +224,10 @@ pub fn resolve_plan_doc_location(template: &str, container_id: &str) -> PlanDocL
 pub fn load_plan_content(
     issue: &Issue,
     template: &str,
-    container_id: &str,
+    container: &PlanDocContainer,
     base_dir: &Path,
 ) -> Result<String, PlanDocError> {
-    match resolve_plan_doc_location(template, container_id) {
+    match resolve_plan_doc_location(template, container) {
         PlanDocLocation::Inline => Ok(issue.description.clone()),
         PlanDocLocation::External(relative) => {
             let path = if relative.is_absolute() {
@@ -152,7 +236,7 @@ pub fn load_plan_content(
                 base_dir.join(relative)
             };
             std::fs::read_to_string(&path).map_err(|source| PlanDocError::Read {
-                container_id: container_id.to_string(),
+                container_id: container.id().to_string(),
                 path,
                 source,
             })
@@ -176,11 +260,11 @@ pub fn load_plan_content(
 pub fn project_plan_doc(
     issue: &Issue,
     template: &str,
-    container_id: &str,
+    container: &PlanDocContainer,
     base_dir: &Path,
     repo_default_format: ContentFormat,
 ) -> Result<Projection, PlanDocError> {
-    let content = load_plan_content(issue, template, container_id, base_dir)?;
+    let content = load_plan_content(issue, template, container, base_dir)?;
     let parser = content_parser_for(issue.content_format, repo_default_format)?;
     // PURE from here: project the cheap selector fields, then attach the section
     // view computed from the RESOLVED content. No filesystem access.
@@ -190,10 +274,52 @@ pub fn project_plan_doc(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::template_expand::test_declarations as declared;
     use tempfile::TempDir;
 
     fn container(description: &str) -> Issue {
         crate::domain::types::fixture_issue("Container".to_string(), description.to_string())
+    }
+
+    /// The substitutions for a container known by `id`, under a declaration
+    /// naming no issue-scoped area.
+    fn identified(id: &str) -> PlanDocContainer {
+        let mut issue = container("");
+        issue.id = id.to_string();
+        PlanDocContainer::unscoped(&issue)
+    }
+
+    /// The substitutions for the shared container fixture, under a declaration
+    /// naming the shared issue-scoped area.
+    fn in_declared_area(issue: &Issue) -> PlanDocContainer {
+        PlanDocContainer::in_area(
+            issue,
+            declared::AREA,
+            &declared::documentation(),
+            &declared::hierarchy(),
+        )
+        .unwrap()
+    }
+
+    /// The path the apply engine writes for `declaration` (resolved in
+    /// `area`) — the answer this resolver must agree with.
+    fn applied_document(issue: &Issue, declaration: &str, area: Option<&str>) -> String {
+        let delta = declared::expand(
+            &declared::document_template(declaration, area),
+            issue,
+            &declared::bindings(&issue.id),
+            &declared::snapshots(&[]),
+        )
+        .unwrap();
+        declared::planned_document(&delta).to_string()
+    }
+
+    /// The external path `location` names.
+    fn external(location: PlanDocLocation) -> PathBuf {
+        match location {
+            PlanDocLocation::External(path) => path,
+            PlanDocLocation::Inline => panic!("expected an external plan-doc location"),
+        }
     }
 
     // --- resolve_plan_doc_location (pure) ---------------------------------
@@ -201,7 +327,7 @@ mod tests {
     #[test]
     fn test_resolve_inline_sentinel_is_inline() {
         assert_eq!(
-            resolve_plan_doc_location("inline", "abc123"),
+            resolve_plan_doc_location("inline", &identified("abc123")),
             PlanDocLocation::Inline
         );
     }
@@ -209,7 +335,7 @@ mod tests {
     #[test]
     fn test_resolve_substitutes_id_placeholder() {
         assert_eq!(
-            resolve_plan_doc_location("plans/{id}.md", "abc123"),
+            resolve_plan_doc_location("plans/{id}.md", &identified("abc123")),
             PlanDocLocation::External(PathBuf::from("plans/abc123.md"))
         );
     }
@@ -217,7 +343,7 @@ mod tests {
     #[test]
     fn test_resolve_substitutes_every_id_occurrence() {
         assert_eq!(
-            resolve_plan_doc_location("{id}/plan-{id}.md", "xyz"),
+            resolve_plan_doc_location("{id}/plan-{id}.md", &identified("xyz")),
             PlanDocLocation::External(PathBuf::from("xyz/plan-xyz.md"))
         );
     }
@@ -228,7 +354,7 @@ mod tests {
         // to the container id exactly like `{id}` so a template's plan-doc
         // location resolves at validation time.
         assert_eq!(
-            resolve_plan_doc_location("dev/active/{container.id}-plan.md", "abc123"),
+            resolve_plan_doc_location("dev/active/{container.id}-plan.md", &identified("abc123")),
             PlanDocLocation::External(PathBuf::from("dev/active/abc123-plan.md"))
         );
     }
@@ -236,9 +362,94 @@ mod tests {
     #[test]
     fn test_resolve_template_without_placeholder_is_verbatim() {
         assert_eq!(
-            resolve_plan_doc_location("dev/plan.md", "abc123"),
+            resolve_plan_doc_location("dev/plan.md", &identified("abc123")),
             PlanDocLocation::External(PathBuf::from("dev/plan.md"))
         );
+    }
+
+    #[test]
+    fn test_resolve_plan_doc_location_substitutes_the_artifact_directory_field() {
+        let issue = declared::container("c1");
+        // Two declarations that both name the directory, one of them twice, so a
+        // single-occurrence substitution is not enough to pass.
+        for declaration in ["{container.dir}/plan.md", "{container.dir}/{container.dir}"] {
+            let resolved = external(resolve_plan_doc_location(
+                declaration,
+                &in_declared_area(&issue),
+            ));
+
+            // The located plan is the file an apply writes for the same
+            // declaration: one declaration resolves to one path, whichever
+            // derivation resolves it.
+            assert_eq!(
+                resolved,
+                PathBuf::from(applied_document(&issue, declaration, Some(declared::AREA))),
+                "{declaration} must locate the applied document"
+            );
+            let located = resolved.to_string_lossy();
+            assert!(
+                !located.contains('{'),
+                "no declaration field may survive the substitution: {located}"
+            );
+            assert!(
+                resolved.starts_with(declared::AREA),
+                "the declared area holds the resolved directory: {located}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_resolve_plan_doc_location_leaves_the_directory_field_out_of_scope_without_an_area() {
+        // A declaration naming no issue-scoped area has no directory to resolve
+        // in, so the field stays verbatim — what the apply engine resolves the
+        // same declaration to.
+        let issue = declared::container("c1");
+        let declaration = "{container.dir}/plan.md";
+
+        assert_eq!(
+            external(resolve_plan_doc_location(
+                declaration,
+                &PlanDocContainer::unscoped(&issue)
+            )),
+            PathBuf::from(applied_document(&issue, declaration, None))
+        );
+    }
+
+    #[test]
+    fn test_plan_doc_container_rejects_an_area_the_registry_does_not_declare() {
+        let issue = declared::container("c1");
+        // A sibling of the declared area: close enough that only the registry
+        // distinguishes it.
+        let undeclared = format!("{}-drafts", declared::AREA);
+
+        let error = PlanDocContainer::in_area(
+            &issue,
+            &undeclared,
+            &declared::documentation(),
+            &declared::hierarchy(),
+        )
+        .unwrap_err();
+
+        let ArtifactDirectoryError::UndeclaredArea {
+            area,
+            declared: registry,
+        } = &error;
+        assert_eq!(area, &undeclared);
+        assert_eq!(registry, &declared::documentation().issue_scoped_areas());
+        // The message names the offending area and the registry it was matched
+        // against, so it locates the declaration to fix.
+        let message = error.to_string();
+        assert!(message.contains(&undeclared), "{message}");
+        assert!(message.contains(declared::AREA), "{message}");
+
+        // The rejection is the registry's doing: the declared area resolves.
+        assert!(PlanDocContainer::in_area(
+            &issue,
+            declared::AREA,
+            &declared::documentation(),
+            &declared::hierarchy()
+        )
+        .is_ok());
     }
 
     // --- load_plan_content (boundary) -------------------------------------
@@ -247,7 +458,13 @@ mod tests {
     fn test_load_inline_returns_issue_body() {
         let issue = container("## Plan\n\n- inline step\n");
         let dir = TempDir::new().unwrap();
-        let content = load_plan_content(&issue, "inline", &issue.id, dir.path()).unwrap();
+        let content = load_plan_content(
+            &issue,
+            "inline",
+            &PlanDocContainer::unscoped(&issue),
+            dir.path(),
+        )
+        .unwrap();
         assert_eq!(content, issue.description);
     }
 
@@ -262,7 +479,8 @@ mod tests {
         .unwrap();
 
         let issue = container("the body is ignored when external");
-        let content = load_plan_content(&issue, "plans/{id}.md", "abc123", dir.path()).unwrap();
+        let content =
+            load_plan_content(&issue, "plans/{id}.md", &identified("abc123"), dir.path()).unwrap();
         assert_eq!(content, "## Plan\n\n- external step\n");
     }
 
@@ -270,7 +488,8 @@ mod tests {
     fn test_load_missing_external_path_yields_contextual_error() {
         let dir = TempDir::new().unwrap();
         let issue = container("body");
-        let err = load_plan_content(&issue, "plans/{id}.md", "abc123", dir.path()).unwrap_err();
+        let err = load_plan_content(&issue, "plans/{id}.md", &identified("abc123"), dir.path())
+            .unwrap_err();
         let message = err.to_string();
         // Names the container id and the resolved path.
         assert!(matches!(err, PlanDocError::Read { .. }));
@@ -287,8 +506,13 @@ mod tests {
         let issue = container("body");
         // An absolute template is read as-is, ignoring base_dir.
         let other_base = TempDir::new().unwrap();
-        let content =
-            load_plan_content(&issue, abs.to_str().unwrap(), "abc123", other_base.path()).unwrap();
+        let content = load_plan_content(
+            &issue,
+            abs.to_str().unwrap(),
+            &identified("abc123"),
+            other_base.path(),
+        )
+        .unwrap();
         assert_eq!(content, "## Plan\n\n- absolute step\n");
     }
 
@@ -309,7 +533,7 @@ mod tests {
         let inline_projection = project_plan_doc(
             &inline_issue,
             "inline",
-            "c1",
+            &identified("c1"),
             dir.path(),
             ContentFormat::Markdown,
         )
@@ -322,7 +546,7 @@ mod tests {
         let external_projection = project_plan_doc(
             &external_issue,
             "plan-{id}.md",
-            "c1",
+            &identified("c1"),
             dir.path(),
             ContentFormat::Markdown,
         )
@@ -344,7 +568,7 @@ mod tests {
         let projection = project_plan_doc(
             &issue,
             "inline",
-            &issue.id,
+            &PlanDocContainer::unscoped(&issue),
             dir.path(),
             ContentFormat::Markdown,
         )
@@ -363,7 +587,7 @@ mod tests {
         let result = project_plan_doc(
             &issue,
             "missing/{id}.md",
-            "abc123",
+            &identified("abc123"),
             dir.path(),
             ContentFormat::Markdown,
         );
