@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "03fc347f778859a0df16611b206ffd5dc710dd9f",
+  "completed_at": "2026-07-26T09:09:37.251135483Z",
+  "duration_ms": 168642,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior empty-directory REQ-01 finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e2902949-e14d-4307-b2c3-3fc3c5ad07a5",
+  "message": null,
+  "run_id": "d10e6e98-56c6-4d8e-8b55-1ee62935dadb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T09:06:48.608902583Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6a99d49b, 3f719c85, 76e26a84, 6d94dfa1, 1bdae2f5, fabc59d3, 067ccb0c, 03fc347f (`jit:e2902949`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e2902949/requirement/REQ-01 and @/issue/8e071e18/decision/D-7 (issue descriptions, markdown-first); @/invariant/domain-agnostic (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci failed (exit 1, 2026-07-26T09:01:09Z; fmt, clippy, and tests passed, incremental-state failed); mcp-ci passed (exit 0, 2026-07-26T09:01:07Z)\nTruncation recovery: performed bounded per-path rereads of command, traversal, storage, output/schema, bridge manifest, tests, and tagged merge-parent deltas\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior empty-directory REQ-01 finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

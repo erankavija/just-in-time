@@ -1,7 +1,7 @@
 {
   "epic_id": "8e071e18-d786-43ff-b424-a283fecb11f8",
   "epic_short_id": "8e071e18",
-  "current_wave": 6,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -230,7 +230,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "haiku",
           "group": "B",
           "worktree": ".agents/worktrees/agent-e993f158",
@@ -247,7 +247,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "sonnet",
           "group": "B",
           "worktree": ".agents/worktrees/agent-1373e042",
@@ -264,7 +264,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "haiku",
           "group": "B",
           "worktree": ".agents/worktrees/agent-ecaf5c92",
@@ -281,7 +281,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "sonnet",
           "group": "B",
           "worktree": ".agents/worktrees/agent-5c70f0cb",
@@ -298,7 +298,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "sonnet",
           "group": "B",
           "worktree": ".agents/worktrees/agent-935b51da",
@@ -315,7 +315,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "sonnet",
           "group": "B",
           "worktree": ".agents/worktrees/agent-7b282e85",
@@ -332,7 +332,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "opus",
           "group": "A",
           "worktree": ".agents/worktrees/agent-67345efd",
@@ -348,7 +348,7 @@
           "gates": [
             "repo-validate"
           ],
-          "status": "implemented (lead, on main)",
+          "status": "done",
           "model": "lead",
           "outcome": "Executed directly on main per N1: pinning two document references writes .jit/issues/*.json, which a worktree worker may not do. Both refs pinned (73981310 -> b38c5b94, a4b0fadf -> 4ead5f12). Preview of container 1cc809de reports both as retain with no destination. scripts/benchmark-session-cost-selftest.sh PASS. jit validate green. Commit 53eb56cf. repo-validate gate still to run."
         },
@@ -361,7 +361,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "sonnet",
           "group": "A",
           "worktree": ".agents/worktrees/agent-9ca124f9",
@@ -379,7 +379,7 @@
             "code-review",
             "mcp-ci"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "opus",
           "group": "A",
           "worktree": ".agents/worktrees/agent-e2902949",
@@ -396,7 +396,7 @@
             "doc-review",
             "repo-validate"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "sonnet",
           "group": "A",
           "worktree": ".agents/worktrees/agent-cf0f0014",
@@ -413,7 +413,7 @@
             "doc-review",
             "repo-validate"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "sonnet",
           "group": "A",
           "worktree": ".agents/worktrees/agent-80e08e0f",
@@ -430,7 +430,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "sonnet",
           "group": "A",
           "worktree": ".agents/worktrees/agent-ef2bd13c",
@@ -443,9 +443,10 @@
         "group_a": "59b39c2673262b8b63ca0ec0388e9cf0d5052724",
         "group_b": "192cac9a349bafc97004428d85e6c01d3f19977e"
       },
-      "status": "merged; gates pending",
+      "status": "complete",
       "merged_head": "de3a8764",
-      "integration_evidence": "Leak check clean. scripts/verify-commit-builds.sh exit 0 on de3a8764. CARGO_INCREMENTAL=0 cargo test --workspace --no-run exit 0 on de3a8764 and again after the e2902949 merge, which is the N3 guard the build verifier alone does not give."
+      "integration_evidence": "Leak check clean. scripts/verify-commit-builds.sh exit 0 on de3a8764. CARGO_INCREMENTAL=0 cargo test --workspace --no-run exit 0 on de3a8764 and again after the e2902949 merge, which is the N3 guard the build verifier alone does not give.",
+      "closure_evidence": "Session 4 re-ran cargo-ci for e2902949 after clearing target/debug/incremental; the sole prior failure was the incremental-state step (3941 tests passed, 0 failed). All 13 wave-6 issues Done with every gate passed."
     },
     {
       "wave_number": 7,
@@ -483,7 +484,8 @@
           ],
           "status": "pending"
         }
-      ]
+      ],
+      "status": "dispatching"
     },
     {
       "wave_number": 8,
@@ -1117,6 +1119,16 @@
       "situation": "Ten wave-6 issues carried a satisfies: label reaching past their own criteria. 9ca124f9 and ef2bd13c each deliver one clause of REQ-08; 67345efd delivers the template-interpolation clause of REQ-05; cf0f0014 and 80e08e0f repoint citations and archive nothing, while REQ-09 is about the archival runs; each of the six skill-conversion issues converts exactly one skill while REQ-11 spans every skill under .agents/skills.",
       "lead_analysis": "Same shape as E1, E2, E3 and E5. Crediting siblings remain for every criterion: REQ-08 keeps 3be32cad (wave 8, closing clause), REQ-05 keeps 429995e1 and 8ff4cff3, REQ-09 keeps 33 issues, REQ-11 keeps 935b51da. REQ-11 was kept on exactly one of the six rather than dropped from all six, because dropping all six would leave the criterion with zero crediting issues; 935b51da is reviewed last in the wave, when every skill is converted at HEAD and the claim is supported (the b4d1a2c8 precedent).",
       "resolution": "Dropped under E3 standing approval before dispatch, in commit 59b39c26. satisfies:REQ-06 on e2902949 and enforces:@/invariant/domain-agnostic were KEPT: e2902949 delivers REQ-06 whole, and the enforces label asserts the issue upholds the invariant, which its no-built-in-list criterion does."
+    },
+    {
+      "id": "E8",
+      "wave": 6,
+      "issue": "e2902949",
+      "category": "issue scope change (success criteria)",
+      "situation": "code-review round 2 blocked on REQ-03's literal no-mutation reading: the report creates .jit/.index.lock on first use through the shared index read path.",
+      "lead_analysis": "Every jit read path opens the shared advisory .index.lock, so a literal reading was unsatisfiable without an unserialized index read.",
+      "resolution": "Owner approved amending REQ-03 to scope it to repository content and exclude the gitignored advisory lock files (commit 1bdae2f5). Recorded here in session 4; session 3 ended before it reached the progress file.",
+      "record_location": "commit message of 1bdae2f5"
     }
   ],
   "rework_counts": {
@@ -1256,6 +1268,13 @@
       "subject": "wave 6 is dispatched in two groups against two different base SHAs",
       "detail": "13 issues. Group A (e2902949, 67345efd, 9ca124f9, ef2bd13c, cf0f0014, 80e08e0f) is anchored at 59b39c26; group B (the six skill conversions) at 192cac9a, after the lead landed d9e70703 on main between the two dispatches. Footprints were checked across all 13 and collide nowhere. Models were chosen by difficulty: Opus for the two implementation issues that add a command and a schema field, Sonnet for the moderate ones, Haiku for the two single-file skill conversions.",
       "decision": "Merge order does not matter for conflicts, but gate order does: run 935b51da code-review LAST among the skill issues, since it is the only one still claiming REQ-11 and that claim is supported only once every skill is converted at HEAD. Reinstall the binary from a clean tree after all merges and before any gate run."
+    },
+    {
+      "id": "N7",
+      "raised_at": "session 4 resume",
+      "subject": "session 3 ended on a server error mid wave-6 close",
+      "detail": "Progress file was last written at wave-6 dispatch. Git history carried three further e2902949 review rounds, the E8 criteria amendment, and the closure of eleven wave-6 issues that the file did not record. The only outstanding work was e2902949's cargo-ci, which had failed solely on the incremental-state step.",
+      "decision": "Reconstructed wave-6 state from git log, jit issue state, and .jit/gate-runs rather than from the progress file. Re-ran cargo-ci after rm -rf target/debug/incremental; passed. Closed e2902949 and wave 6."
     }
   ]
 }
