@@ -1289,3 +1289,193 @@ fn test_archive_document_preview_actions_blockers_and_eligibility_match_regardle
         "a citation warning must change nothing but the plan's warnings"
     );
 }
+
+/// A repository that classifies its development areas explicitly, per
+/// `@/issue/8e071e18/decision/D-6`, with `dev/presentations` as the one
+/// configured managed area.
+///
+/// `managed` selects whether the deck sits inside that configured area or in
+/// an adjacent development-root directory that no configured entry claims,
+/// reproducing the predecessor deck's actual gap. `terminal` selects whether
+/// the linked owner reaches a terminal state before the preview runs. The
+/// deck is always linked with `jit doc add`: an unlinked artifact makes the
+/// terminal-owner check vacuously true (`jit:1f80212b`'s code-review finding
+/// against a sibling test), so every caller here exercises a genuine
+/// ownership edge, not an absent one.
+fn presentation_deck_repo(managed: bool, terminal: bool) -> (TempDir, String, String) {
+    let repo = TempDir::new().unwrap();
+    assert_success(&jit(&repo, &["init", "--json"]));
+    set_documentation_policy(
+        &repo,
+        concat!(
+            "[documentation]\n",
+            "development_root = \"dev\"\n",
+            "managed_paths = [\"dev/presentations\"]\n",
+            "permanent_paths = []\n",
+            "archive_root = \"dev/archive\"\n",
+        ),
+    );
+    let area = if managed {
+        "dev/presentations"
+    } else {
+        "dev/unclassified"
+    };
+    let deck_path = format!("{area}/talk.html");
+    fs::create_dir_all(repo.path().join(area)).unwrap();
+    fs::write(repo.path().join(&deck_path), "<html>deck</html>").unwrap();
+
+    let created = jit(
+        &repo,
+        &[
+            "issue",
+            "create",
+            "--title",
+            "Presentation deck owner",
+            "--type",
+            "epic",
+            "--json",
+        ],
+    );
+    assert_success(&created);
+    let id = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_success(&jit(
+        &repo,
+        &["doc", "add", &id, &deck_path, "--skip-scan", "--json"],
+    ));
+    if terminal {
+        assert_success(&jit(
+            &repo,
+            &["issue", "update", &id, "--state", "rejected", "--json"],
+        ));
+    }
+    (repo, id, deck_path)
+}
+
+/// The plan artifact recorded for `source`, panicking if the fixture never produced one.
+fn find_artifact<'a>(plan: &'a Value, source: &str) -> &'a Value {
+    plan["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|artifact| artifact["source"] == source)
+        .unwrap_or_else(|| panic!("plan carries no artifact for {source}: {plan}"))
+}
+
+/// REQ-01/REQ-03 (`jit:daf4fa46`): a deck asset under the configured
+/// `dev/presentations` managed area, linked to a terminal-state owner,
+/// previews as an eligible document-target plan reporting no target-level
+/// `unmanaged-selected-root` blocker.
+///
+/// The counterfactual at the end pins the terminal-owner check against the
+/// vacuous pass a sibling issue's test fell into: an artifact with a linked
+/// but non-terminal owner must stay `retain`, not `move`, so the `move`
+/// asserted above is genuine evidence the owner's state was consulted rather
+/// than an artifact of previewing an unlinked path.
+#[test]
+fn test_archive_document_preview_reports_eligible_plan_for_deck_owned_by_terminal_issue() {
+    let (repo, _owner, deck_path) = presentation_deck_repo(true, true);
+
+    let preview = jit(&repo, &["archive", "document", &deck_path, "--json"]);
+    assert_success(&preview);
+    let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+
+    assert_eq!(plan["eligible"], true);
+    assert!(plan["blockers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|blocker| blocker["code"] != "unmanaged-selected-root"));
+    assert_eq!(
+        find_artifact(&plan, &deck_path)["action"],
+        "move",
+        "the deck must genuinely be selected for relocation, not vacuously eligible: {plan}"
+    );
+
+    let (non_terminal_repo, _owner, deck_path) = presentation_deck_repo(true, false);
+    let blocked = jit(
+        &non_terminal_repo,
+        &["archive", "document", &deck_path, "--json"],
+    );
+    assert_success(&blocked);
+    let blocked_plan: Value = serde_json::from_slice(&blocked.stdout).unwrap();
+    assert_ne!(
+        find_artifact(&blocked_plan, &deck_path)["action"],
+        "move",
+        "a non-terminal owner must not be selected for relocation: {blocked_plan}"
+    );
+}
+
+/// REQ-02/REQ-03 (`jit:daf4fa46`): a container-target preview whose subtree
+/// contains a deck under the configured managed area, owned (as the
+/// container itself) by a terminal issue, reaches the same eligible outcome
+/// and the same absence of a target-level `unmanaged-selected-root` blocker
+/// as the document-target form.
+///
+/// The counterfactual mirrors the document-target test: a non-terminal
+/// container owner leaves the deck `retain`, proving the container form
+/// consults the same terminal-owner state rather than defaulting to eligible.
+#[test]
+fn test_archive_container_preview_reports_eligible_plan_for_subtree_deck_owned_by_terminal_issue() {
+    let (repo, owner, deck_path) = presentation_deck_repo(true, true);
+
+    let preview = jit(&repo, &["archive", "container", &owner, "--json"]);
+    assert_success(&preview);
+    let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+
+    assert_eq!(plan["eligible"], true);
+    assert!(plan["blockers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|blocker| blocker["code"] != "unmanaged-selected-root"));
+    assert_eq!(
+        find_artifact(&plan, &deck_path)["action"],
+        "move",
+        "the deck must genuinely be selected for relocation, not vacuously eligible: {plan}"
+    );
+
+    let (non_terminal_repo, non_terminal_owner, deck_path) = presentation_deck_repo(true, false);
+    let blocked = jit(
+        &non_terminal_repo,
+        &["archive", "container", &non_terminal_owner, "--json"],
+    );
+    assert_success(&blocked);
+    let blocked_plan: Value = serde_json::from_slice(&blocked.stdout).unwrap();
+    assert_ne!(
+        find_artifact(&blocked_plan, &deck_path)["action"],
+        "move",
+        "a non-terminal owner must not be selected for relocation: {blocked_plan}"
+    );
+}
+
+/// REQ-03 negative control (`jit:daf4fa46`): the identical deck and terminal
+/// owner, relocated one directory over into a development-root area that no
+/// configured entry claims, reports `unmanaged-selected-root` in the
+/// target-level blocker array through both target forms. This is what proves
+/// the absence asserted in the two tests above is meaningful: these fixtures
+/// can and do raise the blocker when the area genuinely is unmanaged.
+#[test]
+fn test_archive_preview_reports_unmanaged_selected_root_for_deck_outside_configured_area() {
+    let (repo, owner, deck_path) = presentation_deck_repo(false, true);
+
+    for args in [
+        vec!["archive", "document", deck_path.as_str(), "--json"],
+        vec!["archive", "container", owner.as_str(), "--json"],
+    ] {
+        let preview = jit(&repo, &args);
+        assert_success(&preview);
+        let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+        assert_eq!(plan["eligible"], false, "{args:?} plan: {plan}");
+        assert!(
+            plan["blockers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|blocker| blocker["code"] == "unmanaged-selected-root"),
+            "{args:?} plan: {plan}"
+        );
+    }
+}
