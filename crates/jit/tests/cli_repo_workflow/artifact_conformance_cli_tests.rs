@@ -326,6 +326,15 @@ fn test_doc_conformance_exits_successfully_and_changes_nothing_whatever_it_finds
     // every file, with its bytes.
     assert!(jit(repo.path(), &["issue", "list"]).status.success());
 
+    // Planted after that warming read, so nothing the report could delete has
+    // already been swept away before the comparisons start. An empty
+    // `<id>.lock` beside an issue record is what the retired per-issue read
+    // lock left behind, and the read-all maintenance path collects exactly
+    // that shape — so a run that reaches it unlinks this file and the exact
+    // snapshots below say so.
+    let sidecar = repo.path().join(format!(".jit/issues/{}.lock", issue.id));
+    fs::write(&sidecar, "").unwrap();
+
     let nonconforming = format!("{area}/{}-plan.md", issue.short_id);
     let unattributed = format!("{area}/{UNOWNED_PREFIX}-notes.md");
 
@@ -360,6 +369,11 @@ fn test_doc_conformance_exits_successfully_and_changes_nothing_whatever_it_finds
                 differences(&after, &tree_snapshot(repo.path()))
             );
         });
+
+    assert!(
+        sidecar.exists(),
+        "every run above left the planted issue-lock sidecar in place"
+    );
 
     // The successful exits above were not vacuous: by the last pass the report
     // had both kinds of finding to make.

@@ -130,9 +130,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// and the verdicts come from
     /// [`report_area_artifacts`](crate::domain::artifact_conformance::report_area_artifacts).
     ///
-    /// Read-only and advisory (`@/issue/8e071e18/decision/D-7`): nothing is
-    /// written, and the findings are the return value rather than a status a
-    /// caller could gate on. A declared area that does not exist yet
+    /// Read-only and advisory (`@/issue/8e071e18/decision/D-7`): the findings
+    /// are the return value rather than a status a caller could gate on, and
+    /// the run publishes, rewrites, and unlinks no repository content. The
+    /// issue set the report attributes short ids against is read through
+    /// [`IssueStore::read_issues`](crate::storage::IssueStore::read_issues),
+    /// which carries no index maintenance, rather than `list_issues`, which
+    /// carries the sidecar sweep. A declared area that does not exist yet
     /// contributes no findings.
     ///
     /// # Errors
@@ -151,7 +155,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documentation
             .unwrap_or_default();
         let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
-        let issues = self.storage.list_issues()?;
+        let issues = self.storage.read_issues()?;
         // The declared registry, through the accessor that decides area
         // membership everywhere else: a declared entry that normalizes to
         // nothing names no area, so it is neither walked nor reported as

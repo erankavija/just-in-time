@@ -187,10 +187,36 @@ pub trait IssueStore: Clone {
 
     /// List all issues in the repository.
     ///
+    /// Backends may attach index maintenance to this path, so a caller that
+    /// must leave the repository untouched reads through
+    /// [`IssueStore::read_issues`] instead.
+    ///
     /// # Errors
     ///
     /// Returns an error if issues cannot be loaded.
     fn list_issues(&self) -> Result<Vec<Issue>>;
+
+    /// Return the same issue set as [`IssueStore::list_issues`], carrying no
+    /// index maintenance.
+    ///
+    /// This is the enumeration a strictly read-only command reads through: it
+    /// publishes, rewrites, and unlinks no repository content, so an advisory
+    /// report can be stated over the whole issue set without becoming a
+    /// mutation. A backend's retained advisory locks are the one thing it may
+    /// still open create-if-absent, as every read path does; they hold no
+    /// repository content and are never unlinked.
+    ///
+    /// The default implementation delegates to [`IssueStore::list_issues`],
+    /// which is correct for a backend that attaches no maintenance to its
+    /// read-all path; a backend that does **must** override this with the
+    /// enumeration alone.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if issues cannot be loaded.
+    fn read_issues(&self) -> Result<Vec<Issue>> {
+        self.list_issues()
+    }
 
     /// Load the gate registry.
     ///
