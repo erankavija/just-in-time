@@ -245,5 +245,5 @@ This is a reference only, not a commitment:
 
 ## Related Documentation
 
-- `dev/design/subgraph-clustering-layout.md` - Overall clustering design
+- `dev/archive/9d427a6b-production-polish/dev/design/subgraph-clustering-layout.md` - Overall clustering design
 - Phase 1 implementation (completed) - Foundation this builds on
