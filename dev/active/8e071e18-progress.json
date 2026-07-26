@@ -460,7 +460,8 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "lead-verified; gates pending",
+          "model": "lead"
         },
         {
           "id": "daf4fa46-8785-41f6-a992-9bf844fb5aa3",
@@ -471,7 +472,12 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "merged; gates pending",
+          "model": "sonnet",
+          "worktree": ".agents/worktrees/agent-daf4fa46",
+          "branch": "worktree-agent-daf4fa46",
+          "worker_commit": "9926f360",
+          "merge_commit": "a442657d"
         },
         {
           "id": "d2870182-68c3-4b0e-a1ee-fdd3ca127d5d",
@@ -482,10 +488,18 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "merged; gates pending",
+          "model": "opus",
+          "worktree": ".agents/worktrees/agent-d2870182",
+          "branch": "worktree-agent-d2870182",
+          "worker_commit": "33e86a2b",
+          "merge_commit": "5b4eca20"
         }
       ],
-      "status": "dispatching"
+      "status": "merged; gates pending",
+      "merged_head": "5b4eca20",
+      "dispatched_from_main_sha": "f4e142b8d5c2b39cea48c43d852679cbfd8c6870",
+      "integration_evidence": "Leak check clean. scripts/verify-commit-builds.sh exit 0 on 5b4eca20. CARGO_INCREMENTAL=0 cargo test --workspace --no-run exit 0 on 5b4eca20 (the N3 guard)."
     },
     {
       "wave_number": 8,
@@ -1223,6 +1237,20 @@
       "subject": "planning-lead eval fixtures state the flat plan-doc path",
       "detail": ".agents/skills/jit-planning-lead/evals/evals.json states, in three expected_output fields, \"A plan document exists at P's plan-doc path (dev/active/<container-short-id>-plan.md)\". The parenthetical mirrors .jit/templates.toml's plan template doc field, which 429995e1 repoints at the canonical artifact directory. When that lands, the parenthetical contradicts the template it describes. Eval fixtures are explicitly out of scope for every skill-conversion issue (their REQ-05) and for the story checkpoint 2bc344fc (its REQ-04).",
       "disposition": "OPEN. Not a criterion violation: REQ-11 scopes to skill prompts and reference templates that read or write an artifact path, and an eval fixture expected_output is neither. VERIFY at wave 9 when 429995e1 lands, and reconcile against the epic criteria before the epic gate. Fixing it inside 429995e1 would widen that issue's declared footprint, which is an escalation rather than a lead call."
+    },
+    {
+      "id": "P13",
+      "raised_by": "d2870182 (worker), verified by the lead",
+      "subject": "the plan-doc location resolver has no production caller, so REQ-03's substitution is latent",
+      "detail": "resolve_plan_doc_location, load_plan_content, and project_plan_doc in crates/jit/src/commands/plan_doc.rs are reached only from that module's own tests. No re-export in commands/mod.rs or lib.rs, no CLI arm, no caller in crates/server/, and project_plan_doc calls project() rather than the reverse. The condition predates d2870182: it holds at base commit f4e142b8 too. What IS live from the module is PLAN_DOC_LABEL, read by planning_node_plan_path (commands/validate.rs:2293) \u2014 jit validate locates a plan from the planning node's recorded DocumentReference, not by re-deriving the template's location. PlanDocError's main.rs downcast arm is wired but unreachable because nothing in production constructs it.",
+      "disposition": "OPEN as a product observation, NOT a criterion violation. d2870182's REQ-03 names the resolver and the resolver now substitutes the field, so the criterion is met; none of the epic's 15 [hard] criteria names plan-doc resolution reachability. Reconcile against the epic criteria before the epic gate; expected to remain a genuine follow-up. If a future issue reintroduces a derive-the-location path, it will resolve {container.dir} to the apply engine's directory and reject an undeclared area without further work."
+    },
+    {
+      "id": "P14",
+      "raised_by": "lead review of d2870182",
+      "subject": "pre-existing stale doc comments surface in files an issue rewrites",
+      "detail": "PLAN_DOC_LABEL's doc comment (plan_doc.rs:51-52) claimed the template's plan_doc_location is the creation-time default 'used by jit apply plan when first writing this reference'. Apply attaches no document reference at all \u2014 crates/jit/tests/fast_docs_templates/template_apply_tests.rs:243-247 asserts neither node carries a plan-labelled ref. The worker flagged it rather than fixing it, on the correct ground that its own change did not invalidate it.",
+      "disposition": "CLOSED in d2870182 (commit 33e86a2b) at the lead's direction. The repository rule about sweeping stale text covers text a change invalidates; a pre-existing falsehood in a file the issue otherwise rewrites is cheaper to fix in place than to leave for a reviewer to rediscover. Lead pattern for the remaining waves: when a worker flags pre-existing staleness inside its own footprint, direct the fix rather than deferring it."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
@@ -1275,6 +1303,13 @@
       "subject": "session 3 ended on a server error mid wave-6 close",
       "detail": "Progress file was last written at wave-6 dispatch. Git history carried three further e2902949 review rounds, the E8 criteria amendment, and the closure of eleven wave-6 issues that the file did not record. The only outstanding work was e2902949's cargo-ci, which had failed solely on the incremental-state step.",
       "decision": "Reconstructed wave-6 state from git log, jit issue state, and .jit/gate-runs rather than from the progress file. Re-ran cargo-ci after rm -rf target/debug/incremental; passed. Closed e2902949 and wave 6."
+    },
+    {
+      "id": "N8",
+      "raised_at": "wave 7",
+      "subject": "the stale-binary guard is narrower than sessions 1-2 assumed",
+      "detail": "crates/jit/src/domain/build_provenance.rs refuses a verdict only when binary identity is established AND either the build was dirty or a DECLARED BUILD-INPUT path changed. BINARY_BUILD_INPUTS is Cargo.toml, Cargo.lock, crates/jit/Cargo.toml, crates/jit/Cargo.lock, crates/jit/build.rs, crates/jit/src/, profiles/jit-dogfood/, scripts/hooks/pre-commit, scripts/hooks/pre-push. A bare HEAD move past the build commit is NOT staleness.",
+      "decision": "Reinstall only when a commit since the build touched one of those paths. Wave 7 DID touch crates/jit/src/ (d2870182), so a reinstall is required here. Wave 8's archive executions write only dev/ and .jit/, neither a build input, so the 24 sequential runs should not each need a reinstall \u2014 verify empirically at the first sweep rather than assuming, and fall back to reinstalling per commit if a verdict is refused."
     }
   ]
 }
