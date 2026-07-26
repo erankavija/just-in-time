@@ -941,26 +941,41 @@ fn moving_path_citation_warnings(
     source: &str,
     citations: &CitationScanEvidence,
 ) -> Vec<PlanWarning> {
-    if source.is_empty() {
-        return Vec::new();
-    }
     citations
         .iter()
         .flat_map(|(citing, text)| {
             text.lines().enumerate().flat_map(move |(index, line)| {
-                line.match_indices(source).map(move |(offset, _)| {
+                citation_columns(line, source).map(move |column| {
                     PlanWarning::new(
                         WarningCode::MovingPathCitation,
-                        Some(format!(
-                            "{citing}:{}:{}",
-                            index + 1,
-                            line[..offset].chars().count() + 1
-                        )),
+                        Some(format!("{citing}:{}:{column}", index + 1)),
                     )
                 })
             })
         })
         .collect()
+}
+
+/// The 1-based character column of every occurrence of `source` in `line`,
+/// in ascending order and including occurrences that overlap each other.
+///
+/// A path that ends with one of its own prefixes occurs twice in text that
+/// chains it — `a/a` occurs at columns 1 and 3 of `a/a/a` — so the search
+/// resumes one character past each occurrence's start rather than past its end.
+/// Resuming by one *character* is what keeps the traversal inside the text:
+/// every slice boundary it takes is the start or the end of a whole character,
+/// so text in any script is scanned without panicking. An empty `source` names
+/// no citation and yields nothing.
+fn citation_columns<'a>(line: &'a str, source: &'a str) -> impl Iterator<Item = usize> + 'a {
+    let leading = source.chars().next();
+    std::iter::successors(Some((line, 1usize, None)), move |&(rest, column, _)| {
+        let resume = leading?.len_utf8();
+        rest.find(source).map(|offset| {
+            let found = column + rest[..offset].chars().count();
+            (&rest[offset + resume..], found + 1, Some(found))
+        })
+    })
+    .filter_map(|(_, _, found)| found)
 }
 
 fn selected_destination_roots(
@@ -2604,6 +2619,20 @@ mod tests {
             .unwrap_or_else(|| panic!("{citing} has no line {line}"))
     }
 
+    /// Whether the scanned text really cites `cited` where `location` says.
+    ///
+    /// Reading the named line and skipping the reported column's worth of
+    /// characters must land on the cited path, which is what makes a reported
+    /// position a citation the reader can follow.
+    fn reads_back(files: &[(&str, &str)], location: &(String, usize, usize), cited: &str) -> bool {
+        let (_, _, column) = location;
+        cited_line(files, location)
+            .chars()
+            .skip(column - 1)
+            .collect::<String>()
+            .starts_with(cited)
+    }
+
     #[test]
     fn test_classify_artifacts_warns_once_per_occurrence_of_a_moving_artifact_path_in_scanned_text()
     {
@@ -2617,12 +2646,8 @@ mod tests {
         // from the line and column it names yields the moving artifact's path.
         for location in &located {
             let (citing, line, column) = location;
-            let from_column = cited_line(&files, location)
-                .chars()
-                .skip(column - 1)
-                .collect::<String>();
             assert!(
-                from_column.starts_with(CITED_SOURCE),
+                reads_back(&files, location, CITED_SOURCE),
                 "{citing}:{line}:{column} does not locate a citation"
             );
         }
@@ -2632,10 +2657,97 @@ mod tests {
         for (citing, text) in &files {
             assert_eq!(
                 located.iter().filter(|(cited, ..)| cited == citing).count(),
-                text.matches(CITED_SOURCE).count(),
+                occurrences(text, CITED_SOURCE),
                 "{citing} earns one warning per occurrence"
             );
         }
+    }
+
+    /// Every occurrence of `cited` in `text`, overlapping ones included.
+    ///
+    /// The count comes from a candidate start at every character of the text,
+    /// which shares no search with the scan under test: the scan resumes from
+    /// the character after an occurrence it found, while this examines each
+    /// position on its own and so cannot inherit a skipped position from it.
+    fn occurrences(text: &str, cited: &str) -> usize {
+        text.char_indices()
+            .filter(|(offset, _)| text[*offset..].starts_with(cited))
+            .count()
+    }
+
+    fn scanned_plan_for(
+        policy: ArtifactClassificationPolicy,
+        source: &str,
+        files: &[(&str, &str)],
+    ) -> ArtifactPlan {
+        container_with_policy(
+            policy,
+            vec![explicit(source, vec![owner("i", State::Done, true)])],
+            ArtifactClassificationFacts {
+                citations: citations(files),
+                ..present_source(source)
+            },
+        )
+    }
+
+    #[test]
+    fn test_classify_artifacts_warns_for_each_of_two_overlapping_occurrences_of_a_moving_path() {
+        // A path ending with one of its own prefixes occurs twice in text that
+        // chains it: `dev/active/dev` starts again at the `dev` that ends the
+        // first occurrence, the minimal shape of `a/a` in `a/a/a`. A search
+        // resuming past the end of an occurrence sees only the first, so this
+        // fixture separates any-occurrence scanning from non-overlapping
+        // scanning.
+        let source = "dev/active/dev";
+        let files = [("dev/studies/tooling.md", "`dev/active/dev/active/dev`\n")];
+        let plan = scanned_plan_for(default_policy(), source, &files);
+        let artifact = entry(&plan, source);
+        assert_eq!(artifact.action(), ArtifactAction::Move);
+        let located = cited_locations(artifact);
+
+        assert_eq!(located.len(), occurrences(files[0].1, source));
+        assert!(located
+            .iter()
+            .all(|location| reads_back(&files, location, source)));
+        // The two occurrences really do overlap, which is what makes the count
+        // above differ from one that resumes past an occurrence's end.
+        let columns = located
+            .iter()
+            .map(|(_, _, column)| *column)
+            .collect::<BTreeSet<_>>();
+        assert!(matches!(
+            columns.iter().copied().collect::<Vec<_>>().as_slice(),
+            [first, second] if second - first < source.chars().count()
+        ));
+    }
+
+    #[test]
+    fn test_classify_artifacts_reports_a_character_column_for_a_citation_among_multibyte_text() {
+        // A repository whose roots are not ASCII: the cited path opens with a
+        // two-byte character, so one byte past an occurrence's start is inside
+        // that character and slicing there would panic, and the prose ahead of
+        // the occurrence is multi-byte too, so a column counted in bytes would
+        // overshoot the one the text reads back at.
+        let policy = ArtifactClassificationPolicy::configured(
+            "äänet",
+            vec!["äänet/käynnissä".into()],
+            vec!["docs".into()],
+            "äänet/arkisto",
+        );
+        let source = "äänet/käynnissä/ääni.md";
+        let files = [(
+            "äänet/tutkimus/muistio.md",
+            "# Ääni\n\nÄänitys: `äänet/käynnissä/ääni.md` on päivitetty.\n",
+        )];
+        let plan = scanned_plan_for(policy, source, &files);
+        let artifact = entry(&plan, source);
+        assert_eq!(artifact.action(), ArtifactAction::Move);
+        let located = cited_locations(artifact);
+
+        assert_eq!(located.len(), occurrences(files[0].1, source));
+        assert!(located
+            .iter()
+            .all(|location| reads_back(&files, location, source)));
     }
 
     #[test]
