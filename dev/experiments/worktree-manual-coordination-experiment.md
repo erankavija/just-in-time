@@ -374,5 +374,5 @@ Resolution: `git show :2 > ours && git show :3 > theirs && cat ours theirs | sor
 ## References
 
 - Epic: `ad601a15` - Enable parallel multi-agent work with git worktrees
-- Design: `dev/design/worktree-parallel-work.md`
+- Design: `dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md`
 - Tasks: Phase 1 Foundation (b69fa9a9, 5186a98d, 61783d2f, 565cda12)
