@@ -10,7 +10,7 @@
   "description": "The session-cost benchmark harness gains a bulk-mutation scenario so the artifact captures the post-fix bulk-update behavior.\n\n## Background\n\nThe session-cost benchmark harness `scripts/benchmark-session-cost.sh` times a fixed set of scenarios and emits a JSON artifact at `dev/studies/perf/session-cost-<jit-commit>.json`. Once the bulk-update eligibility prefilter has bounded session opens to the work that actually needs a change, the harness adds a bulk-mutation scenario - a filtered `issue update` - recorded in the artifact's `commands` array, so the artifact measures the fixed behavior rather than the O(n)-sessions path.\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/benchmark-session-cost.sh` includes a bulk-mutation scenario (a filtered `issue update`) in the scenarios it times.\n- [hard] REQ-02: The emitted artifact records the bulk-mutation scenario in its `commands` array with the same per-command stat fields as the other scenarios.\n- [hard] REQ-03: The bulk-mutation scenario runs against a freshly materialized fixture per measured sample so no sample observes a prior sample's mutation.\n\n## Notes\n\nThe scenario measures the bounded bulk-update behavior, so it builds on both the benchmark harness and the eligibility-prefilter fix.",
   "documents": [
     {
-      "commit": null,
+      "commit": "4ead5f12c79fbf8750fb63bb841265df1e09640b",
       "doc_type": "notes",
       "label": "Bulk-mutation session-cost artifact",
       "path": "dev/studies/perf/session-cost-c488ef85.json"
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Bulk-mutation benchmark scenario",
-  "updated_at": "2026-07-24T16:24:31.697176787Z"
+  "updated_at": "2026-07-26T05:27:32.350765317Z"
 }
