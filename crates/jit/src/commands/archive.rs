@@ -1917,14 +1917,14 @@ epic = "epic"
             .iter()
             .find(|artifact| artifact.source() == "workspace/active/target.md")
             .unwrap();
-        assert!(
-            artifact.evidence().contains(&EvidenceCode::OutsideOwner),
-            "the claim reaching the target through the hub must survive"
-        );
         assert_eq!(
             artifact.action(),
             ArtifactAction::Copy,
             "an artifact another document still reaches must keep its source"
+        );
+        assert!(
+            artifact.evidence().contains(&EvidenceCode::OutsideOwner),
+            "the claim reaching the target through the hub is why it keeps it"
         );
         assert!(artifact.pending_deletions().is_empty());
         // The hub bounds the plan even though it does not bound the ownership
