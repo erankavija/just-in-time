@@ -21,6 +21,7 @@
 //! directly for library integration.
 
 pub mod artifact_classifier;
+pub mod artifact_conformance;
 pub mod artifact_directory;
 pub mod artifact_discovery;
 pub mod artifact_execution;

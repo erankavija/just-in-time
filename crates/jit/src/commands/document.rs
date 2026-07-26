@@ -119,6 +119,86 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
+    /// Report the artifacts under the declared issue-scoped areas whose
+    /// location disagrees with their owning issue's canonical directory.
+    ///
+    /// The walked registry is
+    /// [`DocumentationConfig::issue_scoped_areas`](crate::config::DocumentationConfig::issue_scoped_areas)
+    /// and nothing else, so a repository that declares no issue-scoped area is
+    /// reported over no areas at all. Each area is listed with the same
+    /// no-follow recursive walk the archival planner reads its evidence with,
+    /// and the verdicts come from
+    /// [`report_area_artifacts`](crate::domain::artifact_conformance::report_area_artifacts).
+    ///
+    /// Read-only and advisory (`@/issue/8e071e18/decision/D-7`): nothing is
+    /// written, and the findings are the return value rather than a status a
+    /// caller could gate on. A declared area that does not exist yet
+    /// contributes no findings.
+    ///
+    /// # Errors
+    ///
+    /// An unreadable declared area, which is a failure of the walk rather than
+    /// a finding, and the usual configuration and storage read failures.
+    pub fn report_artifact_conformance(
+        &self,
+    ) -> Result<crate::output::ArtifactConformanceResponse> {
+        use crate::domain::artifact_discovery::{ArtifactEvidence, ArtifactListingScope};
+        use crate::domain::artifact_plan::normalize_artifact_path;
+
+        let documentation = self
+            .config_manager
+            .load()?
+            .documentation
+            .unwrap_or_default();
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let issues = self.storage.list_issues()?;
+        // The declared registry, through the accessor that decides area
+        // membership everywhere else: a declared entry that normalizes to
+        // nothing names no area, so it is neither walked nor reported as
+        // walked. The surviving entries are reported in their normalized
+        // spelling, which is the spelling every finding carries.
+        let areas = documentation
+            .issue_scoped_areas()
+            .into_iter()
+            .filter(|area| documentation.is_issue_scoped_area(area))
+            .map(|area| normalize_artifact_path(&area))
+            .collect::<Vec<_>>();
+
+        let artifacts = areas
+            .iter()
+            .map(|area| {
+                let paths = match crate::storage::artifact_planning::inspect_artifact_evidence(
+                    &self.storage,
+                    area,
+                    ArtifactListingScope::RecursiveFiles,
+                )? {
+                    ArtifactEvidence::Directory { entries, .. } => entries,
+                    // An area that is absent, a file, or a symlink holds no
+                    // per-issue artifact tree to walk.
+                    _ => Vec::new(),
+                };
+                crate::domain::artifact_conformance::report_area_artifacts(
+                    area,
+                    &paths,
+                    &issues,
+                    &documentation,
+                    &hierarchy,
+                )
+                .map_err(anyhow::Error::from)
+            })
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .map(crate::output::ArtifactConformanceEntry::from)
+            .collect::<Vec<_>>();
+
+        Ok(crate::output::ArtifactConformanceResponse {
+            areas,
+            count: artifacts.len(),
+            artifacts,
+        })
+    }
+
     pub fn remove_document_reference(
         &self,
         issue_id: &str,

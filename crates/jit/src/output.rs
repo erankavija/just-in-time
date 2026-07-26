@@ -2287,6 +2287,76 @@ pub struct ArtifactDirectoryResponse {
     pub directory: String,
 }
 
+/// Response for `doc conformance`, the advisory artifact-location report.
+///
+/// A list envelope: `count` is the length of `artifacts`. `areas` states the
+/// registry that was walked, which is exactly
+/// [`DocumentationConfig::issue_scoped_areas`](crate::config::DocumentationConfig::issue_scoped_areas),
+/// so a machine caller reads the scanned set instead of assuming one.
+///
+/// The report is advice (`@/issue/8e071e18/decision/D-7`): an entry states
+/// where an artifact sits and where its owner's directory is, and blocks
+/// nothing.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ArtifactConformanceResponse {
+    /// Declared issue-scoped areas the report walked.
+    pub areas: Vec<String>,
+    /// Reported artifacts, ordered by area and then by path.
+    pub artifacts: Vec<ArtifactConformanceEntry>,
+    /// Number of reported artifacts.
+    pub count: usize,
+}
+
+/// One artifact `doc conformance` names.
+///
+/// `status` is `nonconforming` when the owning issue is known and the artifact
+/// sits outside the directory that issue owns, and `unattributed` when no
+/// single issue answers to the artifact's short-id prefix. `issue_id` and
+/// `canonical_directory` are carried by a `nonconforming` entry and absent from
+/// an `unattributed` one, which claims no owner and no destination.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ArtifactConformanceEntry {
+    /// Repository-relative path of the artifact, which is a directory when a
+    /// whole directory sits outside its owner's.
+    pub path: String,
+    /// Declared issue-scoped area the artifact was found under.
+    pub area: String,
+    /// Short identifier the artifact's own name carries.
+    pub short_id: String,
+    /// `nonconforming` or `unattributed`.
+    pub status: String,
+    /// Full identifier of the owning issue, for a `nonconforming` entry.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issue_id: Option<String>,
+    /// Repository-relative directory the owner owns in that area, for a
+    /// `nonconforming` entry.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub canonical_directory: Option<String>,
+}
+
+impl From<crate::domain::artifact_conformance::ReportedArtifact> for ArtifactConformanceEntry {
+    fn from(artifact: crate::domain::artifact_conformance::ReportedArtifact) -> Self {
+        use crate::domain::artifact_conformance::ArtifactDisposition;
+
+        let status = artifact.disposition.as_str().to_string();
+        let (issue_id, canonical_directory) = match artifact.disposition {
+            ArtifactDisposition::Nonconforming {
+                issue_id,
+                canonical_directory,
+            } => (Some(issue_id), Some(canonical_directory)),
+            ArtifactDisposition::Unattributed => (None, None),
+        };
+        Self {
+            path: artifact.path,
+            area: artifact.area,
+            short_id: artifact.short_id,
+            status,
+            issue_id,
+            canonical_directory,
+        }
+    }
+}
+
 // ============================================================================
 // Label Response Types
 // ============================================================================

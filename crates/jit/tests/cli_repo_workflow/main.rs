@@ -4,6 +4,7 @@
 
 mod apply_cli_tests;
 mod archive_preview_cli_tests;
+mod artifact_conformance_cli_tests;
 mod claim_integration_tests;
 mod config_get_tests;
 mod cross_substrate_generality_tests;
