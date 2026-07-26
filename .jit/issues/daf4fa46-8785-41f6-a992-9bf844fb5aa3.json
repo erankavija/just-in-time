@@ -9,12 +9,24 @@
   ],
   "description": "A presentation deck owned by a terminal issue previews as an eligible plan through the document target form and the container target form, closing the gap that forced the predecessor deck to be relocated by hand.\n\n## Background\n\nArchiving the predecessor showcase deck had to be hand-rolled because the presentation area was outside the managed paths. That bypass skipped the planner's reference remapping, left a document reference dangling, and caused a validation failure that had to be repaired by hand. A preview over the predecessor container reproduces the gap with blockers on an architecture document, a successor deck, and a tombstone.\n\nWith the areas classified, out-of-root artifacts classified permanent, and directory targets skipped, both target forms should reach eligibility. The assertion reads the target-level blocker array as well as the per-artifact one, because a selected-root blocker is recorded at target level and never appears in artifact action counts.\n\n## Success Criteria\n\n- [hard] REQ-01: A document-target preview of a deck asset owned by a terminal issue reports an eligible plan.\n- [hard] REQ-02: A container-target preview whose subtree contains a deck owned by a terminal issue reports an eligible plan.\n- [hard] REQ-03: Neither preview reports an unmanaged-selected-root blocker for a path under a configured development area, asserted against the target-level blocker array.\n",
   "documents": [],
+  "done_at": "2026-07-26T12:40:43.164732097Z",
   "first_ready_at": "2026-07-26T07:16:12.141241994Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T12:22:11.680787640Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T12:34:20.710008114Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "daf4fa46-8785-41f6-a992-9bf844fb5aa3",
   "labels": [
     "type:task",
@@ -24,7 +36,7 @@
     "satisfies:REQ-02"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Prove deck archival is eligible through both archive target forms",
-  "updated_at": "2026-07-26T11:40:59.139704414Z"
+  "updated_at": "2026-07-26T12:40:43.164732097Z"
 }

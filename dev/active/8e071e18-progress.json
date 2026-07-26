@@ -1,7 +1,7 @@
 {
   "epic_id": "8e071e18-d786-43ff-b424-a283fecb11f8",
   "epic_short_id": "8e071e18",
-  "current_wave": 7,
+  "current_wave": 8,
   "waves": [
     {
       "wave_number": 1,
@@ -460,7 +460,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "lead-verified; gates pending",
+          "status": "done",
           "model": "lead"
         },
         {
@@ -472,7 +472,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "sonnet",
           "worktree": ".agents/worktrees/agent-daf4fa46",
           "branch": "worktree-agent-daf4fa46",
@@ -488,7 +488,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "opus",
           "worktree": ".agents/worktrees/agent-d2870182",
           "branch": "worktree-agent-d2870182",
@@ -496,10 +496,11 @@
           "merge_commit": "5b4eca20"
         }
       ],
-      "status": "merged; gates pending",
+      "status": "complete",
       "merged_head": "5b4eca20",
       "dispatched_from_main_sha": "f4e142b8d5c2b39cea48c43d852679cbfd8c6870",
-      "integration_evidence": "Leak check clean. scripts/verify-commit-builds.sh exit 0 on 5b4eca20. CARGO_INCREMENTAL=0 cargo test --workspace --no-run exit 0 on 5b4eca20 (the N3 guard)."
+      "integration_evidence": "Leak check clean. scripts/verify-commit-builds.sh exit 0 on 5b4eca20. CARGO_INCREMENTAL=0 cargo test --workspace --no-run exit 0 on 5b4eca20 (the N3 guard).",
+      "closure_evidence": "All six gates passed first time at c7fb0587; three code-review verdicts with zero findings. 2bc344fc was lead-verified rather than dispatched: it is a pure aggregation checkpoint with no footprint, and its code-review ran under the no-attributable-commit fallback."
     },
     {
       "wave_number": 8,
@@ -781,7 +782,8 @@
           ],
           "status": "pending"
         }
-      ]
+      ],
+      "status": "dispatching"
     },
     {
       "wave_number": 9,

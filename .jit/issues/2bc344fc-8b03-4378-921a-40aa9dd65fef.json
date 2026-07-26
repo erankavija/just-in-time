@@ -13,12 +13,24 @@
   ],
   "description": "Every agent skill prompt and reference template that reads or writes an issue artifact path obtains it from the convention, and each edited file's packaged twin travels with it.\n\n## Background\n\nThe agent skill prompts in this repository spell out a flat area-plus-short-id-prefix pattern for plan documents, progress files, handoffs, investigations, research notes, and per-issue design documents. One of them derives a document slug from the issue title, which is exactly the anti-pattern the convention removes. Two of the project-tier references already name hard-coded roots as a mistake to avoid, so the change generalizes a rule the prompts already believe in.\n\nThe skill files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so editing a prompt without its twin fails the test suite outright. Deferring the twins was rejected for that reason, and restricting the change to files that are not declared assets was rejected because that excludes nearly every skill document and would leave the shipped skills carrying the flat path.\n\nEvaluation fixtures, transcripts, and git worktree directory patterns are out of scope: they are recorded material or working directories rather than live artifact-path instructions.\n\n## Success Criteria\n\n- [hard] REQ-01: No agent skill prompt or reference template instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: No skill document derives an artifact filename or directory from an issue title.\n- [hard] REQ-03: Every edited file that is a declared profile asset carries identical content in its packaged twin.\n- [hard] REQ-04: Evaluation fixtures, transcripts, and worktree directory patterns are unchanged.\n",
   "documents": [],
+  "done_at": "2026-07-26T12:42:31.194748782Z",
   "first_ready_at": "2026-07-26T08:28:06.582442403Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T12:32:46.488690691Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T12:40:17.620176737Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2bc344fc-8b03-4378-921a-40aa9dd65fef",
   "labels": [
     "type:story",
@@ -27,7 +39,7 @@
     "story:skill-path-adoption"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Agent skills obtain artifact paths from the convention",
-  "updated_at": "2026-07-26T11:41:07.153369350Z"
+  "updated_at": "2026-07-26T12:42:31.194748782Z"
 }

@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "c7fb0587c37cc62f7aa749b8fd5968daa00e82ee",
+  "completed_at": "2026-07-26T12:36:55.040338561Z",
+  "duration_ms": 153277,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four issue requirements are implemented and covered by focused equivalence and invalid-area tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d2870182-68c3-4b0e-a1ee-fdd3ca127d5d",
+  "message": null,
+  "run_id": "1d6f3bc4-c37c-41b8-8ddf-a6e1e71f5290",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T12:34:21.762595498Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 33e86a2b (substantive), 5b4eca20 (merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-2 (issue description, markdown-first); @/invariant/domain-agnostic and @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T12:22:12Z); code-review pending\nTruncation recovery: recovered affected patches and current behavior with bounded per-file reads; omitted an overbroad issue-JSON search after resolving its relevant decision directly\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four issue requirements are implemented and covered by focused equivalence and invalid-area tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

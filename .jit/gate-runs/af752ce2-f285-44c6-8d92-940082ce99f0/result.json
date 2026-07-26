@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "c7fb0587c37cc62f7aa749b8fd5968daa00e82ee",
+  "completed_at": "2026-07-26T12:34:20.458802009Z",
+  "duration_ms": 93182,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable integration tests cover both archive target forms and target-level unmanaged-root behavior; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "daf4fa46-8785-41f6-a992-9bf844fb5aa3",
+  "message": null,
+  "run_id": "af752ce2-f285-44c6-8d92-940082ce99f0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T12:32:47.276686569Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9926f360; a442657d (merge carrying the same test patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-3,D-5,D-6,D-13 (issue Markdown); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-test-assertions,@/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T12:17:03Z)\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable integration tests cover both archive target forms and target-level unmanaged-root behavior; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

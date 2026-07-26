@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "c7fb0587c37cc62f7aa749b8fd5968daa00e82ee",
+  "completed_at": "2026-07-26T12:40:17.366210699Z",
+  "duration_ms": 201184,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact defects found in the fallback-scoped review.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2bc344fc-8b03-4378-921a-40aa9dd65fef",
+  "message": null,
+  "run_id": "b54ad12a-a13b-4732-aa94-9bc11811524d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T12:36:56.182101999Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fallback: no reachable `jit:2bc344fc` commits; reviewed issue intent and integrated completed dependencies\nPolicy sources: `AGENTS.md`; `.jit/config.toml`; `.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json`\nResolved items: `@/issue/8e071e18/decision/D-11` — markdown-first issue description\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T12:27:30Z); code-review pending\nTruncation recovery: reread truncated packaged execution-lead diffs and D-11 source; irrelevant broad profile-search hits were outside the skill-document impact cone\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found in the fallback-scoped review.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
