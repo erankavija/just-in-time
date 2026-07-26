@@ -8,10 +8,11 @@ description: >
 
 # JIT Planning Lead
 
-Deliver two linked artifacts for each breakable container `C`:
+Deliver two linked artifacts for each breakable container `C`, inside the
+directory `jit doc dir <C> dev/active` resolves:
 
-- `dev/active/<C-short-id>-plan.md`: shared design, decisions, risks, and a generated overview.
-- `dev/active/<C-short-id>-breakdown.json`: the complete authoritative issue graph, directly consumable by `jit issue batch-create`.
+- `plan.md`: shared design, decisions, risks, and a generated overview.
+- `breakdown.json`: the complete authoritative issue graph, directly consumable by `jit issue batch-create`.
 
 Planning is complete only when `P` and `B` are done, both artifacts are linked,
 every manifest issue/edge was created exactly, and every finest-tier issue is
@@ -38,8 +39,8 @@ Read [interview-protocol.md](references/interview-protocol.md) when eliciting in
 
 Dispatch the investigator with
 [investigator-prompt.md](references/investigator-prompt.md). It writes and links
-`dev/active/<C-short-id>-investigation.md` to `P`. Consumer and file inventories
-live there; the plan only cites them. Dispatch
+`investigation.md`, inside the directory `jit doc dir <C> dev/active` resolves, to
+`P`. Consumer and file inventories live there; the plan only cites them. Dispatch
 [researcher-prompt.md](references/researcher-prompt.md) only for external
 dependencies, real option selection, or unfamiliar architectural work.
 
@@ -53,16 +54,17 @@ first, then the concise plan. The manifest contract is
 the deterministic helper rather than retyping its rules:
 
 ```bash
+DIR="$(jit doc dir <C> dev/active)"
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py validate \
-  dev/active/<C>-breakdown.json --config .jit/config.toml \
-  --plan dev/active/<C>-plan.md --known-source <every-valid-source-id> ... \
+  "$DIR/breakdown.json" --config .jit/config.toml \
+  --plan "$DIR/plan.md" --known-source <every-valid-source-id> ... \
   --required-source <mandatory-source-id> ... \
   --required-criterion <criterion-id> ... --deny-warnings
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py render \
-  dev/active/<C>-breakdown.json dev/active/<C>-plan.md --write
+  "$DIR/breakdown.json" "$DIR/plan.md" --write
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py render \
-  dev/active/<C>-breakdown.json dev/active/<C>-plan.md --check
-jit issue batch-create --from-json dev/active/<C>-breakdown.json --dry-run --json
+  "$DIR/breakdown.json" "$DIR/plan.md" --check
+jit issue batch-create --from-json "$DIR/breakdown.json" --dry-run --json
 ```
 
 Link both artifacts to `P`. The plan contains only outcome/criterion approach,
