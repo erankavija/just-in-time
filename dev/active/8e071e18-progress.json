@@ -1253,6 +1253,15 @@
       "situation": "P7 and P15 are unenforced single-source mechanisms. Investigating the twin question the owner raised showed the profile packages 62 live assets that are byte-equality asserted against their repo originals (crates/jit/src/profile/dogfood.rs:444-473), because include_dir! embeds the package directory at compile time (dogfood.rs:8-9) while this repository consumes the same files live. .jit/templates.toml is NOT among them - it appears nowhere in manifest.toml and is embedded inline as [[contribution.value.nodes]], so no guard reaches it.",
       "lead_analysis": "Two different risk classes. The 62 pairs are duplication with an enforced equality; the templates pair and the adopter policy lists are duplication with nothing. The structurally-SSOT option is to generate assets/live/ at build time - crates/jit/build.rs is already a declared build input but only stamps provenance env vars.",
       "resolution": "Owner chose the fullest option: one epic under 9db27a3a covering all three, including build-time derivation of the packaged assets. Filed as e204e63d (epic:derived-package-sources, milestone:v1.0, component:core, repo-validate + holistic-review, 4 [hard] criteria). Creating an epic-level type is escalation policy item 1, approved by the owner."
+    },
+    {
+      "id": "E12",
+      "wave": 8,
+      "issue": "0e5dff57",
+      "category": "3 - success-criteria amendment; 5 - architectural decision with significant trade-offs",
+      "situation": "code-review F2 required the discovery closure to be bounded at evidence acquisition rather than at plan derivation. The worker had already implemented and measured that reading: bounding the walks flips 8 artifacts from Copy to Move, because their outside-owner evidence derives from ownership chains that run through an out-of-root artifact. A Copy-to-Move flip DELETES a live file another issue's document still reaches - the traceability loss D-14 rejected unlinking for. REQ-04's letter permits it, since it forbids only LOSING relocations, not gaining them. Separately, retention leaves 12 archive-side citations unresolved across 4 containers; the worker exempted those edges from the layout validator, without which --execute refuses outright.",
+      "lead_analysis": "Two owner-level calls, neither visible when D+A was approved. On F2: the reviewer's reading is defensible but its cost exceeds the defect's. No-argue discipline forbids softening the criterion by argument, so the choice was amend or comply. On the citations: lead recount gives 12, not the worker's 10 - the worker's replica models relative references only and missed a root-relative edge in 14303b30. The split that decides it: 9 sit on COPIED parents whose live originals keep resolving, so only the frozen snapshot is affected; 3 sit on RELOCATED parents across 2 documents and are dead everywhere. (Lead first reported this split as 4/8 in the escalation and corrected it to 3/9 on recount.)",
+      "resolution": "Owner decided both. (1) REQ-03 amended to the observable property - 'a retained out-of-root artifact contributes no descendants to the plan' - which is what the 684->20 reduction actually delivers and keeps moves at 175 with no Copy-to-Move flips. The amendment and its reasoning are recorded in 0e5dff57's Notes. (2) The validator exemption is accepted and D-14 now records the citation consequence; the 3 permanent citations are repointed before their containers archive, filed as 84c4e956 wired ahead of e536ea5a and 8ea5b13d. The 9 snapshot-only ones are accepted as what an archived snapshot is."
     }
   ],
   "rework_counts": {
@@ -1484,6 +1493,13 @@
       "subject": "installing with ANY uncommitted change makes the build dirty and the guard refuses",
       "detail": "cargo-ci was refused with exit 10, reason 'this jit binary predates the tree under review', because install-jit.sh ran while the lead's own `jit issue claim` was still uncommitted in .jit/. The guard reported 'built from commit 556b504f with a dirty working tree at build time'. .jit/ is NOT a declared build input, which is exactly why this is easy to get wrong.",
       "decision": "N9 covers a dirty tree at GATE time and remains correct: gates ran fine with dev/ artifacts uncommitted. This is the different case of a dirty tree at BUILD time, where the dirty flag is recorded into the binary's provenance and no later cleanup clears it. Sequence for every wave close: merge, commit EVERYTHING including .jit/, then install, then evaluate. Re-installing after committing cleared it and both gates passed."
+    },
+    {
+      "id": "N13",
+      "raised_at": "session 5, 0e5dff57 review",
+      "subject": "real-data measurement is necessary but not sufficient; it misses unexercised configuration paths",
+      "detail": "The lead measured all 24 containers against the worker's branch and every criterion held: 175 moves with identical move SETS in 24/24, copies 684->20, artifacts 993->278, 0 blockers. code-review then found two blocking defects anyway. F1 lived on a path this repository never exercises - all 8 of its managed paths are inside dev/, so a managed-path carve-out on the out-of-root rule is inert here and would only harm an adopter. F2 was invisible to any check that inspects the resulting plan, because the plan was correct and only the read volume was wrong.",
+      "decision": "Keep measuring real data - it is what caught the Copy-to-Move flip and what grounded both owner decisions - but never treat it as review. When a change keys on configuration, ask what this repository's configuration does NOT exercise, and read the diff for carve-outs that the local config makes inert."
     }
   ],
   "handoffs": [
