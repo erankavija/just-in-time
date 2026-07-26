@@ -78,7 +78,7 @@ Cursor 2.0 (Oct 2025) ships two distinct parallel agent modes:
 
 ## Critical Design Conflict: Worktree Placement
 
-The JIT architecture design (`dev/design/worktree-parallel-work.md`) explicitly states:
+The JIT architecture design (`dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md`) explicitly states:
 
 > "Worktrees must be placed **outside** the main repository directory. Placing them inside (e.g., `project-root/worktrees/`) causes agents to see each other's files during searches and glob operations, breaking isolation."
 
@@ -207,7 +207,7 @@ When starting a new parallel session in this repo:
 
 ### 6. Update JIT architecture doc and tutorial for dual worktree patterns
 
-`dev/design/worktree-parallel-work.md` and `docs/tutorials/parallel-work-worktrees.md` should:
+`dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md` and `docs/tutorials/parallel-work-worktrees.md` should:
 - Acknowledge Claude Code's `.claude/worktrees/` convention explicitly
 - Document the inside-repo isolation tradeoff
 - Show tool-specific setup sections (CC, Cursor local, Cursor cloud)
@@ -223,7 +223,7 @@ When starting a new parallel session in this repo:
 - [Agent Best Practices | Cursor](https://cursor.com/blog/agent-best-practices)
 - [Subagents | Cursor Docs](https://cursor.com/docs/context/subagents)
 - [Common Workflows | Claude Code Docs](https://code.claude.com/docs/en/common-workflows)
-- `dev/design/worktree-parallel-work.md` — JIT architecture design
+- `dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md` — JIT architecture design
 - `docs/tutorials/parallel-work-worktrees.md` — JIT tutorial
 - `docs/how-to/multi-agent-coordination.md` — JIT coordination how-to
-- `dev/experiments/worktree-manual-coordination-experiment.md` — original parallel work experiment
+- `dev/archive/ad601a15-parallel-work/dev/experiments/worktree-manual-coordination-experiment.md` — original parallel work experiment
