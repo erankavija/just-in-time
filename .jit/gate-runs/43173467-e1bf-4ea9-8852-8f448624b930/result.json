@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "6d94dfa1d0eb16e8218ebc2dbdae489689adf784",
+  "completed_at": "2026-07-26T08:02:19.781953082Z",
+  "duration_ms": 127050,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/json.rs",
+        "id": "F1",
+        "line": 1103,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/decision/D-7"
+        ],
+        "severity": "high",
+        "summary": "The report creates .jit/.index.lock on first use through read_issues, so it is not non-mutating."
+      }
+    ],
+    "summary": "The report still creates an index-lock file on first use, violating its hard no-mutation criterion.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e2902949-e14d-4307-b2c3-3fc3c5ad07a5",
+  "message": null,
+  "run_id": "43173467-e1bf-4ea9-8852-8f448624b930",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T08:00:12.731811077Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6969 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9d70-5734-7292-aca2-c4958cd8d3be\n--------\nuser\n--- 6956 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 6a99d49b, 3f719c85, 76e26a84, 6d94dfa1 (`jit:e2902949`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-7 (issue description, markdown-first); @/invariant/domain-agnostic and @/invariant/shared-test-contracts (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T07:48:52Z); mcp-ci passed (exit 0, 2026-07-26T07:48:49Z)\nTruncation recovery: reread the conformance test in three bounded ranges; compared each tagged merge’s first-parent delta separately\n\n1. [blocking][issue-impact][high] `jit doc conformance` still mutates a fresh repository: `read_issues` acquires `.jit/.index.lock` at [crates/jit/src/storage/json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:1103), and the shared-lock implementation opens it with `create(true)` at [crates/jit/src/storage/lock.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/lock.rs:286). The new regression test warms the lock before snapshotting, so it misses this first-run file creation. The prior sidecar-deletion finding is addressed, but REQ-03’s no-mutation requirement remains unmet. References: `@/issue/8e071e18/decision/D-7`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The report still creates an index-lock file on first use, violating its hard no-mutation criterion.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The report creates .jit/.index.lock on first use through read_issues, so it is not non-mutating.\",\"file\":\"crates/jit/src/storage/json.rs\",\"line\":1103,\"references\":[\"@/issue/8e071e18/decision/D-7\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -8,6 +8,7 @@
   ],
   "description": "The single-issue skill's prompt and its extraction reference name the canonical artifact directory instead of a flat short-id-prefixed path, and each packaged profile twin carries the identical content.\n\n## Background\n\nThis skill instructs an agent to write a design document at a managed root with a short-id-prefixed filename, and it derives that filename's slug from the issue title. The title-derived slug is the clearest instance of the anti-pattern the convention exists to remove.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
   "documents": [],
+  "done_at": "2026-07-26T08:28:02.887823577Z",
   "first_ready_at": "2026-07-26T03:45:19.917531472Z",
   "gates_required": [
     "cargo-ci",
@@ -16,12 +17,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-26T06:35:01.960710587Z",
+      "updated_at": "2026-07-26T08:00:11.886920687Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-26T07:06:28.037439053Z",
+      "status": "passed",
+      "updated_at": "2026-07-26T08:04:22.178252767Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,7 +35,7 @@
     "per:@/issue/8e071e18/decision/D-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Convert the single-issue skill to the artifact directory convention",
-  "updated_at": "2026-07-26T07:06:28.037439053Z"
+  "updated_at": "2026-07-26T08:28:02.887823577Z"
 }

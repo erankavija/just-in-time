@@ -6,7 +6,7 @@
   "dependencies": [
     "3559ca25-4d31-4e57-9eb1-0853ccd60996"
   ],
-  "description": "A read-only report lists artifacts under the declared issue-scoped areas whose location disagrees with their owning issue's canonical directory, as advice rather than as enforcement.\n\n## Background\n\nLegacy flat artifacts are deliberately tolerated, so a blocking rule would be a false-positive source. A non-enforced validation rule would technically not block, but it rides inside the validation exit code that a repository gate consumes. A dedicated read-only report satisfies the non-blocking requirement by construction: a command that only prints cannot gate anything.\n\nThe report walks the issue-scoped areas the configuration registry declares, resolves each prefixed artifact's owning issue, compares its location with the canonical directory for the area it sits in, and lists the differences. An artifact whose owner cannot be resolved is reported as unattributed rather than as nonconforming. A shell-level area scan already exists in the repository as a precedent for this kind of advisory sweep, and it reads its root from configuration rather than hard-coding one.\n\nThe adopter command reference is not edited here. This epic's command-surface changes are documented together in that one reference, so this issue's footprint names only the files it mutates.\n\n## Success Criteria\n\n- [hard] REQ-01: The report lists each artifact under a declared issue-scoped area whose location differs from its owning issue's canonical directory for that area.\n- [hard] REQ-02: The scanned areas are exactly the areas the configuration registry declares, with no built-in list.\n- [hard] REQ-03: The report exits successfully whatever it finds and performs no mutation.\n- [hard] REQ-04: No state transition is blocked by a nonconforming artifact.\n- [hard] REQ-05: An artifact whose owning issue cannot be resolved is reported as unattributed rather than as nonconforming.\n- [hard] REQ-06: Machine-readable output wraps the collection in the standard count-and-collection envelope.\n- [hard] REQ-07: The command is curated in the generated bridge manifest with a rationale.\n",
+  "description": "A read-only report lists artifacts under the declared issue-scoped areas whose location disagrees with their owning issue's canonical directory, as advice rather than as enforcement.\n\n## Background\n\nLegacy flat artifacts are deliberately tolerated, so a blocking rule would be a false-positive source. A non-enforced validation rule would technically not block, but it rides inside the validation exit code that a repository gate consumes. A dedicated read-only report satisfies the non-blocking requirement by construction: a command that only prints cannot gate anything.\n\nThe report walks the issue-scoped areas the configuration registry declares, resolves each prefixed artifact's owning issue, compares its location with the canonical directory for the area it sits in, and lists the differences. An artifact whose owner cannot be resolved is reported as unattributed rather than as nonconforming. A shell-level area scan already exists in the repository as a precedent for this kind of advisory sweep, and it reads its root from configuration rather than hard-coding one.\n\nThe adopter command reference is not edited here. This epic's command-surface changes are documented together in that one reference, so this issue's footprint names only the files it mutates.\n\n## Success Criteria\n\n- [hard] REQ-01: The report lists each artifact under a declared issue-scoped area whose location differs from its owning issue's canonical directory for that area.\n- [hard] REQ-02: The scanned areas are exactly the areas the configuration registry declares, with no built-in list.\n- [hard] REQ-03: The report exits successfully whatever it finds, creates, moves or deletes no artifact, and changes no tracked repository content. The gitignored advisory lock files that every read path opens are outside this criterion: they are shared coordination state rather than repository content, and a read that bypassed them would be the only unserialized reader in the codebase.\n- [hard] REQ-04: No state transition is blocked by a nonconforming artifact.\n- [hard] REQ-05: An artifact whose owning issue cannot be resolved is reported as unattributed rather than as nonconforming.\n- [hard] REQ-06: Machine-readable output wraps the collection in the standard count-and-collection envelope.\n- [hard] REQ-07: The command is curated in the generated bridge manifest with a rationale.",
   "documents": [],
   "first_ready_at": "2026-07-26T03:45:27.404008530Z",
   "gates_required": [
@@ -17,17 +17,17 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-26T06:18:54.819687934Z",
+      "updated_at": "2026-07-26T07:54:59.055903321Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-07-26T06:59:11.781985697Z",
+      "updated_at": "2026-07-26T08:02:20.039768187Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-07-26T05:58:46.559786494Z",
+      "updated_at": "2026-07-26T07:48:51.597398732Z",
       "updated_by": "auto:executor"
     }
   },
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Report artifacts sitting outside their owning issue's canonical directory",
-  "updated_at": "2026-07-26T06:59:11.781985697Z"
+  "updated_at": "2026-07-26T08:27:59.080837651Z"
 }
