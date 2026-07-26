@@ -680,6 +680,12 @@ impl CommandSchema {
                 Some(schema_to_value::<GateListResponse>()),
                 "GateListResponse",
             ),
+            // `doc dir` resolves one value, so it declares the flat named object
+            // rather than a list envelope.
+            "doc_dir" => (
+                Some(schema_to_value::<ArtifactDirectoryResponse>()),
+                "ArtifactDirectoryResponse",
+            ),
             "label_namespaces" => (
                 Some(schema_to_value::<NamespacesResponse>()),
                 "NamespacesResponse",
