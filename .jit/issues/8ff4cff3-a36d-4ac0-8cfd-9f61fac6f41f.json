@@ -7,6 +7,7 @@
   ],
   "description": "The adopter planning-bracket guide and the two example template registries carry the area declaration together with the artifact-directory field, so an adopter copying either one produces a document path inside the convention.\n\n## Background\n\nThe planning-bracket how-to teaches the template document declaration by quoting the software-design example registry, and the research example registry declares the same shape for its own bracket. Both spell out a flat area-plus-identifier pattern, so an adopter following the guide reproduces the layout the convention replaces.\n\nThe guide's quoted block and the registry it quotes are one fact in two places, so they move together or the guide teaches a declaration no example carries.\n\nThese registries are adopter-facing samples rather than this repository's own configuration, so they carry the shape an adopter should copy and no repository-local path.\n\n## Success Criteria\n\n- [hard] REQ-01: The adopter planning-bracket guide names the area declaration a template document node carries.\n- [hard] REQ-02: The adopter planning-bracket guide names the interpolation field that resolves to the container's canonical artifact directory.\n- [hard] REQ-03: The software-design example registry declares its planning document path through the artifact-directory field with a filename carrying no short-id prefix.\n- [hard] REQ-04: The research example registry declares its planning document path the same way.\n- [hard] REQ-05: The declaration quoted in the guide matches the example registry it quotes.\n",
   "documents": [],
+  "first_ready_at": "2026-07-26T13:43:56.963176623Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
@@ -22,7 +23,7 @@
     "per:@/issue/8e071e18/decision/D-2"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "State the artifact-directory template field in the adopter template documentation",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-26T13:43:56.963176623Z"
 }

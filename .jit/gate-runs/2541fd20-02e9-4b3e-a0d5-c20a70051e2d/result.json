@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "9f1064062fbc87660934be22452d5a6f56b8a382",
+  "completed_at": "2026-07-26T13:43:08.319213739Z",
+  "duration_ms": 135647,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are satisfied by the attributed template, packaged-profile, and application-test changes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "429995e1-7413-41a0-bb67-fd069022968d",
+  "message": null,
+  "run_id": "2541fd20-02e9-4b3e-a0d5-c20a70051e2d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T13:40:52.671823869Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: becd7266 `jit:429995e1`; 9b4b9122 merge `jit:429995e1` (no distinct combined patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/requirement/REQ-05, @/issue/8e071e18/decision/D-2, @/issue/8e071e18/decision/D-11 (issue 8e071e18 description, markdown-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T13:33:08Z); repo-validate passed (exit 0, 2026-07-26T13:38:36Z)\nTruncation recovery: narrowed reads of configuration, template/apply implementation, profile manifest, and tests after broad output truncation\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are satisfied by the attributed template, packaged-profile, and application-test changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

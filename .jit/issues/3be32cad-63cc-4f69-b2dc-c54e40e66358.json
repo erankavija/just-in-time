@@ -8,12 +8,24 @@
   ],
   "description": "Regression coverage proves that archival execution relocates and relinks artifacts without altering the bytes of any document, so the warning channel stays the only response to an inline citation.\n\n## Background\n\nExecution emits file writes, file deletions, and directory creations, and the only synthesized bytes it produces are the container marker. No content rewriting exists anywhere in the archival path, so the guarantee holds today but is unasserted. A citation inside a dated historical document must survive verbatim, which is why the planner warns instead of rewriting; without a regression test that boundary can erode silently.\n\nThe assertion distinguishes the two things execution legitimately changes — file location and the issue's document link records — from the one it must not change, which is file content.\n\n## Success Criteria\n\n- [hard] REQ-01: After execution, every relocated artifact's content is byte-identical to its pre-execution content.\n- [hard] REQ-02: After execution, a scanned file that cites a relocated artifact's path is byte-identical to its pre-execution content.\n- [hard] REQ-03: The issue document link records are still relinked to the new locations, so immutability is not achieved by skipping work.\n- [hard] REQ-04: The container marker remains the only file whose bytes execution synthesizes.\n",
   "documents": [],
+  "done_at": "2026-07-26T13:43:45.465574520Z",
   "first_ready_at": "2026-07-26T12:41:01.896542782Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T13:33:08.134665319Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T13:40:51.582033765Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3be32cad-63cc-4f69-b2dc-c54e40e66358",
   "labels": [
     "type:task",
@@ -25,7 +37,7 @@
     "enforces:@/invariant/derived-state-coherence"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Lock in that archive execution rewrites no document content",
-  "updated_at": "2026-07-26T12:44:07.824012430Z"
+  "updated_at": "2026-07-26T13:43:45.465574520Z"
 }

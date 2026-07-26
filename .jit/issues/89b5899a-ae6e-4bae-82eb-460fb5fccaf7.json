@@ -9,6 +9,7 @@
   ],
   "description": "The archival planner names its destination directory without falling back to an issue title and warns about in-content path citations that a move would break, without ever rewriting document content.\n\n## Background\n\nThe planner derives a destination directory name from a membership label and falls back to the issue title when no single membership value exists. The fallback produces long names truncated mid-word, and one such directory exists in the archive as its own counter-example. Removing the fallback reverses a shipped, reviewed decision rather than fixing a bug; the reversal is deliberate.\n\nSeparately, the planner relinks issue document records when artifacts move, but it does not see path mentions in the text of ordinary files. Shell scripts, operator-facing error strings, a production module doc comment, adopter tutorials, and changelog entries all cite artifact paths inline, and none of them is a document link record, so validation stays silent when a move breaks them. Those citations must be reported as plan warnings, and archival is a core command, so the files the scan reads are declared in configuration rather than taken from a Git index.\n\nContent is never rewritten. A citation inside a dated historical document must survive verbatim, so the planner warns and a human decides.\n\n## Success Criteria\n\n- [hard] REQ-01: The archive directory name is derived from a membership label or a bare short id with no title fallback, and the one pre-existing title-slugged directory is renamed with its container marker still resolving it.\n- [hard] REQ-02: An archival plan reports, as plan warnings, occurrences of a moving artifact's path in the text of the files its declared scan universe covers, including code comments and shell scripts, with or without Git.\n- [hard] REQ-03: Execution rewrites no document content.\n",
   "documents": [],
+  "first_ready_at": "2026-07-26T13:43:49.288974113Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -25,7 +26,7 @@
     "story:archive-naming-and-warnings"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive directory naming and citation breakage warnings",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-26T13:43:49.288974113Z"
 }

@@ -754,7 +754,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "opus",
           "worker_commit": "142704f6",
           "merge_commit": "f543b51e",
@@ -771,7 +771,7 @@
             "code-review",
             "repo-validate"
           ],
-          "status": "merged; gates pending",
+          "status": "done",
           "model": "sonnet",
           "worker_commit": "becd7266",
           "merge_commit": "9b4b9122",
@@ -795,7 +795,8 @@
       ],
       "status": "dispatching",
       "dispatched_from_main_sha": "4dd883ba1e4e0b92eb675817650948591110d5a7",
-      "archive_sweep_status": "BLOCKED pending owner decision on the out-of-root copy policy (escalation E9). All 24 containers preview eligible with zero blockers."
+      "archive_sweep_status": "BLOCKED pending owner decision on the out-of-root copy policy (escalation E9). All 24 containers preview eligible with zero blockers.",
+      "implementation_closure_evidence": "3be32cad and 429995e1 closed at HEAD 9f106406: five gates passed, both code-reviews zero findings, jit validate green. The 24 archive executions remain blocked on E9."
     },
     {
       "wave_number": 9,
@@ -1157,6 +1158,21 @@
       "lead_analysis": "Every jit read path opens the shared advisory .index.lock, so a literal reading was unsatisfiable without an unserialized index read.",
       "resolution": "Owner approved amending REQ-03 to scope it to repository content and exclude the gitignored advisory lock files (commit 1bdae2f5). Recorded here in session 4; session 3 ended before it reached the progress file.",
       "record_location": "commit message of 1bdae2f5"
+    },
+    {
+      "id": "E9",
+      "wave": 8,
+      "issue": "the 24 archive-sweep issues",
+      "category": "6 \u2014 architectural decision with significant trade-offs; 8 \u2014 blast radius beyond this epic",
+      "situation": "All 24 containers preview eligible with zero blockers, but the 24 plans together schedule 684 copy operations over 139 distinct files (~16.6 MB) into dev/archive/: 56 adopter docs under docs/, 44 .jit/.github/scripts/mcp-server files, 29 dev/ files, 6 production sources under crates/, and 4 repository-root files including README.md and AGENTS.md. Seven containers copy 90-132 files each. Predicted at planning time \u2014 seven issue descriptions say '90 for copying' \u2014 so this is not a regression; the counts have drifted up (132/92/91 vs 90) because docs/ grew since.",
+      "lead_analysis": "The classifier selects an action from two independent booleans at artifact_classifier.rs:765: (wants_destination, needs_source) -> Copy/Move/Retain. 'Permanent' was designed for dev/architecture \u2014 living documentation the archive wants a frozen snapshot of while readers keep the live file \u2014 so it sets needs_source=true and Copy falls out. D-14 needed out-of-root artifacts to stop BLOCKING and expressed that by extending is_permanent() to cover anything outside the development root (:129-137). That flag only says keep the source; wants_destination stays true. The copying is an inherited side effect rather than a chosen behaviour. Epic REQ-14 requires only that no unmanaged-selected-root blocker is reported and that no file outside the development root is relocated \u2014 it does not require copying, so classifying out-of-root sources to the existing Retain action satisfies it just as literally.",
+      "options": [
+        "A: classify out-of-root sources Retain (684 copies -> 8); configured permanent roots keep Copy. Costs an amendment to D-14's recorded mechanism, a remediation task against 4f9af089's shipped classification, and a re-preview of the 12 affected containers.",
+        "B: execute as planned, as the reviewed plan and breakdown review approved.",
+        "C: unlink the out-of-root documents first \u2014 explicitly rejected by D-14 as destroying traceability from ten terminal issues."
+      ],
+      "lead_recommendation": "A. It matches what D-14 was trying to buy, and B risks a finding at the epic's own holistic-review gate against @/inv/single-source-prose ('a hand-maintained copy is a staleness defect') and @/charter/D-13, both cited as binding in the epic's Notes \u2014 seven frozen copies of the adopter docs tree are exactly that.",
+      "resolution": "OPEN. Owner asked the clarifying question 'Why copy sources? Sounds weird.', received the mechanism analysis, then requested a session handoff. No option chosen."
     }
   ],
   "rework_counts": {
@@ -1345,6 +1361,28 @@
       "subject": "the stale-binary guard is narrower than sessions 1-2 assumed",
       "detail": "crates/jit/src/domain/build_provenance.rs refuses a verdict only when binary identity is established AND either the build was dirty or a DECLARED BUILD-INPUT path changed. BINARY_BUILD_INPUTS is Cargo.toml, Cargo.lock, crates/jit/Cargo.toml, crates/jit/Cargo.lock, crates/jit/build.rs, crates/jit/src/, profiles/jit-dogfood/, scripts/hooks/pre-commit, scripts/hooks/pre-push. A bare HEAD move past the build commit is NOT staleness.",
       "decision": "Reinstall only when a commit since the build touched one of those paths. Wave 7 DID touch crates/jit/src/ (d2870182), so a reinstall is required here. Wave 8's archive executions write only dev/ and .jit/, neither a build input, so the 24 sequential runs should not each need a reinstall \u2014 verify empirically at the first sweep rather than assuming, and fall back to reinstalling per commit if a verdict is refused."
+    },
+    {
+      "id": "N9",
+      "raised_at": "wave 8 gate batch",
+      "subject": "a dirty working tree of non-build-input paths does not invalidate a gate verdict",
+      "detail": "Gates 2-5 of the wave-8 batch ran while the tree carried an uncommitted dev/active/8e071e18-dev-artifact-layout/handoff-3.md and a modified dev/active/8e071e18-progress.json. All four passed and recorded tree_dirty: true. This is the empirical confirmation N8 asked for: the guard refuses only on a dirty BUILD or a change to one of the nine BINARY_BUILD_INPUTS paths.",
+      "decision": "Sessions 1-2's rule 'never edit any repo file while a gate batch runs' can be relaxed to 'never edit a BUILD-INPUT file while a gate batch runs'. Editing progress files, handoffs, and dev/ artifacts mid-batch is safe. Editing crates/jit/src/, profiles/jit-dogfood/, Cargo manifests, or the git hooks is not."
+    }
+  ],
+  "handoffs": [
+    {
+      "session": 1,
+      "path": "dev/active/8e071e18-handoff.md"
+    },
+    {
+      "session": 2,
+      "path": "dev/active/8e071e18-handoff-2.md"
+    },
+    {
+      "session": 4,
+      "path": "dev/active/8e071e18-dev-artifact-layout/handoff-3.md",
+      "note": "First artifact written to the epic's canonical directory (jit doc dir); earlier artifacts stay flat per D-4/REQ-13."
     }
   ]
 }
