@@ -31,7 +31,7 @@ const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
 /// `container` anchor (REQ-13). A fresh apply wires the `depends_on` edge (B→P),
 /// the `anchor_edge` (C→B), and runs the `move-upstream-to-role` transform onto P.
 fn plan_template() -> GraphTemplate {
-    plan_template_document("dev/active/{container.id}-plan.md", None)
+    plan_template_document("{container.dir}/plan.md", Some("dev/active"))
 }
 
 /// The same `plan`-shaped template with its planning node's document
@@ -230,14 +230,30 @@ fn test_apply_resolves_node_doc_location() {
         .unwrap();
 
     let planning = h.get_issue(&result.created_node_ids_by_role["planning"]);
-    let full_id = h.get_issue(&epic).id;
     // The `{doc}` token resolves into the planning node's DESCRIPTION as an
-    // instruction (where to author and link the plan).
+    // instruction (where to author and link the plan). REQ-01/REQ-04: the path
+    // sits inside the container's canonical artifact directory — the same
+    // directory the domain resolver reports for the declared area, not a
+    // hand-composed `area/id` path.
+    let directory = h
+        .executor
+        .resolve_issue_artifact_directory(&epic, "dev/active")
+        .unwrap()
+        .directory;
     assert!(
         planning
             .description
-            .contains(&format!("dev/active/{full_id}-plan.md")),
+            .contains(&format!("{directory}/plan.md")),
         "planning description must carry the resolved plan-doc location: {}",
+        planning.description
+    );
+    // REQ-02: the filename repeats no short id — the directory already names
+    // the issue.
+    assert!(
+        !planning
+            .description
+            .contains(&format!("{}-plan.md", h.get_issue(&epic).short_id())),
+        "the filename must not repeat the issue's short id: {}",
         planning.description
     );
     // Apply attaches NO document reference: the plan does not exist yet, so the

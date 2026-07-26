@@ -286,7 +286,8 @@ gates = ["repo-validate"]
 role = "planning"
 type = "planning"
 gates = ["plan-review"]
-doc = "dev/active/{container.short_id}-plan.md"
+doc_area = "dev/active"
+doc = "{container.dir}/plan.md"
 description = "Plan {container.title} ({container.short_id}) against every hard success criterion, write the concise design at {doc} and its authoritative sibling breakdown manifest, and link both to this planning issue."
 
 [[contribution.value.nodes]]
