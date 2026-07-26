@@ -1,6 +1,6 @@
 # Progress file
 
-Persist the wave plan to `dev/active/<epic-short-id>-progress.json`:
+Persist the wave plan to `progress.json` in the epic's artifact directory, resolved via `jit doc dir <epic-id> dev/active`:
 
 ```json
 {

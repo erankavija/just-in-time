@@ -2,7 +2,7 @@
 
 Write a session handoff at the end of any session that does not complete the epic, so that the next-session lead (possibly a different agent or model) can resume with full context.
 
-Save to the project's managed docs path (typically `dev/active/<epic-short-id>-handoff.md`, or `dev/active/<epic-short-id>-handoff-<N>.md` for subsequent handoffs — do not overwrite the earlier one).
+Save to `handoff.md` in the epic's artifact directory (`jit doc dir <epic-id> dev/active`), or `handoff-<N>.md` for subsequent handoffs — do not overwrite the earlier one.
 
 Use exactly the sections below, in this order. Do not skip sections — if a section has nothing to report, write "None." rather than removing it. Every section serves a specific purpose for the next lead.
 
@@ -20,7 +20,7 @@ Use exactly the sections below, in this order. Do not skip sections — if a sec
 - Children summary: [X done, Y in_progress, Z backlog/ready, W rejected]
 - Active claims: [list any issues currently claimed, with agent IDs and claim age]
 - Open escalations: [list any escalations still awaiting invoker input]
-- Progress file: `<managed-docs-root>/<short-id>-progress.json` (reflects the above)
+- Progress file: `progress.json` in the epic's artifact directory, `jit doc dir <epic-id> dev/active` (reflects the above)
 
 ## What just happened
 
