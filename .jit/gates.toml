@@ -168,7 +168,7 @@ REVIEWER_AGENT = 'codex exec -m gpt-5.6-terra -c model_reasoning_effort="high"'
 version = 1
 key = "docs-mechanical"
 title = "Documentation Mechanical Checks"
-description = "Deterministic mechanical checks over the adopter-facing documentation surface, each deriving both comparison sides live from the tree so it encodes no product facts: markdown link + heading-anchor resolution (M2), source-path + @/… citation existence (M3), and registry projection freshness (M5, re-runs jit project render and diffs the configured targets). Runs ./scripts/docs-mechanical.sh, which fans out to the three committed checkers under scripts/ (docs-check-links.sh, docs-check-citations.sh, docs-check-projections.sh). The footprint is caller-supplied: area audits and the container's full-surface run pass their own paths via positional arguments or the DOCS_FOOTPRINT environment variable; with none supplied the checker defaults to the configured permanent documentation roots (currently docs/)."
+description = "Deterministic mechanical checks over the adopter-facing documentation surface, each deriving both comparison sides live from the tree so it encodes no product facts: markdown link + heading-anchor resolution (M2), source-path + @/… citation existence (M3), and registry projection freshness (M5, re-runs jit project render and diffs the configured targets). Runs ./scripts/docs-mechanical.sh, which fans out to the three committed checkers under scripts/ (docs-check-links.sh, docs-check-citations.sh, docs-check-projections.sh). The footprint is caller-supplied: area audits and the container's full-surface run pass their own paths via positional arguments, and this gate supplies the adopter documentation root through the DOCS_FOOTPRINT environment variable."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -181,6 +181,12 @@ timeout_seconds = 300
 pass_context = false
 
 [gates.checker.env]
+# The adopter documentation surface, supplied explicitly. The checker's own
+# fallback derives a footprint from [documentation].permanent_paths, which
+# denotes the artifacts that archive by copy — a deliberately different set
+# from the adopter surface once development areas carry permanent entries
+# (@/issue/8e071e18/decision/D-13).
+DOCS_FOOTPRINT = "docs/"
 
 [gates.reserved]
 
