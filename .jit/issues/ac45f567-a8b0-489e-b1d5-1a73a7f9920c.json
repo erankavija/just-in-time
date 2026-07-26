@@ -1,0 +1,25 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-26T19:29:27.896552817Z",
+  "dependencies": [],
+  "description": "A supported link whose reference carries an anchor fragment fails the proposed-layout check, so an archival execution refuses a container whose plan previewed as eligible.\n\n## Background\n\nBefore writing anything, an archival execution verifies that every supported edge still resolves to an available path once the plan's moves are applied. The check joins the edge's reference onto each candidate parent location and tests the result for membership in the target's available paths. It uses the reference verbatim, fragment included, while the available paths are plain repository-relative paths that never carry a fragment. Reference resolution elsewhere strips the query string and the fragment before computing a target, so the two disagree about what the reference names.\n\nAny supported edge written with an anchor therefore fails, and it fails only at execution. The preview reports the plan eligible with no blockers; the execution then refuses with an error naming a reference that a reader can watch resolve correctly in the working tree.\n\nMeasured over the containers this repository is about to archive: 8 of 24 refuse, and every one of the 8 fails on a fragment-bearing reference. The refusal is clean — a failed run leaves the tree untouched — but the affected containers cannot be archived at all while it stands.\n\n## Success Criteria\n\n- [hard] REQ-01: A supported edge whose reference carries an anchor fragment resolves in the proposed-layout check against the same path as the equivalent fragment-free reference.\n- [hard] REQ-02: A supported edge whose reference carries a query string resolves the same way.\n- [hard] REQ-03: An edge whose path component genuinely fails to resolve after the move still fails the check, and the reported failure names the reference as it was written.\n- [hard] REQ-04: A container whose plan previews eligible completes its execution without a proposed-layout refusal, for every container whose fragment-bearing edges have resolving path components.\n\n## Notes\n\nThe asymmetry between preview and execution is what makes this expensive to diagnose: eligibility is computed without the proposed-layout check, so the only signal is the refusal itself.",
+  "documents": [],
+  "first_ready_at": "2026-07-26T19:29:27.896552817Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ac45f567-a8b0-489e-b1d5-1a73a7f9920c",
+  "labels": [
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "story:area-classification",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Anchor fragments survive the proposed-layout check",
+  "updated_at": "2026-07-26T19:29:27.896552817Z"
+}

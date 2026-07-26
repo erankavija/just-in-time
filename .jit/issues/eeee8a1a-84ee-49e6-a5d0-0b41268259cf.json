@@ -1,0 +1,24 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-26T19:30:08.501698654Z",
+  "dependencies": [],
+  "description": "The mechanical documentation checker falls back to the archival permanent paths when no footprint is supplied, so a bare invocation checks the contributor areas that archival retains rather than the adopter documentation surface.\n\n## Background\n\nThe checker resolves its footprint in order and, absent an explicit one, reads the permanent-path list from the repository's documentation policy. That list denotes the areas an archive copies rather than relocates. Since each development area became classified explicitly, those two sets are deliberately different: the permanent paths are contributor areas holding living documentation, and the adopter documentation surface is a separate tree.\n\nThe gate that runs this checker no longer reaches the fallback, because an explicit footprint is pinned ahead of it in the resolution order. Any other caller invoking the script bare still gets the contributor areas, and the checkers exit non-zero over them on pre-existing illustrative sample paths — so the fallback both checks the wrong tree and fails on it.\n\nThe script is repository-local: it appears in no profile asset and in no gate preset shipped by the binary.\n\n## Success Criteria\n\n- [hard] REQ-01: A bare invocation of the checker resolves a footprint denoting the adopter documentation surface, not the archival permanent paths.\n- [hard] REQ-02: An explicitly supplied footprint still takes precedence over the default, in the same resolution order as today.\n- [hard] REQ-03: A bare invocation over an unmodified repository exits zero.\n- [hard] REQ-04: The checker's own documentation states which surface the default denotes.\n\n## Notes\n\nThe two sets diverged when each development area gained an explicit archival classification. Nothing announced the divergence to this checker, which is why the fallback kept resolving and kept being wrong.",
+  "documents": [],
+  "first_ready_at": "2026-07-26T19:30:08.501698654Z",
+  "gates_required": [
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "eeee8a1a-84ee-49e6-a5d0-0b41268259cf",
+  "labels": [
+    "milestone:v1.0",
+    "component:tooling",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Mechanical documentation checker defaults to the archival permanent paths",
+  "updated_at": "2026-07-26T19:30:08.501698654Z"
+}

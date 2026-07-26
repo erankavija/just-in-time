@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
+    "0e5dff57-44c1-4fc3-ac2c-f60cf118dabf",
     "b4d1a2c8-d408-46d0-b0b6-dc3e30283420",
     "daf4fa46-8785-41f6-a992-9bf844fb5aa3"
   ],
@@ -25,7 +26,7 @@
     "per:@/issue/8e071e18/decision/D-21"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Archive the structured knowledge container's linked artifacts",
-  "updated_at": "2026-07-26T12:40:50.672243349Z"
+  "updated_at": "2026-07-26T19:32:13.442347334Z"
 }

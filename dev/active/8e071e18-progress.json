@@ -506,6 +506,26 @@
       "wave_number": 8,
       "issues": [
         {
+          "short_id": "0e5dff57",
+          "title": "Retain artifacts outside the development root and stop discovery at them",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "short_id": "ac45f567",
+          "title": "Anchor fragments survive the proposed-layout check",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
           "id": "e536ea5a-54cb-45ea-a757-0d94dba0a001",
           "short_id": "e536ea5a",
           "title": "Archive the CLI ergonomics phase container's linked artifacts",
@@ -790,13 +810,14 @@
             "docs-mechanical",
             "repo-validate"
           ],
-          "status": "pending"
+          "status": "blocked"
         }
       ],
       "status": "dispatching",
       "dispatched_from_main_sha": "4dd883ba1e4e0b92eb675817650948591110d5a7",
       "archive_sweep_status": "BLOCKED pending owner decision on the out-of-root copy policy (escalation E9). All 24 containers preview eligible with zero blockers.",
-      "implementation_closure_evidence": "3be32cad and 429995e1 closed at HEAD 9f106406: five gates passed, both code-reviews zero findings, jit validate green. The 24 archive executions remain blocked on E9."
+      "implementation_closure_evidence": "3be32cad and 429995e1 closed at HEAD 9f106406: five gates passed, both code-reviews zero findings, jit validate green. The 24 archive executions remain blocked on E9.",
+      "ordering_note": "Internal ordering: ac45f567 -> 0e5dff57 -> the 24 archive executions. 35499d1e is downstream of 0e5dff57 and is no longer independently available."
     },
     {
       "wave_number": 9,
@@ -1075,6 +1096,46 @@
       "wave": 3,
       "reason": "E4 remediation for f88a16d9 blocking code-review finding F1",
       "authority": "owner-approved"
+    },
+    {
+      "session": 5,
+      "in_epic": [
+        {
+          "short_id": "ac45f567",
+          "reason": "E10 - anchor fragments refuse 8 of 24 archive executions; blocks REQ-09"
+        },
+        {
+          "short_id": "0e5dff57",
+          "reason": "E9 option D+A - retain out-of-root artifacts and bound the discovery closure"
+        }
+      ],
+      "outside_epic": [
+        {
+          "short_id": "e204e63d",
+          "type": "epic",
+          "reason": "E11 - P7 + P15 + build-time derivation of the packaged assets"
+        },
+        {
+          "short_id": "985ab96d",
+          "type": "task",
+          "reason": "P13 - unreferenced plan-doc location resolver"
+        },
+        {
+          "short_id": "c7f8ebc7",
+          "type": "bug",
+          "reason": "P11 - citation warning fires on a corrected citation"
+        },
+        {
+          "short_id": "ef118aea",
+          "type": "task",
+          "reason": "P16 - execution reports no citation warnings"
+        },
+        {
+          "short_id": "eeee8a1a",
+          "type": "bug",
+          "reason": "P8 - docs checker defaults to the archival permanent paths"
+        }
+      ]
     }
   ],
   "escalations": [
@@ -1172,7 +1233,26 @@
         "C: unlink the out-of-root documents first \u2014 explicitly rejected by D-14 as destroying traceability from ten terminal issues."
       ],
       "lead_recommendation": "A. It matches what D-14 was trying to buy, and B risks a finding at the epic's own holistic-review gate against @/inv/single-source-prose ('a hand-maintained copy is a staleness defect') and @/charter/D-13, both cited as binding in the epic's Notes \u2014 seven frozen copies of the adopter docs tree are exactly that.",
-      "resolution": "OPEN. Owner asked the clarifying question 'Why copy sources? Sounds weird.', received the mechanism analysis, then requested a session handoff. No option chosen."
+      "resolution": "RESOLVED session 5. Owner chose option D+A after asking why so many files were involved, which produced the measurement below. (1) Bound the discovery closure at a permanent/out-of-root node instead of walking through it; (2) classify out-of-root sources to the existing Retain action. Projected 684 copies -> 20; all 175 relocations preserved (simulated per container against each plan's edge graph, zero moves lost). Filed as 0e5dff57 under story:area-classification with satisfies:REQ-14, wired ahead of all 24 sweeps. D-14's recorded mechanism amended in the epic description; the 15 [hard] criteria are untouched and REQ-14 still holds literally.",
+      "measurement": "Root cause is NOT hand-made doc links: the 24 containers carry 236 explicitly linked documents between them, and the worst container has 4 explicit roots yielding 91 embedded artifacts. artifact_discovery.rs:303-338 enqueues every resolved local link as an embedded artifact and re-walks it (driven by storage/artifact_discovery.rs:52-73), so one root citing a documentation hub pulls the whole cross-linked set in. 7 of 24 containers produce 675 of the 684 copies. Copy composition: 525 out-of-root, 75 dev/ permanent-area, 84 dev/ outside-owner. The handoff-3 estimate of '684 -> 8 under option A' was wrong; option A alone gives 684 -> 159."
+    },
+    {
+      "id": "E10",
+      "wave": 8,
+      "issue": "the 24 archive-sweep issues",
+      "category": "6 - blocker outside the issue's scope, discovered during E9 measurement",
+      "situation": "Executing all 24 containers in a throwaway worktree at HEAD showed 8 of 24 REFUSE with exit 4, while every one of the 24 previews reports eligible with zero blockers. Every failure is an anchor fragment: 7 on README.md#quick-start, 1 on docs/how-to/custom-gates.md#structured-findings-machine-readable-output. This was never observed before because preview eligibility does not run the proposed-layout check.",
+      "lead_analysis": "validate_proposed_layout (crates/jit/src/domain/artifact_classifier.rs:644-653) joins edge.reference verbatim onto each candidate parent location and tests membership in the target's available paths, which are plain repository-relative paths carrying no fragment. resolve_reference (artifact_discovery.rs:538) strips ?/# before computing a target, so the two disagree. Independent of E9: container 14303b30 copies nothing out-of-root - README.md and INSTALL.md are already Retain there - and it still refuses. Blocks REQ-09 under every E9 answer. A failed run writes nothing; the tree stays clean.",
+      "resolution": "Owner chose a new task inside this epic, wired before the sweeps. Filed as ac45f567 (story:area-classification, cargo-ci + code-review, 4 [hard] criteria). No satisfies: label - it unblocks REQ-09 but the archival runs deliver it (E3 standing approval)."
+    },
+    {
+      "id": "E11",
+      "wave": 8,
+      "issue": "P7 + P15 + profile-asset derivation",
+      "category": "1 - creating a higher-level type",
+      "situation": "P7 and P15 are unenforced single-source mechanisms. Investigating the twin question the owner raised showed the profile packages 62 live assets that are byte-equality asserted against their repo originals (crates/jit/src/profile/dogfood.rs:444-473), because include_dir! embeds the package directory at compile time (dogfood.rs:8-9) while this repository consumes the same files live. .jit/templates.toml is NOT among them - it appears nowhere in manifest.toml and is embedded inline as [[contribution.value.nodes]], so no guard reaches it.",
+      "lead_analysis": "Two different risk classes. The 62 pairs are duplication with an enforced equality; the templates pair and the adopter policy lists are duplication with nothing. The structurally-SSOT option is to generate assets/live/ at build time - crates/jit/build.rs is already a declared build input but only stamps provenance env vars.",
+      "resolution": "Owner chose the fullest option: one epic under 9db27a3a covering all three, including build-time derivation of the packaged assets. Filed as e204e63d (epic:derived-package-sources, milestone:v1.0, component:core, repo-validate + holistic-review, 4 [hard] criteria). Creating an epic-level type is escalation policy item 1, approved by the owner."
     }
   ],
   "rework_counts": {
@@ -1231,14 +1311,14 @@
       "raised_by": "fd88adda (worker) and lead",
       "subject": "no projection binds the adopter documentation policy lists to SHIPPED_DOCUMENTATION_POLICY",
       "detail": "docs/reference/configuration.md and docs/reference/example-config.toml restate the managed, permanent, and issue-scoped area lists by hand. Nothing binds them to crates/jit/src/config.rs SHIPPED_DOCUMENTATION_POLICY, which is why they went stale from wave 1 to wave 3 and blocked two code reviews (E2 on b3fc1a92, F1 on f88a16d9). Repairing the values does not repair the mechanism. Concrete targets: docs/reference/configuration.md:51-60 (managed_paths, 8), :62-69 (permanent_paths, 6), :70-75 (issue_scoped_areas, 4); docs/reference/example-config.toml:26-35, :38-45, :49-54 (the same three lists in the copyable sample). Authority is crates/jit/src/config.rs SHIPPED_DOCUMENTATION_POLICY, and render_policy_paths at crates/jit/src/hierarchy_templates.rs:22 (used by generate_config_toml at :289) is an EXISTING emitter that already turns the constant into TOML, so a durable fix reuses it rather than writing a generator from scratch.",
-      "disposition": "PARTIALLY MITIGATED by fd88adda commit b93db9e2: the reference now cites SHIPPED_DOCUMENTATION_POLICY in crates/jit/src/config.rs by name and path as the single source, which gives the invariant its 'reaches prose by citation' half, and the example configuration was reduced to a values-only sample pointing at the reference so the two documents are no longer two copies of one explanation. Still OPEN as a mechanism: nothing enforces agreement. Reconcile against the epic's [hard] criteria before the epic gate; REQ-12 names a single canonical home rather than a derived one, so this is most likely a genuine follow-up. Bind any guard to the constant's own renderer, never to a hand-written mirror."
+      "disposition": "CLOSED session 5 - owner decided. Folded into follow-up epic e204e63d (REQ-01: the adopter configuration reference and example configuration obtain the three area lists from SHIPPED_DOCUMENTATION_POLICY, no hand-maintained second copy). Outside 8e071e18; no epic [hard] criterion required it - REQ-12 names a single canonical home, which fd88adda delivered by citation."
     },
     {
       "id": "P8",
       "raised_by": "lead review of f2cac2bd",
       "subject": "docs-mechanical's fallback footprint derives an adopter-docs scope from permanent_paths",
       "detail": "scripts/docs-mechanical.sh resolve_footprint() reads [documentation].permanent_paths as the default adopter documentation surface (scripts/docs-mechanical.sh:50-66). Those are different sets by design after D-13 and D-14. The gate no longer reaches the fallback \u2014 DOCS_FOOTPRINT is pinned ahead of it in the resolution order \u2014 but any future caller invoking the script bare gets the contributor dev areas.",
-      "disposition": "MITIGATED at the gate, OPEN in the checker. Not a criterion violation: none of the epic's 15 [hard] criteria names the docs-mechanical checker, and the script is repository-local rather than shipped (absent from profiles/ and from the binary's gate presets), so it is outside the dogfooding boundary's shipped surface. Reconcile against the criteria before the epic gate; expected to remain a genuine follow-up."
+      "disposition": "CLOSED session 5 - owner decided. Filed as eeee8a1a (bug, milestone:v1.0, component:tooling, code-review + docs-mechanical) outside this epic. Confirmed outside the shipped surface: the script appears in no profile asset and no binary gate preset."
     },
     {
       "id": "P9",
@@ -1259,21 +1339,21 @@
       "raised_by": "cf0f0014 and 80e08e0f (both independently), confirmed by the lead",
       "subject": "a citation corrected to its archived destination still fires moving-path-citation",
       "detail": "citation_columns (crates/jit/src/domain/artifact_classifier.rs:967) is a plain substring find of the moving artifact's repository-relative source path in each scanned line. Every destination is destination_root + \"/\" + source, so a citation that correctly names the archived destination still contains the bare source path as a trailing substring and still warns, at a column shifted by exactly the length of the inserted destination-root prefix. Measured on both repointing issues: warning counts unchanged (5 and 3), columns shifted by 35 and 39 characters respectively. The warning is advisory and changes no action, blocker, or eligibility, so nothing is blocked by it.",
-      "disposition": "OPEN as a product observation, NOT a criterion violation. REQ-08 requires reporting every occurrence of a moving artifact's path in the scan universe, and a corrected citation does contain such an occurrence, so the letter of the criterion is met by reporting it. Candidate follow-up: a warning that distinguishes a bare citation from one already naming the destination. LEAD TRAP: the wave-6 dispatch prompts for cf0f0014 and 80e08e0f told the workers to confirm the warnings disappear after the repoint. That test is unsatisfiable. The correct acceptance test is that the citation names the destination the plan reports."
+      "disposition": "CLOSED session 5 - owner decided. Filed as c7f8ebc7 (bug, milestone:v1.0, component:core) outside this epic, separately from P16 so P16 can close as by-design without dragging P11. Not a criterion violation: REQ-08 requires reporting every occurrence, and a corrected citation does contain one."
     },
     {
       "id": "P12",
       "raised_by": "5c70f0cb (worker), grounded by the lead",
       "subject": "planning-lead eval fixtures state the flat plan-doc path",
       "detail": ".agents/skills/jit-planning-lead/evals/evals.json states, in three expected_output fields, \"A plan document exists at P's plan-doc path (dev/active/<container-short-id>-plan.md)\". The parenthetical mirrors .jit/templates.toml's plan template doc field, which 429995e1 repoints at the canonical artifact directory. When that lands, the parenthetical contradicts the template it describes. Eval fixtures are explicitly out of scope for every skill-conversion issue (their REQ-05) and for the story checkpoint 2bc344fc (its REQ-04).",
-      "disposition": "OPEN. Not a criterion violation: REQ-11 scopes to skill prompts and reference templates that read or write an artifact path, and an eval fixture expected_output is neither. VERIFY at wave 9 when 429995e1 lands, and reconcile against the epic criteria before the epic gate. Fixing it inside 429995e1 would widen that issue's declared footprint, which is an escalation rather than a lead call."
+      "disposition": "CLOSED session 5 - FIXED by the lead. Owner directed a direct fix. The three expected_output fields in .agents/skills/jit-planning-lead/evals/evals.json now read \"A plan document exists at P's plan-doc path\" with the flat parenthetical removed rather than replaced, so the fixture states no path pattern at all - which is what REQ-04 asks of documentation. Verified valid JSON (7 evals), zero remaining flat-path mentions, and confirmed the file is NOT a declared profile asset, so no twin edit was needed."
     },
     {
       "id": "P13",
       "raised_by": "d2870182 (worker), verified by the lead",
       "subject": "the plan-doc location resolver has no production caller, so REQ-03's substitution is latent",
       "detail": "resolve_plan_doc_location, load_plan_content, and project_plan_doc in crates/jit/src/commands/plan_doc.rs are reached only from that module's own tests. No re-export in commands/mod.rs or lib.rs, no CLI arm, no caller in crates/server/, and project_plan_doc calls project() rather than the reverse. The condition predates d2870182: it holds at base commit f4e142b8 too. What IS live from the module is PLAN_DOC_LABEL, read by planning_node_plan_path (commands/validate.rs:2293) \u2014 jit validate locates a plan from the planning node's recorded DocumentReference, not by re-deriving the template's location. PlanDocError's main.rs downcast arm is wired but unreachable because nothing in production constructs it.",
-      "disposition": "OPEN as a product observation, NOT a criterion violation. d2870182's REQ-03 names the resolver and the resolver now substitutes the field, so the criterion is met; none of the epic's 15 [hard] criteria names plan-doc resolution reachability. Reconcile against the epic criteria before the epic gate; expected to remain a genuine follow-up. If a future issue reintroduces a derive-the-location path, it will resolve {container.dir} to the apply engine's directory and reject an undeclared area without further work."
+      "disposition": "CLOSED session 5 - owner decided. Filed as 985ab96d (task, milestone:v1.0, component:core) outside this epic: either wire a production caller or remove the surface, with the choice recorded. Not a criterion violation; d2870182's REQ-03 is met either way."
     },
     {
       "id": "P14",
@@ -1287,14 +1367,14 @@
       "raised_by": "429995e1 (worker), verified by the lead",
       "subject": "nothing binds the plan-doc declaration in .jit/templates.toml to its packaged profile twin",
       "detail": "429995e1's Background states 'The two are asserted to agree, so they change together or the suite fails.' That is false. The only test naming both files is the dogfood profile assertion at crates/jit/src/profile/dogfood.rs:683-700, which greps each for stale PHRASES ('approved plan', 'Agent plan-quality review', ...) and never compares the two declarations. profiles/jit-dogfood/manifest.toml embeds the template inline as [[contribution.value.nodes]] rather than shipping .jit/templates.toml as an asset, so the assets/live/** byte-equality contract that covers the 61 skill files does not reach it. The lead independently confirmed all 61 declared source/target asset pairs are byte-identical and that this pair is not among them.",
-      "disposition": "OPEN. NOT a criterion violation: 429995e1's REQ-03 requires the packaged declaration to carry the same path shape as the repository declaration, and it does (verified in the merged diff). No epic [hard] criterion requires a guard. Same shape as P7: the values agree, the mechanism is unenforced. Reconcile before the epic gate. If a guard is added, bind it to the template loader's own parse of both files, never to a hand-written mirror of the expected string."
+      "disposition": "CLOSED session 5 - owner decided. Folded into follow-up epic e204e63d (REQ-02: a change to either the repository template declaration or its packaged counterpart, without the other, fails the suite; the guard compares parsed declarations, never a hand-written mirror). Investigation confirmed the pair is reachable by no existing guard: .jit/templates.toml appears nowhere in profiles/jit-dogfood/manifest.toml."
     },
     {
       "id": "P16",
       "raised_by": "3be32cad (worker)",
       "subject": "archive execution's warnings array carries no moving-path-citation",
       "detail": "Execution builds its plan through capture_archive_plan -> classification_facts_from_evidence, which declares no citation evidence; only the planning boundary in storage/artifact_planning.rs layers collect_citation_scan_evidence on top. So a citation warning is visible in `jit archive container --json` (preview) and absent from `--execute --json`.",
-      "disposition": "OPEN as a product observation, NOT a criterion violation: epic REQ-08 requires an archival PLAN to report the occurrences, and the plan does. DIRECTLY ACTIONABLE for wave 8: each sweep's REQ-05 requires the plan warnings to be recorded, so the lead must capture them from the PREVIEW rather than from the execute output. Recording this before the sweeps run so the evidence is taken from the right source."
+      "disposition": "CLOSED session 5 - owner decided. Filed as ef118aea (task, milestone:v1.0, component:core, cargo-ci + code-review + doc-review) outside this epic, separate from P11, so it can close as intended behaviour if that is the answer. The wave-8 lead action stands unchanged: take each sweep's REQ-05 citation evidence from the PREVIEW, not from --execute."
     },
     {
       "id": "P17",
@@ -1302,6 +1382,13 @@
       "subject": "adopter planning-bracket guide and both example registries still teach the flat plan-doc pattern",
       "detail": "After 429995e1 repointed the repository template and its profile twin, four sites still spell the flat pattern: docs/examples/sdd/templates.toml:25 and docs/examples/research/templates.toml:27 (doc = \"dev/active/{container.id}-plan.md\"), and docs/how-to/adopt-planning-bracket.md:82 plus its prose at :267 and :278. Note the token is {container.id}, not {container.short_id} \u2014 a grep for the short-id form misses all four.",
       "disposition": "COVERED by 8ff4cff3 (wave 9), whose five [hard] criteria name exactly these files: REQ-01/REQ-02/REQ-05 the guide, REQ-03 the software-design registry, REQ-04 the research registry. Ownership verified against the issue rather than assumed. VERIFY at wave 9 that all four sites close, including the two prose lines at :267 and :278, which the criteria cover only through REQ-05's quoted-block agreement."
+    },
+    {
+      "id": "P18",
+      "raised_by": "lead, session 5, while measuring E9",
+      "subject": "an eligible archival plan can still refuse at execution, and preview gives no warning",
+      "detail": "Plan eligibility does not run validate_proposed_layout, so a container previews eligible with zero blockers and then refuses at execution. Measured by executing all 24 wave-8 containers in a throwaway worktree at HEAD b78ee738: 8 refuse with exit 4, 16 succeed. All 8 fail on an anchor fragment (artifact_classifier.rs:644-653 compares a fragment-bearing reference against fragment-free paths). The refusal is atomic - a failed run leaves a clean git status and creates no destination directory.",
+      "disposition": "FILED as ac45f567 inside this epic (E10), wired ahead of 0e5dff57 and therefore ahead of all 24 sweeps. REQ-04 of that task closes the preview/execute disagreement for resolving fragment-bearing edges. The broader question - whether eligibility should run the proposed-layout check at all, so that preview and execute agree in general - is NOT covered by ac45f567's criteria and remains open. Reconcile it against the epic's criteria before the epic gate; expected to be a genuine follow-up."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
@@ -1368,6 +1455,20 @@
       "subject": "a dirty working tree of non-build-input paths does not invalidate a gate verdict",
       "detail": "Gates 2-5 of the wave-8 batch ran while the tree carried an uncommitted dev/active/8e071e18-dev-artifact-layout/handoff-3.md and a modified dev/active/8e071e18-progress.json. All four passed and recorded tree_dirty: true. This confirms ONLY the dirty-tree half of N8. The moved-HEAD half is still a code reading: both batches this session ran with the binary's build commit exactly equal to HEAD, so a HEAD moved past the build commit was never exercised.",
       "decision": "Sessions 1-2's rule 'never edit any repo file while a gate batch runs' can be relaxed to 'never edit a BUILD-INPUT file while a gate batch runs' \u2014 progress files, handoffs, and dev/ artifacts are safe. Do NOT yet assume the moved-HEAD half: verify it on the FIRST archive sweep by committing the sweep and evaluating repo-validate without reinstalling. Refusal is exit 10 with reason commit_mismatch; on refusal, reinstall per sweep and correct N8."
+    },
+    {
+      "id": "N10",
+      "raised_at": "session 5, wave 8 replan",
+      "subject": "wave 8 now has an internal three-step ordering",
+      "detail": "The 24 archive executions are no longer dispatchable directly. ac45f567 (anchor fragments) -> 0e5dff57 (retain out-of-root + bound discovery) -> the 24 sweeps. Both new tasks carry story:area-classification, so 35499d1e depends on 0e5dff57 and correctly demoted ready -> backlog when the edge landed (the known demotion bug 533da2df did not bite here). The sweeps were wired to 0e5dff57 only, with --reduce: the edge to ac45f567 is transitively implied and adding it would fail validation.",
+      "decision": "Dispatch ac45f567 first and alone; it is the only ready node of the three. Re-preview all 24 containers after 0e5dff57 lands - every sweep issue's stated relocation/copy counts predate both changes and will be wrong. Each sweep reads its own plan rather than a frozen list, which the issue bodies already require."
+    },
+    {
+      "id": "N11",
+      "raised_at": "session 5",
+      "subject": "execute the plan in a throwaway worktree before believing a preview",
+      "detail": "A preview reporting eligible with zero blockers is NOT evidence that execution succeeds; eligibility skips the proposed-layout check entirely. `git worktree add --detach <scratch> HEAD` then running the real --execute inside it exposed 8 refusals that 24 clean previews had hidden, at zero risk: the main tree was untouched throughout and the probe was removed afterwards. It also produced the per-container copy census that answered E9.",
+      "decision": "Before dispatching any wave whose issues are single pre-enumerated mutating commands, rehearse the whole wave in a detached probe worktree at HEAD and compare against the preview. Capture per-item stdout and stderr to SEPARATE FILES - a first attempt at this used `out=$(... ; echo \"$out\")` inside a loop, which reads the PREVIOUS iteration's variable and misattributed every error message. Exit codes were unaffected."
     }
   ],
   "handoffs": [

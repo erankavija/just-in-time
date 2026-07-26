@@ -1,0 +1,25 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-26T19:30:04.651689838Z",
+  "dependencies": [],
+  "description": "An archival execution's machine-readable output carries no citation warnings, while a preview of the same container reports them, so the two views of one plan disagree.\n\n## Background\n\nAn execution rebuilds its plan through a capture path that declares no citation evidence. Only the planning boundary layers the citation scan on top of the plan it builds. The consequence is that citation warnings are visible in a container preview and absent from the same container's execution output, with no indication in either that the difference exists.\n\nWhether that is a defect depends on what an execution's output is for. If it reports what the run did, the citations the run left stale are part of that. If it reports only the actions taken, the preview is the right place to read them and the asymmetry is deliberate — in which case the command surface should say so, rather than leaving a reader to discover it by comparing two runs.\n\nThe criterion requiring citation reporting is satisfied either way: it speaks about an archival plan, and the plan does report the occurrences.\n\n## Success Criteria\n\n- [hard] REQ-01: The choice between reporting citation warnings from an execution and documenting the preview as their only source is recorded with its reasoning and the rejected alternative.\n- [hard] REQ-02: A reader can determine, from the execution output itself or from the documented command surface, where a run's citation warnings are found.\n- [hard] REQ-03: A preview and an execution of one unchanged container report the same warning set, or the command-surface documentation states the difference and why it exists.",
+  "documents": [],
+  "first_ready_at": "2026-07-26T19:30:04.651689838Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "ef118aea-51b4-452b-9aba-fa2bcdf64b9c",
+  "labels": [
+    "milestone:v1.0",
+    "component:core",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Archive execution reports no citation warnings",
+  "updated_at": "2026-07-26T19:30:04.651689838Z"
+}
