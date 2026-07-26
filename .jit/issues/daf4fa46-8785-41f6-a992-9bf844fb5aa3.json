@@ -8,6 +8,7 @@
   ],
   "description": "A presentation deck owned by a terminal issue previews as an eligible plan through the document target form and the container target form, closing the gap that forced the predecessor deck to be relocated by hand.\n\n## Background\n\nArchiving the predecessor showcase deck had to be hand-rolled because the presentation area was outside the managed paths. That bypass skipped the planner's reference remapping, left a document reference dangling, and caused a validation failure that had to be repaired by hand. A preview over the predecessor container reproduces the gap with blockers on an architecture document, a successor deck, and a tombstone.\n\nWith the areas classified, out-of-root artifacts classified permanent, and directory targets skipped, both target forms should reach eligibility. The assertion reads the target-level blocker array as well as the per-artifact one, because a selected-root blocker is recorded at target level and never appears in artifact action counts.\n\n## Success Criteria\n\n- [hard] REQ-01: A document-target preview of a deck asset owned by a terminal issue reports an eligible plan.\n- [hard] REQ-02: A container-target preview whose subtree contains a deck owned by a terminal issue reports an eligible plan.\n- [hard] REQ-03: Neither preview reports an unmanaged-selected-root blocker for a path under a configured development area, asserted against the target-level blocker array.\n",
   "documents": [],
+  "first_ready_at": "2026-07-26T07:16:12.141241994Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "satisfies:REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Prove deck archival is eligible through both archive target forms",
-  "updated_at": "2026-07-25T13:23:10.054597853Z"
+  "updated_at": "2026-07-26T07:16:12.141241994Z"
 }

@@ -8,6 +8,7 @@
   ],
   "description": "The parallel-execution skill's agent prompt template names the canonical artifact directory instead of a flat short-id-prefixed path, and its packaged profile twin carries the identical content.\n\n## Background\n\nThe template tells a dispatched agent where to write its implementation plan and repeats the same path in the document declaration it hands back, so both occurrences name the resolved directory and an unprefixed filename.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
   "documents": [],
+  "done_at": "2026-07-26T07:16:19.742860508Z",
   "first_ready_at": "2026-07-26T03:45:34.897699370Z",
   "gates_required": [
     "cargo-ci",
@@ -34,7 +35,7 @@
     "per:@/issue/8e071e18/decision/D-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Convert the parallel-execution skill to the artifact directory convention",
-  "updated_at": "2026-07-26T07:04:14.299664696Z"
+  "updated_at": "2026-07-26T07:16:19.742860508Z"
 }

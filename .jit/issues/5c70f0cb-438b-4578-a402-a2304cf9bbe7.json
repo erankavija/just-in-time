@@ -8,6 +8,7 @@
   ],
   "description": "The planning-lead skill's prompts and reference templates name the canonical artifact directory instead of a flat short-id-prefixed path, and each packaged profile twin carries the identical content.\n\n## Background\n\nThe planning-lead skill spells out flat plan, breakdown, investigation, and research paths in its main prompt and in its investigator and researcher references. Its plan-document template also carries a relative link whose filename repeats the short id, which the unprefixed filename rule removes.\n\nThe affected files are declared assets of a packaged profile and are asserted byte-identical to their packaged copies, so each edit travels with its twin or the suite fails.\n\n## Success Criteria\n\n- [hard] REQ-01: No prompt or reference in this skill instructs a reader to compose an issue artifact path from a flat area-plus-short-id-prefix pattern.\n- [hard] REQ-02: An instruction that names an artifact filename uses an unprefixed filename inside the resolved directory.\n- [hard] REQ-03: No instruction derives an artifact directory or filename from an issue title.\n- [hard] REQ-04: Each edited file that is a declared profile asset is byte-identical to its packaged twin, including file mode.\n- [hard] REQ-05: Evaluation fixtures, transcripts, and worktree directory patterns in this skill are unchanged.\n",
   "documents": [],
+  "done_at": "2026-07-26T07:16:23.547351171Z",
   "first_ready_at": "2026-07-26T03:45:12.446897439Z",
   "gates_required": [
     "cargo-ci",
@@ -34,7 +35,7 @@
     "per:@/issue/8e071e18/decision/D-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Convert the planning-lead skill to the artifact directory convention",
-  "updated_at": "2026-07-26T07:08:54.120480208Z"
+  "updated_at": "2026-07-26T07:16:23.547351171Z"
 }

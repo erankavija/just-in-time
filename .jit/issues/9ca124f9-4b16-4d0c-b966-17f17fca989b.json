@@ -9,6 +9,7 @@
   ],
   "description": "An archival preview reports the same in-content citation warnings whether or not the working tree is under version control, and a plan carrying those warnings has the same actions, blockers, and eligibility as one carrying none.\n\n## Background\n\nArchival is a core command, and core commands do not require version control. The citation scan reads a declared root set for exactly that reason, and the property only holds if it is asserted where a plan is actually produced: the archive preview suite runs in plain temporary directories that are no repositories, so a scan that quietly depended on tracking data would pass every in-crate unit test and still fail an adopter.\n\nThe second property is the warning's advisory contract. A citation warning records that a move would break a mention of a path in some other file; it changes nothing about what the plan does, adds no blocker, and never flips eligibility. Both properties are observable over one preview fixture pair, so they are asserted together at the plan boundary.\n\n## Success Criteria\n\n- [hard] REQ-01: A preview over a fixture citation set in a working tree that is under no version control reports the citation warnings for the moving artifact's path.\n- [hard] REQ-02: The same fixture inside an initialized version-control repository reports the same citation warnings.\n- [hard] REQ-03: A previewed plan carrying citation warnings reports the same actions, blockers, and eligibility as the same plan whose scan universe holds no citation.\n",
   "documents": [],
+  "done_at": "2026-07-26T07:16:08.387531514Z",
   "first_ready_at": "2026-07-26T03:45:46.241448086Z",
   "gates_required": [
     "cargo-ci",
@@ -36,7 +37,7 @@
     "per:@/issue/8e071e18/decision/D-8"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Prove citation warnings hold outside version control without altering the plan",
-  "updated_at": "2026-07-26T06:55:50.016862122Z"
+  "updated_at": "2026-07-26T07:16:08.387531514Z"
 }

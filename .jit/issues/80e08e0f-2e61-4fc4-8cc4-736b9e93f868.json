@@ -8,6 +8,7 @@
   ],
   "description": "The two phase design records cite companion records that one archival run relocates, so their citations name the archived locations before that run moves them.\n\n## Background\n\nArchival never rewrites the content of a record it relocates. A citation left uncorrected when its own file moves is therefore frozen at its stale value for good, which is why these records are corrected first and relocated afterwards.\n\nBoth citing records and both cited records belong to one container, so a single run relocates all of them into the same destination root. The corrected citations name that destination and resolve once the run completes; between the correction and the run they name a location the run has yet to create.\n\nValidation resolves document link records only, so an inline path mention in prose breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences.\n\nThe enumerated citations are:\n\n- `dev/design/phase2-collapse-expand.md` — cites `dev/design/subgraph-clustering-layout.md`\n- `dev/design/phase3-advanced-features.md` — cites `dev/design/subgraph-clustering-layout.md`, `dev/design/phase2-collapse-expand.md`\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation names the archived location the production polish run produces for the record it cites.\n- [hard] REQ-02: Both citing records carry their corrected citations before that run relocates them.\n- [hard] REQ-03: No other content in either record is changed.\n- [hard] REQ-04: Whole-repository validation passes afterwards.\n",
   "documents": [],
+  "done_at": "2026-07-26T07:15:53.204629069Z",
   "first_ready_at": "2026-07-26T03:45:42.458470018Z",
   "gates_required": [
     "doc-review",
@@ -34,7 +35,7 @@
     "per:@/issue/8e071e18/decision/D-8"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Resolve the phase design records' citations before their archival run",
-  "updated_at": "2026-07-26T06:00:27.790775108Z"
+  "updated_at": "2026-07-26T07:15:53.204629069Z"
 }
