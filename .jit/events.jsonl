@@ -9748,3 +9748,5 @@
 {"from":"backlog","id":"4944f927-a0e4-4814-a9ba-df54cf1bfbbb","issue_id":"9ca124f9-4b16-4d0c-b966-17f17fca989b","timestamp":"2026-07-26T03:45:46.241448086Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"3401ef2d-0c1d-4fa9-9f51-5d1c0646729f","issue_id":"cf0f0014-1f42-49af-87d5-a3d5840a7c96","timestamp":"2026-07-26T03:45:50.001866408Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"4bb75aff-bce1-467f-b7a4-7b1e57657d12","issue_id":"ef2bd13c-4901-45d3-98c4-5b9b55e35975","timestamp":"2026-07-26T03:45:53.760457536Z","to":"ready","type":"issue_state_changed"}
+{"id":"605b50f6-2f02-47bd-8541-66e2a31be9b0","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","priority":"high","timestamp":"2026-07-26T05:16:36.327304273Z","title":"Structured failure reporting across the machine-readable CLI surface","type":"issue_created"}
+{"fields":["dependencies"],"id":"44cbc13f-7b8f-4d3b-8794-13d13acbe978","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-07-26T05:16:48.954683055Z","type":"issue_updated","updated_by":"dependency-add"}
