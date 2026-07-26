@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:45:51.157629124Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T07:11:27.086819550Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1373e042-4756-43df-ac63-7eca36cedf74",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Convert the execution-lead skill to the artifact directory convention",
-  "updated_at": "2026-07-26T05:29:01.952298485Z"
+  "updated_at": "2026-07-26T07:11:27.086819550Z"
 }

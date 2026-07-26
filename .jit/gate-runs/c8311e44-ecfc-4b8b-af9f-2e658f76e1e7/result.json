@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "93e871cabafdc3dbfccf4d8f9d8b517c012bbaab",
+  "completed_at": "2026-07-26T07:11:26.836837978Z",
+  "duration_ms": 151799,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped artifact-path instructions and packaged twins meet the stated criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1373e042-4756-43df-ac63-7eca36cedf74",
+  "message": null,
+  "run_id": "c8311e44-ecfc-4b8b-af9f-2e658f76e1e7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T07:08:55.037273323Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 91333fee and merge 4d907b48 (same 12-file integration footprint)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-11 (issue description §Decisions; markdown-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T06:40:31Z); code-review pending\nTruncation recovery: re-read per-tree patches, merge-parent diffs, and narrowed manifest/CLI evidence\nNo findings.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped artifact-path instructions and packaged twins meet the stated criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

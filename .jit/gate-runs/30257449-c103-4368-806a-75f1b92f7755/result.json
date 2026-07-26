@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "93e871cabafdc3dbfccf4d8f9d8b517c012bbaab",
+  "completed_at": "2026-07-26T07:06:27.779292907Z",
+  "duration_ms": 132400,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".agents/skills/jit-manage/references/issue-extraction-prompt.md",
+        "id": "F1",
+        "line": 63,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/7b282e85/requirement/REQ-02",
+          "@/issue/8e071e18/decision/D-11"
+        ],
+        "severity": "high",
+        "summary": "The extraction reference instructs benchmark artifact paths under <managed-docs-root> instead of a jit doc dir-resolved issue directory."
+      }
+    ],
+    "summary": "The extraction reference still names an artifact path outside the resolved issue directory.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7b282e85-f46e-446d-bf50-8a32403f1d0f",
+  "message": null,
+  "run_id": "30257449-c103-4368-806a-75f1b92f7755",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T07:04:15.378653452Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 1075 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9d3d-1c0a-7d13-955f-00b515fef48b\n--------\nuser\n--- 1062 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7b973799, df81e53d (jit:7b282e85)\nPolicy sources: AGENTS.md\nResolved items: @/issue/7b282e85/requirement/REQ-01 and REQ-02 (.jit issue description, markdown-first); @/issue/8e071e18/decision/D-11 (.jit issue description, markdown-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T06:29:41Z); code-review pending (no exit code)\nTruncation recovery: narrowed reads of AGENTS.md, governing decision source, skill references, manifest assets, and current path-pattern evidence\n\n1. **[blocking][issue-impact]** [.agents/skills/jit-manage/references/issue-extraction-prompt.md:63](/home/vkaskivuo/Projects/just-in-time/.agents/skills/jit-manage/references/issue-extraction-prompt.md:63) still directs readers to write `batch-reference.json` beneath `<managed-docs-root>/benchmarks/` (also line 75), rather than inside an issue directory resolved by `jit doc dir`. The tagged change left this reference untouched, so hard REQ-02 is unmet. References: @/issue/7b282e85/requirement/REQ-02, @/issue/8e071e18/decision/D-11.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The extraction reference still names an artifact path outside the resolved issue directory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The extraction reference instructs benchmark artifact paths under <managed-docs-root> instead of a jit doc dir-resolved issue directory.\",\"file\":\".agents/skills/jit-manage/references/issue-extraction-prompt.md\",\"line\":63,\"references\":[\"@/issue/7b282e85/requirement/REQ-02\",\"@/issue/8e071e18/decision/D-11\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

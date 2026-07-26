@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:35:01.960710587Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-26T07:06:28.037439053Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7b282e85-f46e-446d-bf50-8a32403f1d0f",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Convert the single-issue skill to the artifact directory convention",
-  "updated_at": "2026-07-26T05:29:17.052261895Z"
+  "updated_at": "2026-07-26T07:06:28.037439053Z"
 }

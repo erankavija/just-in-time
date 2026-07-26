@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:29:40.805149024Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T07:04:14.299664696Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ecaf5c92-f33e-4dea-be2b-5562338db6bf",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Convert the parallel-execution skill to the artifact directory convention",
-  "updated_at": "2026-07-26T05:29:05.724799436Z"
+  "updated_at": "2026-07-26T07:04:14.299664696Z"
 }

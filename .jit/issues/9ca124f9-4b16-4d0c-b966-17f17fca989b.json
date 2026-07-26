@@ -14,7 +14,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:13:20.249965414Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:55:50.016862122Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9ca124f9-4b16-4d0c-b966-17f17fca989b",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Prove citation warnings hold outside version control without altering the plan",
-  "updated_at": "2026-07-26T05:23:26.803125261Z"
+  "updated_at": "2026-07-26T06:55:50.016862122Z"
 }

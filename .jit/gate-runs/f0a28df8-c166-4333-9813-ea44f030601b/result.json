@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "93e871cabafdc3dbfccf4d8f9d8b517c012bbaab",
+  "completed_at": "2026-07-26T07:01:52.518381754Z",
+  "duration_ms": 159631,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The tagged skill update uses the canonical resolver and unprefixed filename, preserves declared asset parity, and leaves fixtures unchanged.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e993f158-4bb2-4186-a07f-f4f2e8b5544e",
+  "message": null,
+  "run_id": "f0a28df8-c166-4333-9813-ea44f030601b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T06:59:12.886489245Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 72bfe48f (implementation), efe211e4 (merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-1, D-2, D-11 (issue Markdown, markdown-first)\nGate evidence: cargo-ci passed (exit 0)\nTruncation recovery: narrowed the resolver search to CLI/docs/tests after excluding an unrelated vendored minified file\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged skill update uses the canonical resolver and unprefixed filename, preserves declared asset parity, and leaves fixtures unchanged.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "93e871cabafdc3dbfccf4d8f9d8b517c012bbaab",
+  "completed_at": "2026-07-26T07:04:14.049141692Z",
+  "duration_ms": 140185,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The prompt uses the resolved artifact directory with unprefixed plan.md, its declared packaged twin is byte-identical with matching mode, and scoped fixtures/worktree patterns are unchanged.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ecaf5c92-f33e-4dea-be2b-5562338db6bf",
+  "message": null,
+  "run_id": "d449c34e-2805-40de-b767-c5dce661e5a2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T07:01:53.863234628Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 76ffe26b, 269286c6 (same two template changes via merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-11 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json, markdown-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T06:24:14Z)\nTruncation recovery: narrowed merge-parent patch and packaged-asset conformance-test reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The prompt uses the resolved artifact directory with unprefixed plan.md, its declared packaged twin is byte-identical with matching mode, and scoped fixtures/worktree patterns are unchanged.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

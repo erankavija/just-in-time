@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "93e871cabafdc3dbfccf4d8f9d8b517c012bbaab",
+  "completed_at": "2026-07-26T06:54:07.264076339Z",
+  "duration_ms": 175373,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard success criteria are satisfied by the attributed implementation and tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "67345efd-b94a-439d-bdf4-7a9c3dbcba19",
+  "message": null,
+  "run_id": "b9ddc61e-d4a8-4297-a166-76cfd7b9894a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T06:51:11.890627767Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a6b5f61e (feature), de3a8764 (merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-2 (issue Markdown); @/charter/D-1, @/charter/D-3, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T06:01:23.672133479+00:00)\nTruncation recovery: Re-read merge patches per affected path with bounded `--unified=0` diffs.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard success criteria are satisfied by the attributed implementation and tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:40:30.393041610Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T07:08:54.120480208Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5c70f0cb-438b-4578-a402-a2304cf9bbe7",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Convert the planning-lead skill to the artifact directory convention",
-  "updated_at": "2026-07-26T05:29:09.493564601Z"
+  "updated_at": "2026-07-26T07:08:54.120480208Z"
 }

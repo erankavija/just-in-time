@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:51:11.012540464Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T07:13:56.327322456Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "935b51da-6596-4565-8153-ed0e7c60d0d2",
   "labels": [
     "type:task",
@@ -26,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Convert the project-lead skill to the artifact directory convention",
-  "updated_at": "2026-07-26T05:29:13.269672298Z"
+  "updated_at": "2026-07-26T07:13:56.327322456Z"
 }

@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "93e871cabafdc3dbfccf4d8f9d8b517c012bbaab",
+  "completed_at": "2026-07-26T06:55:49.767745401Z",
+  "duration_ms": 101262,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The added CLI preview tests verify all three hard criteria against the current root-based citation scan and advisory warning behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9ca124f9-4b16-4d0c-b966-17f17fca989b",
+  "message": null,
+  "run_id": "403fc2b8-c288-4a8b-896c-59125e9edbf9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T06:54:08.505186157Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e8cbc968 `jit:9ca124f9`; d2a8db5e merge (no patch)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/issue/8e071e18/decision/D-8 and D-16 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T06:07:53Z)\nTruncation recovery: none\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The added CLI preview tests verify all three hard criteria against the current root-based citation scan and advisory warning behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

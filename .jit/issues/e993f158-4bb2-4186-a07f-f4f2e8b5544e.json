@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:24:13.696004499Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T07:01:52.773877855Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e993f158-4bb2-4186-a07f-f4f2e8b5544e",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Convert the breakdown skill to the artifact directory convention",
-  "updated_at": "2026-07-26T05:28:58.188943028Z"
+  "updated_at": "2026-07-26T07:01:52.773877855Z"
 }

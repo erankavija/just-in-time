@@ -13,7 +13,18 @@
     "doc-review",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T05:59:41.574712221Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-26T05:58:33.801644072Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cf0f0014-1f42-49af-87d5-a3d5840a7c96",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Resolve the parallel-work research records' citations before their archival runs",
-  "updated_at": "2026-07-26T05:23:34.362915298Z"
+  "updated_at": "2026-07-26T05:59:41.574712221Z"
 }

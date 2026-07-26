@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "93e871cabafdc3dbfccf4d8f9d8b517c012bbaab",
+  "completed_at": "2026-07-26T07:13:56.074507189Z",
+  "duration_ms": 148093,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed documentation changes satisfy the issue-scoped artifact-directory convention and packaged-twin requirements.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "935b51da-6596-4565-8153-ed0e7c60d0d2",
+  "message": null,
+  "run_id": "22d68a17-8bbe-4d4e-89a0-fc58398fb28c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T07:11:27.980991629Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 53118df2, 99cb6f82\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/requirement/REQ-11, @/issue/8e071e18/decision/D-3, @/issue/8e071e18/decision/D-11 — .jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T06:45:51Z); code-review pending\nTruncation recovery: narrowed reads of the charter references, template, resolver implementation, and governing issue sections\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed documentation changes satisfy the issue-scoped artifact-directory convention and packaged-twin requirements.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

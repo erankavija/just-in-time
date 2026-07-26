@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "93e871cabafdc3dbfccf4d8f9d8b517c012bbaab",
+  "completed_at": "2026-07-26T06:59:11.531580704Z",
+  "duration_ms": 200427,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/document.rs",
+        "id": "F1",
+        "line": 154,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/decision/D-7"
+        ],
+        "severity": "high",
+        "summary": "The supposedly read-only report invokes a first-read cleanup that can delete issue lock sidecars."
+      }
+    ],
+    "summary": "One issue-impact blocking finding: the advisory report can delete legacy issue-lock sidecars.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e2902949-e14d-4307-b2c3-3fc3c5ad07a5",
+  "message": null,
+  "run_id": "8de4d2dd-5f02-4be0-a965-bb78bfc492b6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T06:55:51.103905021Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11564 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f9d35-6a33-7532-9228-73952c3baa97\n--------\nuser\n--- 11551 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:e2902949 commits 6a99d49b and merge 3f719c85\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-7 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json); @/invariant/domain-agnostic, @/invariant/gate-semantics, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T06:13:20Z); mcp-ci passed (exit 0, 2026-07-26T05:58:44Z); code-review pending\nTruncation recovery: Re-read truncated attribution output by individual commit, affected file, and current-file line ranges\n\n1. [blocking][issue-impact][high] `jit doc conformance` is not read-only: [document.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/document.rs:154) calls `list_issues()`, whose first call removes empty UUID-named `.jit/issues/*.lock` sidecars ([json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:1067)). This violates REQ-03; the new no-mutation test pre-warms `issue list`, masking precisely that mutation ([artifact_conformance_cli_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_repo_workflow/artifact_conformance_cli_tests.rs:323)). Use a genuinely read-only issue enumeration path or move sidecar cleanup out of report reads.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact blocking finding: the advisory report can delete legacy issue-lock sidecars.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The supposedly read-only report invokes a first-read cleanup that can delete issue lock sidecars.\",\"file\":\"crates/jit/src/commands/document.rs\",\"line\":154,\"references\":[\"@/issue/8e071e18/decision/D-7\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

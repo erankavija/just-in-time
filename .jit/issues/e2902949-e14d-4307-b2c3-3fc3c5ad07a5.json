@@ -14,7 +14,23 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:18:54.819687934Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-26T06:59:11.781985697Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T05:58:46.559786494Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e2902949-e14d-4307-b2c3-3fc3c5ad07a5",
   "labels": [
     "type:task",
@@ -28,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Report artifacts sitting outside their owning issue's canonical directory",
-  "updated_at": "2026-07-26T05:23:19.283029289Z"
+  "updated_at": "2026-07-26T06:59:11.781985697Z"
 }

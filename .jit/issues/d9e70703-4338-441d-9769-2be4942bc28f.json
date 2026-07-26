@@ -12,7 +12,13 @@
   "gates_required": [
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-26T05:58:31.438316649Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d9e70703-4338-441d-9769-2be4942bc28f",
   "labels": [
     "type:task",
@@ -25,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Pin the runtime-read measurement records so archival retains them",
-  "updated_at": "2026-07-26T05:28:15.663493371Z"
+  "updated_at": "2026-07-26T05:58:31.438316649Z"
 }

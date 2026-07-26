@@ -13,7 +13,18 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:01:22.854499253Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-26T05:58:44.094411117Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ef2bd13c-4901-45d3-98c4-5b9b55e35975",
   "labels": [
     "type:task",
@@ -26,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "State the citation scan universe in the adopter configuration reference",
-  "updated_at": "2026-07-26T05:23:30.588821204Z"
+  "updated_at": "2026-07-26T06:01:22.854499253Z"
 }

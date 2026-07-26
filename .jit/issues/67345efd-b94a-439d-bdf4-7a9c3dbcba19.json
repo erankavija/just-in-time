@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:07:52.901252224Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:54:07.514017302Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "67345efd-b94a-439d-bdf4-7a9c3dbcba19",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Interpolate the canonical artifact directory into template document paths",
-  "updated_at": "2026-07-26T05:23:23.041343768Z"
+  "updated_at": "2026-07-26T06:54:07.514017302Z"
 }

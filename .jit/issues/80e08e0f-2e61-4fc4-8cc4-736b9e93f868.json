@@ -13,7 +13,18 @@
     "doc-review",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-26T06:00:27.790775108Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-26T05:58:36.139258174Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "80e08e0f-2e61-4fc4-8cc4-736b9e93f868",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Resolve the phase design records' citations before their archival run",
-  "updated_at": "2026-07-26T05:23:38.135506149Z"
+  "updated_at": "2026-07-26T06:00:27.790775108Z"
 }
