@@ -27,7 +27,7 @@
     "per:@/issue/8e071e18/decision/D-21"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive the parallel work container's linked artifacts",
-  "updated_at": "2026-07-26T19:31:42.760591817Z"
+  "updated_at": "2026-07-26T22:24:45.709955755Z"
 }

@@ -26,7 +26,7 @@
     "per:@/issue/8e071e18/decision/D-21"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive the observability container's linked artifacts",
-  "updated_at": "2026-07-26T19:31:38.934555200Z"
+  "updated_at": "2026-07-26T22:24:56.987544474Z"
 }

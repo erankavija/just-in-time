@@ -27,7 +27,7 @@
     "per:@/issue/8e071e18/decision/D-21"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive the agent validation container's linked artifacts",
-  "updated_at": "2026-07-26T19:31:00.798542287Z"
+  "updated_at": "2026-07-26T22:24:41.942384201Z"
 }

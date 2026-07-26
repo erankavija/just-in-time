@@ -21,7 +21,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Repoint citations that do not survive their document's relocation",
-  "updated_at": "2026-07-26T21:45:36.683450583Z"
+  "updated_at": "2026-07-26T22:25:04.531160664Z"
 }

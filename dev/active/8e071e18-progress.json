@@ -513,7 +513,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "ready"
+          "status": "done"
         },
         {
           "short_id": "ac45f567",
@@ -810,7 +810,7 @@
             "docs-mechanical",
             "repo-validate"
           ],
-          "status": "blocked"
+          "status": "ready"
         }
       ],
       "status": "dispatching",
@@ -1528,6 +1528,13 @@
       "subject": "`git stash push <path>` then `git stash pop` around a merge can pop an unrelated stash",
       "detail": "The lead's merge ritual was: stash the uncommitted .jit claim, merge, pop. On the third merge the stash push was a NO-OP, because the claim had already been committed in the preceding step, so nothing was saved and no new stash entry was created. The pop then applied stash@{0}, a pre-existing unrelated WIP ('deletion bug investigation') left in this repository long before this session. It conflicted, leaving UU markers in crates/jit/src/storage/json.rs and integration_test.rs and foreign edits in two more files. Because the pop conflicted, git KEPT the stash entry, so nothing was destroyed.",
       "decision": "Recovered with `git reset --hard HEAD` back to the merge commit; all 3 pre-existing stashes intact and the merge itself verified uncontaminated (8 files, none of them json.rs). Stop using stash around merges entirely: commit the claim BEFORE merging, which N12 already requires for the install step anyway. If a stash is ever unavoidable, capture the ref from `git stash create` and apply that specific ref - never bare `pop`, which is positional and silently targets someone else's work when your own push was a no-op."
+    },
+    {
+      "id": "N17",
+      "raised_at": "session 5, 0e5dff57 close",
+      "subject": "verify a guard test is load-bearing by breaking what it guards, not by reading it",
+      "detail": "The worker added the directed regression test and reported instrumenting two bounding variants to prove it fails under each. Rather than take that on trust or re-derive both variants, the lead ran a cheaper negative control in the worker's warm worktree: inject an early `return owners;` into discover_embedded_owners behind an env var, run the single test, observe it fail at exactly the reported assertion (archive.rs:1920, 'the claim reaching the target through the hub must survive'), then revert. That proves the assertion depends on the ownership walk - the mechanism actually at risk - in about two minutes against a warm target dir.",
+      "decision": "For any test whose value is that it fails later, break the thing it guards and watch it fail before accepting it. Use the worker's already-built worktree for the experiment; a fresh probe worktree costs a full cold compile for the same answer."
     }
   ],
   "handoffs": [
