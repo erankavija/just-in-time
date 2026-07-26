@@ -142,8 +142,8 @@ impl ArtifactClassificationPolicy {
     /// Such a source — a source file, a script, an agent asset, a
     /// repository-root document — is not the repository's development record,
     /// so an archive neither relocates nor duplicates it: the plan schedules no
-    /// destination for it, and artifact discovery stops following links at it
-    /// rather than pulling everything it cites into the plan
+    /// destination for it and admits no descendant of it, so one linked
+    /// repository-root hub no longer draws the set it cites into the plan
     /// (`@/issue/8e071e18/decision/D-14`).
     ///
     /// The boundary admits no area carve-out. A managed or permanent root the

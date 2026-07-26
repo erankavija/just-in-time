@@ -46,51 +46,9 @@ fn test_terminal_evidence_closes_without_parsing_or_more_needs() {
         let result = expand_artifact_closure(
             ArtifactClosureState::new(["root.md".to_string()]),
             &evidence,
-            &unbounded_policy(),
         );
         assert!(matches!(result, ArtifactClosure::Complete(parsed) if parsed.is_empty()));
     }
-}
-
-#[test]
-fn test_expand_artifact_closure_never_resolves_the_links_of_an_out_of_root_artifact() {
-    // Evidence covers the scanned artifact and the out-of-root hub it links,
-    // and nothing else. Resolving the hub's own link would make the closure ask
-    // for what that link names, so a closure that completes on this evidence is
-    // one that never opened the hub's descendants.
-    let evidence = ArtifactEvidenceMap::from([
-        (
-            "dev/active/plan.md".to_string(),
-            ArtifactEvidence::File(b"[hub](../../README.md)".to_vec()),
-        ),
-        (
-            "README.md".to_string(),
-            ArtifactEvidence::File(b"[guide](docs/guide.md)".to_vec()),
-        ),
-    ]);
-    let roots = || ["dev/active/plan.md".to_string()];
-
-    let ArtifactClosure::Needs { paths, .. } = expand_artifact_closure(
-        ArtifactClosureState::new(roots()),
-        &evidence,
-        &unbounded_policy(),
-    ) else {
-        panic!("an unbounded walk must ask for what the hub cites");
-    };
-    assert_eq!(paths, ["docs/guide.md".to_string()].into_iter().collect());
-
-    let ArtifactClosure::Complete(parsed) = expand_artifact_closure(
-        ArtifactClosureState::new(roots()),
-        &evidence,
-        &development_root_policy(),
-    ) else {
-        panic!("a walk bounded at the hub must not ask for anything the hub cites");
-    };
-    assert_eq!(
-        parsed.keys().map(String::as_str).collect::<Vec<_>>(),
-        ["README.md", "dev/active/plan.md"],
-        "the hub itself is read; only its links go unresolved"
-    );
 }
 
 #[derive(Clone)]
@@ -157,8 +115,7 @@ impl Repo {
 }
 
 #[test]
-fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_without_resolving_its_own_links()
-{
+fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_but_none_of_its_descendants() {
     let repo = Repo::new();
     repo.write("dev/active/plan.md", "[hub](../../README.md)");
     repo.write("README.md", "[guide](docs/guide.md)");
@@ -180,7 +137,7 @@ fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_without_resolv
     assert_eq!(
         Repo::sources(&bounded),
         ["README.md", "dev/active/plan.md"],
-        "the walk must stop at the out-of-root hub rather than passing through it"
+        "no artifact reached only through the out-of-root hub may join the plan"
     );
     let hub = bounded
         .artifacts()
@@ -305,9 +262,7 @@ fn test_markdown_links_preserve_relative_and_root_relative_edge_metadata() {
 fn test_incremental_closure_reuses_parsed_state_for_shared_cyclic_reachability() {
     let mut evidence = ArtifactEvidenceMap::new();
     let state = ArtifactClosureState::new(["root.md".to_string()]);
-    let ArtifactClosure::Needs { paths, state } =
-        expand_artifact_closure(state, &evidence, &unbounded_policy())
-    else {
+    let ArtifactClosure::Needs { paths, state } = expand_artifact_closure(state, &evidence) else {
         panic!("an uncaptured root must be requested");
     };
     assert_eq!(paths, ["root.md".to_string()].into_iter().collect());
@@ -315,9 +270,7 @@ fn test_incremental_closure_reuses_parsed_state_for_shared_cyclic_reachability()
         "root.md".into(),
         ArtifactEvidence::File(b"[a](a.md) [b](b.md)".to_vec()),
     );
-    let ArtifactClosure::Needs { paths, state } =
-        expand_artifact_closure(state, &evidence, &unbounded_policy())
-    else {
+    let ArtifactClosure::Needs { paths, state } = expand_artifact_closure(state, &evidence) else {
         panic!("the shared branches must be requested");
     };
     assert_eq!(
@@ -333,9 +286,7 @@ fn test_incremental_closure_reuses_parsed_state_for_shared_cyclic_reachability()
             ArtifactEvidence::File(b"[shared](shared.md)".to_vec()),
         );
     }
-    let ArtifactClosure::Needs { paths, state } =
-        expand_artifact_closure(state, &evidence, &unbounded_policy())
-    else {
+    let ArtifactClosure::Needs { paths, state } = expand_artifact_closure(state, &evidence) else {
         panic!("the shared descendant must be requested once");
     };
     assert_eq!(paths, ["shared.md".to_string()].into_iter().collect());
@@ -347,9 +298,7 @@ fn test_incremental_closure_reuses_parsed_state_for_shared_cyclic_reachability()
         "shared.md".into(),
         ArtifactEvidence::File(b"[cycle](a.md)".to_vec()),
     );
-    let ArtifactClosure::Complete(parsed) =
-        expand_artifact_closure(state, &evidence, &unbounded_policy())
-    else {
+    let ArtifactClosure::Complete(parsed) = expand_artifact_closure(state, &evidence) else {
         panic!("completed evidence must close without reparsing the changed root bytes");
     };
     assert_eq!(

@@ -737,7 +737,7 @@ impl CommandExecutor<JsonFileStorage> {
         let mut evidence = ArtifactEvidenceMap::new();
         let mut state = ArtifactClosureState::new(roots);
         let parsed = loop {
-            match expand_artifact_closure(state, &evidence, &policy) {
+            match expand_artifact_closure(state, &evidence) {
                 ArtifactClosure::Complete(parsed) => break parsed,
                 ArtifactClosure::Needs {
                     paths,

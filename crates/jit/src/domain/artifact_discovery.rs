@@ -5,12 +5,11 @@
 //! repository-component semantics. The storage layer owns the recursive read
 //! loop and feeds bytes through this pure core.
 //!
-//! Every walk here is bounded by the classification policy: an artifact the
-//! policy retains outside the development root is a frontier. It is read and
-//! it enters the plan when a scanned artifact links it, but its own references
-//! are never resolved, so no file it cites is ever opened and the closure stops
-//! there instead of absorbing everything a repository-root hub reaches
-//! (`@/issue/8e071e18/decision/D-14`).
+//! The plan's walk is bounded by the classification policy: an artifact the
+//! policy retains outside the development root contributes no descendants. It
+//! enters the plan when a scanned artifact links it, but nothing reached only
+//! through its links joins it there, so one repository-root hub no longer draws
+//! the set it cites into the plan (`@/issue/8e071e18/decision/D-14`).
 
 use crate::domain::artifact_classifier::{
     ArtifactClassificationInventory, ArtifactClassificationPolicy, EmbeddedArtifactOwner,
@@ -172,15 +171,17 @@ pub enum ArtifactDiscoveryError {
 
 /// Expand all supported local edges from roots using one explicit evidence map.
 ///
-/// `policy` bounds the frontier. An artifact it retains outside the development
-/// root is itself read, because a scanned artifact links it and the plan names
-/// it, but its own references are never resolved, so nothing it cites is ever
-/// requested and no descendant of it is opened
-/// (`@/issue/8e071e18/decision/D-14`).
+/// This closure is deliberately unbounded, and the development root does not
+/// narrow it. It answers "what does the repository still reach", which both the
+/// selected inventory and the repository-wide ownership relation read. An
+/// ownership claim only ever retains a source, so a claim reached through an
+/// artifact outside the development root is worth keeping even though
+/// [`discover_archive_artifacts`] refuses to take that artifact's descendants
+/// into a plan: bounding the read here would instead delete live files another
+/// issue's document still reaches (`@/issue/8e071e18/decision/D-14`).
 pub fn expand_artifact_closure(
     mut state: ArtifactClosureState,
     evidence: &ArtifactEvidenceMap,
-    policy: &ArtifactClassificationPolicy,
 ) -> ArtifactClosure {
     let mut needs = BTreeSet::new();
     while let Some(path) = state.graph.next_path() {
@@ -190,7 +191,7 @@ pub fn expand_artifact_closure(
             }
             Some(ArtifactEvidence::File(bytes)) => {
                 let artifact = parse_artifact(&path, bytes);
-                followed_references(&path, &artifact, policy).for_each(|reference| {
+                artifact.references().iter().for_each(|reference| {
                     if let ReferenceResolution::Local { target, .. } =
                         resolve_reference(&path, reference)
                     {
@@ -222,12 +223,11 @@ pub fn expand_artifact_closure(
     }
 }
 
-/// The references of one parsed artifact that discovery resolves.
+/// The references of one parsed artifact that the plan's walk resolves.
 ///
 /// An artifact the policy retains outside the development root contributes
-/// none: every walk stops at it, so it names no edge, admits no further
-/// artifact, and causes nothing it cites to be read
-/// (`@/issue/8e071e18/decision/D-14`).
+/// none: the walk stops at it, so it names no edge and admits no descendant of
+/// it to the plan (`@/issue/8e071e18/decision/D-14`).
 fn followed_references<'a>(
     path: &str,
     artifact: &'a ParsedArtifact,
@@ -248,9 +248,7 @@ fn followed_references<'a>(
 /// contribute no edge, no artifact entry, and no traversal. An explicitly
 /// selected root is inventoried whatever its filesystem kind, so a directory
 /// named as a root still reaches classification and blocks there. `policy`
-/// bounds this walk and the ownership walk alike through
-/// [`followed_references`], matching the frontier
-/// [`expand_artifact_closure`] acquired evidence up to.
+/// bounds this walk through [`followed_references`].
 pub fn discover_archive_artifacts(
     inventory: ExplicitRootInventory,
     issues: &[Issue],
@@ -399,7 +397,7 @@ pub fn discover_archive_artifacts(
     historical.extend(working.into_values());
     historical.sort_by_key(ArtifactPlanEntry::identity);
     let members = member_ids.iter().cloned().collect::<BTreeSet<_>>();
-    let owners = discover_embedded_owners(issues, &members, parsed_by_path, policy);
+    let owners = discover_embedded_owners(issues, &members, parsed_by_path);
     Ok((
         ArtifactClassificationInventory::new(target, historical, blockers),
         owners,
@@ -425,16 +423,14 @@ fn is_navigation_target(target: &str, evidence: &ArtifactEvidenceMap) -> bool {
 
 /// Derive repository-wide embedded ownership from the same closed artifact evidence.
 ///
-/// Ownership follows the same bounded walk the inventory does, so an issue
-/// claims what its documents reach without passing through an artifact the
-/// policy retains outside the development root. It cannot do otherwise: the
-/// closure never reads past that frontier, so no evidence for a further
-/// artifact exists to claim.
+/// Ownership is not bounded by the development root. A claim it reports only
+/// ever retains a source, so reaching an artifact through one the plan retains
+/// outside that root is the safe direction to err in: a missed claim would let
+/// an archive delete a file another issue's document still reaches.
 fn discover_embedded_owners(
     issues: &[Issue],
     selected_member_ids: &BTreeSet<String>,
     parsed_by_path: &BTreeMap<String, ParsedArtifact>,
-    policy: &ArtifactClassificationPolicy,
 ) -> Vec<EmbeddedArtifactOwner> {
     let mut owners = Vec::new();
     for issue in issues {
@@ -445,7 +441,7 @@ fn discover_embedded_owners(
         {
             let root = crate::domain::artifact_plan::normalize_artifact_path(&document.path);
             owners.extend(
-                reachable_parsed_paths(&root, parsed_by_path, policy)
+                reachable_parsed_paths(&root, parsed_by_path)
                     .into_iter()
                     .filter(|path| path != &root)
                     .map(|path| EmbeddedArtifactOwner {
@@ -469,7 +465,6 @@ fn discover_embedded_owners(
 fn reachable_parsed_paths(
     root: &str,
     parsed_by_path: &BTreeMap<String, ParsedArtifact>,
-    policy: &ArtifactClassificationPolicy,
 ) -> BTreeSet<String> {
     let mut graph = DiscoveryGraph::new([root.to_string()]);
     let mut reachable = BTreeSet::new();
@@ -478,7 +473,7 @@ fn reachable_parsed_paths(
             continue;
         };
         reachable.insert(path.clone());
-        followed_references(&path, parsed, policy).for_each(|reference| {
+        parsed.references().iter().for_each(|reference| {
             if let ReferenceResolution::Local { target, .. } = resolve_reference(&path, reference) {
                 graph.enqueue(target);
             }
