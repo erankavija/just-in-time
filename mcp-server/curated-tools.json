@@ -45,6 +45,7 @@
     "jit_doc_list": "Discovers the documents linked to an issue.",
     "jit_doc_show": "Reads linked document content, usually a spec an agent implements against.",
     "jit_doc_dir": "Names the canonical artifact directory an issue owns in a declared area, so an agent writes its work product where the convention puts it instead of composing the path.",
+    "jit_doc_conformance": "Advisory sweep naming artifacts that sit outside their owning issue's canonical directory, so an agent can repair what it filed rather than leaving the drift for a maintainer.",
     "jit_doc_remove": "Unlinks a document reference, the inverse of doc add.",
     "jit_item_show": "Resolves a qualified id such as @/inv/dag-acyclic that an agent encounters in issue text.",
     "jit_item_list": "Enumerates addressable items by kind, for citing requirements and invariants.",

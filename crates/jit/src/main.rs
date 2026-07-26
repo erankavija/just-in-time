@@ -5143,6 +5143,57 @@ fn run() -> Result<()> {
                     }
                 }
             }
+            DocCommands::Conformance { json } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                // This command takes no argument it could reject and states no
+                // verdict in its exit status, so it has no typed rejection to
+                // classify: what remains is infrastructure failure (an
+                // unreadable `config.toml`, an unreadable declared area), which
+                // the sibling `doc dir` arm also returns to the top-level
+                // handler rather than relabelling under a code whose exit class
+                // would disagree with it.
+                let report = executor.report_artifact_conformance()?;
+
+                if json {
+                    use jit::output::JsonOutput;
+                    println!("{}", JsonOutput::success(&report).to_json_string()?);
+                } else {
+                    output_ctx.print_data(format!(
+                        "Scanned areas: {}",
+                        if report.areas.is_empty() {
+                            "none declared".to_string()
+                        } else {
+                            report.areas.join(", ")
+                        }
+                    ))?;
+                    if report.artifacts.is_empty() {
+                        // A finding-free report says so rather than trailing
+                        // off after the header, since exit status carries no
+                        // verdict here.
+                        output_ctx.print_data(
+                            "No artifact sits outside its owning issue's canonical directory.",
+                        )?;
+                    } else {
+                        output_ctx
+                            .print_data(format!("Artifacts ({}):", report.artifacts.len()))?;
+                    }
+                    for artifact in &report.artifacts {
+                        output_ctx.print_data(format!("  {}", artifact.path))?;
+                        // The advice: where it belongs, or that nothing can be
+                        // said about where it belongs.
+                        match (&artifact.canonical_directory, &artifact.issue_id) {
+                            (Some(directory), Some(issue_id)) => output_ctx.print_data(format!(
+                                "    {} -> {directory} (issue {issue_id})",
+                                artifact.status
+                            ))?,
+                            _ => output_ctx.print_data(format!(
+                                "    {} (no issue answers to {})",
+                                artifact.status, artifact.short_id
+                            ))?,
+                        }
+                    }
+                }
+            }
             DocCommands::History { id, path, json } => {
                 use jit::output::JsonOutput;
 

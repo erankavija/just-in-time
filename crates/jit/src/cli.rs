@@ -1956,6 +1956,25 @@ pub enum DocCommands {
         json: bool,
     },
 
+    /// Report artifacts sitting outside their owning issue's canonical directory
+    ///
+    /// Walks the issue-scoped areas the repository declares under
+    /// `[documentation]`, resolves each artifact's owning issue from the short
+    /// id its name opens with, and lists the artifacts whose location differs
+    /// from the directory that issue owns (`jit doc dir`). An artifact no
+    /// single issue answers to is listed as unattributed instead.
+    ///
+    /// Advice, not enforcement: legacy flat artifacts are tolerated, so this
+    /// command only prints. It exits successfully whatever it finds, writes
+    /// nothing, and blocks no state transition.
+    ///
+    /// JSON output is the standard list envelope over `artifacts`, alongside
+    /// the `areas` it walked; `jit --schema` declares its exact shape.
+    Conformance {
+        #[arg(long)]
+        json: bool,
+    },
+
     /// List commit history for a document
     History {
         /// Issue ID
@@ -3053,6 +3072,7 @@ impl DocCommands {
             | Self::Delete { .. }
             | Self::Show { .. }
             | Self::Dir { .. }
+            | Self::Conformance { .. }
             | Self::History { .. }
             | Self::Diff { .. }
             | Self::CheckLinks { .. } => false,
@@ -3231,6 +3251,7 @@ impl DocCommands {
             | Self::Delete { .. }
             | Self::Show { .. }
             | Self::Dir { .. }
+            | Self::Conformance { .. }
             | Self::History { .. }
             | Self::Diff { .. }
             | Self::CheckLinks { .. } => false,
@@ -3407,6 +3428,7 @@ mod recovery_dispatch_tests {
         "doc add",
         "doc assets list",
         "doc check-links",
+        "doc conformance",
         "doc delete",
         "doc diff",
         "doc dir",

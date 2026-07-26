@@ -686,6 +686,10 @@ impl CommandSchema {
                 Some(schema_to_value::<ArtifactDirectoryResponse>()),
                 "ArtifactDirectoryResponse",
             ),
+            "doc_conformance" => (
+                Some(schema_to_value::<ArtifactConformanceResponse>()),
+                "ArtifactConformanceResponse",
+            ),
             "label_namespaces" => (
                 Some(schema_to_value::<NamespacesResponse>()),
                 "NamespacesResponse",

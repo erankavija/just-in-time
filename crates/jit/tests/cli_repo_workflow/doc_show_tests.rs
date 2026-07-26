@@ -5,6 +5,11 @@
 //! - doc show with git
 //! - doc show with --at commit
 //! - doc dir, the canonical artifact directory resolver
+//!
+//! The repository, issue, and area fixtures below are crate-visible: the
+//! sibling `artifact_conformance_cli_tests` module drives the same repository
+//! shape and resolves directories through the same `doc dir` run
+//! (`@/invariant/shared-test-contracts`).
 
 use assert_cmd::prelude::*;
 use std::collections::HashSet;
@@ -157,7 +162,7 @@ fn test_doc_show_with_git() {
 
 /// Run the built binary in `repo` and hand back the whole outcome, so a case can
 /// assert on exit status, stdout, and stderr together.
-fn jit(repo: &Path, args: &[&str]) -> Output {
+pub(crate) fn jit(repo: &Path, args: &[&str]) -> Output {
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(repo)
         .args(args)
@@ -167,7 +172,7 @@ fn jit(repo: &Path, args: &[&str]) -> Output {
 
 /// An initialized repository with no Git history. `doc dir` derives a path from
 /// configuration and the issue record alone, so Git has nothing to contribute.
-fn initialized_repo() -> TempDir {
+pub(crate) fn initialized_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let init = jit(temp.path(), &["init"]);
     assert!(
@@ -179,12 +184,12 @@ fn initialized_repo() -> TempDir {
 }
 
 /// The identifiers a created issue answers to.
-struct CreatedIssue {
-    id: String,
-    short_id: String,
+pub(crate) struct CreatedIssue {
+    pub(crate) id: String,
+    pub(crate) short_id: String,
 }
 
-fn create_issue(repo: &Path, title: &str, labels: &[String]) -> CreatedIssue {
+pub(crate) fn create_issue(repo: &Path, title: &str, labels: &[String]) -> CreatedIssue {
     let mut args = vec!["issue", "create", "--title", title, "--json"];
     args.extend(labels.iter().flat_map(|label| ["--label", label.as_str()]));
     let output = jit(repo, &args);
@@ -203,7 +208,7 @@ fn create_issue(repo: &Path, title: &str, labels: &[String]) -> CreatedIssue {
 /// An area a fresh repository declares issue-scoped. `jit init` scaffolds the
 /// shipped policy into `.jit/config.toml`, so reading the policy states which
 /// areas that repository declares without restating the registry here.
-fn declared_area() -> &'static str {
+pub(crate) fn declared_area() -> &'static str {
     jit::config::SHIPPED_DOCUMENTATION_POLICY
         .issue_scoped_areas
         .first()
@@ -214,7 +219,7 @@ fn declared_area() -> &'static str {
 /// A development area the shipped policy manages but leaves outside the
 /// convention. A real area rather than an invented path, so rejecting it can
 /// only come from the registry.
-fn undeclared_area() -> &'static str {
+pub(crate) fn undeclared_area() -> &'static str {
     jit::config::SHIPPED_DOCUMENTATION_POLICY
         .managed_paths
         .iter()
@@ -230,7 +235,7 @@ fn undeclared_area() -> &'static str {
 /// A type the scaffolded hierarchy maps to a membership namespace, with that
 /// namespace. `jit init` applies this template, so an issue carrying
 /// `type:<type>` and `<namespace>:<value>` names a single membership value.
-fn membership_type_and_namespace() -> (String, String) {
+pub(crate) fn membership_type_and_namespace() -> (String, String) {
     let mut associations = jit::hierarchy_templates::HierarchyTemplate::default()
         .label_associations
         .into_iter()
@@ -294,7 +299,7 @@ fn assert_json_rejection_agrees(
 
 /// The directory `doc dir` names for `id` in `area`, requiring the run to
 /// succeed.
-fn resolve_directory(repo: &Path, id: &str, area: &str) -> String {
+pub(crate) fn resolve_directory(repo: &Path, id: &str, area: &str) -> String {
     let output = jit(repo, &["doc", "dir", id, area]);
     assert!(
         output.status.success(),
