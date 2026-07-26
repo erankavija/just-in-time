@@ -230,11 +230,13 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "haiku",
           "group": "B",
           "worktree": ".agents/worktrees/agent-e993f158",
-          "branch": "worktree-agent-e993f158"
+          "branch": "worktree-agent-e993f158",
+          "worker_commit": "72bfe48f",
+          "merge_commit": "efe211e4"
         },
         {
           "id": "1373e042-4756-43df-ac63-7eca36cedf74",
@@ -245,11 +247,13 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "sonnet",
           "group": "B",
           "worktree": ".agents/worktrees/agent-1373e042",
-          "branch": "worktree-agent-1373e042"
+          "branch": "worktree-agent-1373e042",
+          "worker_commit": "91333fee",
+          "merge_commit": "4d907b48"
         },
         {
           "id": "ecaf5c92-f33e-4dea-be2b-5562338db6bf",
@@ -260,11 +264,13 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "haiku",
           "group": "B",
           "worktree": ".agents/worktrees/agent-ecaf5c92",
-          "branch": "worktree-agent-ecaf5c92"
+          "branch": "worktree-agent-ecaf5c92",
+          "worker_commit": "76ffe26b",
+          "merge_commit": "269286c6"
         },
         {
           "id": "5c70f0cb-438b-4578-a402-a2304cf9bbe7",
@@ -275,11 +281,13 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "sonnet",
           "group": "B",
           "worktree": ".agents/worktrees/agent-5c70f0cb",
-          "branch": "worktree-agent-5c70f0cb"
+          "branch": "worktree-agent-5c70f0cb",
+          "worker_commit": "56652c16",
+          "merge_commit": "5914025b"
         },
         {
           "id": "935b51da-6596-4565-8153-ed0e7c60d0d2",
@@ -290,11 +298,13 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "sonnet",
           "group": "B",
           "worktree": ".agents/worktrees/agent-935b51da",
-          "branch": "worktree-agent-935b51da"
+          "branch": "worktree-agent-935b51da",
+          "worker_commit": "99cb6f82",
+          "merge_commit": "53118df2"
         },
         {
           "id": "7b282e85-f46e-446d-bf50-8a32403f1d0f",
@@ -305,11 +315,13 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "sonnet",
           "group": "B",
           "worktree": ".agents/worktrees/agent-7b282e85",
-          "branch": "worktree-agent-7b282e85"
+          "branch": "worktree-agent-7b282e85",
+          "worker_commit": "7b973799",
+          "merge_commit": "df81e53d"
         },
         {
           "id": "67345efd-b94a-439d-bdf4-7a9c3dbcba19",
@@ -320,11 +332,13 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "opus",
           "group": "A",
           "worktree": ".agents/worktrees/agent-67345efd",
-          "branch": "worktree-agent-67345efd"
+          "branch": "worktree-agent-67345efd",
+          "worker_commit": "a6b5f61e",
+          "merge_commit": "de3a8764"
         },
         {
           "id": "d9e70703-4338-441d-9769-2be4942bc28f",
@@ -347,11 +361,13 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "sonnet",
           "group": "A",
           "worktree": ".agents/worktrees/agent-9ca124f9",
-          "branch": "worktree-agent-9ca124f9"
+          "branch": "worktree-agent-9ca124f9",
+          "worker_commit": "e8cbc968",
+          "merge_commit": "d2a8db5e"
         },
         {
           "id": "e2902949-e14d-4307-b2c3-3fc3c5ad07a5",
@@ -363,11 +379,13 @@
             "code-review",
             "mcp-ci"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "opus",
           "group": "A",
           "worktree": ".agents/worktrees/agent-e2902949",
-          "branch": "worktree-agent-e2902949"
+          "branch": "worktree-agent-e2902949",
+          "worker_commit": "6a99d49b",
+          "merge_commit": "3f719c85"
         },
         {
           "id": "cf0f0014-1f42-49af-87d5-a3d5840a7c96",
@@ -378,11 +396,13 @@
             "doc-review",
             "repo-validate"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "sonnet",
           "group": "A",
           "worktree": ".agents/worktrees/agent-cf0f0014",
-          "branch": "worktree-agent-cf0f0014"
+          "branch": "worktree-agent-cf0f0014",
+          "worker_commit": "6004ca8d",
+          "merge_commit": "fdfc41d4"
         },
         {
           "id": "80e08e0f-2e61-4fc4-8cc4-736b9e93f868",
@@ -393,11 +413,13 @@
             "doc-review",
             "repo-validate"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "sonnet",
           "group": "A",
           "worktree": ".agents/worktrees/agent-80e08e0f",
-          "branch": "worktree-agent-80e08e0f"
+          "branch": "worktree-agent-80e08e0f",
+          "worker_commit": "6d3a7bca",
+          "merge_commit": "7b842320"
         },
         {
           "id": "ef2bd13c-4901-45d3-98c4-5b9b55e35975",
@@ -408,18 +430,22 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "dispatched",
+          "status": "merged; gates pending",
           "model": "sonnet",
           "group": "A",
           "worktree": ".agents/worktrees/agent-ef2bd13c",
-          "branch": "worktree-agent-ef2bd13c"
+          "branch": "worktree-agent-ef2bd13c",
+          "worker_commit": "5d2d4d37",
+          "merge_commit": "d6282105"
         }
       ],
       "dispatched_from_main_sha": {
         "group_a": "59b39c2673262b8b63ca0ec0388e9cf0d5052724",
         "group_b": "192cac9a349bafc97004428d85e6c01d3f19977e"
       },
-      "status": "dispatched"
+      "status": "merged; gates pending",
+      "merged_head": "de3a8764",
+      "integration_evidence": "Leak check clean. scripts/verify-commit-builds.sh exit 0 on de3a8764. CARGO_INCREMENTAL=0 cargo test --workspace --no-run exit 0 on de3a8764 and again after the e2902949 merge, which is the N3 guard the build verifier alone does not give."
     },
     {
       "wave_number": 7,
