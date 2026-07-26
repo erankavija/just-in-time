@@ -1014,6 +1014,15 @@
       "situation": "All three wave-5 issues carried a satisfies: label reaching past their own criteria. f2cac2bd (satisfies:REQ-08) declares this repository's scan roots but ships no scan; 2ac35e8e (satisfies:REQ-08) ships the scan mechanism but neither the version-control-independence proof nor the no-rewrite-on-execute lock; 3559ca25 (satisfies:REQ-04) ships the command but not the tooling and documentation adoption the criterion also names.",
       "lead_analysis": "Same shape that cost review rounds on 30595d22 (E1), b3fc1a92 (E2), 8cd6eb73/6aa82c0b/22c11e40 (E3). Siblings still credit both criteria: REQ-08 by 9ca124f9, ef2bd13c, 3be32cad; REQ-04 by 58c56743. 3be32cad (wave 8) is the last REQ-08 issue and 58c56743 (wave 11) the last REQ-04 issue, so each criterion's remaining credit sits on the issue closing its final clause.",
       "resolution": "Dropped satisfies:REQ-08 from f2cac2bd and 2ac35e8e and satisfies:REQ-04 from 3559ca25 under E3's standing approval, before dispatch. Recorded in commit bb401f1d."
+    },
+    {
+      "id": "E6",
+      "wave": 5,
+      "issue": "f2cac2bd",
+      "category": "8 \u2014 changes to shared infrastructure",
+      "situation": "f2cac2bd's adoption of the shipped area classification silently inverts the docs-mechanical gate's scope. The gate runs ./scripts/docs-mechanical.sh with no positional args and an empty [gates.checker.env], so the checker derives its footprint from [documentation].permanent_paths. That was [\"docs/\"]; after adoption it is dev/architecture, dev/eval, dev/vision, dev/index.md, dev/TESTING.md, dev/authoring-conventions.md. 93 issues repository-wide carry the gate, 15 of them still open in this epic, the next (ef2bd13c) in wave 6.",
+      "lead_analysis": "The checker conflates two sets that D-13/D-14 deliberately separate: permanent_paths denotes archive-by-copy artifacts, not the adopter documentation surface. Measured, not assumed: docs-check-links.sh and docs-check-citations.sh both exit 0 over docs/ and both exit 1 over the six dev permanent paths (pre-existing illustrative sample paths in the architecture and eval docs). So keeping docs/ in permanent_paths \u2014 the one fix inside f2cac2bd's own footprint \u2014 was tested and rejected: the superset footprint would fail the gate for all 93 carriers. docs-mechanical is repository-local; it appears in no profile asset and no binary preset, so this is not a shipped-product defect.",
+      "resolution": "Owner chose to pin the footprint. Added DOCS_FOOTPRINT = \"docs/\" to [gates.checker.env] for docs-mechanical in .jit/gates.toml, using the caller-supplied knob the checker already designates, and rewrote the gate description's now-false tail clause. The description is a projection source, so jit validate failed on stale docs/reference/rules-and-gates.md until jit project render ran. Landed as a2a8b9ac; docs-mechanical exits 0 with M2, M3, and M5 all green."
     }
   ],
   "rework_counts": {
@@ -1071,6 +1080,13 @@
       "subject": "no projection binds the adopter documentation policy lists to SHIPPED_DOCUMENTATION_POLICY",
       "detail": "docs/reference/configuration.md and docs/reference/example-config.toml restate the managed, permanent, and issue-scoped area lists by hand. Nothing binds them to crates/jit/src/config.rs SHIPPED_DOCUMENTATION_POLICY, which is why they went stale from wave 1 to wave 3 and blocked two code reviews (E2 on b3fc1a92, F1 on f88a16d9). Repairing the values does not repair the mechanism. Concrete targets: docs/reference/configuration.md:51-60 (managed_paths, 8), :62-69 (permanent_paths, 6), :70-75 (issue_scoped_areas, 4); docs/reference/example-config.toml:26-35, :38-45, :49-54 (the same three lists in the copyable sample). Authority is crates/jit/src/config.rs SHIPPED_DOCUMENTATION_POLICY, and render_policy_paths at crates/jit/src/hierarchy_templates.rs:22 (used by generate_config_toml at :289) is an EXISTING emitter that already turns the constant into TOML, so a durable fix reuses it rather than writing a generator from scratch.",
       "disposition": "PARTIALLY MITIGATED by fd88adda commit b93db9e2: the reference now cites SHIPPED_DOCUMENTATION_POLICY in crates/jit/src/config.rs by name and path as the single source, which gives the invariant its 'reaches prose by citation' half, and the example configuration was reduced to a values-only sample pointing at the reference so the two documents are no longer two copies of one explanation. Still OPEN as a mechanism: nothing enforces agreement. Reconcile against the epic's [hard] criteria before the epic gate; REQ-12 names a single canonical home rather than a derived one, so this is most likely a genuine follow-up. Bind any guard to the constant's own renderer, never to a hand-written mirror."
+    },
+    {
+      "id": "P8",
+      "raised_by": "lead review of f2cac2bd",
+      "subject": "docs-mechanical's fallback footprint derives an adopter-docs scope from permanent_paths",
+      "detail": "scripts/docs-mechanical.sh resolve_footprint() reads [documentation].permanent_paths as the default adopter documentation surface (scripts/docs-mechanical.sh:50-66). Those are different sets by design after D-13 and D-14. The gate no longer reaches the fallback \u2014 DOCS_FOOTPRINT is pinned ahead of it in the resolution order \u2014 but any future caller invoking the script bare gets the contributor dev areas.",
+      "disposition": "MITIGATED at the gate, OPEN in the checker. Not a criterion violation: none of the epic's 15 [hard] criteria names the docs-mechanical checker, and the script is repository-local rather than shipped (absent from profiles/ and from the binary's gate presets), so it is outside the dogfooding boundary's shipped surface. Reconcile against the criteria before the epic gate; expected to remain a genuine follow-up."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
