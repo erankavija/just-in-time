@@ -1366,8 +1366,8 @@
       "id": "N9",
       "raised_at": "wave 8 gate batch",
       "subject": "a dirty working tree of non-build-input paths does not invalidate a gate verdict",
-      "detail": "Gates 2-5 of the wave-8 batch ran while the tree carried an uncommitted dev/active/8e071e18-dev-artifact-layout/handoff-3.md and a modified dev/active/8e071e18-progress.json. All four passed and recorded tree_dirty: true. This is the empirical confirmation N8 asked for: the guard refuses only on a dirty BUILD or a change to one of the nine BINARY_BUILD_INPUTS paths.",
-      "decision": "Sessions 1-2's rule 'never edit any repo file while a gate batch runs' can be relaxed to 'never edit a BUILD-INPUT file while a gate batch runs'. Editing progress files, handoffs, and dev/ artifacts mid-batch is safe. Editing crates/jit/src/, profiles/jit-dogfood/, Cargo manifests, or the git hooks is not."
+      "detail": "Gates 2-5 of the wave-8 batch ran while the tree carried an uncommitted dev/active/8e071e18-dev-artifact-layout/handoff-3.md and a modified dev/active/8e071e18-progress.json. All four passed and recorded tree_dirty: true. This confirms ONLY the dirty-tree half of N8. The moved-HEAD half is still a code reading: both batches this session ran with the binary's build commit exactly equal to HEAD, so a HEAD moved past the build commit was never exercised.",
+      "decision": "Sessions 1-2's rule 'never edit any repo file while a gate batch runs' can be relaxed to 'never edit a BUILD-INPUT file while a gate batch runs' \u2014 progress files, handoffs, and dev/ artifacts are safe. Do NOT yet assume the moved-HEAD half: verify it on the FIRST archive sweep by committing the sweep and evaluating repo-validate without reinstalling. Refusal is exit 10 with reason commit_mismatch; on refusal, reinstall per sweep and correct N8."
     }
   ],
   "handoffs": [
