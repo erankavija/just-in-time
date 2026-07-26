@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "0eebad7db809e3b711d5c3024d38f8824d0af6fa",
+  "completed_at": "2026-07-26T22:37:35.475714466Z",
+  "duration_ms": 128778,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Current behavior and attributable tests satisfy the hard criteria; prior F1 and F2 are resolved under amended REQ-03 semantics.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0e5dff57-44c1-4fc3-ac2c-f60cf118dabf",
+  "message": null,
+  "run_id": "501cac4e-b3ef-4ead-9eb0-2dc79eea26f5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T22:35:26.697337770Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0eebad7d, 6d318a94, d5fbe8c6, 8d1fda74, 4ce0c3c4, bc1ede46, fdf564d5, 733937b4, 5b90120f, 4ab2213d, 2b5cab98, d72526cc, bc4e3584, 68b760dc\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/requirement/REQ-14, @/issue/8e071e18/decision/D-14, and D-18 (markdown-first issue sections); @/gate/cargo-ci (.jit/gates.toml); @/invariant/semantic-test-assertions, shared-test-contracts, and bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-26T22:29:08Z); prior structured code-review passed with no findings\nTruncation recovery: reread patches separately by commit and path; inspected current classifier, discovery, storage, execution, tests, documentation, and first-parent merge diffs\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Current behavior and attributable tests satisfy the hard criteria; prior F1 and F2 are resolved under amended REQ-03 semantics.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

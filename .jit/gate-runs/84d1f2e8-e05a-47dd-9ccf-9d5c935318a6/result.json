@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "0eebad7db809e3b711d5c3024d38f8824d0af6fa",
+  "completed_at": "2026-07-26T22:35:16.610581907Z",
+  "duration_ms": 368551,
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "issue_id": "0e5dff57-44c1-4fc3-ac2c-f60cf118dabf",
+  "message": null,
+  "run_id": "84d1f2e8-e05a-47dd-9ccf-9d5c935318a6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-26T22:29:08.059042779Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "  ✓ fmt: ok\n  ✓ clippy: ok\n  ✓ test: 3965 passed, 0 failed, 14 ignored\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1252 bytes=23261679)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1273818120/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

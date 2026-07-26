@@ -1413,6 +1413,13 @@
       "subject": "only relative citations break under retention; root-relative ones survive by construction",
       "detail": "The lead's first count of archive-side citation breakage ignored reference resolution mode and reported 12 across 4 containers. A root-relative reference resolves as normalize(reference.trim_start_matches('/')) independently of the parent's location (artifact_classifier.rs:693), and a retained target's available set is exactly its source, so the two always match: the citation resolves from the archived copy as readily as from the original. Corrected count is 11, all relative: 9 on copied parents (snapshot-only) and 2 on one relocated document.",
       "disposition": "CLOSED as a measurement correction, and turned into a design input. 84c4e956 was rescoped from 3 citations across 2 documents to 2 in dev/active/2b9a80fb-audit-notes.md, its dependency from e536ea5a was dropped, and D-14's recorded numbers were corrected. The mechanism is now the REPAIR FORM in 84c4e956's Notes: rewriting a relative citation as root-relative satisfies both its criteria by construction, because the repository root is the one anchor archival does not move."
+    },
+    {
+      "id": "P21",
+      "raised_by": "worker 0e5dff57, self-reported",
+      "subject": "worktree TRAP 6 recurred AFTER the issue's work was complete, during a verification experiment",
+      "detail": "While instrumenting the bounding variant to capture the guard test's failure, two of the worker's shell commands ran without a leading `cd` into its worktree. The tool resets cwd between calls, so both executed in main's checkout and modified three tracked build-input files there (commands/archive.rs, domain/artifact_discovery.rs, storage/artifact_discovery.rs), carrying a temporary closure-bounding change. Never staged, never committed. The worker noticed when a failure message did not match the file it was reading, restored all three with `git checkout --`, and removed the target/debug/incremental directory the stray build created. It then self-reported. Contributing cause it identified: a `cp` failure short-circuited a command chain while a trailing `echo` still printed success, so it believed an edit had applied when it had not.",
+      "disposition": "CLOSED, no lasting damage, verified independently by the lead. Main's working tree matches HEAD with zero diff on all three files, HEAD never moved, and the bounding change is absent from main's sources. The gate evidence is sound: the runs at 8d1fda74 report 3965 tests passed against fdf564d5's 3964 - exactly the one guard test bc1ede46 added - and that test FAILS under the bounding change, so the sources under test could not have carried the leak. TWO REAL CONSEQUENCES the lead saw before knowing the cause: an install-jit.sh run recorded dirty=true and had to be repeated, which under N12 would have made the stale-binary guard refuse the gate; and a cargo-ci run failed its incremental-state step on the 367MB target/debug/incremental directory the stray build left. Both were treated as transients at the time; they were this."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
@@ -1535,6 +1542,13 @@
       "subject": "verify a guard test is load-bearing by breaking what it guards, not by reading it",
       "detail": "The worker added the directed regression test and reported instrumenting two bounding variants to prove it fails under each. Rather than take that on trust or re-derive both variants, the lead ran a cheaper negative control in the worker's warm worktree: inject an early `return owners;` into discover_embedded_owners behind an env var, run the single test, observe it fail at exactly the reported assertion (archive.rs:1920, 'the claim reaching the target through the hub must survive'), then revert. That proves the assertion depends on the ownership walk - the mechanism actually at risk - in about two minutes against a warm target dir.",
       "decision": "For any test whose value is that it fails later, break the thing it guards and watch it fail before accepting it. Use the worker's already-built worktree for the experiment; a fresh probe worktree costs a full cold compile for the same answer."
+    },
+    {
+      "id": "N18",
+      "raised_at": "session 5, 0e5dff57 post-close",
+      "subject": "the leak check is dispatch-scoped and does not cover post-completion experiments",
+      "detail": "check-leak-into-main.sh compares main against a snapshot taken at DISPATCH time and is run once after a wave completes. This leak happened after the issue's implementation was finished, while the worker ran a verification experiment at the lead's request, and would have been missed entirely had the worker not self-reported. An unexplained `dirty=true` at install time and an unexplained incremental-state gate failure were the only signals reaching the lead, and both have innocuous explanations that were accepted.",
+      "decision": "Treat an unexplained dirty tree or a stale incremental directory as a possible concurrent writer, not only as a local transient - especially while any worker is still live. Re-run the leak check before every install and every gate batch, not only at wave close, and re-run it after directing a worker to perform any experiment. Directing a worker to instrument production code is what created the exposure; when a verification needs temporary source edits, prefer running it as the lead in a disposable probe worktree."
     }
   ],
   "handoffs": [
