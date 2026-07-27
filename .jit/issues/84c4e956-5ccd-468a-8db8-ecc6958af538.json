@@ -8,6 +8,7 @@
   ],
   "description": "Two citations that will not survive their document's relocation are rewritten into a form that resolves from both the document's current location and its archived one, before the container holding that document is archived.\n\n## Background\n\nAn artifact outside the development root is retained where it is: the archive schedules no destination for it and leaves its source untouched. A document that cites such an artifact and is itself relocated into the archive therefore carries a citation that may resolve to nothing once the move happens. The execution-time layout validator exempts these edges rather than refusing the plan, because demanding that a retained target stay reachable would forbid relocating anything that cites one.\n\nWhether the citation actually breaks depends on how the reference resolves.\n\nA **relative** reference is interpreted from the citing document's own directory, so moving the document changes what the reference names, and a reference reaching a retained target resolves to nothing from the archived location. A **root-relative** reference is interpreted from the repository root, which archival never moves, so it names the same file from either location and survives relocation intact.\n\nOnly relative references are at risk, and only where the citing document relocates rather than being copied. Where the document is copied, its live original stays in place and keeps resolving; only the frozen archive snapshot carries a dead link, which is what a snapshot of a moved-on repository is.\n\nMeasured across this repository's terminal containers, eleven citations reach a retained out-of-root target from a document with an archive destination. Nine sit on copied documents and are snapshot-only. Two sit on a relocated document and are dead everywhere:\n\n- `dev/active/2b9a80fb-audit-notes.md` cites `../../mcp-server/README.md` and `../../mcp-server/curated-tools.json`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the two citations resolves to its intended target when read from the citing document's archived location.\n- [hard] REQ-02: Each of the two citations resolves to its intended target when read from the citing document's current location, for as long as it remains there.\n- [hard] REQ-03: No plan over the affected container reports a relative-reference edge whose target is retained outside the development root and whose citing artifact is scheduled for relocation.\n- [hard] REQ-04: Whole-repository validation passes, with every document reference resolving.\n\n## Notes\n\nREQ-01 and REQ-02 together rule out deleting the citations, and rule out any form that trades one location's correctness for the other's. A root-relative reference satisfies both by construction, because the repository root is the one anchor archival does not move; a reference rewritten to name an archived destination would satisfy neither for a target that is never archived.\n\nThe citing document is a historical record. Its prose is not rewritten beyond the citation form itself.\n\nPer `@/issue/8e071e18/decision/D-14`.\n",
   "documents": [],
+  "done_at": "2026-07-27T08:24:39.526330635Z",
   "first_ready_at": "2026-07-26T21:20:47.534163561Z",
   "gates_required": [
     "repo-validate",
@@ -21,7 +22,7 @@
     },
     "repo-validate": {
       "status": "passed",
-      "updated_at": "2026-07-27T08:19:22.399772706Z",
+      "updated_at": "2026-07-27T08:24:16.203832741Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,7 +34,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Repoint citations that do not survive their document's relocation",
-  "updated_at": "2026-07-27T08:21:28.880393654Z"
+  "updated_at": "2026-07-27T08:24:39.526330635Z"
 }
