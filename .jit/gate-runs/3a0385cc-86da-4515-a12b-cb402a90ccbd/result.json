@@ -1,0 +1,50 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "d1d58d85eb50e243936eda29d49e452ea7442425",
+  "completed_at": "2026-07-27T13:35:08.444443738Z",
+  "duration_ms": 293528,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/fdb039ee-7073-4f19-8e52-71c1d99a66c6.json",
+        "id": "F1",
+        "line": 26,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8e071e18/requirement/REQ-09"
+        ],
+        "severity": "high",
+        "summary": "REQ-09 is unmet: terminal issue fdb039ee outside the epic closure still references live dev/active/fdb039ee-modular-document-rendering.md; its commit pin is not an exception in the requirement."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/8e071e18-dev-artifact-layout/archive-completeness-record.md",
+        "id": "F2",
+        "line": 115,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The archival-completeness snapshot reports 49 active files and 138 total, but its named commit contains 50 active files and 139 total; handoff-4.md is omitted."
+      }
+    ],
+    "summary": "REQ-09 leaves a terminal external issue artifact in dev/active, and linked archival evidence has a reproducible count error.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "8e071e18-d786-43ff-b424-a283fecb11f8",
+  "message": null,
+  "run_id": "3a0385cc-86da-4515-a12b-cb402a90ccbd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T13:30:14.915605005Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12801 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa3c4-dad2-7e21-a589-eb9f4753c8d6\n--------\nuser\n--- 12788 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 (high, blocking):** REQ-09 is unmet. Terminal issue `fdb039ee` lies outside this epic’s dependency closure yet still references the live `dev/active/fdb039ee-modular-document-rendering.md`; the record explicitly says no archival run was planned because it is commit-pinned. REQ-09 contains no commit-pin exception. Evidence: `.jit/issues/fdb039ee-7073-4f19-8e52-71c1d99a66c6.json:26`.\n\n2. **F2 (medium, advisory):** The linked archival-completeness record’s snapshot count is false. It reports 49 active files and 138 total, but the exact cited commit (`ed55bafe`) contains 50 active files and 139 managed-area files; `handoff-4.md` is present but omitted from its enumeration. Evidence: `dev/active/8e071e18-dev-artifact-layout/archive-completeness-record.md:115`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-09 leaves a terminal external issue artifact in dev/active, and linked archival evidence has a reproducible count error.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-09 is unmet: terminal issue fdb039ee outside the epic closure still references live dev/active/fdb039ee-modular-document-rendering.md; its commit pin is not an exception in the requirement.\",\"file\":\".jit/issues/fdb039ee-7073-4f19-8e52-71c1d99a66c6.json\",\"line\":26,\"references\":[\"@/issue/8e071e18/requirement/REQ-09\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The archival-completeness snapshot reports 49 active files and 138 total, but its named commit contains 50 active files and 139 total; handoff-4.md is omitted.\",\"file\":\"dev/active/8e071e18-dev-artifact-layout/archive-completeness-record.md\",\"line\":115,\"references\":[\"@/inv/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

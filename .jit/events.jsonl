@@ -10509,3 +10509,10 @@
 {"from":"in_progress","id":"3af4091e-9c4c-4761-83d6-b16fe9b74491","issue_id":"af264b06-10bc-4176-a98c-16956c8a5372","timestamp":"2026-07-27T13:28:55.968445143Z","to":"done","type":"issue_state_changed"}
 {"id":"d595b1cd-5bb9-432e-b317-379980228785","issue_id":"af264b06-10bc-4176-a98c-16956c8a5372","timestamp":"2026-07-27T13:28:55.968445143Z","type":"issue_completed"}
 {"fields":["documents"],"id":"6052fac1-b236-414d-b005-aa092addb25a","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-27T13:29:57.810858818Z","type":"issue_updated","updated_by":"doc-add"}
+{"gate_key":"repo-validate","id":"72c5553c-f232-4221-b554-ac7dd6bd1d2d","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-27T13:30:14.127259686Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"97a52ae1-7ef5-4a55-ac34-2f7cc2c2cb65","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-27T13:35:08.809484765Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"4005939a-d9bd-4934-852c-23495998745c","issue_id":"d8d7f317-6e67-4288-a0b4-6a8189584d45","priority":"high","timestamp":"2026-07-27T13:40:24.491414459Z","title":"Archive the usability container's pinned modular-renderer artifact","type":"issue_created"}
+{"fields":["dependencies"],"id":"21da1baf-2cc5-44be-a44e-5643ade08ac4","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-27T13:40:33.841649687Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"repo-validate","id":"e5761a05-9ac6-4e88-97fd-d29eb492f7ee","issue_id":"d8d7f317-6e67-4288-a0b4-6a8189584d45","timestamp":"2026-07-27T13:40:35.266235139Z","type":"gate_added"}
+{"from":"ready","id":"bdd89f55-a6f3-4540-962c-b3ff64587ac9","issue_id":"d8d7f317-6e67-4288-a0b4-6a8189584d45","timestamp":"2026-07-27T13:40:46.604946417Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"5ce52d1a-6a7a-44f4-9bb2-02e96a9f2de6","issue_id":"d8d7f317-6e67-4288-a0b4-6a8189584d45","timestamp":"2026-07-27T13:40:46.604946417Z","type":"issue_claimed"}
