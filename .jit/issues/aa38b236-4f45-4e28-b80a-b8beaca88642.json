@@ -47,11 +47,18 @@
       "path": "dev/active/8e071e18-dev-artifact-layout/citation-warning-consolidation.md"
     }
   ],
+  "done_at": "2026-07-27T11:27:21.815115096Z",
   "first_ready_at": "2026-07-27T10:06:30.255093980Z",
   "gates_required": [
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-27T11:26:39.401695279Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "aa38b236-4f45-4e28-b80a-b8beaca88642",
   "labels": [
     "type:task",
@@ -64,7 +71,7 @@
     "enforces:@/invariant/derived-state-coherence"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Confirm the archival runs serviced the development root",
-  "updated_at": "2026-07-27T10:43:51.099303582Z"
+  "updated_at": "2026-07-27T11:27:21.815115096Z"
 }

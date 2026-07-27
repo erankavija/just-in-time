@@ -7,6 +7,7 @@
   ],
   "description": "The build scripts and the workspace manifest cite an artifact path that resolves after the cleanup, including the two operator-facing error strings that print the path.\n\n## Background\n\nThe build-efficiency record is cited from a budget checker's two operator-facing error messages, from a comment in each of two scripts, and from a comment in the workspace manifest. The error strings are the sharpest case: an operator reading a budget failure is sent to a path that must exist.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named files resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: The budget checker's operator-facing error strings name a path that exists.\n",
   "documents": [],
+  "first_ready_at": "2026-07-27T11:27:33.347227165Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "per:@/issue/8e071e18/decision/D-8"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Resolve the build tooling's citations of relocated artifacts",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-27T11:27:33.347227165Z"
 }

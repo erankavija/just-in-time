@@ -7,6 +7,7 @@
   ],
   "description": "The contributor testing guide's citations of the build-efficiency record and the benchmark report resolve after the cleanup.\n\n## Background\n\nThe guide carries one citation of the build-efficiency record and two relative markdown links to the benchmark report. The relative links are the fragile ones: they resolve today and break the moment their target moves, with no validation failure to announce it.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named files resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: Mechanical link checks over the testing guide pass.\n",
   "documents": [],
+  "first_ready_at": "2026-07-27T11:27:37.177375449Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
@@ -22,7 +23,7 @@
     "per:@/issue/8e071e18/decision/D-8"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Resolve the testing guide's citations of relocated artifacts",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-27T11:27:37.177375449Z"
 }
