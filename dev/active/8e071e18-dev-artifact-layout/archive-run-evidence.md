@@ -542,3 +542,36 @@ Issue `8ea5b13d`. Plan eligible with no blockers. 16 relocated, 0 mirrored, 10 r
 ### Other plan warnings (1)
 
 - `missing-edge-target` at `dev/reference/configuration.md`
+
+## `9ac9fdac` — dev/archive/9ac9fdac-graph-templates
+Issue `f320923c`. Plan eligible with no blockers. 6 relocated, 0 mirrored, 2 retained, 1 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/57269494-apply-plan-doc.md` | `dev/archive/9ac9fdac-graph-templates/dev/active/57269494-apply-plan-doc.md` | 57269494 |
+| move | `dev/active/9ac9fdac-828a-40f2-9d73-71af14f44ff8-plan.md` | `dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-828a-40f2-9d73-71af14f44ff8-plan.md` | 7d88e37d |
+| move | `dev/active/9ac9fdac-completion-report.md` | `dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-completion-report.md` | 9ac9fdac |
+| move | `dev/active/9ac9fdac-graph-templates-showcase/base.css` | `dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-graph-templates-showcase/base.css` | — |
+| move | `dev/active/9ac9fdac-graph-templates-showcase/talk.html` | `dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-graph-templates-showcase/talk.html` | 9ac9fdac |
+| move | `dev/active/9ac9fdac-graph-templates-showcase/themes/rust.css` | `dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-graph-templates-showcase/themes/rust.css` | — |
+| retain | `dev/archive/features/25064508/dogfood-9ac9fdac.md` | already under the archive root | 9ac9fdac fc414353 |
+| retain | `docs/concepts/planning-bracket.md` | retained in place | 04656f7b(outside) c8aa199e |
+
+### In-content citation warnings (8)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:2128:14` | `dev/active/57269494-apply-plan-doc.md` |
+| `dev/active/8e071e18-breakdown.json:2129:14` | `dev/active/9ac9fdac-828a-40f2-9d73-71af14f44ff8-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2130:14` | `dev/active/9ac9fdac-completion-report.md` |
+| `dev/active/8e071e18-breakdown.json:2131:14` | `dev/active/9ac9fdac-graph-templates-showcase/base.css` |
+| `dev/active/8e071e18-breakdown.json:2132:14` | `dev/active/9ac9fdac-graph-templates-showcase/talk.html` |
+| `dev/active/8e071e18-breakdown.json:2133:14` | `dev/active/9ac9fdac-graph-templates-showcase/themes/rust.css` |
+| `dev/active/9b7b5f9c-investigation.md:320:4` | `dev/active/57269494-apply-plan-doc.md` |
+| `dev/archive/9ac9fdac-handoff.md:62:49` | `dev/active/9ac9fdac-828a-40f2-9d73-71af14f44ff8-plan.md` |
+
+### Other plan warnings (1)
+
+- `external-edge` at `dev/active/9ac9fdac-graph-templates-showcase/talk.html`

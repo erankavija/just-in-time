@@ -1,37 +1,37 @@
 {
-  "id": "7d88e37d-2946-4ea8-9f71-e3956e5bc96d",
-  "title": "Plan: Graph templates: configurable parameterized subgraphs applied to the work DAG",
-  "description": "Planning node for epic **Graph templates: configurable parameterized subgraphs applied to the work DAG** (`9ac9fdac`).\n\nProduce the plan that decomposes this epic before fan-out: address the container's `[hard]` success criteria (REQ-01–REQ-08) and make it concrete enough to break into well-ordered work.\n\nPlan document: `dev/active/9ac9fdac-828a-40f2-9d73-71af14f44ff8-plan.md`.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-22T21:04:33.237714640Z",
+  "context": {},
+  "created_at": "2026-06-21T23:20:16.951854564Z",
   "dependencies": [],
+  "description": "Planning node for epic **Graph templates: configurable parameterized subgraphs applied to the work DAG** (`9ac9fdac`).\n\nProduce the plan that decomposes this epic before fan-out: address the container's `[hard]` success criteria (REQ-01–REQ-08) and make it concrete enough to break into well-ordered work.\n\nPlan document: `dev/active/9ac9fdac-828a-40f2-9d73-71af14f44ff8-plan.md`.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "label": "plan",
+      "path": "dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-828a-40f2-9d73-71af14f44ff8-plan.md"
+    }
+  ],
+  "done_at": "2026-06-22T22:29:17.453045356Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-22T21:54:08.279836227Z"
+      "updated_at": "2026-06-22T21:54:08.279836227Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/9ac9fdac-828a-40f2-9d73-71af14f44ff8-plan.md",
-      "commit": null,
-      "label": "plan",
-      "doc_type": null
-    }
-  ],
+  "id": "7d88e37d-2946-4ea8-9f71-e3956e5bc96d",
   "labels": [
     "milestone:v1.0",
     "epic:graph-templates",
     "type:planning"
   ],
-  "created_at": "2026-06-21T23:20:16.951854564Z",
-  "updated_at": "2026-07-05T19:51:13.014873326Z",
-  "claimed_at": "2026-06-22T21:04:33.237714640Z",
-  "done_at": "2026-06-22T22:29:17.453045356Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Plan: Graph templates: configurable parameterized subgraphs applied to the work DAG",
+  "updated_at": "2026-07-27T10:03:08.412362670Z"
 }

@@ -1,146 +1,49 @@
 {
-  "id": "9ac9fdac-828a-40f2-9d73-71af14f44ff8",
-  "title": "Graph templates: configurable parameterized subgraphs applied to the work DAG",
-  "description": "Generalize the hardcoded planning bracket into a **graph-template layer**: named, parameterized subgraphs declared in config and spliced into the work DAG by a generic `jit apply <template> <target>` command. The planning bracket (P→B) becomes the first template (`plan`); the mechanism is generic and domain-agnostic.\n\n## Context\n\n`jit plan` today creates only the planning node `P`; the breakdown node `B` is hand-assembled by the jit-breakdown skill from primitives — an asymmetry, with B-wiring living in skill prose rather than the binary. `jit plan` also leaves `P`'s description empty, which weakens the `plan-review` gate (its prompt reads `issue.description` for criteria) and gives readers no context. The `[planning]` config is effectively a hardcoded two-node bracket declaration.\n\nThis epic replaces that with a generic primitive: a **graph template** is a reusable subgraph that the engine instantiates and splices onto bound anchor nodes. The planning bracket is one template; the layer can express other recurring subgraph patterns later.\n\n## Model\n\n- **Graph template** — declared in `.jit/templates.toml`: a named template with\n  - **nodes**: each with `role`, `type` (from the type hierarchy), `gates` (gate presets), a `doc` location template, and a `description` template;\n  - **internal edges**: `depends_on` expressed by node role (e.g. `breakdown` depends on `planning`);\n  - **named anchors**: roles (e.g. `container`) bound to existing issues at apply time; nodes may wire to anchors;\n  - **transforms**: a small, fixed vocabulary of edge transforms on anchors (e.g. `move-upstream-to-role`, `redirect`), all DAG-preserving.\n- **Static, no deferred edges.** A template fully instantiates at apply: create nodes (fresh ids), wire internal + anchor edges, apply gate presets, run declared transforms. It has no phased/deferred edges; later structural changes (e.g. the breakdown interior splice) happen independently of templates.\n- **Templating** — `description` and `doc` fields interpolate from anchor context (container title, id, `[hard]` criteria, labels, doc path), so applying `plan` yields a planning node with a populated description.\n\n## Command\n\n`jit apply <template-name> <anchor bindings>` — generic; `plan` is one template among possible others. Applying `plan` to a container `C` creates `P` (`type:planning`, `plan-review`) and `B` (`type:breakdown`, `coverage-preview` + `breakdown-review`), wires `B→P` and `C→B`, and runs the `move-upstream-to-planning` transform (reproducing today's \"move C's upstream deps onto P\"). This replaces both the old `jit plan` (P-only) and the skill's hand-wiring of B.\n\n## Success Criteria\n\n- [hard] REQ-01: Graph templates are declared in `.jit/templates.toml` as a named template with nodes (`role`, `type`, `gates`, `doc` template, `description` template), role-based internal `depends_on` edges, and named anchors. No template name or node role is hardcoded in engine logic.\n- [hard] REQ-02: `jit apply <template> <anchors>` instantiates a template in one operation — fresh-id nodes, internal + anchor edges, gate presets, declared transforms — and the result is always validated as an acyclic DAG.\n- [hard] REQ-03: `description`/`doc` fields interpolate from anchor context; applying `plan` produces a planning node with a non-empty description (closing the empty-P gap).\n- [hard] REQ-04: The `plan` template reproduces the planning bracket — applying it to `C` creates `P` (plan-review) and `B` (coverage-preview + breakdown-review) with `B→P` and `C→B` — replacing the split where `jit plan` made P and the skill made B.\n- [hard] REQ-05: Templates support multiple named anchors bound at apply; the `plan` template uses one (`container`).\n- [hard] REQ-06: The transform vocabulary is small, fixed, and DAG-preserving, with an extensible dispatch. This epic ships only `move-upstream-to-role` (the transform `plan` needs, used as `move-upstream-to-planning`); other transforms (e.g. `redirect`) are deferred.\n- [hard] REQ-07: The breakdown engine and the jit-breakdown skill are updated to consume the pre-created `B` and perform only the interior splice (sources→`B`, `C`→sinks); B-creation is removed from skill prose.\n- [hard] REQ-08: The template engine is exercised by extensive automated tests against **isolated temporary jit repositories** (never the production `.jit`), and dogfooded on a real container after completion.\n- [hard] REQ-09: Existing empty planning-node descriptions (`1eb0bdfd`, `2937919f`) are reseeded from their containers; a manual fix is acceptable — not an engine deliverable.\n- [hard] REQ-10: This repo's config is rewritten to the templates.toml model and the flat `[planning]` / `PlanningConfig` path is removed from the codebase. gf2 has no `[planning]` block (it never adopted the bracket), so it needs no rewrite — it can opt in later by declaring planning/breakdown types and a template.\n\n## Non-goals\n\n- General graph rewriting beyond the fixed transform vocabulary (must stay a cycle-checked DAG, small vocabulary).\n- Deferred/phased template edges — the breakdown interior splice stays independent of templates.\n- Shipping templates other than `plan` this epic (the engine enables them; only `plan` is delivered).\n- Changes to the structured-knowledge epic (`25064508`) or to jit-plan-skill behavior beyond the breakdown alignment.\n\n## Relationships\n\n- **Generalizes the planning bracket from epic `2fbd2a82`** (done); no hard dependency edge.\n- **jit-plan skill (`eed6750c`) is a beneficiary** — it will call `jit apply plan` and get seeded P+B for free; no edge.\n- **Distinct from the structured-knowledge epic (`25064508`)** — that is addressable items/invariants; this is the graph-macro layer.",
-  "state": "done",
-  "priority": "high",
+  "archived_from": "done",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-06-21T23:17:25.662247878Z",
   "dependencies": [
     "adc640e4-1307-4ef8-a6d8-612df86b3480",
     "57269494-9531-45d9-8eb9-df5e32b6a621",
     "99a0c161-07a2-464a-be91-7dc7a43db987"
   ],
-  "gates_required": [],
-  "gates_status": {},
-  "context": {},
+  "description": "Generalize the hardcoded planning bracket into a **graph-template layer**: named, parameterized subgraphs declared in config and spliced into the work DAG by a generic `jit apply <template> <target>` command. The planning bracket (P→B) becomes the first template (`plan`); the mechanism is generic and domain-agnostic.\n\n## Context\n\n`jit plan` today creates only the planning node `P`; the breakdown node `B` is hand-assembled by the jit-breakdown skill from primitives — an asymmetry, with B-wiring living in skill prose rather than the binary. `jit plan` also leaves `P`'s description empty, which weakens the `plan-review` gate (its prompt reads `issue.description` for criteria) and gives readers no context. The `[planning]` config is effectively a hardcoded two-node bracket declaration.\n\nThis epic replaces that with a generic primitive: a **graph template** is a reusable subgraph that the engine instantiates and splices onto bound anchor nodes. The planning bracket is one template; the layer can express other recurring subgraph patterns later.\n\n## Model\n\n- **Graph template** — declared in `.jit/templates.toml`: a named template with\n  - **nodes**: each with `role`, `type` (from the type hierarchy), `gates` (gate presets), a `doc` location template, and a `description` template;\n  - **internal edges**: `depends_on` expressed by node role (e.g. `breakdown` depends on `planning`);\n  - **named anchors**: roles (e.g. `container`) bound to existing issues at apply time; nodes may wire to anchors;\n  - **transforms**: a small, fixed vocabulary of edge transforms on anchors (e.g. `move-upstream-to-role`, `redirect`), all DAG-preserving.\n- **Static, no deferred edges.** A template fully instantiates at apply: create nodes (fresh ids), wire internal + anchor edges, apply gate presets, run declared transforms. It has no phased/deferred edges; later structural changes (e.g. the breakdown interior splice) happen independently of templates.\n- **Templating** — `description` and `doc` fields interpolate from anchor context (container title, id, `[hard]` criteria, labels, doc path), so applying `plan` yields a planning node with a populated description.\n\n## Command\n\n`jit apply <template-name> <anchor bindings>` — generic; `plan` is one template among possible others. Applying `plan` to a container `C` creates `P` (`type:planning`, `plan-review`) and `B` (`type:breakdown`, `coverage-preview` + `breakdown-review`), wires `B→P` and `C→B`, and runs the `move-upstream-to-planning` transform (reproducing today's \"move C's upstream deps onto P\"). This replaces both the old `jit plan` (P-only) and the skill's hand-wiring of B.\n\n## Success Criteria\n\n- [hard] REQ-01: Graph templates are declared in `.jit/templates.toml` as a named template with nodes (`role`, `type`, `gates`, `doc` template, `description` template), role-based internal `depends_on` edges, and named anchors. No template name or node role is hardcoded in engine logic.\n- [hard] REQ-02: `jit apply <template> <anchors>` instantiates a template in one operation — fresh-id nodes, internal + anchor edges, gate presets, declared transforms — and the result is always validated as an acyclic DAG.\n- [hard] REQ-03: `description`/`doc` fields interpolate from anchor context; applying `plan` produces a planning node with a non-empty description (closing the empty-P gap).\n- [hard] REQ-04: The `plan` template reproduces the planning bracket — applying it to `C` creates `P` (plan-review) and `B` (coverage-preview + breakdown-review) with `B→P` and `C→B` — replacing the split where `jit plan` made P and the skill made B.\n- [hard] REQ-05: Templates support multiple named anchors bound at apply; the `plan` template uses one (`container`).\n- [hard] REQ-06: The transform vocabulary is small, fixed, and DAG-preserving, with an extensible dispatch. This epic ships only `move-upstream-to-role` (the transform `plan` needs, used as `move-upstream-to-planning`); other transforms (e.g. `redirect`) are deferred.\n- [hard] REQ-07: The breakdown engine and the jit-breakdown skill are updated to consume the pre-created `B` and perform only the interior splice (sources→`B`, `C`→sinks); B-creation is removed from skill prose.\n- [hard] REQ-08: The template engine is exercised by extensive automated tests against **isolated temporary jit repositories** (never the production `.jit`), and dogfooded on a real container after completion.\n- [hard] REQ-09: Existing empty planning-node descriptions (`1eb0bdfd`, `2937919f`) are reseeded from their containers; a manual fix is acceptable — not an engine deliverable.\n- [hard] REQ-10: This repo's config is rewritten to the templates.toml model and the flat `[planning]` / `PlanningConfig` path is removed from the codebase. gf2 has no `[planning]` block (it never adopted the bracket), so it needs no rewrite — it can opt in later by declaring planning/breakdown types and a template.\n\n## Non-goals\n\n- General graph rewriting beyond the fixed transform vocabulary (must stay a cycle-checked DAG, small vocabulary).\n- Deferred/phased template edges — the breakdown interior splice stays independent of templates.\n- Shipping templates other than `plan` this epic (the engine enables them; only `plan` is delivered).\n- Changes to the structured-knowledge epic (`25064508`) or to jit-plan-skill behavior beyond the breakdown alignment.\n\n## Relationships\n\n- **Generalizes the planning bracket from epic `2fbd2a82`** (done); no hard dependency edge.\n- **jit-plan skill (`eed6750c`) is a beneficiary** — it will call `jit apply plan` and get seeded P+B for free; no edge.\n- **Distinct from the structured-knowledge epic (`25064508`)** — that is addressable items/invariants; this is the graph-macro layer.",
   "documents": [
     {
-      "path": "dev/active/9ac9fdac-completion-report.md",
       "commit": null,
-      "label": "Completion report",
       "doc_type": "documentation",
-      "format": "markdown"
+      "format": "markdown",
+      "label": "Completion report",
+      "path": "dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-completion-report.md"
     },
     {
-      "path": "dev/active/9ac9fdac-graph-templates-showcase/talk.html",
       "commit": null,
-      "label": "Showcase slides",
       "doc_type": "slides",
       "format": "html",
-      "assets": [
-        {
-          "original_path": "base.css",
-          "resolved_path": "dev/active/9ac9fdac-graph-templates-showcase/base.css",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "e964dd787590ea2c2eb5784b5362674504e66d2e4626bca1b1e8abff071f7059",
-          "is_shared": false
-        },
-        {
-          "original_path": "themes/rust.css",
-          "resolved_path": "dev/active/9ac9fdac-graph-templates-showcase/themes/rust.css",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "7ba057c88a30dc41c8564b549d0b76bb6fa98413c3a50b66fd6a3f80a4783cbe",
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://fonts.gstatic.com",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://fonts.googleapis.com",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        }
-      ]
+      "label": "Showcase slides",
+      "path": "dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-graph-templates-showcase/talk.html"
     },
     {
-      "path": "dev/archive/features/25064508/dogfood-9ac9fdac.md",
       "commit": null,
-      "label": "Dogfood evidence",
       "doc_type": null,
-      "format": "markdown"
+      "format": "markdown",
+      "label": "Dogfood evidence",
+      "path": "dev/archive/features/25064508/dogfood-9ac9fdac.md"
     }
   ],
+  "done_at": "2026-06-24T05:30:05.247973747Z",
+  "first_ready_at": "2026-06-22T21:57:21.919591797Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "9ac9fdac-828a-40f2-9d73-71af14f44ff8",
   "labels": [
     "type:epic",
     "milestone:v1.0",
     "epic:graph-templates"
   ],
-  "created_at": "2026-06-21T23:17:25.662247878Z",
-  "updated_at": "2026-07-05T21:45:38.932872318Z",
-  "first_ready_at": "2026-06-22T21:57:21.919591797Z",
-  "done_at": "2026-06-24T05:30:05.247973747Z"
+  "priority": "high",
+  "state": "archived",
+  "title": "Graph templates: configurable parameterized subgraphs applied to the work DAG",
+  "updated_at": "2026-07-27T10:03:08.412362670Z"
 }
