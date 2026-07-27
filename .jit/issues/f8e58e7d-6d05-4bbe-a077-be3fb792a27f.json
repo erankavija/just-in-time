@@ -1,13 +1,23 @@
 {
-  "id": "f8e58e7d-6d05-4bbe-a077-be3fb792a27f",
-  "title": "Add divergence and lease validation to jit validate",
-  "description": "Add `--divergence` and `--leases` flags to `jit validate` command. Validate branch divergence from main and lease consistency respectively. Report issues with fix suggestions.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-cli",
+  "claimed_at": "2026-01-11T00:13:28.945328046Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:15.061398020Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Add `--divergence` and `--leases` flags to `jit validate` command. Validate branch divergence from main and lease consistency respectively. Report issues with fix suggestions.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Implementation Session Notes - Code Review Findings",
+      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-20260111-validate-implementation.md"
+    }
+  ],
+  "done_at": "2026-01-15T20:46:42.442696781Z",
+  "first_ready_at": "2026-01-07T23:32:21.547772053Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -18,49 +28,39 @@
   "gates_status": {
     "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-15T20:46:37.065729138Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-15T20:46:41.914738999Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-15T20:46:12.438670549Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-15T20:46:12.327384154Z"
+      "updated_at": "2026-01-15T20:46:37.065729138Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-15T20:46:42.442070312Z"
+      "updated_at": "2026-01-15T20:46:42.442070312Z",
+      "updated_by": null
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_at": "2026-01-15T20:46:41.914738999Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_at": "2026-01-15T20:46:12.327384154Z",
+      "updated_by": null
+    },
+    "tests": {
+      "status": "passed",
+      "updated_at": "2026-01-15T20:46:12.438670549Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/sessions/session-20260111-validate-implementation.md",
-      "commit": null,
-      "label": "Implementation Session Notes - Code Review Findings",
-      "doc_type": "notes",
-      "format": "markdown"
-    }
-  ],
+  "id": "f8e58e7d-6d05-4bbe-a077-be3fb792a27f",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:15.061398020Z",
-  "updated_at": "2026-07-05T19:51:13.123368655Z",
-  "first_ready_at": "2026-01-07T23:32:21.547772053Z",
-  "claimed_at": "2026-01-11T00:13:28.945328046Z",
-  "done_at": "2026-01-15T20:46:42.442696781Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Add divergence and lease validation to jit validate",
+  "updated_at": "2026-07-27T10:03:58.963578233Z"
 }

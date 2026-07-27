@@ -1,10 +1,8 @@
 {
-  "id": "92bf3a9b-914a-4015-8d26-b52535afe479",
-  "title": "Story: Recovery and Robustness",
-  "description": "Implement crash recovery, consistency validation, and self-healing mechanisms to ensure the system recovers gracefully from failures.\n\n## Goal\n\nEnsure the parallel work system is robust against crashes, stale state, and corruption, with automatic recovery where possible.\n\n## Tasks\n\n1. **Startup recovery routine** - Run on every `jit` command to detect/fix issues\n2. **Stale lock cleanup** - Detect and remove locks from dead processes (PID check)\n3. **Claims index rebuild** - Reconstruct index from append-only JSONL log\n4. **Index consistency validation** - Detect duplicates, expired entries, corruption\n5. **Lock hygiene** - Metadata files with PID/timestamp for diagnostics\n6. **Temp file cleanup** - Remove orphaned `.tmp` files from interrupted operations\n\n## Success Criteria\n\n- Corrupted index automatically rebuilt from log without data loss\n- Stale locks from crashed processes cleaned up automatically\n- Lock metadata enables diagnosis of stuck processes\n- `jit validate` reports all consistency issues with fix suggestions\n- No manual intervention required for common failure scenarios\n\n## References\n\nSee design document `dev/design/worktree-parallel-work.md`:\n- Section \"Recovery and Robustness\" for startup recovery algorithm\n- Section \"Lock Hygiene and Metadata\" for lock management\n- Section \"Index Consistency Validation\" for validation logic\n\n## Testing Strategy\n\n- Crash recovery tests (corrupt index, remove mid-operation)\n- Lock cleanup tests (stale locks with dead PIDs)\n- Property-based tests for index rebuild correctness\n\n## Dependencies\n\nRequires Story: Claim Coordination System (structures to recover)",
-  "state": "done",
-  "priority": "high",
   "assignee": "copilot:cli-session",
+  "claimed_at": "2026-02-02T12:29:37.053338968Z",
+  "context": {},
+  "created_at": "2026-01-03T20:27:36.165112456Z",
   "dependencies": [
     "e8f9a2ff-e921-439d-9a9e-0710218368ff",
     "26893ec6-2110-4e2c-b787-45b85664caaa",
@@ -14,6 +12,18 @@
     "5f567491-ff8d-4f85-8788-7c4d60ea7a87",
     "5f189c35-c830-45b6-84f0-961e1652ec19"
   ],
+  "description": "Implement crash recovery, consistency validation, and self-healing mechanisms to ensure the system recovers gracefully from failures.\n\n## Goal\n\nEnsure the parallel work system is robust against crashes, stale state, and corruption, with automatic recovery where possible.\n\n## Tasks\n\n1. **Startup recovery routine** - Run on every `jit` command to detect/fix issues\n2. **Stale lock cleanup** - Detect and remove locks from dead processes (PID check)\n3. **Claims index rebuild** - Reconstruct index from append-only JSONL log\n4. **Index consistency validation** - Detect duplicates, expired entries, corruption\n5. **Lock hygiene** - Metadata files with PID/timestamp for diagnostics\n6. **Temp file cleanup** - Remove orphaned `.tmp` files from interrupted operations\n\n## Success Criteria\n\n- Corrupted index automatically rebuilt from log without data loss\n- Stale locks from crashed processes cleaned up automatically\n- Lock metadata enables diagnosis of stuck processes\n- `jit validate` reports all consistency issues with fix suggestions\n- No manual intervention required for common failure scenarios\n\n## References\n\nSee design document `dev/design/worktree-parallel-work.md`:\n- Section \"Recovery and Robustness\" for startup recovery algorithm\n- Section \"Lock Hygiene and Metadata\" for lock management\n- Section \"Index Consistency Validation\" for validation logic\n\n## Testing Strategy\n\n- Crash recovery tests (corrupt index, remove mid-operation)\n- Lock cleanup tests (stale locks with dead PIDs)\n- Property-based tests for index rebuild correctness\n\n## Dependencies\n\nRequires Story: Claim Coordination System (structures to recover)",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Design Document",
+      "path": "dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md"
+    }
+  ],
+  "done_at": "2026-02-02T13:00:03.808232716Z",
+  "first_ready_at": "2026-02-02T12:26:54.281898718Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -22,76 +32,33 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
+    "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T13:14:20.745028898Z"
+      "updated_at": "2026-02-02T13:14:20.542347280Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "copilot:cli-session",
-      "updated_at": "2026-02-02T12:59:59.375112778Z"
+      "updated_at": "2026-02-02T12:59:59.375112778Z",
+      "updated_by": "copilot:cli-session"
     },
-    "clippy": {
+    "fmt": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T13:14:20.542347280Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T13:14:00.026221350Z"
+      "updated_at": "2026-02-02T13:14:20.745028898Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
       "status": "passed",
-      "updated_by": "copilot:session",
-      "updated_at": "2026-02-02T12:29:37.050180117Z"
+      "updated_at": "2026-02-02T12:29:37.050180117Z",
+      "updated_by": "copilot:session"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_at": "2026-02-02T13:14:00.026221350Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/design/worktree-parallel-work.md",
-      "commit": null,
-      "label": "Design Document",
-      "doc_type": "design",
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "https://docs.rs/fs4/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://github.com/ulid/spec",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://git-scm.com/docs/git-worktree",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://automerge.org/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "92bf3a9b-914a-4015-8d26-b52535afe479",
   "labels": [
     "type:story",
     "epic:parallel-work",
@@ -99,9 +66,8 @@
     "component:storage",
     "story:recovery-robustness"
   ],
-  "created_at": "2026-01-03T20:27:36.165112456Z",
-  "updated_at": "2026-07-05T19:51:13.036046461Z",
-  "first_ready_at": "2026-02-02T12:26:54.281898718Z",
-  "claimed_at": "2026-02-02T12:29:37.053338968Z",
-  "done_at": "2026-02-02T13:00:03.808232716Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Story: Recovery and Robustness",
+  "updated_at": "2026-07-27T10:03:58.963578233Z"
 }

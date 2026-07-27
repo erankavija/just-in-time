@@ -1,10 +1,8 @@
 {
-  "id": "7051d24e-c804-4231-9a60-d1046ef45dde",
-  "title": "Story: Configuration System",
-  "description": "Implement configuration system for worktree mode, lease enforcement, and coordination settings.\n\n## Goal\n\nProvide flexible configuration to support different deployment scenarios from single-agent sequential work to multi-agent parallel coordination.\n\n## Tasks\n\n1. **Repository config schema** - `.jit/config.toml` with worktree and coordination sections\n2. **Agent config** - `~/.config/jit/agent.toml` for persistent agent identity\n3. **Worktree mode setting** - `auto`, `on`, `off` modes for feature enablement\n4. **Enforcement mode setting** - `strict`, `warn`, `off` for lease enforcement\n5. **TTL and heartbeat settings** - Configurable defaults for lease management\n6. **Config commands** - `jit config show/get/set/validate`\n7. **Environment variable overrides** - `JIT_AGENT_ID` and similar\n\n## Success Criteria\n\n- Sequential workflows unaffected when `worktree.mode = \"off\"`\n- Configuration loading follows documented priority order\n- `jit config show` displays effective merged configuration\n- All settings documented with examples\n- Invalid configuration rejected with clear error messages\n\n## References\n\nSee design document `dev/design/worktree-parallel-work.md`:\n- Section \"Configuration\" for schema and loading order\n- Section \"Repository Configuration\" for `.jit/config.toml` schema\n- Section \"Agent Configuration\" for `~/.config/jit/agent.toml` schema\n\n## Dependencies\n\nRequires Story: Worktree Foundation Infrastructure (paths for config files)",
-  "state": "done",
-  "priority": "normal",
   "assignee": "copilot:cli-session",
+  "claimed_at": "2026-02-02T17:16:40.317688392Z",
+  "context": {},
+  "created_at": "2026-01-03T20:27:36.166661227Z",
   "dependencies": [
     "d41c6a08-81ce-491f-8bf9-6aab78febcbf",
     "d1d7c7fc-5fac-4538-b85f-5c558c61804b",
@@ -13,6 +11,18 @@
     "765f06b2-f0cc-4805-9692-0a80efd77aed",
     "aeae2290-3acb-4b1b-9e92-755fa8740a6e"
   ],
+  "description": "Implement configuration system for worktree mode, lease enforcement, and coordination settings.\n\n## Goal\n\nProvide flexible configuration to support different deployment scenarios from single-agent sequential work to multi-agent parallel coordination.\n\n## Tasks\n\n1. **Repository config schema** - `.jit/config.toml` with worktree and coordination sections\n2. **Agent config** - `~/.config/jit/agent.toml` for persistent agent identity\n3. **Worktree mode setting** - `auto`, `on`, `off` modes for feature enablement\n4. **Enforcement mode setting** - `strict`, `warn`, `off` for lease enforcement\n5. **TTL and heartbeat settings** - Configurable defaults for lease management\n6. **Config commands** - `jit config show/get/set/validate`\n7. **Environment variable overrides** - `JIT_AGENT_ID` and similar\n\n## Success Criteria\n\n- Sequential workflows unaffected when `worktree.mode = \"off\"`\n- Configuration loading follows documented priority order\n- `jit config show` displays effective merged configuration\n- All settings documented with examples\n- Invalid configuration rejected with clear error messages\n\n## References\n\nSee design document `dev/design/worktree-parallel-work.md`:\n- Section \"Configuration\" for schema and loading order\n- Section \"Repository Configuration\" for `.jit/config.toml` schema\n- Section \"Agent Configuration\" for `~/.config/jit/agent.toml` schema\n\n## Dependencies\n\nRequires Story: Worktree Foundation Infrastructure (paths for config files)",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Design Document",
+      "path": "dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md"
+    }
+  ],
+  "done_at": "2026-02-02T17:21:18.579848463Z",
+  "first_ready_at": "2026-02-02T17:16:08.178401006Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -23,74 +33,31 @@
   "gates_status": {
     "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T17:21:12.240533859Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T17:16:37.803866872Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T17:20:52.226062553Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T17:21:12.443144067Z"
+      "updated_at": "2026-02-02T17:21:12.240533859Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T17:21:15.656241447Z"
+      "updated_at": "2026-02-02T17:21:15.656241447Z",
+      "updated_by": null
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_at": "2026-02-02T17:21:12.443144067Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_at": "2026-02-02T17:16:37.803866872Z",
+      "updated_by": null
+    },
+    "tests": {
+      "status": "passed",
+      "updated_at": "2026-02-02T17:20:52.226062553Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/design/worktree-parallel-work.md",
-      "commit": null,
-      "label": "Design Document",
-      "doc_type": "design",
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "https://git-scm.com/docs/git-worktree",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://automerge.org/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://github.com/ulid/spec",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://docs.rs/fs4/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "7051d24e-c804-4231-9a60-d1046ef45dde",
   "labels": [
     "type:story",
     "epic:parallel-work",
@@ -98,9 +65,8 @@
     "component:cli",
     "story:config-system"
   ],
-  "created_at": "2026-01-03T20:27:36.166661227Z",
-  "updated_at": "2026-07-05T19:51:13.001654716Z",
-  "first_ready_at": "2026-02-02T17:16:08.178401006Z",
-  "claimed_at": "2026-02-02T17:16:40.317688392Z",
-  "done_at": "2026-02-02T17:21:18.579848463Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Story: Configuration System",
+  "updated_at": "2026-07-27T10:03:58.963578233Z"
 }

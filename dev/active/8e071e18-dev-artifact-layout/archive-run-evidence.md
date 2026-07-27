@@ -619,3 +619,116 @@ Issue `74a51f37`. Plan eligible with no blockers. 3 relocated, 0 mirrored, 0 ret
 | `dev/active/8e071e18-breakdown.json:2946:14` | `dev/plans/stalled-detection-c802a9b0.md` |
 | `dev/active/8e071e18-breakdown.json:3605:2504` | `dev/active/observability-design.md` |
 | `dev/active/8e071e18-breakdown.json:3605:2596` | `dev/active/observability-design.md` |
+
+## `ad601a15` — dev/archive/ad601a15-parallel-work
+Issue `60c398d3`. Plan eligible with no blockers. 15 relocated, 0 mirrored, 0 retained, 0 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/design/cli-quality-improvements.md` | `dev/archive/ad601a15-parallel-work/dev/design/cli-quality-improvements.md` | 4b2cb4cd |
+| move | `dev/design/worktree-parallel-work.md` | `dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md` | 65e7dccd 7051d24e 730d25b5 909c78cc 92bf3a9b ad601a15 b74af86f f0235aa4 f84945f7 |
+| move | `dev/experiments/worktree-manual-coordination-experiment.md` | `dev/archive/ad601a15-parallel-work/dev/experiments/worktree-manual-coordination-experiment.md` | ad601a15 |
+| move | `dev/sessions/session-20260103-parallel-work-design-review.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260103-parallel-work-design-review.md` | ad601a15 |
+| move | `dev/sessions/session-20260111-validate-implementation.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260111-validate-implementation.md` | f8e58e7d |
+| move | `dev/sessions/session-20260115-cli-quality-phase3.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-cli-quality-phase3.md` | 4b2cb4cd |
+| move | `dev/sessions/session-20260115-phase3-issue7-complete.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-phase3-issue7-complete.md` | 4b2cb4cd |
+| move | `dev/sessions/session-20260115-story-review-f023.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-story-review-f023.md` | f0235aa4 |
+| move | `dev/sessions/session-20260118-f849-manual-testing.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260118-f849-manual-testing.md` | f84945f7 |
+| move | `dev/sessions/session-20260201-cli-enforcement-82b17394.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-cli-enforcement-82b17394.md` | 82b17394 |
+| move | `dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md` | 5e1d5f02 |
+| move | `dev/sessions/session-20260201-refactor-1bdc5395-analysis.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-refactor-1bdc5395-analysis.md` | 1bdc5395 |
+| move | `dev/sessions/session-20260201-refactor-items-5-7.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-refactor-items-5-7.md` | 1bdc5395 |
+| move | `dev/sessions/session-claim-coordination-parallel.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-claim-coordination-parallel.md` | b74af86f |
+| move | `dev/sessions/session-claim-coordination-review.md` | `dev/archive/ad601a15-parallel-work/dev/sessions/session-claim-coordination-review.md` | b74af86f |
+
+### In-content citation warnings (81)
+
+| citing site | moving artifact |
+|---|---|
+| `crates/jit/src/storage/claim_coordinator.rs:13:22` | `dev/design/worktree-parallel-work.md` |
+| `crates/jit/tests/cli_repo_workflow/config_get_tests.rs:369:42` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-breakdown.json:1653:1149` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-breakdown.json:1653:1196` | `dev/experiments/worktree-manual-coordination-experiment.md` |
+| `dev/active/8e071e18-breakdown.json:1653:1260` | `dev/experiments/worktree-manual-coordination-experiment.md` |
+| `dev/active/8e071e18-breakdown.json:1653:1329` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-breakdown.json:1690:14` | `dev/experiments/worktree-manual-coordination-experiment.md` |
+| `dev/active/8e071e18-breakdown.json:3001:14` | `dev/design/cli-quality-improvements.md` |
+| `dev/active/8e071e18-breakdown.json:3002:14` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-breakdown.json:3003:14` | `dev/experiments/worktree-manual-coordination-experiment.md` |
+| `dev/active/8e071e18-breakdown.json:3004:14` | `dev/sessions/session-20260103-parallel-work-design-review.md` |
+| `dev/active/8e071e18-breakdown.json:3005:14` | `dev/sessions/session-20260111-validate-implementation.md` |
+| `dev/active/8e071e18-breakdown.json:3006:14` | `dev/sessions/session-20260115-cli-quality-phase3.md` |
+| `dev/active/8e071e18-breakdown.json:3007:14` | `dev/sessions/session-20260115-phase3-issue7-complete.md` |
+| `dev/active/8e071e18-breakdown.json:3008:14` | `dev/sessions/session-20260115-story-review-f023.md` |
+| `dev/active/8e071e18-breakdown.json:3009:14` | `dev/sessions/session-20260118-f849-manual-testing.md` |
+| `dev/active/8e071e18-breakdown.json:3010:14` | `dev/sessions/session-20260201-cli-enforcement-82b17394.md` |
+| `dev/active/8e071e18-breakdown.json:3011:14` | `dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md` |
+| `dev/active/8e071e18-breakdown.json:3012:14` | `dev/sessions/session-20260201-refactor-1bdc5395-analysis.md` |
+| `dev/active/8e071e18-breakdown.json:3013:14` | `dev/sessions/session-20260201-refactor-items-5-7.md` |
+| `dev/active/8e071e18-breakdown.json:3014:14` | `dev/sessions/session-claim-coordination-parallel.md` |
+| `dev/active/8e071e18-breakdown.json:3015:14` | `dev/sessions/session-claim-coordination-review.md` |
+| `dev/active/8e071e18-breakdown.json:3274:1259` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-breakdown.json:3274:1366` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3338` | `dev/sessions/session-20260103-parallel-work-design-review.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3456` | `dev/sessions/session-20260103-parallel-work-design-review.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3694` | `dev/sessions/session-20260111-validate-implementation.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3808` | `dev/sessions/session-20260111-validate-implementation.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3870` | `dev/sessions/session-20260115-cli-quality-phase3.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3979` | `dev/sessions/session-20260115-cli-quality-phase3.md` |
+| `dev/active/8e071e18-breakdown.json:3734:4036` | `dev/sessions/session-20260115-phase3-issue7-complete.md` |
+| `dev/active/8e071e18-breakdown.json:3734:4149` | `dev/sessions/session-20260115-phase3-issue7-complete.md` |
+| `dev/active/8e071e18-breakdown.json:3734:4210` | `dev/sessions/session-20260115-story-review-f023.md` |
+| `dev/active/8e071e18-breakdown.json:3734:4318` | `dev/sessions/session-20260115-story-review-f023.md` |
+| `dev/active/8e071e18-breakdown.json:3734:4374` | `dev/sessions/session-20260118-f849-manual-testing.md` |
+| `dev/active/8e071e18-breakdown.json:3734:4484` | `dev/sessions/session-20260118-f849-manual-testing.md` |
+| `dev/active/8e071e18-breakdown.json:3734:4542` | `dev/sessions/session-20260201-cli-enforcement-82b17394.md` |
+| `dev/active/8e071e18-breakdown.json:3734:4657` | `dev/sessions/session-20260201-cli-enforcement-82b17394.md` |
+| `dev/active/8e071e18-breakdown.json:3734:4720` | `dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md` |
+| `dev/active/8e071e18-breakdown.json:3734:4837` | `dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md` |
+| `dev/active/8e071e18-breakdown.json:3734:4902` | `dev/sessions/session-20260201-refactor-1bdc5395-analysis.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5019` | `dev/sessions/session-20260201-refactor-1bdc5395-analysis.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5084` | `dev/sessions/session-20260201-refactor-items-5-7.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5193` | `dev/sessions/session-20260201-refactor-items-5-7.md` |
+| `dev/active/8e071e18-breakdown.json:3734:6161` | `dev/sessions/session-claim-coordination-parallel.md` |
+| `dev/active/8e071e18-breakdown.json:3734:6270` | `dev/sessions/session-claim-coordination-parallel.md` |
+| `dev/active/8e071e18-breakdown.json:3734:6327` | `dev/sessions/session-claim-coordination-review.md` |
+| `dev/active/8e071e18-breakdown.json:3734:6434` | `dev/sessions/session-claim-coordination-review.md` |
+| `dev/active/8e071e18-investigation.md:1304:77` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-investigation.md:1305:104` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-investigation.md:1306:75` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-investigation.md:1307:73` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-investigation.md:1308:88` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-investigation.md:1309:62` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-investigation.md:1310:62` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-investigation.md:1311:4` | `dev/experiments/worktree-manual-coordination-experiment.md` |
+| `dev/active/8e071e18-investigation.md:1311:83` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-investigation.md:1316:2` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-investigation.md:1355:35` | `dev/experiments/worktree-manual-coordination-experiment.md` |
+| `dev/active/8e071e18-investigation.md:1360:62` | `dev/experiments/worktree-manual-coordination-experiment.md` |
+| `dev/active/8e071e18-investigation.md:1362:43` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-investigation.md:1370:55` | `dev/experiments/worktree-manual-coordination-experiment.md` |
+| `dev/active/8e071e18-investigation.md:1383:58` | `dev/design/worktree-parallel-work.md` |
+| `dev/active/8e071e18-investigation.md:783:5` | `dev/design/worktree-parallel-work.md` |
+| `dev/archive/2d109173-docs-exhaustive-audit/dev/active/4c33d0e5-audit-notes.md:145:4` | `dev/design/worktree-parallel-work.md` |
+| `dev/archive/4a00b2b0-agent-validation/dev/studies/ai-tool-worktree-compatibility.md:210:37` | `dev/design/worktree-parallel-work.md` |
+| `dev/archive/4a00b2b0-agent-validation/dev/studies/ai-tool-worktree-compatibility.md:226:39` | `dev/design/worktree-parallel-work.md` |
+| `dev/archive/4a00b2b0-agent-validation/dev/studies/ai-tool-worktree-compatibility.md:229:39` | `dev/experiments/worktree-manual-coordination-experiment.md` |
+| `dev/archive/4a00b2b0-agent-validation/dev/studies/ai-tool-worktree-compatibility.md:81:66` | `dev/design/worktree-parallel-work.md` |
+| `dev/archive/features/dbe1e821/dbe1e821-progress.json:177:669` | `dev/design/worktree-parallel-work.md` |
+| `dev/experiments/worktree-manual-coordination-experiment.md:377:47` | `dev/design/worktree-parallel-work.md` |
+| `dev/sessions/session-20260103-parallel-work-design-review.md:34:26` | `dev/design/worktree-parallel-work.md` |
+| `dev/sessions/session-20260103-parallel-work-design-review.md:358:21` | `dev/design/worktree-parallel-work.md` |
+| `dev/sessions/session-20260118-f849-manual-testing.md:60:24` | `dev/design/worktree-parallel-work.md` |
+| `dev/sessions/session-claim-coordination-parallel.md:143:24` | `dev/design/worktree-parallel-work.md` |
+| `dev/sessions/session-claim-coordination-parallel.md:188:24` | `dev/design/worktree-parallel-work.md` |
+| `dev/sessions/session-claim-coordination-parallel.md:308:16` | `dev/design/worktree-parallel-work.md` |
+| `dev/sessions/session-claim-coordination-parallel.md:309:24` | `dev/experiments/worktree-manual-coordination-experiment.md` |
+| `dev/sessions/session-claim-coordination-parallel.md:82:24` | `dev/design/worktree-parallel-work.md` |
+| `docs/how-to/multi-agent-coordination.md:472:21` | `dev/design/worktree-parallel-work.md` |
+| `docs/tutorials/parallel-work-worktrees.md:257:21` | `dev/design/worktree-parallel-work.md` |
+
+### Other plan warnings (1)
+
+- `external-edge` at `dev/design/worktree-parallel-work.md`

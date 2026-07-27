@@ -1,13 +1,21 @@
 {
-  "id": "5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68",
-  "title": "Add configurable enforcement modes",
-  "description": "Add `enforce_leases` config option with modes: `strict` (block), `warn` (warn but allow), `off` (bypass). Load from `.jit/config.toml` and respect in `require_active_lease()`. See design doc section \"Configuration\".",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.592787923Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Add `enforce_leases` config option with modes: `strict` (block), `warn` (warn but allow), `off` (bypass). Load from `.jit/config.toml` and respect in `require_active_lease()`. See design doc section \"Configuration\".",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "label": "Implementation context and plan",
+      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md"
+    }
+  ],
+  "done_at": "2026-02-01T17:01:21.474823470Z",
+  "first_ready_at": "2026-01-07T23:32:21.488336152Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,49 +24,41 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T17:00:40.645674129Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T17:01:00.363326990Z"
-    },
     "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T17:00:58.258794438Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-01T17:01:21.467801778Z"
+      "updated_at": "2026-02-01T17:00:58.258794438Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-01T17:01:21.474519420Z"
+      "updated_at": "2026-02-01T17:01:21.474519420Z",
+      "updated_by": null
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_at": "2026-02-01T17:01:00.363326990Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_at": "2026-02-01T17:01:21.467801778Z",
+      "updated_by": null
+    },
+    "tests": {
+      "status": "passed",
+      "updated_at": "2026-02-01T17:00:40.645674129Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/sessions/session-20260201-enforcement-modes-5e1d5f02.md",
-      "commit": null,
-      "label": "Implementation context and plan",
-      "doc_type": "notes"
-    }
-  ],
+  "id": "5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.592787923Z",
-  "updated_at": "2026-07-05T19:51:12.981415382Z",
-  "first_ready_at": "2026-01-07T23:32:21.488336152Z",
-  "done_at": "2026-02-01T17:01:21.474823470Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Add configurable enforcement modes",
+  "updated_at": "2026-07-27T10:03:58.963578233Z"
 }

@@ -1,10 +1,7 @@
 {
-  "id": "730d25b5-f16c-4327-99fd-fb337e65edb9",
-  "title": "Story: Enforcement and Validation",
-  "description": "Implement defense-in-depth enforcement mechanisms to ensure lease requirements and branch divergence rules are respected at multiple layers.\n\n## Goal\n\nPrevent unauthorized structural edits through CLI-level checks, pre-commit hooks, and divergence validation, providing multiple layers of protection.\n\n## Tasks\n\n1. **CLI-level lease enforcement** - `require_active_lease()` check before structural operations\n2. **Pre-commit hook** - Validate leases and divergence before commit\n3. **Pre-push hook** - Validate leases still active before push (optional, strict teams)\n4. **Branch divergence detection** - Block global operations when diverged from main\n5. **Configurable enforcement modes** - `strict`, `warn`, `off` via config\n\n## Success Criteria\n\n- Structural edits without lease blocked in strict mode, warned in warn mode\n- Pre-commit hook prevents commits with unauthorized edits\n- Global operations (config, gates registry) require main history\n- Clear, actionable error messages with remediation steps\n- Enforcement can be disabled for backward compatibility\n\n## References\n\nSee design document `dev/design/worktree-parallel-work.md`:\n- Section \"Enforcement Mechanisms\" for defense-in-depth strategy\n- Section \"Pre-Commit Hook\" for hook template\n- Section \"CLI-Level Divergence Gate\" for divergence checking\n- Section \"Configuration\" for enforcement modes\n\n## Dependencies\n\nRequires Story: Claim Coordination System (need lease checking)",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-01-03T20:27:03.121777712Z",
   "dependencies": [
     "62ff2fd9-47d3-4057-9a5b-92ee2e269cfb",
     "bc3742d9-15d5-455f-a5a8-c12976c21f12",
@@ -12,6 +9,18 @@
     "82b17394-a36b-4093-98aa-703f678d48c4",
     "5e1d5f02-c94d-4f52-9ed6-a633bd6c8f68"
   ],
+  "description": "Implement defense-in-depth enforcement mechanisms to ensure lease requirements and branch divergence rules are respected at multiple layers.\n\n## Goal\n\nPrevent unauthorized structural edits through CLI-level checks, pre-commit hooks, and divergence validation, providing multiple layers of protection.\n\n## Tasks\n\n1. **CLI-level lease enforcement** - `require_active_lease()` check before structural operations\n2. **Pre-commit hook** - Validate leases and divergence before commit\n3. **Pre-push hook** - Validate leases still active before push (optional, strict teams)\n4. **Branch divergence detection** - Block global operations when diverged from main\n5. **Configurable enforcement modes** - `strict`, `warn`, `off` via config\n\n## Success Criteria\n\n- Structural edits without lease blocked in strict mode, warned in warn mode\n- Pre-commit hook prevents commits with unauthorized edits\n- Global operations (config, gates registry) require main history\n- Clear, actionable error messages with remediation steps\n- Enforcement can be disabled for backward compatibility\n\n## References\n\nSee design document `dev/design/worktree-parallel-work.md`:\n- Section \"Enforcement Mechanisms\" for defense-in-depth strategy\n- Section \"Pre-Commit Hook\" for hook template\n- Section \"CLI-Level Divergence Gate\" for divergence checking\n- Section \"Configuration\" for enforcement modes\n\n## Dependencies\n\nRequires Story: Claim Coordination System (need lease checking)",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Design Document",
+      "path": "dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md"
+    }
+  ],
+  "done_at": "2026-02-01T23:40:15.390763036Z",
+  "first_ready_at": "2026-02-01T23:38:57.596522489Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -20,76 +29,33 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T23:39:43.949495241Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-01T23:39:43.950406061Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T23:40:01.665555339Z"
-    },
     "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T23:40:01.462758541Z"
+      "updated_at": "2026-02-01T23:40:01.462758541Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-01T23:39:43.951778401Z"
+      "updated_at": "2026-02-01T23:39:43.951778401Z",
+      "updated_by": "agent:copilot-session"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_at": "2026-02-01T23:40:01.665555339Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_at": "2026-02-01T23:39:43.950406061Z",
+      "updated_by": "agent:copilot-session"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_at": "2026-02-01T23:39:43.949495241Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/design/worktree-parallel-work.md",
-      "commit": null,
-      "label": "Design Document",
-      "doc_type": "design",
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "https://git-scm.com/docs/git-worktree",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://github.com/ulid/spec",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://docs.rs/fs4/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://automerge.org/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "730d25b5-f16c-4327-99fd-fb337e65edb9",
   "labels": [
     "type:story",
     "epic:parallel-work",
@@ -97,8 +63,8 @@
     "component:cli",
     "story:enforcement-validation"
   ],
-  "created_at": "2026-01-03T20:27:03.121777712Z",
-  "updated_at": "2026-07-05T19:51:13.004778289Z",
-  "first_ready_at": "2026-02-01T23:38:57.596522489Z",
-  "done_at": "2026-02-01T23:40:15.390763036Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Story: Enforcement and Validation",
+  "updated_at": "2026-07-27T10:03:58.963578233Z"
 }

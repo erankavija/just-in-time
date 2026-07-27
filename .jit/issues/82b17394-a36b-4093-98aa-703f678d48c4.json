@@ -1,13 +1,21 @@
 {
-  "id": "82b17394-a36b-4093-98aa-703f678d48c4",
-  "title": "Implement CLI-level lease enforcement",
-  "description": "Add `require_active_lease()` check in `CommandExecutor` before structural operations that modify existing issues: update/delete issue, add/remove deps, add/remove gates, change state.\n\n**IMPORTANT:** Issue creation (`jit issue create`) is EXEMPTED from lease requirement because it allocates a new ULID that cannot conflict. See design doc section \"Issue Creation Workflow\".\n\nSupport configurable enforcement modes (off/warn/strict). See design doc sections \"CLI-Level Enforcement\" and \"Read vs Write Operations\".",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.582650660Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Add `require_active_lease()` check in `CommandExecutor` before structural operations that modify existing issues: update/delete issue, add/remove deps, add/remove gates, change state.\n\n**IMPORTANT:** Issue creation (`jit issue create`) is EXEMPTED from lease requirement because it allocates a new ULID that cannot conflict. See design doc section \"Issue Creation Workflow\".\n\nSupport configurable enforcement modes (off/warn/strict). See design doc sections \"CLI-Level Enforcement\" and \"Read vs Write Operations\".",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "label": "Implementation plan",
+      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-cli-enforcement-82b17394.md"
+    }
+  ],
+  "done_at": "2026-02-01T21:57:59.766603541Z",
+  "first_ready_at": "2026-01-07T23:32:21.461886696Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,49 +24,41 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-01T21:57:10.135537011Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T21:57:09.610794271Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T21:56:38.509303963Z"
-    },
     "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T21:57:04.854595950Z"
+      "updated_at": "2026-02-01T21:57:04.854595950Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-01T21:57:56.087191798Z"
+      "updated_at": "2026-02-01T21:57:56.087191798Z",
+      "updated_by": null
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_at": "2026-02-01T21:57:09.610794271Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_at": "2026-02-01T21:57:10.135537011Z",
+      "updated_by": null
+    },
+    "tests": {
+      "status": "passed",
+      "updated_at": "2026-02-01T21:56:38.509303963Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/sessions/session-20260201-cli-enforcement-82b17394.md",
-      "commit": null,
-      "label": "Implementation plan",
-      "doc_type": "notes"
-    }
-  ],
+  "id": "82b17394-a36b-4093-98aa-703f678d48c4",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.582650660Z",
-  "updated_at": "2026-07-05T19:51:13.018709279Z",
-  "first_ready_at": "2026-01-07T23:32:21.461886696Z",
-  "done_at": "2026-02-01T21:57:59.766603541Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement CLI-level lease enforcement",
+  "updated_at": "2026-07-27T10:03:58.963578233Z"
 }
