@@ -598,3 +598,24 @@ Issue `89b7f534`. Plan eligible with no blockers. 2 relocated, 0 mirrored, 1 ret
 | `dev/archive/2821e177-addressing-v2/dev/active/2821e177-investigation.md:196:4` | `dev/active/90a2dbfd-kinds-over-sources.md` |
 | `dev/archive/2821e177-addressing-v2/dev/active/7f22d6cf-breakdown-spec.md:47:4` | `dev/active/90a2dbfd-kinds-over-sources.md` |
 | `dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-rule-gate-items.md:208:32` | `dev/active/90a2dbfd-kinds-over-sources.md` |
+
+## `d7bfd4a4` — dev/archive/d7bfd4a4-observability
+Issue `74a51f37`. Plan eligible with no blockers. 3 relocated, 0 mirrored, 0 retained, 0 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/observability-design.md` | `dev/archive/d7bfd4a4-observability/dev/active/observability-design.md` | d7bfd4a4 |
+| move | `dev/plans/metrics-713ff59d.md` | `dev/archive/d7bfd4a4-observability/dev/plans/metrics-713ff59d.md` | 713ff59d |
+| move | `dev/plans/stalled-detection-c802a9b0.md` | `dev/archive/d7bfd4a4-observability/dev/plans/stalled-detection-c802a9b0.md` | c802a9b0 |
+
+### In-content citation warnings (5)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:2944:14` | `dev/active/observability-design.md` |
+| `dev/active/8e071e18-breakdown.json:2945:14` | `dev/plans/metrics-713ff59d.md` |
+| `dev/active/8e071e18-breakdown.json:2946:14` | `dev/plans/stalled-detection-c802a9b0.md` |
+| `dev/active/8e071e18-breakdown.json:3605:2504` | `dev/active/observability-design.md` |
+| `dev/active/8e071e18-breakdown.json:3605:2596` | `dev/active/observability-design.md` |

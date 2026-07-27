@@ -1,11 +1,18 @@
 {
-  "id": "713ff59d-5d50-4401-b48c-3966bf82f319",
-  "title": "Implement metrics reporting system",
-  "description": "Implement comprehensive metrics reporting system providing actionable insights into issue tracker state and workflow performance. Add 'jit metrics' command with support for multiple categories: issue state distribution, workflow velocity (throughput, cycle time, lead time, WIP), gate performance (pass rates, execution times), and dependency graph health. Support time range filtering (since date, last N days) and multiple output formats (JSON, Prometheus, CSV). Parse event logs for historical data and calculate key metrics like average cycle time from ready→done, gate pass rates by gate type, and blocking time distributions. Include Prometheus export format for integration with monitoring infrastructure. This feature provides essential observability for production deployments, enabling data-driven decisions and early detection of workflow issues.",
-  "state": "rejected",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2025-12-19T23:03:47.850902133Z",
   "dependencies": [],
+  "description": "Implement comprehensive metrics reporting system providing actionable insights into issue tracker state and workflow performance. Add 'jit metrics' command with support for multiple categories: issue state distribution, workflow velocity (throughput, cycle time, lead time, WIP), gate performance (pass rates, execution times), and dependency graph health. Support time range filtering (since date, last N days) and multiple output formats (JSON, Prometheus, CSV). Parse event logs for historical data and calculate key metrics like average cycle time from ready→done, gate pass rates by gate type, and blocking time distributions. Include Prometheus export format for integration with monitoring infrastructure. This feature provides essential observability for production deployments, enabling data-driven decisions and early detection of workflow issues.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "implementation-plan",
+      "format": "markdown",
+      "label": "Implementation Plan",
+      "path": "dev/archive/d7bfd4a4-observability/dev/plans/metrics-713ff59d.md"
+    }
+  ],
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,22 +21,15 @@
     "code-review"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/plans/metrics-713ff59d.md",
-      "commit": null,
-      "label": "Implementation Plan",
-      "doc_type": "implementation-plan",
-      "format": "markdown"
-    }
-  ],
+  "id": "713ff59d-5d50-4401-b48c-3966bf82f319",
   "labels": [
     "type:task",
     "epic:observability",
     "milestone:v1.0",
     "component:cli"
   ],
-  "created_at": "2025-12-19T23:03:47.850902133Z",
-  "updated_at": "2026-06-01T21:44:03.307937346+00:00"
+  "priority": "normal",
+  "state": "rejected",
+  "title": "Implement metrics reporting system",
+  "updated_at": "2026-07-27T10:03:41.737751631Z"
 }

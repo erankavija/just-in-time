@@ -1,11 +1,18 @@
 {
-  "id": "c802a9b0-79df-4ce3-b129-2f86fff3c9ce",
-  "title": "Implement stalled work detection",
-  "description": "Implement automatic stalled work detection to identify issues that are stuck or abandoned, enabling timely intervention. Add 'jit query stalled' command that detects multiple stall patterns: in-progress issues exceeding time thresholds (default 7 days), orphaned assignments with inactive assignees (3+ days), blocked issues with stalled dependencies, high-priority ready issues never claimed, and gated issues without gate check attempts. Support configurable thresholds globally and per-label via .jit/config/stall-detection.json. Return detailed stall information including stall type, duration, last activity timestamp, and suggested remediation actions. Enable JSON output for integration with monitoring and alerting systems. This capability is critical for AI agent coordination, ensuring continuous progress and detecting coordination failures early.",
-  "state": "rejected",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2025-12-19T23:03:47.853706183Z",
   "dependencies": [],
+  "description": "Implement automatic stalled work detection to identify issues that are stuck or abandoned, enabling timely intervention. Add 'jit query stalled' command that detects multiple stall patterns: in-progress issues exceeding time thresholds (default 7 days), orphaned assignments with inactive assignees (3+ days), blocked issues with stalled dependencies, high-priority ready issues never claimed, and gated issues without gate check attempts. Support configurable thresholds globally and per-label via .jit/config/stall-detection.json. Return detailed stall information including stall type, duration, last activity timestamp, and suggested remediation actions. Enable JSON output for integration with monitoring and alerting systems. This capability is critical for AI agent coordination, ensuring continuous progress and detecting coordination failures early.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "implementation-plan",
+      "format": "markdown",
+      "label": "Implementation Plan",
+      "path": "dev/archive/d7bfd4a4-observability/dev/plans/stalled-detection-c802a9b0.md"
+    }
+  ],
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,22 +21,15 @@
     "code-review"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/plans/stalled-detection-c802a9b0.md",
-      "commit": null,
-      "label": "Implementation Plan",
-      "doc_type": "implementation-plan",
-      "format": "markdown"
-    }
-  ],
+  "id": "c802a9b0-79df-4ce3-b129-2f86fff3c9ce",
   "labels": [
     "type:task",
     "epic:observability",
     "milestone:v1.0",
     "component:cli"
   ],
-  "created_at": "2025-12-19T23:03:47.853706183Z",
-  "updated_at": "2026-06-01T21:44:03.357732421+00:00"
+  "priority": "normal",
+  "state": "rejected",
+  "title": "Implement stalled work detection",
+  "updated_at": "2026-07-27T10:03:41.737751631Z"
 }
