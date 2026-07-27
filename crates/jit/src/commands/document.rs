@@ -138,7 +138,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Read-only and advisory (`@/issue/8e071e18/decision/D-7`): the findings
     /// are the return value rather than a status a caller could gate on, and
     /// the run publishes, rewrites, and unlinks no repository content. The
-    /// issue set the report attributes short ids against is read through
+    /// issue set the report resolves owners against — both the short ids those
+    /// issues answer to and the document references they hold — is read through
     /// [`IssueStore::read_issues`](crate::storage::IssueStore::read_issues),
     /// which carries no index maintenance, rather than `list_issues`, which
     /// carries the sidecar sweep. A declared area that does not exist yet

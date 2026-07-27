@@ -2310,8 +2310,8 @@ pub struct ArtifactConformanceResponse {
 /// One artifact `doc conformance` names.
 ///
 /// `status` is `nonconforming` when the owning issue is known and the artifact
-/// sits outside the directory that issue owns, and `unattributed` when no
-/// single issue answers to the artifact's short-id prefix. `issue_id` and
+/// sits outside the directory that issue owns, and `unattributed` when the
+/// report's inputs settle no single owner. `issue_id` and
 /// `canonical_directory` are carried by a `nonconforming` entry and absent from
 /// an `unattributed` one, which claims no owner and no destination.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -2321,7 +2321,8 @@ pub struct ArtifactConformanceEntry {
     pub path: String,
     /// Declared issue-scoped area the artifact was found under.
     pub area: String,
-    /// Short identifier the artifact's own name carries.
+    /// Short identifier the artifact's own name opens with, empty when the name
+    /// carries none and a document reference resolved the owner instead.
     pub short_id: String,
     /// `nonconforming` or `unattributed`.
     pub status: String,
