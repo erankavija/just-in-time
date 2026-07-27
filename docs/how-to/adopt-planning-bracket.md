@@ -107,7 +107,7 @@ The engine hardcodes **none** of these names — `epic`/`goal`, `planning`,
 
 `doc_area` is the node's area declaration: it names one of the issue-scoped areas
 your [`[documentation]` table](../reference/configuration.md#documentation)
-declares, and an area the registry does not declare fails the apply. Inside a
+declares, and an undeclared area fails the apply. Inside a
 `doc` path, `{container.dir}` interpolates to the canonical artifact directory
 `C` owns in that area — the directory `jit doc dir <C> dev/active` prints — so
 the filename beside it is the artifact's own name, `plan.md`. To make `P`'s plan
