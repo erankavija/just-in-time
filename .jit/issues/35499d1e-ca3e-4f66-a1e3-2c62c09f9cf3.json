@@ -18,7 +18,18 @@
     "docs-mechanical",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "failed",
+      "updated_at": "2026-07-27T10:13:09.056349200Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-27T10:13:01.092881414Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "35499d1e-ca3e-4f66-a1e3-2c62c09f9cf3",
   "labels": [
     "type:story",
@@ -29,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Serviceable archival for every configured development area",
-  "updated_at": "2026-07-27T10:12:00.711013770Z"
+  "updated_at": "2026-07-27T10:13:09.056349200Z"
 }

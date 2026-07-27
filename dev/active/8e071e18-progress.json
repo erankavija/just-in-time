@@ -1,7 +1,7 @@
 {
  "epic_id": "8e071e18-d786-43ff-b424-a283fecb11f8",
  "epic_short_id": "8e071e18",
- "current_wave": 8,
+ "current_wave": 9,
  "waves": [
   {
    "wave_number": 1,
@@ -524,7 +524,7 @@
       "cargo-ci",
       "code-review"
      ],
-     "status": "merged into main at 66d5da56, cargo-ci and code-review running",
+     "status": "done",
      "note": "Filed session 6 from the wave-8 rehearsal. Wired ahead of all 24 sweeps and 35499d1e with --reduce."
     },
     {
@@ -555,7 +555,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "39757bb3-666a-465c-97ff-9e5d8dd03246",
@@ -565,7 +565,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "6f6fe80e-1606-4d25-859d-c9434264ec43",
@@ -575,7 +575,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "6116d362-ccaa-45e1-aed6-40e7130efbbe",
@@ -585,7 +585,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "5c09146f-32de-423a-accf-02c4631944ef",
@@ -595,7 +595,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "a45bc29c-d53d-42c5-8bc7-47196c7490b6",
@@ -605,7 +605,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "fccedb73-b4b4-4990-a26d-b99a2cda7739",
@@ -615,7 +615,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "95b01080-0be9-4e9a-ba94-9c4279fc8d66",
@@ -625,7 +625,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "a21185df-4053-498c-a413-a4dbdb6ba71f",
@@ -635,7 +635,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "d1ae9782-3bc9-42b6-bb1c-315cc41dd1e8",
@@ -645,7 +645,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "1c4b7a3c-74f5-4ad1-ab2f-a26012b73cab",
@@ -655,7 +655,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "8ea5b13d-676b-4727-acaf-f73e2e75a370",
@@ -665,7 +665,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "f320923c-702d-4910-b046-0817375de510",
@@ -675,7 +675,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "89b7f534-e6ff-4fce-867d-eec5033bf988",
@@ -685,7 +685,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "74a51f37-96af-49a0-816d-3f03958fbff7",
@@ -695,7 +695,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "60c398d3-16aa-471e-a412-cd1df6f3e0f1",
@@ -705,7 +705,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "deb50576-7598-4b01-8cad-338824f22a92",
@@ -715,7 +715,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "f2f05554-e2a5-4cfd-87a2-6ce24eb1a766",
@@ -725,7 +725,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "edf71346-61e2-4836-8eff-8acf1e343f9e",
@@ -735,7 +735,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "83c61de0-9820-4f48-80f9-6b17ded0c467",
@@ -745,7 +745,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "3c36ffa1-1ad3-4382-bba1-1ab209ce1685",
@@ -755,7 +755,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "f3ddbf55-7a94-4e2d-bfef-8b575bd301c5",
@@ -765,7 +765,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "3ef329f3-10a4-4110-92cc-56e8788c5f69",
@@ -775,7 +775,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "2f524511-8176-4c9a-862f-06de7c3de21c",
@@ -785,7 +785,7 @@
      "gates": [
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
      "id": "3be32cad-63cc-4f69-b2dc-c54e40e66358",
@@ -832,7 +832,7 @@
       "docs-mechanical",
       "repo-validate"
      ],
-     "status": "ready"
+     "status": "criteria lead-verified; 5-gate batch running"
     },
     {
      "short_id": "334bcd6f",
@@ -871,9 +871,9 @@
      "note": "Wave-9 issue pulled forward: independent of the sweeps and of ca832358. Closes pitfall P17."
     }
    ],
-   "status": "in progress",
+   "status": "complete",
    "dispatched_from_main_sha": "4dd883ba1e4e0b92eb675817650948591110d5a7",
-   "archive_sweep_status": "BLOCKED on ca832358. E9 and E10 are resolved and their fixes landed, but the session-6 rehearsal of all 24 executions in a throwaway worktree at 389ca71f showed jit validate FAILS afterwards: 33 retained artifacts across 8 containers carry a reference change to a destination the run never writes. All 24 previews are eligible with zero blockers and all 24 executions exit 0, so neither signal reveals it. Do not execute on main until ca832358 lands.",
+   "archive_sweep_status": "COMPLETE. All 24 executions ran sequentially on main, one commit pair per issue, each verified before its commit and gated with repo-validate. Totals: 176 relocated, 19 mirrored, 83 retained, 0 blockers, 24 recorded execution events. Re-verified afterwards under one uniform set of assertions including byte-for-byte hash comparison of 214 files against the plan that moved them; jit validate reports valid with zero errors, warnings and divergences. Evidence at dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md, linked to the epic.",
    "implementation_closure_evidence": "3be32cad and 429995e1 closed at HEAD 9f106406: five gates passed, both code-reviews zero findings, jit validate green. The 24 archive executions remain blocked on E9.",
    "ordering_note": "Internal ordering: ac45f567 -> 0e5dff57 -> ca832358 -> the 24 archive executions. 84c4e956 is independent and done. 35499d1e is downstream of ca832358. 8ff4cff3 (wave 9) is independent of the sweeps and was dispatched early."
   },
@@ -1733,6 +1733,27 @@
    "subject": "stop a gate batch when an early failure predicts a later one in the same batch",
    "detail": "334bcd6f's doc-review failed on a sentence in docs/reference/cli-commands.md. 89b5899a's doc-review was queued two positions later in the same batch, and its REQ-01 is destination naming - the very subject of that sentence - so it would very likely have re-reported the same defect against a different issue. Stopping the batch cost about one minute of the in-flight 8ff4cff3 review; letting it run would have cost a 30-minute review round plus a spurious failed-gate record on the checkpoint.",
    "decision": "When a batched gate fails, check the remaining entries for a shared surface before letting the batch continue. Fix, then restart the batch from the top."
+  },
+  {
+   "id": "N28",
+   "raised_at": "session 6, ca832358 code-review",
+   "subject": "a criterion that can only be observed once needs its observation committed",
+   "detail": "ca832358's REQ-05 was an end-to-end property of THIS repository: whole-repository validation passing after every terminal container plan executes. It had been verified twice - by the worker and independently by the lead - and code-review still failed it as 'materially unverified', correctly: no attributable test or recorded evidence existed in the repository. cargo-ci cannot establish it, and a fixture cannot either, because the criterion names this repository's own containers.",
+   "decision": "Produce the observation as a committed artifact in the issue's OWN canonical directory (jit doc dir <issue> dev/active, not the epic's, or jit doc conformance reports it as misplaced), carrying the reproduction commands, a per-container table with exit status, and the verbatim validator output. Generally: when a criterion can only be observed by running something destructive once, the deliverable is the recorded observation, and the issue should say so at planning time rather than leaving a reviewer to discover the gap."
+  },
+  {
+   "id": "N29",
+   "raised_at": "session 6, the 24 sweeps",
+   "subject": "three verification oracles, each wrong in a different way, before the right one",
+   "detail": "Verifying that a RETAINED artifact was left alone took three attempts. (1) `os.path.exists(src)` failed on dev/reference/configuration.md, an embedded link target that never existed - correctly retained as a no-op and correctly non-blocking, because only an explicitly-linked source raises MissingSource. (2) Keying on content_identity failed too: the planner records an identity only for an artifact it will write, so it is null both for a present out-of-root file and for an absent one. (3) The right oracle is git: a sweep commits only after verification, so HEAD is the pre-run state and `git status --porcelain -- <path>` empty means the run left the path alone, whether or not it existed.",
+   "decision": "When verifying that an operation left something untouched, compare the tree against its own previous committed state rather than inferring the previous state from the operation's own report. The report describes what the operation intended, not what was there."
+  },
+  {
+   "id": "N30",
+   "raised_at": "session 6, retrospective sweep verification",
+   "subject": "a per-run assertion does not survive being applied to the final tree",
+   "detail": "Re-checking all 24 runs at the end flagged 14303b30 for a mirrored artifact absent at its source. It was correct per-run and correct at the end: dev/active/json-output-standardization-plan.md is owned by two issues, 14303b30 mirrors it and retains the source, and 9d427a6b - later in the order - relocates it, because the outside owner has by then been relinked to the mirrored copy so only the inside owner remains. Both archived copies exist, the live source is gone, both references resolve.",
+   "decision": "A retrospective pass over a sequence of mutations must model the sequence. Index every later relocation before asserting an earlier run's retention, and assert the bytes survived at the later destination instead. Recorded in the evidence record so the apparent contradiction is answered where a reader meets it."
   }
  ],
  "handoffs": [

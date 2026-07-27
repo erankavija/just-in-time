@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/docs-mechanical.sh",
+  "commit": "670a5323861e5ed330714ac9b92ca9c6eb985eb9",
+  "completed_at": "2026-07-27T10:13:09.048648627Z",
+  "duration_ms": 7545,
+  "exit_code": 1,
+  "gate_key": "docs-mechanical",
+  "issue_id": "35499d1e-ca3e-4f66-a1e3-2c62c09f9cf3",
+  "message": null,
+  "run_id": "9c66869e-2b61-4990-b33e-e31838e2dc42",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T10:13:01.503551895Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nMISSING: dev/design/worktree-parallel-work.md\n\n== M5 projections ==\nOK: projections fresh\n\n",
+  "tree_dirty": true
+}
