@@ -751,6 +751,21 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.publish_captured_auto_transition(full_id, State::Ready)
     }
 
+    /// Demote a `Ready` issue an unmet dependency blocks back to `Backlog`.
+    ///
+    /// The inverse of [`auto_transition_to_ready`](Self::auto_transition_to_ready):
+    /// both consult [`Issue::derive_readiness_correction`], so a repository whose
+    /// stored readiness drifted from its graph converges from either side. Returns
+    /// whether the issue changed state; an issue whose stored state already agrees
+    /// with the graph is left untouched.
+    pub(super) fn auto_transition_to_backlog(&self, issue_id: &str) -> Result<bool>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        self.publish_captured_auto_transition(full_id, State::Backlog)
+    }
+
     pub(super) fn auto_transition_to_done(&self, issue_id: &str) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,

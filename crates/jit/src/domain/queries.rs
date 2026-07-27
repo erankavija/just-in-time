@@ -123,6 +123,26 @@ pub fn build_issue_map(issues: &[Issue]) -> HashMap<String, &Issue> {
     issues.iter().map(|i| (i.id.clone(), i)).collect()
 }
 
+/// The dependencies of `issue` that [`is_dependency_met`] rejects, resolved
+/// against `resolved_issues`.
+///
+/// This is the population [`Issue::is_blocked`] answers over, so every surface
+/// that explains a blocked issue names the same dependencies the predicate
+/// counts. A dependency id that resolves to no issue blocks the issue too, but
+/// carries no record to return; whole-repository validation reports such a
+/// dangling id as its own defect.
+pub fn unmet_dependencies<'a>(
+    issue: &Issue,
+    resolved_issues: &HashMap<String, &'a Issue>,
+) -> Vec<&'a Issue> {
+    issue
+        .dependencies
+        .iter()
+        .filter_map(|dependency_id| resolved_issues.get(dependency_id).copied())
+        .filter(|dependency| !is_dependency_met(dependency.state, dependency.archived_from))
+        .collect()
+}
+
 /// Query issues that are ready to be worked on.
 ///
 /// Returns issues that are:
@@ -197,16 +217,12 @@ pub fn query_blocked(issues: &[Issue]) -> Vec<(Issue, Vec<BlockingReason>)> {
         .filter(|issue| issue.is_blocked(&resolved))
         .map(|issue| {
             // Unmet dependencies, by the one predicate every surface shares.
-            let dep_reasons = issue.dependencies.iter().filter_map(|dep_id| {
-                resolved.get(dep_id).and_then(|dep| {
-                    (!is_dependency_met(dep.state, dep.archived_from)).then(|| {
-                        BlockingReason::Dependency {
-                            id: dep_id.clone(),
-                            title: dep.title.clone(),
-                            state: dep.state,
-                        }
-                    })
-                })
+            let dep_reasons = unmet_dependencies(issue, &resolved).into_iter().map(|dep| {
+                BlockingReason::Dependency {
+                    id: dep.id.clone(),
+                    title: dep.title.clone(),
+                    state: dep.state,
+                }
             });
 
             // Required gates that have not passed (absent status reads as Pending).

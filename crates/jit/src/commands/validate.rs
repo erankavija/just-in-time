@@ -2053,11 +2053,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.reduce_all_dependencies(dry_run)
     }
 
-    /// Check for and fix pending state transitions.
+    /// Reconcile stored readiness with the readiness the dependency graph derives.
     ///
-    /// After worktree merges, issues in backlog state may have every dependency
-    /// in a terminal state but never auto-transition to ready. This method detects
-    /// and fixes those pending transitions.
+    /// Stored state can drift from the graph in both directions: after a worktree
+    /// merge a backlog issue may have every dependency in a terminal state without
+    /// ever auto-transitioning to ready, and an issue can hold `Ready` while a
+    /// dependency that blocks it is unmet. Both are violations of
+    /// `@/invariant/derived-state-coherence` and both are repaired here, through
+    /// the one derivation [`Issue::derive_readiness_correction`] owns.
     ///
     /// Uses multiple passes to handle cascading transitions (e.g., when tasks reach a
     /// terminal state, stories become ready, then epics that depend on those stories
@@ -2074,6 +2077,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
+        use crate::domain::ReadinessCorrection;
+
         let mut total_fixed = 0;
         let mut messages = Vec::new();
         let max_passes = 10; // Safety limit to prevent infinite loops
@@ -2086,31 +2091,39 @@ impl<S: IssueStore> CommandExecutor<S> {
             let issues = self.storage.list_issues()?;
             let resolved = crate::domain::queries::build_issue_map(&issues);
 
-            // Find backlog issues that should transition to ready
-            let backlog_issues: Vec<_> = issues
+            // Every issue whose stored readiness disagrees with the graph, with the
+            // correction that restores agreement.
+            let corrections = issues
                 .iter()
-                .filter(|i| i.state == State::Backlog)
-                .collect();
+                .filter_map(|issue| {
+                    issue
+                        .derive_readiness_correction(&resolved)
+                        .map(|correction| (issue.id.clone(), issue.short_id(), correction))
+                })
+                .collect::<Vec<_>>();
 
-            let mut pass_fixed = 0;
-            for issue in backlog_issues {
-                if issue.should_auto_transition_to_ready(&resolved) {
-                    messages.push(format!(
-                        "  → Transitioning {} to ready (dependencies terminal)",
-                        &issue.id[..8.min(issue.id.len())]
-                    ));
-
-                    if !dry_run {
-                        self.auto_transition_to_ready(&issue.id)?;
+            for (issue_id, short_id, correction) in &corrections {
+                messages.push(match correction {
+                    ReadinessCorrection::Promote => {
+                        format!("  → Transitioning {short_id} to ready (dependencies terminal)")
                     }
-                    pass_fixed += 1;
+                    ReadinessCorrection::Demote => {
+                        format!("  → Transitioning {short_id} to backlog (dependencies unmet)")
+                    }
+                });
+
+                if !dry_run {
+                    match correction {
+                        ReadinessCorrection::Promote => self.auto_transition_to_ready(issue_id)?,
+                        ReadinessCorrection::Demote => self.auto_transition_to_backlog(issue_id)?,
+                    };
                 }
             }
 
-            total_fixed += pass_fixed;
+            total_fixed += corrections.len();
 
             // If no fixes this pass, we're done
-            if pass_fixed == 0 {
+            if corrections.is_empty() {
                 break;
             }
         }

@@ -490,6 +490,22 @@ pub(crate) fn fixture_issue(title: String, description: String) -> Issue {
     issue
 }
 
+/// The readiness change the dependency graph demands for a stored issue.
+///
+/// Readiness is stored on the issue and is also derivable from the graph, so the
+/// two views must agree. [`Issue::derive_readiness_correction`] names the change
+/// that restores agreement, and every dependency-mutating path applies the
+/// direction it owns: an edge addition can only demote, an edge removal or a
+/// dependency reaching a terminal state can only promote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadinessCorrection {
+    /// A [`State::Backlog`] issue nothing blocks belongs in [`State::Ready`].
+    Promote,
+    /// A [`State::Ready`] issue with at least one unmet dependency belongs in
+    /// [`State::Backlog`].
+    Demote,
+}
+
 impl Issue {
     /// Draft an issue carrying no authoritative id or lifecycle timestamps.
     ///
@@ -577,13 +593,38 @@ impl Issue {
             .collect()
     }
 
+    /// Derive the readiness correction the dependency graph demands for this
+    /// issue, or `None` when the stored state already agrees with the graph.
+    ///
+    /// This is the single derivation of readiness from the graph: every path
+    /// that mutates a dependency edge — `jit dep add`/`remove`, graph-template
+    /// application, and the `jit validate --fix` repair — decides here, so no two
+    /// of them can drift (`@/invariant/derived-state-coherence`). The
+    /// whole-repository check reports a [`ReadinessCorrection::Demote`] as a
+    /// violation.
+    ///
+    /// Only [`State::Backlog`] and [`State::Ready`] are graph-derived. Every
+    /// other state is owned by an explicit transition — an issue already claimed,
+    /// gated, or terminal is not re-derived from its dependencies — and yields
+    /// `None`.
+    pub fn derive_readiness_correction(
+        &self,
+        resolved_issues: &HashMap<String, &Issue>,
+    ) -> Option<ReadinessCorrection> {
+        match (self.state, self.is_blocked(resolved_issues)) {
+            (State::Backlog, false) => Some(ReadinessCorrection::Promote),
+            (State::Ready, true) => Some(ReadinessCorrection::Demote),
+            _ => None,
+        }
+    }
+
     /// Check if this issue should auto-transition to Ready state
     /// A Backlog issue transitions to Ready when it becomes unblocked
     pub fn should_auto_transition_to_ready(
         &self,
         resolved_issues: &HashMap<String, &Issue>,
     ) -> bool {
-        self.state == State::Backlog && !self.is_blocked(resolved_issues)
+        self.derive_readiness_correction(resolved_issues) == Some(ReadinessCorrection::Promote)
     }
 
     /// Check if this issue should auto-transition to Done state
@@ -1947,6 +1988,84 @@ mod tests {
 
         assert_eq!(issue.state, State::Backlog);
         assert!(!issue.should_auto_transition_to_ready(&resolved));
+    }
+
+    #[test]
+    fn test_derive_readiness_correction_demotes_a_ready_issue_an_unmet_dependency_blocks() {
+        let mut issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let dependency =
+            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        issue.state = State::Ready;
+        issue.dependencies.push(dependency.id.clone());
+        let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
+
+        assert_eq!(
+            issue.derive_readiness_correction(&resolved),
+            Some(ReadinessCorrection::Demote)
+        );
+    }
+
+    #[test]
+    fn test_derive_readiness_correction_promotes_a_backlog_issue_nothing_blocks() {
+        let mut issue =
+            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut dependency =
+            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        dependency.state = State::Done;
+        issue.dependencies.push(dependency.id.clone());
+        let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
+
+        assert_eq!(
+            issue.derive_readiness_correction(&resolved),
+            Some(ReadinessCorrection::Promote)
+        );
+    }
+
+    #[test]
+    fn test_derive_readiness_correction_leaves_a_state_that_already_agrees_with_the_graph() {
+        let mut ready =
+            crate::domain::types::fixture_issue("Ready".to_string(), "Desc".to_string());
+        ready.state = State::Ready;
+        let mut blocked =
+            crate::domain::types::fixture_issue("Blocked".to_string(), "Desc".to_string());
+        let dependency =
+            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        blocked.dependencies.push(dependency.id.clone());
+        let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
+
+        assert_eq!(ready.derive_readiness_correction(&resolved), None);
+        assert_eq!(blocked.derive_readiness_correction(&resolved), None);
+    }
+
+    #[test]
+    fn test_derive_readiness_correction_leaves_a_state_no_dependency_owns() {
+        let dependency =
+            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
+        let blocked_by_unmet_dependency = [
+            State::InProgress,
+            State::Gated,
+            State::Done,
+            State::Rejected,
+            State::Archived,
+        ]
+        .map(|state| {
+            let mut issue =
+                crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
+            issue.state = state;
+            issue.dependencies.push(dependency.id.clone());
+            issue
+        });
+
+        for issue in &blocked_by_unmet_dependency {
+            assert_eq!(
+                issue.derive_readiness_correction(&resolved),
+                None,
+                "{:?} is owned by an explicit transition, not derived from dependencies",
+                issue.state
+            );
+        }
     }
 
     #[test]

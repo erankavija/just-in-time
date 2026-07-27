@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Graph-template application no longer leaves a node `ready` while a
+  dependency it just wired blocks it.** `jit apply` added the edge, then read
+  the dependent's dependency set back from the already-mutated map. When the new
+  edge introduced no transitive redundancy the set compared equal to itself and
+  a guard skipped the rest of the loop body — which held both the `ready →
+  backlog` demotion and the `dependency-add` event. Applying the planning
+  bracket therefore left the breakdown node and the container `ready` with unmet
+  dependencies, and recorded neither event. The guard now exempts the dependent
+  whose set grew, and both paths that mutate a dependency edge — `jit dep
+  add`/`rm` and template application — derive readiness through the single
+  domain helper `Issue::derive_readiness_correction`. `jit validate` reports any
+  issue stored as `ready` while carrying unmet dependencies, and `jit validate
+  --fix` demotes it to the state its dependencies imply.
+
 ### Removed
 
 - **The legacy gate-verb aliases `pass`, `pass-all`, `check`, and `check-all`

@@ -14,6 +14,7 @@ mod domain_queries_tests;
 mod graph_rule_validation_tests;
 mod hierarchy_vectors_test;
 mod lifecycle_timestamps_tests;
+mod readiness_coherence_tests;
 mod short_hash_tests;
 mod state_transition_fix_tests;
 mod strictness_enforcement_tests;

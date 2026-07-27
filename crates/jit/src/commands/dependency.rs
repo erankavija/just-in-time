@@ -1044,6 +1044,10 @@ fn derive_reduced_graph_intents(
     source: Option<(&str, &HashSet<String>)>,
 ) -> Result<Vec<MutationIntent>> {
     let graph = dependency_graph(candidate);
+    // Dependency states are what readiness reads, and this derivation changes no
+    // issue's state, so the original view resolves every dependency the reduced
+    // sets can name.
+    let resolved = crate::domain::queries::build_issue_map(original);
     let mut updates = Vec::new();
     let mut events = Vec::new();
 
@@ -1070,13 +1074,14 @@ fn derive_reduced_graph_intents(
         let issue_id = issue.id.clone();
 
         if source.is_some_and(|(source_id, _)| source_id == issue_id) {
-            let added = reduced.difference(&original_deps);
-            let any_unmet = added
-                .map(|dependency_id| captured_issue(original, dependency_id))
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .any(|dependency| !is_dependency_met(dependency.state, dependency.archived_from));
-            if issue.state == State::Ready && any_unmet {
+            // Readiness derives from the final dependency set through the shared
+            // domain helper, the same one the graph-template apply path consults,
+            // so the two cannot drift (`@/invariant/derived-state-coherence`). An
+            // edge addition owns only the demotion direction; promotion belongs to
+            // the removal path below and to dependency completion.
+            let demoted =
+                issue.derive_readiness_correction(&resolved) == Some(ReadinessCorrection::Demote);
+            if demoted {
                 issue.state = State::Backlog;
                 events.push(MutationIntent::RecordEvent {
                     phase: 1,

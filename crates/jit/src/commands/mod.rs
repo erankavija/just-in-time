@@ -106,7 +106,8 @@ use crate::config_manager::ConfigManager;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
 use crate::domain::{
-    is_dependency_met, Event, GateState, GateStatus, Issue, LabelNamespaces, Priority, State,
+    is_dependency_met, Event, GateState, GateStatus, Issue, LabelNamespaces, Priority,
+    ReadinessCorrection, State,
 };
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
@@ -655,6 +656,12 @@ enum CapturedLifecycleMutation {
     AutoReady {
         issue_id: String,
     },
+    /// Demote a `Ready` issue an unmet dependency blocks back to `Backlog`,
+    /// restoring agreement between stored readiness and the dependency graph
+    /// (`@/invariant/derived-state-coherence`). The inverse of [`Self::AutoReady`].
+    AutoBacklog {
+        issue_id: String,
+    },
     AutoDone {
         issue_id: String,
     },
@@ -667,6 +674,7 @@ impl CapturedLifecycleMutation {
             | Self::Claim { issue_id, .. }
             | Self::Release { issue_id, .. }
             | Self::AutoReady { issue_id }
+            | Self::AutoBacklog { issue_id }
             | Self::AutoDone { issue_id } => issue_id,
         }
     }
@@ -2465,6 +2473,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let request = match target {
             State::Ready => CapturedLifecycleMutation::AutoReady { issue_id },
+            State::Backlog => CapturedLifecycleMutation::AutoBacklog { issue_id },
             State::Done => CapturedLifecycleMutation::AutoDone { issue_id },
             _ => {
                 return Err(anyhow!(
@@ -2796,6 +2805,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                         }));
                     }
                     (State::Ready, false, false)
+                }
+                CapturedLifecycleMutation::AutoBacklog { .. } => {
+                    let resolved = crate::domain::queries::build_issue_map(&issues);
+                    if issue.derive_readiness_correction(&resolved)
+                        != Some(ReadinessCorrection::Demote)
+                    {
+                        return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
+                            target_id: expected_target.clone(),
+                            changed: false,
+                            warnings: Vec::new(),
+                            storage_warnings,
+                        }));
+                    }
+                    (State::Backlog, false, false)
                 }
                 CapturedLifecycleMutation::AutoDone { .. } => {
                     if !issue.should_auto_transition_to_done() {

@@ -1325,17 +1325,12 @@ fn add_captured_template_edge(
             .map(|id| (id.clone(), graph.compute_transitive_reduction(id)))
             .collect::<BTreeMap<_, _>>()
     };
+    // Publish the reduced dependency set of every issue the new edge reshaped.
+    // The dependent `from` is exempt from the unchanged-set shortcut: its own set
+    // grew by `to` above, so a reduction that gives back the same set still means
+    // the edge landed, and the readiness derivation and the dependency-add event
+    // below are still owed.
     for (id, reduced) in reductions {
-        let newly_added = if id == from {
-            reduced.difference(&before).cloned().collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
-        let blocks = newly_added.iter().any(|dependency| {
-            issues.get(dependency).is_some_and(|dependency| {
-                !is_dependency_met(dependency.state, dependency.archived_from)
-            })
-        });
         let issue = issues
             .get_mut(&id)
             .ok_or_else(|| IssueNotFoundError::new(&id))?;
@@ -1347,29 +1342,48 @@ fn add_captured_template_edge(
         removed.sort();
         issue.dependencies = reduced.iter().cloned().collect();
         issue.dependencies.sort();
-        if id == from {
-            if issue.state == State::Ready && blocks {
-                issue.state = State::Backlog;
-                events.push((
-                    1,
-                    Event::draft_issue_state_changed(id.clone(), State::Ready, State::Backlog),
-                ));
-            }
-            events.push((
-                2,
-                Event::draft_issue_updated(
-                    id,
-                    "dependency-add".to_string(),
-                    vec!["dependencies".to_string()],
-                ),
-            ));
-        } else {
+        if id != from {
             events.push((
                 3,
                 Event::draft_dependency_reduced(id, old.len(), reduced.len(), removed),
             ));
         }
     }
+
+    // Readiness derives from the FINAL graph through the shared domain helper, the
+    // same one `jit dep add` consults, so the two paths cannot drift
+    // (`@/invariant/derived-state-coherence`). An edge addition owns only the
+    // demotion direction; promotion belongs to the paths that remove an edge or
+    // retire a dependency.
+    let demoted = {
+        let resolved = issues
+            .iter()
+            .map(|(id, issue)| (id.clone(), issue))
+            .collect::<HashMap<_, _>>();
+        issues
+            .get(from)
+            .ok_or_else(|| IssueNotFoundError::new(from))?
+            .derive_readiness_correction(&resolved)
+            == Some(ReadinessCorrection::Demote)
+    };
+    let issue = issues
+        .get_mut(from)
+        .ok_or_else(|| IssueNotFoundError::new(from))?;
+    if demoted {
+        issue.state = State::Backlog;
+        events.push((
+            1,
+            Event::draft_issue_state_changed(from.to_string(), State::Ready, State::Backlog),
+        ));
+    }
+    events.push((
+        2,
+        Event::draft_issue_updated(
+            from.to_string(),
+            "dependency-add".to_string(),
+            vec!["dependencies".to_string()],
+        ),
+    ));
     Ok(())
 }
 
@@ -1381,7 +1395,7 @@ fn remove_captured_template_edge(
     lease_targets: &mut Vec<String>,
 ) -> Result<()> {
     lease_targets.push(from.to_string());
-    let remaining = {
+    {
         let issue = issues
             .get_mut(from)
             .ok_or_else(|| IssueNotFoundError::new(from))?;
@@ -1390,8 +1404,7 @@ fn remove_captured_template_edge(
         if issue.dependencies.len() == before {
             return Ok(());
         }
-        issue.dependencies.clone()
-    };
+    }
     events.push((
         2,
         Event::draft_issue_updated(
@@ -1400,17 +1413,25 @@ fn remove_captured_template_edge(
             vec!["dependencies".to_string()],
         ),
     ));
-    let all_met = remaining.iter().all(|dependency| {
+
+    // The removal direction of the same shared derivation the addition path uses:
+    // an edge removal can only promote, never demote.
+    let promoted = {
+        let resolved = issues
+            .iter()
+            .map(|(id, issue)| (id.clone(), issue))
+            .collect::<HashMap<_, _>>();
         issues
-            .get(dependency)
-            .is_some_and(|dependency| is_dependency_met(dependency.state, dependency.archived_from))
-    });
-    let issue = issues
-        .get_mut(from)
-        .ok_or_else(|| IssueNotFoundError::new(from))?;
-    let ready = issue.state == State::Backlog && all_met;
-    if ready {
-        issue.state = State::Ready;
+            .get(from)
+            .ok_or_else(|| IssueNotFoundError::new(from))?
+            .derive_readiness_correction(&resolved)
+            == Some(ReadinessCorrection::Promote)
+    };
+    if promoted {
+        issues
+            .get_mut(from)
+            .ok_or_else(|| IssueNotFoundError::new(from))?
+            .state = State::Ready;
         events.push((
             3,
             Event::draft_issue_state_changed(from.to_string(), State::Backlog, State::Ready),

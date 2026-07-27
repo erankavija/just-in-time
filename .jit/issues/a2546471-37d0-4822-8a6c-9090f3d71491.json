@@ -21,7 +21,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-27T19:46:26.677353906Z"
+  "updated_at": "2026-07-27T20:19:05.729574444Z"
 }

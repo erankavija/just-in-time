@@ -17,7 +17,7 @@ use crate::domain::item::{
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressScope,
     ProjectSource, RawScopeItem,
 };
-use crate::domain::{parse_known_events, Issue, SHORT_ID_LENGTH};
+use crate::domain::{parse_known_events, Issue, ReadinessCorrection, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
 use crate::repository_state::{RepositoryEntry, RepositoryImage, RepositoryIndex};
 use crate::validation::engine::Finding;
@@ -551,6 +551,35 @@ fn validate_integrity(
                 ));
             }
         }
+    }
+
+    // Stored readiness must agree with the readiness the graph derives
+    // (`@/invariant/derived-state-coherence`): an issue reported as Ready while
+    // its unmet-dependency list is non-empty tells an agent it may start work the
+    // dependency graph withholds.
+    let resolved = crate::domain::queries::build_issue_map(issues);
+    let incoherent = issues
+        .iter()
+        .filter(|issue| {
+            issue.derive_readiness_correction(&resolved) == Some(ReadinessCorrection::Demote)
+        })
+        .map(|issue| {
+            let unmet = crate::domain::queries::unmet_dependencies(issue, &resolved)
+                .into_iter()
+                .map(|dependency| dependency.short_id())
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("'{}' ({}) waits on: {unmet}", issue.short_id(), issue.title)
+        })
+        .collect::<Vec<_>>();
+    if !incoherent.is_empty() {
+        return Err(anyhow!(
+            "Found {} issue(s) stored as Ready while carrying unmet dependencies:\n  {}\n\
+             Stored readiness must agree with the dependency graph.\n\
+             Run 'jit validate --fix' to move them to the state their dependencies imply.",
+            incoherent.len(),
+            incoherent.join("\n  ")
+        ));
     }
     Ok(())
 }

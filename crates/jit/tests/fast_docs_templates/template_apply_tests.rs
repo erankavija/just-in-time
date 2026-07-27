@@ -1311,6 +1311,100 @@ applies_to  = ["epic"]
     assert_eq!(h.all_issues().len(), before);
 }
 
+// === Readiness coherence across the wired edges (jit:533da2df) ===
+
+/// REQ-01: every node the apply leaves carrying an unmet dependency is stored in
+/// `Backlog`, so the stored state never contradicts the graph the same apply
+/// wired. The spine is `C → B → P`, so both `C` and `B` gain a dependency on a
+/// non-terminal node and must be demoted out of the `Ready` their creation gave
+/// them; `P` keeps its own derived state.
+#[test]
+fn test_apply_template_leaves_no_node_ready_while_it_carries_an_unmet_dependency() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Coherence epic");
+
+    h.executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    let issues = h.all_issues();
+    let resolved = jit::domain::queries::build_issue_map(&issues);
+    let incoherent: Vec<&str> = issues
+        .iter()
+        .filter(|issue| issue.state == jit::domain::State::Ready && issue.is_blocked(&resolved))
+        .map(|issue| issue.title.as_str())
+        .collect();
+    assert!(
+        incoherent.is_empty(),
+        "apply left blocked issue(s) stored as Ready: {incoherent:?}"
+    );
+    // The demotion is a real state change, not an artifact of nothing having
+    // been wired: both dependents do carry the spine edge that blocks them.
+    let container = h.get_issue(&epic);
+    assert_eq!(container.state, jit::domain::State::Backlog);
+    assert!(!container.dependencies.is_empty());
+}
+
+/// REQ-01: the demotion the apply performs is auditable — each node it moves out
+/// of `Ready` appends its own `Ready → Backlog` state-change event.
+#[test]
+fn test_apply_template_appends_a_state_change_event_for_every_node_it_demotes() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Demotion event epic");
+
+    let (result, _w) = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+    let breakdown_id = result.created_node_ids_by_role["breakdown"].clone();
+    let container_id = h.get_issue(&epic).id;
+
+    let events = h.storage.read_events().unwrap();
+    for demoted in [&container_id, &breakdown_id] {
+        assert!(
+            events.iter().any(|event| matches!(
+                event,
+                jit::domain::Event::IssueStateChanged { issue_id, from, to, .. }
+                    if issue_id == demoted
+                        && *from == jit::domain::State::Ready
+                        && *to == jit::domain::State::Backlog
+            )),
+            "no Ready → Backlog event recorded for the demoted node {demoted}"
+        );
+    }
+}
+
+/// REQ-03: every edge the apply wires appends its own dependency-add event,
+/// including the internal `B → P` edge, which introduces no transitive
+/// redundancy and so leaves the dependent's reduced dependency set unchanged.
+#[test]
+fn test_apply_template_appends_a_dependency_add_event_for_every_wired_edge() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Edge event epic");
+
+    let (result, _w) = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+    let breakdown_id = result.created_node_ids_by_role["breakdown"].clone();
+    let container_id = h.get_issue(&epic).id;
+
+    let events = h.storage.read_events().unwrap();
+    for dependent in [&container_id, &breakdown_id] {
+        assert!(
+            events.iter().any(|event| matches!(
+                event,
+                jit::domain::Event::IssueUpdated { issue_id, updated_by, .. }
+                    if issue_id == dependent && updated_by == "dependency-add"
+            )),
+            "no dependency-add event recorded for the dependent {dependent}"
+        );
+    }
+}
+
 // === TSTA-02: the JSON apply-result output ===
 
 #[test]

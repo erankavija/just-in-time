@@ -223,8 +223,11 @@ jit issue create \
   --label "type:task"
 ```
 
-New dependency-free issues are created in `ready`. Gates do not block `ready`;
-they are checked when work starts or completes.
+New dependency-free issues are created in `ready`. An issue created carrying a
+dependency that is not yet effectively terminal — a `jit issue batch-create`
+entry with `depends_on`, or a graph-template node wired to a sibling — is created
+in `backlog` instead. Gates do not block `ready`; they are checked when work
+starts or completes.
 
 **2. Transition to Ready**
 
@@ -234,6 +237,11 @@ re-scans its dependents and moves each newly-unblocked issue to `ready` in the
 same operation (`check_auto_transitions`, `crates/jit/src/commands/issue.rs`).
 Prechecks are not a readiness condition: they run when a ready issue is claimed or
 explicitly moved to `in_progress`.
+
+The reverse holds too: a `ready` issue that gains a dependency on a non-terminal
+issue returns to `backlog` in the same operation. Stored state therefore always
+agrees with the dependency graph, and an issue reported as `ready` while listing
+unmet dependencies is a repository defect `jit validate` reports.
 
 **3. Work Begins**
 
@@ -791,6 +799,7 @@ do not rely on it to prohibit a later explicit state update.
 
 **Auto-transitions:**
 - `Backlog → Ready`: Automatic. When a dependency reaches a terminal state (done or rejected), the completing/rejecting command re-scans dependents and promotes each newly-unblocked issue in the same operation (`check_auto_transitions`, `crates/jit/src/commands/issue.rs`)
+- `Ready → Backlog`: Automatic. The inverse: adding a dependency on a non-terminal issue — through `jit dep add` or through graph-template application — demotes the dependent in the same operation, so stored readiness never contradicts the graph
 
 **Guarded workflow operations:**
 - `Ready → In Progress`: `jit issue claim` attempts this transition and runs prechecks
