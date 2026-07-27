@@ -10105,3 +10105,7 @@
 {"id":"965e0688-ade6-4bad-b3bc-ed8b7cfe7fc3","issue_id":"334bcd6f-4bf8-4f1f-98c9-62f3d2c848e6","priority":"high","timestamp":"2026-07-27T08:56:23.348376229Z","title":"Correct the command reference's archive naming, directory-target and citation-warning facts","type":"issue_created"}
 {"fields":["dependencies"],"id":"7b504070-a622-4ae6-b6a9-26d075c20a23","issue_id":"334bcd6f-4bf8-4f1f-98c9-62f3d2c848e6","timestamp":"2026-07-27T08:56:36.996628743Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"4e95a958-efc6-4c2f-9d85-130628e8c544","issue_id":"89b5899a-ae6e-4bae-82eb-460fb5fccaf7","timestamp":"2026-07-27T08:57:28.285816134Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"76494332-30e7-4290-a00b-40ab76cadf33","issue_id":"8ff4cff3-a36d-4ac0-8cfd-9f61fac6f41f","timestamp":"2026-07-27T09:00:40.048742263Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"a733fce3-2ce0-46aa-a6ca-a77a1b42987d","issue_id":"8ff4cff3-a36d-4ac0-8cfd-9f61fac6f41f","timestamp":"2026-07-27T09:00:40.048742263Z","type":"issue_claimed"}
+{"from":"ready","id":"5706086e-f3f8-465c-af33-4d77090f9ca5","issue_id":"334bcd6f-4bf8-4f1f-98c9-62f3d2c848e6","timestamp":"2026-07-27T09:00:46.471873559Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"50fabe2f-e3f5-4bde-91d2-04ad914911ab","issue_id":"334bcd6f-4bf8-4f1f-98c9-62f3d2c848e6","timestamp":"2026-07-27T09:00:46.471873559Z","type":"issue_claimed"}

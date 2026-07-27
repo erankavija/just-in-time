@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-27T09:00:46.471873559Z",
   "context": {},
   "created_at": "2026-07-27T08:56:23.348376229Z",
   "dependencies": [
@@ -21,7 +22,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Correct the command reference's archive naming, directory-target and citation-warning facts",
-  "updated_at": "2026-07-27T08:56:36.996628743Z"
+  "updated_at": "2026-07-27T09:00:46.471873559Z"
 }
