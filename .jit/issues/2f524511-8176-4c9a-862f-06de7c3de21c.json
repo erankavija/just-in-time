@@ -10,11 +10,18 @@
   ],
   "description": "The linked artifacts of the structured knowledge container reach the archive through the product's own execution path, and the plan warnings the run reports are recorded for the citation work that follows.\n\n## Background\n\nRunning the cleanup through archival execution rather than by hand is the point: an earlier hand-rolled move skipped the planner's reference remapping, left a document reference dangling, and forced a hand repair of a validation failure. Executing the real mechanism exercises the remapping on real artifacts and makes the run its own acceptance evidence.\n\nThis is the single execution over container `25064508`, whose destination directory is `dev/archive/25064508-structured-knowledge`. Its plan currently schedules 5 artifacts for relocation.\n\nThe enumerated artifact set is the plan's current one. A classification change landing before this run can move an entry between relocation and copying and can admit an entry the current plan reports as a blocked selected root, so the execution reads its own plan rather than a frozen list.\n\nRelocation is the only outcome this plan currently schedules: it copies nothing, so the run has no retained source to read. The declared footprint names only what this run writes, which is the destination directory it creates plus the sources it relocates.\n\nAn execution refuses to run unless its plan is eligible, so an ineligible preview is a stop rather than a partial move. The run reports plan warnings naming in-content citations of the artifacts it relocates; those warnings are the input to the citation work that follows and are recorded rather than discarded.\n\n## Success Criteria\n\n- [hard] REQ-01: The container previews an eligible plan before its execution runs.\n- [hard] REQ-02: Every artifact the plan schedules for relocation is present at its destination under `dev/archive/25064508-structured-knowledge` and absent from its source path.\n- [hard] REQ-03: The relocation was performed by the archival execution path, evidenced by the recorded execution events and the container marker in the destination directory.\n- [hard] REQ-04: The plan warnings naming in-content citations of the artifacts this run relocates are recorded.\n- [hard] REQ-05: Artifacts owned by live issues are left where they are.\n- [hard] REQ-06: Whole-repository validation passes after the run and every document reference resolves.\n",
   "documents": [],
+  "done_at": "2026-07-27T10:06:26.442355014Z",
   "first_ready_at": "2026-07-26T12:40:50.672243349Z",
   "gates_required": [
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-27T10:06:23.798963980Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2f524511-8176-4c9a-862f-06de7c3de21c",
   "labels": [
     "type:task",
@@ -27,7 +34,7 @@
     "per:@/issue/8e071e18/decision/D-21"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Archive the structured knowledge container's linked artifacts",
-  "updated_at": "2026-07-27T10:06:13.160873520Z"
+  "updated_at": "2026-07-27T10:06:26.442355014Z"
 }
