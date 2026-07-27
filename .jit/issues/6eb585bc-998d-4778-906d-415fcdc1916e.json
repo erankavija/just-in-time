@@ -1,10 +1,8 @@
 {
-  "id": "6eb585bc-998d-4778-906d-415fcdc1916e",
-  "title": "Core maintenance",
-  "description": "Umbrella for standalone jit core maintenance and bug-fix work that is not part of a feature epic.\n\n## Success Criteria\n\n- Every child maintenance item is resolved (done or rejected) with its own verifiable criteria.",
-  "state": "done",
-  "priority": "normal",
+  "archived_from": "done",
   "assignee": "agent:jit-execution-lead",
+  "context": {},
+  "created_at": "2026-06-16T18:30:52.029597744Z",
   "dependencies": [
     "73482aa1-aa6b-46f6-9d6f-3152a102e558",
     "16402e14-d7cc-4f40-b4a3-1b372979be67",
@@ -66,6 +64,32 @@
     "1d59070d-bebc-4a55-9456-c6c7a3caba2a",
     "0cce1a44-34d5-47e1-b1bb-8da3679f894a"
   ],
+  "description": "Umbrella for standalone jit core maintenance and bug-fix work that is not part of a feature epic.\n\n## Success Criteria\n\n- Every child maintenance item is resolved (done or rejected) with its own verifiable criteria.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "report",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/6eb585bc-completion-report.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "report",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/6eb585bc-batch-report-2026-07-05.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "report",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/6eb585bc-usability-audit-2026-07-05.md"
+    }
+  ],
+  "done_at": "2026-07-17T13:33:40.339134398Z",
+  "first_ready_at": "2026-07-05T08:08:20.123562836Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -74,63 +98,40 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T13:25:19.094372944Z"
-    },
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T13:25:17.979391434Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T13:22:34.337904327Z"
+      "updated_at": "2026-07-17T13:22:34.337904327Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-17T13:25:19.094372944Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T13:29:22.867799281Z"
+      "updated_at": "2026-07-17T13:29:22.867799281Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-17T13:25:17.979391434Z",
+      "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T13:25:18.669860306Z"
+      "updated_at": "2026-07-17T13:25:18.669860306Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/archive/6eb585bc-completion-report.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "report",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/archive/6eb585bc-batch-report-2026-07-05.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "report",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/archive/6eb585bc-usability-audit-2026-07-05.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "report",
-      "format": "markdown"
-    }
-  ],
+  "id": "6eb585bc-998d-4778-906d-415fcdc1916e",
   "labels": [
     "type:epic",
     "epic:core-maintenance",
     "milestone:v1.0"
   ],
-  "created_at": "2026-06-16T18:30:52.029597744Z",
-  "updated_at": "2026-07-17T13:33:58.141736793Z",
-  "first_ready_at": "2026-07-05T08:08:20.123562836Z",
-  "done_at": "2026-07-17T13:33:40.339134398Z"
+  "priority": "normal",
+  "state": "archived",
+  "title": "Core maintenance",
+  "updated_at": "2026-07-27T09:58:50.049489070Z"
 }

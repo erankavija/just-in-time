@@ -1,11 +1,21 @@
 {
-  "id": "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a",
-  "title": "Establish reproducible Rust build measurements and baseline",
-  "description": "Create the repeatable measurement foundation for the Rust build-efficiency work before changing build topology or policy. The harness must capture a trustworthy pre-optimization baseline, a complete test inventory, and enough environment detail to compare later results on the same host and toolchain.\n\n## Background\n\nHistorical gate durations mix compilation, test execution, host contention, and stale artifacts. The benchmark therefore needs isolated target directories, repeated samples, and machine-readable results. The pre-change test inventory is also required to prove that suite consolidation preserves ignored and non-ignored cases.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed `scripts/benchmark-rust-build.sh` runs each clean sample in a newly created isolated `CARGO_TARGET_DIR`, refuses to overlap another repository Cargo build, executes zero-warning workspace all-target clippy followed by `cargo test --workspace --no-run`, and records each command's wall time, maximum resident memory, and exit status.\n- [hard] REQ-02: `dev/benchmarks/rust-build-efficiency/baseline.json` contains at least three successful clean samples and at least three successful representative source-rebuild samples from the pre-optimization revision, together with Git revision, operating system, CPU count, memory, Cargo version, Rustc version, linker, target triple, and relevant Cargo and Rust environment variables.\n- [hard] REQ-03: Every source-rebuild sample begins from an equivalent completed clean build, appends the same reversible comment-only probe to `crates/jit/src/lib.rs`, compiles workspace tests without executing them, restores the original file byte-for-byte, and leaves the worktree free of benchmark-induced changes.\n- [hard] REQ-04: `dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json` records every discoverable workspace test case, its ignored status, and its Cargo test target before suite consolidation, and the measurement harness records integration-test target count, complete target-directory bytes, and unique active test-executable bytes from Cargo JSON output.\n- [hard] REQ-05: `dev/benchmarks/rust-build-efficiency/report.md` documents the protocol, baseline medians, raw-sample path, environment, and observed variance without presenting a single favorable run as representative.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-14T19:43:17.445042198Z",
+  "context": {},
+  "created_at": "2026-07-14T13:02:01.567997375Z",
   "dependencies": [],
+  "description": "Create the repeatable measurement foundation for the Rust build-efficiency work before changing build topology or policy. The harness must capture a trustworthy pre-optimization baseline, a complete test inventory, and enough environment detail to compare later results on the same host and toolchain.\n\n## Background\n\nHistorical gate durations mix compilation, test execution, host contention, and stale artifacts. The benchmark therefore needs isolated target directories, repeated samples, and machine-readable results. The pre-change test inventory is also required to prove that suite consolidation preserves ignored and non-ignored cases.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed `scripts/benchmark-rust-build.sh` runs each clean sample in a newly created isolated `CARGO_TARGET_DIR`, refuses to overlap another repository Cargo build, executes zero-warning workspace all-target clippy followed by `cargo test --workspace --no-run`, and records each command's wall time, maximum resident memory, and exit status.\n- [hard] REQ-02: `dev/benchmarks/rust-build-efficiency/baseline.json` contains at least three successful clean samples and at least three successful representative source-rebuild samples from the pre-optimization revision, together with Git revision, operating system, CPU count, memory, Cargo version, Rustc version, linker, target triple, and relevant Cargo and Rust environment variables.\n- [hard] REQ-03: Every source-rebuild sample begins from an equivalent completed clean build, appends the same reversible comment-only probe to `crates/jit/src/lib.rs`, compiles workspace tests without executing them, restores the original file byte-for-byte, and leaves the worktree free of benchmark-induced changes.\n- [hard] REQ-04: `dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json` records every discoverable workspace test case, its ignored status, and its Cargo test target before suite consolidation, and the measurement harness records integration-test target count, complete target-directory bytes, and unique active test-executable bytes from Cargo JSON output.\n- [hard] REQ-05: `dev/benchmarks/rust-build-efficiency/report.md` documents the protocol, baseline medians, raw-sample path, environment, and observed variance without presenting a single favorable run as representative.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/report.md"
+    }
+  ],
+  "done_at": "2026-07-15T01:57:42.328915576Z",
+  "first_ready_at": "2026-07-14T13:02:01.568002645Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -14,71 +24,27 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T01:49:51.223256579Z"
-    },
-    "doc-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T01:56:20.157870943Z"
+      "updated_at": "2026-07-15T01:49:51.223256579Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T01:51:59.707294430Z"
+      "updated_at": "2026-07-15T01:51:59.707294430Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-15T01:56:20.157870943Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/benchmarks/rust-build-efficiency/report.md",
-      "commit": null,
-      "label": null,
-      "doc_type": null,
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "baseline.json",
-          "resolved_path": "dev/benchmarks/rust-build-efficiency/baseline.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "b4aa8b1d2826554910bb8d90588510b889104e9075799275181df90b91b20f77",
-          "is_shared": false
-        },
-        {
-          "original_path": "../../../scripts/benchmark-rust-build.sh",
-          "resolved_path": "scripts/benchmark-rust-build.sh",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "5da3df2d70f71988d8a8c343a7f15a64beda6c0b080fa1bb448393a3108ce2c4",
-          "is_shared": false
-        },
-        {
-          "original_path": "raw/",
-          "resolved_path": "dev/benchmarks/rust-build-efficiency/raw",
-          "asset_type": "missing",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "pre-change-test-inventory.json",
-          "resolved_path": "dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "47741c5f6385746346c13a3009a71c0da97be4ef79c516a5739f960289e739ce",
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a",
   "labels": [
     "story:rust-build-efficiency",
     "type:task"
   ],
-  "created_at": "2026-07-14T13:02:01.567997375Z",
-  "updated_at": "2026-07-15T01:57:42.328916256Z",
-  "first_ready_at": "2026-07-14T13:02:01.568002645Z",
-  "claimed_at": "2026-07-14T19:43:17.445042198Z",
-  "done_at": "2026-07-15T01:57:42.328915576Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Establish reproducible Rust build measurements and baseline",
+  "updated_at": "2026-07-27T09:58:50.049489070Z"
 }

@@ -253,3 +253,98 @@ Issue `a45bc29c`. Plan eligible with no blockers. 1 relocated, 0 mirrored, 0 ret
 | citing site | moving artifact |
 |---|---|
 | `dev/active/8e071e18-breakdown.json:2836:14` | `dev/active/7095769d-smell-hunt-report.md` |
+
+## `6eb585bc` — dev/archive/6eb585bc-core-maintenance
+Issue `fccedb73`. Plan eligible with no blockers. 17 relocated, 7 mirrored, 10 retained, 6 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| copy | `dev/active/73482aa1-rust-build-efficiency.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md` | 73482aa1 |
+| copy | `dev/benchmarks/rust-build-efficiency/baseline.json` | `dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/baseline.json` | — |
+| copy | `dev/benchmarks/rust-build-efficiency/optimized.json` | `dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/optimized.json` | 26f97dc2 |
+| copy | `dev/benchmarks/rust-build-efficiency/post-change-test-inventory.json` | `dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/post-change-test-inventory.json` | — |
+| copy | `dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json` | `dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json` | — |
+| copy | `dev/benchmarks/rust-build-efficiency/raw/clean-1/executable-remeasure.json` | `dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/raw/clean-1/executable-remeasure.json` | — |
+| copy | `dev/benchmarks/rust-build-efficiency/report.md` | `dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/report.md` | 26f97dc2 4e22a20d |
+| move | `dev/active/3e12ffbd-batch-export-design.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/3e12ffbd-batch-export-design.md` | 3e12ffbd |
+| move | `dev/active/3e12ffbd-batch-export-use-cases.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/3e12ffbd-batch-export-use-cases.md` | 3e12ffbd |
+| move | `dev/active/450db193-generic-projection-design.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/450db193-generic-projection-design.md` | 450db193 |
+| move | `dev/active/45a140ae-archived-semantics.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/45a140ae-archived-semantics.md` | 45a140ae |
+| move | `dev/active/71be6ae9-code-review-reliability.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/71be6ae9-code-review-reliability.md` | 71be6ae9 |
+| move | `dev/active/71be6ae9-live-review-report.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/71be6ae9-live-review-report.md` | 71be6ae9 |
+| move | `dev/active/73482aa1-completion-report.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-completion-report.md` | 73482aa1 |
+| move | `dev/active/76cb968b-citation-check.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/76cb968b-citation-check.md` | 76cb968b |
+| move | `dev/active/76cb968b-ssot-adoption-sweep.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/76cb968b-ssot-adoption-sweep.md` | 76cb968b |
+| move | `dev/active/76cb968b-sweep-table.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/76cb968b-sweep-table.md` | 76cb968b |
+| move | `dev/active/949cd9d0-gate-verb-semantics.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/949cd9d0-gate-verb-semantics.md` | 949cd9d0 |
+| move | `dev/active/af4c901a-derive-default-rules-at-load.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/af4c901a-derive-default-rules-at-load.md` | af4c901a |
+| move | `dev/active/b4e55aa2-code-review-live-verification.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/b4e55aa2-code-review-live-verification.md` | 155a2d43 |
+| move | `dev/active/b4e55aa2-ground-code-review-policy.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/b4e55aa2-ground-code-review-policy.md` | b4e55aa2 |
+| move | `dev/active/d74a9ed1-write-through-namespace-unique-membership.md` | `dev/archive/6eb585bc-core-maintenance/dev/active/d74a9ed1-write-through-namespace-unique-membership.md` | d74a9ed1 |
+| move | `dev/benchmarks/rust-build-efficiency/consolidation-inventory-diff.json` | `dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/consolidation-inventory-diff.json` | 8d4f7084 |
+| move | `dev/benchmarks/rust-build-efficiency/verify-consolidation-inventory.py` | `dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/verify-consolidation-inventory.py` | 8d4f7084 |
+| retain | `CHANGELOG.md` | retained in place | b1586c0d d0f88ee2 |
+| retain | `crates/jit/tests/cli_issue/verb_hint_tests.rs` | retained in place | d0f88ee2 |
+| retain | `dev/archive/6eb585bc-batch-report-2026-07-05.md` | already under the archive root | 6eb585bc |
+| retain | `dev/archive/6eb585bc-completion-report.md` | already under the archive root | 6eb585bc |
+| retain | `dev/archive/6eb585bc-usability-audit-2026-07-05.md` | already under the archive root | 6eb585bc |
+| retain | `dev/archive/76cb968b-completion-report.md` | already under the archive root | 76cb968b |
+| retain | `dev/archive/a9b5dd08/dev/active/a9b5dd08-archive-directory-slugs.md` | already under the archive root | a9b5dd08 |
+| retain | `dev/archive/b4e55aa2-completion-report.md` | already under the archive root | b4e55aa2 |
+| retain | `docs/reference/cli-commands.md` | retained in place | b1586c0d d0f88ee2 |
+| retain | `scripts/benchmark-rust-build.sh` | retained in place | — |
+
+### In-content citation warnings (48)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/71be6ae9-code-review-reliability.md:203:11` | `dev/active/71be6ae9-live-review-report.md` |
+| `dev/active/73482aa1-progress.json:7:90` | `dev/active/73482aa1-completion-report.md` |
+| `dev/active/76cb968b-ssot-adoption-sweep.md:77:970` | `dev/active/76cb968b-sweep-table.md` |
+| `dev/active/76cb968b-ssot-adoption-sweep.md:87:233` | `dev/active/76cb968b-citation-check.md` |
+| `dev/active/8e071e18-breakdown.json:1813:14` | `dev/active/3e12ffbd-batch-export-design.md` |
+| `dev/active/8e071e18-breakdown.json:1814:14` | `dev/active/3e12ffbd-batch-export-use-cases.md` |
+| `dev/active/8e071e18-breakdown.json:1815:14` | `dev/active/450db193-generic-projection-design.md` |
+| `dev/active/8e071e18-breakdown.json:1816:14` | `dev/active/45a140ae-archived-semantics.md` |
+| `dev/active/8e071e18-breakdown.json:1817:14` | `dev/active/71be6ae9-code-review-reliability.md` |
+| `dev/active/8e071e18-breakdown.json:1818:14` | `dev/active/71be6ae9-live-review-report.md` |
+| `dev/active/8e071e18-breakdown.json:1819:14` | `dev/active/73482aa1-completion-report.md` |
+| `dev/active/8e071e18-breakdown.json:1820:14` | `dev/active/76cb968b-citation-check.md` |
+| `dev/active/8e071e18-breakdown.json:1821:14` | `dev/active/76cb968b-ssot-adoption-sweep.md` |
+| `dev/active/8e071e18-breakdown.json:1822:14` | `dev/active/76cb968b-sweep-table.md` |
+| `dev/active/8e071e18-breakdown.json:1823:14` | `dev/active/949cd9d0-gate-verb-semantics.md` |
+| `dev/active/8e071e18-breakdown.json:1824:14` | `dev/active/af4c901a-derive-default-rules-at-load.md` |
+| `dev/active/8e071e18-breakdown.json:1825:14` | `dev/active/b4e55aa2-code-review-live-verification.md` |
+| `dev/active/8e071e18-breakdown.json:1826:14` | `dev/active/b4e55aa2-ground-code-review-policy.md` |
+| `dev/active/8e071e18-breakdown.json:1827:14` | `dev/active/d74a9ed1-write-through-namespace-unique-membership.md` |
+| `dev/active/8e071e18-breakdown.json:1828:14` | `dev/benchmarks/rust-build-efficiency/consolidation-inventory-diff.json` |
+| `dev/active/8e071e18-breakdown.json:1829:14` | `dev/benchmarks/rust-build-efficiency/verify-consolidation-inventory.py` |
+| `dev/active/8e071e18-breakdown.json:3459:1338` | `dev/active/73482aa1-completion-report.md` |
+| `dev/active/8e071e18-investigation.md:1137:5` | `dev/benchmarks/rust-build-efficiency/consolidation-inventory-diff.json` |
+| `dev/active/8e071e18-investigation.md:1140:5` | `dev/benchmarks/rust-build-efficiency/verify-consolidation-inventory.py` |
+| `dev/active/9b7b5f9c-investigation.md:325:4` | `dev/active/76cb968b-ssot-adoption-sweep.md` |
+| `dev/archive/2d109173-investigation.md:192:106` | `dev/active/76cb968b-citation-check.md` |
+| `dev/archive/2d109173-investigation.md:215:6` | `dev/active/76cb968b-citation-check.md` |
+| `dev/archive/6eb585bc-handoff-2.md:10:108` | `dev/active/73482aa1-completion-report.md` |
+| `dev/archive/6eb585bc-handoff-2.md:46:10` | `dev/active/73482aa1-completion-report.md` |
+| `dev/archive/6eb585bc-handoff-3.md:72:47` | `dev/active/45a140ae-archived-semantics.md` |
+| `dev/archive/6eb585bc-handoff-4.md:94:119` | `dev/active/d74a9ed1-write-through-namespace-unique-membership.md` |
+| `dev/archive/6eb585bc-handoff-4.md:94:32` | `dev/active/45a140ae-archived-semantics.md` |
+| `dev/archive/6eb585bc-handoff-4.md:94:75` | `dev/active/3e12ffbd-batch-export-design.md` |
+| `dev/archive/6eb585bc-progress.json:254:210` | `dev/active/d74a9ed1-write-through-namespace-unique-membership.md` |
+| `dev/archive/6eb585bc-progress.json:55:274` | `dev/active/73482aa1-completion-report.md` |
+| `dev/archive/76cb968b-completion-report.md:25:160` | `dev/active/76cb968b-sweep-table.md` |
+| `dev/archive/76cb968b-completion-report.md:28:78` | `dev/active/76cb968b-citation-check.md` |
+| `dev/archive/76cb968b-progress.json:4:139` | `dev/active/76cb968b-ssot-adoption-sweep.md` |
+| `dev/archive/b4e55aa2-completion-report.md:36:214` | `dev/active/b4e55aa2-code-review-live-verification.md` |
+| `dev/archive/b4e55aa2-handoff.md:53:17` | `dev/active/b4e55aa2-ground-code-review-policy.md` |
+| `dev/archive/cdc840ad-handoff-12.md:62:111` | `dev/active/d74a9ed1-write-through-namespace-unique-membership.md` |
+| `dev/archive/cdc840ad-handoff-12.md:62:56` | `dev/active/af4c901a-derive-default-rules-at-load.md` |
+| `dev/archive/cdc840ad-investigation.md:1095:4` | `dev/active/af4c901a-derive-default-rules-at-load.md` |
+| `dev/archive/cdc840ad-investigation.md:1098:4` | `dev/active/d74a9ed1-write-through-namespace-unique-membership.md` |
+| `dev/archive/cdc840ad-investigation.md:1100:4` | `dev/active/450db193-generic-projection-design.md` |
+| `dev/archive/cdc840ad-research.md:1265:244` | `dev/active/af4c901a-derive-default-rules-at-load.md` |
+| `dev/archive/cdc840ad-research.md:931:4` | `dev/active/af4c901a-derive-default-rules-at-load.md` |
+| `dev/archive/cdc840ad-research.md:936:4` | `dev/active/af4c901a-derive-default-rules-at-load.md` |

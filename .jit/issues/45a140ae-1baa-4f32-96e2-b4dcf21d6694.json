@@ -1,11 +1,21 @@
 {
-  "id": "45a140ae-1baa-4f32-96e2-b4dcf21d6694",
-  "title": "Define Archived lifecycle semantics for artifact archival",
-  "description": "Define and implement coherent semantics for the `Archived` lifecycle state and its relationship to dependency-aware artifact archival. Today `Archived` is reachable as a lifecycle state but is not terminal, while container artifact execution requires `Done` or `Rejected`; the intended user workflow and invariant are not yet decided.\n\n## Background\n\nJIT currently has two distinct concepts with overlapping language: an issue can enter lifecycle state `Archived`, and `jit archive container` can relocate linked artifacts. Marking a container `Archived` does not relocate its documents and also makes its artifact plan ineligible because `Archived` is not terminal. Conversely, completing a container and executing artifact archival leaves its lifecycle state as `Done`. This creates a semantic wrinkle for users retiring containers and for descendants whose documents may already have been archived independently.\n\nThe resolution may keep the concepts orthogonal, make `Archived` terminal or archive-eligible, introduce an explicit transition sequence, or choose another coherent model. The issue must record the chosen and rejected alternatives with reasons before changing behavior.\n\n## Success Criteria\n\n- [hard] REQ-01: Records an explicit decision defining the meaning of lifecycle state `Archived`, whether it is terminal for dependency and readiness semantics, its legal transitions, and its relationship to document/container artifact archival.\n- [hard] REQ-02: Applies the chosen semantics consistently across lifecycle transitions, dependency satisfaction, readiness, hierarchy rollups, status and query projections, archive candidates, archive preview, and archive execution.\n- [hard] REQ-03: Defines an unambiguous retirement workflow with no circular prerequisite between reaching an eligible lifecycle state and executing artifact archival, including the intended lifecycle state after successful execution.\n- [hard] REQ-04: Preserves existing issue records, events, and marker-backed archives safely, with any compatibility behavior or migration requirement explicit and tested rather than inferred from directory names.\n- [hard] REQ-05: Emits consistent human and JSON diagnostics that explain the permitted next action whenever lifecycle state makes an artifact archive plan ineligible.\n- [hard] REQ-06: Verifies the lifecycle and archive matrix for `Done`, `Rejected`, and `Archived`, including legal and illegal transitions, dependency/readiness effects, parent and descendant archival, independently archived descendants, reruns, and existing repositories.\n- [hard] REQ-07: Documents the selected model and user workflow in the canonical lifecycle and archive references without conflating lifecycle state with filesystem relocation.\n\n## Notes\n\nThe semantic choice is intentionally open. Alternatives to evaluate include keeping lifecycle and artifact archival orthogonal, treating `Archived` as terminal or archive-eligible, and coupling successful artifact execution to a lifecycle transition. The design must state why the selected model is safer and clearer than the rejected alternatives.\n\n## Decisions pinned by invoker interview (2026-07-16)\n\n- **Archived is terminality-preserving.** Archiving preserves what was true before it: an issue archived from Done/Rejected keeps satisfying dependents; an issue archived from a non-terminal state does not start satisfying them. Rejected: always-terminal (archiving unfinished work would unblock dependents) and never-terminal (retiring finished work would re-block dependents).\n- **Coupled retirement workflow.** Artifact archival requires a terminal state (Done/Rejected); successful execution transitions the container to Archived. Rejected: fully orthogonal (manual composition leaves the circular-prerequisite wrinkle) and archived-first eligibility (state change as trigger inverts the safety order).\n- **Revive restores the pre-archive state exactly** (done -> archived -> done). A completed issue can never re-enter the active lifecycle via the archive round-trip; this closes the live-verified done -> archived -> ready resurrection loophole. Rejected: free revive + advisory warning (keeps the loophole), no revive (unforgiving of mis-archives).",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-16T08:53:53.023075064Z",
+  "context": {},
+  "created_at": "2026-07-14T07:16:43.938864310Z",
   "dependencies": [],
+  "description": "Define and implement coherent semantics for the `Archived` lifecycle state and its relationship to dependency-aware artifact archival. Today `Archived` is reachable as a lifecycle state but is not terminal, while container artifact execution requires `Done` or `Rejected`; the intended user workflow and invariant are not yet decided.\n\n## Background\n\nJIT currently has two distinct concepts with overlapping language: an issue can enter lifecycle state `Archived`, and `jit archive container` can relocate linked artifacts. Marking a container `Archived` does not relocate its documents and also makes its artifact plan ineligible because `Archived` is not terminal. Conversely, completing a container and executing artifact archival leaves its lifecycle state as `Done`. This creates a semantic wrinkle for users retiring containers and for descendants whose documents may already have been archived independently.\n\nThe resolution may keep the concepts orthogonal, make `Archived` terminal or archive-eligible, introduce an explicit transition sequence, or choose another coherent model. The issue must record the chosen and rejected alternatives with reasons before changing behavior.\n\n## Success Criteria\n\n- [hard] REQ-01: Records an explicit decision defining the meaning of lifecycle state `Archived`, whether it is terminal for dependency and readiness semantics, its legal transitions, and its relationship to document/container artifact archival.\n- [hard] REQ-02: Applies the chosen semantics consistently across lifecycle transitions, dependency satisfaction, readiness, hierarchy rollups, status and query projections, archive candidates, archive preview, and archive execution.\n- [hard] REQ-03: Defines an unambiguous retirement workflow with no circular prerequisite between reaching an eligible lifecycle state and executing artifact archival, including the intended lifecycle state after successful execution.\n- [hard] REQ-04: Preserves existing issue records, events, and marker-backed archives safely, with any compatibility behavior or migration requirement explicit and tested rather than inferred from directory names.\n- [hard] REQ-05: Emits consistent human and JSON diagnostics that explain the permitted next action whenever lifecycle state makes an artifact archive plan ineligible.\n- [hard] REQ-06: Verifies the lifecycle and archive matrix for `Done`, `Rejected`, and `Archived`, including legal and illegal transitions, dependency/readiness effects, parent and descendant archival, independently archived descendants, reruns, and existing repositories.\n- [hard] REQ-07: Documents the selected model and user workflow in the canonical lifecycle and archive references without conflating lifecycle state with filesystem relocation.\n\n## Notes\n\nThe semantic choice is intentionally open. Alternatives to evaluate include keeping lifecycle and artifact archival orthogonal, treating `Archived` as terminal or archive-eligible, and coupling successful artifact execution to a lifecycle transition. The design must state why the selected model is safer and clearer than the rejected alternatives.\n\n## Decisions pinned by invoker interview (2026-07-16)\n\n- **Archived is terminality-preserving.** Archiving preserves what was true before it: an issue archived from Done/Rejected keeps satisfying dependents; an issue archived from a non-terminal state does not start satisfying them. Rejected: always-terminal (archiving unfinished work would unblock dependents) and never-terminal (retiring finished work would re-block dependents).\n- **Coupled retirement workflow.** Artifact archival requires a terminal state (Done/Rejected); successful execution transitions the container to Archived. Rejected: fully orthogonal (manual composition leaves the circular-prerequisite wrinkle) and archived-first eligibility (state change as trigger inverts the safety order).\n- **Revive restores the pre-archive state exactly** (done -> archived -> done). A completed issue can never re-enter the active lifecycle via the archive round-trip; this closes the live-verified done -> archived -> ready resurrection loophole. Rejected: free revive + advisory warning (keeps the loophole), no revive (unforgiving of mis-archives).",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Archived semantics decision",
+      "path": "dev/archive/6eb585bc-core-maintenance/dev/active/45a140ae-archived-semantics.md"
+    }
+  ],
+  "done_at": "2026-07-17T12:18:31.730604055Z",
+  "first_ready_at": "2026-07-14T07:16:43.938877770Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -13,37 +23,28 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "docs-mechanical": {
+    "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T12:08:09.314938269Z"
+      "updated_at": "2026-07-17T12:05:31.563345976Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T03:47:26.297951214Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T12:05:31.563345976Z"
+      "updated_at": "2026-07-17T03:47:26.297951214Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T12:08:10.031424260Z"
+      "updated_at": "2026-07-17T12:08:10.031424260Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-17T12:08:09.314938269Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/45a140ae-archived-semantics.md",
-      "commit": null,
-      "label": "Archived semantics decision",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "45a140ae-1baa-4f32-96e2-b4dcf21d6694",
   "labels": [
     "epic:core-maintenance",
     "milestone:v1.0",
@@ -52,9 +53,8 @@
     "component:docs",
     "type:enhancement"
   ],
-  "created_at": "2026-07-14T07:16:43.938864310Z",
-  "updated_at": "2026-07-17T12:18:31.730604525Z",
-  "first_ready_at": "2026-07-14T07:16:43.938877770Z",
-  "claimed_at": "2026-07-16T08:53:53.023075064Z",
-  "done_at": "2026-07-17T12:18:31.730604055Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Define Archived lifecycle semantics for artifact archival",
+  "updated_at": "2026-07-27T09:58:50.049489070Z"
 }

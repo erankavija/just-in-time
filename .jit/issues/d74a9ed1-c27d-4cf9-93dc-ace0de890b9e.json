@@ -1,11 +1,21 @@
 {
-  "id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
-  "title": "Write default-rule membership through to rules.toml on config-driven refresh",
-  "description": "Split from af4c901a integration: default-rule MEMBERSHIP is reconciled from the config registry in memory at load, but .jit/rules.toml entries are not updated, so the addressable rule registry (@/rule/<name> resolves rules.toml entries) can lag effective membership. Observed live: brackets was declared unique after scaffold; reconciliation enforced namespace-unique-brackets and the rules-and-gates projection documented it, while @/rule/namespace-unique-brackets dangled until the entry was added by hand.\n\n## Background\n\nThe refresh path from af4c901a already republishes schemas/default-*.json on jit-driven config writes. Extending it to append/drop default-origin namespace-unique-* rule ENTRIES in rules.toml on the same trigger keeps the addressable registry consistent with derived membership. Custom rules and default-rule policy fields (severity, enforce, selector) stay untouched.\n\n## Success Criteria\n\n- [hard] REQ-01: A jit-driven write that changes the config namespace registry appends the namespace-unique-* entry for a newly-unique namespace to rules.toml and drops the entry for a namespace no longer unique or removed, for origin=default entries only. Add-only syncs preserve all other file content byte-exact; a membership drop may canonicalize TOML syntax decoration elsewhere in the file (semantically lossless re-serialization, invoker-approved 2026-07-17) and preserves all other content semantically intact.\n- [hard] REQ-02: Rule addressability (@/rule/<name>) resolves every effectively-enforced default rule after such a write; docs-mechanical citation checking cannot dangle on a reconciled rule.\n- [hard] REQ-03: Hand edits to default-rule policy fields and all custom rules survive the rewrite; tests cover append, drop, and preservation.\n- Out of scope: changing in-memory reconciliation semantics (they remain authoritative at load).",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-16T08:53:53.042220838Z",
+  "context": {},
+  "created_at": "2026-07-14T19:05:10.783498583Z",
   "dependencies": [],
+  "description": "Split from af4c901a integration: default-rule MEMBERSHIP is reconciled from the config registry in memory at load, but .jit/rules.toml entries are not updated, so the addressable rule registry (@/rule/<name> resolves rules.toml entries) can lag effective membership. Observed live: brackets was declared unique after scaffold; reconciliation enforced namespace-unique-brackets and the rules-and-gates projection documented it, while @/rule/namespace-unique-brackets dangled until the entry was added by hand.\n\n## Background\n\nThe refresh path from af4c901a already republishes schemas/default-*.json on jit-driven config writes. Extending it to append/drop default-origin namespace-unique-* rule ENTRIES in rules.toml on the same trigger keeps the addressable registry consistent with derived membership. Custom rules and default-rule policy fields (severity, enforce, selector) stay untouched.\n\n## Success Criteria\n\n- [hard] REQ-01: A jit-driven write that changes the config namespace registry appends the namespace-unique-* entry for a newly-unique namespace to rules.toml and drops the entry for a namespace no longer unique or removed, for origin=default entries only. Add-only syncs preserve all other file content byte-exact; a membership drop may canonicalize TOML syntax decoration elsewhere in the file (semantically lossless re-serialization, invoker-approved 2026-07-17) and preserves all other content semantically intact.\n- [hard] REQ-02: Rule addressability (@/rule/<name>) resolves every effectively-enforced default rule after such a write; docs-mechanical citation checking cannot dangle on a reconciled rule.\n- [hard] REQ-03: Hand edits to default-rule policy fields and all custom rules survive the rewrite; tests cover append, drop, and preservation.\n- Out of scope: changing in-memory reconciliation semantics (they remain authoritative at load).",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Write-through design note",
+      "path": "dev/archive/6eb585bc-core-maintenance/dev/active/d74a9ed1-write-through-namespace-unique-membership.md"
+    }
+  ],
+  "done_at": "2026-07-17T13:21:54.215541881Z",
+  "first_ready_at": "2026-07-14T19:05:10.783504203Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -15,44 +25,34 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T13:07:46.885491833Z"
-    },
-    "doc-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T13:19:45.957445535Z"
-    },
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T13:11:45.559450101Z"
+      "updated_at": "2026-07-17T13:07:46.885491833Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T13:11:46.275762562Z"
+      "updated_at": "2026-07-17T13:11:46.275762562Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-17T13:19:45.957445535Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-17T13:11:45.559450101Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/d74a9ed1-write-through-namespace-unique-membership.md",
-      "commit": null,
-      "label": "Write-through design note",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
   "labels": [
     "epic:core-maintenance",
     "component:storage",
     "component:validation",
     "type:enhancement"
   ],
-  "created_at": "2026-07-14T19:05:10.783498583Z",
-  "updated_at": "2026-07-17T13:21:54.215543031Z",
-  "first_ready_at": "2026-07-14T19:05:10.783504203Z",
-  "claimed_at": "2026-07-16T08:53:53.042220838Z",
-  "done_at": "2026-07-17T13:21:54.215541881Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Write default-rule membership through to rules.toml on config-driven refresh",
+  "updated_at": "2026-07-27T09:58:50.049489070Z"
 }

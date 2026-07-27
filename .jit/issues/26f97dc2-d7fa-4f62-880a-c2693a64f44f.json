@@ -1,14 +1,30 @@
 {
-  "id": "26f97dc2-d7fa-4f62-880a-c2693a64f44f",
-  "title": "Verify compilation gains and publish optimized results",
-  "description": "Run the optimized build through the same isolated, repeated protocol as the baseline and publish the raw evidence and comparison. The results must demonstrate both bounded disk use and materially faster clean and source-rebuild compilation while confirming that all Rust validation variants and test cases remain intact.\n\n## Background\n\nCompilation improvements are only accepted when medians from equivalent same-host, same-toolchain samples meet the specified thresholds. A single favorable run or a comparison that changes the build sequence is insufficient.\n\n## Success Criteria\n\n- [hard] REQ-01: `dev/benchmarks/rust-build-efficiency/optimized.json` contains at least three successful clean samples and at least three successful representative source-rebuild samples collected with the committed harness on the same recorded Linux host, target triple, Rustc version, Cargo version, linker, build sequence, and source-change probe as the baseline.\n- [hard] REQ-02: Every optimized clean sample performs zero-warning workspace all-target clippy followed by workspace test compilation without test execution in a new isolated target directory, and records wall time, maximum resident memory, target-directory bytes, integration-target count, and unique active test-executable bytes.\n- [hard] REQ-03: The median complete fresh validation target directory is at most 10 GiB and unique active test executables total at most 2 GiB.\n- [hard] REQ-04: Median clean workspace test-compilation wall time is at least 40% below the baseline median, calculated as `100 × (baseline − optimized) / baseline` from the raw samples.\n- [hard] REQ-05: Median workspace test-rebuild wall time after the representative `crates/jit/src/lib.rs` source change is at least 60% below the baseline median using the same calculation and equivalent prepared clean states.\n- [hard] REQ-06: `dev/benchmarks/rust-build-efficiency/report.md` contains the baseline and optimized sample tables, medians, percentage changes, environment comparison, variance discussion, and links to both raw JSON artifacts.\n- [hard] REQ-07: The final revision passes `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, feature-enabled clippy and tests for `html,xml`, and a comparison against `dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json` showing that every pre-change ignored and non-ignored test remains discoverable or has a separately documented behavioral justification.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-15T12:14:41.778468796Z",
+  "context": {},
+  "created_at": "2026-07-14T13:02:21.120718163Z",
   "dependencies": [
     "5d862134-2424-4a1c-b9f4-204e3b53801b",
     "3f73423b-fc24-4725-9fa3-dfbd2994f790"
   ],
+  "description": "Run the optimized build through the same isolated, repeated protocol as the baseline and publish the raw evidence and comparison. The results must demonstrate both bounded disk use and materially faster clean and source-rebuild compilation while confirming that all Rust validation variants and test cases remain intact.\n\n## Background\n\nCompilation improvements are only accepted when medians from equivalent same-host, same-toolchain samples meet the specified thresholds. A single favorable run or a comparison that changes the build sequence is insufficient.\n\n## Success Criteria\n\n- [hard] REQ-01: `dev/benchmarks/rust-build-efficiency/optimized.json` contains at least three successful clean samples and at least three successful representative source-rebuild samples collected with the committed harness on the same recorded Linux host, target triple, Rustc version, Cargo version, linker, build sequence, and source-change probe as the baseline.\n- [hard] REQ-02: Every optimized clean sample performs zero-warning workspace all-target clippy followed by workspace test compilation without test execution in a new isolated target directory, and records wall time, maximum resident memory, target-directory bytes, integration-target count, and unique active test-executable bytes.\n- [hard] REQ-03: The median complete fresh validation target directory is at most 10 GiB and unique active test executables total at most 2 GiB.\n- [hard] REQ-04: Median clean workspace test-compilation wall time is at least 40% below the baseline median, calculated as `100 × (baseline − optimized) / baseline` from the raw samples.\n- [hard] REQ-05: Median workspace test-rebuild wall time after the representative `crates/jit/src/lib.rs` source change is at least 60% below the baseline median using the same calculation and equivalent prepared clean states.\n- [hard] REQ-06: `dev/benchmarks/rust-build-efficiency/report.md` contains the baseline and optimized sample tables, medians, percentage changes, environment comparison, variance discussion, and links to both raw JSON artifacts.\n- [hard] REQ-07: The final revision passes `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, feature-enabled clippy and tests for `html,xml`, and a comparison against `dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json` showing that every pre-change ignored and non-ignored test remains discoverable or has a separately documented behavioral justification.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "label": "Optimized build samples",
+      "path": "dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/optimized.json"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Baseline vs optimized benchmark report",
+      "path": "dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/report.md"
+    }
+  ],
+  "done_at": "2026-07-15T16:48:32.010823039Z",
+  "first_ready_at": "2026-07-14T13:02:21.120723553Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -17,101 +33,27 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T16:38:46.751638423Z"
-    },
-    "doc-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T16:47:35.441744283Z"
+      "updated_at": "2026-07-15T16:38:46.751638423Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T16:40:20.100564184Z"
+      "updated_at": "2026-07-15T16:40:20.100564184Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-15T16:47:35.441744283Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/benchmarks/rust-build-efficiency/optimized.json",
-      "commit": null,
-      "label": "Optimized build samples",
-      "doc_type": null
-    },
-    {
-      "path": "dev/benchmarks/rust-build-efficiency/report.md",
-      "commit": null,
-      "label": "Baseline vs optimized benchmark report",
-      "doc_type": null,
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "raw/",
-          "resolved_path": "dev/benchmarks/rust-build-efficiency/raw",
-          "asset_type": "missing",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "../../../scripts/benchmark-rust-build.sh",
-          "resolved_path": "scripts/benchmark-rust-build.sh",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "d0521e8852db9d03ff79ea21e20d31ebbcb9f83af36357cfb807d21bb30501f9",
-          "is_shared": false
-        },
-        {
-          "original_path": "optimized.json",
-          "resolved_path": "dev/benchmarks/rust-build-efficiency/optimized.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "fe4f1c39a966f93428d5b320a7faae0a57ce6f2167711b0e7e544919540c0ff1",
-          "is_shared": false
-        },
-        {
-          "original_path": "pre-change-test-inventory.json",
-          "resolved_path": "dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "a9798c9b7848d34d3bf6568380582cf439526fc52048eb254b09ea006c6b12e8",
-          "is_shared": false
-        },
-        {
-          "original_path": "raw/clean-1/executable-remeasure.json",
-          "resolved_path": "dev/benchmarks/rust-build-efficiency/raw/clean-1/executable-remeasure.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "4da3d262647ed29067c08ad72d7732ddcf9f464394d816f126c72f80b0ba188d",
-          "is_shared": false
-        },
-        {
-          "original_path": "baseline.json",
-          "resolved_path": "dev/benchmarks/rust-build-efficiency/baseline.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "f0ba81667e03aa2d875c557f0b871d80b0d682c407dbd05c8e271572af627baa",
-          "is_shared": false
-        },
-        {
-          "original_path": "post-change-test-inventory.json",
-          "resolved_path": "dev/benchmarks/rust-build-efficiency/post-change-test-inventory.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "df3552fb6966660bfcc0dd742ac53fecac591c9875d8414c356966fd1f32d5fc",
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "26f97dc2-d7fa-4f62-880a-c2693a64f44f",
   "labels": [
     "story:rust-build-efficiency",
     "type:task"
   ],
-  "created_at": "2026-07-14T13:02:21.120718163Z",
-  "updated_at": "2026-07-15T16:48:32.010823729Z",
-  "first_ready_at": "2026-07-14T13:02:21.120723553Z",
-  "claimed_at": "2026-07-15T12:14:41.778468796Z",
-  "done_at": "2026-07-15T16:48:32.010823039Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Verify compilation gains and publish optimized results",
+  "updated_at": "2026-07-27T09:58:50.049489070Z"
 }
