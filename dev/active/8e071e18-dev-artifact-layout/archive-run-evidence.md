@@ -396,3 +396,32 @@ Issue `95b01080`. Plan eligible with no blockers. 6 relocated, 2 mirrored, 1 ret
 ### Other plan warnings (1)
 
 - `external-edge` at `dev/studies/documentation-organization-strategy.md`
+
+## `94f873c8` — dev/archive/94f873c8-docs-lifecycle-p2
+Issue `a21185df`. Plan eligible with no blockers. 3 relocated, 0 mirrored, 0 retained, 0 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/5c060496-raw-assets-design.md` | `dev/archive/94f873c8-docs-lifecycle-p2/dev/active/5c060496-raw-assets-design.md` | 5c060496 |
+| move | `dev/active/abfd6016-multi-format-doc-rendering-design.md` | `dev/archive/94f873c8-docs-lifecycle-p2/dev/active/abfd6016-multi-format-doc-rendering-design.md` | abfd6016 |
+| move | `dev/active/documentation-lifecycle-phase2-design.md` | `dev/archive/94f873c8-docs-lifecycle-p2/dev/active/documentation-lifecycle-phase2-design.md` | 94f873c8 |
+
+### In-content citation warnings (13)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:2430:14` | `dev/active/5c060496-raw-assets-design.md` |
+| `dev/active/8e071e18-breakdown.json:2431:14` | `dev/active/abfd6016-multi-format-doc-rendering-design.md` |
+| `dev/active/8e071e18-breakdown.json:2432:14` | `dev/active/documentation-lifecycle-phase2-design.md` |
+| `dev/active/8e071e18-breakdown.json:3459:1730` | `dev/active/abfd6016-multi-format-doc-rendering-design.md` |
+| `dev/active/8e071e18-breakdown.json:3605:2334` | `dev/active/documentation-lifecycle-phase2-design.md` |
+| `dev/active/8e071e18-breakdown.json:3605:2447` | `dev/active/documentation-lifecycle-phase2-design.md` |
+| `dev/active/8e071e18-investigation.md:648:4` | `dev/active/documentation-lifecycle-phase2-design.md` |
+| `dev/active/abfd6016-progress.json:64:18` | `dev/active/abfd6016-multi-format-doc-rendering-design.md` |
+| `dev/archive/7d3a3a47/dev/active/7d3a3a47-investigation.md:138:173` | `dev/active/5c060496-raw-assets-design.md` |
+| `dev/archive/7d3a3a47/dev/active/7d3a3a47-investigation.md:43:247` | `dev/active/5c060496-raw-assets-design.md` |
+| `dev/archive/7d3a3a47/dev/active/7d3a3a47-investigation.md:43:376` | `dev/active/5c060496-raw-assets-design.md` |
+| `dev/archive/7d3a3a47/dev/active/7d3a3a47-investigation.md:46:119` | `dev/active/documentation-lifecycle-phase2-design.md` |
+| `dev/archive/7d3a3a47/dev/active/7d3a3a47-investigation.md:49:158` | `dev/active/documentation-lifecycle-phase2-design.md` |

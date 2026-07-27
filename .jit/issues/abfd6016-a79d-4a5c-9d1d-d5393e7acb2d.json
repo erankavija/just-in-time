@@ -1,48 +1,49 @@
 {
-  "id": "abfd6016-a79d-4a5c-9d1d-d5393e7acb2d",
-  "title": "Multi-format document rendering in web UI (reveal.js / HTML first)",
-  "description": "Enable non-Markdown issue-linked documents to be viewed through the web UI via a pluggable renderer registry. First concrete child story under Docs Lifecycle Phase 2 (94f873c8), addressing the epic's \"Limited format support (Markdown only)\" problem statement.\n\nTarget artifact type: reveal.js HTML presentations (e.g. ../gf2 docs/presentations/*.html). Rendering mode: inline sandboxed iframe plus \"Open in new tab\" escape hatch. Framework is generic — PDF / AsciiDoc / Jupyter are follow-ons that just register another renderer.\n\nDesign doc: dev/active/abfd6016-multi-format-doc-rendering-design.md\n\n## Child task breakdown\n\n- (a) 75b1ccb8 Server: expand content-type inference + add raw-bytes endpoint\n- (b) 42bd50ce Web: extract renderer-registry abstraction from DocumentViewer\n- (c) eeafaa78 Web: HtmlRenderer component (sandboxed iframe + open-in-new-tab) — depends on (a) and (b)\n- (d) 85bd1288 Core: register HtmlAdapter in Rust format registry\n\n## Success Criteria\n\n- [ ] Server returns Content-Type: text/html for .html documents (curl /api/issues/:id/documents/:path/content on a .html fixture shows text/html in the JSON; new /raw endpoint responds with text/html in the HTTP header).\n- [ ] Server /api/issues/:id/documents/:path/raw endpoint returns the file bytes verbatim with correct Content-Type and a Content-Security-Policy response header permitting https:.\n- [ ] Web renderer registry exists at web/src/components/Document/renderers/index.ts with at least two entries (html-match, markdown-catchall) and a pickRenderer(content, ref) helper; unit tests verify dispatch for text/html, text/markdown, and unknown content types.\n- [ ] DocumentViewer.tsx no longer imports react-markdown directly; rendering is delegated to pickRenderer. Visual regression: existing markdown documents render identically (same HTML output, same search highlighting, same history panel behavior).\n- [ ] HtmlRenderer renders a sandboxed iframe (sandbox=\"allow-scripts allow-same-origin allow-popups\") pointing at the server raw endpoint; a reveal.js deck from ../gf2 loads and slides navigate via arrow keys when opened through the web UI.\n- [ ] HtmlRenderer header includes an \"Open in new tab\" link whose href is the raw endpoint URL with target=\"_blank\" rel=\"noopener\".\n- [ ] Rust HtmlAdapter is registered in AdapterRegistry::with_builtins(); AdapterRegistry::with_builtins().resolve(\"foo.html\", \"\") returns an adapter with id() == \"html\".\n- [ ] jit document add <issue> <file.html> persists format: \"html\" in the DocumentReference JSON (verify by inspecting .jit/issues/<id>.json after).\n- [ ] All four child tasks have cargo-ci + code-review gates passing.\n- [ ] Full workspace: cargo fmt --check, cargo clippy --workspace --all-targets -D warnings, cargo test --workspace all clean.\n- [ ] Web workspace: cd web && npm test && npm run lint && npm run build all clean.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:project-lead",
+  "claimed_at": "2026-04-23T21:32:11.440697583Z",
+  "context": {},
+  "created_at": "2026-04-23T21:20:24.883165396Z",
   "dependencies": [
     "047a235e-eaa7-4e6d-b12b-08fca4d3672b",
     "9393cb08-feeb-40e2-9175-a472d1a83abf",
     "85bd1288-6d6b-4f56-8d2c-ca859df7e92c",
     "eeafaa78-290d-4390-9097-4d29ff48ef82"
   ],
+  "description": "Enable non-Markdown issue-linked documents to be viewed through the web UI via a pluggable renderer registry. First concrete child story under Docs Lifecycle Phase 2 (94f873c8), addressing the epic's \"Limited format support (Markdown only)\" problem statement.\n\nTarget artifact type: reveal.js HTML presentations (e.g. ../gf2 docs/presentations/*.html). Rendering mode: inline sandboxed iframe plus \"Open in new tab\" escape hatch. Framework is generic — PDF / AsciiDoc / Jupyter are follow-ons that just register another renderer.\n\nDesign doc: dev/active/abfd6016-multi-format-doc-rendering-design.md\n\n## Child task breakdown\n\n- (a) 75b1ccb8 Server: expand content-type inference + add raw-bytes endpoint\n- (b) 42bd50ce Web: extract renderer-registry abstraction from DocumentViewer\n- (c) eeafaa78 Web: HtmlRenderer component (sandboxed iframe + open-in-new-tab) — depends on (a) and (b)\n- (d) 85bd1288 Core: register HtmlAdapter in Rust format registry\n\n## Success Criteria\n\n- [ ] Server returns Content-Type: text/html for .html documents (curl /api/issues/:id/documents/:path/content on a .html fixture shows text/html in the JSON; new /raw endpoint responds with text/html in the HTTP header).\n- [ ] Server /api/issues/:id/documents/:path/raw endpoint returns the file bytes verbatim with correct Content-Type and a Content-Security-Policy response header permitting https:.\n- [ ] Web renderer registry exists at web/src/components/Document/renderers/index.ts with at least two entries (html-match, markdown-catchall) and a pickRenderer(content, ref) helper; unit tests verify dispatch for text/html, text/markdown, and unknown content types.\n- [ ] DocumentViewer.tsx no longer imports react-markdown directly; rendering is delegated to pickRenderer. Visual regression: existing markdown documents render identically (same HTML output, same search highlighting, same history panel behavior).\n- [ ] HtmlRenderer renders a sandboxed iframe (sandbox=\"allow-scripts allow-same-origin allow-popups\") pointing at the server raw endpoint; a reveal.js deck from ../gf2 loads and slides navigate via arrow keys when opened through the web UI.\n- [ ] HtmlRenderer header includes an \"Open in new tab\" link whose href is the raw endpoint URL with target=\"_blank\" rel=\"noopener\".\n- [ ] Rust HtmlAdapter is registered in AdapterRegistry::with_builtins(); AdapterRegistry::with_builtins().resolve(\"foo.html\", \"\") returns an adapter with id() == \"html\".\n- [ ] jit document add <issue> <file.html> persists format: \"html\" in the DocumentReference JSON (verify by inspecting .jit/issues/<id>.json after).\n- [ ] All four child tasks have cargo-ci + code-review gates passing.\n- [ ] Full workspace: cargo fmt --check, cargo clippy --workspace --all-targets -D warnings, cargo test --workspace all clean.\n- [ ] Web workspace: cd web && npm test && npm run lint && npm run build all clean.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Multi-format doc rendering — design",
+      "path": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/abfd6016-multi-format-doc-rendering-design.md"
+    }
+  ],
+  "done_at": "2026-04-24T14:16:45.054185248Z",
+  "first_ready_at": "2026-04-24T09:12:30.112416158Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "npm-ci"
   ],
   "gates_status": {
-    "npm-ci": {
+    "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T12:27:01.543297691Z"
+      "updated_at": "2026-04-24T09:12:39.992493455Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T14:09:21.663028252Z"
+      "updated_at": "2026-04-24T14:09:21.663028252Z",
+      "updated_by": "auto:executor"
     },
-    "cargo-ci": {
+    "npm-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T09:12:39.992493455Z"
+      "updated_at": "2026-04-24T12:27:01.543297691Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/abfd6016-multi-format-doc-rendering-design.md",
-      "commit": null,
-      "label": "Multi-format doc rendering — design",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "abfd6016-a79d-4a5c-9d1d-d5393e7acb2d",
   "labels": [
     "epic:docs-lifecycle-p2",
     "component:docs",
@@ -50,9 +51,8 @@
     "component:web",
     "story:multi-format-rendering"
   ],
-  "created_at": "2026-04-23T21:20:24.883165396Z",
-  "updated_at": "2026-07-18T12:56:16.621970388Z",
-  "first_ready_at": "2026-04-24T09:12:30.112416158Z",
-  "claimed_at": "2026-04-23T21:32:11.440697583Z",
-  "done_at": "2026-04-24T14:16:45.054185248Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Multi-format document rendering in web UI (reveal.js / HTML first)",
+  "updated_at": "2026-07-27T09:59:24.160974647Z"
 }
