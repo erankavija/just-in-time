@@ -1,0 +1,35 @@
+{
+  "branch": "worktree-agent-b6917d8f",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "7d617076e90981f246b6aea03e3714949f6cd329",
+  "completed_at": "2026-07-27T22:55:32.600385249Z",
+  "duration_ms": 145836,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/output.rs",
+        "id": "F1",
+        "line": 507,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "JsonError accepts arbitrary code strings and silently maps unknown strings to GenericError, violating REQ-05."
+      }
+    ],
+    "summary": "Unregistered JSON error codes are still silently mapped to exit 1.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b6917d8f-0821-4063-afdd-041ddc50c691",
+  "message": null,
+  "run_id": "64af0393-74b8-4132-a237-31c0bc8e4773",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T22:53:06.763539730Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4165 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-b6917d8f\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa5c8-2ea7-75c1-be9d-3f21ed9708e8\n--------\nuser\n--- 4152 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7d617076e90981f246b6aea03e3714949f6cd329 (`jit:b6917d8f`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: passed (exit 0, 2026-07-27T22:45:46Z); code-review: pending\nTruncation recovery: narrowed source, caller, test, and documentation searches after truncated broad searches\n\n1. [blocking][issue-impact] `JsonError::new` still accepts arbitrary strings, and `JsonError::exit_code` converts an unrecognised string into `GenericError` via `unwrap_or` at [crates/jit/src/output.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-b6917d8f/crates/jit/src/output.rs:507). Existing JSON paths continue to emit literals such as `GATE_ERROR` and `PROFILE_ERROR`; they therefore silently map to exit 1. The direct `FromStr` test observes an unresolved value, but the machine-error rendering path discards that error. This recreates the fallback behavior REQ-05 prohibits.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Unregistered JSON error codes are still silently mapped to exit 1.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"JsonError accepts arbitrary code strings and silently maps unknown strings to GenericError, violating REQ-05.\",\"file\":\"crates/jit/src/output.rs\",\"line\":507,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
