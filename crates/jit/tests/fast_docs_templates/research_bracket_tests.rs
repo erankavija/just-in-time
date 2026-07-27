@@ -24,7 +24,7 @@
 //!     semantics (only the same no-op-in-a-plain-goal `child-type-exclude` added).
 //!
 //! The bracket spine modeled here mirrors the design doc
-//! (`dev/active/planning-bracket-design.md`):
+//! (`dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-design.md`):
 //!
 //! ```text
 //!   C(goal) ──dep→ experiment ──dep→ B(type:breakdown) ──dep→ P(type:planning)

@@ -1,12 +1,15 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-27T10:17:44.987836503Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
-    "aa38b236-4f45-4e28-b80a-b8beaca88642"
+    "60c398d3-16aa-471e-a412-cd1df6f3e0f1",
+    "deb50576-7598-4b01-8cad-338824f22a92"
   ],
   "description": "A production module doc comment, a configuration test comment, and three bracket template test fixtures cite development artifact paths that resolve after the cleanup.\n\n## Background\n\nOne production storage module points readers at the design document describing its own algorithm, one integration test comment cites the same document beside the configuration reference, and three template test fixtures cite the planning-bracket design document. None of them is a document reference, so nothing fails when a target moves.\n\nValidation resolves document references only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\nThe enumerated citations are:\n\n- `crates/jit/src/storage/claim_coordinator.rs` — cites `dev/design/worktree-parallel-work.md`\n- `crates/jit/tests/cli_repo_workflow/config_get_tests.rs` — cites `dev/design/worktree-parallel-work.md`\n- `crates/jit/tests/fast_docs_templates/bracket_breakdown_tests.rs` — cites `dev/active/planning-bracket-design.md`\n- `crates/jit/tests/fast_docs_templates/research_bracket_tests.rs` — cites `dev/active/planning-bracket-design.md`\n- `crates/jit/tests/fast_docs_templates/sdd_bracket_tests.rs` — cites `dev/active/planning-bracket-design.md`\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named files resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: The production module doc comment names a path that exists.\n- [hard] REQ-04: The workspace test suites pass with the edited citations in place.\n",
   "documents": [],
+  "first_ready_at": "2026-07-27T10:17:40.883058107Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +25,7 @@
     "per:@/issue/8e071e18/decision/D-8"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Resolve the Rust sources' citations of relocated artifacts",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-27T10:18:21.162536619Z"
 }

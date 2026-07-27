@@ -16,7 +16,7 @@
 //!   * the existing **closure** rule (`child-state = "done"`) is untouched.
 //!
 //! The bracket spine modeled here mirrors the design doc
-//! (`dev/active/planning-bracket-design.md`):
+//! (`dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-design.md`):
 //!
 //! ```text
 //!   C(epic) ──dep→ impl ──dep→ B(type:breakdown) ──dep→ P(type:planning)

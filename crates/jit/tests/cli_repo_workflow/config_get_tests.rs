@@ -366,7 +366,7 @@ fn test_get_on_fresh_repo_without_config_toml_resolves_defaults() {
 #[test]
 fn test_get_worktree_mode_still_works_unchanged() {
     // Backward-compat: the two keys real workflows already document
-    // (docs/reference/configuration.md, dev/design/worktree-parallel-work.md)
+    // (docs/reference/configuration.md, dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md)
     // must keep working exactly as before.
     let temp = TempDir::new().unwrap();
     assert!(jit_init(temp.path()).status.success());
