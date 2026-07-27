@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "05e8331c7ccf838d40f271ab70702f092a0b3499",
+  "completed_at": "2026-07-27T20:37:41.595708632Z",
+  "duration_ms": 133197,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are verified in the attributable current-tree footprint.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "533da2df-b2b3-4977-9e01-0b8b4c569b5a",
+  "message": null,
+  "run_id": "ea009189-a03e-4659-b978-3aeb82ccb8b2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T20:35:28.398693585Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 10bdbc89, 2a68ca42, 6443b52e (`jit:533da2df`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/derived-state-coherence (.jit/invariants.toml); @/invariant/event-log (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-27T20:29:35Z); code-review pending\nTruncation recovery: recovered initial truncated combined reads with bounded per-commit/path diffs and focused source/test reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are verified in the attributable current-tree footprint.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

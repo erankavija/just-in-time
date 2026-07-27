@@ -13,14 +13,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-07-25T09:08:06.492377811Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-27T20:35:22.633066307Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-07-25T09:08:06.619740706Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-27T20:37:41.863635604Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "533da2df-b2b3-4977-9e01-0b8b4c569b5a",
@@ -33,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Blocking dependency addition does not demote the dependent out of Ready",
-  "updated_at": "2026-07-27T19:57:27.385972430Z"
+  "updated_at": "2026-07-27T20:37:41.863635604Z"
 }
