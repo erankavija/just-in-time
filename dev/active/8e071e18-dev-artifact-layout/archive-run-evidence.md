@@ -202,3 +202,39 @@ Issue `6116d362`. Plan eligible with no blockers. 5 relocated, 0 mirrored, 1 ret
 ### Other plan warnings (1)
 
 - `external-edge` at `dev/presentations/2e926e39/talk.html`
+
+## `4a00b2b0` — dev/archive/4a00b2b0-agent-validation
+Issue `5c09146f`. Plan eligible with no blockers. 3 relocated, 0 mirrored, 0 retained, 0 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/agent-validation-design.md` | `dev/archive/4a00b2b0-agent-validation/dev/active/agent-validation-design.md` | 4a00b2b0 |
+| move | `dev/studies/ai-tool-worktree-compatibility.md` | `dev/archive/4a00b2b0-agent-validation/dev/studies/ai-tool-worktree-compatibility.md` | 4a00b2b0 |
+| move | `dev/studies/worktree-merge-analysis.md` | `dev/archive/4a00b2b0-agent-validation/dev/studies/worktree-merge-analysis.md` | 4a00b2b0 |
+
+### In-content citation warnings (16)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:1653:1080` | `dev/studies/ai-tool-worktree-compatibility.md` |
+| `dev/active/8e071e18-breakdown.json:1689:14` | `dev/studies/ai-tool-worktree-compatibility.md` |
+| `dev/active/8e071e18-breakdown.json:2725:14` | `dev/active/agent-validation-design.md` |
+| `dev/active/8e071e18-breakdown.json:2726:14` | `dev/studies/ai-tool-worktree-compatibility.md` |
+| `dev/active/8e071e18-breakdown.json:2727:14` | `dev/studies/worktree-merge-analysis.md` |
+| `dev/active/8e071e18-breakdown.json:3605:1174` | `dev/active/agent-validation-design.md` |
+| `dev/active/8e071e18-breakdown.json:3605:1272` | `dev/active/agent-validation-design.md` |
+| `dev/active/8e071e18-breakdown.json:3777:2101` | `dev/studies/ai-tool-worktree-compatibility.md` |
+| `dev/active/8e071e18-breakdown.json:3777:2207` | `dev/studies/ai-tool-worktree-compatibility.md` |
+| `dev/active/8e071e18-breakdown.json:3777:6595` | `dev/studies/worktree-merge-analysis.md` |
+| `dev/active/8e071e18-breakdown.json:3777:6694` | `dev/studies/worktree-merge-analysis.md` |
+| `dev/active/8e071e18-investigation.md:1308:4` | `dev/studies/ai-tool-worktree-compatibility.md` |
+| `dev/active/8e071e18-investigation.md:1309:4` | `dev/studies/ai-tool-worktree-compatibility.md` |
+| `dev/active/8e071e18-investigation.md:1310:4` | `dev/studies/ai-tool-worktree-compatibility.md` |
+| `dev/active/8e071e18-investigation.md:1360:4` | `dev/studies/ai-tool-worktree-compatibility.md` |
+| `dev/active/8e071e18-investigation.md:1363:22` | `dev/studies/ai-tool-worktree-compatibility.md` |
+
+### Other plan warnings (1)
+
+- `external-edge` at `dev/studies/ai-tool-worktree-compatibility.md`
