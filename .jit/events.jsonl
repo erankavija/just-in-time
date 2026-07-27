@@ -10516,3 +10516,4 @@
 {"gate_key":"repo-validate","id":"e5761a05-9ac6-4e88-97fd-d29eb492f7ee","issue_id":"d8d7f317-6e67-4288-a0b4-6a8189584d45","timestamp":"2026-07-27T13:40:35.266235139Z","type":"gate_added"}
 {"from":"ready","id":"bdd89f55-a6f3-4540-962c-b3ff64587ac9","issue_id":"d8d7f317-6e67-4288-a0b4-6a8189584d45","timestamp":"2026-07-27T13:40:46.604946417Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"5ce52d1a-6a7a-44f4-9bb2-02e96a9f2de6","issue_id":"d8d7f317-6e67-4288-a0b4-6a8189584d45","timestamp":"2026-07-27T13:40:46.604946417Z","type":"issue_claimed"}
+{"fields":["documents"],"id":"480a7e2c-21bd-486b-803e-97dcf4144a30","issue_id":"fdb039ee-7073-4f19-8e52-71c1d99a66c6","timestamp":"2026-07-27T13:40:50.673826055Z","type":"issue_updated","updated_by":"doc-update"}
