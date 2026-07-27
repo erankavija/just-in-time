@@ -10468,3 +10468,6 @@
 {"assignee":"agent:worker","id":"d8bb8e81-d3c6-46e3-847b-abc63deab319","issue_id":"4a6fb8c1-2283-4e4a-bb0d-af2baa3e8c13","reason":"not dispatched; session ending at the user's request, left ready for the next lead","timestamp":"2026-07-27T12:07:42.730427940Z","type":"issue_released"}
 {"from":"ready","id":"781cafc8-0b9c-4f6f-872b-0980c3313753","issue_id":"4a6fb8c1-2283-4e4a-bb0d-af2baa3e8c13","timestamp":"2026-07-27T12:34:22.326384817Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"c4c827db-cd2d-415b-92dd-8a0be10949b6","issue_id":"4a6fb8c1-2283-4e4a-bb0d-af2baa3e8c13","timestamp":"2026-07-27T12:34:22.326384817Z","type":"issue_claimed"}
+{"gate_key":"repo-validate","id":"951ce161-4a84-4428-89ec-566a4e3c66dd","issue_id":"143388dc-f58e-48ca-9b36-dbe58a527489","timestamp":"2026-07-27T12:37:56.395377333Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"docs-mechanical","id":"6a6ac515-0089-400c-9f67-8722143fb965","issue_id":"143388dc-f58e-48ca-9b36-dbe58a527489","timestamp":"2026-07-27T12:38:04.462590505Z","type":"gate_passed","updated_by":"auto:executor"}
+{"fields":["documents"],"id":"a49d4596-7961-4863-9a64-801c18fa3daf","issue_id":"143388dc-f58e-48ca-9b36-dbe58a527489","timestamp":"2026-07-27T12:41:14.498932295Z","type":"issue_updated","updated_by":"doc-add"}
