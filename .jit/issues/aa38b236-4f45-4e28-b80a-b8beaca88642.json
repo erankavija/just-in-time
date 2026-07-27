@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-27T10:08:49.961584193Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
@@ -48,7 +49,7 @@
     "enforces:@/invariant/derived-state-coherence"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Confirm the archival runs serviced the development root",
-  "updated_at": "2026-07-27T10:06:30.255093980Z"
+  "updated_at": "2026-07-27T10:08:49.961584193Z"
 }
