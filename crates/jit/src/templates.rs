@@ -331,9 +331,13 @@ pub struct TemplateNode {
     #[serde(default)]
     pub gates: Vec<String>,
     /// Plan-doc location template for the node, with `{...}` interpolation
-    /// tokens resolved at apply time (e.g. `"dev/active/{container.id}-plan.md"`).
+    /// tokens resolved at apply time.
+    ///
     /// A node that declares a [`doc_area`](Self::doc_area) names its document
-    /// relative to `{container.dir}` (e.g. `"{container.dir}/plan.md"`).
+    /// relative to `{container.dir}`, the canonical artifact directory the
+    /// container owns in that area (e.g. `"{container.dir}/plan.md"`). Without an
+    /// area declaration that token is left verbatim, so such a node's path names
+    /// its own location.
     #[serde(default)]
     pub doc: Option<String>,
     /// Issue-scoped area the node's document belongs in (e.g. `"dev/active"`),
@@ -503,8 +507,7 @@ impl GraphTemplate {
     }
 
     /// The planning node's doc-location template (e.g.
-    /// `"dev/active/{container.id}-plan.md"`), with `{...}` tokens resolved at
-    /// apply time.
+    /// `"{container.dir}/plan.md"`), with `{...}` tokens resolved at apply time.
     pub fn plan_doc_location(&self, roles: &RoleBindings) -> Option<&str> {
         self.planning_node(roles).and_then(|n| n.doc.as_deref())
     }
