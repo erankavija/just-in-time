@@ -160,11 +160,13 @@ otherwise. The membership value resolves in three steps: the issue's single
 `type:` label, that type's membership namespace from
 [`[type_hierarchy].label_associations`](#type_hierarchy), then a single value of
 that namespace on the issue; the slug is that value normalized, the same suffix
-form an archive destination directory carries. Every other shape — no type label,
-several of them, a type the mapping does not name, no membership value, several
-of them, or a value that normalizes to nothing — names the bare short-id
-directory. The name comes from labels and the short id alone, so renaming an
-issue leaves its directory where it is. Filenames carry no short-id prefix:
+form an archive destination directory carries. Normalizing lowercases the
+value's alphanumeric characters, collapses each run of everything else into a
+single `-`, bounds the result at 48 characters, and drops a trailing separator.
+Every other shape — no type label, several of them, a type the mapping does not
+name, no membership value, several of them, or a value that normalizes to
+nothing — names the bare short-id directory. The name comes from labels and the
+short id alone, so renaming an issue leaves its directory where it is. Filenames carry no short-id prefix:
 the directory already names the issue, so each file names its own artifact
 (`plan.md`, `breakdown.json`).
 
