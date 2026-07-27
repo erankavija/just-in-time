@@ -348,3 +348,51 @@ Issue `fccedb73`. Plan eligible with no blockers. 17 relocated, 7 mirrored, 10 r
 | `dev/archive/cdc840ad-research.md:1265:244` | `dev/active/af4c901a-derive-default-rules-at-load.md` |
 | `dev/archive/cdc840ad-research.md:931:4` | `dev/active/af4c901a-derive-default-rules-at-load.md` |
 | `dev/archive/cdc840ad-research.md:936:4` | `dev/active/af4c901a-derive-default-rules-at-load.md` |
+
+## `71373e37` — dev/archive/71373e37-docs-lifecycle
+Issue `95b01080`. Plan eligible with no blockers. 6 relocated, 2 mirrored, 1 retained, 1 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| copy | `dev/active/documentation-lifecycle-design.md` | `dev/archive/71373e37-docs-lifecycle/dev/active/documentation-lifecycle-design.md` | 71373e37 |
+| copy | `dev/studies/documentation-organization-strategy.md` | `dev/archive/71373e37-docs-lifecycle/dev/studies/documentation-organization-strategy.md` | 165cf162 cfb3ba94(outside) |
+| move | `dev/active/doc-archive-implementation-guide.md` | `dev/archive/71373e37-docs-lifecycle/dev/active/doc-archive-implementation-guide.md` | 896ff7df |
+| move | `dev/active/snapshot-export-implementation-plan.md` | `dev/archive/71373e37-docs-lifecycle/dev/active/snapshot-export-implementation-plan.md` | a8f2f04b |
+| move | `dev/sessions/session-2024-12-24-check-links-incomplete.md` | `dev/archive/71373e37-docs-lifecycle/dev/sessions/session-2024-12-24-check-links-incomplete.md` | fb6e2e31 |
+| move | `dev/sessions/session-2025-12-22-doc-consolidation.md` | `dev/archive/71373e37-docs-lifecycle/dev/sessions/session-2025-12-22-doc-consolidation.md` | 6f6b842a |
+| move | `dev/sessions/session-2025-12-27-doc-archive.md` | `dev/archive/71373e37-docs-lifecycle/dev/sessions/session-2025-12-27-doc-archive.md` | 896ff7df |
+| move | `dev/studies/documentation-lifecycle-strategy.md` | `dev/archive/71373e37-docs-lifecycle/dev/studies/documentation-lifecycle-strategy.md` | 71373e37 |
+| retain | `dev/archive/studies/authoring-conventions-draft.md` | already under the archive root | 71373e37 fb6e2e31 |
+
+### In-content citation warnings (22)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8b05a612-investigation.md:60:4` | `dev/sessions/session-2025-12-22-doc-consolidation.md` |
+| `dev/active/8e071e18-breakdown.json:2610:14` | `dev/active/doc-archive-implementation-guide.md` |
+| `dev/active/8e071e18-breakdown.json:2611:14` | `dev/active/snapshot-export-implementation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2612:14` | `dev/sessions/session-2024-12-24-check-links-incomplete.md` |
+| `dev/active/8e071e18-breakdown.json:2613:14` | `dev/sessions/session-2025-12-22-doc-consolidation.md` |
+| `dev/active/8e071e18-breakdown.json:2614:14` | `dev/sessions/session-2025-12-27-doc-archive.md` |
+| `dev/active/8e071e18-breakdown.json:2615:14` | `dev/studies/documentation-lifecycle-strategy.md` |
+| `dev/active/8e071e18-breakdown.json:3648:2582` | `dev/active/snapshot-export-implementation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:2690` | `dev/active/snapshot-export-implementation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3691:1304` | `dev/active/doc-archive-implementation-guide.md` |
+| `dev/active/8e071e18-breakdown.json:3691:1409` | `dev/active/doc-archive-implementation-guide.md` |
+| `dev/active/8e071e18-breakdown.json:3734:1248` | `dev/sessions/session-2024-12-24-check-links-incomplete.md` |
+| `dev/active/8e071e18-breakdown.json:3734:1364` | `dev/sessions/session-2024-12-24-check-links-incomplete.md` |
+| `dev/active/8e071e18-breakdown.json:3734:1594` | `dev/sessions/session-2025-12-22-doc-consolidation.md` |
+| `dev/active/8e071e18-breakdown.json:3734:1705` | `dev/sessions/session-2025-12-22-doc-consolidation.md` |
+| `dev/active/8e071e18-breakdown.json:3734:1944` | `dev/sessions/session-2025-12-27-doc-archive.md` |
+| `dev/active/8e071e18-breakdown.json:3734:2049` | `dev/sessions/session-2025-12-27-doc-archive.md` |
+| `dev/active/8e071e18-breakdown.json:3777:3970` | `dev/studies/documentation-lifecycle-strategy.md` |
+| `dev/active/8e071e18-breakdown.json:3777:4076` | `dev/studies/documentation-lifecycle-strategy.md` |
+| `dev/active/8e071e18-investigation.md:647:52` | `dev/active/doc-archive-implementation-guide.md` |
+| `dev/active/8e071e18-investigation.md:650:28` | `dev/studies/documentation-lifecycle-strategy.md` |
+| `dev/archive/2d109173-investigation.md:216:6` | `dev/sessions/session-2024-12-24-check-links-incomplete.md` |
+
+### Other plan warnings (1)
+
+- `external-edge` at `dev/studies/documentation-organization-strategy.md`
