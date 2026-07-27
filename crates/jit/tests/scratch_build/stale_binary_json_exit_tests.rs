@@ -5,8 +5,8 @@
 //! exactly matching the exit code the non-`--json` path already produced.
 //! Before that fix, `render_gate_pass_error` (main.rs) had no branch for
 //! `StaleBinaryError`, so it fell through to the generic `GATE_ERROR` code,
-//! which `ErrorCode::to_exit_code` maps to exit `1` — silently breaking the
-//! documented exit-10 contract under `--json` only.
+//! which cannot resolve to an `ErrorCode` member and maps to exit `1` —
+//! silently breaking the documented exit-10 contract under `--json` only.
 //!
 //! Reproducing a genuine EVALUATOR-path refusal needs a binary whose own build
 //! commit is a commit the repository under review knows but has advanced past.
@@ -24,6 +24,18 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
+
+#[test]
+fn test_stale_binary_error_code_resolves_to_external_error() {
+    use jit::output::{ErrorCode, ExitCode};
+
+    let code = "STALE_BINARY"
+        .parse::<ErrorCode>()
+        .expect("the emitted stale-binary code should be registered");
+
+    assert_eq!(code, ErrorCode::StaleBinary);
+    assert_eq!(code.exit_code(), ExitCode::ExternalError);
+}
 
 fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")

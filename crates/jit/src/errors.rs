@@ -773,9 +773,9 @@ impl TransitionBlockedError {
                 TransitionBlocker::Dependency { .. } | TransitionBlocker::MissingDependency { .. }
             )
         }) {
-            crate::output::ErrorCode::BLOCKED
+            crate::output::ErrorCode::Blocked.as_str()
         } else {
-            crate::output::ErrorCode::VALIDATION_FAILED
+            crate::output::ErrorCode::ValidationFailed.as_str()
         }
     }
 
@@ -1189,7 +1189,7 @@ mod tests {
         // A graph-rule block is a validation failure (exit 4 via error_code).
         assert_eq!(
             error.error_code(),
-            crate::output::ErrorCode::VALIDATION_FAILED
+            crate::output::ErrorCode::ValidationFailed.as_str()
         );
 
         let rendered = error.to_string();

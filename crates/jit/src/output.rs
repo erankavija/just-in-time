@@ -505,7 +505,11 @@ impl JsonError {
 
     /// Get the appropriate exit code for this error
     pub fn exit_code(&self) -> ExitCode {
-        ErrorCode::to_exit_code(&self.error.code)
+        self.error
+            .code
+            .parse::<ErrorCode>()
+            .map(ErrorCode::exit_code)
+            .unwrap_or(ExitCode::GenericError)
     }
 }
 
@@ -633,74 +637,229 @@ impl ExitCode {
 }
 
 // ============================================================================
-// Error Codes (String constants for JSON responses)
+// Error Codes (JSON responses)
 // ============================================================================
 
-/// Standard error codes for JIT operations (JSON format)
-pub struct ErrorCode;
-
-#[allow(dead_code)]
-impl ErrorCode {
-    pub const ISSUE_NOT_FOUND: &'static str = "ISSUE_NOT_FOUND";
-    pub const GATE_NOT_FOUND: &'static str = "GATE_NOT_FOUND";
-    pub const CYCLE_DETECTED: &'static str = "CYCLE_DETECTED";
-    pub const INVALID_ARGUMENT: &'static str = "INVALID_ARGUMENT";
-    pub const VALIDATION_FAILED: &'static str = "VALIDATION_FAILED";
-    pub const ALREADY_EXISTS: &'static str = "ALREADY_EXISTS";
-    pub const INVALID_STATE: &'static str = "INVALID_STATE";
-    pub const BLOCKED: &'static str = "BLOCKED";
-    pub const GATE_FAILED: &'static str = "GATE_FAILED";
-    pub const IO_ERROR: &'static str = "IO_ERROR";
-    pub const PARSE_ERROR: &'static str = "PARSE_ERROR";
-    /// A claim/lease command was run outside a git repository (exit code 10).
-    pub const CLAIM_REQUIRES_GIT: &'static str = "CLAIM_REQUIRES_GIT";
-    /// An id prefix matched more than one candidate (exit code 2).
-    pub const AMBIGUOUS_ID: &'static str = "AMBIGUOUS_ID";
-    /// An id prefix was shorter than the 4-character minimum (exit code 2).
-    pub const INVALID_ID_PREFIX: &'static str = "INVALID_ID_PREFIX";
-    /// No `.jit` repository exists at the resolved data directory (exit code 3).
-    pub const REPOSITORY_NOT_FOUND: &'static str = "REPOSITORY_NOT_FOUND";
-    /// The repository's on-disk format is newer than this binary supports (exit code 10).
-    pub const REPOSITORY_FORMAT_TOO_NEW: &'static str = "REPOSITORY_FORMAT_TOO_NEW";
-    /// A gate checker was refused because the running binary predates the
-    /// repository under review (exit code 10). Pre-verdict: unlike
-    /// `GATE_FAILED`, the checker never ran, so the envelope carries no
-    /// `verdict` field.
-    pub const STALE_BINARY: &'static str = "STALE_BINARY";
-    /// `jit issue delete` was refused for missing operator confirmation
-    /// (`JIT_ALLOW_DELETION=1` not set in the process environment; exit code 2).
-    pub const DELETION_NOT_CONFIRMED: &'static str = "DELETION_NOT_CONFIRMED";
-    /// Requested embedded profile ID does not exist.
-    pub const PROFILE_NOT_FOUND: &'static str = "PROFILE_NOT_FOUND";
-    /// Profile package planning or final-state validation rejected the operation.
-    pub const PROFILE_CONFLICT: &'static str = "PROFILE_CONFLICT";
+/// Standard error-code vocabulary for JIT's machine-readable responses.
+///
+/// The serialized names are the strings carried in JSON error envelopes.
+/// [`ErrorCode::ALL`] is checked against this enum's derived schema, keeping
+/// enumeration consumers in lockstep with the type's variants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, JsonSchema)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ErrorCode {
+    /// The requested issue does not exist.
+    IssueNotFound,
+    /// The requested gate does not exist.
+    GateNotFound,
+    /// The requested dependency would make the graph cyclic.
+    CycleDetected,
+    /// An argument or invocation is invalid.
+    InvalidArgument,
+    /// Repository or domain validation failed.
+    ValidationFailed,
+    /// The requested resource already exists.
+    AlreadyExists,
+    /// A requested lifecycle state or transition is invalid.
+    InvalidState,
+    /// Unfinished dependencies block the requested operation.
+    Blocked,
+    /// A quality-gate checker completed without passing.
+    GateFailed,
+    /// An input/output or external-system operation failed.
+    IoError,
+    /// Input data could not be parsed.
+    ParseError,
+    /// A claim or lease command requires a Git repository.
+    ClaimRequiresGit,
+    /// An ID prefix matched more than one candidate.
+    AmbiguousId,
+    /// An ID prefix was shorter than the accepted minimum.
+    InvalidIdPrefix,
+    /// No `.jit` repository exists at the resolved data directory.
+    RepositoryNotFound,
+    /// The repository format is newer than this binary supports.
+    RepositoryFormatTooNew,
+    /// A gate checker was refused because the binary predates the repository.
+    StaleBinary,
+    /// Issue deletion was refused because operator confirmation was absent.
+    DeletionNotConfirmed,
+    /// The requested embedded profile does not exist.
+    ProfileNotFound,
+    /// Profile planning or final-state validation rejected the operation.
+    ProfileConflict,
 }
 
 impl ErrorCode {
-    /// Map error code string to exit code
-    pub fn to_exit_code(code: &str) -> ExitCode {
-        match code {
-            Self::ISSUE_NOT_FOUND | Self::GATE_NOT_FOUND | Self::PROFILE_NOT_FOUND => {
-                ExitCode::NotFound
-            }
-            Self::CYCLE_DETECTED
-            | Self::VALIDATION_FAILED
-            | Self::BLOCKED
-            | Self::GATE_FAILED
-            | Self::PROFILE_CONFLICT => ExitCode::ValidationFailed,
-            Self::INVALID_ARGUMENT
-            | Self::INVALID_STATE
-            | Self::AMBIGUOUS_ID
-            | Self::INVALID_ID_PREFIX
-            | Self::DELETION_NOT_CONFIRMED => ExitCode::InvalidArgument,
-            Self::ALREADY_EXISTS => ExitCode::AlreadyExists,
-            Self::REPOSITORY_NOT_FOUND => ExitCode::NotFound,
-            Self::IO_ERROR
-            | Self::CLAIM_REQUIRES_GIT
-            | Self::REPOSITORY_FORMAT_TOO_NEW
-            | Self::STALE_BINARY => ExitCode::ExternalError,
-            _ => ExitCode::GenericError,
+    /// Every registered error code, in declaration order.
+    ///
+    /// A conformance test compares this list with the variants schemars derives
+    /// from [`ErrorCode`], so omitting a newly added member fails the suite.
+    pub const ALL: [ErrorCode; 20] = [
+        ErrorCode::IssueNotFound,
+        ErrorCode::GateNotFound,
+        ErrorCode::CycleDetected,
+        ErrorCode::InvalidArgument,
+        ErrorCode::ValidationFailed,
+        ErrorCode::AlreadyExists,
+        ErrorCode::InvalidState,
+        ErrorCode::Blocked,
+        ErrorCode::GateFailed,
+        ErrorCode::IoError,
+        ErrorCode::ParseError,
+        ErrorCode::ClaimRequiresGit,
+        ErrorCode::AmbiguousId,
+        ErrorCode::InvalidIdPrefix,
+        ErrorCode::RepositoryNotFound,
+        ErrorCode::RepositoryFormatTooNew,
+        ErrorCode::StaleBinary,
+        ErrorCode::DeletionNotConfirmed,
+        ErrorCode::ProfileNotFound,
+        ErrorCode::ProfileConflict,
+    ];
+
+    /// Return the byte-exact code written to a JSON error envelope.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            ErrorCode::IssueNotFound => "ISSUE_NOT_FOUND",
+            ErrorCode::GateNotFound => "GATE_NOT_FOUND",
+            ErrorCode::CycleDetected => "CYCLE_DETECTED",
+            ErrorCode::InvalidArgument => "INVALID_ARGUMENT",
+            ErrorCode::ValidationFailed => "VALIDATION_FAILED",
+            ErrorCode::AlreadyExists => "ALREADY_EXISTS",
+            ErrorCode::InvalidState => "INVALID_STATE",
+            ErrorCode::Blocked => "BLOCKED",
+            ErrorCode::GateFailed => "GATE_FAILED",
+            ErrorCode::IoError => "IO_ERROR",
+            ErrorCode::ParseError => "PARSE_ERROR",
+            ErrorCode::ClaimRequiresGit => "CLAIM_REQUIRES_GIT",
+            ErrorCode::AmbiguousId => "AMBIGUOUS_ID",
+            ErrorCode::InvalidIdPrefix => "INVALID_ID_PREFIX",
+            ErrorCode::RepositoryNotFound => "REPOSITORY_NOT_FOUND",
+            ErrorCode::RepositoryFormatTooNew => "REPOSITORY_FORMAT_TOO_NEW",
+            ErrorCode::StaleBinary => "STALE_BINARY",
+            ErrorCode::DeletionNotConfirmed => "DELETION_NOT_CONFIRMED",
+            ErrorCode::ProfileNotFound => "PROFILE_NOT_FOUND",
+            ErrorCode::ProfileConflict => "PROFILE_CONFLICT",
         }
+    }
+
+    /// Return the process exit status associated with this error code.
+    ///
+    /// The match is exhaustive so adding a member requires choosing its status.
+    pub const fn exit_code(self) -> ExitCode {
+        match self {
+            ErrorCode::IssueNotFound
+            | ErrorCode::GateNotFound
+            | ErrorCode::ProfileNotFound
+            | ErrorCode::RepositoryNotFound => ExitCode::NotFound,
+            ErrorCode::CycleDetected
+            | ErrorCode::ValidationFailed
+            | ErrorCode::Blocked
+            | ErrorCode::GateFailed
+            | ErrorCode::ProfileConflict => ExitCode::ValidationFailed,
+            ErrorCode::InvalidArgument
+            | ErrorCode::InvalidState
+            | ErrorCode::AmbiguousId
+            | ErrorCode::InvalidIdPrefix
+            | ErrorCode::DeletionNotConfirmed => ExitCode::InvalidArgument,
+            ErrorCode::AlreadyExists => ExitCode::AlreadyExists,
+            ErrorCode::IoError
+            | ErrorCode::ClaimRequiresGit
+            | ErrorCode::RepositoryFormatTooNew
+            | ErrorCode::StaleBinary => ExitCode::ExternalError,
+            ErrorCode::ParseError => ExitCode::GenericError,
+        }
+    }
+
+    /// Return a concise description of the failure this member names.
+    ///
+    /// The match is exhaustive so adding a member requires describing it.
+    pub const fn description(self) -> &'static str {
+        match self {
+            ErrorCode::IssueNotFound => "The requested issue does not exist.",
+            ErrorCode::GateNotFound => "The requested gate does not exist.",
+            ErrorCode::CycleDetected => "The dependency would create a cycle.",
+            ErrorCode::InvalidArgument => "An argument or invocation is invalid.",
+            ErrorCode::ValidationFailed => "Repository or domain validation failed.",
+            ErrorCode::AlreadyExists => "The requested resource already exists.",
+            ErrorCode::InvalidState => "A lifecycle state or transition is invalid.",
+            ErrorCode::Blocked => "Unfinished dependencies block the operation.",
+            ErrorCode::GateFailed => "A quality-gate checker did not pass.",
+            ErrorCode::IoError => "An input/output or external-system operation failed.",
+            ErrorCode::ParseError => "Input data could not be parsed.",
+            ErrorCode::ClaimRequiresGit => "The claim or lease operation requires Git.",
+            ErrorCode::AmbiguousId => "The ID prefix matches more than one candidate.",
+            ErrorCode::InvalidIdPrefix => "The ID prefix is shorter than the accepted minimum.",
+            ErrorCode::RepositoryNotFound => "No JIT repository exists at the resolved path.",
+            ErrorCode::RepositoryFormatTooNew => {
+                "The repository format is newer than this binary supports."
+            }
+            ErrorCode::StaleBinary => "The running binary predates the repository under review.",
+            ErrorCode::DeletionNotConfirmed => {
+                "Issue deletion lacks the required operator confirmation."
+            }
+            ErrorCode::ProfileNotFound => "The requested embedded profile does not exist.",
+            ErrorCode::ProfileConflict => "Profile planning or validation found a conflict.",
+        }
+    }
+}
+
+/// An input string that is not a member of the registered error-code vocabulary.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("unknown error code `{code}`")]
+pub struct UnknownErrorCode {
+    code: String,
+}
+
+impl UnknownErrorCode {
+    /// Return the unresolved input string.
+    pub fn as_str(&self) -> &str {
+        &self.code
+    }
+}
+
+impl std::str::FromStr for ErrorCode {
+    type Err = UnknownErrorCode;
+
+    fn from_str(code: &str) -> Result<Self, Self::Err> {
+        match code {
+            "ISSUE_NOT_FOUND" => Ok(ErrorCode::IssueNotFound),
+            "GATE_NOT_FOUND" => Ok(ErrorCode::GateNotFound),
+            "CYCLE_DETECTED" => Ok(ErrorCode::CycleDetected),
+            "INVALID_ARGUMENT" => Ok(ErrorCode::InvalidArgument),
+            "VALIDATION_FAILED" => Ok(ErrorCode::ValidationFailed),
+            "ALREADY_EXISTS" => Ok(ErrorCode::AlreadyExists),
+            "INVALID_STATE" => Ok(ErrorCode::InvalidState),
+            "BLOCKED" => Ok(ErrorCode::Blocked),
+            "GATE_FAILED" => Ok(ErrorCode::GateFailed),
+            "IO_ERROR" => Ok(ErrorCode::IoError),
+            "PARSE_ERROR" => Ok(ErrorCode::ParseError),
+            "CLAIM_REQUIRES_GIT" => Ok(ErrorCode::ClaimRequiresGit),
+            "AMBIGUOUS_ID" => Ok(ErrorCode::AmbiguousId),
+            "INVALID_ID_PREFIX" => Ok(ErrorCode::InvalidIdPrefix),
+            "REPOSITORY_NOT_FOUND" => Ok(ErrorCode::RepositoryNotFound),
+            "REPOSITORY_FORMAT_TOO_NEW" => Ok(ErrorCode::RepositoryFormatTooNew),
+            "STALE_BINARY" => Ok(ErrorCode::StaleBinary),
+            "DELETION_NOT_CONFIRMED" => Ok(ErrorCode::DeletionNotConfirmed),
+            "PROFILE_NOT_FOUND" => Ok(ErrorCode::ProfileNotFound),
+            "PROFILE_CONFLICT" => Ok(ErrorCode::ProfileConflict),
+            code => Err(UnknownErrorCode {
+                code: code.to_string(),
+            }),
+        }
+    }
+}
+
+impl Display for ErrorCode {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl From<ErrorCode> for String {
+    fn from(code: ErrorCode) -> Self {
+        code.as_str().to_string()
     }
 }
 
@@ -716,11 +875,11 @@ impl ErrorCode {
 /// is a no-op for the vast majority of call sites.
 pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
     if let Some(prefix_error) = error.downcast_ref::<crate::storage::InvalidIdPrefixError>() {
-        return JsonError::new(ErrorCode::INVALID_ID_PREFIX, prefix_error.to_string())
+        return JsonError::new(ErrorCode::InvalidIdPrefix, prefix_error.to_string())
             .with_details(serde_json::json!({ "prefix": prefix_error.prefix() }));
     }
     if let Some(ambiguous) = error.downcast_ref::<crate::storage::AmbiguousIdError>() {
-        return JsonError::new(ErrorCode::AMBIGUOUS_ID, ambiguous.to_string()).with_details(
+        return JsonError::new(ErrorCode::AmbiguousId, ambiguous.to_string()).with_details(
             serde_json::json!({
                 "prefix": ambiguous.prefix(),
                 "matches": ambiguous.matches(),
@@ -735,7 +894,7 @@ pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError 
 impl JsonError {
     pub fn issue_not_found(issue_id: &str) -> Self {
         Self::new(
-            ErrorCode::ISSUE_NOT_FOUND,
+            ErrorCode::IssueNotFound,
             format!("Issue not found: {}", issue_id),
         )
         .with_details(serde_json::json!({"issue_id": issue_id}))
@@ -745,7 +904,7 @@ impl JsonError {
 
     pub fn gate_not_found(gate_key: &str) -> Self {
         Self::new(
-            ErrorCode::GATE_NOT_FOUND,
+            ErrorCode::GateNotFound,
             format!("Gate not found: {}", gate_key),
         )
         .with_details(serde_json::json!({"key": gate_key}))
@@ -755,7 +914,7 @@ impl JsonError {
 
     pub fn cycle_detected(from: &str, to: &str) -> Self {
         Self::new(
-            ErrorCode::CYCLE_DETECTED,
+            ErrorCode::CycleDetected,
             format!("Adding dependency would create a cycle: {} -> {}", from, to),
         )
         .with_details(serde_json::json!({"from": from, "to": to}))
@@ -764,17 +923,14 @@ impl JsonError {
     }
 
     pub fn invalid_state(state: &str) -> Self {
-        Self::new(
-            ErrorCode::INVALID_STATE,
-            format!("Invalid state: {}", state),
-        )
-        .with_details(serde_json::json!({"invalid_state": state}))
-        .with_suggestion("Valid states are: open, ready, in_progress, done")
+        Self::new(ErrorCode::InvalidState, format!("Invalid state: {}", state))
+            .with_details(serde_json::json!({"invalid_state": state}))
+            .with_suggestion("Valid states are: open, ready, in_progress, done")
     }
 
     pub fn invalid_priority(priority: &str) -> Self {
         Self::new(
-            ErrorCode::INVALID_ARGUMENT,
+            ErrorCode::InvalidArgument,
             format!("Invalid priority: {}", priority),
         )
         .with_details(serde_json::json!({"invalid_priority": priority}))
@@ -783,7 +939,7 @@ impl JsonError {
 
     pub fn gate_validation_failed(unpassed_gates: &[String], issue_id: &str) -> Self {
         Self::new(
-            ErrorCode::VALIDATION_FAILED,
+            ErrorCode::ValidationFailed,
             format!(
                 "Cannot transition to 'done' - {} gate(s) not passed: {}",
                 unpassed_gates.len(),
@@ -2387,7 +2543,9 @@ pub struct WorktreeListResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use schemars::schema_for;
     use serde_json::json;
+    use std::collections::BTreeSet;
 
     /// jit:45a140ae REQ-02: a dependency-tree node archived from a terminal
     /// state renders and serializes as effectively terminal; a legacy Archived
@@ -2829,9 +2987,167 @@ mod tests {
     #[test]
     fn test_gate_failed_error_code_is_validation_failure() {
         assert_eq!(
-            ErrorCode::to_exit_code(ErrorCode::GATE_FAILED),
+            ErrorCode::GateFailed.exit_code(),
             ExitCode::ValidationFailed
         );
+    }
+
+    fn schema_accepted_strings(schema: &serde_json::Value) -> BTreeSet<String> {
+        match schema {
+            serde_json::Value::Object(map) => map
+                .iter()
+                .flat_map(|(key, value)| match (key.as_str(), value) {
+                    ("enum", serde_json::Value::Array(values)) => values
+                        .iter()
+                        .filter_map(|value| value.as_str().map(str::to_string))
+                        .collect(),
+                    _ => schema_accepted_strings(value),
+                })
+                .collect(),
+            serde_json::Value::Array(values) => {
+                values.iter().flat_map(schema_accepted_strings).collect()
+            }
+            _ => BTreeSet::new(),
+        }
+    }
+
+    #[test]
+    fn test_error_code_all_lists_every_derived_variant() {
+        let schema = serde_json::to_value(schema_for!(ErrorCode))
+            .expect("ErrorCode schema should serialize");
+        let derived = schema_accepted_strings(&schema);
+        assert!(!derived.is_empty(), "derived schema should list variants");
+
+        let listed: BTreeSet<String> = ErrorCode::ALL
+            .iter()
+            .map(|code| code.as_str().to_string())
+            .collect();
+
+        assert_eq!(listed, derived, "ErrorCode::ALL must list every variant");
+    }
+
+    #[test]
+    fn test_error_code_wire_strings_and_exit_statuses_match_contract() {
+        let expected = [
+            (
+                ErrorCode::IssueNotFound,
+                "ISSUE_NOT_FOUND",
+                ExitCode::NotFound,
+            ),
+            (
+                ErrorCode::GateNotFound,
+                "GATE_NOT_FOUND",
+                ExitCode::NotFound,
+            ),
+            (
+                ErrorCode::CycleDetected,
+                "CYCLE_DETECTED",
+                ExitCode::ValidationFailed,
+            ),
+            (
+                ErrorCode::InvalidArgument,
+                "INVALID_ARGUMENT",
+                ExitCode::InvalidArgument,
+            ),
+            (
+                ErrorCode::ValidationFailed,
+                "VALIDATION_FAILED",
+                ExitCode::ValidationFailed,
+            ),
+            (
+                ErrorCode::AlreadyExists,
+                "ALREADY_EXISTS",
+                ExitCode::AlreadyExists,
+            ),
+            (
+                ErrorCode::InvalidState,
+                "INVALID_STATE",
+                ExitCode::InvalidArgument,
+            ),
+            (ErrorCode::Blocked, "BLOCKED", ExitCode::ValidationFailed),
+            (
+                ErrorCode::GateFailed,
+                "GATE_FAILED",
+                ExitCode::ValidationFailed,
+            ),
+            (ErrorCode::IoError, "IO_ERROR", ExitCode::ExternalError),
+            (ErrorCode::ParseError, "PARSE_ERROR", ExitCode::GenericError),
+            (
+                ErrorCode::ClaimRequiresGit,
+                "CLAIM_REQUIRES_GIT",
+                ExitCode::ExternalError,
+            ),
+            (
+                ErrorCode::AmbiguousId,
+                "AMBIGUOUS_ID",
+                ExitCode::InvalidArgument,
+            ),
+            (
+                ErrorCode::InvalidIdPrefix,
+                "INVALID_ID_PREFIX",
+                ExitCode::InvalidArgument,
+            ),
+            (
+                ErrorCode::RepositoryNotFound,
+                "REPOSITORY_NOT_FOUND",
+                ExitCode::NotFound,
+            ),
+            (
+                ErrorCode::RepositoryFormatTooNew,
+                "REPOSITORY_FORMAT_TOO_NEW",
+                ExitCode::ExternalError,
+            ),
+            (
+                ErrorCode::StaleBinary,
+                "STALE_BINARY",
+                ExitCode::ExternalError,
+            ),
+            (
+                ErrorCode::DeletionNotConfirmed,
+                "DELETION_NOT_CONFIRMED",
+                ExitCode::InvalidArgument,
+            ),
+            (
+                ErrorCode::ProfileNotFound,
+                "PROFILE_NOT_FOUND",
+                ExitCode::NotFound,
+            ),
+            (
+                ErrorCode::ProfileConflict,
+                "PROFILE_CONFLICT",
+                ExitCode::ValidationFailed,
+            ),
+        ];
+
+        assert_eq!(expected.len(), ErrorCode::ALL.len());
+        for ((code, wire, status), listed) in expected.into_iter().zip(ErrorCode::ALL) {
+            assert_eq!(code, listed);
+            assert_eq!(code.as_str(), wire);
+            assert_eq!(code.exit_code(), status);
+        }
+    }
+
+    #[test]
+    fn test_error_code_strings_round_trip_and_unknown_is_unresolved() {
+        for code in ErrorCode::ALL {
+            assert_eq!(code.as_str().parse::<ErrorCode>(), Ok(code));
+        }
+
+        let unresolved = "UNREGISTERED_ERROR"
+            .parse::<ErrorCode>()
+            .expect_err("unknown input should stay unresolved");
+        assert_eq!(unresolved.as_str(), "UNREGISTERED_ERROR");
+    }
+
+    #[test]
+    fn test_error_code_members_have_descriptions() {
+        for code in ErrorCode::ALL {
+            assert!(
+                !code.description().is_empty(),
+                "{} should have a description",
+                code.as_str()
+            );
+        }
     }
 
     // ========================================================================

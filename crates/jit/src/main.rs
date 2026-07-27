@@ -374,12 +374,12 @@ fn dep_add_batch_json_error(
             err.downcast_ref::<GraphError>(),
             Some(GraphError::CycleDetected)
         ) {
-            ErrorCode::CYCLE_DETECTED
+            ErrorCode::CycleDetected.as_str()
         } else if err
             .downcast_ref::<jit::errors::RedundantDependencyError>()
             .is_some()
         {
-            ErrorCode::VALIDATION_FAILED
+            ErrorCode::ValidationFailed.as_str()
         } else if err
             .downcast_ref::<jit::storage::IssueNotFoundError>()
             .is_some()
@@ -388,17 +388,17 @@ fn dep_add_batch_json_error(
                 Some(GraphError::NodeNotFound { .. })
             )
         {
-            ErrorCode::ISSUE_NOT_FOUND
+            ErrorCode::IssueNotFound.as_str()
         } else if err
             .downcast_ref::<jit::storage::InvalidIdPrefixError>()
             .is_some()
         {
-            ErrorCode::INVALID_ID_PREFIX
+            ErrorCode::InvalidIdPrefix.as_str()
         } else if err
             .downcast_ref::<jit::storage::AmbiguousIdError>()
             .is_some()
         {
-            ErrorCode::AMBIGUOUS_ID
+            ErrorCode::AmbiguousId.as_str()
         } else {
             "DEPENDENCY_ERROR"
         }
@@ -452,7 +452,7 @@ fn dep_add_batch_json_error(
         .downcast_ref::<jit::errors::RedundantDependencyError>()
         .is_some()
     {
-        JsonError::new(ErrorCode::VALIDATION_FAILED, err.to_string())
+        JsonError::new(ErrorCode::ValidationFailed, err.to_string())
     } else if err
         .downcast_ref::<jit::storage::IssueNotFoundError>()
         .is_some()
@@ -495,7 +495,7 @@ fn claim_json_error(error: &anyhow::Error, fallback_code: &str) -> jit::output::
         .downcast_ref::<jit::errors::ClaimRequiresGitError>()
         .is_some()
     {
-        ErrorCode::CLAIM_REQUIRES_GIT
+        ErrorCode::ClaimRequiresGit.as_str()
     } else {
         fallback_code
     };
@@ -508,12 +508,12 @@ fn validate_fix_json_error(error: &anyhow::Error, exit_code: ExitCode) -> jit::o
     use jit::output::ErrorCode;
 
     let code = match exit_code {
-        ExitCode::ValidationFailed => ErrorCode::VALIDATION_FAILED,
-        ExitCode::InvalidArgument => ErrorCode::INVALID_ARGUMENT,
-        ExitCode::NotFound => ErrorCode::REPOSITORY_NOT_FOUND,
-        ExitCode::AlreadyExists => ErrorCode::ALREADY_EXISTS,
-        ExitCode::PermissionDenied | ExitCode::ExternalError => ErrorCode::IO_ERROR,
-        ExitCode::Success | ExitCode::GenericError | ExitCode::BrokenPipe => ErrorCode::IO_ERROR,
+        ExitCode::ValidationFailed => ErrorCode::ValidationFailed,
+        ExitCode::InvalidArgument => ErrorCode::InvalidArgument,
+        ExitCode::NotFound => ErrorCode::RepositoryNotFound,
+        ExitCode::AlreadyExists => ErrorCode::AlreadyExists,
+        ExitCode::PermissionDenied | ExitCode::ExternalError => ErrorCode::IoError,
+        ExitCode::Success | ExitCode::GenericError | ExitCode::BrokenPipe => ErrorCode::IoError,
     };
     jit::output::JsonError::new(code, format!("{error:#}"))
 }
@@ -617,7 +617,7 @@ fn render_gate_pass_error(
         // Pre-verdict refusal (jit:7446af34): the checker never spawned, so —
         // like `GateNotRequiredError` above, and unlike `GatePassFailed` — this
         // carries no `verdict` field. `STALE_BINARY` maps to exit code 10
-        // (`ErrorCode::to_exit_code`), matching the non-JSON path's
+        // (`ErrorCode::exit_code`), matching the non-JSON path's
         // `ExitCode::ExternalError` classification of the same typed error in
         // `error_to_exit_code`.
         stale_binary_json_error(stale)
@@ -647,7 +647,7 @@ fn stale_binary_json_error(stale: &jit::errors::StaleBinaryError) -> jit::output
         }
         StaleBinaryReason::DirtyBuild { built_from } => ("dirty_build", built_from.clone()),
     };
-    JsonError::new(ErrorCode::STALE_BINARY, stale.to_string())
+    JsonError::new(ErrorCode::StaleBinary, stale.to_string())
         .with_details(serde_json::json!({
             "issue_id": stale.issue_id(),
             "key": stale.gate_key(),
@@ -763,7 +763,7 @@ fn resolve_gate_key_for(
         Err(e) => {
             if json {
                 let json_error = jit::output::JsonError::new(
-                    jit::output::ErrorCode::INVALID_ARGUMENT,
+                    jit::output::ErrorCode::InvalidArgument,
                     e.to_string(),
                 );
                 println!("{}", json_error.to_json_string()?);
@@ -784,7 +784,7 @@ fn resolve_gate_key_for(
 fn invalid_argument(message: String, json: bool) -> anyhow::Error {
     if json {
         let json_error =
-            jit::output::JsonError::new(jit::output::ErrorCode::INVALID_ARGUMENT, message);
+            jit::output::JsonError::new(jit::output::ErrorCode::InvalidArgument, message);
         if let Ok(s) = json_error.to_json_string() {
             println!("{}", s);
         }
@@ -798,7 +798,7 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
     use jit::repository_state::{InitializationError, ProducerError, RepositoryStateError};
 
     if error.downcast_ref::<jit::errors::NotFoundError>().is_some() {
-        return JsonError::new(ErrorCode::PROFILE_NOT_FOUND, error.to_string())
+        return JsonError::new(ErrorCode::ProfileNotFound, error.to_string())
             .with_suggestion("Run 'jit profile list --json' to see embedded profiles");
     }
     if error
@@ -808,7 +808,7 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
             .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()
     {
-        return JsonError::new(ErrorCode::PROFILE_CONFLICT, error.to_string());
+        return JsonError::new(ErrorCode::ProfileConflict, error.to_string());
     }
     // The single sanctioned downcast of the anyhow CLI transport to the typed
     // repository-state error: a profile target conflict (raised directly or through
@@ -821,7 +821,7 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
             | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(_))
             | RepositoryStateError::Producer(ProducerError::ProfileContributionConflict {
                 ..
-            }) => ErrorCode::PROFILE_CONFLICT,
+            }) => ErrorCode::ProfileConflict.as_str(),
             RepositoryStateError::Producer(
                 ProducerError::ProfileRegistryNotFile { .. }
                 | ProducerError::ProfileRegistryParse { .. },
@@ -1451,7 +1451,7 @@ fn run_project<S: IssueStore + jit::storage::RepositoryStateStore>(
             || e.downcast_ref::<jit::repository_state::ManagedDocumentError>()
                 .is_some()
         {
-            jit::output::ErrorCode::VALIDATION_FAILED
+            jit::output::ErrorCode::ValidationFailed.as_str()
         } else {
             "PROJECT_COMMAND_FAILED"
         };
@@ -1773,12 +1773,12 @@ fn emit_startup_json_error(error: &anyhow::Error) {
         .downcast_ref::<jit::storage::RepositoryNotFoundError>()
         .is_some()
     {
-        JsonError::new(ErrorCode::REPOSITORY_NOT_FOUND, error.to_string())
+        JsonError::new(ErrorCode::RepositoryNotFound, error.to_string())
     } else if error
         .downcast_ref::<jit::storage::RepositoryFormatTooNewError>()
         .is_some()
     {
-        JsonError::new(ErrorCode::REPOSITORY_FORMAT_TOO_NEW, error.to_string())
+        JsonError::new(ErrorCode::RepositoryFormatTooNew, error.to_string())
     } else if let Some(stale) = error.downcast_ref::<jit::errors::StaleBinaryError>() {
         stale_binary_json_error(stale)
     } else {
@@ -3050,7 +3050,7 @@ fn run() -> Result<()> {
                     if let Err(e) = executor.confirm_deletion_allowed(&id, allow_deletion) {
                         if json {
                             let json_error = jit::output::JsonError::new(
-                                jit::output::ErrorCode::DELETION_NOT_CONFIRMED,
+                                jit::output::ErrorCode::DeletionNotConfirmed,
                                 e.to_string(),
                             )
                             .with_details(serde_json::json!({ "id": id }))
@@ -5110,7 +5110,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         // Every rejection this command states is typed, so the `--json`
-                        // envelope carries the code whose `ErrorCode::to_exit_code`
+                        // envelope carries the code whose `ErrorCode::exit_code`
                         // mapping is the exit status `error_to_exit_code` already gives
                         // that same typed error on the plain-text path: an undeclared
                         // area is the resolver's `InvalidArgumentError`
@@ -5127,7 +5127,7 @@ fn run() -> Result<()> {
                             .downcast_ref::<jit::errors::InvalidArgumentError>()
                             .is_some()
                         {
-                            JsonError::new(ErrorCode::INVALID_ARGUMENT, e.to_string())
+                            JsonError::new(ErrorCode::InvalidArgument, e.to_string())
                         } else if e
                             .downcast_ref::<jit::storage::IssueNotFoundError>()
                             .is_some()
@@ -6074,7 +6074,7 @@ fn run() -> Result<()> {
                             handle_json_error!(
                                 json,
                                 e,
-                                JsonError::new(ErrorCode::INVALID_ARGUMENT, e.to_string())
+                                JsonError::new(ErrorCode::InvalidArgument, e.to_string())
                             );
                         } else {
                             return Err(e);
@@ -8156,7 +8156,10 @@ mod repository_state_classifier_tests {
         for state_error in conflict_cases {
             let error = anyhow::Error::new(state_error);
             let json = profile_json_error(&error);
-            assert_eq!(json.error.code, jit::output::ErrorCode::PROFILE_CONFLICT);
+            assert_eq!(
+                json.error.code,
+                jit::output::ErrorCode::ProfileConflict.as_str()
+            );
             assert_eq!(json.exit_code().code(), 4);
         }
 
@@ -8176,7 +8179,10 @@ mod repository_state_classifier_tests {
     fn test_profile_json_error_maps_not_found_before_variant_match() {
         let error = anyhow::Error::new(jit::errors::NotFoundError::new("no such profile"));
         let json = profile_json_error(&error);
-        assert_eq!(json.error.code, jit::output::ErrorCode::PROFILE_NOT_FOUND);
+        assert_eq!(
+            json.error.code,
+            jit::output::ErrorCode::ProfileNotFound.as_str()
+        );
         assert_eq!(json.exit_code().code(), 3);
     }
 }
