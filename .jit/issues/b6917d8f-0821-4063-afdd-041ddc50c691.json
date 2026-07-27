@@ -16,12 +16,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-27T22:52:56.625294355Z",
+      "updated_at": "2026-07-27T23:28:10.379521748Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-07-27T22:55:32.886755510Z",
+      "updated_at": "2026-07-27T23:31:04.118022479Z",
       "updated_by": "auto:executor"
     }
   },
@@ -37,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Make the error-code vocabulary an enumerable type",
-  "updated_at": "2026-07-27T22:55:32.886755510Z"
+  "updated_at": "2026-07-27T23:31:04.118022479Z"
 }
