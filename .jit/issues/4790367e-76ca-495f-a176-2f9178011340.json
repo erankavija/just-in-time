@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-27T11:36:09.240627384Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4790367e-76ca-495f-a176-2f9178011340",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Resolve the build tooling's citations of relocated artifacts",
-  "updated_at": "2026-07-27T11:30:33.716993998Z"
+  "updated_at": "2026-07-27T11:36:09.240627384Z"
 }
