@@ -524,7 +524,7 @@
       "cargo-ci",
       "code-review"
      ],
-     "status": "dispatched (round 2 after a server error killed the first worker before it wrote anything)",
+     "status": "merged into main at 66d5da56, cargo-ci and code-review running",
      "note": "Filed session 6 from the wave-8 rehearsal. Wired ahead of all 24 sweeps and 35499d1e with --reduce."
     },
     {
@@ -842,7 +842,7 @@
       "doc-review",
       "docs-mechanical"
      ],
-     "status": "merged into main at f3c8b6be, gates pending",
+     "status": "done",
      "note": "E14 remediation for 89b5899a's doc-review F1-F3. Two commits: the three corrections, then the lead-directed removal of the 'legacy'/'old archives'/'new preferred root' framing from the destination-naming pair, which the worker had flagged and left. Worker verified the surviving adoption mechanism live, including the destination-conflict clause firing on an unaccounted entry in an occupied unsuffixed directory."
     },
     {
@@ -856,8 +856,19 @@
       "docs-mechanical",
       "repo-validate"
      ],
-     "status": "4 of 5 gates passed; doc-review failed on F1-F3, blocked on 334bcd6f",
+     "status": "done",
      "note": "Lead-verified, not dispatched. REQ-01 evidenced by 8cd6eb73 + b4d1a2c8 (dev/archive/a9b5dd08 renamed, marker resolves); REQ-02 by the named tests covering code comments, shell scripts, and both inside and outside version control; REQ-03 by 3be32cad's four whole-tree content tests with a totality assertion."
+    },
+    {
+     "short_id": "8ff4cff3",
+     "title": "State the artifact-directory template field in the adopter template documentation",
+     "classification": "documentation",
+     "gates": [
+      "doc-review",
+      "docs-mechanical"
+     ],
+     "status": "done",
+     "note": "Wave-9 issue pulled forward: independent of the sweeps and of ca832358. Closes pitfall P17."
     }
    ],
    "status": "in progress",
@@ -1701,6 +1712,27 @@
    "subject": "a fresh-repository probe is the honest evidence for a shipped-default criterion",
    "detail": "35499d1e REQ-01 and REQ-02 are about what a FRESHLY INITIALIZED repository does, which this repository's live .jit/ cannot evidence - the dogfooding boundary. Ran `git init` + `jit init` in a scratch directory with the installed binary: the scaffolded [documentation] table carries 8 managed paths, 6 permanent paths and 4 issue-scoped areas with no hand editing, and archival reports policy_status 'configured'. Then linked a deck at dev/presentations/deck.md to a task, terminalised it, and previewed both target forms: `jit archive document` gives eligible with 1 move and zero blockers, `jit archive container` gives eligible with destination dev/archive/b44aeed5 and zero blockers.",
    "decision": "Keep the scratch repository until the checkpoint closes and extend the same probe for REQ-03 and REQ-04 once ca832358 lands. The bare short-id destination in that probe is also live evidence for 89b5899a REQ-01's no-title-fallback clause on a repository that has never seen this epic's data."
+  },
+  {
+   "id": "N25",
+   "raised_at": "session 6, ca832358 verification",
+   "subject": "an archival plan is order-dependent, so a pre-computed action table is not evidence",
+   "detail": "Measuring all 24 container plans against a PRISTINE tree gives 175 moves and 20 copies. Measuring them interleaved with their executions, in the run order, gives 176 and 19. The difference is one artifact: dev/active/json-output-standardization-plan.md has two owners, and container 14303b30 - first in the order - COPIES it and relinks the outside owner's reference to that copy. By the time 9d427a6b is previewed, only its inside owner remains, so the action is Move rather than Copy. Each execution relinks references and thereby changes later containers' ownership sets.",
+   "decision": "Take each sweep's evidence from the preview computed immediately before that sweep executes, in the fixed order - which is what the sweep issue bodies already require ('the execution reads its own plan rather than a frozen list') and what the runner does. Never compare a pristine measurement against an interleaved one and read the difference as a regression; the lead nearly did exactly that."
+  },
+  {
+   "id": "N26",
+   "raised_at": "session 6, ca832358 verification",
+   "subject": "A/B the same command on the same state with the old and the new binary",
+   "detail": "The worker's own before/after numbers came from two different repository states (its baseline was quoted from the issue description, measured at a different HEAD), which is what made the 175/20 vs 176/19 discrepancy look alarming. The decisive check was cheap: run all 24 previews against ONE unchanged tree twice, once with the installed binary and once with the worker's release build invoked by explicit path. Actions identical at 175/20/83; artifacts carrying a reference change went move 152->152, copy 13->13, retain 33->0.",
+   "decision": "For any change whose effect is a delta in derived output, hold the input state fixed and vary only the binary. A worker's release build in its own warm worktree is directly runnable against main for read-only commands, so this costs one loop and no rebuild - and it proves the change touched nothing it should not, which a post-state measurement alone cannot."
+  },
+  {
+   "id": "N27",
+   "raised_at": "session 6, documentation gate batch",
+   "subject": "stop a gate batch when an early failure predicts a later one in the same batch",
+   "detail": "334bcd6f's doc-review failed on a sentence in docs/reference/cli-commands.md. 89b5899a's doc-review was queued two positions later in the same batch, and its REQ-01 is destination naming - the very subject of that sentence - so it would very likely have re-reported the same defect against a different issue. Stopping the batch cost about one minute of the in-flight 8ff4cff3 review; letting it run would have cost a 30-minute review round plus a spurious failed-gate record on the checkpoint.",
+   "decision": "When a batched gate fails, check the remaining entries for a shared surface before letting the batch continue. Fix, then restart the batch from the top."
   }
  ],
  "handoffs": [
