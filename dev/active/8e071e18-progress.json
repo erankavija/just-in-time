@@ -1516,6 +1516,13 @@
    "subject": "docs-mechanical.sh's header comment states a derived default footprint that no longer matches the live configuration",
    "detail": "The script's header claims its no-argument derived default is 'currently docs/'. resolve_footprint derives it from [documentation].permanent_paths, which after f2cac2bd is six dev/ entries and no docs/ at all. Run bare, the script exits 1 on pre-existing findings in dev/eval and dev/architecture files. The gate itself never reaches the fallback - DOCS_FOOTPRINT is pinned ahead of it in the resolution order (escalation E6).",
    "disposition": "Belongs to eeee8a1a (bug, milestone:v1.0, component:tooling), already filed outside this epic for the same mechanism under P8. This is the stale header comment, a second symptom of it; recorded so eeee8a1a's scope covers the comment as well as the derivation."
+  },
+  {
+   "id": "P25",
+   "raised_by": "lead, session 6 fresh-repository probe for 35499d1e REQ-04",
+   "subject": "a directory link target is navigation to archival discovery and a missing asset to link checking",
+   "detail": "Measured on a fresh `jit init` repository. A document linking `[text](../studies)` where dev/studies is a real directory: `jit archive container` gives an eligible plan with the directory contributing no artifact entry and no edge (the epic's REQ-15 behaviour, from 7d6d2783). The same link is recorded by `jit doc add`'s asset scan as `asset_type: missing` with resolved_path dev/studies, and `jit doc check-links` then reports it as a `missing_asset` ERROR plus a `scan_error` reading 'Failed to scan document for links: Is a directory (os error 21)'. Separately, `jit doc add <id> dev/studies` - a directory linked directly as a document - makes `jit validate` fail with 'file dev/studies not found in the working tree or at HEAD', which is a misleading message for a path that exists.",
+   "disposition": "OPEN as a product observation, outside this epic's criteria. Epic REQ-15 and @/issue/8e071e18/decision/D-18 both scope themselves to artifact discovery and the unsupported-artifact-type blocker, which the shipped behaviour satisfies; neither reaches the asset scanner or the link checker. Not filed as an issue: filing outside this epic has been an owner call every previous time on this epic (E11, P8, P9, P11, P13, P16). Raise it in the completion report for an owner decision."
   }
  ],
  "started_at": "2026-07-25T14:24:30.011076+00:00",
