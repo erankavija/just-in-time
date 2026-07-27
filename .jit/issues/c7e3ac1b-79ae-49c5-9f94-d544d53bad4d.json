@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-27T11:30:40.236693070Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
@@ -22,7 +23,7 @@
     "per:@/issue/8e071e18/decision/D-13"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Resolve the benchmark generators' citations of their own output areas",
-  "updated_at": "2026-07-27T11:28:00.272036886Z"
+  "updated_at": "2026-07-27T11:30:40.236693070Z"
 }
