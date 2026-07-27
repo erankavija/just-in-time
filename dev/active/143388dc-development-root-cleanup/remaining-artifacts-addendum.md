@@ -72,16 +72,20 @@ recorded here as removed. That is 145, the population `git ls-files` reports ove
 The population kept growing while the epic finished, so the count above is the checkpoint's, not a
 standing total. Recorded here rather than left to drift:
 
+Measured as a set difference against the commit that fixed the count above, not carried forward by
+arithmetic: 20 files added, 1 removed.
+
 | added | files | reason it remains |
 |---|---|---|
-| `dev/active/d8d7f317/req09-remediation-evidence.md` | 1 | live owner — `d8d7f317`, the REQ-09 remediation the epic's holistic-review gate required |
+| `dev/active/8e071e18-dev-artifact-layout/pitfall-criterion-reconciliation.md` | 1 | live owner — `8e071e18` |
 | `dev/active/8e071e18-dev-artifact-layout/completion-report.md` | 1 | live owner — `8e071e18` |
-| `dev/presentations/8e071e18-dev-artifact-layout/` | 16 | live owner — `8e071e18`; the feature showcase deck and its vendored assets |
+| `dev/active/d8d7f317/req09-remediation-evidence.md` | 1 | live owner — `d8d7f317`, the REQ-09 remediation the epic's holistic-review gate required |
+| `dev/presentations/8e071e18-dev-artifact-layout/` | 17 | live owner — `8e071e18`; the feature showcase deck, its two themes, and its vendored reveal.js and font files |
 
 One file left over the same span: `dev/active/fdb039ee-modular-document-rendering.md`, archived by
 `d8d7f317` into `dev/archive/41d07c6b-usability/`.
 
-That is 164 at the commit that adds this section, which `git ls-files` over the eight areas
-confirms. Every added file has a live owner, so none is an artifact archival has failed to reach.
-The deck's directory is the one `jit doc dir 8e071e18 dev/presentations` resolves, and
-`jit doc conformance` reports no entry for any of its sixteen files.
+145 + 20 − 1 = **164**, which `git ls-files` over the eight areas confirms at the commit that adds
+this section. Every added file has a live owner, so none is an artifact archival has failed to
+reach. The deck's directory is the one `jit doc dir 8e071e18 dev/presentations` resolves, and
+`jit doc conformance` reports no entry for any of its seventeen files.
