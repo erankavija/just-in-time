@@ -68,7 +68,7 @@ confirmation = "invoked"
 [[arms]]
 path = "issue delete"
 argv = ["issue", "delete", "deadbeef", "--json"]
-setup = ["init", "env-unset:JIT_ALLOW_DELETION"]
+setup = ["worktree:primary", "init", "env-unset:JIT_ALLOW_DELETION"]
 expected_failure = "The delete arm refuses deletion without explicit confirmation."
 expected_exit = 2
 confirmation = "invoked"
