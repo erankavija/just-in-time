@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-27T10:12:00.711013770Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
@@ -26,7 +27,7 @@
     "story:area-classification"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Serviceable archival for every configured development area",
-  "updated_at": "2026-07-27T09:55:07.874034948Z"
+  "updated_at": "2026-07-27T10:12:00.711013770Z"
 }
