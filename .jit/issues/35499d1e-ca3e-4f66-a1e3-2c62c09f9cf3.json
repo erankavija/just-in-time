@@ -10,6 +10,7 @@
   ],
   "description": "Archival classifies each development area explicitly and stops refusing artifacts it was never meant to block, so a repository can archive a presentation deck through the supported workflow.\n\n## Background\n\nThe archival planner refuses any selected root that is neither managed, permanent, nor already archived. The `[documentation]` block that repository initialization scaffolds is emitted commented out, names a subset of the areas under a development root, and advertises two keys the configuration type no longer carries. Policy completeness is computed from authored fields alone and ignores the runtime accessor fallbacks, so an adopter who never edits the scaffolded block gets an unconfigured policy and archival is refused whatever the fallbacks say.\n\nTwo further gaps compound it. A linked artifact outside the development root — source code, a script, an agent asset, a repository-root file — is blocked rather than archived by copy. A markdown link whose target resolves to a directory is treated as an unsupported artifact and blocks the plan that reaches it. Plan eligibility is all-or-nothing, so one blocker anywhere in a container subtree makes the whole plan ineligible.\n\nClassification is explicit per area rather than a blanket rule over the development root, so an area holding living documentation archives by copy and retains its source while an area holding revision-specific work products moves.\n\n## Success Criteria\n\n- [hard] REQ-01: A freshly initialized repository classifies every area under its development root as managed or permanent and reports a configured documentation policy without hand-editing.\n- [hard] REQ-02: A presentation deck owned by a terminal issue previews as an eligible plan through both archive target forms, and no configured development area produces an unmanaged-selected-root blocker.\n- [hard] REQ-03: A linked artifact outside the development root is retained rather than blocked — the plan schedules no destination for it and leaves its source untouched — and executing a plan that contains one relocates no file outside the development root.\n- [hard] REQ-04: A link target that resolves to a directory produces no unsupported-artifact-type blocker, and a container whose remaining blockers were all directory targets yields an eligible plan.\n\n## Notes\n\nREQ-03 named the mechanism as permanent classification until escalation E9 replaced it. Classifying an out-of-root source permanent leaves it wanting a destination, so copying fell out as an inherited consequence: measured over this repository's terminal containers it scheduled 684 copy operations over 139 files and 16.6 MB duplicated into the archive, including frozen mirrors of the whole adopter documentation tree, which `@/invariant/single-source-prose` and `@/charter/D-13` both name a staleness defect. The shipped mechanism is retention, and the criterion now names it. Owner-approved amendment; the observable requirement is unchanged, and epic REQ-14 already stated it as relocating no file rather than as copying.\n",
   "documents": [],
+  "done_at": "2026-07-27T10:46:27.870740197Z",
   "first_ready_at": "2026-07-26T12:40:54.406833989Z",
   "gates_required": [
     "cargo-ci",
@@ -53,7 +54,7 @@
     "story:area-classification"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Serviceable archival for every configured development area",
-  "updated_at": "2026-07-27T10:45:19.707890601Z"
+  "updated_at": "2026-07-27T10:46:27.870740197Z"
 }
