@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "a4cc301d3703ab452598e14232304b86e563a2f9",
+  "completed_at": "2026-07-27T09:24:56.563902536Z",
+  "duration_ms": 65183,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The adopter guide and both template samples accurately document the artifact-directory template field.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "8ff4cff3-a36d-4ac0-8cfd-9f61fac6f41f",
+  "message": null,
+  "run_id": "d9deacbb-455a-4963-b09a-abe3755035f4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T09:23:51.380520155Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: maximum-level `task` leaf with no resolved children. Reviewed four reachable `jit:8ff4cff3` commits individually; the two implementation commits update the how-to and both adopter sample registries, while the merge and gate-record commits add no user-facing documentation changes.\n\nThe impacted guide and samples accurately document `doc_area = \"dev/active\"` with `doc = \"{container.dir}/plan.md\"`. The quoted declaration matches the SDD sample, and the current resolver confirms that `doc_area` selects a declared issue-scoped area and `{container.dir}` resolves to the container’s canonical artifact directory. No issue-impact documentation defect remains.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The adopter guide and both template samples accurately document the artifact-directory template field.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

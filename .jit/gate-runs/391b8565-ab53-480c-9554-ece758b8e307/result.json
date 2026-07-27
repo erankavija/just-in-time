@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "a4cc301d3703ab452598e14232304b86e563a2f9",
+  "completed_at": "2026-07-27T09:23:49.963671314Z",
+  "duration_ms": 94801,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue-scoped command-reference corrections accurately document the current archive planner behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "334bcd6f-4bf8-4f1f-98c9-62f3d2c848e6",
+  "message": null,
+  "run_id": "391b8565-ab53-480c-9554-ece758b8e307",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T09:22:15.162029598Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task; reviewed its five individual `jit:334bcd6f` commits. Three changed the command reference, one only recorded project progress, and the merge had no patch. The prior blocking fallback wording is corrected at [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:335). Current planner behavior matches the updated naming, directory-navigation, and citation-warning documentation.\n\n1. No blocking or advisory findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-scoped command-reference corrections accurately document the current archive planner behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

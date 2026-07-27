@@ -8,6 +8,7 @@
   ],
   "description": "The adopter command reference states the archive naming, directory-target and citation-warning behaviour the planner actually has, so no adopter-facing sentence describes a mechanism this epic replaced.\n\n## Background\n\nThree statements in `docs/reference/cli-commands.md` describe behaviour the planner no longer has. Each was true when written and each was invalidated by an issue in this epic that carries no documentation gate, so nothing swept the reference.\n\n- `:304-307` — \"Otherwise the issue title supplies the slug\", and slug normalization \"uses `container` when no usable character remains\". `8cd6eb73` removed the title fallback and the empty-slug placeholder: an ambiguous or absent membership label now yields a bare `<short-id>` directory.\n- `:250-251` — \"When a supported local reference resolves to such an object, its parent also reports warning `unsupported-edge-target` with the normalized target path.\" `7d6d2783` made discovery skip a directory link target as navigation: it contributes no artifact entry and no edge, so no warning is raised. The preceding sentence at `:245-249` stays accurate and must stay: a path an issue links *directly* that is not a regular file or symlink is still blocked as `unsupported-artifact-type`.\n- `:210` and its section — the reference lists what a preview reports but documents no in-content citation warning at all. `2ac35e8e` added the warning, `6aa82c0b` the declared scan universe it reads, and `3be32cad` locked in that execution rewrites no document content. The word \"citation\" does not appear in the document.\n\nThe absence in the third case matters as much as the falsehoods in the first two: an adopter who sees a warning has no way to look up what it means, whether it blocks, or whether the tool will edit their files.\n\n## Success Criteria\n\n- [hard] REQ-01: The reference states that an archive destination directory name is derived from a membership label, and that an issue without a single membership value yields a bare short-id directory, with no title-derived name and no placeholder for an empty slug.\n- [hard] REQ-02: The reference states that a supported local reference resolving to a directory is navigation — contributing no artifact entry and no edge warning — while a path an issue links directly that is not a regular file or symbolic link is still blocked as `unsupported-artifact-type`.\n- [hard] REQ-03: The reference names the in-content citation warning code, states that each reported occurrence carries its location, states that the warning blocks no plan and no transition, and states that execution rewrites no document content.\n- [hard] REQ-04: Mechanical documentation checks over the adopter documentation surface pass.\n\n## Notes\n\nScope is these three subjects and nothing else. `4a6fb8c1` owns this reference outright later and covers the rest of the epic's command-surface changes: the subcommand that prints an issue's canonical artifact directory, the advisory conformance report, the out-of-root retention statement, and citing the canonical adopter home for the directory convention and the area classification. Restructuring the document belongs there, not here.\n\nFiled because `89b5899a`'s `doc-review` blocked on all three as `issue-impact` findings against that story's own criteria, and the issue that owns the file sits four waves downstream behind the canonical-home work its last criterion must cite. Same structural pattern as the wave-3 remediation `fd88adda`, and resolved the same way: correct the false facts now, leave the document's shape to its owner.",
   "documents": [],
+  "done_at": "2026-07-27T09:26:51.713378048Z",
   "first_ready_at": "2026-07-27T08:56:23.348376229Z",
   "gates_required": [
     "doc-review",
@@ -15,13 +16,13 @@
   ],
   "gates_status": {
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-07-27T09:20:30.260211767Z",
+      "status": "passed",
+      "updated_at": "2026-07-27T09:23:50.234283120Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-07-27T09:19:08.035795861Z",
+      "updated_at": "2026-07-27T09:22:14.249609490Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,7 +34,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Correct the command reference's archive naming, directory-target and citation-warning facts",
-  "updated_at": "2026-07-27T09:20:30.260211767Z"
+  "updated_at": "2026-07-27T09:26:51.713378048Z"
 }
