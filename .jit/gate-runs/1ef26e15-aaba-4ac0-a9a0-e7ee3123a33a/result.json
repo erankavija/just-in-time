@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "a93784d74f95f4b66ddb3e2244008299e3682897",
+  "completed_at": "2026-07-27T09:54:06.295954629Z",
+  "duration_ms": 139769,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are supported by the finalized action-gated relink logic, focused regression tests, and recorded 24-container validation evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ca832358-e27e-4511-9a7b-a2ff2fb5be66",
+  "message": null,
+  "run_id": "1ef26e15-aaba-4ac0-a9a0-e7ee3123a33a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T09:51:46.526768276Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 01871b6f, ac2acee0, 66d5da56, 9d48ee13, a93784d7 (`jit:ca832358`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/ca832358/requirement/REQ-01–REQ-05 (issue Markdown); @/issue/8e071e18/decision/D-14 (issue Markdown); @/gate/jit-validate (.jit/gates.toml); applicable invariants (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); prior code-review failed (exit 1) with REQ-05 evidence gap, addressed by the tagged execution-evidence record\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are supported by the finalized action-gated relink logic, focused regression tests, and recorded 24-container validation evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

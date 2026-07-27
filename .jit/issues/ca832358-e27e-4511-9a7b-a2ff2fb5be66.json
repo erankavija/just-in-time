@@ -16,6 +16,7 @@
       "path": "dev/active/ca832358/req05-archival-execution-evidence.md"
     }
   ],
+  "done_at": "2026-07-27T09:54:56.678666481Z",
   "first_ready_at": "2026-07-27T08:31:02.326134893Z",
   "gates_required": [
     "cargo-ci",
@@ -28,8 +29,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-27T09:44:40.695856446Z",
+      "status": "passed",
+      "updated_at": "2026-07-27T09:54:06.584394384Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,7 +42,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Suppress the relink for an artifact the plan retains",
-  "updated_at": "2026-07-27T09:50:40.879227348Z"
+  "updated_at": "2026-07-27T09:54:56.678666481Z"
 }

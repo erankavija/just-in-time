@@ -26,7 +26,7 @@
     "per:@/issue/8e071e18/decision/D-21"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive the production stability container's linked artifacts",
-  "updated_at": "2026-07-27T08:32:35.592789779Z"
+  "updated_at": "2026-07-27T09:56:14.713875125Z"
 }

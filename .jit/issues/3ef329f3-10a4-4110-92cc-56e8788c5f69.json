@@ -27,7 +27,7 @@
     "per:@/issue/8e071e18/decision/D-21"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive the repository-state quality container's linked artifacts",
-  "updated_at": "2026-07-27T08:32:51.445487801Z"
+  "updated_at": "2026-07-27T09:55:18.966475390Z"
 }

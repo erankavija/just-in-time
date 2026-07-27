@@ -26,7 +26,7 @@
     "per:@/issue/8e071e18/decision/D-21"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive the CLI ergonomics phase container's linked artifacts",
-  "updated_at": "2026-07-27T08:31:24.300694227Z"
+  "updated_at": "2026-07-27T09:56:10.982174530Z"
 }
