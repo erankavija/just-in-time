@@ -1,0 +1,44 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "3350d52659d3e68f7c332db17917b167d7ad432f",
+  "completed_at": "2026-07-27T10:47:55.715965559Z",
+  "duration_ms": 155134,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 2522,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The CLI reference omits the new `jit doc dir` and `jit doc conformance` commands."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/configuration.md",
+        "id": "F2",
+        "line": 280,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The new `doc_area` and `{container.dir}` template contract lacks canonical configuration-reference coverage."
+      }
+    ],
+    "summary": "The new artifact-directory commands and general template-field contract lack canonical reference documentation.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "0b3840f1-fa19-4b9c-8591-3d8c287f9f8f",
+  "message": null,
+  "run_id": "7dde6afc-11c3-4971-9c6d-43789d480ff3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T10:45:20.581162307Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5070 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa32d-e10d-7a72-bb52-4f8e12569b5b\n--------\nuser\n--- 5057 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: container review includes the story and all nine DAG-resolved delivered children. I inspected the 36 individually tagged reachable patches with rename detection; all included issues had tagged commits. Current behavior and the smallest affected docs cone were then checked.\n\nDocumentation impact decision: configuration and planning-bracket guidance are accurate, but the new command surface and general template-field reference remain undocumented in their canonical reference locations.\n\n1. **F1 — blocking, issue-impact, high:** The complete CLI reference omits both `jit doc dir` and `jit doc conformance`, despite both being new adopter-visible commands. Add concise entries under [Document Commands](docs/reference/cli-commands.md:2522) covering arguments/output, JSON shape, no-write behavior, and conformance’s advisory/non-blocking semantics.\n\n2. **F2 — blocking, issue-impact, medium:** `doc_area` and `{container.dir}` are documented only in the planning-bracket how-to; the configuration reference’s template section has no general field contract. Add their semantics, validation rule, and canonical-directory relationship to [Template bindings](docs/reference/configuration.md:280), linking to `jit doc dir`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The new artifact-directory commands and general template-field contract lack canonical reference documentation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The CLI reference omits the new `jit doc dir` and `jit doc conformance` commands.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2522},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The new `doc_area` and `{container.dir}` template contract lacks canonical configuration-reference coverage.\",\"file\":\"docs/reference/configuration.md\",\"line\":280}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

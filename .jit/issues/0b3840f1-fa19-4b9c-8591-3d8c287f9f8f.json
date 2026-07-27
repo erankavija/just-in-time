@@ -24,6 +24,16 @@
       "updated_at": "2026-07-27T10:37:32.031587789Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-27T10:50:40.589431463Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-07-27T10:47:55.979309393Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-07-27T10:20:00.550874097Z",
@@ -50,5 +60,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Canonical issue artifact directory convention",
-  "updated_at": "2026-07-27T10:37:32.031587789Z"
+  "updated_at": "2026-07-27T10:50:40.589431463Z"
 }

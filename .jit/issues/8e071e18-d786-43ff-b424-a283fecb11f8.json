@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-07-25T07:17:03.106580363Z",
   "dependencies": [
+    "0b3840f1-fa19-4b9c-8591-3d8c287f9f8f",
     "143388dc-f58e-48ca-9b36-dbe58a527489",
     "2bc344fc-8b03-4378-921a-40aa9dd65fef",
     "af264b06-10bc-4176-a98c-16956c8a5372"
@@ -39,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue-based development artifact layout and serviceable archival",
-  "updated_at": "2026-07-27T10:43:47.135131522Z"
+  "updated_at": "2026-07-27T11:23:54.312087837Z"
 }
