@@ -4,7 +4,7 @@ namespace = "doc"
 [[arms]]
 path = "doc add"
 argv = ["doc", "add", "deadbeef", ".jit/config.toml", "--json"]
-setup = ["initialized-repository"]
+setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
@@ -12,7 +12,7 @@ confirmation = "invoked"
 [[arms]]
 path = "doc assets list"
 argv = ["doc", "assets", "list", "deadbeef", ".jit/config.toml", "--json"]
-setup = ["initialized-repository"]
+setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
@@ -20,7 +20,7 @@ confirmation = "invoked"
 [[arms]]
 path = "doc check-links"
 argv = ["doc", "check-links", "--scope", "issue:deadbeef", "--json"]
-setup = ["initialized-repository"]
+setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
@@ -28,7 +28,7 @@ confirmation = "invoked"
 [[arms]]
 path = "doc conformance"
 argv = ["doc", "conformance", "--json"]
-setup = ["initialized-repository", "malformed-config-toml"]
+setup = ["init", "malformed-config-toml"]
 expected_failure = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
@@ -37,7 +37,7 @@ setup_notes = "Replace the [version] table header in .jit/config.toml with the m
 [[arms]]
 path = "doc diff"
 argv = ["doc", "diff", "deadbeef", ".jit/config.toml", "--from", "HEAD", "--json"]
-setup = ["initialized-repository"]
+setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
@@ -45,7 +45,7 @@ confirmation = "invoked"
 [[arms]]
 path = "doc dir"
 argv = ["doc", "dir", "deadbeef", "dev", "--json"]
-setup = ["initialized-repository"]
+setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
@@ -53,7 +53,7 @@ confirmation = "invoked"
 [[arms]]
 path = "doc history"
 argv = ["doc", "history", "deadbeef", ".jit/config.toml", "--json"]
-setup = ["initialized-repository"]
+setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
@@ -61,7 +61,7 @@ confirmation = "invoked"
 [[arms]]
 path = "doc list"
 argv = ["doc", "list", "deadbeef", "--json"]
-setup = ["initialized-repository"]
+setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
@@ -69,7 +69,7 @@ confirmation = "invoked"
 [[arms]]
 path = "doc remove"
 argv = ["doc", "remove", "deadbeef", ".jit/config.toml", "--json"]
-setup = ["initialized-repository"]
+setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
@@ -77,7 +77,7 @@ confirmation = "invoked"
 [[arms]]
 path = "doc show"
 argv = ["doc", "show", "deadbeef", ".jit/config.toml", "--json"]
-setup = ["initialized-repository"]
+setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
