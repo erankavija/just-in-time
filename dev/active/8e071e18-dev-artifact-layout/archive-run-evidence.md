@@ -238,3 +238,18 @@ Issue `5c09146f`. Plan eligible with no blockers. 3 relocated, 0 mirrored, 0 ret
 ### Other plan warnings (1)
 
 - `external-edge` at `dev/studies/ai-tool-worktree-compatibility.md`
+
+## `7095769d` — dev/archive/7095769d-code-smell-cleanup
+Issue `a45bc29c`. Plan eligible with no blockers. 1 relocated, 0 mirrored, 0 retained, 0 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/7095769d-smell-hunt-report.md` | `dev/archive/7095769d-code-smell-cleanup/dev/active/7095769d-smell-hunt-report.md` | 7095769d |
+
+### In-content citation warnings (1)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:2836:14` | `dev/active/7095769d-smell-hunt-report.md` |
