@@ -1253,3 +1253,39 @@ Issue `3ef329f3`. Plan eligible with no blockers. 18 relocated, 4 mirrored, 5 re
 
 - `dynamic-loading-suspected` at `dev/presentations/1cc809de/vendor/reveal.js/reveal.css`
 - `external-edge` at `dev/archive/features/cdc840ad/showcase/talk.html`
+
+## `25064508` — dev/archive/25064508-structured-knowledge
+Issue `2f524511`. Plan eligible with no blockers. 5 relocated, 0 mirrored, 5 retained, 3 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/0d593d90-invariant-projection-design.md` | `dev/archive/25064508-structured-knowledge/dev/active/0d593d90-invariant-projection-design.md` | 0d593d90 |
+| move | `dev/active/1e1ea81d-item-kind-six-tuple.md` | `dev/archive/25064508-structured-knowledge/dev/active/1e1ea81d-item-kind-six-tuple.md` | 1e1ea81d |
+| move | `dev/active/21558ace-invariants-registry.md` | `dev/archive/25064508-structured-knowledge/dev/active/21558ace-invariants-registry.md` | 21558ace |
+| move | `dev/active/56ab0224-item-model-design.md` | `dev/archive/25064508-structured-knowledge/dev/active/56ab0224-item-model-design.md` | 56ab0224 |
+| move | `dev/active/93480b00-invariant-registry-first-kind.md` | `dev/archive/25064508-structured-knowledge/dev/active/93480b00-invariant-registry-first-kind.md` | 93480b00 93480b00 |
+| retain | `dev/archive/features/25064508/completion-report.md` | already under the archive root | 25064508 |
+| retain | `dev/archive/features/25064508/plan.md` | already under the archive root | 0d753ba5 25064508 |
+| retain | `dev/archive/features/25064508/showcase/base.css` | retained in place | — |
+| retain | `dev/archive/features/25064508/showcase/talk.html` | already under the archive root | 25064508 |
+| retain | `dev/archive/features/25064508/showcase/themes/rust.css` | retained in place | — |
+
+### In-content citation warnings (9)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:2248:14` | `dev/active/0d593d90-invariant-projection-design.md` |
+| `dev/active/8e071e18-breakdown.json:2249:14` | `dev/active/1e1ea81d-item-kind-six-tuple.md` |
+| `dev/active/8e071e18-breakdown.json:2250:14` | `dev/active/21558ace-invariants-registry.md` |
+| `dev/active/8e071e18-breakdown.json:2251:14` | `dev/active/56ab0224-item-model-design.md` |
+| `dev/active/8e071e18-breakdown.json:2252:14` | `dev/active/93480b00-invariant-registry-first-kind.md` |
+| `dev/archive/2821e177-addressing-v2/dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md:279:57` | `dev/active/21558ace-invariants-registry.md` |
+| `dev/archive/2821e177-addressing-v2/dev/active/2821e177-investigation.md:180:7` | `dev/active/21558ace-invariants-registry.md` |
+| `dev/archive/2821e177-addressing-v2/dev/active/2821e177-investigation.md:213:4` | `dev/active/21558ace-invariants-registry.md` |
+| `dev/archive/2821e177-addressing-v2/dev/active/7f22d6cf-breakdown-spec.md:46:57` | `dev/active/21558ace-invariants-registry.md` |
+
+### Other plan warnings (1)
+
+- `external-edge` at `dev/archive/features/25064508/showcase/talk.html`

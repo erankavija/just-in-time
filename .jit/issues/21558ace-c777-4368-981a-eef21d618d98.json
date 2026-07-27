@@ -1,40 +1,41 @@
 {
-  "id": "21558ace-c777-4368-981a-eef21d618d98",
-  "title": "Add the invariants.toml schema and config-time loader",
-  "description": "Add `.jit/invariants.toml` as a registry-first source: a declarative registry whose entries each carry a `statement`, a `kind` of `enforced` or `advisory`, and an optional `enforced-by` binding to a rule or gate. Add a new `invariants.rs` module mirroring `RuleSet::load` (`crates/jit/src/validation/rules.rs:902`) and load the registry at config time on BOTH return paths of `JitConfig::load` (`crates/jit/src/config.rs:432-451` and `:474`), so invariants load even when no `config.toml` is present.\n\n## Success Criteria\n\n- [hard] REQ-01: An entry declaring `statement`, `kind` (`enforced`|`advisory`), and optional `enforced-by` is loaded at config time.\n- [hard] REQ-02: Invariants load on both config-load return paths, including when `config.toml` is absent.\n- [hard] REQ-03: An invalid invariant entry fails config load with a typed, descriptive error.\n- [hard] REQ-04: The loader is covered by `cargo test`.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-25T16:57:56.242976641Z",
+  "context": {},
+  "created_at": "2026-06-24T22:48:19.029250166Z",
   "dependencies": [
     "61b17603-df87-4bd8-8cc5-57bca6be2e71",
     "1e1ea81d-e583-4a1a-9e50-db9ea8eddef5"
   ],
+  "description": "Add `.jit/invariants.toml` as a registry-first source: a declarative registry whose entries each carry a `statement`, a `kind` of `enforced` or `advisory`, and an optional `enforced-by` binding to a rule or gate. Add a new `invariants.rs` module mirroring `RuleSet::load` (`crates/jit/src/validation/rules.rs:902`) and load the registry at config time on BOTH return paths of `JitConfig::load` (`crates/jit/src/config.rs:432-451` and `:474`), so invariants load even when no `config.toml` is present.\n\n## Success Criteria\n\n- [hard] REQ-01: An entry declaring `statement`, `kind` (`enforced`|`advisory`), and optional `enforced-by` is loaded at config time.\n- [hard] REQ-02: Invariants load on both config-load return paths, including when `config.toml` is absent.\n- [hard] REQ-03: An invalid invariant entry fails config load with a typed, descriptive error.\n- [hard] REQ-04: The loader is covered by `cargo test`.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "epic:structured-knowledge",
+      "path": "dev/archive/25064508-structured-knowledge/dev/active/21558ace-invariants-registry.md"
+    }
+  ],
+  "done_at": "2026-06-25T17:12:30.388803946Z",
+  "first_ready_at": "2026-06-25T16:55:05.887496932Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T17:10:28.389622752Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T17:07:17.553066503Z"
+      "updated_at": "2026-06-25T17:07:17.553066503Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-06-25T17:10:28.389622752Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/21558ace-invariants-registry.md",
-      "commit": null,
-      "label": "epic:structured-knowledge",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "21558ace-c777-4368-981a-eef21d618d98",
   "labels": [
     "type:task",
     "epic:structured-knowledge",
@@ -42,9 +43,8 @@
     "satisfies:REQ-03",
     "satisfies:REQ-05"
   ],
-  "created_at": "2026-06-24T22:48:19.029250166Z",
-  "updated_at": "2026-07-05T19:51:12.923434949Z",
-  "first_ready_at": "2026-06-25T16:55:05.887496932Z",
-  "claimed_at": "2026-06-25T16:57:56.242976641Z",
-  "done_at": "2026-06-25T17:12:30.388803946Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Add the invariants.toml schema and config-time loader",
+  "updated_at": "2026-07-27T10:06:19.467062518Z"
 }

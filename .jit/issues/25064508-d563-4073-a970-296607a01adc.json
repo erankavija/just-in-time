@@ -1,147 +1,148 @@
 {
-  "id": "25064508-d563-4073-a970-296607a01adc",
-  "title": "Structured project knowledge in jit: addressable items, qualified ids, and projected invariants",
-  "description": "Make structured knowledge inside jit **first-class, addressable, searchable, and projectable**. Generalize today's regex-parsed requirements into a uniform model of *addressable items* with globally-unique *qualified ids*, add a project-scoped *registry* layer (invariants), and *project* invariants into agent-facing docs with drift detection. Requirements are one kind; the model is generic and domain-agnostic.\n\n## Context\n\nThe validation engine is already generic over `(section, marker, id-pattern)` — `criterion_ids()` plus the `label-coverage` / `criteria-to-check` / `criteria-label-match` rules; \"requirement\" is just one configuration. Config already declares `[type_hierarchy]` and `[namespaces.*]` as registries, and `.jit/` already stores non-work-graph state (`config.toml`, `gates.json`, `rules.toml`, `schemas/`). This epic **names and consolidates** that latent pattern rather than inventing new surface area.\n\nTwo structural insights frame the work:\n- Addressable items are an **annotation overlay on the work DAG**, not a second graph — coverage is computed by walking existing dependency edges. The work DAG stays the single first-class graph.\n- jit holds **five data shapes**: nodes (issues), edges (deps), annotations (labels + addressable items), registries (config/gates/rules — and now invariants), and history (events/claims). Invariants are a **registry**, not work-graph nodes.\n\n## Model\n\n- **Addressable item** — a structured line in a declared section carrying a self-id (matched by an id-pattern), optionally a marker. **Qualified id `<scope>/<self-id>`**, derived not stored, where `scope` is an issue short-id or `@` for project scope (e.g. `eed6750c/REQ-01`, `@/INV-03`).\n- **Item kind** — config-declared `(section, id-pattern, marker(s), link-namespace(s), scope, source-of-truth direction)`. No kind name hardcoded in engine logic.\n- **Kinds shipped this epic:** `requirement`, `decision`, `risk` (issue-scoped, markdown-first, authored in issue/plan descriptions and indexed) and `invariant` (project-scoped, registry-first). This set spans both substrates to prove generality.\n- **Link layer** — generic node→item label namespaces referencing qualified ids: `satisfies:` (requirement), `mitigates:`/`resolves:` (risk), `per:` (decision), `enforces:` (invariant). Existing `label-coverage` / `criteria-to-check` become instances over this model.\n- **Invariant registry** — `.jit/invariants.toml`; each entry: `statement`, `kind` (`enforced` | `advisory`), optional `enforced-by` binding to a rule or gate key.\n- **Doc projection** — invariants render into a **configurable** documentation target: either a delimited region of an existing file or a separate jit-owned file. The target path is config-driven; **no literal `CLAUDE.md` (or any doc name) is hardcoded** in engine logic.\n- **Drift detection** — a validate rule reports **both directions**: declared-but-unenforced (an invariant whose `enforced-by` is missing/broken) and enforced-but-undeclared (a rule/gate no invariant claims).\n- **CLI** — generic `jit item list/show/search/resolve` (filter by `--kind`) plus `jit invariant render/check`.\n\n## Principles\n\n- **Single source of truth, per-kind direction.** Issue kinds: markdown authoritative, index derived. Project kinds: registry authoritative, docs projected. Never a hand-maintained structured duplicate (avoid the type-declaration triple-source trap).\n- **Domain-agnostic, opt-in.** Kinds are declared per project; nothing hardcoded in engine logic.\n- **Graceful degradation.** A line with no self-id is plain prose; projects pay for addressing only where they want it.\n\n## Success Criteria\n\n- [hard] REQ-01: Every addressable item has a globally-unique qualified id `<scope>/<self-id>`, scope = issue short-id or `@` (project); the id is derived (not separately stored); self-id is human-authored and unique within scope.\n- [hard] REQ-02: Item kinds are declared in config as `(section, id-pattern, marker(s), link-namespace(s), scope, source-of-truth)`; no kind name is hardcoded in engine logic.\n- [hard] REQ-03: Source-of-truth direction is per kind — requirement/decision/risk are markdown-first (authored in descriptions, indexed); invariant is registry-first.\n- [hard] REQ-04: `requirement`, `decision`, `risk`, and `invariant` are all implemented, indexed, and queryable, demonstrating generality across the issue-scoped and project-scoped substrates.\n- [hard] REQ-05: Invariants live in `.jit/invariants.toml` with `statement`, `kind` (enforced|advisory), and optional `enforced-by` rule/gate binding.\n- [hard] REQ-06: Invariants project into a configurable doc target (delimited region of an existing file, or a separate file); the target is config-driven and no documentation filename is hardcoded in engine logic.\n- [hard] REQ-07: A bidirectional enforcement-drift check (declared-but-unenforced + enforced-but-undeclared) is runnable via validate.\n- [hard] REQ-08: Generic node→item link namespaces reference qualified ids; the existing `label-coverage` / `criteria-to-check` rules are re-expressed as instances over the model or shown compatible.\n- [hard] REQ-09: CLI exposes `jit item list/show/search/resolve` (with `--kind`) and `jit invariant render/check`.\n- [hard] REQ-10: Indexes and qualified ids are pure projections; addressing degrades gracefully (a line without a self-id is not required to be addressable).\n\n## Non-goals\n\n- Per-item lifecycle/state records (L2).\n- Cross-issue item→item dependency edges (enabled by global ids, but future).\n- The `check`/`acceptance` and `glossary` kinds — declarable later via config, not built this epic.\n- Modifying `jit-plan` (`eed6750c`) or other skills.\n\n## Relationships\n\n- **`56ab0224` (addressable structured items + qualified ids) is the foundational child** of this epic.\n- **`jit-plan` (`eed6750c`) is a sibling beneficiary, no dependency edge** — it works at L0 today and adopts qualified ids / declared invariants opportunistically once they exist.",
-  "state": "done",
-  "priority": "high",
+  "archived_from": "done",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-06-21T22:20:43.845860410Z",
   "dependencies": [
     "b121fd51-1a96-4943-80d1-95bedb068425",
     "52ad3b1f-1048-489a-8595-f04ec846b8b9",
     "72cdf315-7440-41cb-976b-ecea19b794bd",
     "b9966826-5e4a-4a06-a611-5ada3a2f76ea"
   ],
-  "gates_required": [],
-  "gates_status": {},
-  "context": {},
+  "description": "Make structured knowledge inside jit **first-class, addressable, searchable, and projectable**. Generalize today's regex-parsed requirements into a uniform model of *addressable items* with globally-unique *qualified ids*, add a project-scoped *registry* layer (invariants), and *project* invariants into agent-facing docs with drift detection. Requirements are one kind; the model is generic and domain-agnostic.\n\n## Context\n\nThe validation engine is already generic over `(section, marker, id-pattern)` — `criterion_ids()` plus the `label-coverage` / `criteria-to-check` / `criteria-label-match` rules; \"requirement\" is just one configuration. Config already declares `[type_hierarchy]` and `[namespaces.*]` as registries, and `.jit/` already stores non-work-graph state (`config.toml`, `gates.json`, `rules.toml`, `schemas/`). This epic **names and consolidates** that latent pattern rather than inventing new surface area.\n\nTwo structural insights frame the work:\n- Addressable items are an **annotation overlay on the work DAG**, not a second graph — coverage is computed by walking existing dependency edges. The work DAG stays the single first-class graph.\n- jit holds **five data shapes**: nodes (issues), edges (deps), annotations (labels + addressable items), registries (config/gates/rules — and now invariants), and history (events/claims). Invariants are a **registry**, not work-graph nodes.\n\n## Model\n\n- **Addressable item** — a structured line in a declared section carrying a self-id (matched by an id-pattern), optionally a marker. **Qualified id `<scope>/<self-id>`**, derived not stored, where `scope` is an issue short-id or `@` for project scope (e.g. `eed6750c/REQ-01`, `@/INV-03`).\n- **Item kind** — config-declared `(section, id-pattern, marker(s), link-namespace(s), scope, source-of-truth direction)`. No kind name hardcoded in engine logic.\n- **Kinds shipped this epic:** `requirement`, `decision`, `risk` (issue-scoped, markdown-first, authored in issue/plan descriptions and indexed) and `invariant` (project-scoped, registry-first). This set spans both substrates to prove generality.\n- **Link layer** — generic node→item label namespaces referencing qualified ids: `satisfies:` (requirement), `mitigates:`/`resolves:` (risk), `per:` (decision), `enforces:` (invariant). Existing `label-coverage` / `criteria-to-check` become instances over this model.\n- **Invariant registry** — `.jit/invariants.toml`; each entry: `statement`, `kind` (`enforced` | `advisory`), optional `enforced-by` binding to a rule or gate key.\n- **Doc projection** — invariants render into a **configurable** documentation target: either a delimited region of an existing file or a separate jit-owned file. The target path is config-driven; **no literal `CLAUDE.md` (or any doc name) is hardcoded** in engine logic.\n- **Drift detection** — a validate rule reports **both directions**: declared-but-unenforced (an invariant whose `enforced-by` is missing/broken) and enforced-but-undeclared (a rule/gate no invariant claims).\n- **CLI** — generic `jit item list/show/search/resolve` (filter by `--kind`) plus `jit invariant render/check`.\n\n## Principles\n\n- **Single source of truth, per-kind direction.** Issue kinds: markdown authoritative, index derived. Project kinds: registry authoritative, docs projected. Never a hand-maintained structured duplicate (avoid the type-declaration triple-source trap).\n- **Domain-agnostic, opt-in.** Kinds are declared per project; nothing hardcoded in engine logic.\n- **Graceful degradation.** A line with no self-id is plain prose; projects pay for addressing only where they want it.\n\n## Success Criteria\n\n- [hard] REQ-01: Every addressable item has a globally-unique qualified id `<scope>/<self-id>`, scope = issue short-id or `@` (project); the id is derived (not separately stored); self-id is human-authored and unique within scope.\n- [hard] REQ-02: Item kinds are declared in config as `(section, id-pattern, marker(s), link-namespace(s), scope, source-of-truth)`; no kind name is hardcoded in engine logic.\n- [hard] REQ-03: Source-of-truth direction is per kind — requirement/decision/risk are markdown-first (authored in descriptions, indexed); invariant is registry-first.\n- [hard] REQ-04: `requirement`, `decision`, `risk`, and `invariant` are all implemented, indexed, and queryable, demonstrating generality across the issue-scoped and project-scoped substrates.\n- [hard] REQ-05: Invariants live in `.jit/invariants.toml` with `statement`, `kind` (enforced|advisory), and optional `enforced-by` rule/gate binding.\n- [hard] REQ-06: Invariants project into a configurable doc target (delimited region of an existing file, or a separate file); the target is config-driven and no documentation filename is hardcoded in engine logic.\n- [hard] REQ-07: A bidirectional enforcement-drift check (declared-but-unenforced + enforced-but-undeclared) is runnable via validate.\n- [hard] REQ-08: Generic node→item link namespaces reference qualified ids; the existing `label-coverage` / `criteria-to-check` rules are re-expressed as instances over the model or shown compatible.\n- [hard] REQ-09: CLI exposes `jit item list/show/search/resolve` (with `--kind`) and `jit invariant render/check`.\n- [hard] REQ-10: Indexes and qualified ids are pure projections; addressing degrades gracefully (a line without a self-id is not required to be addressable).\n\n## Non-goals\n\n- Per-item lifecycle/state records (L2).\n- Cross-issue item→item dependency edges (enabled by global ids, but future).\n- The `check`/`acceptance` and `glossary` kinds — declarable later via config, not built this epic.\n- Modifying `jit-plan` (`eed6750c`) or other skills.\n\n## Relationships\n\n- **`56ab0224` (addressable structured items + qualified ids) is the foundational child** of this epic.\n- **`jit-plan` (`eed6750c`) is a sibling beneficiary, no dependency edge** — it works at L0 today and adopts qualified ids / declared invariants opportunistically once they exist.",
   "documents": [
     {
-      "path": "dev/archive/features/25064508/plan.md",
       "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
       "label": "Plan (approved)",
-      "doc_type": "design",
-      "format": "markdown"
+      "path": "dev/archive/features/25064508/plan.md"
     },
     {
-      "path": "dev/archive/features/25064508/completion-report.md",
       "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
       "label": "Completion report",
-      "doc_type": "design",
-      "format": "markdown"
+      "path": "dev/archive/features/25064508/completion-report.md"
     },
     {
-      "path": "dev/archive/features/25064508/showcase/talk.html",
-      "commit": null,
-      "label": "Showcase / user-guide slides",
-      "doc_type": "design",
-      "format": "html",
       "assets": [
         {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
           "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
+          "resolved_path": null
         },
         {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
           "original_path": "https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
+          "resolved_path": null
         },
         {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
           "original_path": "https://fonts.googleapis.com",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
+          "resolved_path": null
         },
         {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
           "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
+          "resolved_path": null
         },
         {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
           "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
+          "resolved_path": null
         },
         {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
           "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
+          "resolved_path": null
         },
         {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
           "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
+          "resolved_path": null
         },
         {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
           "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
+          "resolved_path": null
         },
         {
-          "original_path": "themes/rust.css",
-          "resolved_path": "dev/archive/features/25064508/showcase/themes/rust.css",
           "asset_type": "local",
-          "mime_type": null,
           "content_hash": "7ba057c88a30dc41c8564b549d0b76bb6fa98413c3a50b66fd6a3f80a4783cbe",
-          "is_shared": false
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "themes/rust.css",
+          "resolved_path": "dev/archive/features/25064508/showcase/themes/rust.css"
         },
         {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
           "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
+          "resolved_path": null
         },
         {
-          "original_path": "base.css",
-          "resolved_path": "dev/archive/features/25064508/showcase/base.css",
           "asset_type": "local",
-          "mime_type": null,
           "content_hash": "e964dd787590ea2c2eb5784b5362674504e66d2e4626bca1b1e8abff071f7059",
-          "is_shared": false
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "base.css",
+          "resolved_path": "dev/archive/features/25064508/showcase/base.css"
         },
         {
-          "original_path": "https://fonts.gstatic.com",
-          "resolved_path": null,
           "asset_type": "external",
-          "mime_type": null,
           "content_hash": null,
-          "is_shared": false
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://fonts.gstatic.com",
+          "resolved_path": null
         }
-      ]
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "html",
+      "label": "Showcase / user-guide slides",
+      "path": "dev/archive/features/25064508/showcase/talk.html"
     }
   ],
+  "done_at": "2026-06-25T23:42:38.300137881Z",
+  "first_ready_at": "2026-06-25T23:38:10.247924531Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "25064508-d563-4073-a970-296607a01adc",
   "labels": [
     "type:epic",
     "milestone:v1.0",
     "epic:structured-knowledge"
   ],
-  "created_at": "2026-06-21T22:20:43.845860410Z",
-  "updated_at": "2026-07-05T19:51:12.925746311Z",
-  "first_ready_at": "2026-06-25T23:38:10.247924531Z",
-  "done_at": "2026-06-25T23:42:38.300137881Z"
+  "priority": "high",
+  "state": "archived",
+  "title": "Structured project knowledge in jit: addressable items, qualified ids, and projected invariants",
+  "updated_at": "2026-07-27T10:06:19.467062518Z"
 }
