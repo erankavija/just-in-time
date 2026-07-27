@@ -10508,3 +10508,4 @@
 {"gate_key":"doc-review","id":"7a20b634-9aa6-4751-9835-bef7ee392955","issue_id":"af264b06-10bc-4176-a98c-16956c8a5372","timestamp":"2026-07-27T13:28:40.841833920Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"3af4091e-9c4c-4761-83d6-b16fe9b74491","issue_id":"af264b06-10bc-4176-a98c-16956c8a5372","timestamp":"2026-07-27T13:28:55.968445143Z","to":"done","type":"issue_state_changed"}
 {"id":"d595b1cd-5bb9-432e-b317-379980228785","issue_id":"af264b06-10bc-4176-a98c-16956c8a5372","timestamp":"2026-07-27T13:28:55.968445143Z","type":"issue_completed"}
+{"fields":["documents"],"id":"6052fac1-b236-414d-b005-aa092addb25a","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-27T13:29:57.810858818Z","type":"issue_updated","updated_by":"doc-add"}

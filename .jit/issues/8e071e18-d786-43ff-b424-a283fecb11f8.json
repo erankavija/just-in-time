@@ -37,6 +37,13 @@
       "format": "markdown",
       "label": "Showcase-theme disposition",
       "path": "dev/active/8e071e18-dev-artifact-layout/disposition-showcase-theme.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Pitfall-criterion reconciliation",
+      "path": "dev/active/8e071e18-dev-artifact-layout/pitfall-criterion-reconciliation.md"
     }
   ],
   "first_ready_at": "2026-07-25T07:17:03.106580363Z",
@@ -54,5 +61,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue-based development artifact layout and serviceable archival",
-  "updated_at": "2026-07-27T12:07:08.118309188Z"
+  "updated_at": "2026-07-27T13:29:57.810858818Z"
 }

@@ -1588,6 +1588,13 @@
       "subject": "the conformance report attributes an artifact's owner from its filename, so a document reference naming a different owner is invisible to it",
       "detail": "crates/jit/src/domain/artifact_conformance.rs:10-24 defines an artifact as a path component opening with a short id, and passes over a component carrying none. Six records this epic wrote sit in dev/active/8e071e18-dev-artifact-layout/ while their document reference names a different owner (archive-completeness-record.md and citation-warning-consolidation.md -> aa38b236; the five disposition-*.md -> 93aaa2b2, 079ea42e, 2d7ae27e, 5a19fffb, 66c467c1). The live report lists 45 artifacts and none of these. Confirmed by running the command, not only by reading the module.",
       "disposition": "OPEN as a product observation, NOT an epic REQ-06 violation. @/issue/8e071e18/decision/D-2 drops the short-id prefix from filenames inside an issue directory, so under the shipped convention a prefix-less file's owner IS the directory's owner and nothing here sits outside its owning issue's canonical directory. The residual is narrower than REQ-06's subject: a document reference can name an owner that disagrees with the location, and the report is silent on that disagreement because it never consults document references. Raise it in the completion report for an owner decision rather than filing - filing outside this epic has been an owner call every time on this epic."
+    },
+    {
+      "id": "P30",
+      "raised_by": "5e9305ec (worker), verified and extended by the lead",
+      "subject": "the skill eval baseline cites two evaluation records that do not exist",
+      "detail": "dev/eval/lead-skills-eval-baseline.md:18 cites .agents/skills/jit-execution-lead/evals/results.md and :19 cites .agents/skills/jit-planning-lead/evals/results.md. Neither directory holds a results.md; both hold evals.json, fixtures/, setup-test-repo.sh and test-manifest-tool.sh. The worker found one row; both are broken. The file also cites transcript paths under those directories that do not resolve.",
+      "disposition": "OPEN, outside this epic. dev/eval is a permanent area and no epic criterion ranges over it - REQ-09 and REQ-10 scope themselves to the managed areas and to dev/active, dev/studies and dev/sessions. The citations predate this epic and no archival run touched them. Not filed: filing outside the epic has been an owner call every time here. Raised in the completion report."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
@@ -1829,6 +1836,13 @@
       "subject": "a record written into the population it enumerates must count itself",
       "detail": "The lead's remaining-artifacts addendum reported 144 files present and 7 added, measured before its own commit. Committing it made the tree 145 and the additions 8. code-review failed it as internally inconsistent (F1, blocking) and separately caught the record calling its owner in_progress while the tracked state was ready (F2, advisory). Both findings were correct and both were the lead's own defects, not a worker's.",
       "decision": "Corrected to 138 + 8 - 1 = 145 with the self-inclusion stated in the prose, and claimed 143388dc so the recorded owner state is true. The reviewer re-ran clean. Generalise: a lead-authored evidence record is gate evidence like any other - measure the tree as it will be after the commit, and state an issue's state as of the commit rather than as of the intention."
+    },
+    {
+      "id": "N35",
+      "raised_at": "session 7, before the epic gates",
+      "subject": "the pitfall reconciliation is recorded as an artifact, not held in the lead's head",
+      "detail": "lead-review-protocol requires a container gate to reconcile surfaced_pitfalls against the container's own criteria, and records that an earlier epic failed its independent holistic review on exactly this step, with the reviewer drawing all three findings from a list the lead had read and classified as future work.",
+      "decision": "Wrote dev/active/8e071e18-dev-artifact-layout/pitfall-criterion-reconciliation.md: all 30 pitfalls tested against the 15 [hard] criteria, with the six open ones argued individually and the five carrying an explicit 'verify at wave N' instruction (P2, P3, P4, P5, P6) re-verified at HEAD with file:line evidence. No open pitfall is a criterion violation. Recording it makes the reasoning reviewable instead of asserted."
     }
   ],
   "handoffs": [
