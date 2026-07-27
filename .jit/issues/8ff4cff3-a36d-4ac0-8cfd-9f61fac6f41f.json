@@ -13,7 +13,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-27T09:00:58.130219342Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8ff4cff3-a36d-4ac0-8cfd-9f61fac6f41f",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "State the artifact-directory template field in the adopter template documentation",
-  "updated_at": "2026-07-27T09:00:40.048742263Z"
+  "updated_at": "2026-07-27T09:00:58.130219342Z"
 }

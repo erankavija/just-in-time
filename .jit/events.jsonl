@@ -10109,3 +10109,4 @@
 {"assignee":"agent:jit-execution-lead","id":"a733fce3-2ce0-46aa-a6ca-a77a1b42987d","issue_id":"8ff4cff3-a36d-4ac0-8cfd-9f61fac6f41f","timestamp":"2026-07-27T09:00:40.048742263Z","type":"issue_claimed"}
 {"from":"ready","id":"5706086e-f3f8-465c-af33-4d77090f9ca5","issue_id":"334bcd6f-4bf8-4f1f-98c9-62f3d2c848e6","timestamp":"2026-07-27T09:00:46.471873559Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"50fabe2f-e3f5-4bde-91d2-04ad914911ab","issue_id":"334bcd6f-4bf8-4f1f-98c9-62f3d2c848e6","timestamp":"2026-07-27T09:00:46.471873559Z","type":"issue_claimed"}
+{"gate_key":"docs-mechanical","id":"6df8de1c-98bc-4aba-b195-c647479cb3f3","issue_id":"8ff4cff3-a36d-4ac0-8cfd-9f61fac6f41f","timestamp":"2026-07-27T09:00:58.130219342Z","type":"gate_passed","updated_by":"auto:executor"}
