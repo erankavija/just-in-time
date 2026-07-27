@@ -2691,13 +2691,20 @@ jit doc conformance [--json]
 ```
 
 The report walks every declared issue-scoped area and resolves each artifact's
-owner from the short id its own name opens with. An artifact outside the
-directory that issue owns (`jit doc dir`) is `nonconforming` and carries both
-the owner and that directory; one whose short-id prefix no single issue answers
-to is `unattributed` and carries neither. A name opening with no short id is
-passed over. The topmost offending path component is the one named, so a
-misplaced directory is a single entry rather than one per file inside it, and
-an artifact anywhere beneath its owner's directory conforms.
+owner in one of two ways. A name opening with a short id is owned by the issue
+that short id answers to. A name carrying none is owned by the issue whose
+document reference (`jit doc add`) names that path, which is how an artifact
+filed inside an issue directory states its owner — the directory already names
+the issue, so the file need not repeat it.
+
+An artifact outside the directory its owner owns (`jit doc dir`) is
+`nonconforming` and carries both the owner and that directory. An ownership
+neither rule settles is `unattributed` and carries neither: a short-id prefix
+no single issue answers to, and a prefix-less name several issues reference. A
+prefix-less name no issue references is passed over, since nothing states who
+owns it. The topmost offending path component is the one named, so a misplaced
+directory is a single entry rather than one per file inside it, and an artifact
+anywhere beneath its owner's directory conforms.
 
 Advice rather than enforcement: the command writes nothing, blocks no state
 transition, and exits `0` whatever it finds. A listed artifact is left exactly
@@ -2708,17 +2715,23 @@ verdict:
 
 ```
 Scanned areas: <area>, <area>
-Artifacts (2):
+Artifacts (3):
   <area>/abc12345-plan.md
     nonconforming -> <area>/abc12345-auth (issue abc12345-49b1-4b0f-9a1e-6c2f0d3a7e55)
+  <area>/abc12345-auth/review.md
+    nonconforming -> <area>/def67890-search (issue def67890-7c3d-4a11-b58e-2f9a1c40d6b3)
   <area>/deadbeef-notes.md
     unattributed (no issue answers to deadbeef)
 ```
 
+The second entry is a name carrying no short id: `review.md` sits in one
+issue's directory while another issue's document reference names it.
+
 JSON is the list envelope over `artifacts` alongside the `areas` walked:
 `{"areas": [...], "count": N, "artifacts": [...]}`. Each entry carries `path`,
 `area`, `short_id`, and `status`; a `nonconforming` entry adds `issue_id` and
-`canonical_directory`.
+`canonical_directory`. `short_id` is the short id the artifact's own name opens
+with, and is empty for an artifact a document reference attributed.
 
 ## Graph Commands
 

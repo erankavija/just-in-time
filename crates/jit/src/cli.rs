@@ -1959,10 +1959,13 @@ pub enum DocCommands {
     /// Report artifacts sitting outside their owning issue's canonical directory
     ///
     /// Walks the issue-scoped areas the repository declares under
-    /// `[documentation]`, resolves each artifact's owning issue from the short
-    /// id its name opens with, and lists the artifacts whose location differs
-    /// from the directory that issue owns (`jit doc dir`). An artifact no
-    /// single issue answers to is listed as unattributed instead.
+    /// `[documentation]`, resolves each artifact's owning issue, and lists the
+    /// artifacts whose location differs from the directory that issue owns
+    /// (`jit doc dir`). The short id a name opens with resolves the owner; a
+    /// name carrying none is resolved from the document references naming it,
+    /// where exactly one referencing issue owns the artifact. An artifact whose
+    /// owner no single issue answers for is listed as unattributed instead, and
+    /// a prefix-less name no issue references is passed over.
     ///
     /// Advice, not enforcement: legacy flat artifacts are tolerated, so this
     /// command only prints. It exits successfully whatever it finds, writes

@@ -7,13 +7,16 @@
 //! into the artifacts whose location disagrees with
 //! [`resolve_artifact_directory`], and says nothing about the rest.
 //!
-//! An **artifact** here is a path component that opens with a short id: eight
-//! lowercase hexadecimal characters delimited by `-`, `.`, or the end of the
-//! component, the shape [`Issue::short_id`] prints. That prefix names the
-//! owner, so a component carrying none is not something this report can
-//! attribute and is passed over rather than reported. A prefix that no single
-//! issue answers to is *unattributed*: the artifact is named, and nothing is
-//! claimed about where it belongs.
+//! An **artifact** here is a path component the report resolves an owner for.
+//! A component that opens with a short id — eight lowercase hexadecimal
+//! characters delimited by `-`, `.`, or the end of the component, the shape
+//! [`Issue::short_id`] prints — names its owner outright, and that prefix
+//! decides. A component carrying none is resolved from the document references
+//! naming it, where exactly one referencing issue is the owner and a component
+//! no issue references is passed over rather than reported. An ownership these
+//! inputs cannot settle is *unattributed* — a prefix no single issue answers
+//! to, or a prefix-less name several issues reference: the artifact is named,
+//! and nothing is claimed about where it belongs.
 //!
 //! Occurrences are located from the top down. Each component below the area is
 //! examined in turn and the first one that is unattributed or misplaced is the
@@ -29,7 +32,7 @@ use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDire
 use crate::domain::artifact_plan::normalize_artifact_path;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Issue, SHORT_ID_LENGTH};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// What the report says about one artifact.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,9 +45,10 @@ pub enum ArtifactDisposition {
         /// Repository-relative directory the owner owns in this area.
         canonical_directory: String,
     },
-    /// No single issue answers to the artifact's short-id prefix, so nothing is
-    /// claimed about where it belongs. Both an unknown prefix and one several
-    /// issues share land here.
+    /// The inputs settle no single owner, so nothing is claimed about where the
+    /// artifact belongs. A short-id prefix no issue answers to, one several
+    /// issues share, and a prefix-less name several issues reference all land
+    /// here.
     Unattributed,
 }
 
@@ -66,7 +70,8 @@ pub struct ReportedArtifact {
     /// Repository-relative path of the artifact, which is a directory when a
     /// whole directory is misplaced.
     pub path: String,
-    /// Short id the artifact's own name carries.
+    /// Short id the artifact's own name opens with, empty when the name carries
+    /// none and a document reference resolved the owner instead.
     pub short_id: String,
     /// What the report says about it.
     pub disposition: ArtifactDisposition,
@@ -79,9 +84,12 @@ pub struct ReportedArtifact {
 /// directories alike; a path that lies outside `area` contributes nothing.
 /// Naming a directory is what lets an empty one be reported, since it reaches
 /// this function through no path of its own otherwise. `issues` is the
-/// repository's issue set, which is what a short-id prefix is resolved against:
-/// exactly one match attributes the artifact, and both zero matches and several
-/// land on [`ArtifactDisposition::Unattributed`].
+/// repository's issue set, which owners are resolved against: a short-id prefix
+/// against the ids those issues answer to, and a name carrying no prefix
+/// against the document references they hold. Exactly one match attributes the
+/// artifact. A prefix zero or several issues match lands on
+/// [`ArtifactDisposition::Unattributed`], as does a prefix-less name several
+/// issues reference; a prefix-less name no issue references is passed over.
 ///
 /// Results are ordered by path and hold one entry per reported artifact, so a
 /// misplaced directory is named once however many of its own descendants also
@@ -110,6 +118,7 @@ pub fn report_area_artifacts(
     }
 
     let owners = owners_by_short_id(issues);
+    let references = owners_by_referenced_path(issues);
     let canonical_directories = issues
         .iter()
         .map(|issue| {
@@ -120,7 +129,9 @@ pub fn report_area_artifacts(
 
     Ok(paths
         .iter()
-        .filter_map(|path| first_reported_occurrence(&area, path, &owners, &canonical_directories))
+        .filter_map(|path| {
+            first_reported_occurrence(&area, path, &owners, &references, &canonical_directories)
+        })
         .map(|artifact| (artifact.path.clone(), artifact))
         .collect::<BTreeMap<_, _>>()
         .into_values()
@@ -136,6 +147,7 @@ fn first_reported_occurrence(
     area: &str,
     path: &str,
     owners: &BTreeMap<String, Vec<&Issue>>,
+    references: &BTreeMap<String, Vec<&Issue>>,
     canonical_directories: &BTreeMap<String, String>,
 ) -> Option<ReportedArtifact> {
     let path = normalize_artifact_path(path);
@@ -151,9 +163,9 @@ fn first_reported_occurrence(
             Some((occurrence.clone(), component.to_string()))
         })
         .find_map(|(occurrence, component)| {
-            let short_id = short_id_prefix(&component)?;
-            let disposition = match owners.get(short_id).map(Vec::as_slice) {
-                Some([issue]) => {
+            let (short_id, owner) = resolve_owner(&component, &occurrence, owners, references)?;
+            let disposition = match owner {
+                ComponentOwner::Single(issue) => {
                     let canonical = canonical_directories.get(&issue.id)?;
                     (!contains_path(canonical, &occurrence)).then(|| {
                         ArtifactDisposition::Nonconforming {
@@ -162,15 +174,56 @@ fn first_reported_occurrence(
                         }
                     })
                 }
-                _ => Some(ArtifactDisposition::Unattributed),
+                ComponentOwner::Unsettled => Some(ArtifactDisposition::Unattributed),
             }?;
             Some(ReportedArtifact {
                 area: area.to_string(),
                 path: occurrence,
-                short_id: short_id.to_string(),
+                short_id,
                 disposition,
             })
         })
+}
+
+/// What the report's inputs say about one path component's owner.
+enum ComponentOwner<'a> {
+    /// Exactly one issue answers for the component.
+    Single(&'a Issue),
+    /// Several issues answer for it, or the short id it carries answers to
+    /// none, so the inputs settle no owner.
+    Unsettled,
+}
+
+/// The owner of the component `occurrence` ends in, with the short id the
+/// report carries for it, or `None` when the component is passed over.
+///
+/// The name's own short-id prefix decides first and is resolved against
+/// `owners`. A name carrying none is resolved against `references`, the issues
+/// whose document references name that repository-relative path — the durable
+/// statement of ownership a name without a prefix leaves unsaid. A prefix-less
+/// name no issue references resolves to nothing at all, which is what the walk
+/// passes over: an unreferenced file is invisible to archival too, and the
+/// report claims nothing about it.
+fn resolve_owner<'a>(
+    component: &str,
+    occurrence: &str,
+    owners: &BTreeMap<String, Vec<&'a Issue>>,
+    references: &BTreeMap<String, Vec<&'a Issue>>,
+) -> Option<(String, ComponentOwner<'a>)> {
+    let (short_id, candidates) = match short_id_prefix(component) {
+        Some(short_id) => (
+            short_id.to_string(),
+            owners.get(short_id).map(Vec::as_slice).unwrap_or_default(),
+        ),
+        // The empty short id says the name carries none, so an entry states
+        // which of the two rules attributed it.
+        None => (String::new(), references.get(occurrence)?.as_slice()),
+    };
+
+    Some(match candidates {
+        [issue] => (short_id, ComponentOwner::Single(issue)),
+        _ => (short_id, ComponentOwner::Unsettled),
+    })
 }
 
 /// The short id a path component opens with, if it opens with one.
@@ -197,6 +250,29 @@ fn owners_by_short_id(issues: &[Issue]) -> BTreeMap<String, Vec<&Issue>> {
     issues.iter().fold(BTreeMap::new(), |mut owners, issue| {
         owners.entry(issue.short_id()).or_default().push(issue);
         owners
+    })
+}
+
+/// Every issue grouped under the repository-relative path each of its document
+/// references names.
+///
+/// Paths are normalized to the spelling the walk carries, so a reference and an
+/// occurrence naming the same file meet. An issue naming one path from several
+/// of its own references counts once, so a group holding more than one issue is
+/// a path several issues claim.
+fn owners_by_referenced_path(issues: &[Issue]) -> BTreeMap<String, Vec<&Issue>> {
+    issues.iter().fold(BTreeMap::new(), |references, issue| {
+        issue
+            .documents
+            .iter()
+            .map(|document| normalize_artifact_path(&document.path))
+            .filter(|path| !path.is_empty())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .fold(references, |mut references, path| {
+                references.entry(path).or_default().push(issue);
+                references
+            })
     })
 }
 
@@ -238,6 +314,18 @@ mod tests {
         let mut issue = fixture_issue("Artifact owner".to_string(), String::new());
         issue.labels = vec![format!("type:{TYPE}"), format!("{NAMESPACE}:{membership}")];
         issue
+    }
+
+    /// `issue` stating, through its document references, that it owns each of
+    /// `paths` — the claim a name carrying no short id leaves unsaid.
+    fn referencing(issue: Issue, paths: &[&str]) -> Issue {
+        Issue {
+            documents: paths
+                .iter()
+                .map(|path| crate::domain::DocumentReference::new((*path).to_string()))
+                .collect(),
+            ..issue
+        }
     }
 
     fn canonical(issue: &Issue) -> String {
@@ -414,7 +502,101 @@ mod tests {
     }
 
     #[test]
-    fn test_report_area_artifacts_passes_over_names_carrying_no_short_id_prefix() {
+    fn test_report_area_artifacts_attributes_a_prefixless_artifact_to_the_issue_referencing_it() {
+        let host = issue("artifact-layout");
+        // Filed inside the directory another issue owns, under a name that says
+        // nothing about who owns it.
+        let filed_inside = format!("{}/disposition-record.md", canonical(&host));
+        let owner = referencing(issue("other-initiative"), &[&filed_inside]);
+
+        let reported = report(&[&filed_inside], &[host.clone(), owner.clone()]);
+
+        assert_eq!(reported_paths(&reported), vec![filed_inside.as_str()]);
+        assert_eq!(
+            reported[0].disposition,
+            ArtifactDisposition::Nonconforming {
+                issue_id: owner.id.clone(),
+                canonical_directory: canonical(&owner),
+            },
+            "the reference names the owner, and a conforming enclosing directory does not excuse it"
+        );
+        assert!(
+            reported[0].short_id.is_empty(),
+            "the entry states that the name itself carries no short id: {:?}",
+            reported[0].short_id
+        );
+
+        // Location still decides: the same name, referenced by the same issue,
+        // inside the directory that issue owns is not a finding.
+        let filed_at_home = format!("{}/disposition-record.md", canonical(&owner));
+        assert!(
+            report(
+                &[&filed_at_home],
+                &[host, referencing(owner, &[&filed_at_home])]
+            )
+            .is_empty(),
+            "an artifact its owner references inside the directory that owner owns conforms"
+        );
+    }
+
+    #[test]
+    fn test_report_area_artifacts_reports_a_prefixless_artifact_several_issues_reference_as_unattributed(
+    ) {
+        let contested = format!("{AREA}/disposition-record.md");
+        let first = referencing(issue("artifact-layout"), &[&contested]);
+        let second = referencing(issue("other-initiative"), &[&contested]);
+
+        let reported = report(&[&contested], &[first.clone(), second]);
+
+        assert_eq!(reported_paths(&reported), vec![contested.as_str()]);
+        assert_eq!(
+            reported[0].disposition,
+            ArtifactDisposition::Unattributed,
+            "an ownership two issues both claim names neither an owner nor a directory"
+        );
+
+        // One issue naming the same artifact from two of its own references is
+        // one claim, however each reference spells the path.
+        let twice = referencing(first, &[&contested, &format!("./{contested}")]);
+        assert!(
+            matches!(
+                report(&[&contested], std::slice::from_ref(&twice))[0].disposition,
+                ArtifactDisposition::Nonconforming { .. }
+            ),
+            "the claim is counted per issue rather than per reference"
+        );
+    }
+
+    #[test]
+    fn test_report_area_artifacts_resolves_a_name_carrying_a_short_id_from_that_prefix_alone() {
+        let owner = issue("artifact-layout");
+        let flat = format!("{AREA}/{}-plan.md", owner.short_id());
+        let claimant = referencing(issue("other-initiative"), &[&flat]);
+
+        let reported = report(&[&flat], &[owner.clone(), claimant]);
+
+        assert_eq!(
+            reported[0].disposition,
+            ArtifactDisposition::Nonconforming {
+                issue_id: owner.id.clone(),
+                canonical_directory: canonical(&owner),
+            },
+            "the prefix the name carries decides, and a reference from elsewhere does not move it"
+        );
+        assert_eq!(reported[0].short_id, owner.short_id());
+
+        // The same where the prefix resolves nothing: an unsettled prefix is
+        // unattributed rather than falling through to whoever references it.
+        let unknown = format!("{AREA}/deadbeef-plan.md");
+        let claimant = referencing(issue("other-initiative"), &[&unknown]);
+        assert_eq!(
+            report(&[&unknown], &[owner, claimant])[0].disposition,
+            ArtifactDisposition::Unattributed
+        );
+    }
+
+    #[test]
+    fn test_report_area_artifacts_passes_over_an_unreferenced_name_carrying_no_short_id_prefix() {
         let owner = issue("artifact-layout");
         let short_id = owner.short_id();
 
@@ -438,8 +620,20 @@ mod tests {
                 std::slice::from_ref(&owner),
             )
             .is_empty(),
-            "a name the report cannot attribute is passed over, not reported"
+            "a name no prefix and no reference attributes is passed over, not reported"
         );
+
+        // Not vacuous: what the report has nothing to say about is the missing
+        // claim rather than the shape of the name. Each of the same names is
+        // reported once one issue's reference states it owns it.
+        unprefixed.iter().for_each(|path| {
+            let claimant = referencing(issue("other-initiative"), &[path]);
+            assert_eq!(
+                reported_paths(&report(&[path.as_str()], &[owner.clone(), claimant])),
+                vec![path.as_str()],
+                "a reference attributes the artifact its name leaves unattributed"
+            );
+        });
     }
 
     #[test]
@@ -527,6 +721,48 @@ mod tests {
             let reported = report(&[path.as_str()], std::slice::from_ref(&owner));
             prop_assert_eq!(reported.len(), 1);
             prop_assert_eq!(&reported[0].path, &path);
+        }
+
+        /// Property: what the report says about an artifact whose name carries
+        /// a short id is the same whether or not another issue's reference
+        /// names that artifact. The two runs differ in the reference alone, so
+        /// the prefix rule owns the verdict outright.
+        #[test]
+        fn test_report_area_artifacts_leaves_a_prefixed_artifact_unmoved_by_a_reference_naming_it(
+            membership in "[a-z]{1,12}",
+            suffix in "-[a-z0-9-]{0,20}\\.md",
+        ) {
+            let owner = issue(&membership);
+            let path = format!("{AREA}/{}{suffix}", owner.short_id());
+            let claimant = issue("other-initiative");
+
+            prop_assert_eq!(
+                report(&[path.as_str()], &[owner.clone(), referencing(claimant.clone(), &[&path])]),
+                report(&[path.as_str()], &[owner, claimant]),
+            );
+        }
+
+        /// Property: a name carrying no short id that exactly one issue
+        /// references is reported wherever it sits outside that issue's
+        /// directory, whatever it is called.
+        #[test]
+        fn test_report_area_artifacts_always_reports_a_referenced_artifact_outside_its_owner(
+            membership in "[a-z]{1,12}",
+            name in "[g-z]{1,10}\\.md",
+        ) {
+            let path = format!("{AREA}/{name}");
+            let owner = referencing(issue(&membership), &[&path]);
+            let reported = report(&[path.as_str()], std::slice::from_ref(&owner));
+
+            prop_assert_eq!(reported.len(), 1);
+            prop_assert_eq!(&reported[0].path, &path);
+            prop_assert_eq!(
+                &reported[0].disposition,
+                &ArtifactDisposition::Nonconforming {
+                    issue_id: owner.id.clone(),
+                    canonical_directory: canonical(&owner),
+                }
+            );
         }
     }
 }

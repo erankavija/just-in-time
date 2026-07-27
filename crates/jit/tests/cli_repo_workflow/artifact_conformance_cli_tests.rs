@@ -105,15 +105,49 @@ fn create_artifact_directory(repo: &Path, path: &str) {
 /// An issue whose labels resolve a single membership value, so the directory it
 /// owns is distinguishable from the bare area it is written into.
 fn issue_owning_a_directory(repo: &Path, title: &str) -> CreatedIssue {
+    issue_owning(repo, title, "artifact-layout")
+}
+
+/// The same under a named membership value, so two issues own two directories.
+fn issue_owning(repo: &Path, title: &str, membership: &str) -> CreatedIssue {
     let (issue_type, namespace) = membership_type_and_namespace();
     create_issue(
         repo,
         title,
         &[
             format!("type:{issue_type}"),
-            format!("{namespace}:artifact-layout"),
+            format!("{namespace}:{membership}"),
         ],
     )
+}
+
+/// Record, through `doc add`, that `id` owns the artifact at `path` — the
+/// repository's durable statement of ownership for a name that carries none.
+fn reference_document(repo: &Path, id: &str, path: &str) {
+    let output = jit(repo, &["doc", "add", id, path, "--skip-scan"]);
+    assert!(
+        output.status.success(),
+        "doc add {id} {path}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// The verdict the human report prints under `path`, which is the line that
+/// follows the one naming it.
+fn human_verdict(repo: &Path, path: &str) -> String {
+    let output = jit(repo, &["doc", "conformance"]);
+    assert!(
+        output.status.success(),
+        "doc conformance exits successfully"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    stdout
+        .lines()
+        .skip_while(|line| line.trim() != path)
+        .nth(1)
+        .unwrap_or_else(|| panic!("the human report names {path} and its verdict: {stdout}"))
+        .trim()
+        .to_string()
 }
 
 /// Replace the `issue_scoped_areas` registry in the repository's configuration.
@@ -535,6 +569,82 @@ fn test_doc_conformance_reports_an_artifact_with_no_resolvable_owner_as_unattrib
         owned_entry["issue_id"].as_str() == Some(issue.id.as_str())
             && owned_entry["canonical_directory"].as_str().is_some(),
         "the resolvable sibling still carries its attribution: {owned_entry}"
+    );
+}
+
+#[test]
+fn test_doc_conformance_attributes_a_prefixless_artifact_to_the_issue_whose_reference_names_it() {
+    let repo = initialized_repo();
+    let area = declared_area();
+    let host = issue_owning_a_directory(repo.path(), "Owns the directory they all sit in");
+    let author = issue_owning(
+        repo.path(),
+        "Filed its record in another issue's directory",
+        "other-initiative",
+    );
+    let host_directory = resolve_directory(repo.path(), &host.short_id, area);
+    let author_directory = resolve_directory(repo.path(), &author.short_id, area);
+
+    // Three artifacts of the same shape in the same directory, none of whose
+    // names carries a short id. What separates them is what the repository says
+    // about them: the issue owning the directory references the first, another
+    // issue references the second, and no issue references the third.
+    let at_home = format!("{host_directory}/plan.md");
+    let stranger = format!("{host_directory}/disposition-record.md");
+    let unreferenced = format!("{host_directory}/scratch.md");
+    [&at_home, &stranger, &unreferenced]
+        .iter()
+        .for_each(|path| {
+            write_artifact(repo.path(), path);
+        });
+    reference_document(repo.path(), &host.short_id, &at_home);
+    reference_document(repo.path(), &author.short_id, &stranger);
+
+    let report = conformance_report(repo.path());
+    let entry = report.require(&stranger);
+    assert_eq!(
+        entry["issue_id"].as_str(),
+        Some(author.id.as_str()),
+        "the artifact is attributed to the issue whose reference names it: {entry}"
+    );
+    assert_eq!(
+        entry["canonical_directory"].as_str(),
+        Some(author_directory.as_str()),
+        "and told where that issue's directory is: {entry}"
+    );
+    assert!(
+        report.entry(&at_home).is_none(),
+        "an artifact its own issue references inside that issue's directory conforms: {:?}",
+        report.paths()
+    );
+    assert!(
+        report.entry(&unreferenced).is_none(),
+        "an artifact no issue references is passed over: {:?}",
+        report.paths()
+    );
+
+    // A second issue referencing the same artifact leaves an ownership the
+    // report's inputs no longer settle.
+    reference_document(repo.path(), &host.short_id, &stranger);
+    let contested = conformance_report(repo.path());
+    let entry = contested.require(&stranger);
+    assert!(
+        entry["status"]
+            .as_str()
+            .is_some_and(|status| status.contains("unattributed")),
+        "an artifact two issues reference is unattributed: {entry}"
+    );
+    assert!(
+        entry["issue_id"].as_str().is_none() && entry["canonical_directory"].as_str().is_none(),
+        "an unattributed artifact names neither an owner nor a directory it belongs in: {entry}"
+    );
+
+    // The human verdict states what is unsettled rather than trailing off after
+    // an identifier the name does not carry.
+    let verdict = human_verdict(repo.path(), &stranger);
+    assert!(
+        verdict.contains("unattributed") && verdict.contains("reference"),
+        "the human report says several issues reference it: {verdict}"
     );
 }
 

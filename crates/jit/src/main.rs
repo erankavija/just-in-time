@@ -5186,6 +5186,13 @@ fn run() -> Result<()> {
                                 "    {} -> {directory} (issue {issue_id})",
                                 artifact.status
                             ))?,
+                            // A name carrying no short id reached the report
+                            // through the references naming it, so what could
+                            // not be settled is which of them owns it.
+                            _ if artifact.short_id.is_empty() => output_ctx.print_data(format!(
+                                "    {} (several issues reference it)",
+                                artifact.status
+                            ))?,
                             _ => output_ctx.print_data(format!(
                                 "    {} (no issue answers to {})",
                                 artifact.status, artifact.short_id
