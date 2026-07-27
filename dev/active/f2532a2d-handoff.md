@@ -53,12 +53,12 @@ None. The one escalation this session (flaky-test gate) was resolved by the invo
 ## Reference artefacts
 
 - Epic: `jit issue show f2532a2d`
-- Plan (bracket): `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` (decisions D1–D9)
+- Plan (bracket): `dev/archive/f2532a2d-jit-project-lead/dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` (decisions D1–D9)
 - Progress + verdicts: `dev/active/f2532a2d-progress.json` (`waves`, `reviewed{}`, `rework_counts`, `notes[]`)
 - Adjudication method (used by all eval issues): `dev/eval/skill-eval-adjudication.md`
 - Content standards (scanner/fixer target): `docs/reference/jit-content-standards.md`
 - Scanner + fixer: `.agents/skills/jit-project-lead/scripts/standards-scan.sh`, `standards-fix.sh`, `references/standards-scan.md`, `references/standards-fix.md`
 - Dispatch prose (e7d41080): `.agents/skills/jit-project-lead/references/container-dispatch.md`
 - 41aa1b75 WIP: branch `worktree-agent-41aa1b75` @ `a4cf8dc7`
-- External dep for 6c5f70ad: `dev/active/eed6750c-handoff.md`
+- External dep for 6c5f70ad: `dev/archive/f2532a2d-jit-project-lead/dev/active/eed6750c-handoff.md`
 - Dispatch scripts: `.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh`, `check-leak-into-main.sh`

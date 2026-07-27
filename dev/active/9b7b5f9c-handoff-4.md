@@ -51,7 +51,7 @@
 ## Reference artefacts
 
 - Epic: `jit issue show 9b7b5f9c`
-- Plan: `dev/active/9b7b5f9c-plan.md`
+- Plan: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-plan.md`
 - Progress: `dev/active/9b7b5f9c-progress.json`
 - Prior handoffs: `dev/active/9b7b5f9c-handoff.md`, `dev/active/9b7b5f9c-handoff-2.md`, `dev/active/9b7b5f9c-handoff-3.md`
 - Overlay final worker/merge: `f2df3982` is dependency remediation; overlay worker `48526373`, merge `de101a5f`
