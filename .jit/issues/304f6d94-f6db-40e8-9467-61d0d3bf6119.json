@@ -1,14 +1,24 @@
 {
-  "id": "304f6d94-f6db-40e8-9467-61d0d3bf6119",
-  "title": "Sub-strategic dispatch in topological waves with coherence review",
-  "description": "Drives a strategic-tier container's sub-strategic children by grouping them into topological waves and dispatching the renamed execution lead as a subagent for each, running a cross-container coherence review before accepting any container as complete.\n\n## Background\n\n`jit-execution-lead` already computes wave order by hand-layering an epic's children by dependency depth, and holds a multi-tier review protocol before accepting a worker's output, including a holistic cross-issue coherence review. jit-project-lead needs the one-tier-up analogue of both: waves over sub-strategic containers instead of issues, and a coherence review across containers instead of across issues within one container. No topological/wave CLI primitive exists in jit itself — the layering is computed by the skill, the same way `jit-execution-lead` already does it.\n\n## Success Criteria\n\n- [hard] REQ-01: Sub-strategic containers under the strategic-tier container are grouped into waves computed from `jit graph deps <container-id>`, ordered by dependency depth.\n- [hard] REQ-02: Each sub-strategic container in a wave is driven by dispatching `jit-execution-lead` as a subagent, reusing its existing canonical dispatch scripts without forking or reimplementing them.\n- [hard] REQ-03: Before accepting a dispatched container as complete, a cross-container coherence review runs, checking naming, style, and interface consistency across containers — the one-tier-up analogue of the existing per-issue holistic coherence review.\n\n## Notes\n\nSkill prose follows the cc-sdd/superpowers register. Exemplars: `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, `../jit-research/superpowers/skills/executing-plans/SKILL.md`.\n\nThis item dispatches the existing `jit-execution-lead` unmodified aside from its escalation-target change delivered separately; it must never re-implement epic-level breakdown or execution.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-02T23:46:55.933505024Z",
+  "context": {},
+  "created_at": "2026-07-01T22:08:58.294792137Z",
   "dependencies": [
     "7a9eb806-28eb-4dd9-b31f-2506a25f6660",
     "e8b1cee3-893c-4a5e-bd6b-e02a89a2d601"
   ],
+  "description": "Drives a strategic-tier container's sub-strategic children by grouping them into topological waves and dispatching the renamed execution lead as a subagent for each, running a cross-container coherence review before accepting any container as complete.\n\n## Background\n\n`jit-execution-lead` already computes wave order by hand-layering an epic's children by dependency depth, and holds a multi-tier review protocol before accepting a worker's output, including a holistic cross-issue coherence review. jit-project-lead needs the one-tier-up analogue of both: waves over sub-strategic containers instead of issues, and a coherence review across containers instead of across issues within one container. No topological/wave CLI primitive exists in jit itself — the layering is computed by the skill, the same way `jit-execution-lead` already does it.\n\n## Success Criteria\n\n- [hard] REQ-01: Sub-strategic containers under the strategic-tier container are grouped into waves computed from `jit graph deps <container-id>`, ordered by dependency depth.\n- [hard] REQ-02: Each sub-strategic container in a wave is driven by dispatching `jit-execution-lead` as a subagent, reusing its existing canonical dispatch scripts without forking or reimplementing them.\n- [hard] REQ-03: Before accepting a dispatched container as complete, a cross-container coherence review runs, checking naming, style, and interface consistency across containers — the one-tier-up analogue of the existing per-issue holistic coherence review.\n\n## Notes\n\nSkill prose follows the cc-sdd/superpowers register. Exemplars: `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, `../jit-research/superpowers/skills/executing-plans/SKILL.md`.\n\nThis item dispatches the existing `jit-execution-lead` unmodified aside from its escalation-target change delivered separately; it must never re-implement epic-level breakdown or execution.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/f2532a2d-jit-project-lead/dev/active/304f6d94-breakdown-spec.md"
+    }
+  ],
+  "done_at": "2026-07-02T23:50:01.096372490Z",
+  "first_ready_at": "2026-07-02T23:45:10.743010442Z",
   "gates_required": [
     "code-review",
     "cargo-ci"
@@ -16,25 +26,16 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T23:46:59.693443338Z"
+      "updated_at": "2026-07-02T23:46:59.693443338Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T23:48:41.828198068Z"
+      "updated_at": "2026-07-02T23:48:41.828198068Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/304f6d94-breakdown-spec.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "304f6d94-f6db-40e8-9467-61d0d3bf6119",
   "labels": [
     "type:story",
     "epic:jit-project-lead",
@@ -42,9 +43,8 @@
     "satisfies:REQ-04",
     "milestone:v1.0"
   ],
-  "created_at": "2026-07-01T22:08:58.294792137Z",
-  "updated_at": "2026-07-05T19:51:12.938617460Z",
-  "first_ready_at": "2026-07-02T23:45:10.743010442Z",
-  "claimed_at": "2026-07-02T23:46:55.933505024Z",
-  "done_at": "2026-07-02T23:50:01.096372490Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Sub-strategic dispatch in topological waves with coherence review",
+  "updated_at": "2026-07-27T10:05:09.242464464Z"
 }

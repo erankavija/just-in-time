@@ -1,14 +1,31 @@
 {
-  "id": "c23dfe71-94f1-4f8e-a9f4-e371ce65c70f",
-  "title": "Runnable eval verification for the lead skills",
-  "description": "Makes \"the renamed skills pass their evals\" a checkable claim rather than an aspiration: defines how a scenario eval is adjudicated, runs it once per renamed skill to record a passing baseline, and adds an activation (trigger) check for each.\n\n## Background\n\n`jit-execution-lead` ships three scenario evals (`evals/evals.json`) that grade free-text `expected_output` against actual agent behavior, but no runner exists in-repo to execute and adjudicate them. `jit-planning-lead` (formerly `jit-plan`) has no `evals/` directory at all. Neither skill's activation-from-description has ever been checked with a trigger eval.\n\n## Success Criteria\n\n- [hard] REQ-01: A documented adjudication method exists for scenario evals — either an LLM-judge procedure that grades a recorded transcript against the `expected_output` rubric and records a verdict, or each eval's `expected_output` converted into an assertable checklist. The method is written down, not performed once from memory.\n- [hard] REQ-02: `jit-execution-lead`'s three existing scenario evals (`evals/evals.json`) are run under the adjudication method and the passing verdicts are recorded.\n- [hard] REQ-03: `jit-planning-lead` gains an equivalent `evals/` directory with scenario evals covering its documented entry paths, run under the same adjudication method with recorded passing verdicts.\n- [hard] REQ-04: Both renamed skills gain an activation (trigger) check — a `trigger_eval.json` consumed by the skill-creator plugin's trigger-eval runner, or a documented equivalent — with recorded passing results confirming each skill activates from its own description.\n\n## Notes\n\nScope this to a thin, documented run-and-record procedure plus the minimal machinery each check needs — not a reusable eval framework. A general framework is explicit scope creep past what \"pass their evals\" requires.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-02T23:14:23.686551137Z",
+  "context": {},
+  "created_at": "2026-07-01T22:08:58.150488642Z",
   "dependencies": [
     "41aa1b75-3dba-4836-a3e2-78794a892914",
     "6662f738-cc2b-467a-9de3-01629b7b36d0"
   ],
+  "description": "Makes \"the renamed skills pass their evals\" a checkable claim rather than an aspiration: defines how a scenario eval is adjudicated, runs it once per renamed skill to record a passing baseline, and adds an activation (trigger) check for each.\n\n## Background\n\n`jit-execution-lead` ships three scenario evals (`evals/evals.json`) that grade free-text `expected_output` against actual agent behavior, but no runner exists in-repo to execute and adjudicate them. `jit-planning-lead` (formerly `jit-plan`) has no `evals/` directory at all. Neither skill's activation-from-description has ever been checked with a trigger eval.\n\n## Success Criteria\n\n- [hard] REQ-01: A documented adjudication method exists for scenario evals — either an LLM-judge procedure that grades a recorded transcript against the `expected_output` rubric and records a verdict, or each eval's `expected_output` converted into an assertable checklist. The method is written down, not performed once from memory.\n- [hard] REQ-02: `jit-execution-lead`'s three existing scenario evals (`evals/evals.json`) are run under the adjudication method and the passing verdicts are recorded.\n- [hard] REQ-03: `jit-planning-lead` gains an equivalent `evals/` directory with scenario evals covering its documented entry paths, run under the same adjudication method with recorded passing verdicts.\n- [hard] REQ-04: Both renamed skills gain an activation (trigger) check — a `trigger_eval.json` consumed by the skill-creator plugin's trigger-eval runner, or a documented equivalent — with recorded passing results confirming each skill activates from its own description.\n\n## Notes\n\nScope this to a thin, documented run-and-record procedure plus the minimal machinery each check needs — not a reusable eval framework. A general framework is explicit scope creep past what \"pass their evals\" requires.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/f2532a2d-jit-project-lead/dev/active/c23dfe71-breakdown-spec.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "label": "Lead-skills eval baseline (REQ-01..04 verification rollup)",
+      "path": "dev/archive/f2532a2d-jit-project-lead/dev/eval/lead-skills-eval-baseline.md"
+    }
+  ],
+  "done_at": "2026-07-02T23:27:11.799144160Z",
+  "first_ready_at": "2026-07-02T23:13:02.497887588Z",
   "gates_required": [
     "code-review",
     "cargo-ci"
@@ -16,106 +33,16 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T23:23:57.570462681Z"
+      "updated_at": "2026-07-02T23:23:57.570462681Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T23:25:22.012597306Z"
+      "updated_at": "2026-07-02T23:25:22.012597306Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/c23dfe71-breakdown-spec.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "design",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/eval/lead-skills-eval-baseline.md",
-      "commit": null,
-      "label": "Lead-skills eval baseline (REQ-01..04 verification rollup)",
-      "doc_type": "reference",
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "../../.claude/skills/jit-execution-lead/evals/results.md",
-          "resolved_path": ".claude/skills/jit-execution-lead/evals/results.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "a2bb62c000ea47cf12d1e2a1a85cde04f6e30c02be7b098a1aebb98d3e388624",
-          "is_shared": false
-        },
-        {
-          "original_path": "../../.claude/skills/jit-planning-lead/evals/evals.json",
-          "resolved_path": ".claude/skills/jit-planning-lead/evals/evals.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "ca6507b08cfddbdbea09e2ac31d827f6864135542afc71ac8c47a14216f9a016",
-          "is_shared": false
-        },
-        {
-          "original_path": "../../.claude/skills/jit-planning-lead/trigger_eval_results.json",
-          "resolved_path": ".claude/skills/jit-planning-lead/trigger_eval_results.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "c0ae38c61761a005e7546342aa82c04eec6b77c581271b1b8eee6300fc231229",
-          "is_shared": false
-        },
-        {
-          "original_path": "../../.claude/skills/jit-planning-lead/trigger_eval.json",
-          "resolved_path": ".claude/skills/jit-planning-lead/trigger_eval.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "6274021a72cc216e169d5c73386e149179ca37698db472405ea10db61ac775a1",
-          "is_shared": false
-        },
-        {
-          "original_path": "../../.claude/skills/jit-execution-lead/evals/evals.json",
-          "resolved_path": ".claude/skills/jit-execution-lead/evals/evals.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "f13934f527ddf8614a94f5c86f3e8694c7848a83996208be37ecd0d877602d1a",
-          "is_shared": false
-        },
-        {
-          "original_path": "../../.claude/skills/jit-execution-lead/trigger_eval.json",
-          "resolved_path": ".claude/skills/jit-execution-lead/trigger_eval.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "614ae364b339544bfa45b067fd2f2ac1affd421aaade05ac5defd46d8e1639e9",
-          "is_shared": false
-        },
-        {
-          "original_path": "../../.claude/skills/jit-execution-lead/trigger_eval_results.json",
-          "resolved_path": ".claude/skills/jit-execution-lead/trigger_eval_results.json",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "8ce9ec8fc1ea4f1b131149606f78d52a3a313a8f4a44f416566b96ed329c4f3b",
-          "is_shared": false
-        },
-        {
-          "original_path": "skill-eval-adjudication.md",
-          "resolved_path": "dev/eval/skill-eval-adjudication.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "0bb2f6d199851514d528aa77c18c8d193f49631f18578d12864929de5c0ac2d9",
-          "is_shared": false
-        },
-        {
-          "original_path": "../../.claude/skills/jit-planning-lead/evals/results.md",
-          "resolved_path": ".claude/skills/jit-planning-lead/evals/results.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "ce0cbac7a5f309c1b9127ec53f2aaaa5be1bcd0ecacc949562b96e0ab453bfef",
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "c23dfe71-94f1-4f8e-a9f4-e371ce65c70f",
   "labels": [
     "type:story",
     "epic:jit-project-lead",
@@ -123,9 +50,8 @@
     "satisfies:REQ-07",
     "milestone:v1.0"
   ],
-  "created_at": "2026-07-01T22:08:58.150488642Z",
-  "updated_at": "2026-07-09T23:21:36.288690602Z",
-  "first_ready_at": "2026-07-02T23:13:02.497887588Z",
-  "claimed_at": "2026-07-02T23:14:23.686551137Z",
-  "done_at": "2026-07-02T23:27:11.799144160Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Runnable eval verification for the lead skills",
+  "updated_at": "2026-07-27T10:05:09.242464464Z"
 }

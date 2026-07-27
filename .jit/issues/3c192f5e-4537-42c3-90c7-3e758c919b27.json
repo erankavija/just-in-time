@@ -1,40 +1,41 @@
 {
-  "id": "3c192f5e-4537-42c3-90c7-3e758c919b27",
-  "title": "Project-wide content-standards sweep mode",
-  "description": "Adds jit-project-lead's fourth mode: an audit of the whole project against the canonical jit content standards doc, auto-fixing mechanical violations and surfacing judgment calls for review.\n\n## Background\n\nThe canonical standards doc (`docs/reference/jit-content-standards.md`) covers issue-description structure, `[hard]`/`[aspirational]` criteria markers with `REQ-NN` ids, clean titles, standalone-readability, and Mermaid/LaTeX formatting. Some violations are mechanical (a missing marker, an embedded ID in a title) and safe to auto-fix; others require judgment (whether a description is truly standalone-readable) and must be surfaced rather than silently changed.\n\n## Success Criteria\n\n- [hard] REQ-01: The sweep reports every mechanical and judgment violation of the canonical standards doc found across the project's issues and documents.\n- [hard] REQ-02: Mechanical violations (for example: missing `[hard]`/`[aspirational]` markers, embedded IDs or ordinals in titles, a missing `## Success Criteria` section) are auto-fixed.\n- [hard] REQ-03: Judgment violations (for example: a description that is not actually standalone-readable) are listed separately from auto-fixed ones, for human or lead review rather than silent correction.\n\n## Notes\n\nSkill prose follows the cc-sdd/superpowers register. Exemplars: `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, `../jit-research/superpowers/skills/executing-plans/SKILL.md`.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-03T00:23:32.808529259Z",
+  "context": {},
+  "created_at": "2026-07-01T22:08:58.384371372Z",
   "dependencies": [
     "206bd960-6531-4aa0-a73a-1d525f4604ee",
     "e8b1cee3-893c-4a5e-bd6b-e02a89a2d601"
   ],
+  "description": "Adds jit-project-lead's fourth mode: an audit of the whole project against the canonical jit content standards doc, auto-fixing mechanical violations and surfacing judgment calls for review.\n\n## Background\n\nThe canonical standards doc (`docs/reference/jit-content-standards.md`) covers issue-description structure, `[hard]`/`[aspirational]` criteria markers with `REQ-NN` ids, clean titles, standalone-readability, and Mermaid/LaTeX formatting. Some violations are mechanical (a missing marker, an embedded ID in a title) and safe to auto-fix; others require judgment (whether a description is truly standalone-readable) and must be surfaced rather than silently changed.\n\n## Success Criteria\n\n- [hard] REQ-01: The sweep reports every mechanical and judgment violation of the canonical standards doc found across the project's issues and documents.\n- [hard] REQ-02: Mechanical violations (for example: missing `[hard]`/`[aspirational]` markers, embedded IDs or ordinals in titles, a missing `## Success Criteria` section) are auto-fixed.\n- [hard] REQ-03: Judgment violations (for example: a description that is not actually standalone-readable) are listed separately from auto-fixed ones, for human or lead review rather than silent correction.\n\n## Notes\n\nSkill prose follows the cc-sdd/superpowers register. Exemplars: `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, `../jit-research/superpowers/skills/executing-plans/SKILL.md`.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/f2532a2d-jit-project-lead/dev/active/3c192f5e-breakdown-spec.md"
+    }
+  ],
+  "done_at": "2026-07-03T00:31:27.852074249Z",
+  "first_ready_at": "2026-07-03T00:22:39.202910678Z",
   "gates_required": [
     "code-review",
     "cargo-ci"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T00:30:12.774117065Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T00:28:46.043453726Z"
+      "updated_at": "2026-07-03T00:28:46.043453726Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-03T00:30:12.774117065Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/3c192f5e-breakdown-spec.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "3c192f5e-4537-42c3-90c7-3e758c919b27",
   "labels": [
     "type:story",
     "epic:jit-project-lead",
@@ -42,9 +43,8 @@
     "satisfies:REQ-06",
     "milestone:v1.0"
   ],
-  "created_at": "2026-07-01T22:08:58.384371372Z",
-  "updated_at": "2026-07-05T19:51:12.948307967Z",
-  "first_ready_at": "2026-07-03T00:22:39.202910678Z",
-  "claimed_at": "2026-07-03T00:23:32.808529259Z",
-  "done_at": "2026-07-03T00:31:27.852074249Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Project-wide content-standards sweep mode",
+  "updated_at": "2026-07-27T10:05:09.242464464Z"
 }

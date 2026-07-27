@@ -1,38 +1,38 @@
 {
-  "id": "8f5de6bc-a563-424a-8c13-746948680418",
-  "title": "planning: jit-project-lead skill: milestone-level vision steward above the epic lead",
-  "description": "Planning node for jit-project-lead skill: milestone-level vision steward above the epic lead (f2532a2d). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Plan document: dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md.",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-06-24T17:28:58.568456395Z",
   "dependencies": [],
+  "description": "Planning node for jit-project-lead skill: milestone-level vision steward above the epic lead (f2532a2d). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Plan document: dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/f2532a2d-jit-project-lead/dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md"
+    }
+  ],
+  "done_at": "2026-07-01T21:57:14.068779031Z",
+  "first_ready_at": "2026-07-01T21:48:35.990749657Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-01T21:55:45.493978771Z"
+      "updated_at": "2026-07-01T21:55:45.493978771Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "8f5de6bc-a563-424a-8c13-746948680418",
   "labels": [
     "milestone:v1.0",
     "epic:jit-project-lead",
     "type:planning"
   ],
-  "created_at": "2026-06-24T17:28:58.568456395Z",
-  "updated_at": "2026-07-05T19:51:13.031241968Z",
-  "first_ready_at": "2026-07-01T21:48:35.990749657Z",
-  "done_at": "2026-07-01T21:57:14.068779031Z"
+  "priority": "high",
+  "state": "done",
+  "title": "planning: jit-project-lead skill: milestone-level vision steward above the epic lead",
+  "updated_at": "2026-07-27T10:05:09.242464464Z"
 }

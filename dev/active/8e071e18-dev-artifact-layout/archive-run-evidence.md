@@ -922,3 +922,108 @@ Issue `edf71346`. Plan eligible with no blockers. 14 relocated, 0 mirrored, 0 re
 | `dev/sessions/session-2025-12-30-bulk-operations-progress.md:330:4` | `dev/active/multi-issue-bulk-operations-plan.md` |
 | `dev/sessions/session-2025-12-30-bulk-operations-progress.md:331:4` | `dev/active/production-stability-design.md` |
 | `dev/sessions/session-2025-12-30-bulk-phase5-docs.md:85:4` | `dev/sessions/session-2025-12-30-bulk-phase5-docs.md` |
+
+## `f2532a2d` — dev/archive/f2532a2d-jit-project-lead
+Issue `83c61de0`. Plan eligible with no blockers. 11 relocated, 4 mirrored, 30 retained, 1 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| copy | `dev/eval/lead-skills-eval-baseline.md` | `dev/archive/f2532a2d-jit-project-lead/dev/eval/lead-skills-eval-baseline.md` | c23dfe71 |
+| copy | `dev/eval/skill-eval-adjudication.md` | `dev/archive/f2532a2d-jit-project-lead/dev/eval/skill-eval-adjudication.md` | a5b04c9f |
+| copy | `dev/eval/skill-triggers/README.md` | `dev/archive/f2532a2d-jit-project-lead/dev/eval/skill-triggers/README.md` | 6662f738 |
+| copy | `dev/eval/skill-triggers/run_trigger_eval.py` | `dev/archive/f2532a2d-jit-project-lead/dev/eval/skill-triggers/run_trigger_eval.py` | 6662f738 |
+| move | `dev/active/304f6d94-breakdown-spec.md` | `dev/archive/f2532a2d-jit-project-lead/dev/active/304f6d94-breakdown-spec.md` | 304f6d94 |
+| move | `dev/active/3c192f5e-breakdown-spec.md` | `dev/archive/f2532a2d-jit-project-lead/dev/active/3c192f5e-breakdown-spec.md` | 3c192f5e |
+| move | `dev/active/c23dfe71-breakdown-spec.md` | `dev/archive/f2532a2d-jit-project-lead/dev/active/c23dfe71-breakdown-spec.md` | c23dfe71 |
+| move | `dev/active/e8b1cee3-breakdown-spec.md` | `dev/archive/f2532a2d-jit-project-lead/dev/active/e8b1cee3-breakdown-spec.md` | e8b1cee3 |
+| move | `dev/active/eed6750c-handoff.md` | `dev/archive/f2532a2d-jit-project-lead/dev/active/eed6750c-handoff.md` | eed6750c |
+| move | `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` | `dev/archive/f2532a2d-jit-project-lead/dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` | 8f5de6bc f2532a2d |
+| move | `dev/sessions/session-20260620-planning-skill-design.md` | `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260620-planning-skill-design.md` | eed6750c |
+| move | `dev/sessions/session-20260622-planning-failures-and-churn.md` | `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260622-planning-failures-and-churn.md` | eed6750c |
+| move | `dev/sessions/session-20260623-planning-skill-observations.md` | `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260623-planning-skill-observations.md` | eed6750c |
+| move | `dev/sessions/session-20260624-project-lead-role-design.md` | `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260624-project-lead-role-design.md` | f2532a2d |
+| move | `dev/sessions/session-20260625-planning-skill-authoring.md` | `dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260625-planning-skill-authoring.md` | eed6750c |
+| retain | `.agents/skills/jit-execution-lead/evals/evals.json` | retained in place | — |
+| retain | `.agents/skills/jit-execution-lead/evals/results.md` | retained in place | — |
+| retain | `.agents/skills/jit-execution-lead/trigger_eval.json` | retained in place | 6662f738 |
+| retain | `.agents/skills/jit-execution-lead/trigger_eval_results.json` | retained in place | 6662f738 |
+| retain | `.agents/skills/jit-planning-lead/evals/evals.json` | retained in place | 41aa1b75 |
+| retain | `.agents/skills/jit-planning-lead/evals/results.md` | retained in place | 41aa1b75(pinned) |
+| retain | `.agents/skills/jit-planning-lead/evals/results.md` | retained in place | — |
+| retain | `.agents/skills/jit-planning-lead/evals/setup-test-repo.sh` | retained in place | 41aa1b75 |
+| retain | `.agents/skills/jit-planning-lead/evals/transcripts/plan-from-existing.completion-report.md` | retained in place | 41aa1b75(pinned) |
+| retain | `.agents/skills/jit-planning-lead/evals/transcripts/research-and-plan.completion-report.md` | retained in place | 41aa1b75(pinned) |
+| retain | `.agents/skills/jit-planning-lead/trigger_eval.json` | retained in place | 6662f738 |
+| retain | `.agents/skills/jit-planning-lead/trigger_eval_results.json` | retained in place | 6662f738 |
+| retain | `.agents/skills/jit-project-lead/evals/evals.json` | retained in place | 02a2bbb9 |
+| retain | `.agents/skills/jit-project-lead/evals/results.md` | retained in place | 02a2bbb9 |
+| retain | `.agents/skills/jit-project-lead/references/container-dispatch.md` | retained in place | e7d41080 |
+| retain | `.agents/skills/jit-project-lead/references/mode-routing.md` | retained in place | 6c5f70ad |
+| retain | `.agents/skills/jit-project-lead/references/parent-escalation.md` | retained in place | 634b2382 |
+| retain | `.agents/skills/jit-project-lead/references/progress-artifact.md` | retained in place | eff48a6e |
+| retain | `.agents/skills/jit-project-lead/references/standards-fix.md` | retained in place | 0b7e864d |
+| retain | `.agents/skills/jit-project-lead/references/standards-scan.md` | retained in place | 66aeee5f |
+| retain | `.agents/skills/jit-project-lead/references/standards-sweep.md` | retained in place | 206bd960 |
+| retain | `.agents/skills/jit-project-lead/references/templates/vision-charter.md` | retained in place | eff48a6e |
+| retain | `.agents/skills/jit-project-lead/references/vision-charter.md` | retained in place | eff48a6e |
+| retain | `.agents/skills/jit-project-lead/scripts/standards-fix.sh` | retained in place | 0b7e864d |
+| retain | `.agents/skills/jit-project-lead/scripts/standards-scan.sh` | retained in place | 66aeee5f |
+| retain | `.agents/skills/jit-project-lead/scripts/test-standards-scan.sh` | retained in place | 66aeee5f |
+| retain | `.agents/skills/jit-project-lead/trigger_eval.json` | retained in place | 02a2bbb9 |
+| retain | `.agents/skills/jit-project-lead/trigger_eval_results.json` | retained in place | 02a2bbb9 |
+| retain | `dev/archive/f2532a2d-completion-report.md` | already under the archive root | f2532a2d |
+| retain | `docs/reference/jit-content-standards.md` | retained in place | faed8ffa |
+
+### In-content citation warnings (43)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/304f6d94-breakdown-spec.md:96:6` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/3c192f5e-breakdown-spec.md:107:6` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/8e071e18-breakdown.json:1937:14` | `dev/active/304f6d94-breakdown-spec.md` |
+| `dev/active/8e071e18-breakdown.json:1938:14` | `dev/active/3c192f5e-breakdown-spec.md` |
+| `dev/active/8e071e18-breakdown.json:1939:14` | `dev/active/c23dfe71-breakdown-spec.md` |
+| `dev/active/8e071e18-breakdown.json:1940:14` | `dev/active/e8b1cee3-breakdown-spec.md` |
+| `dev/active/8e071e18-breakdown.json:1941:14` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/8e071e18-breakdown.json:1942:14` | `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` |
+| `dev/active/8e071e18-breakdown.json:1943:14` | `dev/sessions/session-20260620-planning-skill-design.md` |
+| `dev/active/8e071e18-breakdown.json:1944:14` | `dev/sessions/session-20260622-planning-failures-and-churn.md` |
+| `dev/active/8e071e18-breakdown.json:1945:14` | `dev/sessions/session-20260623-planning-skill-observations.md` |
+| `dev/active/8e071e18-breakdown.json:1946:14` | `dev/sessions/session-20260624-project-lead-role-design.md` |
+| `dev/active/8e071e18-breakdown.json:1947:14` | `dev/sessions/session-20260625-planning-skill-authoring.md` |
+| `dev/active/8e071e18-breakdown.json:3459:2070` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/8e071e18-breakdown.json:3459:2104` | `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3459:2208` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/8e071e18-breakdown.json:3459:2242` | `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5250` | `dev/sessions/session-20260620-planning-skill-design.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5365` | `dev/sessions/session-20260620-planning-skill-design.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5425` | `dev/sessions/session-20260622-planning-failures-and-churn.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5546` | `dev/sessions/session-20260622-planning-failures-and-churn.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5612` | `dev/sessions/session-20260623-planning-skill-observations.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5733` | `dev/sessions/session-20260623-planning-skill-observations.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5799` | `dev/sessions/session-20260624-project-lead-role-design.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5917` | `dev/sessions/session-20260624-project-lead-role-design.md` |
+| `dev/active/8e071e18-breakdown.json:3734:5980` | `dev/sessions/session-20260625-planning-skill-authoring.md` |
+| `dev/active/8e071e18-breakdown.json:3734:6098` | `dev/sessions/session-20260625-planning-skill-authoring.md` |
+| `dev/active/c23dfe71-breakdown-spec.md:28:12` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/c23dfe71-breakdown-spec.md:32:13` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/c23dfe71-breakdown-spec.md:97:6` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/e8b1cee3-breakdown-spec.md:107:6` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/eed6750c-handoff.md:13:4` | `dev/sessions/session-20260625-planning-skill-authoring.md` |
+| `dev/active/eed6750c-handoff.md:49:32` | `dev/sessions/session-20260625-planning-skill-authoring.md` |
+| `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md:108:12` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md:112:13` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md:66:33` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/f2532a2d-handoff-2.md:34:290` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/f2532a2d-handoff-2.md:55:20` | `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` |
+| `dev/active/f2532a2d-handoff-2.md:63:31` | `dev/active/eed6750c-handoff.md` |
+| `dev/active/f2532a2d-handoff.md:56:20` | `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` |
+| `dev/active/f2532a2d-handoff.md:63:31` | `dev/active/eed6750c-handoff.md` |
+| `dev/archive/9ac9fdac-handoff.md:52:52` | `dev/sessions/session-20260622-planning-failures-and-churn.md` |
+| `dev/archive/f2532a2d-progress.json:6:177` | `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` |
+
+### Other plan warnings (1)
+
+- `missing-edge-target` at `.agents/skills/jit-planning-lead/evals/results.md`
