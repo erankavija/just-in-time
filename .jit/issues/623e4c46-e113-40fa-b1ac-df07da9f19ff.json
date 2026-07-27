@@ -8,6 +8,7 @@
   ],
   "description": "The adopter tutorial and the adopter how-to cite a design-document path that resolves after the cleanup.\n\n## Background\n\nBoth guides close with a pointer to the same architecture design document. These are the only adopter-facing citations in the working set, so accuracy matters more here than volume.\n\nValidation resolves document link records only, so an inline path mention in prose or code breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named files resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: Mechanical documentation checks over the two named guides pass.\n",
   "documents": [],
+  "done_at": "2026-07-27T10:45:35.811340417Z",
   "first_ready_at": "2026-07-27T10:15:40.716589540Z",
   "gates_required": [
     "doc-review",
@@ -35,7 +36,7 @@
     "per:@/issue/8e071e18/decision/D-8"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Resolve the adopter guides' citations of relocated artifacts",
-  "updated_at": "2026-07-27T10:38:45.529923062Z"
+  "updated_at": "2026-07-27T10:45:35.811340417Z"
 }

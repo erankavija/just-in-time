@@ -10361,3 +10361,8 @@
 {"id":"291ed7e5-0661-4526-9ad9-ac840bebf650","issue_id":"f9e42a43-e382-4e1b-9e15-91984def9977","priority":"normal","timestamp":"2026-07-27T10:44:23.643747816Z","title":"Treat a directory link target consistently across discovery, link checking and validation","type":"issue_created"}
 {"id":"c8e9f6f6-51ba-494e-a079-d453a272194f","issue_id":"f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8","priority":"normal","timestamp":"2026-07-27T10:44:26.375581722Z","title":"Honour a document reference's commit pin when checking links","type":"issue_created"}
 {"fields":["dependencies"],"id":"d5c24768-b1d0-4b6c-b971-a4a5fd8bd618","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-07-27T10:44:38.733169740Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"code-review","id":"ccd27916-f6b3-45b0-af40-ab2b25218692","issue_id":"35499d1e-ca3e-4f66-a1e3-2c62c09f9cf3","timestamp":"2026-07-27T10:45:19.707890601Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"2649a848-960e-4870-8853-06c6642d310e","issue_id":"623e4c46-e113-40fa-b1ac-df07da9f19ff","timestamp":"2026-07-27T10:45:35.811340417Z","to":"done","type":"issue_state_changed"}
+{"id":"30d9f7cd-0cbe-4efd-a3b3-121b634bd29a","issue_id":"623e4c46-e113-40fa-b1ac-df07da9f19ff","timestamp":"2026-07-27T10:45:35.811340417Z","type":"issue_completed"}
+{"from":"in_progress","id":"084f6872-23fe-4805-9b8a-2e2494ec73e2","issue_id":"834a78a8-b55b-4549-ac06-aa6438a1332e","timestamp":"2026-07-27T10:45:39.694288416Z","to":"done","type":"issue_state_changed"}
+{"id":"912f1320-9dd0-4a10-b544-4086fb31b6d1","issue_id":"834a78a8-b55b-4549-ac06-aa6438a1332e","timestamp":"2026-07-27T10:45:39.694288416Z","type":"issue_completed"}

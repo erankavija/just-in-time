@@ -24,6 +24,11 @@
       "updated_at": "2026-07-27T10:32:08.406398022Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-27T10:45:19.707890601Z",
+      "updated_by": "auto:executor"
+    },
     "doc-review": {
       "status": "passed",
       "updated_at": "2026-07-27T10:43:14.544066022Z",
@@ -50,5 +55,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Serviceable archival for every configured development area",
-  "updated_at": "2026-07-27T10:43:14.544066022Z"
+  "updated_at": "2026-07-27T10:45:19.707890601Z"
 }
