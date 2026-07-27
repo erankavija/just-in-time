@@ -223,10 +223,11 @@ the permitted next action.
 
 A preview also reports the in-content citations a relocation would break as
 `moving-path-citation` warnings, read from the declared `citation_scan_roots`
-universe (see the [`[documentation]`
-table](configuration.md#documentation)). Only a relocating artifact earns them,
-and every occurrence is its own warning whose `path` names the citing file with
-the occurrence's 1-based line and column, spelled
+universe — the repository-relative directories and files whose text the scan
+reads, which need not lie under the development root ([Citation scan
+roots](configuration.md#citation-scan-roots)). Only a relocating artifact earns
+them, and every occurrence is its own warning whose `path` names the citing file
+with the occurrence's 1-based line and column, spelled
 `<citing path>:<line>:<column>`. The warnings are advisory: they carry no action
 and no blocker, so eligibility, `--execute`, and issue transitions all behave as
 they would with no citation present. Execution relocates bytes and relinks
@@ -268,19 +269,29 @@ link is evidenced as the link itself, so one pointing at a directory is
 inventoried and blocked as `symlink-artifact`. Unexpected metadata or storage
 failures still fail planning instead of being converted into this blocker.
 
+The configured development root bounds every plan, and which areas inside it
+are managed or permanent is repository policy (see [Development-area
+classification](configuration.md#development-area-classification)). A selected
+root the development root does not contain is retained: the plan schedules no
+destination for it, leaves its source in place, and carries
+`outside-development-root` evidence. The `unmanaged-selected-root` blocker
+names a selected root the development root contains but no configured area
+matches, so a retained out-of-root artifact reports none. Discovery also stops
+at such an artifact instead of following the references inside it, so a linked
+source file, script, agent asset, or repository-root document keeps its single
+copy and draws nothing further into the plan.
+
 The candidates command has no age, retention, category, suggestion, or default
 target behavior, and it has no `--execute` form. It never writes artifacts,
 issue records, or events. Missing and partial documentation policy therefore
 remain `unconfigured` and `incomplete`; they are reported rather than filled by
 mutation-authorizing defaults. The shared planner also preserves its detailed
-semantics here: a selected root inside the development root that matches no
-configured area is blocked as `unmanaged-selected-root`, a root outside that
-development root is retained at its source with no destination and carries
-`outside-development-root` evidence, and an unmanaged embedded dependency
-carries `unmanaged-path` evidence and can only copy or retain. Sources already
-beneath the configured archive root are evaluated as already existing: direct roots
-retain, relative dependencies of relocated parents copy to the current mirror,
-and root-relative or staying-parent dependencies retain.
+semantics here: the development-root boundary above holds unchanged, an
+unmanaged embedded dependency carries `unmanaged-path` evidence and can only
+copy or retain, and sources already beneath the configured archive root are
+evaluated as already existing — direct roots retain, relative dependencies of
+relocated parents copy to the current mirror, and root-relative or
+staying-parent dependencies retain.
 
 A blocked preview is still a successful read-only command and exits zero. Check
 `eligible`, then inspect target-level and per-artifact `blockers`. In particular,
@@ -315,15 +326,16 @@ re-emit the transition.
 
 For a container target, the preferred destination root is
 `<archive_root>/<container-short-id>-<slug>/`, where `<archive_root>` is the
-repository-authored policy value rather than a built-in path. A membership label
-supplies `<slug>`: when the issue carries exactly one `type:*` label and exactly
-one label in that type's configured membership namespace, that label's value is
-normalized into the suffix, so `epic:artifact-archival` yields
-`archive/2f84c930-artifact-archival/`. Normalization lowercases Unicode
-alphanumeric characters, collapses every other run into a single `-`, bounds the
-result at 48 characters, and drops a trailing separator. Without that pair of
-labels, or when the membership value normalizes to no usable character, the
-destination root is the bare `<archive_root>/<container-short-id>/`.
+repository-authored policy value rather than a built-in path. A membership
+label supplies `<slug>`, normalized into the same suffix an issue's artifact
+directory carries; [Issue artifact
+directories](configuration.md#issue-artifact-directories) specifies how a
+container's `type:*` label, that type's membership namespace, and that
+namespace's value on the container resolve to one slug. Every other shape,
+including a membership value that normalizes to nothing, gives the bare
+`<archive_root>/<container-short-id>/`. Labels and the short id are the whole
+input to that name, so a container's title has no part in it and retitling one
+leaves its destination where it is.
 
 Execution creates a `.jit-container` marker containing the resolved full
 container ID followed by a newline. The short ID and marker-recorded full ID
@@ -2639,6 +2651,74 @@ jit doc check-links [--scope all|issue:<ID>] [--json]
 [exit-code reference](exit-codes.md#command-specific-mappings): `0` when every
 document is valid, otherwise `1` (broken links) or `2` (only warnings). JSON
 reports `valid`, `errors`, `warnings`, and a `summary`.
+
+### `jit doc dir`
+
+Print the repository-relative directory an issue owns in a declared
+issue-scoped area.
+
+```bash
+jit doc dir <ID> <AREA> [--json]
+```
+
+`<AREA>` is one of the issue-scoped areas the repository declares under
+`[documentation]`; naming it is the caller's whole contribution, because the
+directory name inside it is derived from the issue ([Issue artifact
+directories](configuration.md#issue-artifact-directories)). The answer is a
+name rather than a reading of the tree: it resolves the same whether or not
+anything has been written there, and the command creates nothing.
+
+Human output is the bare directory, so it composes straight into a shell
+substitution:
+
+```bash
+mkdir -p "$(jit doc dir abc12345 <AREA>)"
+```
+
+JSON is a flat object naming the issue, the area, and the directory —
+`{"issue_id": <id>, "short_id": <short id>, "area": <area>, "directory": <path>}`.
+
+An area the repository does not declare is rejected with code
+`INVALID_ARGUMENT` and exit code `2`, and the message lists the declared areas.
+An id naming no issue is `ISSUE_NOT_FOUND`, exit code `3`.
+
+### `jit doc conformance`
+
+Report the artifacts sitting outside the directory their owning issue owns.
+
+```bash
+jit doc conformance [--json]
+```
+
+The report walks every declared issue-scoped area and resolves each artifact's
+owner from the short id its own name opens with. An artifact outside the
+directory that issue owns (`jit doc dir`) is `nonconforming` and carries both
+the owner and that directory; one whose short-id prefix no single issue answers
+to is `unattributed` and carries neither. A name opening with no short id is
+passed over. The topmost offending path component is the one named, so a
+misplaced directory is a single entry rather than one per file inside it, and
+an artifact anywhere beneath its owner's directory conforms.
+
+Advice rather than enforcement: the command writes nothing, blocks no state
+transition, and exits `0` whatever it finds. A listed artifact is left exactly
+where it is, and acting on the report is the adopter's call.
+
+Human output names the areas walked, then each reported artifact with its
+verdict:
+
+```
+Scanned areas: <area>, <area>
+Artifacts (2):
+  <area>/abc12345-plan.md
+    nonconforming -> <area>/abc12345-auth (issue abc12345-49b1-4b0f-9a1e-6c2f0d3a7e55)
+  <area>/deadbeef-notes.md
+    unattributed (no issue answers to deadbeef)
+```
+
+JSON is the list envelope over `artifacts` alongside the `areas` walked:
+`{"areas": [...], "count": N, "artifacts": [...]}`. Each entry carries `path`,
+`area`, `short_id`, and `status`; a `nonconforming` entry adds `issue_id` and
+`canonical_directory`.
 
 ## Graph Commands
 
