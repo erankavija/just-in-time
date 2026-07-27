@@ -331,34 +331,6 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     ExitCode::GenericError
 }
 
-/// Resolve the status named by a JSON envelope at the process boundary.
-///
-/// Legacy call sites can still carry text codes while the vocabulary is being
-/// completed. The `Err` branch deliberately preserves their historical generic
-/// status without writing a new diagnostic, so this shape-only conversion does
-/// not change either process output stream. Unlike the former `unwrap_or`, the
-/// unresolved case remains explicit here and fallible to every other caller.
-fn json_error_exit_code(error: &jit::output::JsonError) -> ExitCode {
-    match error.exit_code() {
-        Ok(exit_code) => exit_code,
-        Err(_unresolved) => ExitCode::GenericError,
-    }
-}
-
-#[cfg(test)]
-mod json_error_exit_code_tests {
-    use super::{json_error_exit_code, ExitCode};
-    use jit::output::JsonError;
-
-    #[test]
-    fn test_json_error_exit_code_preserves_legacy_unregistered_status() {
-        let error = JsonError::new("LEGACY_UNREGISTERED", "legacy failure");
-
-        assert!(error.exit_code().is_err());
-        assert_eq!(json_error_exit_code(&error), ExitCode::GenericError);
-    }
-}
-
 /// Pick the dominant exit code across every rejected edge of a `jit dep add`
 /// batch (jit:c8518f2a). Resolution failures (bad/ambiguous id prefix, not
 /// found — exit 2/3) always win over graph-validation failures (cycle, or a
@@ -491,7 +463,14 @@ fn dep_add_batch_json_error(
     {
         JsonError::issue_not_found(to)
     } else {
-        jit::output::refine_id_error(err, JsonError::new("DEPENDENCY_ERROR", err.to_string()))
+        jit::output::refine_id_error(
+            err,
+            JsonError::legacy_unregistered(
+                "DEPENDENCY_ERROR",
+                jit::output::ExitCode::GenericError,
+                err.to_string(),
+            ),
+        )
     };
 
     let mut details = json_error
@@ -519,15 +498,14 @@ fn dep_add_batch_json_error(
 /// other failure keeps the command-specific `fallback_code`.
 fn claim_json_error(error: &anyhow::Error, fallback_code: &str) -> jit::output::JsonError {
     use jit::output::{ErrorCode, JsonError};
-    let code = if error
+    if error
         .downcast_ref::<jit::errors::ClaimRequiresGitError>()
         .is_some()
     {
-        ErrorCode::ClaimRequiresGit.as_str()
+        JsonError::new(ErrorCode::ClaimRequiresGit, error.to_string())
     } else {
-        fallback_code
-    };
-    JsonError::new(code, error.to_string())
+        JsonError::legacy_unregistered(fallback_code, ExitCode::GenericError, error.to_string())
+    }
 }
 
 /// Preserve a `validate --fix` failure's complete cause chain while selecting
@@ -577,14 +555,14 @@ fn render_gate_pass_error(
         return Err(e);
     }
 
-    use jit::output::{GateRunSummary, JsonError};
+    use jit::output::{ErrorCode, GateRunSummary, JsonError};
     let json_error = if let Some(gate_failure) = e.downcast_ref::<jit::commands::GatePassFailed>() {
         // Distinguish a checker failure (verdict `fail`, exit 4) from a
         // runner/infra error (verdict `error`, exit 10). The error code drives
         // the exit code, so the JSON and non-JSON paths agree.
         let (error_code, verdict) = match gate_failure.status {
-            jit::domain::GateRunStatus::Error => ("IO_ERROR", "error"),
-            _ => ("GATE_FAILED", "fail"),
+            jit::domain::GateRunStatus::Error => (ErrorCode::IoError, "error"),
+            _ => (ErrorCode::GateFailed, "fail"),
         };
         JsonError::new(error_code, e.to_string())
             .with_details(serde_json::json!({
@@ -610,7 +588,7 @@ fn render_gate_pass_error(
     } else if let Some(not_required) = e.downcast_ref::<jit::commands::GateNotRequiredError>() {
         // Pre-verdict argument error: not a gate verdict, so it carries no
         // `verdict` field.
-        JsonError::new("INVALID_ARGUMENT", e.to_string())
+        JsonError::new(jit::output::ErrorCode::InvalidArgument, e.to_string())
             .with_details(serde_json::json!({
                 "issue_id": not_required.issue_id,
                 "key": not_required.gate_key,
@@ -626,7 +604,7 @@ fn render_gate_pass_error(
         // no checker to run, so a bare evaluate would silently record an
         // unattributed pass. No write happened, so — like `GateNotRequiredError`
         // above — this carries no `verdict` field.
-        JsonError::new("INVALID_ARGUMENT", e.to_string())
+        JsonError::new(jit::output::ErrorCode::InvalidArgument, e.to_string())
             .with_details(serde_json::json!({
                 "issue_id": needs_attestor.issue_id,
                 "key": needs_attestor.gate_key,
@@ -650,10 +628,14 @@ fn render_gate_pass_error(
         // `error_to_exit_code`.
         stale_binary_json_error(stale)
     } else {
-        JsonError::new("GATE_ERROR", e.to_string())
+        JsonError::legacy_unregistered(
+            "GATE_ERROR",
+            jit::output::ExitCode::GenericError,
+            e.to_string(),
+        )
     };
     println!("{}", json_error.to_json_string()?);
-    std::process::exit(json_error_exit_code(&json_error).code());
+    std::process::exit(json_error.exit_code().code());
 }
 
 /// Build the `--json` error envelope for a stale-binary refusal
@@ -795,7 +777,7 @@ fn resolve_gate_key_for(
                     e.to_string(),
                 );
                 println!("{}", json_error.to_json_string()?);
-                std::process::exit(json_error_exit_code(&json_error).code());
+                std::process::exit(json_error.exit_code().code());
             }
             Err(e)
         }
@@ -816,7 +798,7 @@ fn invalid_argument(message: String, json: bool) -> anyhow::Error {
         if let Ok(s) = json_error.to_json_string() {
             println!("{}", s);
         }
-        std::process::exit(json_error_exit_code(&json_error).code());
+        std::process::exit(json_error.exit_code().code());
     }
     jit::errors::InvalidArgumentError::new(message).into()
 }
@@ -844,21 +826,28 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
     // unreadable or unparseable profile registry is a generic profile error. Every
     // other variant keeps the generic profile-error code.
     if let Some(state_error) = error.downcast_ref::<RepositoryStateError>() {
-        let code = match state_error {
+        let is_conflict = matches!(
+            state_error,
             RepositoryStateError::ProfileTargetConflict(_)
-            | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(_))
-            | RepositoryStateError::Producer(ProducerError::ProfileContributionConflict {
-                ..
-            }) => ErrorCode::ProfileConflict.as_str(),
-            RepositoryStateError::Producer(
-                ProducerError::ProfileRegistryNotFile { .. }
-                | ProducerError::ProfileRegistryParse { .. },
-            ) => "PROFILE_ERROR",
-            _ => "PROFILE_ERROR",
+                | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
+                    _
+                ))
+                | RepositoryStateError::Producer(ProducerError::ProfileContributionConflict { .. })
+        );
+        if is_conflict {
+            return JsonError::new(ErrorCode::ProfileConflict, error.to_string());
         };
-        return JsonError::new(code, error.to_string());
+        return JsonError::legacy_unregistered(
+            "PROFILE_ERROR",
+            ExitCode::GenericError,
+            error.to_string(),
+        );
     }
-    JsonError::new("PROFILE_ERROR", error.to_string())
+    JsonError::legacy_unregistered(
+        "PROFILE_ERROR",
+        jit::output::ExitCode::GenericError,
+        error.to_string(),
+    )
 }
 
 fn profile_result<T>(result: anyhow::Result<T>, json: bool) -> anyhow::Result<T> {
@@ -867,7 +856,7 @@ fn profile_result<T>(result: anyhow::Result<T>, json: bool) -> anyhow::Result<T>
         Err(error) if json => {
             let json_error = profile_json_error(&error);
             println!("{}", json_error.to_json_string()?);
-            std::process::exit(json_error_exit_code(&json_error).code());
+            std::process::exit(json_error.exit_code().code());
         }
         Err(error) => Err(error),
     }
@@ -1331,7 +1320,11 @@ fn run_item<S: IssueStore>(
         handle_json_error!(
             json,
             e,
-            jit::output::JsonError::new("ITEM_COMMAND_FAILED", e.to_string())
+            jit::output::JsonError::legacy_unregistered(
+                "ITEM_COMMAND_FAILED",
+                jit::output::ExitCode::GenericError,
+                e.to_string()
+            )
         );
     }
     Ok(())
@@ -1405,7 +1398,11 @@ fn run_invariant<S: IssueStore>(
         handle_json_error!(
             json,
             e,
-            jit::output::JsonError::new("INVARIANT_COMMAND_FAILED", e.to_string())
+            jit::output::JsonError::legacy_unregistered(
+                "INVARIANT_COMMAND_FAILED",
+                jit::output::ExitCode::GenericError,
+                e.to_string()
+            )
         );
     }
     Ok(())
@@ -1473,17 +1470,21 @@ fn run_project<S: IssueStore + jit::storage::RepositoryStateStore>(
         // A typed projection or managed-region composition failure is a validation
         // error (exit 4) in JSON mode too, matching the non-JSON path's top-level
         // classification.
-        let code = if e
+        let json_error = if e
             .downcast_ref::<jit::repository_state::ProjectionError>()
             .is_some()
             || e.downcast_ref::<jit::repository_state::ManagedDocumentError>()
                 .is_some()
         {
-            jit::output::ErrorCode::ValidationFailed.as_str()
+            jit::output::JsonError::new(jit::output::ErrorCode::ValidationFailed, e.to_string())
         } else {
-            "PROJECT_COMMAND_FAILED"
+            jit::output::JsonError::legacy_unregistered(
+                "PROJECT_COMMAND_FAILED",
+                jit::output::ExitCode::GenericError,
+                e.to_string(),
+            )
         };
-        handle_json_error!(json, e, jit::output::JsonError::new(code, e.to_string()));
+        handle_json_error!(json, e, json_error);
     }
     Ok(())
 }
@@ -2198,7 +2199,7 @@ fn run() -> Result<()> {
                 Err(error) if json => {
                     let json_error = profile_json_error(&error);
                     println!("{}", json_error.to_json_string()?);
-                    std::process::exit(json_error_exit_code(&json_error).code());
+                    std::process::exit(json_error.exit_code().code());
                 }
                 Err(error) => return Err(error),
             },
@@ -2229,7 +2230,7 @@ fn run() -> Result<()> {
                 Err(error) if json => {
                     let json_error = profile_json_error(&error);
                     println!("{}", json_error.to_json_string()?);
-                    std::process::exit(json_error_exit_code(&json_error).code());
+                    std::process::exit(json_error.exit_code().code());
                 }
                 Err(error) => return Err(error),
             },
@@ -2259,7 +2260,7 @@ fn run() -> Result<()> {
                         Err(error) if json => {
                             let json_error = profile_json_error(&error);
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         }
                         Err(error) => return Err(error),
                     }
@@ -2285,7 +2286,7 @@ fn run() -> Result<()> {
                         Err(error) if json => {
                             let json_error = profile_json_error(&error);
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         }
                         Err(error) => return Err(error),
                     }
@@ -2594,7 +2595,11 @@ fn run() -> Result<()> {
                                 handle_json_error!(
                                     json,
                                     e,
-                                    jit::output::JsonError::new("ITEM_NOT_FOUND", e.to_string())
+                                    jit::output::JsonError::legacy_unregistered(
+                                        "ITEM_NOT_FOUND",
+                                        jit::output::ExitCode::GenericError,
+                                        e.to_string()
+                                    )
                                 );
                             }
                         }
@@ -2982,7 +2987,11 @@ fn run() -> Result<()> {
                                     jit::output::JsonError::issue_not_found(&full_id)
                                 } else {
                                     // Generic error - use the JsonError::new directly
-                                    jit::output::JsonError::new("GENERIC_ERROR", &error_msg)
+                                    jit::output::JsonError::legacy_unregistered(
+                                        "GENERIC_ERROR",
+                                        jit::output::ExitCode::GenericError,
+                                        &error_msg,
+                                    )
                                 };
                                 handle_json_error!(json, e, json_error);
                             }
@@ -3087,7 +3096,7 @@ fn run() -> Result<()> {
                                  JIT_ALLOW_DELETION=1 jit issue delete {id}"
                             ));
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         }
                         return Err(e.into());
                     }
@@ -3191,7 +3200,7 @@ fn run() -> Result<()> {
                                     let json_error =
                                         jit::output::JsonError::transition_blocked(blocked);
                                     println!("{}", json_error.to_json_string()?);
-                                    std::process::exit(json_error_exit_code(&json_error).code());
+                                    std::process::exit(json_error.exit_code().code());
                                 }
                             }
                             return Err(e);
@@ -3304,7 +3313,7 @@ fn run() -> Result<()> {
                                     let json_error =
                                         jit::output::JsonError::transition_blocked(blocked);
                                     println!("{}", json_error.to_json_string()?);
-                                    std::process::exit(json_error_exit_code(&json_error).code());
+                                    std::process::exit(json_error.exit_code().code());
                                 }
                             }
                             return Err(e);
@@ -3435,7 +3444,7 @@ fn run() -> Result<()> {
                         {
                             if json {
                                 let json_error = dep_add_batch_json_error(batch);
-                                let code = json_error_exit_code(&json_error).code();
+                                let code = json_error.exit_code().code();
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(code);
                             }
@@ -3447,7 +3456,11 @@ fn run() -> Result<()> {
                         handle_json_error!(
                             json,
                             e,
-                            jit::output::JsonError::new("DEPENDENCY_ERROR", e.to_string())
+                            jit::output::JsonError::legacy_unregistered(
+                                "DEPENDENCY_ERROR",
+                                jit::output::ExitCode::GenericError,
+                                e.to_string()
+                            )
                         );
                     }
                 }
@@ -3501,7 +3514,11 @@ fn run() -> Result<()> {
                         handle_json_error!(
                             json,
                             e,
-                            jit::output::JsonError::new("DEPENDENCY_ERROR", e.to_string())
+                            jit::output::JsonError::legacy_unregistered(
+                                "DEPENDENCY_ERROR",
+                                jit::output::ExitCode::GenericError,
+                                e.to_string()
+                            )
                         );
                     }
                 }
@@ -3615,9 +3632,13 @@ fn run() -> Result<()> {
                     Err(e) => {
                         if json {
                             use jit::output::JsonError;
-                            let json_error = JsonError::new("GATE_ERROR", e.to_string());
+                            let json_error = JsonError::legacy_unregistered(
+                                "GATE_ERROR",
+                                jit::output::ExitCode::GenericError,
+                                e.to_string(),
+                            );
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -3756,10 +3777,14 @@ fn run() -> Result<()> {
                             {
                                 JsonError::gate_not_found(&key)
                             } else {
-                                JsonError::new("GATE_ERROR", e.to_string())
+                                JsonError::legacy_unregistered(
+                                    "GATE_ERROR",
+                                    jit::output::ExitCode::GenericError,
+                                    e.to_string(),
+                                )
                             };
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -3797,9 +3822,13 @@ fn run() -> Result<()> {
                     Err(e) => {
                         if json {
                             use jit::output::JsonError;
-                            let json_error = JsonError::new("GATE_ERROR", e.to_string());
+                            let json_error = JsonError::legacy_unregistered(
+                                "GATE_ERROR",
+                                jit::output::ExitCode::GenericError,
+                                e.to_string(),
+                            );
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -3863,7 +3892,7 @@ fn run() -> Result<()> {
                         use jit::output::JsonError;
                         let json_error = JsonError::gate_not_found(&key);
                         println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error_exit_code(&json_error).code());
+                        std::process::exit(json_error.exit_code().code());
                     } else {
                         return Err(e);
                     }
@@ -3890,7 +3919,7 @@ fn run() -> Result<()> {
                             use jit::output::JsonError;
                             let json_error = JsonError::gate_not_found(&key);
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -3996,9 +4025,13 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new("GATE_CHECK_ERROR", e.to_string());
+                                let json_error = JsonError::legacy_unregistered(
+                                    "GATE_CHECK_ERROR",
+                                    jit::output::ExitCode::GenericError,
+                                    e.to_string(),
+                                );
                                 println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error_exit_code(&json_error).code());
+                                std::process::exit(json_error.exit_code().code());
                             }
                             return Err(e);
                         }
@@ -4016,9 +4049,13 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new("GATE_CHECK_ERROR", e.to_string());
+                                let json_error = JsonError::legacy_unregistered(
+                                    "GATE_CHECK_ERROR",
+                                    jit::output::ExitCode::GenericError,
+                                    e.to_string(),
+                                );
                                 println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error_exit_code(&json_error).code());
+                                std::process::exit(json_error.exit_code().code());
                             }
                             return Err(e);
                         }
@@ -4109,9 +4146,13 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new("GATE_CHECK_ERROR", e.to_string());
+                                let json_error = JsonError::legacy_unregistered(
+                                    "GATE_CHECK_ERROR",
+                                    jit::output::ExitCode::GenericError,
+                                    e.to_string(),
+                                );
                                 println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error_exit_code(&json_error).code());
+                                std::process::exit(json_error.exit_code().code());
                             }
                             return Err(e);
                         }
@@ -4139,15 +4180,18 @@ fn run() -> Result<()> {
                             );
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new("INVALID_ARGUMENT", message)
-                                    .with_details(serde_json::json!({
-                                        "issue_id": gate_key,
-                                        "key": id,
-                                        "transposed": true,
-                                    }))
-                                    .with_suggestion(format!("Did you mean: {canonical}"));
+                                let json_error = JsonError::new(
+                                    jit::output::ErrorCode::InvalidArgument,
+                                    message,
+                                )
+                                .with_details(serde_json::json!({
+                                    "issue_id": gate_key,
+                                    "key": id,
+                                    "transposed": true,
+                                }))
+                                .with_suggestion(format!("Did you mean: {canonical}"));
                                 println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error_exit_code(&json_error).code());
+                                std::process::exit(json_error.exit_code().code());
                             } else {
                                 eprintln!("Error: {message}");
                                 eprintln!("  Did you mean: {canonical}");
@@ -4186,9 +4230,13 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new("GATE_CHECK_ERROR", e.to_string());
+                                let json_error = JsonError::legacy_unregistered(
+                                    "GATE_CHECK_ERROR",
+                                    jit::output::ExitCode::GenericError,
+                                    e.to_string(),
+                                );
                                 println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error_exit_code(&json_error).code());
+                                std::process::exit(json_error.exit_code().code());
                             } else {
                                 return Err(e);
                             }
@@ -4355,12 +4403,16 @@ fn run() -> Result<()> {
                                 .downcast_ref::<jit::storage::GateNotFoundError>()
                                 .is_some()
                             {
-                                JsonError::new("GATE_NOT_FOUND", error_str)
+                                JsonError::new(jit::output::ErrorCode::GateNotFound, error_str)
                             } else {
-                                JsonError::new("GATE_ERROR", error_str)
+                                JsonError::legacy_unregistered(
+                                    "GATE_ERROR",
+                                    jit::output::ExitCode::GenericError,
+                                    error_str,
+                                )
                             };
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -4523,9 +4575,13 @@ fn run() -> Result<()> {
                     Err(e) => {
                         if json {
                             use jit::output::JsonError;
-                            let json_error = JsonError::new("GATE_ERROR", e.to_string());
+                            let json_error = JsonError::legacy_unregistered(
+                                "GATE_ERROR",
+                                jit::output::ExitCode::GenericError,
+                                e.to_string(),
+                            );
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -4573,9 +4629,13 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new("PRESET_ERROR", e.to_string());
+                                let json_error = JsonError::legacy_unregistered(
+                                    "PRESET_ERROR",
+                                    jit::output::ExitCode::GenericError,
+                                    e.to_string(),
+                                );
                                 println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error_exit_code(&json_error).code());
+                                std::process::exit(json_error.exit_code().code());
                             } else {
                                 return Err(e);
                             }
@@ -4638,9 +4698,13 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new("PRESET_ERROR", e.to_string());
+                                let json_error = JsonError::legacy_unregistered(
+                                    "PRESET_ERROR",
+                                    jit::output::ExitCode::GenericError,
+                                    e.to_string(),
+                                );
                                 println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error_exit_code(&json_error).code());
+                                std::process::exit(json_error.exit_code().code());
                             } else {
                                 return Err(e);
                             }
@@ -4742,9 +4806,13 @@ fn run() -> Result<()> {
                         Err(e) => {
                             if json {
                                 use jit::output::JsonError;
-                                let json_error = JsonError::new("PRESET_ERROR", e.to_string());
+                                let json_error = JsonError::legacy_unregistered(
+                                    "PRESET_ERROR",
+                                    jit::output::ExitCode::GenericError,
+                                    e.to_string(),
+                                );
                                 println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error_exit_code(&json_error).code());
+                                std::process::exit(json_error.exit_code().code());
                             } else {
                                 return Err(e);
                             }
@@ -6321,10 +6389,13 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error =
-                                jit::output::JsonError::new("HOOKS_INSTALL_ERROR", e.to_string());
+                            let json_error = jit::output::JsonError::legacy_unregistered(
+                                "HOOKS_INSTALL_ERROR",
+                                jit::output::ExitCode::GenericError,
+                                e.to_string(),
+                            );
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -6433,12 +6504,16 @@ fn run() -> Result<()> {
                             None
                         };
 
-                        let mut json_error = JsonError::new(error_code, e.to_string());
+                        let mut json_error = JsonError::legacy_unregistered(
+                            error_code,
+                            jit::output::ExitCode::ExternalError,
+                            e.to_string(),
+                        );
                         if let Some(sug) = suggestion {
                             json_error = json_error.with_suggestion(sug);
                         }
                         println!("{}", json_error.to_json_string()?);
-                        std::process::exit(10); // External dependency failed
+                        std::process::exit(json_error.exit_code().code());
                     } else {
                         return Err(e);
                     }
@@ -7014,9 +7089,13 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        let output = jit::output::JsonError::new("recovery_failed", e.to_string());
+                        let output = jit::output::JsonError::legacy_unregistered(
+                            "recovery_failed",
+                            jit::output::ExitCode::GenericError,
+                            e.to_string(),
+                        );
                         eprintln!("{}", serde_json::to_string(&output)?);
-                        std::process::exit(1);
+                        std::process::exit(output.exit_code().code());
                     } else {
                         eprintln!("Recovery failed: {}", e);
                         std::process::exit(1);
@@ -7375,7 +7454,7 @@ fn run() -> Result<()> {
                         if json {
                             let json_error = claim_json_error(&e, "CLAIM_ACQUIRE_ERROR");
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -7420,7 +7499,7 @@ fn run() -> Result<()> {
                         if json {
                             let json_error = claim_json_error(&e, "CLAIM_RELEASE_ERROR");
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -7462,7 +7541,7 @@ fn run() -> Result<()> {
                         if json {
                             let json_error = claim_json_error(&e, "CLAIM_RENEW_ERROR");
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -7495,7 +7574,7 @@ fn run() -> Result<()> {
                         if json {
                             let json_error = claim_json_error(&e, "CLAIM_HEARTBEAT_ERROR");
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -7583,7 +7662,7 @@ fn run() -> Result<()> {
                         if json {
                             let json_error = claim_json_error(&e, "CLAIM_STATUS_ERROR");
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -7656,7 +7735,7 @@ fn run() -> Result<()> {
                         if json {
                             let json_error = claim_json_error(&e, "CLAIM_LIST_ERROR");
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -7695,7 +7774,7 @@ fn run() -> Result<()> {
                         if json {
                             let json_error = claim_json_error(&e, "CLAIM_FORCE_EVICT_ERROR");
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -7746,9 +7825,13 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = JsonError::new("WORKTREE_INFO_ERROR", e.to_string());
+                            let json_error = JsonError::legacy_unregistered(
+                                "WORKTREE_INFO_ERROR",
+                                jit::output::ExitCode::GenericError,
+                                e.to_string(),
+                            );
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -7799,9 +7882,13 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = JsonError::new("WORKTREE_LIST_ERROR", e.to_string());
+                            let json_error = JsonError::legacy_unregistered(
+                                "WORKTREE_LIST_ERROR",
+                                jit::output::ExitCode::GenericError,
+                                e.to_string(),
+                            );
                             println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error_exit_code(&json_error).code());
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             return Err(e);
                         }
@@ -8104,8 +8191,7 @@ mod repository_state_classifier_tests {
     //! variant is asserted so a reclassification (or a mis-mapped newly added
     //! variant) fails here rather than silently changing a command's exit status.
 
-    use super::{error_to_exit_code, json_error_exit_code, profile_json_error};
-    use jit::output::ExitCode;
+    use super::{error_to_exit_code, profile_json_error};
     use jit::repository_state::{
         AmbiguousOwnershipError, ArchiveExecutionError, GateRegistryEditError, InitializationError,
         ManagedDocumentError, ProducerError, ProfileTargetConflictError, ProjectionError,
@@ -8189,7 +8275,7 @@ mod repository_state_classifier_tests {
                 json.error.code,
                 jit::output::ErrorCode::ProfileConflict.as_str()
             );
-            assert_eq!(json.exit_code().map(ExitCode::code), Ok(4));
+            assert_eq!(json.exit_code().code(), 4);
         }
 
         let error_cases: Vec<RepositoryStateError> = vec![
@@ -8200,11 +8286,7 @@ mod repository_state_classifier_tests {
             let error = anyhow::Error::new(state_error);
             let json = profile_json_error(&error);
             assert_eq!(json.error.code, "PROFILE_ERROR");
-            let unresolved = json
-                .exit_code()
-                .expect_err("PROFILE_ERROR is not yet a registered code");
-            assert_eq!(unresolved.as_str(), "PROFILE_ERROR");
-            assert_eq!(json_error_exit_code(&json).code(), 1);
+            assert_eq!(json.exit_code().code(), 1);
         }
     }
 
@@ -8216,6 +8298,6 @@ mod repository_state_classifier_tests {
             json.error.code,
             jit::output::ErrorCode::ProfileNotFound.as_str()
         );
-        assert_eq!(json.exit_code().map(ExitCode::code), Ok(3));
+        assert_eq!(json.exit_code().code(), 3);
     }
 }

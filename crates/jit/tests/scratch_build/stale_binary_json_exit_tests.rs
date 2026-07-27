@@ -5,8 +5,8 @@
 //! exactly matching the exit code the non-`--json` path already produced.
 //! Before that fix, `render_gate_pass_error` (main.rs) had no branch for
 //! `StaleBinaryError`, so it fell through to the generic `GATE_ERROR` code,
-//! which cannot resolve to an `ErrorCode` member and maps to exit `1` —
-//! silently breaking the documented exit-10 contract under `--json` only.
+//! whose legacy constructor explicitly preserves exit `1` — silently breaking
+//! the documented exit-10 contract under `--json` only.
 //!
 //! Reproducing a genuine EVALUATOR-path refusal needs a binary whose own build
 //! commit is a commit the repository under review knows but has advanced past.
