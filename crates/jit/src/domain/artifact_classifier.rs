@@ -764,10 +764,6 @@ fn classify_entry(
         document_all_terminal,
         archived_source,
     );
-    let selected_owners = owners
-        .iter()
-        .filter(|owner| owner.selected_for_relink)
-        .collect::<Vec<_>>();
     let repository_embedded = embedded_owners.get(&source).cloned().unwrap_or_default();
     let direct_outside_owner = matches!(target, PlanTarget::Container { .. })
         && owners.iter().any(|owner| !owner.inside_subtree);
@@ -898,11 +894,26 @@ fn classify_entry(
         action = ArtifactAction::Block;
     }
 
+    // Only `Move` and `Copy` write the destination a relink would name.
+    // `Retain` leaves the source as the only file that exists
+    // (`@/issue/8e071e18/decision/D-14`), and `Block` writes nothing either,
+    // so neither may carry a relink regardless of what the ownership facts
+    // alone selected above.
+    let relinks_to_destination = matches!(action, ArtifactAction::Move | ArtifactAction::Copy);
+    let owners = owners
+        .into_iter()
+        .map(|mut owner| {
+            owner.selected_for_relink = owner.selected_for_relink && relinks_to_destination;
+            owner
+        })
+        .collect::<Vec<_>>();
+
     let reference_changes = if archived_source && explicit {
         Vec::new()
     } else {
-        selected_owners
-            .into_iter()
+        owners
+            .iter()
+            .filter(|owner| owner.selected_for_relink)
             .map(|owner| ReferenceChange {
                 issue: owner.issue.clone(),
                 document_index: owner.document_index,
@@ -2456,8 +2467,8 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_entry_suppresses_the_relink_for_a_retained_owner_outside_the_development_root(
-    ) {
+    fn test_classify_entry_suppresses_the_relink_for_a_retained_owner_outside_the_development_root()
+    {
         // The owner alone — unpinned, inside the resolved subtree, terminal —
         // would otherwise earn a relink, but the source lies outside the
         // development root, so classification always retains it (`:805-806`)
