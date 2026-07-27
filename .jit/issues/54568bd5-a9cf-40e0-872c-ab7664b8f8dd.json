@@ -21,7 +21,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Failure-lever survey for the profile namespace",
-  "updated_at": "2026-07-27T21:44:50.111883865Z"
+  "updated_at": "2026-07-27T22:00:05.477618404Z"
 }

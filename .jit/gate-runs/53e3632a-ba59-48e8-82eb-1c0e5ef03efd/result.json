@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "26a945e9403f8accec725142891466bb89fdb9da",
+  "completed_at": "2026-07-27T21:59:19.759460039Z",
+  "duration_ms": 306046,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The authoritative manifest, stored issues, complete graph, content standards, and finest-tier sizing simulation all pass review.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "059e13e2-0970-4cc8-8a4e-21cc8b3d83ab",
+  "message": null,
+  "run_id": "53e3632a-ba59-48e8-82eb-1c0e5ef03efd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T21:54:13.712621411Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Manifest validation, renderer `--check`, native batch dry-run, and `jit validate` passed. Fidelity checks confirmed 35 exact issues, 46 intra-manifest edges, 15 source→B edges, four C→sink edges, no external re-homes, and no persisted/exported `planning` data. Contract modes, producer reachability, footprints, and overlap strategies are consistent with the created graph. The prior stale survey count was replaced in both the manifest and stored issue.\n\n| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused implementation/review cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---|---|---|---|---|---|---|---|\n| error-code-enum | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| emitted-code-registration | Yes | Yes | Yes | Yes | Yes—override justified | Yes | Yes | PASS |\n| stored-record-decode-classification | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| search-exit-status-repair | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| preset-apply-failure-status | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| exit-status-parity-verification | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| exit-status-projection-binding | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| top-level-envelope-renderer | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| recovery-envelope-stream-repair | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| serve-failure-envelope-repair | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-issue | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-doc | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-gate | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-claim | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-query-graph | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-config | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-label | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-events | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-archive | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-item-invariant-project | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-profile | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-dep-worktree | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-repository-lifecycle | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| lever-survey-standalone-tools | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| failure-lever-registry-assembly | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| forced-failure-probe-fixture | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| error-envelope-conformance-suite | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| arm-coverage-completeness-guard | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| payload-stream-purity-guard | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| error-code-reference-page | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n| failure-contract-doc-home | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n\nFindings (numbered): none.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The authoritative manifest, stored issues, complete graph, content standards, and finest-tier sizing simulation all pass review.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

@@ -21,7 +21,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Failure-lever survey for the dependency and worktree namespaces",
-  "updated_at": "2026-07-27T21:44:54.612612979Z"
+  "updated_at": "2026-07-27T22:00:52.695350533Z"
 }

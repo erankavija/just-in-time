@@ -21,7 +21,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Failure-lever survey for the events namespace",
-  "updated_at": "2026-07-27T21:44:35.664281565Z"
+  "updated_at": "2026-07-27T22:00:29.042889019Z"
 }

@@ -21,7 +21,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Failure-lever survey for the standalone tool commands",
-  "updated_at": "2026-07-27T21:45:03.467712119Z"
+  "updated_at": "2026-07-27T22:00:10.293522515Z"
 }

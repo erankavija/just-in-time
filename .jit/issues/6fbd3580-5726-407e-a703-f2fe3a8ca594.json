@@ -21,7 +21,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Failure-lever survey for the config namespace",
-  "updated_at": "2026-07-27T21:44:26.991743828Z"
+  "updated_at": "2026-07-27T22:00:15.016089195Z"
 }

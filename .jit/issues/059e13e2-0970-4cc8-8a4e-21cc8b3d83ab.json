@@ -7,6 +7,7 @@
   ],
   "description": "Breakdown node bracketing Structured failure reporting across the machine-readable CLI surface (a2546471). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria.",
   "documents": [],
+  "done_at": "2026-07-27T21:59:46.853128472Z",
   "first_ready_at": "2026-07-27T19:20:30.960119095Z",
   "gates_required": [
     "coverage-preview",
@@ -14,8 +15,8 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "failed",
-      "updated_at": "2026-07-27T21:52:51.198227559Z",
+      "status": "passed",
+      "updated_at": "2026-07-27T21:59:20.076217619Z",
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
@@ -33,7 +34,7 @@
     "brackets:a2546471"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "breakdown: Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-27T21:52:51.198227559Z"
+  "updated_at": "2026-07-27T21:59:46.853128472Z"
 }

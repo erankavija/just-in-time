@@ -21,7 +21,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Failure-lever survey for the doc namespace",
-  "updated_at": "2026-07-27T21:44:09.588450440Z"
+  "updated_at": "2026-07-27T22:00:19.675135873Z"
 }
