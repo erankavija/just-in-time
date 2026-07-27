@@ -13,7 +13,18 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-27T10:38:45.529923062Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-27T10:19:39.460487846Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "623e4c46-e113-40fa-b1ac-df07da9f19ff",
   "labels": [
     "type:task",
@@ -26,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Resolve the adopter guides' citations of relocated artifacts",
-  "updated_at": "2026-07-27T10:16:18.854683227Z"
+  "updated_at": "2026-07-27T10:38:45.529923062Z"
 }

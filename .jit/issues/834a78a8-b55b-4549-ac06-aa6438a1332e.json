@@ -14,7 +14,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-27T10:26:52.257302786Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-27T10:41:21.697664476Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "834a78a8-b55b-4549-ac06-aa6438a1332e",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Resolve the Rust sources' citations of relocated artifacts",
-  "updated_at": "2026-07-27T10:18:21.162536619Z"
+  "updated_at": "2026-07-27T10:41:21.697664476Z"
 }

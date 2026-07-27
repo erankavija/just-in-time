@@ -35,7 +35,9 @@
     "ef118aea-51b4-452b-9aba-fa2bcdf64b9c",
     "f16cfe8c-970e-450b-9ac5-050243c6741d",
     "f2532a2d-138d-46bf-9547-e1ea517f0170",
-    "f6a704d0-1f01-447b-a8aa-42251fa7c3eb"
+    "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",
+    "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
+    "f9e42a43-e382-4e1b-9e15-91984def9977"
   ],
   "description": "First stable production release of just-in-time with complete gate system and documentation",
   "documents": [
@@ -65,5 +67,5 @@
   "priority": "critical",
   "state": "backlog",
   "title": "Version 1.0 Production Release",
-  "updated_at": "2026-07-26T19:30:34.454705191Z"
+  "updated_at": "2026-07-27T10:44:38.733169740Z"
 }

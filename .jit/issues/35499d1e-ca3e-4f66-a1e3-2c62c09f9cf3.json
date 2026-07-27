@@ -19,14 +19,24 @@
     "repo-validate"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-27T10:32:08.406398022Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-27T10:43:14.544066022Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
-      "status": "failed",
-      "updated_at": "2026-07-27T10:13:09.056349200Z",
+      "status": "passed",
+      "updated_at": "2026-07-27T10:19:50.016547264Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_at": "2026-07-27T10:13:01.092881414Z",
+      "updated_at": "2026-07-27T10:19:41.916140558Z",
       "updated_by": "auto:executor"
     }
   },
@@ -40,5 +50,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Serviceable archival for every configured development area",
-  "updated_at": "2026-07-27T10:13:09.056349200Z"
+  "updated_at": "2026-07-27T10:43:14.544066022Z"
 }
