@@ -1,0 +1,50 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "b4e26ca7706125ed9fb4dc5f58a5cbe7f2553de7",
+  "completed_at": "2026-07-27T12:52:06.107819784Z",
+  "duration_ms": 153287,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/143388dc-development-root-cleanup/remaining-artifacts-addendum.md",
+        "id": "F1",
+        "line": 21,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "The addendum reports 144 current files and 7 additions, but the current inventory is 145 files: 138 baseline plus 8 additions minus 1 relocation."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/143388dc-development-root-cleanup/remaining-artifacts-addendum.md",
+        "id": "F2",
+        "line": 39,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "low",
+        "summary": "The addendum labels issue 143388dc in_progress although its tracked state is ready; the owner is still non-terminal."
+      }
+    ],
+    "summary": "The addendum’s managed-area accounting is internally inconsistent with the current tree.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "143388dc-f58e-48ca-9b36-dbe58a527489",
+  "message": null,
+  "run_id": "a7737164-d719-4d12-a6b2-ca552c266235",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T12:49:32.820678436Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2805 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa39f-978f-75b0-b8e1-296b5e32bd62\n--------\nuser\n--- 2792 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b4e26ca7 (`jit:143388dc`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/8e071e18/decision/D-8, D-13, D-15 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json)\nGate evidence: repo-validate passed (0); cargo-ci passed (0); doc-review passed (0); docs-mechanical passed (0)\nTruncation recovery: re-read the relevant completeness-record, gate/config, owner-record, and inventory ranges separately; excluded unrelated historical search output\n\n1. [blocking][issue-impact] F1 — The new REQ-03 completion record is internally inconsistent and wrong: it reports 144 current files and 7 additions, but the current managed-area inventory is 145 files (138 baseline + 8 additions − 1 relocation). Its own table lists all eight additions. This makes the attributable completeness evidence unreliable. [`remaining-artifacts-addendum.md:21`](dev/active/143388dc-development-root-cleanup/remaining-artifacts-addendum.md:21) Reference: @/invariant/single-source-prose.\n\n2. [advisory][issue-impact] F2 — The addendum says its owning issue is `in_progress`, while the tracked issue record is `ready`. The owner remains non-terminal, so the retention reason holds, but the stated status is stale. [`remaining-artifacts-addendum.md:39`](dev/active/143388dc-development-root-cleanup/remaining-artifacts-addendum.md:39) Reference: @/invariant/single-source-prose.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The addendum’s managed-area accounting is internally inconsistent with the current tree.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The addendum reports 144 current files and 7 additions, but the current inventory is 145 files: 138 baseline plus 8 additions minus 1 relocation.\",\"file\":\"dev/active/143388dc-development-root-cleanup/remaining-artifacts-addendum.md\",\"line\":21,\"references\":[\"@/invariant/single-source-prose\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The addendum labels issue 143388dc in_progress although its tracked state is ready; the owner is still non-terminal.\",\"file\":\"dev/active/143388dc-development-root-cleanup/remaining-artifacts-addendum.md\",\"line\":39,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

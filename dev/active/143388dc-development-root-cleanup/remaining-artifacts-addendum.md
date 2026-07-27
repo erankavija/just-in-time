@@ -18,12 +18,14 @@ the transitive dependency closure of the 24 archived containers.
 | population | count |
 |---|---|
 | enumerated by the completeness record | 138 |
-| present now | 144 |
-| added since | 7 |
+| present now | 145 |
+| added since | 8 |
 | removed since | 1 |
 
-Every added file is a record this epic wrote after the completeness record, and all seven sit in
-one directory. The single removal is an artifact a re-run relocated.
+Every added file is a record this epic wrote after the completeness record. Seven sit in the epic's
+own directory and the eighth is this addendum, which counts itself: writing it into a managed area
+is what makes it part of the population it enumerates. The single removal is an artifact a re-run
+relocated.
 
 ### Added
 
@@ -36,7 +38,7 @@ one directory. The single removal is an artifact a re-run relocated.
 | `dev/active/8e071e18-dev-artifact-layout/disposition-study-records.md` | owner outside every archived subtree | referenced by `66c467c1` (done), inside no archived container's hierarchy |
 | `dev/active/8e071e18-dev-artifact-layout/disposition-showcase-theme.md` | live owner | referenced by `8e071e18` (in_progress) |
 | `dev/active/8e071e18-dev-artifact-layout/handoff-4.md` | live owner | referenced by `8e071e18` (in_progress) |
-| `dev/active/143388dc-development-root-cleanup/remaining-artifacts-addendum.md` | live owner | this record, referenced by `143388dc` (in_progress) |
+| `dev/active/143388dc-development-root-cleanup/remaining-artifacts-addendum.md` | live owner | this record, referenced by `143388dc` (in_progress, claimed `agent:jit-execution-lead`) |
 
 The five `owner outside every archived subtree` rows are the same class the completeness record
 already carries for `8e071e18-breakdown.json`, `8e071e18-investigation.md`, `8e071e18-plan.md` and
@@ -45,8 +47,8 @@ already carries for `8e071e18-breakdown.json`, `8e071e18-investigation.md`, `8e0
 The record states that scope structurally — the set grows as children close — and these five are
 that growth.
 
-Eight rows are listed against a delta of seven because this addendum is itself one of them: it is
-written into a managed area and so belongs to the population it enumerates.
+The last row is this addendum. A record that enumerates a population it is written into belongs to
+that population, so it is counted rather than exempted.
 
 ### Removed
 
@@ -62,5 +64,5 @@ directories the original runs drained.
 ## Standing
 
 With this addendum, every file under a managed development area carries a recorded reason it
-remains: 138 in the completeness record, 7 added here, and 1 of the 138 relocated since and
-recorded here as removed.
+remains: 138 in the completeness record, 8 added here, and 1 of the 138 relocated since and
+recorded here as removed. That is 145, the population `git ls-files` reports over the eight areas.
