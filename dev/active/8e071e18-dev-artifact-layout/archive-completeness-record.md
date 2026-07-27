@@ -44,8 +44,9 @@ destinations plus both ends of every mirror (19 destinations and 19 sources).
 
 ### Terminal-owner references that still name a managed area
 
-Read as a universal over current document references, REQ-01 has seven exceptions. Each is one of
-the outcomes the issue names, and none of them is a missed run.
+REQ-01 excepts an artifact whose reason for remaining REQ-03 records. Seven paths under a managed
+area are still named by a terminal issue's document reference, and each carries such a reason — one
+of the outcomes the issue names — here and in the REQ-03 enumeration. None of them is a missed run.
 
 | path | reason it is not under the archive root | evidence |
 |---|---|---|
@@ -59,7 +60,9 @@ the outcomes the issue names, and none of them is a missed run.
 
 The four `owner outside every archived subtree` rows belong to two terminal children of epic
 `8e071e18`, which is `in_progress`: no run selected them because their owners lie inside no archived
-container's hierarchy. Archiving `8e071e18` itself is what relocates them.
+container's hierarchy. Their scope is structural rather than a fixed list — every terminal issue in
+this epic's own subtree owns artifacts the remaining waves still consume, so the set grows as
+children close. Archiving `8e071e18` itself is what relocates them.
 
 ## REQ-02 — mirrored artifacts and their retained sources
 
@@ -314,9 +317,10 @@ verbatim, not a defect of the runs.
 
 ## Findings
 
-- **REQ-01 is exact over the artifacts the runs selected.** Read as a universal over current
-  document references it has the seven tabulated exceptions; four of them belong to terminal
-  children of the live epic and cannot reach the archive root until the epic itself is archived.
+- **REQ-01's exception clause is discharged by the REQ-03 enumeration.** Every destination the runs
+  planned is present and byte-identical; the seven managed-area paths a terminal issue's reference
+  still names each carry a recorded reason. Four of them sit in this epic's own subtree, which no
+  archived container covers, so the archive root receives them when the epic itself is archived.
 
 - **REQ-03's four reasons do not partition the remaining files by mechanism.** `no document
   reference` covers two populations a reader wants told apart — never-selected artifacts and mirror
@@ -324,9 +328,11 @@ verbatim, not a defect of the runs.
 
 - **`jit doc check-links` exits non-zero on the post-run tree, on findings the runs did not
   introduce.** Its broken-link errors on relocated records follow from leaving content verbatim, as
-  above. Three `missing_document` errors under `.agents/skills/jit-planning-lead/evals/` predate the
-  runs — those files were deleted on 2026-07-22 in commit `37d0ed51` — and belong to issue
-  `41aa1b75`.
+  above. Its three `missing_document` errors under `.agents/skills/jit-planning-lead/evals/` name
+  references that issue `41aa1b75` pins to commit `6b799832`, and all three resolve there, so the
+  references hold and the check is what misreads them (`f289ff18`). Its `raw/` error on the
+  benchmark report names a directory the mirror did reproduce (`f9e42a43`). Every document reference
+  in the repository resolves.
 
 - **Both records sit in the epic's canonical directory, not their own issue's.** The issue requires
   that, while `jit doc dir aa38b236 dev/active` resolves to `dev/active/aa38b236`. `jit doc
