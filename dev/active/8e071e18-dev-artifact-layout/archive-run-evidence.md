@@ -575,3 +575,26 @@ Issue `f320923c`. Plan eligible with no blockers. 6 relocated, 0 mirrored, 2 ret
 ### Other plan warnings (1)
 
 - `external-edge` at `dev/active/9ac9fdac-graph-templates-showcase/talk.html`
+
+## `90a2dbfd` — dev/archive/90a2dbfd-item-sources
+Issue `89b7f534`. Plan eligible with no blockers. 2 relocated, 0 mirrored, 1 retained, 1 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/90a2dbfd-be54-46f2-b84a-b19382c6b0f2-plan.md` | `dev/archive/90a2dbfd-item-sources/dev/active/90a2dbfd-be54-46f2-b84a-b19382c6b0f2-plan.md` | fbc37f87 |
+| move | `dev/active/90a2dbfd-kinds-over-sources.md` | `dev/archive/90a2dbfd-item-sources/dev/active/90a2dbfd-kinds-over-sources.md` | 90a2dbfd |
+| retain | `dev/archive/features/90a2dbfd-completion-report.md` | already under the archive root | 90a2dbfd |
+
+### In-content citation warnings (7)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:2669:14` | `dev/active/90a2dbfd-be54-46f2-b84a-b19382c6b0f2-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2670:14` | `dev/active/90a2dbfd-kinds-over-sources.md` |
+| `dev/archive/2821e177-addressing-v2/dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md:280:4` | `dev/active/90a2dbfd-kinds-over-sources.md` |
+| `dev/archive/2821e177-addressing-v2/dev/active/2821e177-investigation.md:180:53` | `dev/active/90a2dbfd-kinds-over-sources.md` |
+| `dev/archive/2821e177-addressing-v2/dev/active/2821e177-investigation.md:196:4` | `dev/active/90a2dbfd-kinds-over-sources.md` |
+| `dev/archive/2821e177-addressing-v2/dev/active/7f22d6cf-breakdown-spec.md:47:4` | `dev/active/90a2dbfd-kinds-over-sources.md` |
+| `dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-rule-gate-items.md:208:32` | `dev/active/90a2dbfd-kinds-over-sources.md` |

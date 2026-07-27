@@ -1,16 +1,32 @@
 {
-  "id": "90a2dbfd-be54-46f2-b84a-b19382c6b0f2",
-  "title": "Generalize addressable items to declarative kinds over markdown/toml sources",
-  "description": "The addressable-items engine (epic 25064508, done) is already a generic \"kinds over sources\" system: `ItemKind` is a generic `(name, section, id-pattern, markers, link-namespaces, scope, source, source-of-truth)` tuple, `from_config` builds any kind from an `[item_kinds.<name>]` table, and `resolve_item_kinds` uses a present table verbatim (replacing the four built-ins). Project-scoped **markdown** sources are fully generic today — a kind can already name an arbitrary `.md` file (a `[item_kinds.glossary]` example is in the test suite).\n\nTwo things remain hard-coded, and they are the only blockers to a fully declarative model:\n\n1. **The name `\"invariant\"` is reserved** (`crates/jit/src/domain/item.rs:496-500`): it must be project-scoped + registry-first or `from_config` returns a typed error.\n2. **The registry-first (`.toml`) path is wired to exactly one registry** — `InvariantRegistry::load(.jit/invariants.toml)`, fed in as `registry_items`. A kind cannot name an arbitrary `.toml`; registry-first ignores the `source` field.\n\nThis issue generalizes both so that descriptive project kinds (decision/ADR, definition/glossary, program-risk) are declarable with **zero code**, typed kinds (invariant, and optionally rule/gate) name an arbitrary `.toml` source via a field mapping, and the binary bakes in **no** domain kind names. It also lands the coupled simplification of enforcement-drift (retiring the reserved name changes the drift surface) and region-mode projection into CLAUDE.md.\n\nFull rationale, the project-scoped item taxonomy, the genericity analysis, and the organizing recommendation are in the linked design document.\n\n## Success Criteria\n\n- REQ-01 [hard] A project-scoped, markdown-first kind can be declared purely in `[item_kinds]` naming an arbitrary `.md` file as its `source` (e.g. `glossary.md` -> definition, `DECISIONS.md` -> ADR), with no Rust change. Verified by an integration test that indexes items from a config-declared markdown source.\n- REQ-02 [hard] A registry-first kind can name an arbitrary `.toml` source via a declared field mapping (self-id field, text field, link-namespace fields), replacing the single hard-wired `invariants.toml` path. Verified by a test backing a non-invariant kind from a custom `.toml`.\n- REQ-03 [hard] The reserved-name special case for `invariant` is removed: `invariant` resolves as ordinary config over its `.toml` source, with no kind-name branch remaining in `from_config`.\n- REQ-04 [hard] `jit init` writes the default kinds as an editable `[item_kinds]` table; no domain kind-name literal (requirement/decision/risk/invariant) remains in the indexing path. A repo with an explicit `[item_kinds]` table needs no built-ins.\n- REQ-05 [hard] Enforcement-drift no longer emits `enforced-but-undeclared` findings (the declared-but-unenforced direction becomes the sole error); `jit invariant check` exits 0 on a seed registry unless an invariant's `enforced-by` fails to resolve.\n- REQ-06 [hard] Projection can target a region inside `CLAUDE.md`, so the \"Domain Invariants\" section is a projection of the registry rather than a hand-maintained duplicate.\n- REQ-07 [aspirational] If rule/gate kinds are pursued, the label-value grammar (`crates/jit/src/labels.rs:24`) accepts a qualified id whose self-id carries the rule-name `:` separator, or rule self-ids are remapped to avoid it.\n\n## Out of Scope\n\n- Value injection / codegen: jit makes definitions addressable and citable, it does not rewrite the regex/const that physically holds a value.\n- Actually authoring the project's decision/definition/risk registries (that is downstream adoption, not this engine change).",
-  "state": "done",
-  "priority": "normal",
+  "archived_from": "done",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-06-26T20:01:10.263513476Z",
   "dependencies": [
     "73d98a98-1ab9-4a5b-9022-5e34298ec6d4",
     "8b293a0b-39ab-4cd2-9f7f-78c3376bd1ff",
     "fbe0a401-ac86-47f8-a87f-b0760d06283b",
     "241a0c03-7299-4ca0-a7f5-1f56cbdd02b2"
   ],
+  "description": "The addressable-items engine (epic 25064508, done) is already a generic \"kinds over sources\" system: `ItemKind` is a generic `(name, section, id-pattern, markers, link-namespaces, scope, source, source-of-truth)` tuple, `from_config` builds any kind from an `[item_kinds.<name>]` table, and `resolve_item_kinds` uses a present table verbatim (replacing the four built-ins). Project-scoped **markdown** sources are fully generic today — a kind can already name an arbitrary `.md` file (a `[item_kinds.glossary]` example is in the test suite).\n\nTwo things remain hard-coded, and they are the only blockers to a fully declarative model:\n\n1. **The name `\"invariant\"` is reserved** (`crates/jit/src/domain/item.rs:496-500`): it must be project-scoped + registry-first or `from_config` returns a typed error.\n2. **The registry-first (`.toml`) path is wired to exactly one registry** — `InvariantRegistry::load(.jit/invariants.toml)`, fed in as `registry_items`. A kind cannot name an arbitrary `.toml`; registry-first ignores the `source` field.\n\nThis issue generalizes both so that descriptive project kinds (decision/ADR, definition/glossary, program-risk) are declarable with **zero code**, typed kinds (invariant, and optionally rule/gate) name an arbitrary `.toml` source via a field mapping, and the binary bakes in **no** domain kind names. It also lands the coupled simplification of enforcement-drift (retiring the reserved name changes the drift surface) and region-mode projection into CLAUDE.md.\n\nFull rationale, the project-scoped item taxonomy, the genericity analysis, and the organizing recommendation are in the linked design document.\n\n## Success Criteria\n\n- REQ-01 [hard] A project-scoped, markdown-first kind can be declared purely in `[item_kinds]` naming an arbitrary `.md` file as its `source` (e.g. `glossary.md` -> definition, `DECISIONS.md` -> ADR), with no Rust change. Verified by an integration test that indexes items from a config-declared markdown source.\n- REQ-02 [hard] A registry-first kind can name an arbitrary `.toml` source via a declared field mapping (self-id field, text field, link-namespace fields), replacing the single hard-wired `invariants.toml` path. Verified by a test backing a non-invariant kind from a custom `.toml`.\n- REQ-03 [hard] The reserved-name special case for `invariant` is removed: `invariant` resolves as ordinary config over its `.toml` source, with no kind-name branch remaining in `from_config`.\n- REQ-04 [hard] `jit init` writes the default kinds as an editable `[item_kinds]` table; no domain kind-name literal (requirement/decision/risk/invariant) remains in the indexing path. A repo with an explicit `[item_kinds]` table needs no built-ins.\n- REQ-05 [hard] Enforcement-drift no longer emits `enforced-but-undeclared` findings (the declared-but-unenforced direction becomes the sole error); `jit invariant check` exits 0 on a seed registry unless an invariant's `enforced-by` fails to resolve.\n- REQ-06 [hard] Projection can target a region inside `CLAUDE.md`, so the \"Domain Invariants\" section is a projection of the registry rather than a hand-maintained duplicate.\n- REQ-07 [aspirational] If rule/gate kinds are pursued, the label-value grammar (`crates/jit/src/labels.rs:24`) accepts a qualified id whose self-id carries the rule-name `:` separator, or rule self-ids are remapped to avoid it.\n\n## Out of Scope\n\n- Value injection / codegen: jit makes definitions addressable and citable, it does not rewrite the regex/const that physically holds a value.\n- Actually authoring the project's decision/definition/risk registries (that is downstream adoption, not this engine change).",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Design Document",
+      "path": "dev/archive/90a2dbfd-item-sources/dev/active/90a2dbfd-kinds-over-sources.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "analysis",
+      "format": "markdown",
+      "label": "Completion Report",
+      "path": "dev/archive/features/90a2dbfd-completion-report.md"
+    }
+  ],
+  "done_at": "2026-06-27T01:17:15.720700845Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -18,38 +34,23 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-27T01:11:38.526086993Z"
+      "updated_at": "2026-06-27T01:11:38.526086993Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-27T01:14:50.931748551Z"
+      "updated_at": "2026-06-27T01:14:50.931748551Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/90a2dbfd-kinds-over-sources.md",
-      "commit": null,
-      "label": "Design Document",
-      "doc_type": "design",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/archive/features/90a2dbfd-completion-report.md",
-      "commit": null,
-      "label": "Completion Report",
-      "doc_type": "analysis",
-      "format": "markdown"
-    }
-  ],
+  "id": "90a2dbfd-be54-46f2-b84a-b19382c6b0f2",
   "labels": [
     "milestone:v1.0",
     "type:epic",
     "epic:item-sources"
   ],
-  "created_at": "2026-06-26T20:01:10.263513476Z",
-  "updated_at": "2026-07-05T21:45:38.967774253Z",
-  "done_at": "2026-06-27T01:17:15.720700845Z"
+  "priority": "normal",
+  "state": "archived",
+  "title": "Generalize addressable items to declarative kinds over markdown/toml sources",
+  "updated_at": "2026-07-27T10:03:25.127017689Z"
 }

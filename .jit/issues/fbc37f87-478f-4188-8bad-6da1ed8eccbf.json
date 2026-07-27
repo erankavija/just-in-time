@@ -1,37 +1,37 @@
 {
-  "id": "fbc37f87-478f-4188-8bad-6da1ed8eccbf",
-  "title": "planning: Generalize addressable items to declarative kinds over markdown/toml sources",
-  "description": "Planning node for Generalize addressable items to declarative kinds over markdown/toml sources (90a2dbfd). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/90a2dbfd-be54-46f2-b84a-b19382c6b0f2-plan.md and link it to this node once written.",
-  "state": "done",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-06-26T20:06:57.412389396Z",
   "dependencies": [],
+  "description": "Planning node for Generalize addressable items to declarative kinds over markdown/toml sources (90a2dbfd). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/90a2dbfd-be54-46f2-b84a-b19382c6b0f2-plan.md and link it to this node once written.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Plan Document",
+      "path": "dev/archive/90a2dbfd-item-sources/dev/active/90a2dbfd-be54-46f2-b84a-b19382c6b0f2-plan.md"
+    }
+  ],
+  "done_at": "2026-06-26T20:31:00.903853842Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T20:29:14.825956023Z"
+      "updated_at": "2026-06-26T20:29:14.825956023Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/90a2dbfd-be54-46f2-b84a-b19382c6b0f2-plan.md",
-      "commit": null,
-      "label": "Plan Document",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "fbc37f87-478f-4188-8bad-6da1ed8eccbf",
   "labels": [
     "milestone:v1.0",
     "type:planning",
     "epic:item-sources"
   ],
-  "created_at": "2026-06-26T20:06:57.412389396Z",
-  "updated_at": "2026-07-05T19:51:13.125197596Z",
-  "done_at": "2026-06-26T20:31:00.903853842Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "planning: Generalize addressable items to declarative kinds over markdown/toml sources",
+  "updated_at": "2026-07-27T10:03:25.127017689Z"
 }
