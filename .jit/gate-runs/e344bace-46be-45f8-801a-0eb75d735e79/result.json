@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "95382d47feaeacdeaff30b0cf161f7d5365e4f1d",
+  "completed_at": "2026-07-27T11:48:26.155448568Z",
+  "duration_ms": 119860,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 316,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The archive command reference duplicates the shared short-id/slug derivation instead of citing the canonical Issue artifact directories section."
+      }
+    ],
+    "summary": "The canonical configuration reference is accurate, but the archive command reference still duplicates the shared directory derivation without citing it.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "58c56743-b5e6-4fe3-90af-1910974faefc",
+  "message": null,
+  "run_id": "e344bace-46be-45f8-801a-0eb75d735e79",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T11:46:26.295316294Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.t0bBIgaG41: binary file matches\n--- agent stderr (first 12 of 14015 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa365-d041-78b2-837a-6e54b87bbea0\n--------\n--- 14003 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: leaf task with no resolved children. I inspected its tagged implementation patch and merge; the merge adds no separate diff. Current CLI behavior matches the new configuration reference.\n\n1. **F1 — blocking, issue-impact, medium:** [docs/reference/cli-commands.md:316](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:316) still independently specifies the short-id/slug naming rule for archive destinations without citing the new canonical “Issue artifact directories” section. Replace the shared derivation details with a concise link to `configuration.md#issue-artifact-directories`, retaining only archive-specific behavior (archive root, markers, and fallback handling).\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The canonical configuration reference is accurate, but the archive command reference still duplicates the shared directory derivation without citing it.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The archive command reference duplicates the shared short-id/slug derivation instead of citing the canonical Issue artifact directories section.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":316,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

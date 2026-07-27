@@ -13,7 +13,18 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-07-27T11:48:26.415151096Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-27T11:46:25.592028572Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "58c56743-b5e6-4fe3-90af-1910974faefc",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "State the artifact layout facts in one adopter reference",
-  "updated_at": "2026-07-27T11:23:50.426013813Z"
+  "updated_at": "2026-07-27T11:48:26.415151096Z"
 }

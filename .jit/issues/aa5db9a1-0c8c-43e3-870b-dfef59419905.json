@@ -12,7 +12,18 @@
     "docs-mechanical",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-27T11:48:37.019348521Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-27T11:48:28.945430008Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "aa5db9a1-0c8c-43e3-870b-dfef59419905",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Resolve the retained working notes' citations of relocated artifacts",
-  "updated_at": "2026-07-27T11:27:56.429524692Z"
+  "updated_at": "2026-07-27T11:48:37.019348521Z"
 }
