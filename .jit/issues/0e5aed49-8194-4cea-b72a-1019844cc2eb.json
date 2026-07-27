@@ -18,6 +18,46 @@
       "format": "markdown",
       "label": "Investigation: guard mechanisms, test infrastructure, documentation home",
       "path": "dev/active/a2546471-json-error-contract/investigation-guard-docs.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "6ac8067522a6fe6327c0a1072f880b8a0e5329c01e67f2fa7f7ddfe080946094",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/a2546471-json-error-contract/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7a85f056c0660f7569103f72971d77d4eea6ceb4bc4a353258958460ae98c2ff",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/a2546471-json-error-contract/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "14dd559373efa24dac833ab1c25d4dd17d083ab6e737d356dda195eec24c5d48",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation-guard-docs.md",
+          "resolved_path": "dev/active/a2546471-json-error-contract/investigation-guard-docs.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Plan: structured failure reporting",
+      "path": "dev/active/a2546471-json-error-contract/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "breakdown",
+      "format": "markdown",
+      "label": "Authoritative breakdown manifest",
+      "path": "dev/active/a2546471-json-error-contract/breakdown.json"
     }
   ],
   "first_ready_at": "2026-07-27T19:20:30.960119095Z",
@@ -41,5 +81,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-27T19:45:36.609627651Z"
+  "updated_at": "2026-07-27T20:10:52.741759237Z"
 }
