@@ -16,11 +16,18 @@
       "path": "dev/active/8e071e18-dev-artifact-layout/disposition-design-documents.md"
     }
   ],
+  "done_at": "2026-07-27T12:04:27.962046795Z",
   "first_ready_at": "2026-07-27T11:27:52.590244563Z",
   "gates_required": [
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-27T12:03:57.230559068Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "93aaa2b2-abab-4b21-af6b-3b8bff5df3b5",
   "labels": [
     "type:task",
@@ -31,7 +38,7 @@
     "per:@/issue/8e071e18/decision/D-15"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Record the decided disposition of the unprefixed active-area design documents",
-  "updated_at": "2026-07-27T12:03:27.235535227Z"
+  "updated_at": "2026-07-27T12:04:27.962046795Z"
 }

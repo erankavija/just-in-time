@@ -19,6 +19,7 @@
   ],
   "description": "The development root is cleaned up by running the product's own archival execution once per terminal container and by recording a decided disposition for every artifact the mechanism cannot service.\n\n## Background\n\nMost of the active area is owned by terminal issues and should have been archived long ago. Running the cleanup through the archival mechanism rather than by hand is deliberate: it exercises the repaired reference remapping on real artifacts, and the runs are themselves the acceptance evidence that the mechanism works. Each terminal container gets its own execution, and one pass afterwards judges the development root as a whole.\n\nArtifacts the mechanism cannot service need a different treatment. An artifact with no document reference is invisible to archival, an artifact whose reference is pinned to a commit is retained by design, and an artifact a terminal owner outside the archived subtree also claims is mirrored with its source retained. Each of those outcomes is decided in planning and recorded, so no file is left undecided and no worker judges one. One measurement record is read at runtime by a committed self-test script and is pinned so archival retains it.\n\nMoving artifacts breaks inline path citations that no validation sees, because they are prose and code mentions rather than document references. Those citations are resolved as part of the cleanup, one consumer family at a time.\n\n## Success Criteria\n\n- [hard] REQ-01: Every artifact under a managed development area that a terminal issue's document reference names is archived through the archival execution path, and whole-repository validation passes afterwards with every document reference resolving.\n- [hard] REQ-02: Every artifact in the active, study, and session areas that carries no issue prefix has a recorded disposition — an assigned owning issue, a project-scoped reclassification, or an archived location — and none is left undecided.\n- [hard] REQ-03: Every artifact remaining in a managed development area after the runs is recorded together with the reason it remains.\n- [hard] REQ-04: Inline path citations of relocated artifacts resolve after the cleanup.\n",
   "documents": [],
+  "first_ready_at": "2026-07-27T12:04:43.803476239Z",
   "gates_required": [
     "repo-validate",
     "cargo-ci",
@@ -35,7 +36,7 @@
     "story:development-root-cleanup"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Development root cleanup through the repaired mechanism",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-27T12:04:43.803476239Z"
 }

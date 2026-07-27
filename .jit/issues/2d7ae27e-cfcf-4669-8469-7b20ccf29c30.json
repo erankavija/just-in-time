@@ -16,11 +16,18 @@
       "path": "dev/active/8e071e18-dev-artifact-layout/disposition-reference-material.md"
     }
   ],
+  "done_at": "2026-07-27T12:04:31.931421023Z",
   "first_ready_at": "2026-07-27T11:27:29.511350642Z",
   "gates_required": [
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-27T12:03:59.548174108Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2d7ae27e-cfcf-4669-8469-7b20ccf29c30",
   "labels": [
     "type:task",
@@ -31,7 +38,7 @@
     "per:@/issue/8e071e18/decision/D-15"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Record the decided disposition of the unprefixed active-area guides and briefs",
-  "updated_at": "2026-07-27T12:03:27.375033481Z"
+  "updated_at": "2026-07-27T12:04:31.931421023Z"
 }

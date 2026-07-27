@@ -16,11 +16,18 @@
       "path": "dev/active/8e071e18-dev-artifact-layout/disposition-study-records.md"
     }
   ],
+  "done_at": "2026-07-27T12:04:24.006721510Z",
   "first_ready_at": "2026-07-27T11:27:44.907454269Z",
   "gates_required": [
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-27T12:03:54.913514779Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "66c467c1-1611-46ed-92b2-838afc51274a",
   "labels": [
     "type:task",
@@ -31,7 +38,7 @@
     "per:@/issue/8e071e18/decision/D-15"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Record the blanket disposition of the study records with the runtime-read carve-out",
-  "updated_at": "2026-07-27T12:03:27.053961664Z"
+  "updated_at": "2026-07-27T12:04:24.006721510Z"
 }

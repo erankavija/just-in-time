@@ -7,6 +7,7 @@
   ],
   "description": "The handoffs, progress records, and live investigation that stay in the active area cite artifact paths that resolve after the cleanup.\n\n## Background\n\nArchival owns an artifact through a document reference, so a working note that carries an issue-shaped filename prefix but no reference stays in the active area while the artifacts it cites move. These notes are the largest population of citing files that survive the cleanup in place, and one of them belongs to a live issue whose work is still in progress.\n\nValidation resolves document references only, so an inline path mention in prose breaks silently when the artifact it names moves. The archival plan warnings enumerate these occurrences and the consolidated warning list is the working set. An artifact the runs mirrored without relocating keeps its path, so a citation of it needs no change; the criterion is that the citation resolves, not that it was edited.\n\nCitations inside dated historical records under the archive root are left verbatim: the planner deliberately never rewrites content, and a historical document's citation is part of its record.\n\nThe enumerated citations are:\n\n- `dev/active/2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c-plan.md` — cites `dev/active/planning-bracket-design.md`\n- `dev/active/73482aa1-progress.json` — cites `dev/active/73482aa1-completion-report.md`\n- `dev/active/9b7b5f9c-handoff.md` — cites `dev/active/9b7b5f9c-plan.md`\n- `dev/active/9b7b5f9c-handoff-3.md` — cites `dev/active/9b7b5f9c-plan.md`\n- `dev/active/9b7b5f9c-handoff-4.md` — cites `dev/active/9b7b5f9c-plan.md`\n- `dev/active/9b7b5f9c-handoff-5.md` — cites `dev/active/9b7b5f9c-plan.md`\n- `dev/active/abfd6016-progress.json` — cites `dev/active/abfd6016-multi-format-doc-rendering-design.md`\n- `dev/active/c639cfb5-investigation.md` — cites `dev/active/9b7b5f9c-investigation.md`, `dev/active/9b7b5f9c-mvp-scope-brief.md`, `dev/active/9b7b5f9c-plan.md`, `dev/active/9b7b5f9c-research.md`, `dev/presentations/9b7b5f9c/talk.html`\n- `dev/active/f2532a2d-handoff.md` — cites `dev/active/eed6750c-handoff.md`, `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md`\n- `dev/active/f2532a2d-handoff-2.md` — cites `dev/active/eed6750c-handoff.md`, `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md`\n\n## Success Criteria\n\n- [hard] REQ-01: Each enumerated citation in the named files resolves to an existing repository path after the archival runs.\n- [hard] REQ-02: A citation whose cited artifact the runs relocated names the artifact's new location.\n- [hard] REQ-03: A citation whose cited artifact the runs mirrored without relocating is unchanged.\n- [hard] REQ-04: Mechanical link checks over the named files pass.\n",
   "documents": [],
+  "done_at": "2026-07-27T12:04:39.881798588Z",
   "first_ready_at": "2026-07-27T11:27:56.429524692Z",
   "gates_required": [
     "docs-mechanical",
@@ -34,7 +35,7 @@
     "per:@/issue/8e071e18/decision/D-8"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Resolve the retained working notes' citations of relocated artifacts",
-  "updated_at": "2026-07-27T11:48:37.019348521Z"
+  "updated_at": "2026-07-27T12:04:39.881798588Z"
 }

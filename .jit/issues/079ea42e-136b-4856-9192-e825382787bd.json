@@ -16,11 +16,18 @@
       "path": "dev/active/8e071e18-dev-artifact-layout/disposition-implementation-plans.md"
     }
   ],
+  "done_at": "2026-07-27T12:04:35.894457731Z",
   "first_ready_at": "2026-07-27T11:27:25.662741498Z",
   "gates_required": [
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-27T12:04:01.867681041Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "079ea42e-136b-4856-9192-e825382787bd",
   "labels": [
     "type:task",
@@ -31,7 +38,7 @@
     "per:@/issue/8e071e18/decision/D-15"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Record the decided disposition of the unprefixed active-area implementation plans",
-  "updated_at": "2026-07-27T12:03:27.515242297Z"
+  "updated_at": "2026-07-27T12:04:35.894457731Z"
 }

@@ -16,11 +16,18 @@
       "path": "dev/active/8e071e18-dev-artifact-layout/disposition-session-records.md"
     }
   ],
+  "done_at": "2026-07-27T12:04:20.029721879Z",
   "first_ready_at": "2026-07-27T11:27:41.027605945Z",
   "gates_required": [
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-27T12:03:52.593253345Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5a19fffb-4218-4b2f-99cc-91bc637c587e",
   "labels": [
     "type:task",
@@ -31,7 +38,7 @@
     "per:@/issue/8e071e18/decision/D-15"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Record the blanket disposition of the session records",
-  "updated_at": "2026-07-27T12:03:26.914577940Z"
+  "updated_at": "2026-07-27T12:04:20.029721879Z"
 }
