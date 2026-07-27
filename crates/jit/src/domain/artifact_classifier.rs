@@ -764,10 +764,6 @@ fn classify_entry(
         document_all_terminal,
         archived_source,
     );
-    let selected_owners = owners
-        .iter()
-        .filter(|owner| owner.selected_for_relink)
-        .collect::<Vec<_>>();
     let repository_embedded = embedded_owners.get(&source).cloned().unwrap_or_default();
     let direct_outside_owner = matches!(target, PlanTarget::Container { .. })
         && owners.iter().any(|owner| !owner.inside_subtree);
@@ -898,11 +894,26 @@ fn classify_entry(
         action = ArtifactAction::Block;
     }
 
+    // Only `Move` and `Copy` write the destination a relink would name.
+    // `Retain` leaves the source as the only file that exists
+    // (`@/issue/8e071e18/decision/D-14`), and `Block` writes nothing either,
+    // so neither may carry a relink regardless of what the ownership facts
+    // alone selected above.
+    let relinks_to_destination = matches!(action, ArtifactAction::Move | ArtifactAction::Copy);
+    let owners = owners
+        .into_iter()
+        .map(|mut owner| {
+            owner.selected_for_relink = owner.selected_for_relink && relinks_to_destination;
+            owner
+        })
+        .collect::<Vec<_>>();
+
     let reference_changes = if archived_source && explicit {
         Vec::new()
     } else {
-        selected_owners
-            .into_iter()
+        owners
+            .iter()
+            .filter(|owner| owner.selected_for_relink)
             .map(|owner| ReferenceChange {
                 issue: owner.issue.clone(),
                 document_index: owner.document_index,
@@ -2453,6 +2464,93 @@ mod tests {
             assert_eq!(artifact.destination(), None, "{source}");
             assert!(artifact.pending_deletions().is_empty(), "{source}");
         }
+    }
+
+    #[test]
+    fn test_classify_entry_suppresses_the_relink_for_a_retained_owner_outside_the_development_root()
+    {
+        // The owner alone — unpinned, inside the resolved subtree, terminal —
+        // would otherwise earn a relink, but the source lies outside the
+        // development root, so classification always retains it (`:805-806`)
+        // and writes no destination. The relink and its reference change must
+        // not survive a `Retain` (`@/issue/8e071e18/decision/D-14`).
+        let plan = container(
+            selected_root("scripts/install.sh"),
+            present_source("scripts/install.sh"),
+        );
+        let artifact = entry(&plan, "scripts/install.sh");
+        assert_eq!(artifact.action(), ArtifactAction::Retain);
+        assert!(artifact.reference_changes().is_empty());
+        assert!(artifact
+            .owners()
+            .iter()
+            .all(|owner| !owner.selected_for_relink));
+    }
+
+    #[test]
+    fn test_classify_entry_suppresses_the_relink_for_a_blocked_owner() {
+        // A destination conflict blocks the artifact even though its terminal
+        // owner would otherwise earn a relink. `Block`, like `Retain`, writes
+        // no destination, so the relink must not survive either.
+        let plan = container(
+            vec![explicit(
+                "dev/active/b/file.md",
+                vec![owner("i", State::Done, true)],
+            )],
+            locations(&[(
+                "dev/active/b/file.md",
+                ArtifactLocation::Regular(identity(b"source")),
+                ArtifactLocation::Regular(identity(b"different")),
+            )]),
+        );
+        let artifact = entry(&plan, "dev/active/b/file.md");
+        assert_eq!(artifact.action(), ArtifactAction::Block);
+        assert!(artifact.reference_changes().is_empty());
+        assert!(artifact
+            .owners()
+            .iter()
+            .all(|owner| !owner.selected_for_relink));
+    }
+
+    #[test]
+    fn test_classify_entry_keeps_the_relink_for_a_copied_artifacts_terminal_owner() {
+        // A second, still-active owner forces the classifier to keep the
+        // source alongside the destination it also needs, so the shared
+        // artifact copies rather than moves. `Copy` writes the destination
+        // the relink names (REQ-03), so the terminal owner's relink must
+        // survive even though the source stays too.
+        let plan = container(
+            vec![explicit(
+                "dev/active/shared.md",
+                vec![
+                    owner("terminal", State::Done, true),
+                    owner("active", State::InProgress, true),
+                ],
+            )],
+            locations(&[(
+                "dev/active/shared.md",
+                ArtifactLocation::Regular(identity(b"shared")),
+                ArtifactLocation::Missing,
+            )]),
+        );
+        let artifact = entry(&plan, "dev/active/shared.md");
+        assert_eq!(artifact.action(), ArtifactAction::Copy);
+        let mirror = artifact_mirror_destination(plan.destination_root(), "dev/active/shared.md");
+        assert_eq!(
+            artifact.reference_changes(),
+            &[ReferenceChange {
+                issue: "terminal".to_string(),
+                document_index: 0,
+                from_path: "dev/active/shared.md".to_string(),
+                to_path: mirror,
+            }]
+        );
+        let terminal_owner = artifact
+            .owners()
+            .iter()
+            .find(|owner| owner.issue == "terminal")
+            .unwrap();
+        assert!(terminal_owner.selected_for_relink);
     }
 
     #[test]
