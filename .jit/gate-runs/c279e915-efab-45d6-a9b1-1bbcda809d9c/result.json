@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "e4d8608ea67b2adfacf6a34fd54dc2ce5c7487ef",
+  "completed_at": "2026-07-27T11:42:22.811347500Z",
+  "duration_ms": 46113,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The fallback-scoped changelog citations remain valid and require no adopter-documentation update.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "6e963a7f-3a47-433d-a6fe-55c7406d6dd9",
+  "message": null,
+  "run_id": "c279e915-efab-45d6-a9b1-1bbcda809d9c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T11:41:36.697580748Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task with no resolved children; no reachable `jit:6e963a7f` commit exists, so review used the issue fallback. The two cited paths in `CHANGELOG.md` resolve; the artifact was mirrored, not relocated, and changelog text is unchanged.\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The fallback-scoped changelog citations remain valid and require no adopter-documentation update.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

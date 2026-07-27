@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "e4d8608ea67b2adfacf6a34fd54dc2ce5c7487ef",
+  "completed_at": "2026-07-27T11:41:35.304272076Z",
+  "duration_ms": 185971,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five in-scope citations resolve to an existing retained artifact; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4790367e-76ca-495f-a176-2f9178011340",
+  "message": null,
+  "run_id": "bb343e01-10f4-45e8-978f-35f2deabc63e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T11:38:29.332810898Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `16cf7c268f001d869db78c2214f14ffb0accc2f2` (`jit:4790367e`); metadata-only patch\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/8e071e18/decision/D-8`, `@/issue/8e071e18/requirement/REQ-09`, `@/issue/8e071e18/requirement/REQ-13` (markdown-first issue source); `@/invariant/bounded-rust-build-footprint`, `@/invariant/single-source-prose`, `@/gate/cargo-ci` (registry-first); `@/charter/D-2` (markdown-first `dev/vision/9db27a3a-charter.md`)\nGate evidence: `cargo-ci` — passed (exit 0, 2026-07-27T11:32:02.682962343Z)\nTruncation recovery: reread citation-consolidation lines 159–180 and resolved item/source reads individually after broad issue output truncated\n\n1. No findings. All five build-tooling citations, including the two operator-facing strings at `scripts/rust-build-budget.sh:142` and `:165`, resolve to the retained active artifact; `archive-completeness-record.md:74` confirms its byte-identical archive mirror.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five in-scope citations resolve to an existing retained artifact; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

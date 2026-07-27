@@ -1,0 +1,34 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "2741cc382826b6418ef769766a05fd94e4cfba73",
+  "completed_at": "2026-07-27T11:38:27.944183503Z",
+  "duration_ms": 137873,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": ".jit/issues/c7e3ac1b-79ae-49c5-9f94-d544d53bad4d.json",
+        "id": "F1",
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "The issue description states four Rust benchmark output-path citations, while the current script contains three literal references at lines 49, 57, and 98; all resolve."
+      }
+    ],
+    "summary": "All current output-path citations resolve, and both generators create the documented default directories.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c7e3ac1b-79ae-49c5-9f94-d544d53bad4d",
+  "message": null,
+  "run_id": "cea735d4-6bfd-4c2d-9063-49a1029eea11",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T11:36:10.070186079Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `fc47af1f` (`jit:c7e3ac1b`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/8e071e18/decision/D-10`, `@/issue/8e071e18/decision/D-13`, `@/issue/8e071e18/requirement/REQ-09` (markdown source `.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json`); `@/invariant/derived-state-coherence` (`.jit/invariants.toml`)\nGate evidence: `code-review` pending (no recorded exit code)\nTruncation recovery: re-read narrowed citation-warning matches and policy-source excerpts after a broad read truncated\n\n1. Advisory · pre-existing — The issue description says `benchmark-rust-build.sh` has four citations, but the current script has three literal references (lines 49, 57, and 98). All three resolve, and line 98’s directory is created at line 159; this does not block the success criteria.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All current output-path citations resolve, and both generators create the documented default directories.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The issue description states four Rust benchmark output-path citations, while the current script contains three literal references at lines 49, 57, and 98; all resolve.\",\"file\":\".jit/issues/c7e3ac1b-79ae-49c5-9f94-d544d53bad4d.json\",\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

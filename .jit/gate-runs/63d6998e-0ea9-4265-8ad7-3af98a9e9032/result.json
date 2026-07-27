@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "e4d8608ea67b2adfacf6a34fd54dc2ce5c7487ef",
+  "completed_at": "2026-07-27T11:43:23.704529877Z",
+  "duration_ms": 59537,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No issue-impact documentation defects; all three affected testing-guide links resolve in the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "560c2adb-e4b6-469d-baaa-518abafdb01d",
+  "message": null,
+  "run_id": "63d6998e-0ea9-4265-8ad7-3af98a9e9032",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T11:42:24.166869091Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf issue `560c2adb`; inspected its sole reachable tagged commit individually. It changes only JIT state. Current guide links at `dev/TESTING.md:255`, `:257`, and `:291` resolve; unrelated uncommitted JIT state was excluded.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact documentation defects; all three affected testing-guide links resolve in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

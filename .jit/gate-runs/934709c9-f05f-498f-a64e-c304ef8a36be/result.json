@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "e4d8608ea67b2adfacf6a34fd54dc2ce5c7487ef",
+  "completed_at": "2026-07-27T11:44:20.017310202Z",
+  "duration_ms": 54934,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue has no attributable adopter-facing documentation impact; its verified report citations resolve in the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "d52bd541-9984-449c-bd74-1866143159ff",
+  "message": null,
+  "run_id": "934709c9-f05f-498f-a64e-c304ef8a36be",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T11:43:25.082465554Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf with no resolved children. One reachable `jit:d52bd541` commit was inspected individually; it changes only JIT issue/event records. Current report links and cited paths resolve at `dev/benchmarks/rust-build-efficiency/report.md:14`, `:89-97`, and `:136`; uncommitted JIT state was not attributed.\n\nDocumentation impact: no adopter-facing documentation change is required or introduced by this issue.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue has no attributable adopter-facing documentation impact; its verified report citations resolve in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
