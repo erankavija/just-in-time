@@ -1,36 +1,36 @@
 {
-  "id": "8646a474-4324-47f3-bc75-89ea4cd0e516",
-  "title": "Plan & design review: planning-bracket",
-  "description": "Planning node (P) for the plan-before-fan-out bracket epic. Produces and gets review on the design before any breakdown. Plan artifact: dev/active/planning-bracket-design.md.\n\nWhen this is approved, break the epic down into the 12 tasks (5 waves) described in the design doc; that breakdown is the fan-out (B) and must not happen before this plan is accepted.\n\n## Success Criteria\n- [hard] Design doc reviewed and the 25+ design decisions confirmed sound and coherent.\n- [hard] Task breakdown (12 tasks, dependency waves) validated against the design before fan-out.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude-opus",
+  "context": {},
+  "created_at": "2026-06-14T15:13:40.988644115Z",
   "dependencies": [],
+  "description": "Planning node (P) for the plan-before-fan-out bracket epic. Produces and gets review on the design before any breakdown. Plan artifact: dev/active/planning-bracket-design.md.\n\nWhen this is approved, break the epic down into the 12 tasks (5 waves) described in the design doc; that breakdown is the fan-out (B) and must not happen before this plan is accepted.\n\n## Success Criteria\n- [hard] Design doc reviewed and the 25+ design decisions confirmed sound and coherent.\n- [hard] Task breakdown (12 tasks, dependency waves) validated against the design before fan-out.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Planning-bracket design",
+      "path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-design.md"
+    }
+  ],
+  "done_at": "2026-06-15T18:21:22.450982385Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-15T05:32:55.533070194Z"
+      "updated_at": "2026-06-15T05:32:55.533070194Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/planning-bracket-design.md",
-      "commit": null,
-      "label": "Planning-bracket design",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "8646a474-4324-47f3-bc75-89ea4cd0e516",
   "labels": [
     "epic:planning-bracket",
     "type:planning"
   ],
-  "created_at": "2026-06-14T15:13:40.988644115Z",
-  "updated_at": "2026-07-05T19:51:13.023064132Z",
-  "done_at": "2026-06-15T18:21:22.450982385Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Plan & design review: planning-bracket",
+  "updated_at": "2026-07-27T10:04:16.178852848Z"
 }

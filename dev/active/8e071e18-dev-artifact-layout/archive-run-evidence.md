@@ -732,3 +732,44 @@ Issue `60c398d3`. Plan eligible with no blockers. 15 relocated, 0 mirrored, 0 re
 ### Other plan warnings (1)
 
 - `external-edge` at `dev/design/worktree-parallel-work.md`
+
+## `2fbd2a82` — dev/archive/2fbd2a82-planning-bracket
+Issue `deb50576`. Plan eligible with no blockers. 4 relocated, 0 mirrored, 3 retained, 1 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/planning-bracket-design.md` | `dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-design.md` | 2fbd2a82 8646a474 |
+| move | `dev/active/planning-bracket-showcase/base.css` | `dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/base.css` | — |
+| move | `dev/active/planning-bracket-showcase/talk.html` | `dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/talk.html` | 2fbd2a82 |
+| move | `dev/active/planning-bracket-showcase/themes/rust.css` | `dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/themes/rust.css` | — |
+| retain | `dev/archive/features/2fbd2a82-completion-report.md` | already under the archive root | 2fbd2a82 |
+| retain | `docs/concepts/planning-bracket.md` | retained in place | 04656f7b c8aa199e(outside) |
+| retain | `docs/how-to/adopt-planning-bracket.md` | retained in place | 04656f7b |
+
+### In-content citation warnings (17)
+
+| citing site | moving artifact |
+|---|---|
+| `crates/jit/tests/fast_docs_templates/bracket_breakdown_tests.rs:2:6` | `dev/active/planning-bracket-design.md` |
+| `crates/jit/tests/fast_docs_templates/research_bracket_tests.rs:27:7` | `dev/active/planning-bracket-design.md` |
+| `crates/jit/tests/fast_docs_templates/sdd_bracket_tests.rs:19:7` | `dev/active/planning-bracket-design.md` |
+| `dev/active/2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c-plan.md:18:9` | `dev/active/planning-bracket-design.md` |
+| `dev/active/8e071e18-breakdown.json:2373:14` | `dev/active/planning-bracket-design.md` |
+| `dev/active/8e071e18-breakdown.json:2374:14` | `dev/active/planning-bracket-showcase/base.css` |
+| `dev/active/8e071e18-breakdown.json:2375:14` | `dev/active/planning-bracket-showcase/talk.html` |
+| `dev/active/8e071e18-breakdown.json:2376:14` | `dev/active/planning-bracket-showcase/themes/rust.css` |
+| `dev/active/8e071e18-breakdown.json:3274:1482` | `dev/active/planning-bracket-design.md` |
+| `dev/active/8e071e18-breakdown.json:3274:1598` | `dev/active/planning-bracket-design.md` |
+| `dev/active/8e071e18-breakdown.json:3274:1709` | `dev/active/planning-bracket-design.md` |
+| `dev/active/8e071e18-breakdown.json:3459:1251` | `dev/active/planning-bracket-design.md` |
+| `dev/active/8e071e18-breakdown.json:3605:2636` | `dev/active/planning-bracket-design.md` |
+| `dev/active/8e071e18-breakdown.json:3605:2734` | `dev/active/planning-bracket-design.md` |
+| `dev/archive/2d109173-docs-exhaustive-audit/dev/active/a70bac75-audit-notes.md:102:38` | `dev/active/planning-bracket-design.md` |
+| `dev/archive/features/2fbd2a82-progress.json:6:18` | `dev/active/planning-bracket-design.md` |
+| `dev/archive/features/dbe1e821/dbe1e821-progress.json:177:626` | `dev/active/planning-bracket-design.md` |
+
+### Other plan warnings (1)
+
+- `external-edge` at `dev/active/planning-bracket-showcase/talk.html`

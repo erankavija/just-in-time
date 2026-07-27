@@ -1,147 +1,50 @@
 {
-  "id": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
-  "title": "Plan-before-fan-out bracket: gated planning node before breakdown",
-  "description": "Make planning a first-class, reviewable, gated node in the DAG, sequenced before the implementation fan-out. A breakable container C is bracketed by a planning node P (agent plan-quality gate) and a breakdown node B (deterministic coverage-preview gate via validate --scope), with the impl subgraph spliced into the C->B link as a spine (P > B > impl > C). Front-end counterpart to epic 94d26c42's done-transition coverage enforcement.\n\n## Success Criteria\n- [hard] Breakable container scaffolds to C->P (plan-quality gate on P); the breakdown step splices the impl subgraph and B into a reduced C->impl->B->P spine, correctly typed.\n- [hard] Breakdown gate blocks when drafted children leave a [hard] criterion uncovered, evaluated transitively over the impl interior (exit 4).\n- [hard] Coverage traversal is transitive by default; child-type-exclude excludes bracket nodes and halts descent at them.\n- [hard] jit plan <existing> retrofits a container, moving upstream deps onto P.\n- [hard] Demonstrated on SDD (epic) and research (goal, no epic) with no methodology strings in Rust.\n- jit-breakdown and project-lead drive plan->review->breakdown->coverage->implement; steering suite regression-tests it.\n\nDesign: dev/active/planning-bracket-design.md",
-  "state": "done",
-  "priority": "high",
+  "archived_from": "done",
   "assignee": "agent:project-lead",
+  "claimed_at": "2026-06-16T20:41:57.478454076Z",
+  "context": {},
+  "created_at": "2026-06-14T15:13:23.772344129Z",
   "dependencies": [
     "81fbf45a-2991-4f7e-bf03-7aed8bcedb02",
     "bd5c1feb-33c6-4f0d-8524-6031d8ee9060",
     "cb8cdf1b-2375-4a0a-b864-683dfab97367",
     "c6d2f4ca-950c-4c2a-9d31-d01eaf7fbff7"
   ],
-  "gates_required": [],
-  "gates_status": {},
-  "context": {},
+  "description": "Make planning a first-class, reviewable, gated node in the DAG, sequenced before the implementation fan-out. A breakable container C is bracketed by a planning node P (agent plan-quality gate) and a breakdown node B (deterministic coverage-preview gate via validate --scope), with the impl subgraph spliced into the C->B link as a spine (P > B > impl > C). Front-end counterpart to epic 94d26c42's done-transition coverage enforcement.\n\n## Success Criteria\n- [hard] Breakable container scaffolds to C->P (plan-quality gate on P); the breakdown step splices the impl subgraph and B into a reduced C->impl->B->P spine, correctly typed.\n- [hard] Breakdown gate blocks when drafted children leave a [hard] criterion uncovered, evaluated transitively over the impl interior (exit 4).\n- [hard] Coverage traversal is transitive by default; child-type-exclude excludes bracket nodes and halts descent at them.\n- [hard] jit plan <existing> retrofits a container, moving upstream deps onto P.\n- [hard] Demonstrated on SDD (epic) and research (goal, no epic) with no methodology strings in Rust.\n- jit-breakdown and project-lead drive plan->review->breakdown->coverage->implement; steering suite regression-tests it.\n\nDesign: dev/active/planning-bracket-design.md",
   "documents": [
     {
-      "path": "dev/active/planning-bracket-design.md",
       "commit": null,
-      "label": "Design: planning bracket",
       "doc_type": "design",
-      "format": "markdown"
+      "format": "markdown",
+      "label": "Design: planning bracket",
+      "path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-design.md"
     },
     {
-      "path": "dev/archive/features/2fbd2a82-completion-report.md",
       "commit": null,
-      "label": "Completion Report",
       "doc_type": "completion-report",
-      "format": "markdown"
+      "format": "markdown",
+      "label": "Completion Report",
+      "path": "dev/archive/features/2fbd2a82-completion-report.md"
     },
     {
-      "path": "dev/active/planning-bracket-showcase/talk.html",
       "commit": null,
-      "label": "Showcase slides",
       "doc_type": "slides",
       "format": "html",
-      "assets": [
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "base.css",
-          "resolved_path": "dev/active/planning-bracket-showcase/base.css",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "e964dd787590ea2c2eb5784b5362674504e66d2e4626bca1b1e8abff071f7059",
-          "is_shared": false
-        },
-        {
-          "original_path": "themes/rust.css",
-          "resolved_path": "dev/active/planning-bracket-showcase/themes/rust.css",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "7ba057c88a30dc41c8564b549d0b76bb6fa98413c3a50b66fd6a3f80a4783cbe",
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://fonts.googleapis.com",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://fonts.gstatic.com",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        }
-      ]
+      "label": "Showcase slides",
+      "path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/talk.html"
     }
   ],
+  "done_at": "2026-06-18T20:10:25.277031526Z",
+  "first_ready_at": "2026-06-15T18:21:22.476046562Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
   "labels": [
     "type:epic",
     "epic:planning-bracket"
   ],
-  "created_at": "2026-06-14T15:13:23.772344129Z",
-  "updated_at": "2026-07-05T19:51:12.936974489Z",
-  "first_ready_at": "2026-06-15T18:21:22.476046562Z",
-  "claimed_at": "2026-06-16T20:41:57.478454076Z",
-  "done_at": "2026-06-18T20:10:25.277031526Z"
+  "priority": "high",
+  "state": "archived",
+  "title": "Plan-before-fan-out bracket: gated planning node before breakdown",
+  "updated_at": "2026-07-27T10:04:16.178852848Z"
 }
