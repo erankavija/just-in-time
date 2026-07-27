@@ -10466,3 +10466,5 @@
 {"fields":["documents"],"id":"d46c75d4-09bb-4457-82fa-ec20c03357ab","issue_id":"8e071e18-d786-43ff-b424-a283fecb11f8","timestamp":"2026-07-27T12:07:08.118309188Z","type":"issue_updated","updated_by":"doc-add"}
 {"from":"in_progress","id":"0910500d-8b15-44d4-bd16-a881d78bc355","issue_id":"4a6fb8c1-2283-4e4a-bb0d-af2baa3e8c13","timestamp":"2026-07-27T12:07:22.906239197Z","to":"ready","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"d8bb8e81-d3c6-46e3-847b-abc63deab319","issue_id":"4a6fb8c1-2283-4e4a-bb0d-af2baa3e8c13","reason":"not dispatched; session ending at the user's request, left ready for the next lead","timestamp":"2026-07-27T12:07:42.730427940Z","type":"issue_released"}
+{"from":"ready","id":"781cafc8-0b9c-4f6f-872b-0980c3313753","issue_id":"4a6fb8c1-2283-4e4a-bb0d-af2baa3e8c13","timestamp":"2026-07-27T12:34:22.326384817Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"c4c827db-cd2d-415b-92dd-8a0be10949b6","issue_id":"4a6fb8c1-2283-4e4a-bb0d-af2baa3e8c13","timestamp":"2026-07-27T12:34:22.326384817Z","type":"issue_claimed"}
