@@ -31,7 +31,22 @@
     "fccedb73-b4b4-4990-a26d-b99a2cda7739"
   ],
   "description": "The archival runs are judged complete against the development root as a whole, and the in-content citation warnings they reported are consolidated into one working list.\n\n## Background\n\nThe cleanup runs as one execution per container. Each execution proves its own container moved; none of them proves the development root as a whole is finished. That judgement needs a single pass over the post-run tree, and it is also the backstop for a container whose artifact set grew after the executions were measured.\n\nSeveral outcomes are legitimate and must be told apart. An artifact whose owner sits wholly inside an archived subtree relocates, leaving nothing behind. An artifact an owner outside that subtree also claims is mirrored into the archive while its source stays in place. An artifact whose document reference is pinned to a commit is retained by design. An artifact with a live owner stays in the active area. An artifact carrying an issue-shaped filename prefix but no document reference is invisible to the mechanism, which owns artifacts by reference rather than by filename, so no run selects it. One container already sits under the archive root from an earlier run and converges without a new execution.\n\nRecording which artifacts took which outcome, and why each remaining artifact remains, is what makes the cleanup auditable and what keeps an unreachable artifact from being mistaken for a missed run.\n\nCitations inside records the runs themselves relocated stay verbatim. A historical document's citation is part of its record, which is why the planner warns rather than rewriting content.\n\nThe completeness record and the consolidated warning list are written into this epic's canonical artifact directory in the active area, `dev/active/8e071e18-dev-artifact-layout`, obtained from the command that resolves it rather than composed by hand.\n\n## Success Criteria\n\n- [hard] REQ-01: Every artifact under a managed development area that a terminal issue's document reference names is present under the archive root after the runs, except where REQ-03 records a reason it remains.\n- [hard] REQ-02: An artifact the runs mirrored without relocating is recorded as mirrored, with its retained source path named.\n- [hard] REQ-03: Every artifact remaining in a managed development area is recorded together with the reason it remains: a live owner, a commit-pinned reference, an owner outside the archived subtree, or no document reference at all.\n- [hard] REQ-04: A container whose artifacts an earlier run already relocated converges on its existing destination rather than producing a second one.\n- [hard] REQ-05: In-content citations inside records the runs relocated are unchanged.\n- [hard] REQ-06: The in-content citation warnings the runs reported are consolidated into one working list.\n- [hard] REQ-07: Whole-repository validation passes and every document reference resolves.\n\n## Notes\n\nREQ-01 and REQ-03 partition the same population: an artifact the runs should have relocated, and one that legitimately remains. Read as an unqualified universal REQ-01 would make REQ-03's own list of legitimate reasons unreachable, so the exception clause names the relationship the two criteria already had. Seven artifacts take it: three commit-pinned references, retained by design, and four owned by terminal children of the epic that no run could select, per the scope of `@/issue/8e071e18/requirement/REQ-09`. Owner-approved amendment.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Archival completeness record",
+      "path": "dev/active/8e071e18-dev-artifact-layout/archive-completeness-record.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Consolidated in-content citation warnings",
+      "path": "dev/active/8e071e18-dev-artifact-layout/citation-warning-consolidation.md"
+    }
+  ],
   "first_ready_at": "2026-07-27T10:06:30.255093980Z",
   "gates_required": [
     "repo-validate"
