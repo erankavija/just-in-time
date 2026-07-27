@@ -5,16 +5,25 @@
   "created_at": "2026-07-27T13:40:24.491414459Z",
   "dependencies": [],
   "description": "The usability container's one linked artifact is archived through the archival execution path, closing the last artifact REQ-09 ranges over.\n\n## Background\n\n`41d07c6b` (Epic: Usability Improvements) is terminal and sits outside this epic's own subtree, and its story `fdb039ee` links `dev/active/fdb039ee-modular-document-rendering.md`. The container was not among the 24 archival executions because its whole archivable content is that one artifact and the planner retained it: the document reference carries a commit pin, and a pinned reference is retained by design.\n\nThe pin has no recorded purpose. It was written by `fe7667ed`, the commit that created that issue structure, rather than by a decision to hold the document at a historical version, and no committed script reads the path at runtime — the condition that motivated the deliberate pins `d9e70703` placed on the two `dev/studies/perf` records.\n\nThe epic's independent holistic review read REQ-09 literally and found the artifact unarchived. REQ-09 states no commit-pin exception, so the criterion is closed by archiving the artifact rather than by amending the criterion. Owner-approved.\n\n## Success Criteria\n\n- [hard] REQ-01: The document reference from `fdb039ee` to the modular-renderer design carries no commit pin.\n- [hard] REQ-02: Container `41d07c6b` is archived through `jit archive container --execute`, and the artifact resides under the configured archive root with its reference resolving to the new path.\n- [hard] REQ-03: No artifact owned by a terminal issue outside this epic's own subtree remains under `dev/active`.\n- [hard] REQ-04: Whole-repository validation passes afterwards with every document reference in the repository resolving.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "REQ-09 remediation evidence",
+      "path": "dev/active/d8d7f317/req09-remediation-evidence.md"
+    }
+  ],
+  "done_at": "2026-07-27T13:42:32.203402809Z",
   "first_ready_at": "2026-07-27T13:40:24.491414459Z",
   "gates_required": [
     "repo-validate"
   ],
   "gates_status": {
     "repo-validate": {
-      "status": "pending",
-      "updated_at": "2026-07-27T13:40:35.266235139Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-27T13:42:14.423158425Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "d8d7f317-6e67-4288-a0b4-6a8189584d45",
@@ -25,7 +34,7 @@
     "satisfies:REQ-09"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Archive the usability container's pinned modular-renderer artifact",
-  "updated_at": "2026-07-27T13:40:46.604946417Z"
+  "updated_at": "2026-07-27T13:43:16.389721589Z"
 }
