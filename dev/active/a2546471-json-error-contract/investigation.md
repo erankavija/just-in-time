@@ -2,6 +2,26 @@
 
 Read-only fact-finding for the container's plan. No code, `.jit/` state, or issues were changed.
 
+## Finding index
+
+Each id below names the heading that owns its evidence, so a plan or manifest
+reference resolves to one section of this report.
+
+| Id | Section |
+|---|---|
+| `F-MECHANISMS` | 1. Every mechanism that emits the envelope on failure |
+| `F-ARM-COUNT` | 2. Recounted numbers |
+| `F-EXIT-DIVERGENCE` | 5. `error_to_exit_code` vs `JsonError::exit_code()` |
+| `F-SEARCH-EXIT10` | 5 → `search` exits on a literal its reported code does not map to |
+| `F-PRESET-APPLY-ZERO` | 5 → `gate preset apply` returns zero with its failures nested in a success payload |
+| `F-EXIT-DOC-DEFECT` | 5 → the generated exit-status reference is bound through the plain invocation alone |
+| `F-STDOUT-CLEAN` | 6. The stderr/stdout split |
+| `F-MCP` | 7. MCP bridge |
+| `F-SCHEMA-DERIVED` | The census question → the `--schema` machinery |
+| `F-NO-STATIC` | The census question → dispatch structure in `main.rs` |
+| `F-FORCED-FAILURE` | The census question → is a forced failure reachable for every arm? |
+| `F-CLAP-PARSE` | Consumer sweep → argument-parse failures |
+
 ## Method and provenance
 
 - Tree: `main` at `8a9963a6`, clean working tree.
@@ -11,7 +31,7 @@ Read-only fact-finding for the container's plan. No code, `.jit/` state, or issu
 
 ---
 
-## 1. Every mechanism that emits the envelope on failure — claim **invalid as stated**
+## 1. F-MECHANISMS — Every mechanism that emits the envelope on failure: claim invalid as stated
 
 `handle_json_error!` is **not** the only route. It is one of nine distinct mechanisms.
 
@@ -31,7 +51,7 @@ Envelope-shaped helpers that build but do not print (`JsonError` factories): `de
 
 The team lead's cited `main.rs:765` and `:790` are inside mechanisms 5 and 6 respectively; `:628` is mechanism 4. Confirmed.
 
-## 2. Recounted numbers — both figures in the container body are **wrong**
+## 2. F-ARM-COUNT — Recounted numbers: both figures in the container body are wrong
 
 - **`handle_json_error!` call sites: 13, not 18.** `grep -rn "handle_json_error" crates/ --include="*.rs"` returns 21 lines: 1 macro definition (`output_macros.rs:70`), 13 real invocations, 5 doc/code comments in `main.rs` (`:2564`, `:2669`, `:3416`, `:3469`, `:5119`), 1 doc comment in `crates/jit/src/commands/issue.rs:334`, and 1 in `crates/jit/tests/cli_issue/issue_status_projection_tests.rs:333`.
 - **Arms accepting `--json`: 99, not ~63.** Definition counted: a *leaf* command in `jit --schema` (no `subcommands`) whose `flags` include `json`. The schema has 112 leaf commands; 99 accept `--json`, 13 do not. The 13 without: `dep delete`, `dep remove`, `doc delete`, `doc rm`, `gate delete`, `gate rm`, `issue complete`, `issue edit`, `issue remove`, `issue rm`, `label add`, `label remove`, `label rm` — all hidden verb-hint stubs (`cli.rs`, `#[command(hide = true)]`), which nevertheless render the envelope by sniffing a literal `--json` out of their captured argv (`verb_hint_error`, `main.rs:894`).
@@ -71,7 +91,7 @@ Every listed arm propagates with a bare `?`; `doc dir` is repaired. One arm was 
 | **`doc conformance`** | `:5146` | `?` at `:5155` — **not named in the container body**; it is a ninth `doc` arm with a bare `?`, and the code comment at `main.rs:5148-5154` argues the omission is deliberate |
 | `doc dir` | `:5097` | repaired: `handle_json_error!` at `:5142`, downcast classification at `:5126-5138` |
 
-## 5. `error_to_exit_code` vs `JsonError::exit_code()` — claim **"Both forms carry the same exit code" is invalid as stated**
+## 5. F-EXIT-DIVERGENCE — `error_to_exit_code` vs `JsonError::exit_code()`: "Both forms carry the same exit code" is invalid as stated
 
 They disagree on 9 measured arms. Measured by running the identical forced failure twice, once without `--json` and once with:
 
@@ -91,12 +111,19 @@ Root cause: the plain path classifies by typed downcast in `error_to_exit_code` 
 
 Two further disagreements, structural rather than measured:
 
-- **`search`**: `main.rs:6413` is a hardcoded `std::process::exit(10)` after printing an envelope whose code is `SEARCH_FAILED` or `RIPGREP_NOT_FOUND` (`:6389`, `:6392`). Neither string is in `ErrorCode`, so `json_error.exit_code()` would be `1`. The envelope's own reported code and the process exit status disagree by construction — the exact condition REQ-04 forbids.
-- **`gate preset apply`**: the human path exits `1` on any per-issue error (`main.rs:4692`); the `--json` path has no such exit and returns `0` with the errors nested in the success payload.
+### F-SEARCH-EXIT10 — `search` exits on a literal its reported code does not map to
+
+`main.rs:6413` is a hardcoded `std::process::exit(10)` after printing an envelope whose code is `SEARCH_FAILED` or `RIPGREP_NOT_FOUND` (`:6389`, `:6392`). Neither string is in `ErrorCode`, so `json_error.exit_code()` would be `1`. The envelope's own reported code and the process exit status disagree by construction — the exact condition REQ-04 forbids.
+
+### F-PRESET-APPLY-ZERO — `gate preset apply` returns zero with its failures nested in a success payload
+
+The human path exits `1` on any per-issue error (`main.rs:4692`); the `--json` path has no such exit and returns `0` with the errors nested in the success payload.
+
+### F-EXIT-DOC-DEFECT — The generated exit-status reference is bound through the plain invocation alone
 
 **This contradicts the generated exit-code reference.** `docs/reference/exit-codes.md` states `gate define | 6 | The gate key is already registered.` and `dep add | 4 | …`, and the binding test `test_command_exit_codes_gate_define_duplicate_emits_6` (`crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:575`) exercises the **non-`--json`** invocation only. The projection is therefore accurate for plain invocations and silently wrong for `--json` ones — a live `@/inv/single-source-prose` defect the plan should name.
 
-## 6. REQ-03 — the stderr/stdout split already holds; what remains is narrower than the requirement implies
+## 6. F-STDOUT-CLEAN — REQ-03: the stderr/stdout split already holds, and what remains is narrower than the requirement implies
 
 - `main()` writes `eprintln!("Error: {}", e)` at `main.rs:1728` — **stderr**. Every envelope except `recover`'s is `println!` — **stdout**.
 - Across all 61 arms I could drive to a real in-arm failure under `--json`, stdout was either completely empty or exactly one well-formed JSON document. **No arm wrote a non-JSON line to stdout on failure.** (Probe classifier: `FAIL-NONJSON-STDOUT` count = 0.)
@@ -108,7 +135,7 @@ Two further disagreements, structural rather than measured:
 2. Pin the property. Today it holds by construction and convention, not by any test. Nothing fails if a future arm adds an unguarded `println!` before a fallible call.
 3. Decide the requirement's reading: as written ("no plain-text diagnostic on the stream that carries the envelope") it is already satisfied for 98 of 99 arms. If the intent is "the envelope must exist at all", that is REQ-02, not REQ-03.
 
-## 7. MCP bridge — claim **confirmed, with a concrete defect**
+## 7. F-MCP — MCP bridge: claim confirmed, with a concrete defect
 
 - Generation: `mcp-server/lib/schema-loader.js:22` runs `execFile('jit', ['--schema'])` at server start and parses stdout. No schema file is bundled (`schema-loader.js:5`). `mcp-server/lib/tool-generator.js` turns each schema command into a `jit_<path>` tool; `mcp-server/curated-tools.json` decides which are advertised by default.
 - `--json` is appended automatically for any arm whose schema `flags` contain `json` (`mcp-server/lib/cli-executor.js:118`, `:139-141`).
@@ -138,7 +165,7 @@ Separate latent bug worth flagging (not in scope, but adjacent): `cli-executor.j
 
 **`--json` is per-arm, not global.** It appears as a plain `json: bool` field with `#[arg(long)]` on individual `Subcommand` enum variants — 100 occurrences of `json: bool` across `cli.rs`. No `global = true` appears anywhere except `quiet`. There is therefore **no derive-level property that distinguishes "accepts `--json`"** beyond "this variant has a field named `json`". At the clap-runtime level the distinguishing property is exactly `Command::get_arguments()` containing an `Arg` whose long is `json` — which is what the schema already computes.
 
-### The `--schema` machinery
+### F-SCHEMA-DERIVED — The `--schema` machinery is derived from clap
 
 `crates/jit/src/schema.rs`, entry point `CommandSchema::generate()` (`schema.rs:162`). It is **derived, not hand-maintained**: `crate::cli::Cli::command()` (`schema.rs:163`) via `clap::CommandFactory`, then a recursive walk (`extract_command_with_path_hidden`, `schema.rs:275`) that records every subcommand, its positional `args` (`extract_argument`, `:351`) and its `flags` (`extract_flag`, `:375`) straight off the clap `Arg`s. It qualifies as a derived source under `@/inv/single-source-prose`, and the derivation binds to clap's own runtime — not to a hand-written mirror, so it does not trip the circular-projection-guard concern.
 
@@ -151,7 +178,7 @@ What it does **not** record:
 
 Three hand-maintained lists inside `schema.rs` are worth naming because a plan touching this file will meet them: `hidden_commands()` (`schema.rs:228`, 35 literal paths), `builtin_global_flags()` (`:209`), and `get_output_schema_for_command` (`:456`, a `match` over ~100 literal command paths).
 
-### Dispatch structure in `main.rs`
+### F-NO-STATIC — Dispatch structure in `main.rs`: no static reading decides the property
 
 `run()` (`main.rs:1870`) is one 6000-line `match command` over `Commands`, with nested `match` blocks per namespace. `Commands::Item`, `Commands::Invariant`, `Commands::Project` delegate to wrapper functions (`run_item` `:1285`, `run_invariant` `:1368`, `run_project` `:1434`) that catch the inner result and classify centrally — an existing precedent for group-level central conversion.
 
@@ -172,7 +199,9 @@ An arm's failure path **cannot be identified structurally with confidence**. Bod
 | `scripts/*.sh` gate checkers (`docs-mechanical.sh`, `docs-check-projections.sh`, `rust-build-budget.sh`) wired in `.jit/gates.toml` | `scripts/`, `.jit/gates.toml` | **Only for a source-text heuristic** ("no `?;` in a dispatch arm body"), which the partial-coverage evidence above shows is unsound in both directions. A shell checker *could* drive the binary, but it would duplicate the Rust harness for no gain. | Low to write, high false-positive rate. Not recommended as the primary guard. |
 | Compile-time policy tests | `crates/jit/tests/scratch_build/build_profile_policy_tests.rs`, `dependency_feature_policy_tests.rs` | **No.** These assert manifest/profile facts, not control flow. | — |
 
-**Is a forced failure reachable for every arm?** No. Of 99 arms I drove 61 into a real in-arm failure; 7 more were rejected by clap before dispatch, and for 31 I could construct no failing argument or flag value at all. Those 31 take no argument that can be made invalid and have no invalid flag value:
+### F-FORCED-FAILURE — Is a forced failure reachable for every arm?
+
+No. Of 99 arms I drove 61 into a real in-arm failure; 7 more were rejected by clap before dispatch, and for 31 I could construct no failing argument or flag value at all. Those 31 take no argument that can be made invalid and have no invalid flag value:
 
 `archive candidates`, `archive document`, `config list-templates`, `config show`, `config show-hierarchy`, `config validate`, `doc conformance`, `events query`, `gate define`, `gate list`, `gate preset apply`, `gate preset list`, `graph roots`, `init`, `invariant check`, `item list`, `item search`, `label namespaces`, `label values`, `profile list`, `project render`, `query all`, `query blocked`, `query closed`, `query count`, `query divergence`, `query strategic`, `serve`, `status`, `version`, `worktree list`.
 
@@ -192,9 +221,11 @@ Derivation: schema walk (§Method) crossed with the `main.rs` dispatch site and,
 
 Probe outcome totals across the 99 arms: **31 ENVELOPE, 30 PLAIN, 7 CLAP, 31 n/f**.
 
-**Clap parse errors are a distinct class the plan must scope explicitly.** A malformed invocation (`jit query count --by bogus --json`, `jit hooks install --hook x --json`) is rejected inside `Cli::parse()` at `main.rs:1878`, before any dispatch. Clap prints its own `error: invalid value …` to stderr and exits 2 on its own. No `--json` arm can render an envelope for that class without replacing clap's error handling wholesale (`try_parse` + a jit-owned renderer). REQ-02 as written — "every arm accepting the flag renders its failures as the structured error envelope" — is unachievable for argument-parse failures unless the plan either carves them out or takes on clap error handling.
-
 **Mechanism legend** — `hje` = `handle_json_error!`; `adhoc` = inline `println!(json_error)+exit`; `helper` = one of `profile_result`/`claim_json_error`/`render_gate_pass_error`/`resolve_gate_key_for`/`invalid_argument`; `none` = no envelope route on any failure path.
+
+### F-CLAP-PARSE — Argument-parse failures are a distinct class the plan must scope explicitly
+
+A malformed invocation (`jit query count --by bogus --json`, `jit hooks install --hook x --json`) is rejected inside `Cli::parse()` at `main.rs:1878`, before any dispatch. Clap prints its own `error: invalid value …` to stderr and exits 2 on its own. No `--json` arm can render an envelope for that class without replacing clap's error handling wholesale (`try_parse` + a jit-owned renderer). REQ-02 as written — "every arm accepting the flag renders its failures as the structured error envelope" — is unachievable for argument-parse failures unless the plan either carves them out or takes on clap error handling.
 
 ### `issue` (16 arms)
 

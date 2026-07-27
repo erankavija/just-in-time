@@ -6,11 +6,30 @@ contract belongs. Companion to `investigation.md` (arm census, REQ-01), which is
 owned by a sibling investigator; the arm counts below are reported as measured,
 not adjudicated against that census.
 
+## Finding index
+
+Each id below names the heading that owns its evidence, so a plan or manifest
+reference resolves to one section of this report.
+
+| Id | Section |
+|---|---|
+| `F-TEST-TOPOLOGY` | A.1 integration-test topology |
+| `F-NONBINDING-TESTS` | A.2 → two existing tests are non-binding |
+| `F-NO-SHARED-RUNNER` | A.3 shared fixtures, and the absent subprocess runner |
+| `F-NO-ERROR-SUITE` | A.4 canonical JSON-contract suites |
+| `F-BUDGET` | A.5 build-footprint headroom |
+| `F-COMPLETENESS-PRECEDENT` | Option 1, the runtime exhaustive test |
+| `F-DOC-HOME` | C.1 where the machine-readable output contract lives today |
+| `F-ERRORCODE-STRUCT` | C.3 error codes: not documented, not currently enumerable |
+| `F-ALL-CODES-DOC` | C.3 → the hand-listed exit-status enumeration |
+| `F-PROJECTION-PATTERN` | C.4 projection machinery that fits an error-code vocabulary |
+| `F-DOCS-MECHANICAL` | C.5–C.6 the docs-mechanical gate |
+
 ---
 
 ## Question A — how failure behaviour is currently tested (REQ-05)
 
-### A.1 Integration-test topology
+### A.1 F-TEST-TOPOLOGY — Integration-test topology
 
 Eleven integration-test targets exist workspace-wide, measured from
 `cargo metadata --no-deps --format-version=1`:
@@ -54,8 +73,9 @@ Eighteen further test files across all five `cli_*` suites assert
 `project_render_cli_tests.rs`, `derived_state_repair_tests.rs`,
 `claim_integration_tests.rs`). They are per-feature, not a contract suite.
 
-**Two existing tests in `error_json_tests.rs` are non-binding and would pass
-against the defect this epic repairs:**
+#### F-NONBINDING-TESTS — Two existing tests are non-binding and would pass against the defect this epic repairs
+
+Both are in `error_json_tests.rs`:
 
 - `test_gate_operation_error_json` (`error_json_tests.rs:179-207`) parses stdout
   and discards the result — its only surviving assertion is that stdout is valid
@@ -69,7 +89,7 @@ against the defect this epic repairs:**
 Both are in the epic's blast radius and should be tightened or replaced by REQ-05
 rather than left as apparent coverage.
 
-### A.3 Shared fixtures available (`@/inv/shared-test-contracts`)
+### A.3 F-NO-SHARED-RUNNER — Shared fixtures available, with no shared subprocess runner among them (`@/inv/shared-test-contracts`)
 
 - **In-process harness:** `crates/jit/tests/common/harness.rs` — `TestHarness`
   (`:14-42`) wrapping `CommandExecutor<InMemoryStorage>`, with fluent helpers
@@ -98,7 +118,7 @@ rather than left as apparent coverage.
   points that way. Whether to extract one (and retrofit callers) or add a
   suite-local one is a plan decision with a real churn cost.
 
-### A.4 Is there a canonical JSON-contract suite? (`@/inv/semantic-test-assertions`)
+### A.4 F-NO-ERROR-SUITE — Is there a canonical JSON-contract suite? (`@/inv/semantic-test-assertions`)
 
 **Success side — yes, two.**
 
@@ -123,7 +143,7 @@ rather than extending one. The natural home is `cli_issue`, beside
 assertion (`list_envelope`, `error_json`, `exit_code`, `command_exit_code_projection`,
 `issue_create_json_contract`, `gate_field_contract`).
 
-### A.5 Build-footprint headroom (`@/inv/bounded-rust-build-footprint`)
+### A.5 F-BUDGET — Build-footprint headroom (`@/inv/bounded-rust-build-footprint`)
 
 Budgets are declared once at `scripts/rust-build-budget.sh:39-40`:
 `MAX_INTEGRATION_TARGETS=12`, `MAX_EXECUTABLE_BYTES=2 GiB`.
@@ -224,7 +244,7 @@ without suppressing stderr. Whether the stderr line *should* also be suppressed
 under `--json` is a question REQ-03's wording does not settle; the plan should say
 which reading it takes.
 
-### Option 1 — runtime exhaustive test
+### Option 1 F-COMPLETENESS-PRECEDENT — runtime exhaustive test over a schema-derived arm set
 
 **Enumeration: feasible, with strong precedent.** `CommandSchema::generate()`
 (`crates/jit/src/schema.rs:162-203`) already reflects `crate::cli::Cli::command()`
@@ -396,7 +416,7 @@ envelope unmissable, 1 makes the code correct per arm.
 
 ## Question C — the canonical documentation home (REQ-07)
 
-### C.1 Where the machine-readable OUTPUT contract lives today
+### C.1 F-DOC-HOME — Where the machine-readable OUTPUT contract lives today
 
 **Canonical home: `docs/reference/cli-commands.md`, section `## CLI JSON contracts`
 (`:5-117`).** It states, in one place:
@@ -451,7 +471,7 @@ contract, so this is reported, not proposed as scope.
 nine hand-written `ExitCodeDoc` literals, **not** derived from the `ExitCode` enum.
 A tenth enum variant would not appear there and nothing would fail.
 
-### C.3 Error codes: not documented, and not currently enumerable
+### C.3 F-ERRORCODE-STRUCT — Error codes: not documented, and not currently enumerable
 
 - **`ErrorCode` is a unit struct, not an enum.** `crates/jit/src/output.rs:640`
   declares `pub struct ErrorCode;`, carrying **20 associated
@@ -470,6 +490,8 @@ A tenth enum variant would not appear there and nothing would fail.
   in examples (`cli-commands.md:30,52,85`, `profiles.md:102`,
   `worktree-validate.md:254`). There is no table.
 
+#### F-ALL-CODES-DOC — The hand-listed exit-status enumeration does not break when a status is added
+
 By contrast **`ExitCode` *is* an enum** (`output.rs:539-572`), 9 variants,
 `#[repr(i32)]`. `ExitCode::description` (`:582-598`) is an exhaustive `match` with
 no wildcard, so a new variant is a compile error there — but
@@ -478,7 +500,7 @@ no wildcard, so a new variant is a compile error there — but
 `@/inv/single-source-prose` hazard independent of this epic; worth naming in the
 plan even if out of scope.
 
-### C.4 Is there projection machinery that fits an error-code vocabulary?
+### C.4 F-PROJECTION-PATTERN — Is there projection machinery that fits an error-code vocabulary?
 
 **`.jit/config.toml`'s `[projection.*]` does not fit.** The three declared
 projections (`:255` invariants → `AGENTS.md`; `:264` rules-and-gates →
@@ -529,7 +551,9 @@ same mappings revises neither. But it is real work the plan must place somewhere
 built the `exit-codes.md` way is therefore covered by **`cargo-ci`**, not by
 `docs-mechanical`.
 
-### C.5 `docs-mechanical` footprint for a new or edited page
+### F-DOCS-MECHANICAL — What the `docs-mechanical` gate checks, and which citations fail in a fresh worktree
+
+#### C.5 Footprint for a new or edited page
 
 Gate: `./scripts/docs-mechanical.sh` with `DOCS_FOOTPRINT = "docs/"`
 (`.jit/gates.toml`, `docs-mechanical` block). The orchestrator fans out to three
@@ -553,7 +577,7 @@ checkers and aggregates status, with exit 2 (environment error) dominating exit 
   and `git diff`s the configured targets; note the documented side effect
   (`:18-21`): a stale tree is left holding the freshly rendered region.
 
-### C.6 Memory-flagged pitfall — verified, with a correction
+#### C.6 Memory-flagged pitfall — verified, with a correction
 
 **The underlying claim holds.** Measured on `main` at this checkout:
 
