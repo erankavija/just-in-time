@@ -842,8 +842,8 @@
       "doc-review",
       "docs-mechanical"
      ],
-     "status": "dispatched",
-     "note": "E14 remediation for 89b5899a's doc-review findings F1-F3."
+     "status": "merged into main at f3c8b6be, gates pending",
+     "note": "E14 remediation for 89b5899a's doc-review F1-F3. Two commits: the three corrections, then the lead-directed removal of the 'legacy'/'old archives'/'new preferred root' framing from the destination-naming pair, which the worker had flagged and left. Worker verified the surviving adoption mechanism live, including the destination-conflict clause firing on an unaccounted entry in an occupied unsuffixed directory."
     },
     {
      "short_id": "89b5899a",
@@ -1523,6 +1523,13 @@
    "subject": "a directory link target is navigation to archival discovery and a missing asset to link checking",
    "detail": "Measured on a fresh `jit init` repository. A document linking `[text](../studies)` where dev/studies is a real directory: `jit archive container` gives an eligible plan with the directory contributing no artifact entry and no edge (the epic's REQ-15 behaviour, from 7d6d2783). The same link is recorded by `jit doc add`'s asset scan as `asset_type: missing` with resolved_path dev/studies, and `jit doc check-links` then reports it as a `missing_asset` ERROR plus a `scan_error` reading 'Failed to scan document for links: Is a directory (os error 21)'. Separately, `jit doc add <id> dev/studies` - a directory linked directly as a document - makes `jit validate` fail with 'file dev/studies not found in the working tree or at HEAD', which is a misleading message for a path that exists.",
    "disposition": "OPEN as a product observation, outside this epic's criteria. Epic REQ-15 and @/issue/8e071e18/decision/D-18 both scope themselves to artifact discovery and the unsupported-artifact-type blocker, which the shipped behaviour satisfies; neither reaches the asset scanner or the link checker. Not filed as an issue: filing outside this epic has been an owner call every previous time on this epic (E11, P8, P9, P11, P13, P16). Raise it in the completion report for an owner decision."
+  },
+  {
+   "id": "P26",
+   "raised_by": "334bcd6f (worker), adjudicated by the lead",
+   "subject": "'legacy archived record' as a term of art in both the reference and the type's doc comment",
+   "detail": "docs/reference/cli-commands.md:244, :1174 and :2656 each describe 'a legacy Archived record with no recorded origin', and crates/jit/src/domain/types.rs:106-110 uses the same phrase for the same shape. The shape is representable today: archived_from is Option<State>, so an Archived issue can genuinely carry no origin.",
+   "disposition": "CLOSED as a non-defect, lead decision. The no-legacy-narration rule bans describing superseded BEHAVIOUR in shipped text; this names a data shape that still exists, and the reference uses the term the code uses, which is @/invariant/single-source-prose working as intended. Renaming it in the reference alone would be the defect. Also a different subject from this epic - the Archived state's origin tracking has nothing to do with artifact layout - so any rename wants its own issue covering the type doc comment and all three reference sites together."
   }
  ],
  "started_at": "2026-07-25T14:24:30.011076+00:00",
