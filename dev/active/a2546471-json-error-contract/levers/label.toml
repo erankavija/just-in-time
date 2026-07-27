@@ -1,0 +1,20 @@
+schema = "failure-lever-registry/v1"
+namespace = "label"
+
+[[arms]]
+path = "label namespaces"
+argv = ["label", "namespaces", "--json"]
+setup = ["init", "malformed-config-toml"]
+setup_notes = "Initialize a repository, then replace .jit/config.toml with malformed TOML before invoking the arm."
+expected_failure = "Failed to parse config.toml"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "label values"
+argv = ["label", "values", "epic", "--json"]
+setup = ["init", "malformed-index"]
+setup_notes = "Initialize a repository, then replace .jit/index.json with malformed JSON before invoking the arm."
+expected_failure = "failed to parse index"
+expected_exit = 1
+confirmation = "invoked"
