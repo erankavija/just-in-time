@@ -1027,3 +1027,20 @@ Issue `83c61de0`. Plan eligible with no blockers. 11 relocated, 4 mirrored, 30 r
 ### Other plan warnings (1)
 
 - `missing-edge-target` at `.agents/skills/jit-planning-lead/evals/results.md`
+
+## `93f3e4df` — dev/archive/93f3e4df-rejection-state
+Issue `3c36ffa1`. Plan eligible with no blockers. 1 relocated, 0 mirrored, 0 retained, 0 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/rejection-state-design.md` | `dev/archive/93f3e4df-rejection-state/dev/active/rejection-state-design.md` | 93f3e4df |
+
+### In-content citation warnings (3)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:2890:14` | `dev/active/rejection-state-design.md` |
+| `dev/active/8e071e18-breakdown.json:3605:3074` | `dev/active/rejection-state-design.md` |
+| `dev/active/8e071e18-breakdown.json:3605:3170` | `dev/active/rejection-state-design.md` |
