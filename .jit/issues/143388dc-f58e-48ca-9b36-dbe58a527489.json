@@ -28,6 +28,7 @@
       "path": "dev/active/143388dc-development-root-cleanup/remaining-artifacts-addendum.md"
     }
   ],
+  "done_at": "2026-07-27T13:05:52.474251145Z",
   "first_ready_at": "2026-07-27T12:04:43.803476239Z",
   "gates_required": [
     "repo-validate",
@@ -43,8 +44,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-27T12:52:06.404071401Z",
+      "status": "passed",
+      "updated_at": "2026-07-27T12:57:52.770557927Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
@@ -71,7 +72,7 @@
     "story:development-root-cleanup"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Development root cleanup through the repaired mechanism",
-  "updated_at": "2026-07-27T12:52:46.712122780Z"
+  "updated_at": "2026-07-27T13:05:52.474251145Z"
 }

@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "25e619373687a3d42f57194036de81e56ec1aec3",
+  "completed_at": "2026-07-27T12:59:16.563419506Z",
+  "duration_ms": 74904,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's attributed CLI-reference update accurately and concisely documents all directly affected user-visible behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "4a6fb8c1-2283-4e4a-bb0d-af2baa3e8c13",
+  "message": null,
+  "run_id": "3ef0d8e7-6876-41ad-9ca2-3bbd0aa5252e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T12:58:01.659345942Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf `task` with no resolved children. I inspected all four reachable `jit:4a6fb8c1` commits individually; one provides the CLI-reference update and the remainder are claim/merge metadata. No attribution fallback was needed.\n\nThe current [CLI reference](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:224) accurately covers the archive, citation, directory-link, `doc dir`, and conformance behavior, with canonical configuration citations. Current source and CLI help agree.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's attributed CLI-reference update accurately and concisely documents all directly affected user-visible behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

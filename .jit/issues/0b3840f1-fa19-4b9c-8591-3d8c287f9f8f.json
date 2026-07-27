@@ -9,6 +9,7 @@
   ],
   "description": "An issue's artifacts live in one canonical directory derived from its identity inside an area configuration declares, resolved by a command that tooling and documentation call instead of spelling the pattern out.\n\n## Background\n\nDevelopment artifacts are named as flat files at area root with the owning issue's short id as a filename prefix. The layout does not scale, and the one place that derives a directory name from an issue falls back to the issue title, which yields long names truncated mid-word.\n\nThe convention is a directory per issue named from the issue's membership label, falling back to a bare short id, with filenames inside the directory carrying no redundant short-id prefix. Only some areas under a development root organize their artifacts by issue, so configuration declares which ones do and every resolution names one of them. Directory-per-issue precedents already exist in the repository. The convention governs newly created artifacts; pre-existing flat files are tolerated rather than restructured in place.\n\nEnforcement is a resolver plus an advisory report. A blocking validation rule was rejected because legacy flat artifacts are deliberately tolerated and a cutover predicate would be a false-positive source.\n\n## Success Criteria\n\n- [hard] REQ-01: The development areas that adopt the convention are declared in configuration, and every canonical-directory resolution names one of them.\n- [hard] REQ-02: An issue's canonical artifact directory is the named area joined with its short id and membership slug when the issue carries a membership label, and with the bare short id otherwise, with no name derived from an issue title.\n- [hard] REQ-03: A command resolves the canonical directory, and tooling and documentation obtain the path from it rather than composing it from a spelled-out pattern.\n- [hard] REQ-04: Artifact filenames inside an issue directory carry no short-id prefix.\n- [hard] REQ-05: An advisory report lists artifacts under the declared issue-scoped areas that sit outside their owning issue's canonical directory, and the report blocks no state transition.\n",
   "documents": [],
+  "done_at": "2026-07-27T13:05:56.488947726Z",
   "first_ready_at": "2026-07-27T09:26:59.497145545Z",
   "gates_required": [
     "cargo-ci",
@@ -25,18 +26,18 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-27T10:50:40.589431463Z",
+      "status": "passed",
+      "updated_at": "2026-07-27T13:05:20.333144199Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-07-27T10:47:55.979309393Z",
+      "status": "passed",
+      "updated_at": "2026-07-27T13:02:23.017722572Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-07-27T10:20:00.550874097Z",
+      "updated_at": "2026-07-27T13:01:07.855766032Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -58,7 +59,7 @@
     "story:artifact-directory-convention"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Canonical issue artifact directory convention",
-  "updated_at": "2026-07-27T10:50:40.589431463Z"
+  "updated_at": "2026-07-27T13:05:56.488947726Z"
 }

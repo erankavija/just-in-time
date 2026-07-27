@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "25e619373687a3d42f57194036de81e56ec1aec3",
+  "completed_at": "2026-07-27T13:02:22.754963799Z",
+  "duration_ms": 74299,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The canonical artifact-directory convention and its command and template contracts are accurately documented in the current combined documentation contract.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "0b3840f1-fa19-4b9c-8591-3d8c287f9f8f",
+  "message": null,
+  "run_id": "7d0c9f17-9ca8-479e-89b2-72a0fb5abeb4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T13:01:08.455568157Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: container `0b3840f1` plus its nine done, DAG-resolved children. I inspected each reachable `jit:<short-id>` commit individually with rename detection; unrelated working-tree changes were excluded.\n\nThe prior blockers are addressed: the CLI reference documents `jit doc dir` and `jit doc conformance`, while the configuration reference defines `issue_scoped_areas`, `doc_area`, and `{container.dir}`. Current commands and JSON behavior match those documents.\n\nNo documentation-impact defects remain in the combined contract.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The canonical artifact-directory convention and its command and template contracts are accurately documented in the current combined documentation contract.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

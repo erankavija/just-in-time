@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "25e619373687a3d42f57194036de81e56ec1aec3",
+  "completed_at": "2026-07-27T13:05:20.067081331Z",
+  "duration_ms": 176185,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The current resolver, command surface, documentation, templates, bridge curation, and tests satisfy the issue criteria; prior F1/F2 are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0b3840f1-fa19-4b9c-8591-3d8c287f9f8f",
+  "message": null,
+  "run_id": "1018f0db-2be2-410d-8f10-1a8d0b18bf9a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T13:02:23.882028322Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7221e0dfe9d61f970c054bb7658f555e81965535 (`crates/jit/src/templates.rs`); completed dependencies verified in the current tree\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose and @/invariant/domain-agnostic (.jit/invariants.toml); @/issue/8e071e18/decision/D-2 and D-7 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci, doc-review, docs-mechanical, mcp-ci, and repo-validate passed (exit 0); prior code-review failed with F1/F2, now addressed\nTruncation recovery: narrowed the initial broad searches to the resolver, command, CLI, tests, templates, configuration, and documentation paths\n1. No findings identified. The CLI/configuration references now document `jit doc dir`, `jit doc conformance`, `doc_area`, and `{container.dir}`; the resolver, templates, curated MCP manifest, and tests agree on the configured convention.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current resolver, command surface, documentation, templates, bridge curation, and tests satisfy the issue criteria; prior F1/F2 are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

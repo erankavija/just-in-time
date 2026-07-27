@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "25e619373687a3d42f57194036de81e56ec1aec3",
+  "completed_at": "2026-07-27T13:00:59.226904385Z",
+  "duration_ms": 93465,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf's attributable documentation changes accurately establish and reference the canonical artifact-layout configuration guidance.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "58c56743-b5e6-4fe3-90af-1910974faefc",
+  "message": null,
+  "run_id": "c70e6a40-2966-46da-a5b7-63bf59220b7e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T12:59:25.761343339Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: this maximum-level leaf has no resolved children. I inspected its three `jit:58c56743` commits individually; the merge adds no distinct patch beyond its contained change. Current docs and command behavior confirm the canonical configuration reference is accurate, and the prior CLI-reference duplication is now a pointer to it.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf's attributable documentation changes accurately establish and reference the canonical artifact-layout configuration guidance.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
