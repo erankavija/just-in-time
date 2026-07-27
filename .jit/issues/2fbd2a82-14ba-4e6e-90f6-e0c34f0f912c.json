@@ -32,6 +32,13 @@
       "format": "html",
       "label": "Showcase slides",
       "path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/talk.html"
+    },
+    {
+      "commit": null,
+      "doc_type": "documentation",
+      "format": "markdown",
+      "label": "Showcase alternate theme",
+      "path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/themes/gruvbox.css"
     }
   ],
   "done_at": "2026-06-18T20:10:25.277031526Z",
@@ -46,5 +53,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Plan-before-fan-out bracket: gated planning node before breakdown",
-  "updated_at": "2026-07-27T10:04:16.178852848Z"
+  "updated_at": "2026-07-27T12:06:10.613539794Z"
 }
