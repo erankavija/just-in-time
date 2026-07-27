@@ -10533,3 +10533,11 @@
 {"gate_key":"mcp-ci","id":"02c9b4c3-5ae6-450c-8168-1dd64f6a9370","issue_id":"f89ea266-bf12-4fe6-a685-55cfffa73165","timestamp":"2026-07-27T13:53:12.630180282Z","type":"gate_added"}
 {"from":"ready","id":"243cb1fa-aac7-4eab-a570-8f9edcc3a53f","issue_id":"f89ea266-bf12-4fe6-a685-55cfffa73165","timestamp":"2026-07-27T13:53:15.463335822Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"9642cffc-c982-4073-865f-7ed8c7931fd7","issue_id":"f89ea266-bf12-4fe6-a685-55cfffa73165","timestamp":"2026-07-27T13:53:15.463335822Z","type":"issue_claimed"}
+{"gate_key":"docs-mechanical","id":"d5e4362f-8d01-4716-99ad-99b4712614e0","issue_id":"f89ea266-bf12-4fe6-a685-55cfffa73165","timestamp":"2026-07-27T14:17:32.962879369Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"5dfde0f8-bda4-42d2-ab58-d70f2cba7307","issue_id":"f89ea266-bf12-4fe6-a685-55cfffa73165","timestamp":"2026-07-27T14:17:35.560972090Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"cca0aaa0-b15f-40d1-91be-639786c808c6","issue_id":"f89ea266-bf12-4fe6-a685-55cfffa73165","timestamp":"2026-07-27T14:24:16.714855826Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"fc2ffd79-681c-4542-b654-9388099bbdaa","issue_id":"f89ea266-bf12-4fe6-a685-55cfffa73165","timestamp":"2026-07-27T14:25:20.221937720Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"a0622e20-c147-42ec-8820-a430412e4251","issue_id":"f89ea266-bf12-4fe6-a685-55cfffa73165","timestamp":"2026-07-27T14:28:09.202556164Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"d68a2902-fade-4306-9187-2b309c5d615e","issue_id":"f89ea266-bf12-4fe6-a685-55cfffa73165","timestamp":"2026-07-27T14:33:48.795183138Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"9d72575f-77b3-4b64-b738-eb26a2b3fd08","issue_id":"f89ea266-bf12-4fe6-a685-55cfffa73165","timestamp":"2026-07-27T14:34:04.797880972Z","to":"done","type":"issue_state_changed"}
+{"id":"766df9b1-0627-4115-aba0-e2adfc7bf058","issue_id":"f89ea266-bf12-4fe6-a685-55cfffa73165","timestamp":"2026-07-27T14:34:04.797880972Z","type":"issue_completed"}

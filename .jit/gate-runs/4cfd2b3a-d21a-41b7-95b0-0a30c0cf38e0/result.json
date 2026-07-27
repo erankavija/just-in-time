@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "f7983dfd1193e427eafdc7588080b50224e2947f",
+  "completed_at": "2026-07-27T14:28:08.937702378Z",
+  "duration_ms": 167626,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Reference-based attribution, fallback behavior, preserved prefix precedence, documentation, and semantic test coverage satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f89ea266-bf12-4fe6-a685-55cfffa73165",
+  "message": null,
+  "run_id": "4cfd2b3a-d21a-41b7-95b0-0a30c0cf38e0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T14:25:21.311020123Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 758a44d3 (merge, no combined patch), 6df0d043 (implementation), aec0297f (issue filing)\nPolicy sources: AGENTS.md; .jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/8e071e18/decision/D-2, @/issue/8e071e18/requirement/REQ-06, @/issue/8e071e18/decision/D-7 (issue markdown-first source); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1: pre-existing non-empty incremental directory; fmt, clippy, 3974 tests, provenance, and budget passed); doc-review passed (exit 0); docs-mechanical passed (exit 0); mcp-ci passed (exit 0)\nTruncation recovery: reread implementation, CLI/integration-test, documentation, issue-source, merge, and gate-record evidence in bounded calls; live conformance inspection was not retried after the read command could not acquire .jit/.index.lock\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Reference-based attribution, fallback behavior, preserved prefix precedence, documentation, and semantic test coverage satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
