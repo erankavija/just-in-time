@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T19:20:30.960119095Z",
+  "dependencies": [],
+  "description": "Planning node for Structured failure reporting across the machine-readable CLI surface (a2546471). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/a2546471-json-error-contract/plan.md and link it to this node once written.",
+  "documents": [],
+  "first_ready_at": "2026-07-27T19:20:30.960119095Z",
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_at": "2026-07-27T19:20:30.960119095Z",
+      "updated_by": null
+    }
+  },
+  "id": "0e5aed49-8194-4cea-b72a-1019844cc2eb",
+  "labels": [
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "type:planning"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "planning: Structured failure reporting across the machine-readable CLI surface",
+  "updated_at": "2026-07-27T19:20:30.960119095Z"
+}

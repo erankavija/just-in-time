@@ -1,0 +1,39 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T19:20:30.960119095Z",
+  "dependencies": [
+    "0e5aed49-8194-4cea-b72a-1019844cc2eb"
+  ],
+  "description": "Breakdown node bracketing Structured failure reporting across the machine-readable CLI surface (a2546471). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria.",
+  "documents": [],
+  "first_ready_at": "2026-07-27T19:20:30.960119095Z",
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-07-27T19:20:30.960119095Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-07-27T19:20:30.960119095Z",
+      "updated_by": null
+    }
+  },
+  "id": "059e13e2-0970-4cc8-8a4e-21cc8b3d83ab",
+  "labels": [
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "type:breakdown",
+    "brackets:a2546471"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "breakdown: Structured failure reporting across the machine-readable CLI surface",
+  "updated_at": "2026-07-27T19:20:30.960119095Z"
+}
