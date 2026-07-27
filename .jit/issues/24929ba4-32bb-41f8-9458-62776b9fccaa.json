@@ -19,7 +19,13 @@
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-27T22:30:17.654566482Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "24929ba4-32bb-41f8-9458-62776b9fccaa",
   "labels": [
     "type:task",
@@ -31,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Failure-lever survey for the gate namespace",
-  "updated_at": "2026-07-27T22:25:17.404392943Z"
+  "updated_at": "2026-07-27T22:30:17.654566482Z"
 }
