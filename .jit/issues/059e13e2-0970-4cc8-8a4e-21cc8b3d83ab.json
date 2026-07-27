@@ -14,14 +14,14 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-07-27T19:20:30.960119095Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-07-27T21:52:51.198227559Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-07-27T19:20:30.960119095Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-27T21:46:57.226580574Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "059e13e2-0970-4cc8-8a4e-21cc8b3d83ab",
@@ -33,7 +33,7 @@
     "brackets:a2546471"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "breakdown: Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-27T21:42:31.126852324Z"
+  "updated_at": "2026-07-27T21:52:51.198227559Z"
 }
