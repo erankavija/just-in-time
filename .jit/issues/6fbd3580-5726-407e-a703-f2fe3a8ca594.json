@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-27T22:15:16.439036945Z",
   "context": {},
   "created_at": "2026-07-27T21:43:44.885062384Z",
   "dependencies": [
@@ -21,7 +22,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Failure-lever survey for the config namespace",
-  "updated_at": "2026-07-27T22:00:15.016089195Z"
+  "updated_at": "2026-07-27T22:15:16.439036945Z"
 }

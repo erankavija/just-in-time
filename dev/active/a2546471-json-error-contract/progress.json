@@ -1,0 +1,86 @@
+{
+  "epic_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
+  "epic_short_id": "a2546471",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {"id":"24929ba4-32bb-41f8-9458-62776b9fccaa","short_id":"24929ba4","title":"Failure-lever survey for the gate namespace","classification":"research","status":"claimed"},
+        {"id":"2b4b5ddb-a769-4b2d-9b9e-04f7b844da41","short_id":"2b4b5ddb","title":"Failure-lever survey for the issue namespace","classification":"research","status":"claimed"},
+        {"id":"54568bd5-a9cf-40e0-872c-ab7664b8f8dd","short_id":"54568bd5","title":"Failure-lever survey for the profile namespace","classification":"research","status":"claimed"},
+        {"id":"585d55c3-c3f8-411f-b464-d1f2226cc8ed","short_id":"585d55c3","title":"Failure-lever survey for the standalone tool commands","classification":"research","status":"claimed"},
+        {"id":"6fbd3580-5726-407e-a703-f2fe3a8ca594","short_id":"6fbd3580","title":"Failure-lever survey for the config namespace","classification":"research","status":"claimed"},
+        {"id":"7b5731ab-f94f-4f51-a256-383e7bcacd14","short_id":"7b5731ab","title":"Failure-lever survey for the doc namespace","classification":"research","status":"claimed"},
+        {"id":"860dc866-f32d-4d92-b712-fd3222aa0d8a","short_id":"860dc866","title":"Failure-lever survey for the archive namespace","classification":"research","status":"claimed"},
+        {"id":"9dd880d4-4c8e-4ec5-beec-1832eb07773e","short_id":"9dd880d4","title":"Failure-lever survey for the events namespace","classification":"research","status":"claimed"},
+        {"id":"a971ec3a-8d08-49ee-a758-98d32954f2e8","short_id":"a971ec3a","title":"Failure-lever survey for the repository-lifecycle commands","classification":"research","status":"claimed"},
+        {"id":"b3c9db33-7de3-4f16-882e-04f2d0ed6f57","short_id":"b3c9db33","title":"Failure-lever survey for the label namespace","classification":"research","status":"claimed"},
+        {"id":"b6917d8f-0821-4063-afdd-041ddc50c691","short_id":"b6917d8f","title":"Make the error-code vocabulary an enumerable type","classification":"implementation","status":"claimed"},
+        {"id":"c0a64179-e90f-4b99-b24d-aeafc9d3d281","short_id":"c0a64179","title":"Failure-lever survey for the wrapper-classified namespaces","classification":"research","status":"claimed"},
+        {"id":"c4f8a7d2-b684-4060-90f9-bac7b0516d81","short_id":"c4f8a7d2","title":"Failure-lever survey for the dependency and worktree namespaces","classification":"research","status":"claimed"},
+        {"id":"c7ab609d-0b4f-403c-acee-2e8cc8fe34f5","short_id":"c7ab609d","title":"Failure-lever survey for the claim namespace","classification":"research","status":"claimed"},
+        {"id":"cfaff7f0-f16b-412e-bb00-627740f6f9e8","short_id":"cfaff7f0","title":"Failure-lever survey for the query and graph namespaces","classification":"research","status":"claimed"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"id":"6ebd3d03-6cb2-458a-bb61-dad7604340fc","short_id":"6ebd3d03","title":"Register the emitted error codes that carry no exit classification","classification":"implementation","status":"pending"},
+        {"id":"8cfe8699-95f2-4535-8158-35eb05158266","short_id":"8cfe8699","title":"The canonical failure-lever registry the probes read","classification":"implementation","status":"pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"id":"437ac584-b441-43fb-91bd-a9328f884c12","short_id":"437ac584","title":"Report per-issue preset failures as a failing envelope","classification":"implementation","status":"pending"},
+        {"id":"777d00da-22d5-49e7-a005-f2da47d5f4b6","short_id":"777d00da","title":"Report the server control's failures as the error envelope","classification":"implementation","status":"pending"},
+        {"id":"7c50ef89-0f6d-4b04-b921-84a81d96ecf1","short_id":"7c50ef89","title":"Move the recovery command's failure envelope onto the payload stream","classification":"implementation","status":"pending"},
+        {"id":"85dbcd97-6808-483f-be3f-ebb2fd77939f","short_id":"85dbcd97","title":"A generated adopter reference for the error-code vocabulary","classification":"implementation","status":"pending"},
+        {"id":"e3a11002-7469-438e-b3d0-1b5f6251a1cf","short_id":"e3a11002","title":"Align the search command's exit status with its reported error code","classification":"implementation","status":"pending"},
+        {"id":"f6c95115-2eca-4046-9372-9f2ef7cf8bf9","short_id":"f6c95115","title":"Expose the stored-record decode failure as a classifiable typed error","classification":"implementation","status":"pending"}
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {"id":"72835d56-06fa-427c-82fd-a516803723cc","short_id":"72835d56","title":"Verify exit-status parity between the two invocation forms","classification":"implementation","status":"pending"},
+        {"id":"a193a7cc-a00b-4551-bb30-922a8e015b38","short_id":"a193a7cc","title":"Bind the exit-status projection to the machine-readable invocation form","classification":"implementation","status":"pending"},
+        {"id":"dbe2f2a8-87c0-47a1-94c6-2bca4b6d3b07","short_id":"dbe2f2a8","title":"Render the structured envelope from the top-level failure printer","classification":"implementation","status":"pending"}
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {"id":"4087cd55-0c6e-4e16-8c1f-f468b66e8b37","short_id":"4087cd55","title":"Structural envelope emission for every failing machine-readable invocation","classification":"implementation","status":"pending"},
+        {"id":"7e0c04d0-c4b5-4afb-96af-2926e61f0b43","short_id":"7e0c04d0","title":"An enumerable error-code vocabulary with class-correct exit status","classification":"implementation","status":"pending"},
+        {"id":"f4346059-afd1-459d-8028-3227787061dd","short_id":"f4346059","title":"A shared fixture that drives one recorded failure per command arm","classification":"implementation","status":"pending"}
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {"id":"37e3edf3-57fa-4fc4-9a9b-81ec0e9a804b","short_id":"37e3edf3","title":"The canonical conformance suite for the machine-readable failure envelope","classification":"implementation","status":"pending"},
+        {"id":"60aeaa49-0ee3-4c8d-ac61-f5316bae3932","short_id":"60aeaa49","title":"Pin payload-stream purity on the machine-readable failure path","classification":"implementation","status":"pending"},
+        {"id":"a1322bee-21c1-4f14-af96-ffa8c7204926","short_id":"a1322bee","title":"A coverage guard that fails when a command arm has neither a probe nor an exemption","classification":"implementation","status":"pending"}
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {"id":"7491da4a-f008-4188-9b1b-251fbe56ec77","short_id":"7491da4a","title":"Per-arm failure conformance and the guard that keeps it","classification":"implementation","status":"pending"},
+        {"id":"ec029993-2e68-41dd-b2bd-b3018a35d0d5","short_id":"ec029993","title":"One canonical statement of the machine-readable failure contract","classification":"documentation","status":"pending"}
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {"id":"9eadd135-d27b-471c-b481-46bbf15084d7","short_id":"9eadd135","title":"One canonical adopter home for the machine-readable failure contract","classification":"implementation","status":"pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-07-28T01:13:41+03:00"
+}
