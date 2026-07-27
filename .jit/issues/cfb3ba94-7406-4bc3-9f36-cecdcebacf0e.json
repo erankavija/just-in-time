@@ -1,10 +1,8 @@
 {
-  "id": "cfb3ba94-7406-4bc3-9f36-cecdcebacf0e",
-  "title": "Epic: User Documentation (Product Docs Phase 2)",
-  "description": "Complete Phase 2 of documentation organization strategy: Create comprehensive user-facing product documentation following Diátaxis framework.\n\nPhase 1 (165cf162, DONE) created the docs/ structure and separation. Phase 2 populates it with content for end users and agents across five story areas: Gate System, Core Concepts, Tutorials, How-To Guides, and Reference.\n\nSee: dev/studies/documentation-organization-strategy.md (linked)",
-  "state": "done",
-  "priority": "high",
+  "archived_from": "done",
   "assignee": null,
+  "context": {},
+  "created_at": "2025-12-18T20:37:32.536153839Z",
   "dependencies": [
     "b6aeb05b-dc02-435f-9ae1-ba0a1c6c63f4",
     "5326b331-e14c-4157-b430-447e93f5f91b",
@@ -14,50 +12,43 @@
     "6535ba30-1236-4c10-a718-81ceeb11acb4",
     "48e2e917-d129-433c-b3c5-2449f9c34cfd"
   ],
+  "description": "Complete Phase 2 of documentation organization strategy: Create comprehensive user-facing product documentation following Diátaxis framework.\n\nPhase 1 (165cf162, DONE) created the docs/ structure and separation. Phase 2 populates it with content for end users and agents across five story areas: Gate System, Core Concepts, Tutorials, How-To Guides, and Reference.\n\nSee: dev/studies/documentation-organization-strategy.md (linked)",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/cfb3ba94-docs/dev/studies/documentation-organization-strategy.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Documentation Audit Plan",
+      "path": "dev/archive/studies/docs-audit-plan.md"
+    }
+  ],
+  "done_at": "2026-02-04T12:05:13.124989066Z",
+  "first_ready_at": "2026-02-04T12:04:43.463270380Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
       "status": "passed",
-      "updated_by": "agent:copilot-cli",
-      "updated_at": "2026-02-04T12:05:12.458002316Z"
+      "updated_at": "2026-02-04T12:05:12.458002316Z",
+      "updated_by": "agent:copilot-cli"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/studies/documentation-organization-strategy.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "reference",
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "https://diataxis.fr/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        }
-      ]
-    },
-    {
-      "path": "dev/archive/studies/docs-audit-plan.md",
-      "commit": null,
-      "label": "Documentation Audit Plan",
-      "doc_type": "notes",
-      "format": "markdown"
-    }
-  ],
+  "id": "cfb3ba94-7406-4bc3-9f36-cecdcebacf0e",
   "labels": [
     "type:epic",
     "epic:docs",
     "milestone:v1.0"
   ],
-  "created_at": "2025-12-18T20:37:32.536153839Z",
-  "updated_at": "2026-07-10T11:07:32.478486303Z",
-  "first_ready_at": "2026-02-04T12:04:43.463270380Z",
-  "done_at": "2026-02-04T12:05:13.124989066Z"
+  "priority": "high",
+  "state": "archived",
+  "title": "Epic: User Documentation (Product Docs Phase 2)",
+  "updated_at": "2026-07-27T09:59:40.598569630Z"
 }

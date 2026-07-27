@@ -425,3 +425,28 @@ Issue `a21185df`. Plan eligible with no blockers. 3 relocated, 0 mirrored, 0 ret
 | `dev/archive/7d3a3a47/dev/active/7d3a3a47-investigation.md:43:376` | `dev/active/5c060496-raw-assets-design.md` |
 | `dev/archive/7d3a3a47/dev/active/7d3a3a47-investigation.md:46:119` | `dev/active/documentation-lifecycle-phase2-design.md` |
 | `dev/archive/7d3a3a47/dev/active/7d3a3a47-investigation.md:49:158` | `dev/active/documentation-lifecycle-phase2-design.md` |
+
+## `cfb3ba94` — dev/archive/cfb3ba94-docs
+Issue `d1ae9782`. Plan eligible with no blockers. 1 relocated, 1 mirrored, 2 retained, 1 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| copy | `dev/studies/documentation-organization-strategy.md` | `dev/archive/cfb3ba94-docs/dev/studies/documentation-organization-strategy.md` | cfb3ba94 |
+| move | `dev/sessions/session-2026-01-01-example-md-migration.md` | `dev/archive/cfb3ba94-docs/dev/sessions/session-2026-01-01-example-md-migration.md` | d6dc4dfa |
+| retain | `dev/archive/studies/docs-audit-plan.md` | already under the archive root | cfb3ba94 |
+| retain | `docs/concepts/design-philosophy.md` | retained in place | c8355d70 |
+
+### In-content citation warnings (4)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:1883:14` | `dev/sessions/session-2026-01-01-example-md-migration.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3173` | `dev/sessions/session-2026-01-01-example-md-migration.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3277` | `dev/sessions/session-2026-01-01-example-md-migration.md` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:57:4` | `dev/sessions/session-2026-01-01-example-md-migration.md` |
+
+### Other plan warnings (1)
+
+- `external-edge` at `dev/studies/documentation-organization-strategy.md`
