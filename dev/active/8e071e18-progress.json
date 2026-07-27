@@ -1802,6 +1802,11 @@
    "session": 4,
    "path": "dev/active/8e071e18-dev-artifact-layout/handoff-3.md",
    "note": "First artifact written to the epic's canonical directory (jit doc dir); earlier artifacts stay flat per D-4/REQ-13."
+  },
+  {
+   "session": 6,
+   "path": "dev/active/8e071e18-dev-artifact-layout/handoff-4.md",
+   "note": "Written mid-session with three workers in flight (58c56743, aa5db9a1, dispositions), so its Current state is a floor rather than a snapshot."
   }
  ]
 }
