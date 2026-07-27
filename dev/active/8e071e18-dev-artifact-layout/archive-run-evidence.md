@@ -55,3 +55,98 @@ Issue `e536ea5a`. Plan eligible with no blockers. 8 relocated, 1 mirrored, 4 ret
 | `dev/active/8e071e18-breakdown.json:3777:6446` | `dev/studies/short-hash-implementation-plan.md` |
 | `dev/active/8e071e18-breakdown.json:3777:6544` | `dev/studies/short-hash-implementation-plan.md` |
 | `dev/sessions/session-2026-01-01-example-md-migration.md:190:3` | `dev/active/gate-examples.md` |
+
+## `2821e177` — dev/archive/2821e177-addressing-v2
+Issue `39757bb3`. Plan eligible with no blockers. 11 relocated, 0 mirrored, 5 retained, 2 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/0efbc594-breakdown-spec.md` | `dev/archive/2821e177-addressing-v2/dev/active/0efbc594-breakdown-spec.md` | 0efbc594 |
+| move | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` | `dev/archive/2821e177-addressing-v2/dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` | 0b611ccf |
+| move | `dev/active/2821e177-investigation.md` | `dev/archive/2821e177-addressing-v2/dev/active/2821e177-investigation.md` | 0b611ccf |
+| move | `dev/active/37506c12-breakdown-spec.md` | `dev/archive/2821e177-addressing-v2/dev/active/37506c12-breakdown-spec.md` | 37506c12 |
+| move | `dev/active/637764ef-acceptance-evidence.md` | `dev/archive/2821e177-addressing-v2/dev/active/637764ef-acceptance-evidence.md` | 637764ef |
+| move | `dev/active/71ebd1e8-breakdown-spec.md` | `dev/archive/2821e177-addressing-v2/dev/active/71ebd1e8-breakdown-spec.md` | 71ebd1e8 |
+| move | `dev/active/7f22d6cf-breakdown-spec.md` | `dev/archive/2821e177-addressing-v2/dev/active/7f22d6cf-breakdown-spec.md` | 7f22d6cf |
+| move | `dev/active/9a7106ae-breakdown-spec.md` | `dev/archive/2821e177-addressing-v2/dev/active/9a7106ae-breakdown-spec.md` | 9a7106ae |
+| move | `dev/active/bb7d57a2-breakdown-spec.md` | `dev/archive/2821e177-addressing-v2/dev/active/bb7d57a2-breakdown-spec.md` | bb7d57a2 |
+| move | `dev/studies/addressing-v2-item-use-cases.md` | `dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-item-use-cases.md` | 2821e177 |
+| move | `dev/studies/addressing-v2-rule-gate-items.md` | `dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-rule-gate-items.md` | 0b611ccf 2821e177 |
+| retain | `dev/archive/features/2821e177/completion-report.md` | already under the archive root | 2821e177 |
+| retain | `dev/archive/features/2821e177/showcase/base.css` | retained in place | — |
+| retain | `dev/archive/features/2821e177/showcase/talk.html` | already under the archive root | 2821e177 |
+| retain | `dev/archive/features/2821e177/showcase/themes/rust.css` | retained in place | — |
+| retain | `docs/reference/rules-and-gates.md` | retained in place | ebb6ad45 |
+
+### In-content citation warnings (62)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/0efbc594-breakdown-spec.md:3:162` | `dev/active/2821e177-investigation.md` |
+| `dev/active/0efbc594-breakdown-spec.md:3:55` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+| `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md:490:28` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md:492:4` | `dev/active/637764ef-acceptance-evidence.md` |
+| `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md:5:14` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md:6:9` | `dev/active/2821e177-investigation.md` |
+| `dev/active/2821e177-investigation.md:3:49` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/active/37506c12-breakdown-spec.md:3:162` | `dev/active/2821e177-investigation.md` |
+| `dev/active/37506c12-breakdown-spec.md:3:55` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+| `dev/active/637764ef-acceptance-evidence.md:149:4` | `dev/active/bb7d57a2-breakdown-spec.md` |
+| `dev/active/637764ef-acceptance-evidence.md:150:4` | `dev/active/71ebd1e8-breakdown-spec.md` |
+| `dev/active/637764ef-acceptance-evidence.md:151:4` | `dev/active/7f22d6cf-breakdown-spec.md` |
+| `dev/active/637764ef-acceptance-evidence.md:152:4` | `dev/active/0efbc594-breakdown-spec.md` |
+| `dev/active/637764ef-acceptance-evidence.md:153:4` | `dev/active/9a7106ae-breakdown-spec.md` |
+| `dev/active/637764ef-acceptance-evidence.md:154:4` | `dev/active/37506c12-breakdown-spec.md` |
+| `dev/active/637764ef-acceptance-evidence.md:155:4` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+| `dev/active/637764ef-acceptance-evidence.md:156:4` | `dev/active/2821e177-investigation.md` |
+| `dev/active/637764ef-acceptance-evidence.md:163:34` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/active/637764ef-acceptance-evidence.md:169:15` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/active/71ebd1e8-breakdown-spec.md:3:162` | `dev/active/2821e177-investigation.md` |
+| `dev/active/71ebd1e8-breakdown-spec.md:3:55` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+| `dev/active/7f22d6cf-breakdown-spec.md:3:162` | `dev/active/2821e177-investigation.md` |
+| `dev/active/7f22d6cf-breakdown-spec.md:3:55` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2001:14` | `dev/active/0efbc594-breakdown-spec.md` |
+| `dev/active/8e071e18-breakdown.json:2002:14` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2003:14` | `dev/active/2821e177-investigation.md` |
+| `dev/active/8e071e18-breakdown.json:2004:14` | `dev/active/37506c12-breakdown-spec.md` |
+| `dev/active/8e071e18-breakdown.json:2005:14` | `dev/active/637764ef-acceptance-evidence.md` |
+| `dev/active/8e071e18-breakdown.json:2006:14` | `dev/active/71ebd1e8-breakdown-spec.md` |
+| `dev/active/8e071e18-breakdown.json:2007:14` | `dev/active/7f22d6cf-breakdown-spec.md` |
+| `dev/active/8e071e18-breakdown.json:2008:14` | `dev/active/9a7106ae-breakdown-spec.md` |
+| `dev/active/8e071e18-breakdown.json:2009:14` | `dev/active/bb7d57a2-breakdown-spec.md` |
+| `dev/active/8e071e18-breakdown.json:2010:14` | `dev/studies/addressing-v2-item-use-cases.md` |
+| `dev/active/8e071e18-breakdown.json:2011:14` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/active/8e071e18-breakdown.json:3777:1659` | `dev/studies/addressing-v2-item-use-cases.md` |
+| `dev/active/8e071e18-breakdown.json:3777:1760` | `dev/studies/addressing-v2-item-use-cases.md` |
+| `dev/active/8e071e18-breakdown.json:3777:1809` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/active/8e071e18-breakdown.json:3777:1911` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/active/9a7106ae-breakdown-spec.md:3:162` | `dev/active/2821e177-investigation.md` |
+| `dev/active/9a7106ae-breakdown-spec.md:3:55` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+| `dev/active/9b7b5f9c-investigation.md:324:4` | `dev/active/2821e177-investigation.md` |
+| `dev/active/bb7d57a2-breakdown-spec.md:3:162` | `dev/active/2821e177-investigation.md` |
+| `dev/active/bb7d57a2-breakdown-spec.md:3:55` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+| `dev/archive/features/2821e177/2821e177-handoff-2.md:58:65` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+| `dev/archive/features/2821e177/2821e177-handoff-2.md:59:18` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/archive/features/2821e177/2821e177-handoff-2.md:59:81` | `dev/active/2821e177-investigation.md` |
+| `dev/archive/features/2821e177/2821e177-handoff.md:51:40` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+| `dev/archive/features/2821e177/2821e177-handoff.md:52:18` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/archive/features/2821e177/2821e177-handoff.md:52:81` | `dev/active/2821e177-investigation.md` |
+| `dev/archive/features/2821e177/2821e177-handoff.md:53:103` | `dev/active/71ebd1e8-breakdown-spec.md` |
+| `dev/archive/features/2821e177/2821e177-handoff.md:53:144` | `dev/active/bb7d57a2-breakdown-spec.md` |
+| `dev/archive/features/2821e177/2821e177-handoff.md:53:185` | `dev/active/7f22d6cf-breakdown-spec.md` |
+| `dev/archive/features/2821e177/2821e177-handoff.md:53:21` | `dev/active/37506c12-breakdown-spec.md` |
+| `dev/archive/features/2821e177/2821e177-handoff.md:53:226` | `dev/active/9a7106ae-breakdown-spec.md` |
+| `dev/archive/features/2821e177/2821e177-handoff.md:53:62` | `dev/active/0efbc594-breakdown-spec.md` |
+| `dev/archive/features/2821e177/2821e177-progress.json:192:59` | `dev/active/637764ef-acceptance-evidence.md` |
+| `dev/archive/features/2821e177/completion-report.md:31:139` | `dev/active/637764ef-acceptance-evidence.md` |
+| `dev/archive/features/2821e177/completion-report.md:81:18` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/archive/features/2821e177/completion-report.md:82:26` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+| `dev/archive/features/2821e177/completion-report.md:83:25` | `dev/active/637764ef-acceptance-evidence.md` |
+| `dev/archive/features/2821e177/showcase/talk.html:226:52` | `dev/studies/addressing-v2-rule-gate-items.md` |
+| `dev/studies/addressing-v2-rule-gate-items.md:196:6` | `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` |
+
+### Other plan warnings (1)
+
+- `external-edge` at `dev/archive/features/2821e177/showcase/talk.html`

@@ -1,14 +1,24 @@
 {
-  "id": "71ebd1e8-38b2-40e1-8097-183907fc1678",
-  "title": "Rule as an addressable kind with origin lifted out of the id",
-  "description": "Declare `rule` as a registry-first addressable kind sourced from `rules.toml` via the config toml source descriptor, and split each rule's identity into two fields: a clean, colon-free self-id and a separate `origin` field (for example `default` or `bracket`) that today is embedded directly in the id. Rules currently carry names such as `default:namespace-unique:resolution`, with colons baked into the identifier itself, which conflicts with reserving the colon exclusively for the label `namespace:value` separator. The `namespace-unique:{param}` family of rule names becomes a colon-free slug (for example `namespace-unique-resolution`).\n\n## Success Criteria\n\n- [hard] REQ-01: `rule` is a registry-first kind over `rules.toml` via the toml source descriptor; `@/rule/<self-id>` resolves to the rule.\n- [hard] REQ-02: rule self-ids carry no colon; origin (`default`/`bracket`) is stored as a separate schema field, and the `namespace-unique:{param}` family uses a colon-free slug.\n- [hard] REQ-03: the fixed default-ruleset contract (rule-name construction and its pinned-string tests) is updated consistently and stays green.\n\nBlast radius: the `rules.toml` schema and its seven seed rules; every site that constructs or consumes a `default:`-prefixed rule name literal, including the pinned-string contract tests that assert exact rule-name values.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-03T15:25:35.205386915Z",
+  "context": {},
+  "created_at": "2026-07-01T23:19:51.065614361Z",
   "dependencies": [
     "ae9dd95a-ce1d-428b-b1f0-efab90b20f8f",
     "cdc33a0f-8edd-497f-b27d-a112edde9862"
   ],
+  "description": "Declare `rule` as a registry-first addressable kind sourced from `rules.toml` via the config toml source descriptor, and split each rule's identity into two fields: a clean, colon-free self-id and a separate `origin` field (for example `default` or `bracket`) that today is embedded directly in the id. Rules currently carry names such as `default:namespace-unique:resolution`, with colons baked into the identifier itself, which conflicts with reserving the colon exclusively for the label `namespace:value` separator. The `namespace-unique:{param}` family of rule names becomes a colon-free slug (for example `namespace-unique-resolution`).\n\n## Success Criteria\n\n- [hard] REQ-01: `rule` is a registry-first kind over `rules.toml` via the toml source descriptor; `@/rule/<self-id>` resolves to the rule.\n- [hard] REQ-02: rule self-ids carry no colon; origin (`default`/`bracket`) is stored as a separate schema field, and the `namespace-unique:{param}` family uses a colon-free slug.\n- [hard] REQ-03: the fixed default-ruleset contract (rule-name construction and its pinned-string tests) is updated consistently and stays green.\n\nBlast radius: the `rules.toml` schema and its seven seed rules; every site that constructs or consumes a `default:`-prefixed rule name literal, including the pinned-string contract tests that assert exact rule-name values.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/2821e177-addressing-v2/dev/active/71ebd1e8-breakdown-spec.md"
+    }
+  ],
+  "done_at": "2026-07-03T15:44:07.612557881Z",
+  "first_ready_at": "2026-07-03T15:11:48.265696534Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -17,30 +27,21 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T15:40:39.203859541Z"
-    },
-    "repo-validate": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T15:26:38.669425874Z"
+      "updated_at": "2026-07-03T15:40:39.203859541Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T15:41:37.740526157Z"
+      "updated_at": "2026-07-03T15:41:37.740526157Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-03T15:26:38.669425874Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/71ebd1e8-breakdown-spec.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "71ebd1e8-38b2-40e1-8097-183907fc1678",
   "labels": [
     "type:story",
     "epic:addressing-v2",
@@ -48,9 +49,8 @@
     "satisfies:REQ-03",
     "story:rule-addressable-kind"
   ],
-  "created_at": "2026-07-01T23:19:51.065614361Z",
-  "updated_at": "2026-07-05T19:51:13.003754378Z",
-  "first_ready_at": "2026-07-03T15:11:48.265696534Z",
-  "claimed_at": "2026-07-03T15:25:35.205386915Z",
-  "done_at": "2026-07-03T15:44:07.612557881Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Rule as an addressable kind with origin lifted out of the id",
+  "updated_at": "2026-07-27T09:57:28.408866984Z"
 }

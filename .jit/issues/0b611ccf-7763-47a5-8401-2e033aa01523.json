@@ -1,53 +1,53 @@
 {
-  "id": "0b611ccf-7763-47a5-8401-2e033aa01523",
-  "title": "planning: Addressing v2: uniform path-based addresses; rule/gate as addressable items",
-  "description": "Planning node for Addressing v2: uniform path-based addresses; rule/gate as addressable items (2821e177). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md and link it to this node once written.",
-  "state": "done",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-01T22:44:11.631509015Z",
   "dependencies": [
     "2e926e39-906e-4952-8ae0-38215a7e5aac"
   ],
+  "description": "Planning node for Addressing v2: uniform path-based addresses; rule/gate as addressable items (2821e177). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md and link it to this node once written.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Addressing v2 design brief (research input)",
+      "path": "dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-rule-gate-items.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/2821e177-addressing-v2/dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Addressing v2 grounding investigation",
+      "path": "dev/archive/2821e177-addressing-v2/dev/active/2821e177-investigation.md"
+    }
+  ],
+  "done_at": "2026-07-01T23:15:00.324975531Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-01T23:13:22.715265611Z"
+      "updated_at": "2026-07-01T23:13:22.715265611Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/studies/addressing-v2-rule-gate-items.md",
-      "commit": null,
-      "label": "Addressing v2 design brief (research input)",
-      "doc_type": "design",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "design",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/active/2821e177-investigation.md",
-      "commit": null,
-      "label": "Addressing v2 grounding investigation",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "0b611ccf-7763-47a5-8401-2e033aa01523",
   "labels": [
     "epic:addressing-v2",
     "milestone:v1.0",
     "type:planning"
   ],
-  "created_at": "2026-07-01T22:44:11.631509015Z",
-  "updated_at": "2026-07-05T19:51:12.903339025Z",
-  "done_at": "2026-07-01T23:15:00.324975531Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "planning: Addressing v2: uniform path-based addresses; rule/gate as addressable items",
+  "updated_at": "2026-07-27T09:57:28.408866984Z"
 }

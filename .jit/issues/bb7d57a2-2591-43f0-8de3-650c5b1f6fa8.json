@@ -1,14 +1,24 @@
 {
-  "id": "bb7d57a2-2591-43f0-8de3-650c5b1f6fa8",
-  "title": "Gate as an addressable kind over migrated gates.toml",
-  "description": "Migrate gate storage from `gates.json` to a new `gates.toml` store, mirroring the existing rule-set store's pattern of atomic writes and being the sole source of truth, with full schema parity for every `Gate`/`GateChecker` field (key, title, description, stage, mode, checker, priority, and any prompt/env fields). Declare `gate` as a registry-first addressable kind over the new store, with the key as the id field and description as the text field, so gates resolve at `@/gate/<key>`. Sweep every consumer and test that reads the literal `gates.json` filename, including CLI init output, gate-update tests, invariant-check tests, template-apply tests, snapshot export, and the web server's file-relevance watcher, so nothing still depends on the JSON file after migration.\n\nTOML has no native representation for a JSON null; guard the `Gate.reserved` free-form map against serializing a null value when writing to TOML. Today's live data holds only empty objects, so this is a forward-looking guard rather than a live break.\n\n## Success Criteria\n\n- [hard] REQ-01: a `gates.toml` store, mirroring the existing rule-set store's atomic-write pattern, holds all `Gate`/`GateChecker` fields with parity to the prior JSON schema; gate operations (create, update, list) run over it.\n- [hard] REQ-02: `gate` is a registry-first addressable kind; `@/gate/<key>` resolves to the gate.\n- [hard] REQ-03: no consumer or test reads the literal `gates.json` filename; TOML serialization of `Gate.reserved` is guarded against a JSON null value.\n\nBlast radius: the gate storage module (a new store beside the existing rule-set store); the `Gate`/`GateChecker` domain types; CLI init fixtures/tests, gate-update tests, invariant-check CLI tests, template-apply tests, snapshot export, the web server's gate-file relevance watcher and its test, and stale doc comments referencing `gates.json` by name.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-03T14:02:19.527467187Z",
+  "context": {},
+  "created_at": "2026-07-01T23:19:51.086829876Z",
   "dependencies": [
     "42898915-b8c3-4248-b8d0-c69b3f15b697",
     "943abd0b-8279-457a-a792-74c013edd0a4"
   ],
+  "description": "Migrate gate storage from `gates.json` to a new `gates.toml` store, mirroring the existing rule-set store's pattern of atomic writes and being the sole source of truth, with full schema parity for every `Gate`/`GateChecker` field (key, title, description, stage, mode, checker, priority, and any prompt/env fields). Declare `gate` as a registry-first addressable kind over the new store, with the key as the id field and description as the text field, so gates resolve at `@/gate/<key>`. Sweep every consumer and test that reads the literal `gates.json` filename, including CLI init output, gate-update tests, invariant-check tests, template-apply tests, snapshot export, and the web server's file-relevance watcher, so nothing still depends on the JSON file after migration.\n\nTOML has no native representation for a JSON null; guard the `Gate.reserved` free-form map against serializing a null value when writing to TOML. Today's live data holds only empty objects, so this is a forward-looking guard rather than a live break.\n\n## Success Criteria\n\n- [hard] REQ-01: a `gates.toml` store, mirroring the existing rule-set store's atomic-write pattern, holds all `Gate`/`GateChecker` fields with parity to the prior JSON schema; gate operations (create, update, list) run over it.\n- [hard] REQ-02: `gate` is a registry-first addressable kind; `@/gate/<key>` resolves to the gate.\n- [hard] REQ-03: no consumer or test reads the literal `gates.json` filename; TOML serialization of `Gate.reserved` is guarded against a JSON null value.\n\nBlast radius: the gate storage module (a new store beside the existing rule-set store); the `Gate`/`GateChecker` domain types; CLI init fixtures/tests, gate-update tests, invariant-check CLI tests, template-apply tests, snapshot export, the web server's gate-file relevance watcher and its test, and stale doc comments referencing `gates.json` by name.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/2821e177-addressing-v2/dev/active/bb7d57a2-breakdown-spec.md"
+    }
+  ],
+  "done_at": "2026-07-03T15:47:48.495866562Z",
+  "first_ready_at": "2026-07-03T14:02:04.971326952Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -17,30 +27,21 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T15:44:07.772463907Z"
+      "updated_at": "2026-07-03T15:44:07.772463907Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T15:45:04.711588342Z"
+      "updated_at": "2026-07-03T15:45:04.711588342Z",
+      "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T14:10:38.959328132Z"
+      "updated_at": "2026-07-03T14:10:38.959328132Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/bb7d57a2-breakdown-spec.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "bb7d57a2-2591-43f0-8de3-650c5b1f6fa8",
   "labels": [
     "type:story",
     "epic:addressing-v2",
@@ -48,9 +49,8 @@
     "satisfies:REQ-04",
     "story:gate-addressable-kind"
   ],
-  "created_at": "2026-07-01T23:19:51.086829876Z",
-  "updated_at": "2026-07-05T19:51:13.074205299Z",
-  "first_ready_at": "2026-07-03T14:02:04.971326952Z",
-  "claimed_at": "2026-07-03T14:02:19.527467187Z",
-  "done_at": "2026-07-03T15:47:48.495866562Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Gate as an addressable kind over migrated gates.toml",
+  "updated_at": "2026-07-27T09:57:28.408866984Z"
 }
