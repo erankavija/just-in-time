@@ -467,3 +467,78 @@ Issue `1c4b7a3c`. Plan eligible with no blockers. 1 relocated, 0 mirrored, 0 ret
 | `dev/active/8e071e18-breakdown.json:3142:14` | `dev/studies/documentation-tooling-evaluation.md` |
 | `dev/active/8e071e18-breakdown.json:3777:5069` | `dev/studies/documentation-tooling-evaluation.md` |
 | `dev/active/8e071e18-breakdown.json:3777:5160` | `dev/studies/documentation-tooling-evaluation.md` |
+
+## `2d109173` — dev/archive/2d109173-docs-exhaustive-audit
+Issue `8ea5b13d`. Plan eligible with no blockers. 16 relocated, 0 mirrored, 10 retained, 6 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/2b9a80fb-audit-notes.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/2b9a80fb-audit-notes.md` | 2b9a80fb |
+| move | `dev/active/36d5451e-audit-notes.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/36d5451e-audit-notes.md` | 36d5451e |
+| move | `dev/active/36d5451e-review-round-4.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/36d5451e-review-round-4.md` | 36d5451e |
+| move | `dev/active/36d5451e-review-round-5.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/36d5451e-review-round-5.md` | 36d5451e |
+| move | `dev/active/36d5451e-review-round-6.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/36d5451e-review-round-6.md` | 36d5451e |
+| move | `dev/active/4c33d0e5-audit-notes.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/4c33d0e5-audit-notes.md` | 4c33d0e5 |
+| move | `dev/active/6d82de03-followup-manifest.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/6d82de03-followup-manifest.md` | 6d82de03 6d82de03 |
+| move | `dev/active/6d82de03-lead-review.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/6d82de03-lead-review.md` | 6d82de03 |
+| move | `dev/active/736a069e-audit-notes.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/736a069e-audit-notes.md` | 736a069e |
+| move | `dev/active/7c283e95-audit-notes.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/7c283e95-audit-notes.md` | 7c283e95 |
+| move | `dev/active/8682e95a-gapfill-notes.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/8682e95a-gapfill-notes.md` | 8682e95a |
+| move | `dev/active/99f4a2b4-req02-evidence.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/99f4a2b4-req02-evidence.md` | 99f4a2b4 |
+| move | `dev/active/a70bac75-audit-notes.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/a70bac75-audit-notes.md` | a70bac75 |
+| move | `dev/active/adc4c6ef-relocation-notes.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/adc4c6ef-relocation-notes.md` | adc4c6ef |
+| move | `dev/active/b8924a6d-audit-notes.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/b8924a6d-audit-notes.md` | b8924a6d |
+| move | `dev/active/d24008f0-req01-evidence.md` | `dev/archive/2d109173-docs-exhaustive-audit/dev/active/d24008f0-req01-evidence.md` | d24008f0 |
+| retain | `dev/archive/2d109173-completion-report.md` | already under the archive root | 2d109173 |
+| retain | `dev/archive/2d109173-final-rework-review.md` | already under the archive root | 2c990aa0 47aaad9d b35c267a |
+| retain | `dev/archive/2d109173-investigation.md` | already under the archive root | 3c4cab67 |
+| retain | `dev/archive/2d109173-plan.md` | already under the archive root | 2b9a80fb 36d5451e 3c4cab67 4c33d0e5 6d82de03 736a069e 7c283e95 8682e95a 99f4a2b4 a70bac75 adc4c6ef b8924a6d d24008f0 |
+| retain | `dev/archive/2d109173-wave7-review.md` | already under the archive root | 33b2c714 58bc3826 85aae6d2 |
+| retain | `dev/archive/bug-fixes/2d109173-planning-brief.md` | already under the archive root | 2d109173 |
+| retain | `dev/reference/configuration.md` | retained in place | — |
+| retain | `mcp-server/README.md` | retained in place | — |
+| retain | `mcp-server/curated-tools.json` | retained in place | — |
+| retain | `scripts/docs-check-selftest.sh` | retained in place | 99f4a2b4 |
+
+### In-content citation warnings (32)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/36d5451e-review-round-4.md:38:4` | `dev/active/36d5451e-audit-notes.md` |
+| `dev/active/6d82de03-followup-manifest.md:256:6` | `dev/active/2b9a80fb-audit-notes.md` |
+| `dev/active/6d82de03-followup-manifest.md:297:6` | `dev/active/36d5451e-audit-notes.md` |
+| `dev/active/6d82de03-followup-manifest.md:337:6` | `dev/active/36d5451e-audit-notes.md` |
+| `dev/active/8b05a612-investigation.md:61:4` | `dev/active/36d5451e-audit-notes.md` |
+| `dev/active/8e071e18-breakdown.json:1744:14` | `dev/active/2b9a80fb-audit-notes.md` |
+| `dev/active/8e071e18-breakdown.json:1745:14` | `dev/active/36d5451e-audit-notes.md` |
+| `dev/active/8e071e18-breakdown.json:1746:14` | `dev/active/36d5451e-review-round-4.md` |
+| `dev/active/8e071e18-breakdown.json:1747:14` | `dev/active/36d5451e-review-round-5.md` |
+| `dev/active/8e071e18-breakdown.json:1748:14` | `dev/active/36d5451e-review-round-6.md` |
+| `dev/active/8e071e18-breakdown.json:1749:14` | `dev/active/4c33d0e5-audit-notes.md` |
+| `dev/active/8e071e18-breakdown.json:1750:14` | `dev/active/6d82de03-followup-manifest.md` |
+| `dev/active/8e071e18-breakdown.json:1751:14` | `dev/active/6d82de03-lead-review.md` |
+| `dev/active/8e071e18-breakdown.json:1752:14` | `dev/active/736a069e-audit-notes.md` |
+| `dev/active/8e071e18-breakdown.json:1753:14` | `dev/active/7c283e95-audit-notes.md` |
+| `dev/active/8e071e18-breakdown.json:1754:14` | `dev/active/8682e95a-gapfill-notes.md` |
+| `dev/active/8e071e18-breakdown.json:1755:14` | `dev/active/99f4a2b4-req02-evidence.md` |
+| `dev/active/8e071e18-breakdown.json:1756:14` | `dev/active/a70bac75-audit-notes.md` |
+| `dev/active/8e071e18-breakdown.json:1757:14` | `dev/active/adc4c6ef-relocation-notes.md` |
+| `dev/active/8e071e18-breakdown.json:1758:14` | `dev/active/b8924a6d-audit-notes.md` |
+| `dev/active/8e071e18-breakdown.json:1759:14` | `dev/active/d24008f0-req01-evidence.md` |
+| `dev/active/8e071e18-progress.json:1501:154` | `dev/active/2b9a80fb-audit-notes.md` |
+| `dev/active/99f4a2b4-req02-evidence.md:15:104` | `dev/active/99f4a2b4-req02-evidence.md` |
+| `dev/active/9b7b5f9c-investigation.md:328:4` | `dev/active/d24008f0-req01-evidence.md` |
+| `dev/active/ca832358/req05-archival-execution-evidence.md:142:23` | `dev/active/4c33d0e5-audit-notes.md` |
+| `dev/archive/2d109173-handoff-2.md:50:17` | `dev/active/36d5451e-audit-notes.md` |
+| `dev/archive/2d109173-handoff-3.md:46:25` | `dev/active/36d5451e-review-round-6.md` |
+| `dev/archive/2d109173-handoff-3.md:47:24` | `dev/active/36d5451e-audit-notes.md` |
+| `dev/archive/2d109173-handoff-4.md:56:21` | `dev/active/6d82de03-followup-manifest.md` |
+| `dev/archive/2d109173-handoff.md:28:305` | `dev/active/d24008f0-req01-evidence.md` |
+| `dev/archive/2d109173-handoff.md:65:22` | `dev/active/99f4a2b4-req02-evidence.md` |
+| `dev/archive/2d109173-handoff.md:65:63` | `dev/active/d24008f0-req01-evidence.md` |
+
+### Other plan warnings (1)
+
+- `missing-edge-target` at `dev/reference/configuration.md`

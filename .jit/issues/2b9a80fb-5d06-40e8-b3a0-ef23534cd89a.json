@@ -17,29 +17,11 @@
       "path": "dev/archive/2d109173-plan.md"
     },
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "c750f215aaa60b19fec9d69a034ba5ef8c898e9aab4a7aaff4bcc9505cad75b0",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "/mcp-server/curated-tools.json",
-          "resolved_path": "mcp-server/curated-tools.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "4ae1a8048bca391c7b33997547930217519f8f3c8ea68a7929282c2b62ea7c2d",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "/mcp-server/README.md",
-          "resolved_path": "mcp-server/README.md"
-        }
-      ],
       "commit": null,
       "doc_type": "documentation",
       "format": "markdown",
       "label": "Audit notes",
-      "path": "dev/active/2b9a80fb-audit-notes.md"
+      "path": "dev/archive/2d109173-docs-exhaustive-audit/dev/active/2b9a80fb-audit-notes.md"
     }
   ],
   "done_at": "2026-07-11T08:43:03.400844935Z",
@@ -81,5 +63,5 @@
   "priority": "high",
   "state": "done",
   "title": "CLI command catalog audit",
-  "updated_at": "2026-07-27T08:23:26.094589199Z"
+  "updated_at": "2026-07-27T10:00:14.441101654Z"
 }

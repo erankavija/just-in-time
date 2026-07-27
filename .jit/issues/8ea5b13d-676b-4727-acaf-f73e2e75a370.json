@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-27T10:00:07.457941226Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
@@ -27,7 +28,7 @@
     "per:@/issue/8e071e18/decision/D-21"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Archive the exhaustive documentation audit container's linked artifacts",
-  "updated_at": "2026-07-27T09:55:48.635989568Z"
+  "updated_at": "2026-07-27T10:00:07.457941226Z"
 }
