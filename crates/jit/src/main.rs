@@ -2986,7 +2986,8 @@ fn run() -> Result<()> {
                                 {
                                     jit::output::JsonError::issue_not_found(&full_id)
                                 } else {
-                                    // Generic error - use the JsonError::new directly
+                                    // Preserve the generic legacy code under its explicit
+                                    // historical status until the vocabulary registers it.
                                     jit::output::JsonError::legacy_unregistered(
                                         "GENERIC_ERROR",
                                         jit::output::ExitCode::GenericError,
