@@ -221,6 +221,20 @@ a blocker caused by lifecycle state (`non-terminal-target`,
 `document-non-terminal-owner`) additionally carries a `guidance` string naming
 the permitted next action.
 
+A preview also reports the in-content citations a relocation would break as
+`moving-path-citation` warnings, read from the declared `citation_scan_roots`
+universe (see the [`[documentation]`
+table](configuration.md#documentation)). Only a relocating artifact earns them,
+and every occurrence is its own warning whose `path` names the citing file with
+the occurrence's 1-based line and column, spelled
+`<citing path>:<line>:<column>`. The warnings are advisory: they carry no action
+and no blocker, so eligibility, `--execute`, and issue transitions all behave as
+they would with no citation present. Execution relocates bytes and relinks
+document records while rewriting no document content, so a citing file survives
+byte for byte and keeps a stale citation until an adopter edits it. An execution
+plan is built without citation evidence, so a preview is where these warnings
+are read.
+
 `jit archive candidates` is the read-only container report. It lists every
 effectively terminal issue — `Done`, `Rejected`, or `Archived` from one of those
 — whose `type:*` is configured at a non-leaf level of the live
@@ -247,10 +261,12 @@ An issue-linked path that exists but is not a regular file or symbolic link
 `block` and blocker `unsupported-artifact-type`; it does not abort the report
 or omit other candidates. Direct document and container previews use the same
 diagnostic, and `--execute` refuses the ineligible plan without mutation.
-When a supported local reference resolves to such an object, its parent also
-reports warning `unsupported-edge-target` with the normalized target path.
-Unexpected metadata or storage failures still fail planning instead of being
-converted into this blocker.
+A supported local reference whose target is a directory is navigation: the
+target contributes no artifact entry, no edge, and no warning, leaving the
+referencing plan's eligibility untouched. A reference target that is a symbolic
+link is evidenced as the link itself, so one pointing at a directory is
+inventoried and blocked as `symlink-artifact`. Unexpected metadata or storage
+failures still fail planning instead of being converted into this blocker.
 
 The candidates command has no age, retention, category, suggestion, or default
 target behavior, and it has no `--execute` form. It never writes artifacts,
@@ -299,22 +315,23 @@ re-emit the transition.
 
 For a container target, the preferred destination root is
 `<archive_root>/<container-short-id>-<slug>/`, where `<archive_root>` is the
-repository-authored policy value rather than a built-in path. When the issue has
-exactly one `type:*` label and exactly one label in that type's configured
-membership namespace, the membership-label value supplies `<slug>`; for
-example, `epic:artifact-archival` yields
-`archive/2f84c930-artifact-archival/`. Otherwise the issue title supplies the
-slug. Slug normalization lowercases Unicode alphanumeric characters, collapses
-other runs to `-`, trims separators, limits the result to 48 characters, and
-uses `container` when no usable character remains.
+repository-authored policy value rather than a built-in path. A membership label
+supplies `<slug>`: when the issue carries exactly one `type:*` label and exactly
+one label in that type's configured membership namespace, that label's value is
+normalized into the suffix, so `epic:artifact-archival` yields
+`archive/2f84c930-artifact-archival/`. Normalization lowercases Unicode
+alphanumeric characters, collapses every other run into a single `-`, bounds the
+result at 48 characters, and drops a trailing separator. Without that pair of
+labels, or when the membership value normalizes to no usable character, the
+destination root is the bare `<archive_root>/<container-short-id>/`.
 
 Execution creates a `.jit-container` marker containing the resolved full
 container ID followed by a newline. The short ID and marker-recorded full ID
 remain authoritative; the suffix is only a human-readable aid. Before choosing
 a new preferred root, planning scans the archive root's immediate non-symlink
 directories for that exact full-ID marker. One match freezes and reuses the
-existing directory even after title or label changes. Multiple matches block
-with deterministic `destination-conflict` findings. If no marker matches but
+existing directory even after the container's membership label changes. Multiple
+matches block with deterministic `destination-conflict` findings. If no marker matches but
 the legacy `<archive_root>/<container-short-id>/` path exists, planning adopts
 that path without migration or data movement. Its existing markerless
 accounting and conflict checks still apply, so old archives do not fork a new
