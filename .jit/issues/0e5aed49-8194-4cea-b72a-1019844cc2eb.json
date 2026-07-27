@@ -60,15 +60,16 @@
       "path": "dev/active/a2546471-json-error-contract/breakdown.json"
     }
   ],
+  "done_at": "2026-07-27T21:42:26.342207874Z",
   "first_ready_at": "2026-07-27T19:20:30.960119095Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_at": "2026-07-27T19:20:30.960119095Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-27T21:42:05.556213952Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "0e5aed49-8194-4cea-b72a-1019844cc2eb",
@@ -79,7 +80,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "planning: Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-27T20:10:52.741759237Z"
+  "updated_at": "2026-07-27T21:42:26.342207874Z"
 }

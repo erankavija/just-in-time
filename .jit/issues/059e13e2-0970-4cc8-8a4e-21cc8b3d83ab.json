@@ -33,7 +33,7 @@
     "brackets:a2546471"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "breakdown: Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-27T20:18:53.171503034Z"
+  "updated_at": "2026-07-27T21:42:31.126852324Z"
 }

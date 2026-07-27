@@ -1,0 +1,61 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "1ece4cd87e44f945c070e856fcb4ff6554757057",
+  "completed_at": "2026-07-27T21:10:15.219872214Z",
+  "duration_ms": 221755,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "file": "dev/active/a2546471-json-error-contract/breakdown.json",
+        "id": "F1",
+        "line": 466,
+        "severity": "high",
+        "summary": "The forced-failure fixture consumes a per-arm record, but the survey creates only Markdown and defines no parseable registry contract for invocations, setup, expected results, or exemptions."
+      },
+      {
+        "file": "dev/active/a2546471-json-error-contract/breakdown.json",
+        "id": "F2",
+        "line": 345,
+        "severity": "high",
+        "summary": "The top-level classifier lacks a dependency on stored-record-decode-classification even though it must name that error type to classify stored-record probes."
+      },
+      {
+        "file": "dev/active/a2546471-json-error-contract/breakdown.json",
+        "id": "F3",
+        "line": 49,
+        "severity": "high",
+        "summary": "emitted-code-registration still groups roughly 21 independently classified code registrations across namespaces into one terminal without a broad-quantifier override."
+      },
+      {
+        "file": "dev/active/a2546471-json-error-contract/breakdown.json",
+        "id": "F4",
+        "line": 431,
+        "severity": "high",
+        "summary": "forced-failure-lever-survey assigns investigation and reproducible execution for all 99 arms with unresolved mechanisms to one terminal and has neither a split nor a sizing override."
+      },
+      {
+        "file": "dev/active/a2546471-json-error-contract/plan.md",
+        "id": "F5",
+        "line": 36,
+        "severity": "medium",
+        "summary": "The generated error-code page requires a meaning for every code, but the vocabulary contract defines only code strings and exit classes, leaving no authoritative producer for meanings."
+      }
+    ],
+    "summary": "The graph has an undefined probe-registry contract, a required classifier dependency gap, and unresolved terminal sizing and vocabulary-source defects.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "0e5aed49-8194-4cea-b72a-1019844cc2eb",
+  "message": null,
+  "run_id": "2f64c49b-28f9-4d96-b9be-b33543b2c6a3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T21:06:33.464870519Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5653 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa566-9e6b-7963-a4a2-d95b85ae2279\n--------\nuser\n--- 5640 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 (high)** — The forced-failure fixture has no defined machine-readable input contract. The survey creates only `forced-failure-levers.md`, yet the fixture must read per-arm invocation, setup, expected result, and exemptions. Define and produce a parseable registry (with schema) before the fixture; Markdown may be a projection, not its input. [breakdown.json:466](dev/active/a2546471-json-error-contract/breakdown.json:466)\n\n2. **F2 (high)** — `top-level-envelope-renderer` can run before `stored-record-decode-classification`, although its classifier must name that formerly private error to classify stored-record probes. Add the prerequisite edge (and make the typed-error dependency explicit) so the fixture inherits correct ordering. [breakdown.json:345](dev/active/a2546471-json-error-contract/breakdown.json:345)\n\n3. **F3 (high)** — The prior sizing defect remains: `emitted-code-registration` assigns roughly 21 independently classified codes across many namespaces to one terminal, with no visible `broad-quantifier` override. Split by bounded code family or add a concrete, reviewable override. [breakdown.json:49](dev/active/a2546471-json-error-contract/breakdown.json:49)\n\n4. **F4 (high)** — `forced-failure-lever-survey` requires investigation and reproducible execution for all 99 flag-declaring arms, including unknown failure mechanisms, in one leaf. Split into bounded command-family surveys with a final canonical assembly, or supply a concrete sizing override. [breakdown.json:431](dev/active/a2546471-json-error-contract/breakdown.json:431)\n\n5. **F5 (medium)** — The generated error-code reference requires each code’s “meaning,” but the `error-code-vocabulary` contract specifies only code strings and exit classes. Add one exhaustive, vocabulary-owned meaning/description source before the renderer projects the page. [plan.md:36](dev/active/a2546471-json-error-contract/plan.md:36)\n\nTotal findings: 5\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The graph has an undefined probe-registry contract, a required classifier dependency gap, and unresolved terminal sizing and vocabulary-source defects.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The forced-failure fixture consumes a per-arm record, but the survey creates only Markdown and defines no parseable registry contract for invocations, setup, expected results, or exemptions.\",\"file\":\"dev/active/a2546471-json-error-contract/breakdown.json\",\"line\":466},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"The top-level classifier lacks a dependency on stored-record-decode-classification even though it must name that error type to classify stored-record probes.\",\"file\":\"dev/active/a2546471-json-error-contract/breakdown.json\",\"line\":345},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"emitted-code-registration still groups roughly 21 independently classified code registrations across namespaces into one terminal without a broad-quantifier override.\",\"file\":\"dev/active/a2546471-json-error-contract/breakdown.json\",\"line\":49},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"forced-failure-lever-survey assigns investigation and reproducible execution for all 99 arms with unresolved mechanisms to one terminal and has neither a split nor a sizing override.\",\"file\":\"dev/active/a2546471-json-error-contract/breakdown.json\",\"line\":431},{\"id\":\"F5\",\"severity\":\"medium\",\"summary\":\"The generated error-code page requires a meaning for every code, but the vocabulary contract defines only code strings and exit classes, leaving no authoritative producer for meanings.\",\"file\":\"dev/active/a2546471-json-error-contract/plan.md\",\"line\":36}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
