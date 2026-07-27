@@ -1044,3 +1044,109 @@ Issue `3c36ffa1`. Plan eligible with no blockers. 1 relocated, 0 mirrored, 0 ret
 | `dev/active/8e071e18-breakdown.json:2890:14` | `dev/active/rejection-state-design.md` |
 | `dev/active/8e071e18-breakdown.json:3605:3074` | `dev/active/rejection-state-design.md` |
 | `dev/active/8e071e18-breakdown.json:3605:3170` | `dev/active/rejection-state-design.md` |
+
+## `9b7b5f9c` — dev/archive/9b7b5f9c-jit-profiles
+Issue `f3ddbf55`. Plan eligible with no blockers. 10 relocated, 0 mirrored, 1 retained, 1 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/8b05a612-investigation.md` | `dev/archive/9b7b5f9c-jit-profiles/dev/active/8b05a612-investigation.md` | e131f1dc |
+| move | `dev/active/8b05a612-plan.md` | `dev/archive/9b7b5f9c-jit-profiles/dev/active/8b05a612-plan.md` | e131f1dc |
+| move | `dev/active/8b05a612-research.md` | `dev/archive/9b7b5f9c-jit-profiles/dev/active/8b05a612-research.md` | e131f1dc |
+| move | `dev/active/9b7b5f9c-investigation.md` | `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-investigation.md` | ca024a2b |
+| move | `dev/active/9b7b5f9c-mvp-scope-brief.md` | `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-mvp-scope-brief.md` | 9b7b5f9c |
+| move | `dev/active/9b7b5f9c-plan.md` | `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-plan.md` | ca024a2b |
+| move | `dev/active/9b7b5f9c-research.md` | `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-research.md` | ca024a2b |
+| move | `dev/presentations/9b7b5f9c/base.css` | `dev/archive/9b7b5f9c-jit-profiles/dev/presentations/9b7b5f9c/base.css` | — |
+| move | `dev/presentations/9b7b5f9c/talk.html` | `dev/archive/9b7b5f9c-jit-profiles/dev/presentations/9b7b5f9c/talk.html` | 9b7b5f9c |
+| move | `dev/presentations/9b7b5f9c/themes/rust.css` | `dev/archive/9b7b5f9c-jit-profiles/dev/presentations/9b7b5f9c/themes/rust.css` | — |
+| retain | `dev/archive/9b7b5f9c-completion-report.md` | already under the archive root | 9b7b5f9c |
+
+### In-content citation warnings (76)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8b05a612-plan.md:23:549` | `dev/active/8b05a612-investigation.md` |
+| `dev/active/8b05a612-plan.md:24:340` | `dev/active/8b05a612-research.md` |
+| `dev/active/8b05a612-plan.md:26:307` | `dev/active/8b05a612-investigation.md` |
+| `dev/active/8b05a612-plan.md:27:429` | `dev/active/8b05a612-research.md` |
+| `dev/active/8b05a612-plan.md:28:636` | `dev/active/8b05a612-research.md` |
+| `dev/active/8b05a612-plan.md:29:604` | `dev/active/8b05a612-research.md` |
+| `dev/active/8b05a612-plan.md:30:669` | `dev/active/8b05a612-research.md` |
+| `dev/active/8b05a612-plan.md:31:498` | `dev/active/8b05a612-research.md` |
+| `dev/active/8b05a612-plan.md:33:612` | `dev/active/8b05a612-investigation.md` |
+| `dev/active/8b05a612-plan.md:34:787` | `dev/active/8b05a612-research.md` |
+| `dev/active/8b05a612-plan.md:35:975` | `dev/active/8b05a612-research.md` |
+| `dev/active/8b05a612-plan.md:36:684` | `dev/active/8b05a612-research.md` |
+| `dev/active/8b05a612-plan.md:38:288` | `dev/active/8b05a612-investigation.md` |
+| `dev/active/8b05a612-research.md:4:19` | `dev/active/8b05a612-investigation.md` |
+| `dev/active/8e071e18-breakdown.json:2065:14` | `dev/active/8b05a612-investigation.md` |
+| `dev/active/8e071e18-breakdown.json:2066:14` | `dev/active/8b05a612-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2067:14` | `dev/active/8b05a612-research.md` |
+| `dev/active/8e071e18-breakdown.json:2068:14` | `dev/active/9b7b5f9c-investigation.md` |
+| `dev/active/8e071e18-breakdown.json:2069:14` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+| `dev/active/8e071e18-breakdown.json:2070:14` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2071:14` | `dev/active/9b7b5f9c-research.md` |
+| `dev/active/8e071e18-breakdown.json:2072:14` | `dev/presentations/9b7b5f9c/base.css` |
+| `dev/active/8e071e18-breakdown.json:2073:14` | `dev/presentations/9b7b5f9c/talk.html` |
+| `dev/active/8e071e18-breakdown.json:2074:14` | `dev/presentations/9b7b5f9c/themes/rust.css` |
+| `dev/active/8e071e18-breakdown.json:3459:1425` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3459:1501` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3459:1577` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3459:1653` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3459:1839` | `dev/active/9b7b5f9c-investigation.md` |
+| `dev/active/8e071e18-breakdown.json:3459:1879` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+| `dev/active/8e071e18-breakdown.json:3459:1921` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3459:1952` | `dev/active/9b7b5f9c-research.md` |
+| `dev/active/8e071e18-breakdown.json:3459:1987` | `dev/presentations/9b7b5f9c/talk.html` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:127:4` | `dev/active/9b7b5f9c-investigation.md` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:327:4` | `dev/active/9b7b5f9c-investigation.md` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:32:4` | `dev/active/8b05a612-investigation.md` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:373:4` | `dev/active/8b05a612-investigation.md` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:513:4` | `dev/active/8b05a612-investigation.md` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:532:4` | `dev/active/9b7b5f9c-investigation.md` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:572:4` | `dev/active/9b7b5f9c-investigation.md` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:804:4` | `dev/active/8b05a612-investigation.md` |
+| `dev/active/8e071e18-investigation.md:132:23` | `dev/presentations/9b7b5f9c/talk.html` |
+| `dev/active/8e071e18-investigation.md:140:54` | `dev/presentations/9b7b5f9c/talk.html` |
+| `dev/active/8e071e18-investigation.md:141:12` | `dev/presentations/9b7b5f9c/base.css` |
+| `dev/active/8e071e18-investigation.md:142:12` | `dev/presentations/9b7b5f9c/talk.html` |
+| `dev/active/8e071e18-investigation.md:143:12` | `dev/presentations/9b7b5f9c/themes/rust.css` |
+| `dev/active/9b7b5f9c-handoff-3.md:65:10` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/9b7b5f9c-handoff-4.md:54:10` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/9b7b5f9c-handoff-5.md:55:10` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/9b7b5f9c-handoff.md:54:10` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/9b7b5f9c-investigation.md:116:27` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+| `dev/active/9b7b5f9c-investigation.md:11:3` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+| `dev/active/9b7b5f9c-investigation.md:310:5` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+| `dev/active/9b7b5f9c-investigation.md:6:2` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+| `dev/active/9b7b5f9c-research.md:162:5` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+| `dev/active/9b7b5f9c-research.md:33:6` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+| `dev/active/9b7b5f9c-research.md:9:16` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+| `dev/active/c639cfb5-investigation.md:153:199` | `dev/active/9b7b5f9c-investigation.md` |
+| `dev/active/c639cfb5-investigation.md:153:336` | `dev/active/9b7b5f9c-investigation.md` |
+| `dev/active/c639cfb5-investigation.md:680:24` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+| `dev/active/c639cfb5-investigation.md:682:4` | `dev/active/9b7b5f9c-investigation.md` |
+| `dev/active/c639cfb5-investigation.md:683:4` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/c639cfb5-investigation.md:684:4` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/c639cfb5-investigation.md:686:4` | `dev/active/9b7b5f9c-research.md` |
+| `dev/active/c639cfb5-investigation.md:687:4` | `dev/active/9b7b5f9c-research.md` |
+| `dev/active/c639cfb5-investigation.md:695:5` | `dev/presentations/9b7b5f9c/talk.html` |
+| `dev/active/c639cfb5-investigation.md:696:4` | `dev/presentations/9b7b5f9c/talk.html` |
+| `dev/active/c639cfb5-investigation.md:697:4` | `dev/presentations/9b7b5f9c/talk.html` |
+| `dev/active/c639cfb5-investigation.md:718:3` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+| `dev/active/c639cfb5-investigation.md:721:3` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/active/c639cfb5-investigation.md:725:13` | `dev/active/9b7b5f9c-investigation.md` |
+| `dev/active/c639cfb5-investigation.md:726:41` | `dev/active/9b7b5f9c-investigation.md` |
+| `dev/active/c639cfb5-investigation.md:727:59` | `dev/active/9b7b5f9c-research.md` |
+| `dev/archive/cdc840ad-investigation.md:1102:4` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/archive/cdc840ad-investigation.md:1103:4` | `dev/active/9b7b5f9c-plan.md` |
+| `dev/archive/cdc840ad-investigation.md:1105:4` | `dev/active/9b7b5f9c-mvp-scope-brief.md` |
+
+### Other plan warnings (3)
+
+- `external-edge` at `dev/active/8b05a612-research.md`
+- `external-edge` at `dev/active/9b7b5f9c-research.md`
+- `external-edge` at `dev/presentations/9b7b5f9c/talk.html`

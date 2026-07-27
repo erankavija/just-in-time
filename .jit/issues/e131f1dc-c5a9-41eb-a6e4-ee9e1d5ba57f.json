@@ -1,127 +1,46 @@
 {
-  "id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
-  "title": "planning: v1.0 production readiness and release hardening",
-  "description": "Planning node for v1.0 production readiness and release hardening (8b05a612). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/8b05a612-plan.md and link it to this node once written.",
-  "state": "done",
-  "priority": "critical",
   "assignee": "agent:architect",
+  "claimed_at": "2026-07-14T19:22:20.309276169Z",
+  "context": {},
+  "created_at": "2026-07-14T18:54:18.020731559Z",
   "dependencies": [],
+  "description": "Planning node for v1.0 production readiness and release hardening (8b05a612). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/8b05a612-plan.md and link it to this node once written.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "study",
+      "format": "markdown",
+      "label": "Production Readiness Investigation",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/8b05a612-investigation.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "Production Readiness Research",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/8b05a612-research.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Production Readiness Plan",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/8b05a612-plan.md"
+    }
+  ],
+  "done_at": "2026-07-15T09:01:27.631783209Z",
+  "first_ready_at": "2026-07-14T18:54:18.020732039Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T08:51:08.262254969Z"
+      "updated_at": "2026-07-15T08:51:08.262254969Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/8b05a612-investigation.md",
-      "commit": null,
-      "label": "Production Readiness Investigation",
-      "doc_type": "study",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/active/8b05a612-research.md",
-      "commit": null,
-      "label": "Production Readiness Research",
-      "doc_type": "research",
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "https://docs.npmjs.com/trusted-publishers/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://docs.docker.com/build/ci/github-actions/manage-tags-labels/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://docs.npmjs.com/generating-provenance-statements/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://github.com/rustsec/rustsec/blob/main/cargo-audit/README.md",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://docs.npmjs.com/cli/v11/commands/npm-audit/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://blog.rust-lang.org/releases/latest/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://docs.docker.com/build/ci/github-actions/attestations/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        }
-      ]
-    },
-    {
-      "path": "dev/active/8b05a612-plan.md",
-      "commit": null,
-      "label": "Production Readiness Plan",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
   "labels": [
     "epic:production-readiness",
     "milestone:v1.0",
@@ -133,9 +52,8 @@
     "per:@/charter/D-13",
     "type:planning"
   ],
-  "created_at": "2026-07-14T18:54:18.020731559Z",
-  "updated_at": "2026-07-15T09:01:27.631783759Z",
-  "first_ready_at": "2026-07-14T18:54:18.020732039Z",
-  "claimed_at": "2026-07-14T19:22:20.309276169Z",
-  "done_at": "2026-07-15T09:01:27.631783209Z"
+  "priority": "critical",
+  "state": "done",
+  "title": "planning: v1.0 production readiness and release hardening",
+  "updated_at": "2026-07-27T10:05:43.241915760Z"
 }

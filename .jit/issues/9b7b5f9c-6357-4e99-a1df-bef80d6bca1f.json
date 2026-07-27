@@ -1,13 +1,37 @@
 {
-  "id": "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f",
-  "title": "Versioned repository profiles and portable JIT dogfood setup",
-  "description": "# JIT Profiles v1.0 MVP Scope Brief\n\n**Issue:** 9b7b5f9c\n**Decision:** `@/charter/D-8`\n**Date:** 2026-07-14\n\nDeliver the smallest profile surface that materially improves v1.0 adoption: one versioned, embedded, offline `jit-dogfood` profile that safely installs JIT's repository-neutral workflow into a fresh or existing repository. Plain `jit init` remains minimal. The complete profile lifecycle is deferred without discarding its design.\n\n## Background\n\nAdopters currently assemble hierarchy, planning templates, gates, prompts, projections, content standards, and agent skills from several locations. The original profile epic also included composition, local packages, variables, shared ownership, reconfiguration, diff, upgrade, and removal. That package-manager breadth is not required to solve the immediate adoption problem and would make it the dominant v1.0 release risk. `@/charter/D-8` therefore keeps an embedded-profile MVP in v1.0 and moves the complete lifecycle to a post-1.0 epic.\n\n## Success Criteria\n\n- [hard] REQ-01: Plain `jit init` remains methodology-neutral; `jit init --profile jit-dogfood` applies the one embedded v1.0 profile and delegates to the same application path used by `jit profile apply jit-dogfood` for existing repositories.\n- [hard] REQ-02: Application works offline and without Git, never creates commits or rewrites existing issues, and performs no network access.\n- [hard] REQ-03: A versioned TOML manifest with generated JSON Schema declares the profile ID, compatible JIT range, semantic registry contributions, assets, executable declarations, and built-in projection operations without arbitrary install hooks or engine-level workflow assumptions.\n- [hard] REQ-04: Application builds and validates a deterministic final-state plan before mutation and publishes it under the repository-wide mutation lock. Conflicts and preflight failures mutate nothing; an ordinary handled pre-commit failure is reported only after exact rollback; interruption or rollback uncertainty retains a durable typed recovery journal and error; mandatory recovery before any later JIT mutation converges to all-old or all-new state. Identical content remains byte-exact, differing user content is never overwritten, and unchanged reapplication is a successful no-op.\n- [hard] REQ-05: A minimal record under `.jit/profiles/` stores the applied profile ID, version, origin, and content hashes needed to inspect provenance and prove unchanged reapplication; application appends an audit event consistent with `@/inv/event-log`.\n- [hard] REQ-06: The package and publisher reject absolute paths, traversal, escaping symlinks, undeclared executable assets, invalid interpolation, and any staged result that violates repository validation before publication.\n- [hard] REQ-07: `jit profile list`, `show`, and `apply` support human and `--json` output; apply supports `--dry-run`; request, result, error, and manifest shapes are exposed through `jit --schema`.\n- [hard] REQ-08: `jit-dogfood` installs the repository-neutral milestone, epic, story, task, bug, enhancement, planning, and breakdown taxonomy; the epic-only plan-before-fan-out template; advisory content standards; and enforced epic coverage while preserving the domain-agnostic engine.\n- [hard] REQ-09: The profile installs config-declared plan, breakdown, code-review, coverage, per-issue validation, and repository-validation gates with their portable prompts and scripts; deterministic checks require neither `jq` nor a JIT source checkout, and placeholder AI reviewers emit visible structured warnings.\n- [hard] REQ-10: The repository-neutral JIT skill suite, one canonical content-standards reference, concise managed `AGENTS.md` guidance, an empty invariant registry, and managed invariant plus rules/gates projections are installed without changing non-managed prose.\n- [hard] REQ-11: Adopter documentation presents the embedded profile as the preferred quickstart, links to one canonical profile reference, and keeps manual hierarchy, gate, and planning-bracket configuration as advanced customization rather than duplicating the walkthrough.\n- [hard] REQ-12: Automated tests cover fresh and existing repositories, offline and Git-free operation, deterministic merge, conflict rollback, idempotence, audit/provenance consistency, path safety, concurrency, JSON/schema exposure, portable assets, projections, and an end-to-end profile-to-plan workflow.\n\n## Deferred to the post-1.0 profile epic\n\nMultiple profile composition, explicit local profile directories, profile dependencies and incompatibilities, variables and sensitive-value handling, semantic shared ownership, reconfiguration, detailed diff, three-way upgrade, and safe removal are not v1.0 acceptance criteria. The original 23-requirement contract and full planning brief are carried verbatim by the continuation epic.\n\n## Risks\n\n- RISK-01: A nominally small profile can regrow the deferred package-manager surface; planning must trace every child to the twelve MVP requirements.\n- RISK-02: A passing placeholder reviewer can create false confidence; warnings must remain visible and structured.\n- RISK-03: Duplicating profile facts across assets, compatibility presets, and documentation would recreate the drift this feature is meant to remove.\n",
-  "state": "done",
-  "priority": "high",
+  "archived_from": "done",
   "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-14T19:21:55.658832364Z",
+  "context": {},
+  "created_at": "2026-07-13T23:41:53.510143551Z",
   "dependencies": [
     "bcff56be-2e8f-44ae-9b3b-5739be414630"
   ],
+  "description": "# JIT Profiles v1.0 MVP Scope Brief\n\n**Issue:** 9b7b5f9c\n**Decision:** `@/charter/D-8`\n**Date:** 2026-07-14\n\nDeliver the smallest profile surface that materially improves v1.0 adoption: one versioned, embedded, offline `jit-dogfood` profile that safely installs JIT's repository-neutral workflow into a fresh or existing repository. Plain `jit init` remains minimal. The complete profile lifecycle is deferred without discarding its design.\n\n## Background\n\nAdopters currently assemble hierarchy, planning templates, gates, prompts, projections, content standards, and agent skills from several locations. The original profile epic also included composition, local packages, variables, shared ownership, reconfiguration, diff, upgrade, and removal. That package-manager breadth is not required to solve the immediate adoption problem and would make it the dominant v1.0 release risk. `@/charter/D-8` therefore keeps an embedded-profile MVP in v1.0 and moves the complete lifecycle to a post-1.0 epic.\n\n## Success Criteria\n\n- [hard] REQ-01: Plain `jit init` remains methodology-neutral; `jit init --profile jit-dogfood` applies the one embedded v1.0 profile and delegates to the same application path used by `jit profile apply jit-dogfood` for existing repositories.\n- [hard] REQ-02: Application works offline and without Git, never creates commits or rewrites existing issues, and performs no network access.\n- [hard] REQ-03: A versioned TOML manifest with generated JSON Schema declares the profile ID, compatible JIT range, semantic registry contributions, assets, executable declarations, and built-in projection operations without arbitrary install hooks or engine-level workflow assumptions.\n- [hard] REQ-04: Application builds and validates a deterministic final-state plan before mutation and publishes it under the repository-wide mutation lock. Conflicts and preflight failures mutate nothing; an ordinary handled pre-commit failure is reported only after exact rollback; interruption or rollback uncertainty retains a durable typed recovery journal and error; mandatory recovery before any later JIT mutation converges to all-old or all-new state. Identical content remains byte-exact, differing user content is never overwritten, and unchanged reapplication is a successful no-op.\n- [hard] REQ-05: A minimal record under `.jit/profiles/` stores the applied profile ID, version, origin, and content hashes needed to inspect provenance and prove unchanged reapplication; application appends an audit event consistent with `@/inv/event-log`.\n- [hard] REQ-06: The package and publisher reject absolute paths, traversal, escaping symlinks, undeclared executable assets, invalid interpolation, and any staged result that violates repository validation before publication.\n- [hard] REQ-07: `jit profile list`, `show`, and `apply` support human and `--json` output; apply supports `--dry-run`; request, result, error, and manifest shapes are exposed through `jit --schema`.\n- [hard] REQ-08: `jit-dogfood` installs the repository-neutral milestone, epic, story, task, bug, enhancement, planning, and breakdown taxonomy; the epic-only plan-before-fan-out template; advisory content standards; and enforced epic coverage while preserving the domain-agnostic engine.\n- [hard] REQ-09: The profile installs config-declared plan, breakdown, code-review, coverage, per-issue validation, and repository-validation gates with their portable prompts and scripts; deterministic checks require neither `jq` nor a JIT source checkout, and placeholder AI reviewers emit visible structured warnings.\n- [hard] REQ-10: The repository-neutral JIT skill suite, one canonical content-standards reference, concise managed `AGENTS.md` guidance, an empty invariant registry, and managed invariant plus rules/gates projections are installed without changing non-managed prose.\n- [hard] REQ-11: Adopter documentation presents the embedded profile as the preferred quickstart, links to one canonical profile reference, and keeps manual hierarchy, gate, and planning-bracket configuration as advanced customization rather than duplicating the walkthrough.\n- [hard] REQ-12: Automated tests cover fresh and existing repositories, offline and Git-free operation, deterministic merge, conflict rollback, idempotence, audit/provenance consistency, path safety, concurrency, JSON/schema exposure, portable assets, projections, and an end-to-end profile-to-plan workflow.\n\n## Deferred to the post-1.0 profile epic\n\nMultiple profile composition, explicit local profile directories, profile dependencies and incompatibilities, variables and sensitive-value handling, semantic shared ownership, reconfiguration, detailed diff, three-way upgrade, and safe removal are not v1.0 acceptance criteria. The original 23-requirement contract and full planning brief are carried verbatim by the continuation epic.\n\n## Risks\n\n- RISK-01: A nominally small profile can regrow the deferred package-manager surface; planning must trace every child to the twelve MVP requirements.\n- RISK-02: A passing placeholder reviewer can create false confidence; warnings must remain visible and structured.\n- RISK-03: Duplicating profile facts across assets, compatibility presets, and documentation would recreate the drift this feature is meant to remove.\n",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "label": "MVP Scope Brief",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-mvp-scope-brief.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Completion Report",
+      "path": "dev/archive/9b7b5f9c-completion-report.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "html",
+      "label": "Showcase Deck (reveal.js)",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/presentations/9b7b5f9c/talk.html"
+    }
+  ],
+  "done_at": "2026-07-16T20:56:51.974957142Z",
+  "first_ready_at": "2026-07-13T23:41:53.510147651Z",
   "gates_required": [
     "cargo-ci",
     "repo-validate",
@@ -15,148 +39,28 @@
     "doc-review"
   ],
   "gates_status": {
-    "doc-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T20:49:28.958122751Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T20:41:36.135070946Z"
+      "updated_at": "2026-07-16T20:41:36.135070946Z",
+      "updated_by": "auto:executor"
     },
-    "repo-validate": {
+    "doc-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T20:47:45.591200625Z"
+      "updated_at": "2026-07-16T20:49:28.958122751Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T20:48:05.429920341Z"
+      "updated_at": "2026-07-16T20:48:05.429920341Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-16T20:47:45.591200625Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/9b7b5f9c-mvp-scope-brief.md",
-      "commit": null,
-      "label": "MVP Scope Brief",
-      "doc_type": "design"
-    },
-    {
-      "path": "dev/archive/9b7b5f9c-completion-report.md",
-      "commit": null,
-      "label": "Completion Report",
-      "doc_type": null,
-      "format": "markdown"
-    },
-    {
-      "path": "dev/presentations/9b7b5f9c/talk.html",
-      "commit": null,
-      "label": "Showcase Deck (reveal.js)",
-      "doc_type": "notes",
-      "format": "html",
-      "assets": [
-        {
-          "original_path": "https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "base.css",
-          "resolved_path": "dev/presentations/9b7b5f9c/base.css",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "e964dd787590ea2c2eb5784b5362674504e66d2e4626bca1b1e8abff071f7059",
-          "is_shared": false
-        },
-        {
-          "original_path": "https://fonts.gstatic.com",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "themes/rust.css",
-          "resolved_path": "dev/presentations/9b7b5f9c/themes/rust.css",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "7ba057c88a30dc41c8564b549d0b76bb6fa98413c3a50b66fd6a3f80a4783cbe",
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://fonts.googleapis.com",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f",
   "labels": [
     "epic:jit-profiles",
     "milestone:v1.0",
@@ -168,9 +72,8 @@
     "type:epic",
     "per:@/charter/D-8"
   ],
-  "created_at": "2026-07-13T23:41:53.510143551Z",
-  "updated_at": "2026-07-16T21:29:35.464193425Z",
-  "first_ready_at": "2026-07-13T23:41:53.510147651Z",
-  "claimed_at": "2026-07-14T19:21:55.658832364Z",
-  "done_at": "2026-07-16T20:56:51.974957142Z"
+  "priority": "high",
+  "state": "archived",
+  "title": "Versioned repository profiles and portable JIT dogfood setup",
+  "updated_at": "2026-07-27T10:05:43.241915760Z"
 }
