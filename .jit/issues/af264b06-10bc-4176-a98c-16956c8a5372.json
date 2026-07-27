@@ -8,6 +8,7 @@
   ],
   "description": "The artifact directory convention, the development-area classification, and this epic's command behaviour are each stated once in a canonical adopter-facing home, and other documents cite those homes instead of restating them.\n\n## Background\n\nThe area classification is currently duplicated across an adopter reference, an example configuration, a runtime fallback, and a scaffold, and those copies already disagree. The directory convention is stated in only one adopter document, and that document is a how-to rather than a reference. Meanwhile a contributor index narrates a retention-window and category-subfolder lifecycle that the shipped mechanism does not implement, and a contributor authoring guide contradicts itself about whether archival takes a category.\n\nThe classification also grows under this work, which strengthens the case for stating it once and citing it everywhere else. The command surface grows under it too, across several independent behaviour changes that all surface in the same command reference, so that reference is written once against the behaviour they ship rather than edited by each of them in turn.\n\n## Success Criteria\n\n- [hard] REQ-01: Adopter-facing documentation states the directory convention and the area classification once, in a single canonical home.\n- [hard] REQ-02: Other adopter-facing documents cite that home rather than restating either fact.\n- [hard] REQ-03: Contributor guides describe the shipped mechanism and carry no lifecycle narrative the mechanism does not implement.\n- [hard] REQ-04: The adopter command reference states this epic's command behaviour as one coherent surface rather than as separate edits.\n",
   "documents": [],
+  "first_ready_at": "2026-07-27T13:23:21.703910434Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
@@ -21,7 +22,7 @@
     "story:canonical-documentation-home"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Canonical adopter homes for the layout, classification, and command facts",
-  "updated_at": "2026-07-25T13:20:37.281986323Z"
+  "updated_at": "2026-07-27T13:23:21.703910434Z"
 }
