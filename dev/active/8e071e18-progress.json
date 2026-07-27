@@ -881,7 +881,16 @@
    "wave_number": 9,
    "issues": [
     {
-     "id": "89b5899a-ae6e-4bae-82eb-460fb5fccaf7",
+     "short_id": "aa38b236",
+     "title": "Confirm the archival runs serviced the development root",
+     "classification": "documentation",
+     "gates": [
+      "repo-validate"
+     ],
+     "status": "delivered on its branch, gate pending",
+     "note": "Two records: archive-completeness-record.md (331 lines) and citation-warning-consolidation.md (1160 lines). 138 tracked files remain under the eight managed areas, independently confirmed; per-reason split 9 live owner / 3 commit-pinned / 4 owner outside every archived subtree / 122 no document reference. Consolidated list: 641 occurrences, 105 distinct citing files, cited set exactly equal to the relocated set."
+    },
+    {
      "short_id": "89b5899a",
      "title": "Archive directory naming and citation breakage warnings",
      "classification": "checkpoint",
@@ -892,20 +901,9 @@
       "docs-mechanical",
       "repo-validate"
      ],
-     "status": "pending"
+     "status": "done"
     },
     {
-     "id": "aa38b236-4f45-4e28-b80a-b8beaca88642",
-     "short_id": "aa38b236",
-     "title": "Confirm the archival runs serviced the development root",
-     "classification": "mechanical",
-     "gates": [
-      "repo-validate"
-     ],
-     "status": "pending"
-    },
-    {
-     "id": "8ff4cff3-a36d-4ac0-8cfd-9f61fac6f41f",
      "short_id": "8ff4cff3",
      "title": "State the artifact-directory template field in the adopter template documentation",
      "classification": "documentation",
@@ -913,9 +911,10 @@
       "doc-review",
       "docs-mechanical"
      ],
-     "status": "pending"
+     "status": "done"
     }
-   ]
+   ],
+   "status": "in progress"
   },
   {
    "wave_number": 10,
@@ -1348,6 +1347,24 @@
    "situation": "89b5899a's doc-review failed with three blocking issue-impact findings, all in docs/reference/cli-commands.md: F1 (high, :304-307) the title-slug fallback and `container` placeholder that 8cd6eb73 removed; F2 (medium, :250-251) the unsupported-edge-target warning for a directory link target that 7d6d2783 removed; F3 (medium, ~:210) the in-content citation warning, which 2ac35e8e added and the reference documents nowhere - the word 'citation' does not appear in the file. Its other four gates passed, code-review with zero findings.",
    "lead_analysis": "The three facts are exactly 4a6fb8c1's REQ-01, REQ-03 and REQ-04. 4a6fb8c1 is four waves downstream and depends on 58c56743, because its REQ-07 must cite the canonical adopter home that 58c56743 creates - so it cannot simply move earlier without splitting its criteria. Identical structure to E4 in wave 3, where two review rounds were lost to adopter documentation owned by a later wave. Pitfalls P4 and P5 both predicted these two findings and both recorded the disposition 'covered by 4a6fb8c1, VERIFY at wave 12'; this is the third time on this epic that a 'covered by a later issue' pitfall has blocked an earlier review, after P2 blocked b3fc1a92.",
    "resolution": "Owner chose a new remediation task. Filed 334bcd6f (task, story:archive-naming-and-warnings, doc-review + docs-mechanical, 4 [hard] criteria) scoped to exactly those three subjects and explicitly forbidden from restructuring the document, which stays 4a6fb8c1's. Wired 89b5899a -> 334bcd6f: the story checkpoint is not complete while the adopter reference contradicts its own criteria, and unlike fd88adda this creates no deadlock because 89b5899a is already claimed and in_progress and the dependency is satisfied before it needs to close. 334bcd6f depends on 3be32cad, --reduce having dropped the transitively implied edges to 8cd6eb73, 7d6d2783 and 2ac35e8e."
+  },
+  {
+   "id": "E15",
+   "wave": "9 / epic",
+   "issue": "8e071e18 REQ-09, aa38b236 REQ-01",
+   "category": "3 - epic success-criteria modification; 4 - issue scope change",
+   "situation": "aa38b236's completeness record found 7 artifacts that a terminal issue's document reference names, still in a managed area rather than under the archive root. Three are commit-pinned, which aa38b236's own Background calls retained by design and its REQ-03 lists as a legitimate reason to remain. The other four are the epic's own working artifacts - dev/active/8e071e18-{breakdown.json,investigation.md,plan.md} owned by planning node 55fe8ec2, and dev/active/ca832358/req05-archival-execution-evidence.md - whose owners are Done but which sit in no archived container's dependency closure, because the container that would relocate them is epic 8e071e18 itself.",
+   "lead_analysis": "Epic REQ-09 read literally is unsatisfiable for those four, and the set grows with every child that closes owning an artifact in dev/active. aa38b236 REQ-01 has the same shape against REQ-03: read as an unqualified universal it makes REQ-03's own list of legitimate reasons unreachable. The worker recorded the tension rather than reinterpreting the criterion, which is what the no-argue discipline asks of it.",
+   "resolution": "Owner chose amending the scope. Epic REQ-09 now reads 'owned by a terminal issue outside this epic's own subtree'; aa38b236 REQ-01 gains 'except where REQ-03 records a reason it remains'. Reasoning recorded in both descriptions, stated structurally rather than as an enumerated exception list because the set grows as children close. Archiving them mid-execution was rejected: it removes the records the remaining waves consume. Unlinking was rejected on D-14's traceability ground."
+  },
+  {
+   "id": "E16",
+   "wave": 9,
+   "issue": "two product observations outside the epic",
+   "category": "7 - blocker outside this epic's scope (filing decision)",
+   "situation": "Two inconsistencies surfaced while verifying epic criteria, neither reaching any of the 15. (1) A markdown link whose target is a directory is navigation to archival discovery, a missing_asset ERROR to jit doc check-links, and 'not found in the working tree' to jit validate when linked directly - for a path that exists. (2) jit doc check-links reports missing_document for a commit-pinned reference whose file left the working tree, without honouring the pin.",
+   "lead_analysis": "Both verified before escalating, and both dissolved as criterion violations. For (2) the decisive check was that 41aa1b75's three references resolve at commit 6b799832 (git cat-file -e succeeds for each) and jit validate reports zero errors, so the references do resolve and the checker is the outlier. Every previous decision to file outside this epic has been the owner's.",
+   "resolution": "Owner chose to file both. f9e42a43 (directory link target consistency) and f289ff18 (honour the commit pin when checking links), both bug / milestone:v1.0 / component:core with cargo-ci + code-review, wired under 9db27a3a."
   }
  ],
  "rework_counts": {
@@ -1754,6 +1771,13 @@
    "subject": "a per-run assertion does not survive being applied to the final tree",
    "detail": "Re-checking all 24 runs at the end flagged 14303b30 for a mirrored artifact absent at its source. It was correct per-run and correct at the end: dev/active/json-output-standardization-plan.md is owned by two issues, 14303b30 mirrors it and retains the source, and 9d427a6b - later in the order - relocates it, because the outside owner has by then been relinked to the mirrored copy so only the inside owner remains. Both archived copies exist, the live source is gone, both references resolve.",
    "decision": "A retrospective pass over a sequence of mutations must model the sequence. Index every later relocation before asserting an earlier run's retention, and assert the bytes survived at the later destination instead. Recorded in the evidence record so the apparent contradiction is answered where a reader meets it."
+  },
+  {
+   "id": "N31",
+   "raised_at": "session 6, wave-9 gate batch",
+   "subject": "a stale in-content citation is a shared surface, so the issue that owns it should not wait its turn",
+   "detail": "docs-mechanical's M3 citation check failed on 35499d1e because two adopter guides cited dev/design/worktree-parallel-work.md, which a sweep had relocated. That gate is carried by many issues, so the stale citation was failing a check for the whole remaining epic rather than for one issue. 623e4c46 owned exactly those two citations and 834a78a8 owned five more in Rust sources; both were blocked behind aa38b236, whose consolidated warning list they do not actually need because each enumerates its own citations.",
+   "decision": "Rewired both onto the sweeps that moved their targets - 60c398d3 and deb50576, both Done - rather than onto aa38b236, and ran them immediately. That is reordering, not rescoping: no criterion changed, and both issues are written to be satisfied by the citation RESOLVING rather than by that issue having edited it. Both passed every gate first try. Generally: when a gate fails on repository state that a later issue owns, check whether that issue's stated dependency is a real prerequisite or a convenience before creating a remediation task."
   }
  ],
  "handoffs": [
