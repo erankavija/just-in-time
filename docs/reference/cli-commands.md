@@ -334,7 +334,7 @@ existing directory even after the container's membership label changes. Multiple
 matches block with deterministic `destination-conflict` findings. If no marker
 matches, planning resolves to the unsuffixed
 `<archive_root>/<container-short-id>/` when that path already exists, and to the
-suffixed preferred root otherwise. Adopting an occupied unsuffixed directory
+preferred root otherwise. Adopting an occupied unsuffixed directory
 moves no data, and its markerless accounting and conflict checks still apply, so
 a container's artifacts stay in the one directory that already holds them. A
 marker naming another container or a markerless resolved directory with

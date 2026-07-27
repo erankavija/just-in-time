@@ -13,7 +13,18 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-07-27T09:20:30.260211767Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-27T09:19:08.035795861Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "334bcd6f-4bf8-4f1f-98c9-62f3d2c848e6",
   "labels": [
     "epic:dev-artifact-layout",
@@ -24,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Correct the command reference's archive naming, directory-target and citation-warning facts",
-  "updated_at": "2026-07-27T09:00:46.471873559Z"
+  "updated_at": "2026-07-27T09:20:30.260211767Z"
 }

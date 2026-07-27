@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "00b08be247f86b8c9d8603aad83274ca8f6bdffa",
+  "completed_at": "2026-07-27T09:20:29.989380421Z",
+  "duration_ms": 81093,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 337,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The reconciliation rule incorrectly says the fallback is always a suffixed preferred root, although the preferred root is bare without one unambiguous, usable membership value."
+      }
+    ],
+    "summary": "One issue-authored archive-destination statement contradicts the documented and implemented bare-directory fallback.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "334bcd6f-4bf8-4f1f-98c9-62f3d2c848e6",
+  "message": null,
+  "run_id": "2cec0795-47a0-4613-8bd6-94960646fd95",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T09:19:08.895391555Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 27997 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa2de-f75c-7440-927f-a5a73d9d2713\n--------\nuser\n--- 27984 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `task` is a leaf and has no resolved children. I inspected the four reachable `jit:334bcd6f` commits individually; their union affects the archive command reference (plus one dev-only metadata update). Uncommitted `.jit` state was not attributed.\n\nThe reference correctly documents citation warnings, directory-link navigation, direct unsupported artifacts, and bare short-ID fallback. One follow-up sentence contradicts that fallback.\n\n1. **F1 — blocking, issue-impact, medium:** The reconciliation rule says an absent unsuffixed directory selects “the suffixed preferred root otherwise,” but the preferred root is bare when membership is absent, ambiguous, or slugless. This contradicts the preceding rule and current planner behavior. Replace “the suffixed preferred root otherwise” with “the preferred root otherwise” (or explicitly distinguish bare and suffixed preferred roots). [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:335)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-authored archive-destination statement contradicts the documented and implemented bare-directory fallback.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The reconciliation rule incorrectly says the fallback is always a suffixed preferred root, although the preferred root is bare without one unambiguous, usable membership value.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":337}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
