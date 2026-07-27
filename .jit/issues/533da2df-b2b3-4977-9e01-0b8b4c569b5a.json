@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:bracket-fix",
+  "claimed_at": "2026-07-27T19:57:24.485772612Z",
   "context": {},
   "created_at": "2026-07-25T09:08:01.479980685Z",
   "dependencies": [],
@@ -30,7 +31,7 @@
     "enforces:@/invariant/event-log"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Blocking dependency addition does not demote the dependent out of Ready",
-  "updated_at": "2026-07-25T09:08:57.043360414Z"
+  "updated_at": "2026-07-27T19:57:27.385972430Z"
 }
