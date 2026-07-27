@@ -1673,6 +1673,20 @@
    "subject": "a pitfall recorded as 'covered by a later issue' has now blocked an earlier review three times",
    "detail": "P2 blocked b3fc1a92 in wave 2 (E2). P4 and P5 were both recorded in waves 2 and 3 with the disposition 'covered by 4a6fb8c1 in wave 12, VERIFY there', and both came back as blocking doc-review findings on 89b5899a in wave 8 (E14). In every case the pitfall was correctly attributed - the later issue really does own the file - and in every case the attribution did not stop the finding.",
    "decision": "When a pitfall is a live adopter-facing falsehood rather than a missing improvement, 'covered by a later issue' is not a disposition, it is a scheduled review failure. On this epic the remaining ones to treat this way are P6 (issue_scoped_areas absent from the configuration reference, owned by 58c56743) and P17 (four adopter sites teaching the flat plan-doc pattern, owned by 8ff4cff3 - now landed on main). Check each against the surface of any issue about to be gated, and remediate ahead of the gate rather than after it."
+  },
+  {
+   "id": "N23",
+   "raised_at": "session 6, ca832358 dispatch",
+   "subject": "two consecutive Opus workers on the same issue died on API 529 before writing anything",
+   "detail": "w-ca832358 and w-ca832358-r2 both failed with 'API Error: 529 Overloaded', 5-25 minutes in, each leaving a clean worktree with zero commits. The 8ff4cff3 worker on the same model completed normally in the same window, so this is capacity variance rather than anything about the task. The cost was ~35 minutes of wall clock on the epic's critical path, since every remaining wave sits behind ca832358.",
+   "decision": "Third dispatch went to Sonnet, with the prompt strengthened on two axes: an explicit instruction to commit the failing test before the fix and the fix before verification, so a mid-task loss costs one step rather than the whole task; and an explicit warning that the PATH `jit` binary predates the branch, so a probe run must invoke a binary built from the worker's own change or it measures the old behaviour. Generally: for a task on the critical path, put the commit-early instruction in the prompt from the first dispatch, and treat a clean worktree after a failure as confirmation that nothing needs reconciling."
+  },
+  {
+   "id": "N24",
+   "raised_at": "session 6, 35499d1e pre-verification",
+   "subject": "a fresh-repository probe is the honest evidence for a shipped-default criterion",
+   "detail": "35499d1e REQ-01 and REQ-02 are about what a FRESHLY INITIALIZED repository does, which this repository's live .jit/ cannot evidence - the dogfooding boundary. Ran `git init` + `jit init` in a scratch directory with the installed binary: the scaffolded [documentation] table carries 8 managed paths, 6 permanent paths and 4 issue-scoped areas with no hand editing, and archival reports policy_status 'configured'. Then linked a deck at dev/presentations/deck.md to a task, terminalised it, and previewed both target forms: `jit archive document` gives eligible with 1 move and zero blockers, `jit archive container` gives eligible with destination dev/archive/b44aeed5 and zero blockers.",
+   "decision": "Keep the scratch repository until the checkpoint closes and extend the same probe for REQ-03 and REQ-04 once ca832358 lands. The bare short-id destination in that probe is also live evidence for 89b5899a REQ-01's no-title-fallback clause on a repository that has never seen this epic's data."
   }
  ],
  "handoffs": [
