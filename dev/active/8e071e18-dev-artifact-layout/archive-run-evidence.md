@@ -150,3 +150,26 @@ Issue `39757bb3`. Plan eligible with no blockers. 11 relocated, 0 mirrored, 5 re
 ### Other plan warnings (1)
 
 - `external-edge` at `dev/archive/features/2821e177/showcase/talk.html`
+
+## `53e3fa36` — dev/archive/53e3fa36-agent-ergonomics
+Issue `6f6fe80e`. Plan eligible with no blockers. 2 relocated, 0 mirrored, 1 retained, 1 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md` | `dev/archive/53e3fa36-agent-ergonomics/dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md` | 2937919f 53e3fa36 |
+| move | `dev/studies/session-mining-jit-improvements.md` | `dev/archive/53e3fa36-agent-ergonomics/dev/studies/session-mining-jit-improvements.md` | 53e3fa36 |
+| retain | `dev/archive/features/53e3fa36-completion-report.md` | already under the archive root | 53e3fa36 |
+
+### In-content citation warnings (7)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/2e926e39-906e-4952-8ae0-38215a7e5aac-plan.md:38:361` | `dev/studies/session-mining-jit-improvements.md` |
+| `dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md:4:19` | `dev/studies/session-mining-jit-improvements.md` |
+| `dev/active/8e071e18-breakdown.json:2781:14` | `dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2782:14` | `dev/studies/session-mining-jit-improvements.md` |
+| `dev/active/8e071e18-breakdown.json:3777:6287` | `dev/studies/session-mining-jit-improvements.md` |
+| `dev/active/8e071e18-breakdown.json:3777:6394` | `dev/studies/session-mining-jit-improvements.md` |
+| `dev/archive/features/53e3fa36-progress.json:9:18` | `dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md` |
