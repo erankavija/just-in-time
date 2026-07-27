@@ -66,3 +66,22 @@ directories the original runs drained.
 With this addendum, every file under a managed development area carries a recorded reason it
 remains: 138 in the completeness record, 8 added here, and 1 of the 138 relocated since and
 recorded here as removed. That is 145, the population `git ls-files` reports over the eight areas.
+
+## After the checkpoint closed
+
+The population kept growing while the epic finished, so the count above is the checkpoint's, not a
+standing total. Recorded here rather than left to drift:
+
+| added | files | reason it remains |
+|---|---|---|
+| `dev/active/d8d7f317/req09-remediation-evidence.md` | 1 | live owner — `d8d7f317`, the REQ-09 remediation the epic's holistic-review gate required |
+| `dev/active/8e071e18-dev-artifact-layout/completion-report.md` | 1 | live owner — `8e071e18` |
+| `dev/presentations/8e071e18-dev-artifact-layout/` | 16 | live owner — `8e071e18`; the feature showcase deck and its vendored assets |
+
+One file left over the same span: `dev/active/fdb039ee-modular-document-rendering.md`, archived by
+`d8d7f317` into `dev/archive/41d07c6b-usability/`.
+
+That is 164 at the commit that adds this section, which `git ls-files` over the eight areas
+confirms. Every added file has a live owner, so none is an artifact archival has failed to reach.
+The deck's directory is the one `jit doc dir 8e071e18 dev/presentations` resolves, and
+`jit doc conformance` reports no entry for any of its sixteen files.
