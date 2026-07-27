@@ -1,0 +1,53 @@
+schema = "failure-lever-registry/v1"
+namespace = "item-invariant-project"
+
+[[arms]]
+path = "item list"
+argv = ["item", "list", "--json"]
+setup = ["init", "malformed-config-toml"]
+setup_notes = "Replace .jit/config.toml with `not = valid = toml` after initialization."
+expected_failure = "ITEM_COMMAND_FAILED: invalid .jit/config.toml: Failed to parse config.toml"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "item search"
+argv = ["item", "search", "survey", "--json"]
+setup = ["init", "malformed-config-toml"]
+setup_notes = "Replace .jit/config.toml with `not = valid = toml` after initialization."
+expected_failure = "ITEM_COMMAND_FAILED: invalid .jit/config.toml: Failed to parse config.toml"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "item show"
+argv = ["item", "show", "not-a-qualified-address", "--json"]
+setup = ["init"]
+expected_failure = "ITEM_COMMAND_FAILED: 'not-a-qualified-address' is not a qualified id; expected '<short-id>/<self-id>'"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "item resolve"
+argv = ["item", "resolve", "not-a-qualified-address", "--json"]
+setup = ["init"]
+expected_failure = "ITEM_COMMAND_FAILED: 'not-a-qualified-address' is not a qualified id; expected '<short-id>/<self-id>'"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "invariant check"
+argv = ["invariant", "check", "--json"]
+setup = ["init", "dangling-invariant-enforcement:survey-invariant"]
+setup_notes = "Create .jit/invariants.toml with `survey-invariant` enforced by missing `@/rule/missing-survey-rule` after initialization."
+expected_failure = "Enforcement drift: 1 finding(s) for survey-invariant bound to @/rule/missing-survey-rule"
+expected_exit = 4
+confirmation = "invoked"
+
+[[arms]]
+path = "project render"
+argv = ["project", "render", "--name", "no-such-projection", "--json"]
+setup = ["init", "no-projection:no-such-projection"]
+expected_failure = "PROJECT_COMMAND_FAILED: unknown projection 'no-such-projection'"
+expected_exit = 1
+confirmation = "invoked"
