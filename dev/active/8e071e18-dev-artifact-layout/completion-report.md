@@ -116,6 +116,22 @@ recurred past `MAX_SAME_FINDING_REPEATS`) were the other decisions that changed 
 `fd88adda`, `ac45f567`, `0e5dff57`, `84c4e956`, `ca832358`, `334bcd6f` from execution findings, and
 `d8d7f317`, `f89ea266` from the epic's own gate.
 
+## The epic's own archival
+
+Deliberately not run. `jit archive container 8e071e18` previews eligible with zero blockers, 19
+moves and a destination root of `dev/archive/8e071e18-dev-artifact-layout` — the mechanism can
+service it, which is itself the epic's thesis. Two reasons to leave it:
+
+- **609 in-content citation warnings.** The epic's records cite each other and are cited from
+  outside, and execution rewrites no content by design (`@/issue/8e071e18/decision/D-8`), so a run
+  now would leave 609 occurrences naming pre-move paths.
+- **The milestone above is still open.** `9db27a3a` (v1.0) contains this epic, and archiving that
+  milestone relocates this closure with it. Archiving the epic separately first only splits the
+  operation in two.
+
+The warning count is recorded here because it is the measurement whoever archives this closure will
+want, and re-previewing an archived container reports a no-op.
+
 ## Holistic quality notes
 
 - **The central repair was exercised on real data, not demonstrated.** Twenty-four container

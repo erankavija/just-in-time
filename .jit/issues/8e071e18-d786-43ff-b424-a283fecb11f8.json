@@ -53,6 +53,38 @@
       "format": "markdown",
       "label": "Completion report",
       "path": "dev/active/8e071e18-dev-artifact-layout/completion-report.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "39bb431a5a0de1692279d3a06ee05c95ffe58a4ee57a06b56b0cd7beec460189",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "8e071e18-investigation.md",
+          "resolved_path": "dev/active/8e071e18-investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "aaa292b67d3affaddfed6c7a84a97d896deaeaa0f1da52ce78fd56250eb72b08",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "8e071e18-breakdown.json",
+          "resolved_path": "dev/active/8e071e18-breakdown.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan",
+      "path": "dev/active/8e071e18-plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Investigation",
+      "path": "dev/active/8e071e18-investigation.md"
     }
   ],
   "done_at": "2026-07-27T14:38:26.591625803Z",
@@ -82,5 +114,5 @@
   "priority": "high",
   "state": "done",
   "title": "Issue-based development artifact layout and serviceable archival",
-  "updated_at": "2026-07-27T14:38:26.591625803Z"
+  "updated_at": "2026-07-27T14:39:15.791781561Z"
 }
