@@ -328,17 +328,19 @@ destination root is the bare `<archive_root>/<container-short-id>/`.
 Execution creates a `.jit-container` marker containing the resolved full
 container ID followed by a newline. The short ID and marker-recorded full ID
 remain authoritative; the suffix is only a human-readable aid. Before choosing
-a new preferred root, planning scans the archive root's immediate non-symlink
+a preferred root, planning scans the archive root's immediate non-symlink
 directories for that exact full-ID marker. One match freezes and reuses the
 existing directory even after the container's membership label changes. Multiple
-matches block with deterministic `destination-conflict` findings. If no marker matches but
-the legacy `<archive_root>/<container-short-id>/` path exists, planning adopts
-that path without migration or data movement. Its existing markerless
-accounting and conflict checks still apply, so old archives do not fork a new
-slugged destination. A marker naming another container or a markerless resolved
-directory with unaccounted entries also blocks. The marker's
-`ArchivePublication.source` is `null` because it is executor-generated
-ownership metadata, not a copied or moved repository artifact.
+matches block with deterministic `destination-conflict` findings. If no marker
+matches, planning resolves to the unsuffixed
+`<archive_root>/<container-short-id>/` when that path already exists, and to the
+suffixed preferred root otherwise. Adopting an occupied unsuffixed directory
+moves no data, and its markerless accounting and conflict checks still apply, so
+a container's artifacts stay in the one directory that already holds them. A
+marker naming another container or a markerless resolved directory with
+unaccounted entries also blocks. The marker's `ArchivePublication.source` is
+`null` because it is executor-generated ownership metadata, not a copied or
+moved repository artifact.
 
 Execution stages and verifies bytes, validates supported local links in the
 proposed mirror layout, and publishes with atomic no-replace semantics. It then
