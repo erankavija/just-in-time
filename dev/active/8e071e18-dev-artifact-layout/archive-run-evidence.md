@@ -173,3 +173,32 @@ Issue `6f6fe80e`. Plan eligible with no blockers. 2 relocated, 0 mirrored, 1 ret
 | `dev/active/8e071e18-breakdown.json:3777:6287` | `dev/studies/session-mining-jit-improvements.md` |
 | `dev/active/8e071e18-breakdown.json:3777:6394` | `dev/studies/session-mining-jit-improvements.md` |
 | `dev/archive/features/53e3fa36-progress.json:9:18` | `dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md` |
+
+## `2e926e39` — dev/archive/2e926e39-agent-seamlessness
+Issue `6116d362`. Plan eligible with no blockers. 5 relocated, 0 mirrored, 1 retained, 0 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/2e926e39-906e-4952-8ae0-38215a7e5aac-plan.md` | `dev/archive/2e926e39-agent-seamlessness/dev/active/2e926e39-906e-4952-8ae0-38215a7e5aac-plan.md` | 8efc0d75 |
+| move | `dev/active/2e926e39-completion-report.md` | `dev/archive/2e926e39-agent-seamlessness/dev/active/2e926e39-completion-report.md` | 2e926e39 |
+| move | `dev/presentations/2e926e39/base.css` | `dev/archive/2e926e39-agent-seamlessness/dev/presentations/2e926e39/base.css` | — |
+| move | `dev/presentations/2e926e39/talk.html` | `dev/archive/2e926e39-agent-seamlessness/dev/presentations/2e926e39/talk.html` | 2e926e39 |
+| move | `dev/presentations/2e926e39/themes/rust.css` | `dev/archive/2e926e39-agent-seamlessness/dev/presentations/2e926e39/themes/rust.css` | — |
+| retain | `docs/reference/cli-command-grammar.md` | retained in place | 527bf0a6 |
+
+### In-content citation warnings (6)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:2552:14` | `dev/active/2e926e39-906e-4952-8ae0-38215a7e5aac-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2553:14` | `dev/active/2e926e39-completion-report.md` |
+| `dev/active/8e071e18-breakdown.json:2554:14` | `dev/presentations/2e926e39/base.css` |
+| `dev/active/8e071e18-breakdown.json:2555:14` | `dev/presentations/2e926e39/talk.html` |
+| `dev/active/8e071e18-breakdown.json:2556:14` | `dev/presentations/2e926e39/themes/rust.css` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:169:4` | `dev/active/2e926e39-906e-4952-8ae0-38215a7e5aac-plan.md` |
+
+### Other plan warnings (1)
+
+- `external-edge` at `dev/presentations/2e926e39/talk.html`
