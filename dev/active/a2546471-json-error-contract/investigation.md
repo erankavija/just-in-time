@@ -56,7 +56,7 @@ The team lead's cited `main.rs:765` and `:790` are inside mechanisms 5 and 6 res
 - **`handle_json_error!` call sites: 13, not 18.** `grep -rn "handle_json_error" crates/ --include="*.rs"` returns 21 lines: 1 macro definition (`output_macros.rs:70`), 13 real invocations, 5 doc/code comments in `main.rs` (`:2564`, `:2669`, `:3416`, `:3469`, `:5119`), 1 doc comment in `crates/jit/src/commands/issue.rs:334`, and 1 in `crates/jit/tests/cli_issue/issue_status_projection_tests.rs:333`.
 - **Arms accepting `--json`: 99, not ~63.** Definition counted: a *leaf* command in `jit --schema` (no `subcommands`) whose `flags` include `json`. The schema has 112 leaf commands; 99 accept `--json`, 13 do not. The 13 without: `dep delete`, `dep remove`, `doc delete`, `doc rm`, `gate delete`, `gate rm`, `issue complete`, `issue edit`, `issue remove`, `issue rm`, `label add`, `label remove`, `label rm` — all hidden verb-hint stubs (`cli.rs`, `#[command(hide = true)]`), which nevertheless render the envelope by sniffing a literal `--json` out of their captured argv (`verb_hint_error`, `main.rs:894`).
 - One non-leaf group also carries a `json` flag: `query` (`main.rs:5530`); it is a dispatch shell, not an arm.
-- **Arms with no envelope route on any failure path: 51 of 99** (§ inventory). Two of those are arguably not defects: `version` is handled pre-dispatch and infallible (`main.rs:1895-1913`), and `serve`'s start/stop/status failures go through `eprintln!` + `exit(1)` by design (`main.rs:7075`, `:7123`, `:7299`).
+- **Arms with no envelope route on any failure path: 51 of 99** (§ inventory). One of those is arguably not a defect: `version` is handled pre-dispatch and infallible (`main.rs:1895-1913`). `serve` is a defect of its own kind: under `--json` its start, stop, and status failure branches print a pretty-serialized `{"status": "error", "error": <message>}` on **stdout** (`main.rs:7069-7072`, `:7117-7120`, `:7293-7296`) and then exit a literal `1` (`:7077`, `:7125`, `:7301`); the `eprintln!` at `:7075`, `:7123`, `:7299` is the `else` branch of the same `if json`. So the payload is machine-readable but is neither the error envelope nor a classified code, and the exit status is a literal rather than the class a code determines.
 
 ## 3. Spot-check by invocation — claim **confirmed, and the split is wider than stated**
 
@@ -211,7 +211,7 @@ Two universal forced failures do exist for that set:
 1. **Run outside a repository.** Every arm past `run()`'s discovery step fails with `RepositoryNotFoundError`. Verified: `jit status --json` in an empty directory emits the `REPOSITORY_NOT_FOUND` envelope on stdout, exit 3 — via `emit_startup_json_error`, i.e. *already* satisfying the contract for all of them.
 2. **Corrupt the store.** Making `.jit/issues/*.json` unparseable or unreadable forces an I/O/parse failure inside the arm body, which is the path REQ-02 actually cares about for these arms.
 
-`version` genuinely cannot fail: it is served before repository discovery (`main.rs:1895-1913`) and its only fallible call is `to_json_string()` on a struct of `&'static str`s. Any REQ-06 guard needs an explicit, justified exemption for it — and probably for `serve`, whose failure model is a daemon-control exit, not an error envelope.
+`version` genuinely cannot fail: it is served before repository discovery (`main.rs:1895-1913`) and its only fallible call is `to_json_string()` on a struct of `&'static str`s. Any REQ-06 guard needs an explicit, justified exemption for it. `serve` is not in that position: whether each of its three failure branches is reachable is a survey question like any other arm's, and its failure model is not outside the contract — under `--json` it already writes a machine-readable object to stdout, just not the envelope, carrying no code and exiting a literal `1` (`main.rs:7069-7077`, `:7117-7125`, `:7293-7301`).
 
 ---
 
@@ -331,7 +331,7 @@ A malformed invocation (`jit query count --by bogus --json`, `jit hooks install 
 | `validate` | main.rs:6441 | `validate_fix_json_error` (6742-6744) — `--fix` path only | PLAIN |
 | `recover` | main.rs:6924 | adhoc to **stderr** (6989-6991) | CLAP |
 | `migrate lifecycle-timestamps` | main.rs:7000 | none | CLAP |
-| `serve` | main.rs:7022 | none (eprintln + exit 1) | n/f |
+| `serve` | main.rs:7022 | none — under `--json` a non-envelope `{"status": "error"}` object on stdout, then a literal `exit(1)` (7069-7077, 7117-7125, 7293-7301) | n/f |
 | `worktree info` | main.rs:7679 | adhoc (7721-7723) | ENVELOPE `WORKTREE_INFO_ERROR` |
 | `worktree list` | main.rs:7730 | adhoc (7774-7776) | n/f |
 | `snapshot export` | main.rs:7785 | none | CLAP |
