@@ -31,7 +31,7 @@
   - `206bd960` (ready now, dep `0b7e864d`✓): standards-sweep mode workflow + report (SKILL.md mode-4 body).
   - `304f6d94` (dep `7a9eb806`✓+`e8b1cee3`): wave-dispatch mode; wire in existing `container-dispatch.md` + `coherence-review.md`, no re-implementation.
   - `3c192f5e` (dep `206bd960`+`e8b1cee3`): REQ-06 standards-sweep-mode satisfier (builds on 206bd960's mode).
-  - `6c5f70ad` (dep `eed6750c` EXTERNAL + `e8b1cee3`): four-mode front-door routing (replaces the "Mode dispatch (stub)" block). **Check `eed6750c` state first** — still `in_progress` as of this session; if not done when 6c5f70ad's turn comes, escalate per escalation-policy entry 7 (see `dev/active/eed6750c-handoff.md`).
+  - `6c5f70ad` (dep `eed6750c` EXTERNAL + `e8b1cee3`): four-mode front-door routing (replaces the "Mode dispatch (stub)" block). **Check `eed6750c` state first** — still `in_progress` as of this session; if not done when 6c5f70ad's turn comes, escalate per escalation-policy entry 7 (see `dev/archive/f2532a2d-jit-project-lead/dev/active/eed6750c-handoff.md`).
   - `eff48a6e` (dep `e8b1cee3`): vision/charter + progress artifacts (mostly `references/` + `docs/` charter template; light SKILL.md touch).
   - `634b2382` (dep `e8b1cee3`+`b46e13d9`✓): parent-escalation policy (a `references/` doc — can run in parallel with ONE SKILL.md-body issue since it barely touches SKILL.md).
 - [ ] **Every issue: add+run `cargo-ci` BEFORE `code-review`** (Trap #1).
@@ -52,7 +52,7 @@ None. (Bug `16402e14` was filed at the user's explicit request this session and 
 ## Reference artefacts
 
 - Epic: `jit issue show f2532a2d`
-- Plan (bracket): `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` (D1–D9)
+- Plan (bracket): `dev/archive/f2532a2d-jit-project-lead/dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` (D1–D9)
 - Progress + verdicts: `dev/active/f2532a2d-progress.json`
 - Prior handoff: `dev/active/f2532a2d-handoff.md` (Traps #1–#6)
 - Adjudication method: `dev/eval/skill-eval-adjudication.md`
@@ -60,5 +60,5 @@ None. (Bug `16402e14` was filed at the user's explicit request this session and 
 - Content standards: `docs/reference/jit-content-standards.md`
 - jit-project-lead skeleton + references: `.agents/skills/jit-project-lead/SKILL.md`, `references/{tier-derivation,wave-layering,container-dispatch,coherence-review,standards-scan,standards-fix}.md`
 - Filed bug: `jit issue show 16402e14`; parser site `crates/jit/src/validation/engine.rs:1317`
-- External dep for 6c5f70ad: `dev/active/eed6750c-handoff.md`
+- External dep for 6c5f70ad: `dev/archive/f2532a2d-jit-project-lead/dev/active/eed6750c-handoff.md`
 - Dispatch scripts: `.agents/skills/jit-execution-lead/scripts/{dispatch-worker-worktree,check-leak-into-main}.sh`

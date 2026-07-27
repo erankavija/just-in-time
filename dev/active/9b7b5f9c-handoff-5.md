@@ -52,7 +52,7 @@
 ## Reference artefacts
 
 - Epic: `jit issue show 9b7b5f9c`
-- Plan: `dev/active/9b7b5f9c-plan.md`
+- Plan: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-plan.md`
 - Progress: `dev/active/9b7b5f9c-progress.json`
 - Previous handoff: `dev/active/9b7b5f9c-handoff-4.md`
 - Completed overlay issue: `jit issue show be542b98`

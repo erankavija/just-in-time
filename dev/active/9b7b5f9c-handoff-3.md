@@ -62,7 +62,7 @@ None.
 ## Reference artefacts
 
 - Epic: `jit issue show 9b7b5f9c`
-- Plan: `dev/active/9b7b5f9c-plan.md`
+- Plan: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-plan.md`
 - Progress: `dev/active/9b7b5f9c-progress.json`
 - Prior handoffs: `dev/active/9b7b5f9c-handoff.md`, `dev/active/9b7b5f9c-handoff-2.md`
 - Overlay attempt 5: branch `worktree-agent-be542b98-r5`, commit `48526373891aebb4a6df31db49c1f1f749cfd538`

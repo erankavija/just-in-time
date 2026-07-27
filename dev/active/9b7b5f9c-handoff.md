@@ -51,7 +51,7 @@
 
 ## Reference artefacts
 
-- Plan: `dev/active/9b7b5f9c-plan.md`
+- Plan: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-plan.md`
 - Progress: `dev/active/9b7b5f9c-progress.json`
 - Overlay failed review: `.jit/gate-runs/27811bd8-1fe5-40e0-9877-7ff21a86c745/result.json`
 - Portable final reviews: `.jit/gate-runs/fd5300d2-b6fa-4307-ab33-b9123ac1d65b/result.json`, `.jit/gate-runs/abdc28a6-6df9-4d1b-a3b1-8e0ce72335fd/result.json`

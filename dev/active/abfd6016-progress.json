@@ -61,5 +61,5 @@
   "rework_counts": {},
   "started_at": "2026-04-24T00:00:00Z",
   "gates_applied": ["cargo-ci", "code-review"],
-  "design_doc": "dev/active/abfd6016-multi-format-doc-rendering-design.md"
+  "design_doc": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/abfd6016-multi-format-doc-rendering-design.md"
 }
