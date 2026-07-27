@@ -2,7 +2,7 @@
   {
     "key": "error-code-enum",
     "title": "Make the error-code vocabulary an enumerable type",
-    "description": "The error-code vocabulary becomes a closed enum with a derive-checked member list, so the codes the machine-readable surface reports can be enumerated and mapped to an exit status without a fallback arm.\n\n## Background\n\nThe vocabulary is declared as a unit struct carrying associated string constants. Nothing can iterate it, so a twenty-first constant is invisible to any reflection, and the map from code string to exit status ends in a wildcard that classifies an unrecognised code as a generic failure. Both properties block later work: a projected reference cannot render a list that does not exist, and an exit-status guarantee cannot rest on a map that fails open.\n\nThe conversion is shape-only. Each code string stays byte-identical on the wire and each existing code keeps the exit status it maps to today, so no consumer observes a change.\n\nThe freshness discipline follows the event-tag catalog already in this crate: a public member list beside the type, checked against the variants the type's own derive produces, so a member left out of the list fails the suite rather than being mirrored by hand.\n\n## Success Criteria\n\n- [hard] REQ-01: The error-code vocabulary is an enum whose members render the code strings the surface emits today, byte for byte.\n- [hard] REQ-02: A public member list enumerates the vocabulary, and a test bound to the type's own derive fails when a member is missing from that list.\n- [hard] REQ-03: The member-to-exit-status map is an exhaustive match with no wildcard arm, so a new member is a compile error until its exit status is stated.\n- [hard] REQ-04: Each code the vocabulary carried before the conversion maps to the same exit status afterwards.\n- [hard] REQ-05: A code arriving as text resolves to its member, and an unrecognised string is reported as unresolved rather than mapped silently.\n\n## Notes\n\nThe member list is the freshness anchor for later projection work, so it is public rather than private to the module.\n",
+    "description": "The error-code vocabulary becomes a closed enum with a derive-checked member list, so the codes the machine-readable surface reports can be enumerated and mapped to an exit status without a fallback arm.\n\n## Background\n\nThe vocabulary is declared as a unit struct carrying associated string constants. Nothing can iterate it, so a twenty-first constant is invisible to any reflection, and the map from code string to exit status ends in a wildcard that classifies an unrecognised code as a generic failure. Neither is there anywhere for a code's meaning to live: no source states what a given code tells its reader, so a reference page for adopters would have to invent that prose. All three properties block later work: a projected reference cannot render a list that does not exist, an exit-status guarantee cannot rest on a map that fails open, and a projection cannot carry a meaning its source does not hold.\n\nThe conversion is shape-only. Each code string stays byte-identical on the wire and each existing code keeps the exit status it maps to today, so no consumer observes a change.\n\nThe freshness discipline follows the event-tag catalog already in this crate: a public member list beside the type, checked against the variants the type's own derive produces, so a member left out of the list fails the suite rather than being mirrored by hand.\n\n## Success Criteria\n\n- [hard] REQ-01: The error-code vocabulary is an enum whose members render the code strings the surface emits today, byte for byte.\n- [hard] REQ-02: A public member list enumerates the vocabulary, and a test bound to the type's own derive fails when a member is missing from that list.\n- [hard] REQ-03: The member-to-exit-status map is an exhaustive match with no wildcard arm, so a new member is a compile error until its exit status is stated.\n- [hard] REQ-04: Each code the vocabulary carried before the conversion maps to the same exit status afterwards.\n- [hard] REQ-05: A code arriving as text resolves to its member, and an unrecognised string is reported as unresolved rather than mapped silently.\n- [hard] REQ-06: Each member carries a description of the failure it names, supplied by an exhaustive match with no wildcard arm, so a new member is a compile error until its description is stated.\n\n## Notes\n\nThe member list is the freshness anchor for later projection work, so it is public rather than private to the module.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -18,7 +18,7 @@
     ],
     "depends_on": [],
     "planning": {
-      "outcome": "The error-code vocabulary becomes an enum with a derive-checked member list and an exhaustive exit-status match.",
+      "outcome": "The vocabulary becomes an enum with a derive-checked member list, an exhaustive exit-status match, and a description per member.",
       "contract_refs": [],
       "source_refs": [
         "REQ-07",
@@ -48,7 +48,7 @@
   {
     "key": "emitted-code-registration",
     "title": "Register the emitted error codes that carry no exit classification",
-    "description": "Error code strings the command surface already prints are absent from the registered vocabulary and fall through to the generic exit status. Registering each one with an explicit exit status is what lets the reported code determine the process exit status.\n\n## Background\n\nRoughly twenty code strings reach machine consumers without a registered exit mapping: namespace-scoped fallbacks across the dependency, gate, preset, item, invariant, project, profile, search, worktree, and hooks namespaces, the claim fallbacks, the generic code itself, and the recovery code. Because none is a registered member, each maps to the generic status whatever its real class.\n\nThe status a member takes is the class the plain invocation of the same failure already reports: an unresolvable identifier is a not-found failure, a duplicate gate key is an already-exists failure, a missing preset is a not-found failure. A code whose failure class is genuinely generic keeps the generic status.\n\nCode strings stay byte-identical. Nothing is renamed and nothing is collapsed onto an existing member, because a machine consumer reads the code string and a rename would break it. Only the exit status moves.\n\nThe emission sites keep handing the same string literals to the envelope builder; resolving a code from its text into its member is what makes those literals classify, so this work is confined to the vocabulary rather than spread across the dispatch arms.\n\nA parse code is already declared in the vocabulary and carries no exit status yet, so the status it maps to is settled here rather than invented later.\n\n## Success Criteria\n\n- [hard] REQ-01: Each error code string the command surface emits is a registered member of the vocabulary carrying an explicitly stated exit status.\n- [hard] REQ-02: No emitted code string changes its spelling, and no emitted code is collapsed onto a different member.\n- [hard] REQ-03: A registered member's exit status is the class the plain invocation of the same failure reports.\n- [hard] REQ-04: A code whose failure class is genuinely generic is registered with the generic status rather than left unregistered.\n- [hard] REQ-05: The parse code already declared in the vocabulary carries an explicitly stated exit status.\n",
+    "description": "Error code strings the command surface already prints are absent from the registered vocabulary and fall through to the generic exit status. Registering each one with an explicit exit status is what lets the reported code determine the process exit status.\n\n## Background\n\nRoughly twenty code strings reach machine consumers without a registered exit mapping: namespace-scoped fallbacks across the dependency, gate, preset, item, invariant, project, profile, search, worktree, and hooks namespaces, the claim fallbacks, the generic code itself, and the recovery code. Because none is a registered member, each maps to the generic status whatever its real class.\n\nThe status a member takes is the class the plain invocation of the same failure already reports: an unresolvable identifier is a not-found failure, a duplicate gate key is an already-exists failure, a missing preset is a not-found failure. A code whose failure class is genuinely generic keeps the generic status.\n\nCode strings stay byte-identical. Nothing is renamed and nothing is collapsed onto an existing member, because a machine consumer reads the code string and a rename would break it. Only the exit status moves.\n\nThe emission sites keep handing the same string literals to the envelope builder; resolving a code from its text into its member is what makes those literals classify, so this work is confined to the vocabulary rather than spread across the dispatch arms.\n\nA parse code is already declared in the vocabulary and carries no exit status yet, so the status it maps to is settled here rather than invented later.\n\n## Success Criteria\n\n- [hard] REQ-01: Each error code string the command surface emits is a registered member of the vocabulary carrying an explicitly stated exit status.\n- [hard] REQ-02: No emitted code string changes its spelling, and no emitted code is collapsed onto a different member.\n- [hard] REQ-03: A registered member's exit status is the class the plain invocation of the same failure reports.\n- [hard] REQ-04: A code whose failure class is genuinely generic is registered with the generic status rather than left unregistered.\n- [hard] REQ-05: The parse code already declared in the vocabulary carries an explicitly stated exit status.\n- [hard] REQ-06: Each newly registered member carries a description of the failure its code names.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -66,7 +66,7 @@
       "error-code-enum"
     ],
     "planning": {
-      "outcome": "Each error code string the surface emits becomes a registered member carrying an explicitly stated exit status.",
+      "outcome": "Every error code string the surface emits becomes a registered member carrying an explicitly stated exit status.",
       "contract_refs": [
         "error-code-vocabulary"
       ],
@@ -84,6 +84,9 @@
           "touches": [
             "crates/jit/src/output.rs"
           ]
+        },
+        "warning_overrides": {
+          "broad-quantifier": "The breadth is repetition, not scope: each of the roughly twenty registrations is the same mechanical edit — one enum member plus one arm in the same exhaustive exit-status match in the output layer — and they share one test boundary over that map. Splitting by namespace family would produce terminals with no independent test boundary, each editing the same match in the same file, so it would buy ordering edges through one file rather than parallelism."
         }
       }
     }
@@ -328,7 +331,7 @@
   {
     "key": "top-level-envelope-renderer",
     "title": "Render the structured envelope from the top-level failure printer",
-    "description": "The top-level failure printer renders the structured error envelope for any failure that reaches it under the machine-readable flag, so an arm that propagates its error no longer leaves a machine consumer with an empty payload stream.\n\n## Background\n\nRoughly half the command arms accepting the flag propagate their failures upward with no envelope of their own. The top-level handler writes a human diagnostic line and nothing machine-readable, so a consumer sees an empty payload stream and has to parse prose to learn why the command failed. The generated agent bridge, which drives this surface, reports those failures as a single opaque execution error carrying the diagnostic line inside a shell-command string.\n\nThe handler already renders an envelope for three startup failure classes, reading the flag out of the process arguments because those failures precede a parsed command. Broadening that renderer to cover any failure makes envelope presence structural: no path reaches the printer and emits nothing machine-readable, so an arm cannot regress by omission and no per-arm conversion is needed.\n\nThe code comes from a classifier over the typed error, built as a structural parallel to the exit-status classifier beside it, so the two remain recognisably the same cascade over the same typed errors. The exit status continues to follow the reported code.\n\nFailures rejected during argument parsing sit outside this. The argument parser reports them and exits before any command dispatch, on a status that already equals the invalid-argument class.\n\n## Success Criteria\n\n- [hard] REQ-01: A failure reaching the top-level printer under the machine-readable flag renders an error envelope on the payload stream.\n- [hard] REQ-02: The rendered envelope carries a registered error code chosen by a classifier over the typed error rather than one fixed code.\n- [hard] REQ-03: The process exit status equals the status the rendered code maps to.\n- [hard] REQ-04: An arm that already renders its own envelope emits exactly one envelope, unchanged in code and detail.\n- [hard] REQ-05: The classifier distinguishes each typed error the exit-status classifier distinguishes, so a distinguishable failure is not reported under the generic code.\n- [hard] REQ-06: The human diagnostic line still reaches the diagnostic stream while the payload stream carries the envelope alone.\n- [hard] REQ-07: A previously propagating arm reports its failure through the envelope with a resolvable code.\n",
+    "description": "The top-level failure printer renders the structured error envelope for any failure that reaches it under the machine-readable flag, so an arm that propagates its error no longer leaves a machine consumer with an empty payload stream.\n\n## Background\n\nRoughly half the command arms accepting the flag propagate their failures upward with no envelope of their own. The top-level handler writes a human diagnostic line and nothing machine-readable, so a consumer sees an empty payload stream and has to parse prose to learn why the command failed. The generated agent bridge, which drives this surface, reports those failures as a single opaque execution error carrying the diagnostic line inside a shell-command string.\n\nThe handler already renders an envelope for three startup failure classes, reading the flag out of the process arguments because those failures precede a parsed command. Broadening that renderer to cover any failure makes envelope presence structural: no path reaches the printer and emits nothing machine-readable, so an arm cannot regress by omission and no per-arm conversion is needed.\n\nThe code comes from a classifier over the typed error, built as a structural parallel to the exit-status classifier beside it, so the two remain recognisably the same cascade over the same typed errors. The exit status continues to follow the reported code.\n\nThe classifier can only distinguish a failure whose type it can name. One class the probes rely on — an unreadable stored record — is raised as a crate-private type until that type is given a public name, so the classifier is written against a surface where that exposure has already landed; otherwise the arm reached only through corrupted records classifies as generic no matter how the cascade is written.\n\nFailures rejected during argument parsing sit outside this. The argument parser reports them and exits before any command dispatch, on a status that already equals the invalid-argument class.\n\n## Success Criteria\n\n- [hard] REQ-01: A failure reaching the top-level printer under the machine-readable flag renders an error envelope on the payload stream.\n- [hard] REQ-02: The rendered envelope carries a registered error code chosen by a classifier over the typed error rather than one fixed code.\n- [hard] REQ-03: The process exit status equals the status the rendered code maps to.\n- [hard] REQ-04: An arm that already renders its own envelope emits exactly one envelope, unchanged in code and detail.\n- [hard] REQ-05: The classifier distinguishes each typed error the exit-status classifier distinguishes, so a distinguishable failure is not reported under the generic code.\n- [hard] REQ-06: The human diagnostic line still reaches the diagnostic stream while the payload stream carries the envelope alone.\n- [hard] REQ-07: A previously propagating arm reports its failure through the envelope with a resolvable code.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -343,7 +346,7 @@
       "code-review"
     ],
     "depends_on": [
-      "emitted-code-registration"
+      "stored-record-decode-classification"
     ],
     "planning": {
       "outcome": "A failure reaching the top-level printer prints an error envelope under a code from a central classifier.",
@@ -428,9 +431,9 @@
     }
   },
   {
-    "key": "forced-failure-lever-survey",
-    "title": "A recorded survey of the failure lever each command arm resolves through",
-    "description": "Whether a command arm can be driven into a failure raised inside its own body is unresolved for most of the surface, and every check over the machine-readable failure contract rests on the answer. This survey resolves it arm by arm and records the result where later work reads it.\n\n## Background\n\nThe arm universe is mechanical: the leaf commands whose definition declares the machine-readable flag, derived from the argument parser's own command reflection.\n\nWhich failure an arm can be driven into is not mechanical. An arm that rejects a malformed identifier fails inside its own body, which is the class the failure contract covers. An arm that takes no rejectable argument has no such lever, and running outside a repository instead fails during repository discovery, before any arm body runs — a path that already renders an envelope today, so an arm resolved that way proves nothing about the arm. Unreadable stored records are the candidate lever for that group, because they fail inside the body.\n\nMeasurement so far is partial: most arms driven so far reached a real in-body failure, a handful were rejected during argument parsing before dispatch, and for a substantial minority no failing argument or flag value was constructible at all. Two arms are known not to fit the contract — a version report that cannot fail, and a server control whose failure model is a daemon exit rather than an error envelope.\n\nThe deliverable is the record, not coverage. Where no in-body failure is constructible, that is the finding, stated with its reason, so that a later coverage requirement is written against a measured universe rather than an assumed one.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed record states the arm universe together with the derivation that produced it.\n- [hard] REQ-02: For each arm in that universe, the record names the failure it is driven into after dispatch inside the arm's own body, with the invocation that produces it.\n- [hard] REQ-03: An arm for which no in-body failure is constructible is recorded as such with the reason rather than omitted.\n- [hard] REQ-04: An arm whose failure model sits outside the error-envelope contract is recorded as exempt with the reason.\n- [hard] REQ-05: Re-running a recorded invocation reproduces the recorded failure.\n- [hard] REQ-06: The record distinguishes a lever confirmed by invocation from one read out of the source alone.\n\n## Notes\n\nThe record is evidence rather than an authority. It fixes what no derivation can supply — the lever — while the arm set stays derived from the command definitions at check time, so a check built on the record still reads the definitions for its own completeness side.\n",
+    "key": "lever-survey-issue",
+    "title": "Failure-lever survey for the issue namespace",
+    "description": "The sixteen arms of the issue namespace are surveyed one arm at a time: each is driven into a failure raised inside the arm's own body, and the invocation is recorded in a machine-readable registry fragment for this namespace.\n\n## Background\n\nWhether an arm can be driven into a failure raised inside its own body is unresolved for most of the command surface, and the checks over the machine-readable failure contract rest on the answer. An arm that rejects a malformed identifier fails inside its own body, which is the class the failure contract covers. Running outside a repository instead fails during repository discovery, before any arm body runs, and that path already renders an envelope today — so an arm resolved that way passes against an unmodified binary and proves nothing about the arm. Unreadable stored records are the candidate lever for arms that accept no rejectable argument, because they fail inside the body.\n\nFour arms already render an envelope for an unresolvable identifier, so their lever is a rejectable argument. The creation, batch-creation, search, and listing arms take no identifier that can be made invalid, so their lever has to come from elsewhere.\n\nThe fragment is machine-readable rather than prose, because the probes that consume it are code. Each entry carries the command path as the argument parser spells it, the argument vector of the invocation, the setup that invocation needs, and the failure it is expected to produce; an arm with no constructible in-body failure carries an exemption reason in place of an invocation.\n\nThe deliverable is the record rather than coverage. Where no in-body failure is constructible, that is the finding, stated with its reason, so that a coverage requirement written later rests on a measured universe.\n\n## Success Criteria\n\n- [hard] REQ-01: The fragment states, for each arm of the issue namespace that the command definitions declare with the machine-readable flag, the invocation that drives it into a failure raised after dispatch inside the arm's own body.\n- [hard] REQ-02: Each entry states the setup its invocation needs, so the failure is reproducible from the fragment alone.\n- [hard] REQ-03: Each entry states the failure its invocation is expected to produce.\n- [hard] REQ-04: An arm with no constructible in-body failure carries an exemption reason in place of an invocation rather than being omitted.\n- [hard] REQ-05: Re-running a recorded invocation under its recorded setup reproduces the recorded failure.\n- [hard] REQ-06: The fragment parses as the shared registry shape and carries no entry outside the arms of the issue namespace.\n- [hard] REQ-07: The fragment distinguishes a lever confirmed by invocation from one read out of the source alone.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -444,8 +447,9 @@
     ],
     "depends_on": [],
     "planning": {
-      "outcome": "A committed record states, per command arm, the in-body failure it is driven into or the reason none is constructible.",
+      "outcome": "A registry fragment records the failure lever for each arm of the issue namespace.",
       "contract_refs": [
+        "failure-lever-registry",
         "post-dispatch-failure-scope"
       ],
       "source_refs": [
@@ -454,17 +458,318 @@
         "F-SCHEMA-DERIVED",
         "F-CLAP-PARSE"
       ],
+      "landing_group": "lever-survey",
+      "terminal": {
+        "consumer_family": "the failure-lever registry assembly",
+        "test_boundary": "re-running each recorded invocation in this fragment against its recorded outcome",
+        "worker_sized_reason": "Sixteen arms of one namespace are driven once each, with the outcome written into one fragment.",
+        "footprint": {
+          "creates": [
+            "dev/active/a2546471-json-error-contract/levers/issue.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "lever-survey-doc",
+    "title": "Failure-lever survey for the doc namespace",
+    "description": "The ten arms of the doc namespace are surveyed one arm at a time: each is driven into a failure raised inside the arm's own body, and the invocation is recorded in a machine-readable registry fragment for this namespace.\n\n## Background\n\nWhether an arm can be driven into a failure raised inside its own body is unresolved for most of the command surface, and the checks over the machine-readable failure contract rest on the answer. An arm that rejects a malformed identifier fails inside its own body, which is the class the failure contract covers. Running outside a repository instead fails during repository discovery, before any arm body runs, and that path already renders an envelope today — so an arm resolved that way passes against an unmodified binary and proves nothing about the arm. Unreadable stored records are the candidate lever for arms that accept no rejectable argument, because they fail inside the body.\n\nNine of the arms propagate an unresolvable identifier upward, which makes the identifier their lever. The conformance arm states in its own code comment that it takes no argument it could reject, so it is the one arm here needing another lever or an exemption.\n\nThe fragment is machine-readable rather than prose, because the probes that consume it are code. Each entry carries the command path as the argument parser spells it, the argument vector of the invocation, the setup that invocation needs, and the failure it is expected to produce; an arm with no constructible in-body failure carries an exemption reason in place of an invocation.\n\nThe deliverable is the record rather than coverage. Where no in-body failure is constructible, that is the finding, stated with its reason, so that a coverage requirement written later rests on a measured universe.\n\n## Success Criteria\n\n- [hard] REQ-01: The fragment states, for each arm of the doc namespace that the command definitions declare with the machine-readable flag, the invocation that drives it into a failure raised after dispatch inside the arm's own body.\n- [hard] REQ-02: Each entry states the setup its invocation needs, so the failure is reproducible from the fragment alone.\n- [hard] REQ-03: Each entry states the failure its invocation is expected to produce.\n- [hard] REQ-04: An arm with no constructible in-body failure carries an exemption reason in place of an invocation rather than being omitted.\n- [hard] REQ-05: Re-running a recorded invocation under its recorded setup reproduces the recorded failure.\n- [hard] REQ-06: The fragment parses as the shared registry shape and carries no entry outside the arms of the doc namespace.\n- [hard] REQ-07: The fragment distinguishes a lever confirmed by invocation from one read out of the source alone.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:json-error-contract",
+      "milestone:v1.0",
+      "component:cli",
+      "story:arm-conformance"
+    ],
+    "gates": [
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A registry fragment records the failure lever for each arm of the doc namespace.",
+      "contract_refs": [
+        "failure-lever-registry",
+        "post-dispatch-failure-scope"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "F-FORCED-FAILURE",
+        "F-SCHEMA-DERIVED",
+        "F-CLAP-PARSE"
+      ],
+      "landing_group": "lever-survey",
+      "terminal": {
+        "consumer_family": "the failure-lever registry assembly",
+        "test_boundary": "re-running each recorded invocation in this fragment against its recorded outcome",
+        "worker_sized_reason": "Ten arms of one namespace are driven once each, with the outcome written into one fragment.",
+        "footprint": {
+          "creates": [
+            "dev/active/a2546471-json-error-contract/levers/doc.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "lever-survey-gate",
+    "title": "Failure-lever survey for the gate namespace",
+    "description": "The fifteen arms of the gate namespace are surveyed one arm at a time: each is driven into a failure raised inside the arm's own body, and the invocation is recorded in a machine-readable registry fragment for this namespace.\n\n## Background\n\nWhether an arm can be driven into a failure raised inside its own body is unresolved for most of the command surface, and the checks over the machine-readable failure contract rest on the answer. An arm that rejects a malformed identifier fails inside its own body, which is the class the failure contract covers. Running outside a repository instead fails during repository discovery, before any arm body runs, and that path already renders an envelope today — so an arm resolved that way passes against an unmodified binary and proves nothing about the arm. Unreadable stored records are the candidate lever for arms that accept no rejectable argument, because they fail inside the body.\n\nMost arms reject an unresolvable identifier or an unregistered gate key. Definition fails on a duplicate key rather than on a malformed argument, preset application needs a registered preset against a bad target, and the two listing arms take no rejectable argument at all.\n\nThe fragment is machine-readable rather than prose, because the probes that consume it are code. Each entry carries the command path as the argument parser spells it, the argument vector of the invocation, the setup that invocation needs, and the failure it is expected to produce; an arm with no constructible in-body failure carries an exemption reason in place of an invocation.\n\nThe deliverable is the record rather than coverage. Where no in-body failure is constructible, that is the finding, stated with its reason, so that a coverage requirement written later rests on a measured universe.\n\n## Success Criteria\n\n- [hard] REQ-01: The fragment states, for each arm of the gate namespace that the command definitions declare with the machine-readable flag, the invocation that drives it into a failure raised after dispatch inside the arm's own body.\n- [hard] REQ-02: Each entry states the setup its invocation needs, so the failure is reproducible from the fragment alone.\n- [hard] REQ-03: Each entry states the failure its invocation is expected to produce.\n- [hard] REQ-04: An arm with no constructible in-body failure carries an exemption reason in place of an invocation rather than being omitted.\n- [hard] REQ-05: Re-running a recorded invocation under its recorded setup reproduces the recorded failure.\n- [hard] REQ-06: The fragment parses as the shared registry shape and carries no entry outside the arms of the gate namespace.\n- [hard] REQ-07: The fragment distinguishes a lever confirmed by invocation from one read out of the source alone.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:json-error-contract",
+      "milestone:v1.0",
+      "component:cli",
+      "story:arm-conformance"
+    ],
+    "gates": [
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A registry fragment records the failure lever for each arm of the gate namespace.",
+      "contract_refs": [
+        "failure-lever-registry",
+        "post-dispatch-failure-scope"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "F-FORCED-FAILURE",
+        "F-SCHEMA-DERIVED",
+        "F-CLAP-PARSE"
+      ],
+      "landing_group": "lever-survey",
+      "terminal": {
+        "consumer_family": "the failure-lever registry assembly",
+        "test_boundary": "re-running each recorded invocation in this fragment against its recorded outcome",
+        "worker_sized_reason": "Fifteen arms of one namespace are driven once each, with the outcome written into one fragment.",
+        "footprint": {
+          "creates": [
+            "dev/active/a2546471-json-error-contract/levers/gate.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "lever-survey-claim",
+    "title": "Failure-lever survey for the claim namespace",
+    "description": "The seven arms of the claim namespace are surveyed one arm at a time: each is driven into a failure raised inside the arm's own body, and the invocation is recorded in a machine-readable registry fragment for this namespace.\n\n## Background\n\nWhether an arm can be driven into a failure raised inside its own body is unresolved for most of the command surface, and the checks over the machine-readable failure contract rest on the answer. An arm that rejects a malformed identifier fails inside its own body, which is the class the failure contract covers. Running outside a repository instead fails during repository discovery, before any arm body runs, and that path already renders an envelope today — so an arm resolved that way passes against an unmodified binary and proves nothing about the arm. Unreadable stored records are the candidate lever for arms that accept no rejectable argument, because they fail inside the body.\n\nThe setup dominates this namespace. In a repository without commits, five of the arms short-circuit on a git-requirement failure that exits identically in both invocation forms, so it proves nothing about the arm; the recorded setup therefore has to seed commits before the arm's own failure becomes reachable.\n\nThe fragment is machine-readable rather than prose, because the probes that consume it are code. Each entry carries the command path as the argument parser spells it, the argument vector of the invocation, the setup that invocation needs, and the failure it is expected to produce; an arm with no constructible in-body failure carries an exemption reason in place of an invocation.\n\nThe deliverable is the record rather than coverage. Where no in-body failure is constructible, that is the finding, stated with its reason, so that a coverage requirement written later rests on a measured universe.\n\n## Success Criteria\n\n- [hard] REQ-01: The fragment states, for each arm of the claim namespace that the command definitions declare with the machine-readable flag, the invocation that drives it into a failure raised after dispatch inside the arm's own body.\n- [hard] REQ-02: Each entry states the setup its invocation needs, so the failure is reproducible from the fragment alone.\n- [hard] REQ-03: Each entry states the failure its invocation is expected to produce.\n- [hard] REQ-04: An arm with no constructible in-body failure carries an exemption reason in place of an invocation rather than being omitted.\n- [hard] REQ-05: Re-running a recorded invocation under its recorded setup reproduces the recorded failure.\n- [hard] REQ-06: The fragment parses as the shared registry shape and carries no entry outside the arms of the claim namespace.\n- [hard] REQ-07: The fragment distinguishes a lever confirmed by invocation from one read out of the source alone.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:json-error-contract",
+      "milestone:v1.0",
+      "component:cli",
+      "story:arm-conformance"
+    ],
+    "gates": [
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A registry fragment records the failure lever for each arm of the claim namespace.",
+      "contract_refs": [
+        "failure-lever-registry",
+        "post-dispatch-failure-scope"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "F-FORCED-FAILURE",
+        "F-SCHEMA-DERIVED",
+        "F-CLAP-PARSE"
+      ],
+      "landing_group": "lever-survey",
+      "terminal": {
+        "consumer_family": "the failure-lever registry assembly",
+        "test_boundary": "re-running each recorded invocation in this fragment against its recorded outcome",
+        "worker_sized_reason": "Seven arms of one namespace are driven once each, with the setup that makes each failure reachable recorded beside it.",
+        "footprint": {
+          "creates": [
+            "dev/active/a2546471-json-error-contract/levers/claim.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "lever-survey-query-graph",
+    "title": "Failure-lever survey for the query and graph namespaces",
+    "description": "The twelve arms of the query and graph namespaces are surveyed one arm at a time: each is driven into a failure raised inside the arm's own body, and the invocation is recorded in a machine-readable registry fragment for this namespace.\n\n## Background\n\nWhether an arm can be driven into a failure raised inside its own body is unresolved for most of the command surface, and the checks over the machine-readable failure contract rest on the answer. An arm that rejects a malformed identifier fails inside its own body, which is the class the failure contract covers. Running outside a repository instead fails during repository discovery, before any arm body runs, and that path already renders an envelope today — so an arm resolved that way passes against an unmodified binary and proves nothing about the arm. Unreadable stored records are the candidate lever for arms that accept no rejectable argument, because they fail inside the body.\n\nOne query arm rejects an unknown label filter inside its own body. One graph arm is rejected during argument parsing for an unknown export format, which is outside the contract's scope and needs a different lever. The remaining arms take no argument that can be made invalid.\n\nThe fragment is machine-readable rather than prose, because the probes that consume it are code. Each entry carries the command path as the argument parser spells it, the argument vector of the invocation, the setup that invocation needs, and the failure it is expected to produce; an arm with no constructible in-body failure carries an exemption reason in place of an invocation.\n\nThe deliverable is the record rather than coverage. Where no in-body failure is constructible, that is the finding, stated with its reason, so that a coverage requirement written later rests on a measured universe.\n\n## Success Criteria\n\n- [hard] REQ-01: The fragment states, for each arm of the query namespace and the graph namespace that the command definitions declare with the machine-readable flag, the invocation that drives it into a failure raised after dispatch inside the arm's own body.\n- [hard] REQ-02: Each entry states the setup its invocation needs, so the failure is reproducible from the fragment alone.\n- [hard] REQ-03: Each entry states the failure its invocation is expected to produce.\n- [hard] REQ-04: An arm with no constructible in-body failure carries an exemption reason in place of an invocation rather than being omitted.\n- [hard] REQ-05: Re-running a recorded invocation under its recorded setup reproduces the recorded failure.\n- [hard] REQ-06: The fragment parses as the shared registry shape and carries no entry outside the arms of the query namespace and the graph namespace.\n- [hard] REQ-07: The fragment distinguishes a lever confirmed by invocation from one read out of the source alone.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:json-error-contract",
+      "milestone:v1.0",
+      "component:cli",
+      "story:arm-conformance"
+    ],
+    "gates": [
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A registry fragment records the failure lever for each arm of the query namespace beside the graph namespace.",
+      "contract_refs": [
+        "failure-lever-registry",
+        "post-dispatch-failure-scope"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "F-FORCED-FAILURE",
+        "F-SCHEMA-DERIVED",
+        "F-CLAP-PARSE"
+      ],
+      "landing_group": "lever-survey",
+      "terminal": {
+        "consumer_family": "the failure-lever registry assembly",
+        "test_boundary": "re-running each recorded invocation in this fragment against its recorded outcome",
+        "worker_sized_reason": "Twelve arms of two adjacent namespaces are driven once each, with the outcome written into one fragment.",
+        "footprint": {
+          "creates": [
+            "dev/active/a2546471-json-error-contract/levers/query-graph.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "lever-survey-repository-utilities",
+    "title": "Failure-lever survey for the repository-utility namespaces",
+    "description": "The thirteen arms of the configuration, label, event, and archive namespaces are surveyed one arm at a time: each is driven into a failure raised inside the arm's own body, and the invocation is recorded in a machine-readable registry fragment for this namespace.\n\n## Background\n\nWhether an arm can be driven into a failure raised inside its own body is unresolved for most of the command surface, and the checks over the machine-readable failure contract rest on the answer. An arm that rejects a malformed identifier fails inside its own body, which is the class the failure contract covers. Running outside a repository instead fails during repository discovery, before any arm body runs, and that path already renders an envelope today — so an arm resolved that way passes against an unmodified binary and proves nothing about the arm. Unreadable stored records are the candidate lever for arms that accept no rejectable argument, because they fail inside the body.\n\nOne configuration arm rejects an unknown key inside its own body and one archive arm rejects an unresolvable container identifier. The listing arms across all four namespaces take no rejectable argument, and one event arm is rejected during argument parsing, so this fragment is where the alternative levers concentrate.\n\nThe fragment is machine-readable rather than prose, because the probes that consume it are code. Each entry carries the command path as the argument parser spells it, the argument vector of the invocation, the setup that invocation needs, and the failure it is expected to produce; an arm with no constructible in-body failure carries an exemption reason in place of an invocation.\n\nThe deliverable is the record rather than coverage. Where no in-body failure is constructible, that is the finding, stated with its reason, so that a coverage requirement written later rests on a measured universe.\n\n## Success Criteria\n\n- [hard] REQ-01: The fragment states, for each arm of the configuration, label, event, and archive namespaces that the command definitions declare with the machine-readable flag, the invocation that drives it into a failure raised after dispatch inside the arm's own body.\n- [hard] REQ-02: Each entry states the setup its invocation needs, so the failure is reproducible from the fragment alone.\n- [hard] REQ-03: Each entry states the failure its invocation is expected to produce.\n- [hard] REQ-04: An arm with no constructible in-body failure carries an exemption reason in place of an invocation rather than being omitted.\n- [hard] REQ-05: Re-running a recorded invocation under its recorded setup reproduces the recorded failure.\n- [hard] REQ-06: The fragment parses as the shared registry shape and carries no entry outside the arms of the configuration, label, event, and archive namespaces.\n- [hard] REQ-07: The fragment distinguishes a lever confirmed by invocation from one read out of the source alone.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:json-error-contract",
+      "milestone:v1.0",
+      "component:cli",
+      "story:arm-conformance"
+    ],
+    "gates": [
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A registry fragment records the failure lever for each arm of the repository-utility namespaces.",
+      "contract_refs": [
+        "failure-lever-registry",
+        "post-dispatch-failure-scope"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "F-FORCED-FAILURE",
+        "F-SCHEMA-DERIVED",
+        "F-CLAP-PARSE"
+      ],
+      "landing_group": "lever-survey",
+      "terminal": {
+        "consumer_family": "the failure-lever registry assembly",
+        "test_boundary": "re-running each recorded invocation in this fragment against its recorded outcome",
+        "worker_sized_reason": "Thirteen arms of four small namespaces are driven once each, with the outcome written into one fragment.",
+        "footprint": {
+          "creates": [
+            "dev/active/a2546471-json-error-contract/levers/repository-utilities.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "lever-survey-remaining-namespaces",
+    "title": "Failure-lever survey for the remaining command namespaces",
+    "description": "The twenty-six arms of the item, invariant, project, profile, dependency, and worktree namespaces, together with the standalone commands, are surveyed one arm at a time: each is driven into a failure raised inside the arm's own body, and the invocation is recorded in a machine-readable registry fragment for this namespace.\n\n## Background\n\nWhether an arm can be driven into a failure raised inside its own body is unresolved for most of the command surface, and the checks over the machine-readable failure contract rest on the answer. An arm that rejects a malformed identifier fails inside its own body, which is the class the failure contract covers. Running outside a repository instead fails during repository discovery, before any arm body runs, and that path already renders an envelope today — so an arm resolved that way passes against an unmodified binary and proves nothing about the arm. Unreadable stored records are the candidate lever for arms that accept no rejectable argument, because they fail inside the body.\n\nMost of these arms take an identifier or a name that can be made invalid, and the wrapper-classified namespaces already render an envelope for one. Two are known not to fit the contract: the version report is served before repository discovery and its only fallible call serialises static strings, and the server control reports failure as a daemon-control exit rather than an envelope. Both are recorded as exemptions with those reasons.\n\nThe fragment is machine-readable rather than prose, because the probes that consume it are code. Each entry carries the command path as the argument parser spells it, the argument vector of the invocation, the setup that invocation needs, and the failure it is expected to produce; an arm with no constructible in-body failure carries an exemption reason in place of an invocation.\n\nThe deliverable is the record rather than coverage. Where no in-body failure is constructible, that is the finding, stated with its reason, so that a coverage requirement written later rests on a measured universe.\n\n## Success Criteria\n\n- [hard] REQ-01: The fragment states, for each arm of the item, invariant, project, profile, dependency, and worktree namespaces, and of the standalone commands that the command definitions declare with the machine-readable flag, the invocation that drives it into a failure raised after dispatch inside the arm's own body.\n- [hard] REQ-02: Each entry states the setup its invocation needs, so the failure is reproducible from the fragment alone.\n- [hard] REQ-03: Each entry states the failure its invocation is expected to produce.\n- [hard] REQ-04: An arm with no constructible in-body failure carries an exemption reason in place of an invocation rather than being omitted.\n- [hard] REQ-05: Re-running a recorded invocation under its recorded setup reproduces the recorded failure.\n- [hard] REQ-06: The fragment parses as the shared registry shape and carries no entry outside the arms of the item, invariant, project, profile, dependency, and worktree namespaces, and of the standalone commands.\n- [hard] REQ-07: The fragment distinguishes a lever confirmed by invocation from one read out of the source alone.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:json-error-contract",
+      "milestone:v1.0",
+      "component:cli",
+      "story:arm-conformance"
+    ],
+    "gates": [
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A registry fragment records the failure lever for each arm of the small namespaces beside the standalone commands.",
+      "contract_refs": [
+        "failure-lever-registry",
+        "post-dispatch-failure-scope"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "F-FORCED-FAILURE",
+        "F-SCHEMA-DERIVED",
+        "F-CLAP-PARSE"
+      ],
+      "landing_group": "lever-survey",
+      "terminal": {
+        "consumer_family": "the failure-lever registry assembly",
+        "test_boundary": "re-running each recorded invocation in this fragment against its recorded outcome",
+        "worker_sized_reason": "Twenty-six arms across small namespaces are driven once each, mostly through the same identifier lever, into one fragment.",
+        "footprint": {
+          "creates": [
+            "dev/active/a2546471-json-error-contract/levers/remaining-namespaces.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "failure-lever-registry-assembly",
+    "title": "The canonical failure-lever registry the probes read",
+    "description": "The per-namespace survey fragments merge into one committed registry beside the failure probes, reconciled against the arm universe the command definitions declare, so the probes read one typed input rather than seven partial ones.\n\n## Background\n\nThe failure lever for an arm is measured rather than derived, and the measurement is split by namespace so each survey stays bounded. What the probes need is the opposite of that split: one registry, in one place, covering the whole flag-accepting surface.\n\nMerging is mechanical, and reconciliation is what makes the merged file trustworthy. The arm universe is derivable — the leaf commands whose definition declares the machine-readable flag, read out of the argument parser's own command reflection — so the registry can be compared against it, and an arm present in the reflection but absent from the registry is a hole rather than an omission nobody notices. The comparison is the same set-equality shape the exit-status projection already uses for its own rows.\n\nThe registry lands in the test tree rather than beside the survey fragments, because a probe that read its input from the planning directory would break when that directory is archived. The fragments stay where they were written, as the measurement record; the merged registry is the only one anything reads.\n\nEntries are merged without reinterpretation: a lever recorded by a survey reaches the registry as it was recorded, so a disagreement between the registry and the measurement is a merge defect rather than a judgement call.\n\n## Success Criteria\n\n- [hard] REQ-01: One committed registry in the test tree carries an entry for each arm the command definitions declare with the machine-readable flag.\n- [hard] REQ-02: Each entry carries its invocation, its setup, and its expected failure, or an exemption reason in place of the invocation.\n- [hard] REQ-03: An assertion fails when the registry's arm set differs from the set derived from the command definitions.\n- [hard] REQ-04: An assertion fails when an entry omits a field the registry shape requires.\n- [hard] REQ-05: The registry is read through a typed deserialization rather than by scanning text.\n- [hard] REQ-06: The registry is the only failure-lever input any test reads.\n- [hard] REQ-07: Each merged entry carries the content its survey recorded, unchanged.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:json-error-contract",
+      "milestone:v1.0",
+      "component:cli",
+      "story:arm-conformance",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "lever-survey-issue",
+      "lever-survey-doc",
+      "lever-survey-gate",
+      "lever-survey-claim",
+      "lever-survey-query-graph",
+      "lever-survey-repository-utilities",
+      "lever-survey-remaining-namespaces"
+    ],
+    "planning": {
+      "outcome": "The namespace fragments merge into one typed registry whose arm set is reconciled against the command definitions.",
+      "contract_refs": [
+        "failure-lever-registry",
+        "post-dispatch-failure-scope"
+      ],
       "produces_contracts": [
         "recorded-failure-lever-universe"
       ],
+      "source_refs": [
+        "REQ-05",
+        "F-FORCED-FAILURE",
+        "F-SCHEMA-DERIVED",
+        "F-COMPLETENESS-PRECEDENT"
+      ],
       "landing_group": "failure-conformance",
       "terminal": {
-        "consumer_family": "the author of the failure-probe fixture",
-        "test_boundary": "re-running each recorded invocation against its recorded outcome",
-        "worker_sized_reason": "One derived arm list driven once per arm, with the outcome written into one record.",
+        "consumer_family": "the failure probes reading the registry",
+        "test_boundary": "the registry reconciliation assertion in the issue CLI target",
+        "worker_sized_reason": "Seven recorded fragments merge into one registry behind one reconciliation assertion.",
         "footprint": {
           "creates": [
-            "dev/active/a2546471-json-error-contract/forced-failure-levers.md"
+            "crates/jit/tests/cli_issue/failure_levers.toml",
+            "crates/jit/tests/cli_issue/failure_lever_registry_tests.rs"
+          ],
+          "touches": [
+            "crates/jit/tests/cli_issue/main.rs"
           ]
         }
       }
@@ -473,7 +778,7 @@
   {
     "key": "forced-failure-probe-fixture",
     "title": "A shared fixture that drives one recorded failure per command arm",
-    "description": "One shared fixture drives a named command arm into the failure recorded for it and returns its streams with its exit status, so the checks over the machine-readable failure contract share one way of provoking a failure instead of each inventing its own.\n\n## Background\n\nNo shared subprocess runner exists in this crate's test tree. Sixty test files resolve the binary and set up a temporary repository themselves, in two competing idioms. Several checks over the failure contract need the same thing — a named arm driven into a failure, with its streams and status captured — so that setup belongs in one fixture rather than repeated in each of them.\n\nWhich failure is provoked decides whether a probe proves anything, and that question is settled before this work rather than inside it. A committed record resolves, per arm, the failure reachable after dispatch inside the arm's own body, names the invocation that produces it, and names the arms for which none is constructible. The fixture reads that record. It decides no reachability of its own and widens the recorded universe by nothing.\n\nAn arm the record marks as having no constructible in-body failure is carried as a declared exemption with the recorded reason, so it stays visible rather than becoming silently absent.\n\nFailures the argument parser rejects are out of scope: the parser reports and exits before dispatch, so the fixture forces failures occurring after dispatch, which is the class the failure contract covers.\n\nThe fixture is a module inside the existing issue CLI integration target. That target already aggregates the machine-contract suites, and the build-footprint budget leaves a single integration-target slot, so a dedicated target would spend it on one file.\n\n## Success Criteria\n\n- [hard] REQ-01: A caller names a command arm and receives its payload stream, its diagnostic stream, and its exit status from one forced failure.\n- [hard] REQ-02: The failure an arm is driven into is the one the record resolved for that arm.\n- [hard] REQ-03: The forced failure occurs after command dispatch rather than during argument parsing.\n- [hard] REQ-04: An arm the record marks as having no constructible in-body failure is carried as a declared exemption stating the recorded reason.\n- [hard] REQ-05: An arm the record marks as outside the error-envelope contract is carried as a declared exemption stating the recorded reason.\n- [hard] REQ-06: The fixture's arm registry is checked against the recorded universe, so a recorded arm with no fixture entry fails.\n- [hard] REQ-07: The fixture is a module inside an existing integration target, adding no Cargo test target.\n- [hard] REQ-08: Self-assertions confirm the fixture reports a non-zero exit status for a representative arm of each recorded lever.\n",
+    "description": "One shared fixture drives a named command arm into the failure the registry records for it and returns its streams with its exit status, so the checks over the machine-readable failure contract share one way of provoking a failure instead of each inventing its own.\n\n## Background\n\nNo shared subprocess runner exists in this crate's test tree. Sixty test files resolve the binary and set up a temporary repository themselves, in two competing idioms. Several checks over the failure contract need the same thing — a named arm driven into a failure, with its streams and status captured — so that setup belongs in one fixture rather than repeated in each of them.\n\nWhich failure is provoked decides whether a probe proves anything, and that question is settled before this work rather than inside it. A committed registry beside the probes states, per arm, the invocation that reaches a failure raised after dispatch inside the arm's own body, the setup that invocation needs, the failure it is expected to produce, and — for an arm where no such failure is constructible — an exemption reason in its place. The fixture deserializes that registry and drives what it says. It decides no reachability of its own and widens the recorded universe by nothing.\n\nAn arm the registry marks as exempt is carried as a declared exemption with the recorded reason, so it stays visible rather than becoming silently absent.\n\nFailures the argument parser rejects are out of scope: the parser reports and exits before dispatch, so the fixture forces failures occurring after dispatch, which is the class the failure contract covers.\n\nThe fixture is a module inside the existing issue CLI integration target. That target already aggregates the machine-contract suites, and the build-footprint budget leaves a single integration-target slot, so a dedicated target would spend it on one file.\n\n## Success Criteria\n\n- [hard] REQ-01: A caller names a command arm and receives its payload stream, its diagnostic stream, and its exit status from one forced failure.\n- [hard] REQ-02: The invocation an arm is driven through, and the setup it runs under, are the ones the registry records for that arm.\n- [hard] REQ-03: The forced failure occurs after command dispatch rather than during argument parsing.\n- [hard] REQ-04: An arm the registry marks as exempt is carried as a declared exemption stating the recorded reason.\n- [hard] REQ-05: The fixture's arm set comes from the registry rather than from a list written into the fixture.\n- [hard] REQ-06: The fixture is a module inside an existing integration target, adding no Cargo test target.\n- [hard] REQ-07: Self-assertions confirm the fixture reports a non-zero exit status for a representative arm of each recorded setup class.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -489,18 +794,19 @@
       "code-review"
     ],
     "depends_on": [
-      "forced-failure-lever-survey",
+      "failure-lever-registry-assembly",
       "search-exit-status-repair",
       "preset-apply-failure-status",
       "top-level-envelope-renderer",
       "recovery-envelope-stream-repair"
     ],
     "planning": {
-      "outcome": "One fixture drives a named arm into the failure the committed record resolved for that arm.",
+      "outcome": "One fixture drives a named arm through the invocation the committed registry records for that arm.",
       "contract_refs": [
+        "failure-lever-registry",
+        "recorded-failure-lever-universe",
         "post-dispatch-failure-scope",
-        "top-level-error-envelope",
-        "recorded-failure-lever-universe"
+        "top-level-error-envelope"
       ],
       "source_refs": [
         "REQ-05",
@@ -518,7 +824,7 @@
       "terminal": {
         "consumer_family": "the machine-contract conformance bodies in the issue CLI target",
         "test_boundary": "the fixture's own self-assertions in the issue CLI target",
-        "worker_sized_reason": "One fixture module reads a recorded lever per arm, leaving no reachability decision inside it.",
+        "worker_sized_reason": "One fixture module deserializes the registry and drives what it states, leaving no reachability decision inside it.",
         "footprint": {
           "creates": [
             "crates/jit/tests/cli_issue/failure_probe.rs"
@@ -685,7 +991,7 @@
   {
     "key": "error-code-reference-page",
     "title": "A generated adopter reference for the error-code vocabulary",
-    "description": "The error-code vocabulary reaches adopters as a generated reference page projected from the vocabulary itself, listing each code with its meaning and the exit status it maps to.\n\n## Background\n\nNo adopter page enumerates the error codes. Individual codes appear in worked examples across several pages, so a reader who receives an unfamiliar code has nowhere to look it up. A hand-written table would be a copy of a fact whose source of truth is the vocabulary in the binary, and would go stale on the first addition.\n\nThe projection follows the pattern this crate already uses for its other generated reference pages: a rendering function beside the definitions, a committed page carrying a generated banner, and a test asserting the committed file equals the rendered output byte for byte, with an explicit regeneration path. Because the vocabulary is a closed enum with a derive-checked member list, the page cannot omit a code without failing that check.\n\nThe exit-status column is read from the same map the runtime uses, so the page states the mapping rather than restating it. A separate hand-listed enumeration in the output layer does not break when a status is added; this page introduces no second instance of that hazard.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed adopter reference page lists each error code with its meaning and its exit status.\n- [hard] REQ-02: The page is rendered from the error-code vocabulary rather than hand-written, and carries a generated banner.\n- [hard] REQ-03: A test fails when the committed page differs from the rendered output.\n- [hard] REQ-04: Adding a member to the vocabulary without regenerating the page fails that test.\n- [hard] REQ-05: The exit-status column is read from the runtime mapping rather than restated beside it.\n- [hard] REQ-06: The page is reachable from the documentation index alongside the other reference pages.\n- [hard] REQ-07: The page cites no path under the planning artifact directory.\n",
+    "description": "The error-code vocabulary reaches adopters as a generated reference page projected from the vocabulary itself, listing each code with its meaning and the exit status it maps to.\n\n## Background\n\nNo adopter page enumerates the error codes. Individual codes appear in worked examples across several pages, so a reader who receives an unfamiliar code has nowhere to look it up. A hand-written table would be a copy of a fact whose source of truth is the vocabulary in the binary, and would go stale on the first addition. Both columns the page carries — the meaning and the exit status — are read from the vocabulary, which holds a description per member alongside its exit class, so the page renders its source rather than authoring prose beside it.\n\nThe projection follows the pattern this crate already uses for its other generated reference pages: a rendering function beside the definitions, a committed page carrying a generated banner, and a test asserting the committed file equals the rendered output byte for byte, with an explicit regeneration path. Because the vocabulary is a closed enum with a derive-checked member list, the page cannot omit a code without failing that check.\n\nThe exit-status column is read from the same map the runtime uses, so the page states the mapping rather than restating it. A separate hand-listed enumeration in the output layer does not break when a status is added; this page introduces no second instance of that hazard.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed adopter reference page lists each error code with its meaning and its exit status.\n- [hard] REQ-02: The page is rendered from the error-code vocabulary rather than hand-written, and carries a generated banner.\n- [hard] REQ-03: A test fails when the committed page differs from the rendered output.\n- [hard] REQ-04: Adding a member to the vocabulary without regenerating the page fails that test.\n- [hard] REQ-05: The exit-status column is read from the runtime mapping rather than restated beside it.\n- [hard] REQ-06: The page is reachable from the documentation index alongside the other reference pages.\n- [hard] REQ-07: The page cites no path under the planning artifact directory.\n- [hard] REQ-08: Each code's meaning is read from the vocabulary's own description rather than authored on the page.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -786,7 +1092,7 @@
   {
     "key": "code-vocabulary",
     "title": "An enumerable error-code vocabulary with class-correct exit status",
-    "description": "The error codes the machine-readable surface reports become an enumerable, closed vocabulary in which each member carries an explicit exit status, so the status a caller observes matches the failure class the envelope names.\n\n## Background\n\nThe vocabulary is declared as string constants that cannot be iterated, and the map from code to exit status ends in a wildcard. Roughly twenty code strings the surface actually emits are absent from it, so each exits on the generic status whatever its real class.\n\nMeasured against the plain invocation of the identical failure, nine arms disagree: unresolvable identifiers, a duplicate gate key, and a missing preset all report one status without the flag and the generic status with it. One command exits on a literal its own reported code does not map to, and one reports failure inside a success payload with a zero status.\n\nThe generated exit-status reference documents the plain values and binds each row to runtime through the plain invocation alone, so the projection is accurate for one invocation form and silently wrong for the other.\n\nOne emitted failure class cannot be registered inside the output layer at all: an unreadable stored record is raised as a crate-private type the binary cannot name, so it reports the generic code however the classifier is written.\n\nCode strings stay byte-identical throughout. Nothing is renamed and nothing is collapsed, because a machine consumer reads the code string; only the exit status moves, toward the class the plain path already reports.\n\n## Success Criteria\n\n- [hard] REQ-01: The error-code vocabulary is enumerable and maps each member to an exit status with no fallback arm.\n- [hard] REQ-02: Each code string the command surface emits is a registered member, unchanged in spelling.\n- [hard] REQ-03: For a failure reachable in both invocation forms, the two exit statuses are equal.\n- [hard] REQ-04: No command's failure path exits on a literal status its reported code does not determine.\n- [hard] REQ-05: The generated exit-status reference is bound to runtime through both invocation forms.\n- [hard] REQ-06: A failure raised as a crate-private type is reported under a registered code rather than the generic fallback.\n",
+    "description": "The error codes the machine-readable surface reports become an enumerable, closed vocabulary in which each member carries an explicit exit status, so the status a caller observes matches the failure class the envelope names.\n\n## Background\n\nThe vocabulary is declared as string constants that cannot be iterated, and the map from code to exit status ends in a wildcard. Roughly twenty code strings the surface actually emits are absent from it, so each exits on the generic status whatever its real class.\n\nMeasured against the plain invocation of the identical failure, nine arms disagree: unresolvable identifiers, a duplicate gate key, and a missing preset all report one status without the flag and the generic status with it. One command exits on a literal its own reported code does not map to, and one reports failure inside a success payload with a zero status.\n\nThe generated exit-status reference documents the plain values and binds each row to runtime through the plain invocation alone, so the projection is accurate for one invocation form and silently wrong for the other.\n\nOne emitted failure class cannot be registered inside the output layer at all: an unreadable stored record is raised as a crate-private type the binary cannot name, so it reports the generic code however the classifier is written.\n\nCode strings stay byte-identical throughout. Nothing is renamed and nothing is collapsed, because a machine consumer reads the code string; only the exit status moves, toward the class the plain path already reports.\n\n## Success Criteria\n\n- [hard] REQ-01: The error-code vocabulary is enumerable and maps each member to an exit status with no fallback arm.\n- [hard] REQ-02: Each code string the command surface emits is a registered member, unchanged in spelling.\n- [hard] REQ-03: For a failure reachable in both invocation forms, the two exit statuses are equal.\n- [hard] REQ-04: No command's failure path exits on a literal status its reported code does not determine.\n- [hard] REQ-05: The generated exit-status reference is bound to runtime through both invocation forms.\n- [hard] REQ-06: A failure raised as a crate-private type is reported under a registered code rather than the generic fallback.\n- [hard] REQ-07: Each vocabulary member carries a description of the failure it names, stated once in the vocabulary.\n",
     "type": "story",
     "priority": "high",
     "labels": [
@@ -864,7 +1170,7 @@
   {
     "key": "arm-conformance",
     "title": "Per-arm failure conformance and the guard that keeps it",
-    "description": "Regression coverage drives each command arm accepting the machine-readable flag into a real failure and asserts the envelope contract, and a guard derived from the command definitions fails when an arm has no such coverage, so a newly added arm cannot ship without the failure contract.\n\n## Background\n\nThe success side of the machine-readable contract has canonical suites; the failure side has none. The nearest file covers five arms, and two of its five tests are non-binding — one discards its parsed payload, the other accepts a match on either stream — so both pass against the defect this work repairs.\n\nWhether an arm renders the envelope cannot be decided from the source text. Dispatch bodies mix propagation, inline classification, and helpers that exit internally, and three namespaces already use a wrapper that classifies centrally while its inner function propagates freely, so a scan of a dispatch arm sees a classified call it cannot distinguish from an unclassified one. The property is observable only by running the command.\n\nProvoking a failure is not uniform either: a substantial minority of arms take no argument that can be made invalid and are reached instead through unreadable stored records, which still fails inside the arm body. Whether each arm has such a lever is measured first and recorded, so the coverage requirement is written against a measured universe; one shared fixture then drives the recorded failures, and the conformance checks consume it.\n\nCoverage completeness comes from the command definitions themselves, through the introspection the command schema already performs, so no hand-maintained arm list exists to drift.\n\n## Success Criteria\n\n- [hard] REQ-01: One canonical suite asserts the failure envelope's structure with its classification for each probed arm, semantically rather than against copied message text.\n- [hard] REQ-02: The arm set the checks cover is derived from the command definitions, with no visibility predicate applied.\n- [hard] REQ-03: An arm declaring the machine-readable flag with neither a failure probe nor a declared exemption fails the check.\n- [hard] REQ-04: A failing invocation's payload stream carries exactly one JSON document and no plain-text byte.\n- [hard] REQ-05: The two non-binding tests assert the envelope contract instead of passing vacuously.\n- [hard] REQ-06: The checks report, per arm, whether its failure rendered the envelope and under which code.\n- [hard] REQ-07: An arm with no constructible in-body failure is covered by a declared exemption stating its reason rather than by an absent probe.\n",
+    "description": "Regression coverage drives each command arm accepting the machine-readable flag into a real failure and asserts the envelope contract, and a guard derived from the command definitions fails when an arm has no such coverage, so a newly added arm cannot ship without the failure contract.\n\n## Background\n\nThe success side of the machine-readable contract has canonical suites; the failure side has none. The nearest file covers five arms, and two of its five tests are non-binding — one discards its parsed payload, the other accepts a match on either stream — so both pass against the defect this work repairs.\n\nWhether an arm renders the envelope cannot be decided from the source text. Dispatch bodies mix propagation, inline classification, and helpers that exit internally, and three namespaces already use a wrapper that classifies centrally while its inner function propagates freely, so a scan of a dispatch arm sees a classified call it cannot distinguish from an unclassified one. The property is observable only by running the command.\n\nProvoking a failure is not uniform either: a substantial minority of arms take no argument that can be made invalid and are reached instead through unreadable stored records, which still fails inside the arm body. Whether each arm has such a lever is measured first, namespace by namespace, and merged into one machine-readable registry reconciled against the reflected arm universe, so the coverage requirement is written against a measured surface; one shared fixture then drives what the registry states, and the conformance checks consume it.\n\nCoverage completeness comes from the command definitions themselves, through the introspection the command schema already performs, so no hand-maintained arm list exists to drift.\n\n## Success Criteria\n\n- [hard] REQ-01: One canonical suite asserts the failure envelope's structure with its classification for each probed arm, semantically rather than against copied message text.\n- [hard] REQ-02: The arm set the checks cover is derived from the command definitions, with no visibility predicate applied.\n- [hard] REQ-03: An arm declaring the machine-readable flag with neither a failure probe nor a declared exemption fails the check.\n- [hard] REQ-04: A failing invocation's payload stream carries exactly one JSON document and no plain-text byte.\n- [hard] REQ-05: The two non-binding tests assert the envelope contract instead of passing vacuously.\n- [hard] REQ-06: The checks report, per arm, whether its failure rendered the envelope and under which code.\n- [hard] REQ-07: An arm with no constructible in-body failure is covered by a declared exemption stating its reason rather than by an absent probe.\n- [hard] REQ-08: The probes read one registry whose arm set is reconciled against the command definitions.\n",
     "type": "story",
     "priority": "high",
     "labels": [
