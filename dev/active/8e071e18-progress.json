@@ -1642,6 +1642,13 @@
       "subject": "the skill eval baseline cites two evaluation records that do not exist",
       "detail": "dev/eval/lead-skills-eval-baseline.md:18 cites .agents/skills/jit-execution-lead/evals/results.md and :19 cites .agents/skills/jit-planning-lead/evals/results.md. Neither directory holds a results.md; both hold evals.json, fixtures/, setup-test-repo.sh and test-manifest-tool.sh. The worker found one row; both are broken. The file also cites transcript paths under those directories that do not resolve.",
       "disposition": "OPEN, outside this epic. dev/eval is a permanent area and no epic criterion ranges over it - REQ-09 and REQ-10 scope themselves to the managed areas and to dev/active, dev/studies and dev/sessions. The citations predate this epic and no archival run touched them. Not filed: filing outside the epic has been an owner call every time here. Raised in the completion report."
+    },
+    {
+      "id": "P31",
+      "raised_by": "f89ea266 (worker) and the lead, independently, after the REQ-06 remediation landed",
+      "subject": "the epic's own evidence records do not follow the convention the epic ships",
+      "detail": "Seven records this epic produced sit in 8e071e18's canonical directory while the document reference naming each one belongs to the child issue that wrote it (aa38b236 x2, 93aaa2b2, 079ea42e, 2d7ae27e, 5a19fffb, 66c467c1). Before f89ea266 the conformance report could not see them; it now names all seven as nonconforming, together with three prefix-less artifacts elsewhere. The epic therefore ships a convention its own working records do not follow.",
+      "disposition": "OPEN as an owner decision, deliberately not repaired. No criterion requires it: REQ-06 requires the report to NAME every such artifact, which it now does, and @/issue/8e071e18/decision/D-4 and D-7 together make tolerated non-conforming placement the designed case rather than a defect. Both available repairs cost something the epic has already ruled against. Re-pointing the references to 8e071e18 destroys the child-to-artifact traceability D-14 explicitly refused to destroy. Relocating the seven files means repointing in-content citations inside dated evidence records, which D-8 requires to survive verbatim. Raised in the completion report."
     }
   ],
   "started_at": "2026-07-25T14:24:30.011076+00:00",
