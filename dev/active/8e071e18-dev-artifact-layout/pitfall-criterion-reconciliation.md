@@ -112,7 +112,23 @@ disagrees with the location — six records this epic wrote sit in
 `079ea42e`, `2d7ae27e`, `5a19fffb` and `66c467c1` — and the report is silent on that disagreement
 because it never consults document references.
 
-**Verdict: not a criterion violation.** Carried to the completion report for an owner decision.
+**Verdict at the time of writing: not a criterion violation.** Carried to the completion report for
+an owner decision.
+
+**Overturned at the epic gate.** The epic's independent holistic review read REQ-06 literally and
+failed the epic on this entry, citing `crates/jit/src/domain/artifact_conformance.rs:14`. The review
+is right, for a sharper reason than the paragraph above gives: `@/issue/8e071e18/decision/D-2` strips
+the short-id prefix from filenames inside an issue directory, so every artifact created under the
+convention is prefix-less by construction, and the report's attribution goes blind exactly as the
+convention it advises on is adopted. The reading above also settles "owning issue" on a naming
+convention where the repository's durable statement of ownership is the document reference. The
+count above is wrong too: the population is seven artifacts, not six, plus three whose path carries
+no short id anywhere.
+
+Remediated as `f89ea266` inside this epic — attribute from the document reference where the short-id
+walk declines, additively, so no currently reported artifact changes verdict. Relocating the seven
+records into their owners' directories was rejected: the finding is about what the report can do, not
+about this repository's data.
 
 ### P30 — the skill eval baseline cites two evaluation records that do not exist
 
@@ -127,7 +143,19 @@ criterion ranges over it: REQ-09 and REQ-10 scope themselves to the managed area
 
 ## Standing
 
-No open pitfall is a violation of any of the epic's fifteen `[hard]` criteria. Three are genuine
-product follow-ups (P18, P19, P25), two are observations about behaviour no criterion ranges over
-(P27, P29), one is an execution hazard recorded in the handoff traps (P28), and one is a pre-existing
-defect outside the epic (P30). The completion report names all seven.
+Of the seven pitfalls open at the epic gate, **one was a criterion violation**: P29, which this
+record argued was not, and which the epic's independent holistic review overturned. It is remediated
+inside the epic as `f89ea266`. REQ-09 was also found unmet on one artifact the pitfall list never
+carried at all; that is remediated as `d8d7f317` under escalation E19.
+
+The remaining six stand as recorded: three are product follow-ups (P18, P19, P25), one is an
+observation about behaviour no criterion ranges over (P27), one is an execution hazard recorded in
+the handoff traps (P28), and one is a pre-existing defect outside the epic (P30). The completion
+report names all six.
+
+That this record argued P29 wrongly is the point worth carrying forward. Reconciling the deferred
+findings against the criteria did not stop the lead from misreading one; what it did was put the
+reasoning where a reviewer could read it, which is why the disagreement was settled in a single round
+rather than argued. When a criterion turns on what a word means — here, which issue *owns* an
+artifact — the reading grounded in the repository's durable record beats the one grounded in a naming
+convention.
