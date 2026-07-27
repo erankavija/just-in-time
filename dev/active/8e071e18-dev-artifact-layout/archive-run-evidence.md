@@ -450,3 +450,20 @@ Issue `d1ae9782`. Plan eligible with no blockers. 1 relocated, 1 mirrored, 2 ret
 ### Other plan warnings (1)
 
 - `external-edge` at `dev/studies/documentation-organization-strategy.md`
+
+## `a4e3cfb0` — dev/archive/a4e3cfb0
+Issue `1c4b7a3c`. Plan eligible with no blockers. 1 relocated, 0 mirrored, 0 retained, 0 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/studies/documentation-tooling-evaluation.md` | `dev/archive/a4e3cfb0/dev/studies/documentation-tooling-evaluation.md` | a4e3cfb0 |
+
+### In-content citation warnings (3)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:3142:14` | `dev/studies/documentation-tooling-evaluation.md` |
+| `dev/active/8e071e18-breakdown.json:3777:5069` | `dev/studies/documentation-tooling-evaluation.md` |
+| `dev/active/8e071e18-breakdown.json:3777:5160` | `dev/studies/documentation-tooling-evaluation.md` |
