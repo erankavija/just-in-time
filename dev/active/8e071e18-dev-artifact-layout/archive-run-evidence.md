@@ -1289,3 +1289,30 @@ Issue `2f524511`. Plan eligible with no blockers. 5 relocated, 0 mirrored, 5 ret
 ### Other plan warnings (1)
 
 - `external-edge` at `dev/archive/features/25064508/showcase/talk.html`
+
+## Uniform re-verification across all 24 runs
+
+The first twelve runs were verified before the per-run check compared content
+hashes, so every run was re-checked afterwards under one identical set of
+assertions, reading the preview each run had saved:
+
+```
+containers: 24
+relocated 176, mirrored 19, retained 83
+files whose bytes were hash-compared against the plan: 214
+containers with a recorded execution event: 24
+jit validate: valid=True errors=0 warnings=0 divergences=0
+
+every assertion holds across all 24 runs
+```
+
+One case needs its own statement, because it looks like a failure and is not.
+`dev/active/json-output-standardization-plan.md` is owned by two issues and
+appears in two plans: container `14303b30` mirrors it, retaining the source,
+and container `9d427a6b` — later in the run order — relocates it, because by
+then the owner outside its subtree has been relinked to the mirrored copy and
+only the inside owner remains. Both archived copies exist, the live source is
+gone, and both owners' references resolve. A retrospective check that demanded
+every mirrored source still be in place would read the second run as breaking
+the first; the check instead asserts the bytes survived at the later run's
+destination.

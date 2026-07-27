@@ -15,6 +15,13 @@
       "format": "markdown",
       "label": "Session 4 handoff",
       "path": "dev/active/8e071e18-dev-artifact-layout/handoff-3.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Archive run evidence",
+      "path": "dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md"
     }
   ],
   "first_ready_at": "2026-07-25T07:17:03.106580363Z",
@@ -32,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue-based development artifact layout and serviceable archival",
-  "updated_at": "2026-07-26T21:46:28.919528837Z"
+  "updated_at": "2026-07-27T10:08:00.196819165Z"
 }
