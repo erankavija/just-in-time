@@ -1,0 +1,55 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-27T13:53:15.463335822Z",
+  "context": {},
+  "created_at": "2026-07-27T13:52:57.383480606Z",
+  "dependencies": [],
+  "description": "The conformance report attributes an artifact whose name carries no short id from the document reference that names it, so an artifact filed inside another issue's directory is reported rather than passed over.\n\n## Background\n\n`jit doc conformance` resolves an artifact's owner from the short id its own path component opens with, and passes over a component carrying none (`crates/jit/src/domain/artifact_conformance.rs`). That was sound while every artifact was a flat `<short-id>-<name>` file at area root.\n\nThe convention this epic ships makes it a widening blind spot. `@/issue/8e071e18/decision/D-2` drops the short-id prefix from filenames inside an issue directory, so every artifact created under the convention is prefix-less by construction. The report's attribution therefore reaches legacy flat artifacts and progressively fails to reach conforming ones — it goes blind exactly as the convention it advises on is adopted.\n\nThe epic's independent holistic review found this unmet against `@/issue/8e071e18/requirement/REQ-06`, which requires the report to list **every** artifact under a managed issue-scoped area sitting outside its owning issue's canonical directory. A document reference is the repository's durable statement of which issue owns an artifact; a filename prefix is a naming convention. Where the two disagree, the report currently says nothing.\n\nMeasured in this repository at the time of filing: seven artifacts sit inside one issue's canonical directory while a single other issue's document reference names them, and three more carry no short id anywhere in their path while exactly one issue references them. None is reported today.\n\n## Decisions\n\n- D-1: The new attribution is **additive**, not a replacement. The short-id rule is unchanged and still decides first. The reference rule fires only where the existing walk declines — on a path component carrying no short id. No artifact the report names today changes its verdict, and the existing entries stay exactly as they are. Replacing prefix attribution with reference attribution was rejected: it would re-verdict the legacy flat artifacts the report exists to advise on, and those largely carry no reference at all.\n- D-2: Exactly one referencing issue attributes the artifact. Zero references leaves it passed over, as now — an unreferenced prefix-less file is invisible to archival too, and reporting every such file would flood the report with the benchmark and generated output that no issue claims. Several referencing issues is `unattributed`, the arm the report already has for an ownership its inputs cannot settle.\n- D-3: Containment still decides conformance. An artifact anywhere beneath the directory its resolved owner owns conforms; the topmost offending component is still the one named.\n\n## Success Criteria\n\n- [hard] REQ-01: An artifact whose path component carries no short id is attributed to the single issue whose document reference names it, and is reported when it sits outside that issue's canonical directory.\n- [hard] REQ-02: An artifact no issue references, or one that several issues reference, keeps the behaviour it has today — passed over and `unattributed` respectively.\n- [hard] REQ-03: Every artifact the report names before this change keeps its verdict and its reported owner after it.\n- [hard] REQ-04: The command reference states how an owner is resolved, covering both the short-id and the document-reference paths, and carries no claim that a prefix-less name is passed over unconditionally.\n- [hard] REQ-05: Behaviour is covered by tests that assert the reported set semantically, including an artifact filed inside another issue's canonical directory and an artifact several issues reference.",
+  "documents": [],
+  "first_ready_at": "2026-07-27T13:52:57.383480606Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical",
+    "mcp-ci"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-07-27T13:53:12.051449251Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-07-27T13:53:12.190034314Z",
+      "updated_by": null
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_at": "2026-07-27T13:53:12.327717576Z",
+      "updated_by": null
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_at": "2026-07-27T13:53:12.491279569Z",
+      "updated_by": null
+    },
+    "mcp-ci": {
+      "status": "pending",
+      "updated_at": "2026-07-27T13:53:12.630180282Z",
+      "updated_by": null
+    }
+  },
+  "id": "f89ea266-bf12-4fe6-a685-55cfffa73165",
+  "labels": [
+    "type:task",
+    "epic:dev-artifact-layout",
+    "milestone:v1.0",
+    "satisfies:REQ-06"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Attribute a prefix-less artifact from the document reference that names it",
+  "updated_at": "2026-07-27T13:53:15.463335822Z"
+}
