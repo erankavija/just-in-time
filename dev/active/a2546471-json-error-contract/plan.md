@@ -69,10 +69,14 @@ detail and still emit exactly one.
 ### `forced-failure-arm-fixture` [implementation-produced] — One way to provoke a failure
 
 A shared subprocess fixture that drives a named arm into one post-dispatch failure and
-returns both streams with the exit status. A default lever covers arms taking no
-rejectable argument (31 of them; the levers are running outside a repository and
-corrupting the store), per-arm overrides provoke a more specific failure, and exempt
-arms are named with a reason. No shared subprocess runner exists in the tree today —
+returns both streams with the exit status. Which failure it provokes decides whether the
+probe proves anything: a discovery-time failure is rendered as an envelope by the existing
+startup path, before any arm body runs, so an arm probed that way passes against an
+unmodified binary. The lever is therefore selected by a rule over the arguments the command
+definitions already record — rejectable argument where one exists, corrupted stored records
+otherwise, both failing inside the body — and a discovery-time failure is a last resort
+reserved for an arm where no in-body failure is constructible, named with that reason.
+Exempt arms are named with a reason. No shared subprocess runner exists in the tree today —
 60 files roll their own, in two idioms (F-NO-SHARED-RUNNER, F-FORCED-FAILURE).
 
 ### `generated-error-code-table` [implementation-produced] — The projected code reference
