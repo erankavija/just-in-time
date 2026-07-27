@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T21:43:44.885062384Z",
+  "dependencies": [
+    "f6c95115-2eca-4046-9372-9f2ef7cf8bf9"
+  ],
+  "description": "The top-level failure printer renders the structured error envelope for any failure that reaches it under the machine-readable flag, so an arm that propagates its error no longer leaves a machine consumer with an empty payload stream.\n\n## Background\n\nRoughly half the command arms accepting the flag propagate their failures upward with no envelope of their own. The top-level handler writes a human diagnostic line and nothing machine-readable, so a consumer sees an empty payload stream and has to parse prose to learn why the command failed. The generated agent bridge, which drives this surface, reports those failures as a single opaque execution error carrying the diagnostic line inside a shell-command string.\n\nThe handler already renders an envelope for three startup failure classes, reading the flag out of the process arguments because those failures precede a parsed command. Broadening that renderer to cover any failure makes envelope presence structural: no path reaches the printer and emits nothing machine-readable, so an arm cannot regress by omission and no per-arm conversion is needed.\n\nThe code comes from a classifier over the typed error, built as a structural parallel to the exit-status classifier beside it, so the two remain recognisably the same cascade over the same typed errors. The exit status continues to follow the reported code.\n\nThe classifier can only distinguish a failure whose type it can name. One class the probes rely on — an unreadable stored record — is raised as a crate-private type until that type is given a public name, so the classifier is written against a surface where that exposure has already landed; otherwise the arm reached only through corrupted records classifies as generic no matter how the cascade is written.\n\nFailures rejected during argument parsing sit outside this. The argument parser reports them and exits before any command dispatch, on a status that already equals the invalid-argument class.\n\n## Success Criteria\n\n- [hard] REQ-01: A failure reaching the top-level printer under the machine-readable flag renders an error envelope on the payload stream.\n- [hard] REQ-02: The rendered envelope carries a registered error code chosen by a classifier over the typed error rather than one fixed code.\n- [hard] REQ-03: The process exit status equals the status the rendered code maps to.\n- [hard] REQ-04: An arm that already renders its own envelope emits exactly one envelope, unchanged in code and detail.\n- [hard] REQ-05: The classifier distinguishes each typed error the exit-status classifier distinguishes, so a distinguishable failure is not reported under the generic code.\n- [hard] REQ-06: The human diagnostic line still reaches the diagnostic stream while the payload stream carries the envelope alone.\n- [hard] REQ-07: A previously propagating arm reports its failure through the envelope with a resolvable code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "dbe2f2a8-87c0-47a1-94c6-2bca4b6d3b07",
+  "labels": [
+    "type:task",
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:structural-envelope",
+    "satisfies:REQ-02"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Render the structured envelope from the top-level failure printer",
+  "updated_at": "2026-07-27T21:43:44.885062384Z"
+}

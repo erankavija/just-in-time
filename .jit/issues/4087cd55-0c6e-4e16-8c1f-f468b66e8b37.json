@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T21:43:44.885062384Z",
+  "dependencies": [
+    "777d00da-22d5-49e7-a005-f2da47d5f4b6",
+    "7c50ef89-0f6d-4b04-b921-84a81d96ecf1",
+    "dbe2f2a8-87c0-47a1-94c6-2bca4b6d3b07"
+  ],
+  "description": "Envelope emission stops being per-arm work: the top-level failure printer renders the structured envelope for any failure that reaches it, so no command arm accepting the machine-readable flag can fail without producing machine-readable output.\n\n## Background\n\nNine distinct mechanisms emit the envelope today — a shared macro, five named helpers, and thirty-five inline sites — each classifying the error at its own call site. Roughly half the arms accepting the flag use none of them and propagate their failures to the top-level handler, which writes a human diagnostic line and leaves the payload stream empty. Several arms that do emit an envelope classify one error class and propagate the rest.\n\nConverting arm by arm would leave the property resting on convention, with nothing structural stopping the next arm from omitting it. Rendering from the top-level printer instead makes envelope presence unmissable, because the printer that used to produce plain text alone becomes the renderer.\n\nTwo emission sites remain individually wrong and move onto the convention: one writes its envelope to the diagnostic stream, compactly serialized, under an unregistered code, and the server control writes a machine-readable object of its own shape carrying no code at all, exiting a literal status.\n\nFailures the argument parser rejects sit outside this: the parser reports and exits before dispatch, already on the invalid-argument status.\n\n## Success Criteria\n\n- [hard] REQ-01: A failure reaching the top-level printer under the machine-readable flag renders an error envelope on the payload stream.\n- [hard] REQ-02: The rendered code comes from a classifier over the typed error rather than one fixed value.\n- [hard] REQ-03: An arm that already renders its own envelope keeps its code and detail, emitting exactly one envelope.\n- [hard] REQ-04: Each emission site writes the envelope to the payload stream in the shared serialization under a registered code.\n- [hard] REQ-05: The process exit status follows the reported code at every emission site.\n- [hard] REQ-06: No failing invocation under the flag reports a machine-readable payload of a shape other than the error envelope.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "4087cd55-0c6e-4e16-8c1f-f468b66e8b37",
+  "labels": [
+    "type:story",
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:structural-envelope"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Structural envelope emission for every failing machine-readable invocation",
+  "updated_at": "2026-07-27T21:43:44.885062384Z"
+}

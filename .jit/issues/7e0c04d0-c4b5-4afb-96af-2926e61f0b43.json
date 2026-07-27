@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T21:43:44.885062384Z",
+  "dependencies": [
+    "72835d56-06fa-427c-82fd-a516803723cc",
+    "a193a7cc-a00b-4551-bb30-922a8e015b38"
+  ],
+  "description": "The error codes the machine-readable surface reports become an enumerable, closed vocabulary in which each member carries an explicit exit status, so the status a caller observes matches the failure class the envelope names.\n\n## Background\n\nThe vocabulary is declared as string constants that cannot be iterated, and the map from code to exit status ends in a wildcard. Roughly twenty code strings the surface actually emits are absent from it, so each exits on the generic status whatever its real class.\n\nMeasured against the plain invocation of the identical failure, nine arms disagree: unresolvable identifiers, a duplicate gate key, and a missing preset all report one status without the flag and the generic status with it. One command exits on a literal its own reported code does not map to, and one reports failure inside a success payload with a zero status.\n\nThe generated exit-status reference documents the plain values and binds each row to runtime through the plain invocation alone, so the projection is accurate for one invocation form and silently wrong for the other.\n\nOne emitted failure class cannot be registered inside the output layer at all: an unreadable stored record is raised as a crate-private type the binary cannot name, so it reports the generic code however the classifier is written.\n\nCode strings stay byte-identical throughout. Nothing is renamed and nothing is collapsed, because a machine consumer reads the code string; only the exit status moves, toward the class the plain path already reports.\n\n## Success Criteria\n\n- [hard] REQ-01: The error-code vocabulary is enumerable and maps each member to an exit status with no fallback arm.\n- [hard] REQ-02: Each code string the command surface emits is a registered member, unchanged in spelling.\n- [hard] REQ-03: For a failure reachable in both invocation forms, the two exit statuses are equal.\n- [hard] REQ-04: No command's failure path exits on a literal status its reported code does not determine.\n- [hard] REQ-05: The generated exit-status reference is bound to runtime through both invocation forms.\n- [hard] REQ-06: A failure raised as a crate-private type is reported under a registered code rather than the generic fallback.\n- [hard] REQ-07: Each vocabulary member carries a description of the failure it names, stated once in the vocabulary.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "7e0c04d0-c4b5-4afb-96af-2926e61f0b43",
+  "labels": [
+    "type:story",
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:code-vocabulary"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "An enumerable error-code vocabulary with class-correct exit status",
+  "updated_at": "2026-07-27T21:43:44.885062384Z"
+}

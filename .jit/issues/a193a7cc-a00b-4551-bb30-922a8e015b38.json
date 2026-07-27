@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T21:43:44.885062384Z",
+  "dependencies": [
+    "437ac584-b441-43fb-91bd-a9328f884c12",
+    "e3a11002-7469-438e-b3d0-1b5f6251a1cf"
+  ],
+  "description": "The generated exit-status reference is bound to runtime through the plain invocation only, so a projected row can be accurate for one invocation form and wrong for the other with no test noticing.\n\n## Background\n\nEach row of the generated reference is exercised by an assertion that drives the command and compares the observed status against the projected value. Those assertions use the plain invocation exclusively. Because the machine-readable path derived its status from a separate and incomplete classification, several rows were accurate for the plain form and wrong for the flag form for as long as that divergence existed, while the projection reported no defect.\n\nOnce both paths agree, the binding assertions can cover both forms and hold them agreeing. That closes the projection's blind spot rather than restating documented values a second time.\n\n## Success Criteria\n\n- [hard] REQ-01: Each projected per-command exit-status row is exercised in the plain invocation form and in the machine-readable one.\n- [hard] REQ-02: A row whose two invocation forms disagree fails the suite.\n- [hard] REQ-03: The completeness assertion still fails when a projected row has no runtime binding.\n- [hard] REQ-04: The assertions read the projected value from the projection rather than restating it as a literal.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "a193a7cc-a00b-4551-bb30-922a8e015b38",
+  "labels": [
+    "type:task",
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:code-vocabulary",
+    "satisfies:REQ-04",
+    "enforces:@/invariant/semantic-test-assertions"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Bind the exit-status projection to the machine-readable invocation form",
+  "updated_at": "2026-07-27T21:43:44.885062384Z"
+}

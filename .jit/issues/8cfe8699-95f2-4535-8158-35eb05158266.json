@@ -1,0 +1,41 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T21:43:44.885062384Z",
+  "dependencies": [
+    "24929ba4-32bb-41f8-9458-62776b9fccaa",
+    "2b4b5ddb-a769-4b2d-9b9e-04f7b844da41",
+    "54568bd5-a9cf-40e0-872c-ab7664b8f8dd",
+    "585d55c3-c3f8-411f-b464-d1f2226cc8ed",
+    "6fbd3580-5726-407e-a703-f2fe3a8ca594",
+    "7b5731ab-f94f-4f51-a256-383e7bcacd14",
+    "860dc866-f32d-4d92-b712-fd3222aa0d8a",
+    "9dd880d4-4c8e-4ec5-beec-1832eb07773e",
+    "a971ec3a-8d08-49ee-a758-98d32954f2e8",
+    "b3c9db33-7de3-4f16-882e-04f2d0ed6f57",
+    "c0a64179-e90f-4b99-b24d-aeafc9d3d281",
+    "c4f8a7d2-b684-4060-90f9-bac7b0516d81",
+    "c7ab609d-0b4f-403c-acee-2e8cc8fe34f5",
+    "cfaff7f0-f16b-412e-bb00-627740f6f9e8"
+  ],
+  "description": "The per-namespace survey fragments merge into one committed registry beside the failure probes, reconciled against the arm universe the command definitions declare, so the probes read one typed input rather than seven partial ones.\n\n## Background\n\nThe failure lever for an arm is measured rather than derived, and the measurement is split by namespace so each survey stays bounded. What the probes need is the opposite of that split: one registry, in one place, covering the whole flag-accepting surface.\n\nMeasurement is split across fourteen namespace surveys, so merging is mechanical and reconciliation is what makes the merged file trustworthy. The arm universe is derivable — the leaf commands whose definition declares the machine-readable flag, read out of the argument parser's own command reflection — so the registry can be compared against it, and an arm present in the reflection but absent from the registry is a hole rather than an omission nobody notices. The comparison is the same set-equality shape the exit-status projection already uses for its own rows.\n\nThe registry lands in the test tree rather than beside the survey fragments, because a probe that read its input from the planning directory would break when that directory is archived. The fragments stay where they were written, as the measurement record; the merged registry is the only one anything reads.\n\nEntries are merged without reinterpretation: a lever recorded by a survey reaches the registry as it was recorded, so a disagreement between the registry and the measurement is a merge defect rather than a judgement call.\n\n## Success Criteria\n\n- [hard] REQ-01: One committed registry in the test tree carries an entry for each arm the command definitions declare with the machine-readable flag.\n- [hard] REQ-02: Each entry carries its invocation, its setup, and its expected failure, or an exemption reason in place of the invocation.\n- [hard] REQ-03: An assertion fails when the registry's arm set differs from the set derived from the command definitions.\n- [hard] REQ-04: An assertion fails when an entry omits a field the registry shape requires.\n- [hard] REQ-05: The registry is read through a typed deserialization rather than by scanning text.\n- [hard] REQ-06: The registry is the only failure-lever input any test reads.\n- [hard] REQ-07: Each merged entry carries the content its survey recorded, unchanged.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "8cfe8699-95f2-4535-8158-35eb05158266",
+  "labels": [
+    "type:task",
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:arm-conformance",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "The canonical failure-lever registry the probes read",
+  "updated_at": "2026-07-27T21:43:44.885062384Z"
+}

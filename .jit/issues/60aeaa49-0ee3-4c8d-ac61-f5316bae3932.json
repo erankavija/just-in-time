@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T21:43:44.885062384Z",
+  "dependencies": [
+    "f4346059-afd1-459d-8028-3227787061dd"
+  ],
+  "description": "A failing invocation under the machine-readable flag writes exactly one JSON document on the payload stream and nothing else, asserted across the probed command arms rather than held by convention.\n\n## Background\n\nThe stream split is deliberate: the envelope goes to the payload stream and the human diagnostic to the diagnostic stream, a division existing coverage already pins. Measurement across the arms that could be driven into a failure found payload-stream purity already holding, with one emission site as the exception.\n\nIt holds by construction, though, not by assertion. The human output helpers are suppressed under the flag and progress output sits behind flag guards, but nothing fails if a future arm prints an unguarded line ahead of a fallible call.\n\nSuppressing the diagnostic line is not the intent. The contract is that the payload stream carries the envelope alone, which is what a parser reading that stream depends on.\n\n## Success Criteria\n\n- [hard] REQ-01: For a probed arm's forced failure, the payload stream parses as exactly one JSON document.\n- [hard] REQ-02: A non-JSON byte on the payload stream fails the check.\n- [hard] REQ-03: Output preceding the envelope on the payload stream fails the check.\n- [hard] REQ-04: The human diagnostic on the diagnostic stream stays present and is not asserted away.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "60aeaa49-0ee3-4c8d-ac61-f5316bae3932",
+  "labels": [
+    "type:task",
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:arm-conformance",
+    "satisfies:REQ-03"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Pin payload-stream purity on the machine-readable failure path",
+  "updated_at": "2026-07-27T21:43:44.885062384Z"
+}

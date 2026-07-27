@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T21:43:44.885062384Z",
+  "dependencies": [
+    "ec029993-2e68-41dd-b2bd-b3018a35d0d5"
+  ],
+  "description": "An adopter finds the machine-readable failure contract stated once — the envelope, its error code, and the exit status that code determines — with the code vocabulary itself projected into a generated reference page.\n\n## Background\n\nNo adopter page enumerates the error codes; individual codes appear only in worked examples, so a reader receiving an unfamiliar code has nowhere to look it up. The command reference's machine-readable contracts section is the canonical home for the envelope's shape and the generated exit-status page is the canonical home for statuses, but nothing states that a failing invocation under the flag always produces an envelope, or that its code determines the status.\n\nA hand-written code table would be a copy of a fact whose source of truth is the vocabulary in the binary, and would go stale on the first addition. Projecting the page from the vocabulary follows the pattern this crate already uses for its other generated reference pages, and the vocabulary's derive-checked member list is what keeps the projection honest.\n\n## Success Criteria\n\n- [hard] REQ-01: A generated adopter reference lists each error code with its meaning and its exit status, rendered from the vocabulary.\n- [hard] REQ-02: A committed page differing from the rendered output fails a test.\n- [hard] REQ-03: The command reference states the failure contract once and cites the generated pages rather than copying their tables.\n- [hard] REQ-04: The generated page is reachable from the documentation index.\n- [hard] REQ-05: Adopter prose describes current behaviour without narrating what the surface did before.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "9eadd135-d27b-471c-b481-46bbf15084d7",
+  "labels": [
+    "type:story",
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:failure-contract-docs",
+    "per:@/charter/D-13"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "One canonical adopter home for the machine-readable failure contract",
+  "updated_at": "2026-07-27T21:43:44.885062384Z"
+}

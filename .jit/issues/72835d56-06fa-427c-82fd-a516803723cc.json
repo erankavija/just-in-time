@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T21:43:44.885062384Z",
+  "dependencies": [
+    "437ac584-b441-43fb-91bd-a9328f884c12",
+    "f6c95115-2eca-4046-9372-9f2ef7cf8bf9"
+  ],
+  "description": "A caller branching on the process exit status reads a different failure class depending on whether the machine-readable flag was passed. Assertions that drive one failure through both invocation forms and compare the two statuses are what hold them converged.\n\n## Background\n\nNine failures were measured exiting differently with the flag than without it. An unresolvable identifier exits 3 plain and 1 under the flag in the dependency, claim, and gate namespaces; a duplicate gate key exits 6 plain and 1 under the flag; a missing preset exits 3 plain and 1 under the flag; a preset application with a failing target exits 1 plain and 0 under the flag.\n\nThe causes are repaired in the vocabulary and in the individual failure paths. What is missing is the assertion that keeps them converged: no existing coverage drives a single failure through both invocation forms and compares the resulting statuses, which is why the divergence went unnoticed for as long as it did.\n\nThe assertions belong beside the existing exit-status coverage, and they compare the two observed statuses rather than restating an expected number per row.\n\n## Success Criteria\n\n- [hard] REQ-01: For a failure reachable in both invocation forms, the plain exit status equals the machine-readable one.\n- [hard] REQ-02: An unresolvable identifier reports the not-found status under the flag in the dependency, claim, and gate namespaces.\n- [hard] REQ-03: A duplicate gate key reports the already-exists status under the flag.\n- [hard] REQ-04: A missing preset reports the not-found status under the flag.\n- [hard] REQ-05: A preset application with a failing target reports the same non-zero status in both invocation forms.\n- [hard] REQ-06: An undecodable stored record reports the same status in both invocation forms.\n- [hard] REQ-07: The assertions compare the two observed statuses rather than a status literal copied into the test.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "72835d56-06fa-427c-82fd-a516803723cc",
+  "labels": [
+    "type:task",
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:code-vocabulary",
+    "satisfies:REQ-04",
+    "enforces:@/invariant/semantic-test-assertions"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Verify exit-status parity between the two invocation forms",
+  "updated_at": "2026-07-27T21:43:44.885062384Z"
+}

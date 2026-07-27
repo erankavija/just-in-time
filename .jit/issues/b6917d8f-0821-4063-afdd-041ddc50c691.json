@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T21:43:44.885062384Z",
+  "dependencies": [
+    "059e13e2-0970-4cc8-8a4e-21cc8b3d83ab"
+  ],
+  "description": "The error-code vocabulary becomes a closed enum with a derive-checked member list, so the codes the machine-readable surface reports can be enumerated and mapped to an exit status without a fallback arm.\n\n## Background\n\nThe vocabulary is declared as a unit struct carrying associated string constants. Nothing can iterate it, so a twenty-first constant is invisible to any reflection, and the map from code string to exit status ends in a wildcard that classifies an unrecognised code as a generic failure. Neither is there anywhere for a code's meaning to live: no source states what a given code tells its reader, so a reference page for adopters would have to invent that prose. All three properties block later work: a projected reference cannot render a list that does not exist, an exit-status guarantee cannot rest on a map that fails open, and a projection cannot carry a meaning its source does not hold.\n\nThe conversion is shape-only. Each code string stays byte-identical on the wire and each existing code keeps the exit status it maps to today, so no consumer observes a change.\n\nThe freshness discipline follows the event-tag catalog already in this crate: a public member list beside the type, checked against the variants the type's own derive produces, so a member left out of the list fails the suite rather than being mirrored by hand.\n\n## Success Criteria\n\n- [hard] REQ-01: The error-code vocabulary is an enum whose members render the code strings the surface emits today, byte for byte.\n- [hard] REQ-02: A public member list enumerates the vocabulary, and a test bound to the type's own derive fails when a member is missing from that list.\n- [hard] REQ-03: The member-to-exit-status map is an exhaustive match with no wildcard arm, so a new member is a compile error until its exit status is stated.\n- [hard] REQ-04: Each code the vocabulary carried before the conversion maps to the same exit status afterwards.\n- [hard] REQ-05: A code arriving as text resolves to its member, and an unrecognised string is reported as unresolved rather than mapped silently.\n- [hard] REQ-06: Each member carries a description of the failure it names, supplied by an exhaustive match with no wildcard arm, so a new member is a compile error until its description is stated.\n\n## Notes\n\nThe member list is the freshness anchor for later projection work, so it is public rather than private to the module.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-27T21:43:44.885062384Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b6917d8f-0821-4063-afdd-041ddc50c691",
+  "labels": [
+    "type:task",
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:code-vocabulary",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Make the error-code vocabulary an enumerable type",
+  "updated_at": "2026-07-27T21:44:00.925822379Z"
+}

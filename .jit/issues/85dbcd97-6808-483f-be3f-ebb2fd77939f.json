@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-27T21:43:44.885062384Z",
+  "dependencies": [
+    "6ebd3d03-6cb2-458a-bb61-dad7604340fc"
+  ],
+  "description": "The error-code vocabulary reaches adopters as a generated reference page projected from the vocabulary itself, listing each code with its meaning and the exit status it maps to.\n\n## Background\n\nNo adopter page enumerates the error codes. Individual codes appear in worked examples across several pages, so a reader who receives an unfamiliar code has nowhere to look it up. A hand-written table would be a copy of a fact whose source of truth is the vocabulary in the binary, and would go stale on the first addition. Both columns the page carries — the meaning and the exit status — are read from the vocabulary, which holds a description per member alongside its exit class, so the page renders its source rather than authoring prose beside it.\n\nThe projection follows the pattern this crate already uses for its other generated reference pages: a rendering function beside the definitions, a committed page carrying a generated banner, and a test asserting the committed file equals the rendered output byte for byte, with an explicit regeneration path. Because the vocabulary is a closed enum with a derive-checked member list, the page cannot omit a code without failing that check.\n\nThe exit-status column is read from the same map the runtime uses, so the page states the mapping rather than restating it. A separate hand-listed enumeration in the output layer does not break when a status is added; this page introduces no second instance of that hazard.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed adopter reference page lists each error code with its meaning and its exit status.\n- [hard] REQ-02: The page is rendered from the error-code vocabulary rather than hand-written, and carries a generated banner.\n- [hard] REQ-03: A test fails when the committed page differs from the rendered output.\n- [hard] REQ-04: Adding a member to the vocabulary without regenerating the page fails that test.\n- [hard] REQ-05: The exit-status column is read from the runtime mapping rather than restated beside it.\n- [hard] REQ-06: The page is reachable from the documentation index alongside the other reference pages.\n- [hard] REQ-07: The page cites no path under the planning artifact directory.\n- [hard] REQ-08: Each code's meaning is read from the vocabulary's own description rather than authored on the page.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "85dbcd97-6808-483f-be3f-ebb2fd77939f",
+  "labels": [
+    "type:task",
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:failure-contract-docs",
+    "satisfies:REQ-07",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "A generated adopter reference for the error-code vocabulary",
+  "updated_at": "2026-07-27T21:43:44.885062384Z"
+}
