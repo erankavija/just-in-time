@@ -1365,6 +1365,15 @@
    "situation": "Two inconsistencies surfaced while verifying epic criteria, neither reaching any of the 15. (1) A markdown link whose target is a directory is navigation to archival discovery, a missing_asset ERROR to jit doc check-links, and 'not found in the working tree' to jit validate when linked directly - for a path that exists. (2) jit doc check-links reports missing_document for a commit-pinned reference whose file left the working tree, without honouring the pin.",
    "lead_analysis": "Both verified before escalating, and both dissolved as criterion violations. For (2) the decisive check was that 41aa1b75's three references resolve at commit 6b799832 (git cat-file -e succeeds for each) and jit validate reports zero errors, so the references do resolve and the checker is the outlier. Every previous decision to file outside this epic has been the owner's.",
    "resolution": "Owner chose to file both. f9e42a43 (directory link target consistency) and f289ff18 (honour the commit pin when checking links), both bug / milestone:v1.0 / component:core with cargo-ci + code-review, wired under 9db27a3a."
+  },
+  {
+   "id": "E17",
+   "wave": "9 / 11 / 12",
+   "issue": "0b3840f1, 58c56743, 4a6fb8c1",
+   "category": "5a - same root-cause finding repeated MAX_SAME_FINDING_REPEATS times",
+   "situation": "0b3840f1's doc-review AND code-review independently failed on the same two blocking findings: docs/reference/cli-commands.md documents neither `jit doc dir` nor `jit doc conformance` (4a6fb8c1 REQ-05 and REQ-06), and docs/reference/configuration.md's template section carries no doc_area/{container.dir} field contract. Both are owned two waves downstream, and 58c56743 depended on 0b3840f1, so the content 0b3840f1 needed could not be written until 0b3840f1 closed.",
+   "lead_analysis": "Fourth occurrence of one root cause: E2 on b3fc1a92 (wave 2), E4 on f88a16d9 (wave 3), E14 on 89b5899a (wave 8), this one (wave 9). MAX_SAME_FINDING_REPEATS is 3, so policy 5a applies independent of any rework counter. The cause is the plan's sequencing: every documentation issue sits after the checkpoint stories, while each checkpoint's criteria are about the delivered surface INCLUDING its documentation. Patching it a third time with a remediation task would have left 58c56743 and 4a6fb8c1 pending when 143388dc - five gates, still ahead - gates, and 143388dc carries doc-review.",
+   "resolution": "Owner chose reordering over a third remediation task. Dropped 58c56743 -> 0b3840f1; the epic now depends on 0b3840f1 directly so its membership stays backed by the DAG. Both documentation tasks run now, since every implementation prerequisite they have is Done, and 0b3840f1 re-gates last against a documented surface. 4a6fb8c1 -> 58c56743 is preserved, because 4a6fb8c1's REQ-07 must cite the canonical home 58c56743 creates. Validate and divergence both clean after the rewire."
   }
  ],
  "rework_counts": {
