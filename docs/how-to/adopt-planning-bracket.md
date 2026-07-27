@@ -79,7 +79,8 @@ applies_to  = ["epic"]           # container types that require a bracket
   role        = "planning"       # node P
   type        = "planning"       # P's issue type (must exist in [type_hierarchy])
   gates       = ["plan-review"]  # review checkpoint applied to P
-  doc         = "dev/active/{container.id}-plan.md"   # where P's plan doc lives
+  doc_area    = "dev/active"     # issue-scoped area {container.dir} resolves in
+  doc         = "{container.dir}/plan.md"
 
   [[template.nodes]]
   role        = "breakdown"      # node B
@@ -102,8 +103,15 @@ The research example is identical in shape, with `goal` substituted for `epic`
 [`docs/examples/research/templates.toml`](../examples/research/templates.toml).
 
 The engine hardcodes **none** of these names — `epic`/`goal`, `planning`,
-`breakdown`, and the preset names are all read from the template. To make `P`'s
-plan an inline body rather than an external file, omit the `doc` field.
+`breakdown`, and the preset names are all read from the template.
+
+`doc_area` is the node's area declaration: it names one of the issue-scoped areas
+your [`[documentation]` table](../reference/configuration.md#documentation)
+declares, and an undeclared area fails the apply. Inside a
+`doc` path, `{container.dir}` interpolates to the canonical artifact directory
+`C` owns in that area — the directory `jit doc dir <C> dev/active` prints — so
+the filename beside it is the artifact's own name, `plan.md`. To make `P`'s plan
+an inline body rather than an external file, omit the `doc` field.
 
 The `planning` / `breakdown` node `role`s and the `container` anchor `name` above
 are the defaults the bracket tooling assumes. To use your own vocabulary, name
@@ -262,23 +270,25 @@ jit graph deps epic-123
 
 ## Step 6 — Write and review the plan
 
-Author and link two artifacts to `P`:
+Author and link two artifacts to `P`, both inside the directory
+`jit doc dir <C> dev/active` resolves:
 
-- `dev/active/<C-id>-plan.md`: concise shared architecture, decisions, risks,
-  sources, and a generated overview;
-- `dev/active/<C-id>-breakdown.json`: the authoritative bare batch-create array,
-  including complete issue bodies, edges, and planning metadata.
+- `plan.md`: concise shared architecture, decisions, risks, sources, and a
+  generated overview;
+- `breakdown.json`: the authoritative bare batch-create array, including
+  complete issue bodies, edges, and planning metadata.
 
 Validate the manifest, check the generated region, and run native validation
 without allocating ids or writing issues/events:
 
 ```bash
+DIR="$(jit doc dir <C> dev/active)"
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py validate \
-  dev/active/<C-id>-breakdown.json --config .jit/config.toml \
-  --plan dev/active/<C-id>-plan.md \
+  "$DIR/breakdown.json" --config .jit/config.toml \
+  --plan "$DIR/plan.md" \
   --known-source <every-valid-source-id> ... \
   --required-source <mandatory-source-id> ... --deny-warnings
-jit issue batch-create --from-json dev/active/<C-id>-breakdown.json --dry-run --json
+jit issue batch-create --from-json "$DIR/breakdown.json" --dry-run --json
 ```
 
 Then drive `P` through `plan-review`. Review fails missing/invalid manifests,
