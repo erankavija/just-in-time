@@ -1,0 +1,20 @@
+{
+  "branch": "worktree-agent-b6917d8f",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "7d617076e90981f246b6aea03e3714949f6cd329",
+  "completed_at": "2026-07-27T22:44:08.841109790Z",
+  "duration_ms": 556343,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "b6917d8f-0821-4063-afdd-041ddc50c691",
+  "message": null,
+  "run_id": "f7afa2bd-6ada-4cd7-abd1-1f2745f28314",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T22:34:52.497571533Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- incremental-state output ---\nnon-empty incremental directories under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-b6917d8f/target:\n/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-b6917d8f/target/jit-stale-child-test-cache/debug/incremental\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✓ test: 3993 passed, 0 failed, 14 ignored\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1335 bytes=26432166)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1315715368/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✗ incremental-state: FAILED (exit 1)\n\n",
+  "tree_dirty": false
+}

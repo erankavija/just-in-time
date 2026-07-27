@@ -1,0 +1,25 @@
+{
+  "branch": "worktree-agent-b6917d8f",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "5544db2e8dc510245fbe552005a00018a8609d49",
+  "completed_at": "2026-07-27T23:57:20.120211885Z",
+  "duration_ms": 201261,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The enumerable error-code vocabulary meets all six hard success criteria; the prior unresolved-code fallback is removed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b6917d8f-0821-4063-afdd-041ddc50c691",
+  "message": null,
+  "run_id": "550f2c08-e4e9-4c71-89d5-07e3f09859b0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T23:53:58.858383220Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7d617076, c5249c9e, 49ded1c7, d8212860, d5cca3f7, 5544db2e (`jit:b6917d8f`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-27T23:46:51.836704894+00:00); prior code-review failed (exit 1) and its sole blocking finding is addressed\nTruncation recovery: reread every tagged patch by commit/path and narrowed current enum, constructor, caller, and test reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The enumerable error-code vocabulary meets all six hard success criteria; the prior unresolved-code fallback is removed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,35 @@
+{
+  "branch": "worktree-agent-b6917d8f",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "49ded1c7661c0fde16dbdc3af9742f09d1c2726a",
+  "completed_at": "2026-07-27T23:31:03.830526366Z",
+  "duration_ms": 157345,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 341,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "json_error_exit_code converts unresolved JSON error-code text to GenericError without reporting it, leaving REQ-05 unmet."
+      }
+    ],
+    "summary": "Unregistered JSON error codes are still silently classified as generic at the process boundary.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b6917d8f-0821-4063-afdd-041ddc50c691",
+  "message": null,
+  "run_id": "dd90f505-5ee2-4ff1-a2fc-78c17a5bd86a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T23:28:26.485231497Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8326 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-b6917d8f\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa5e8-869e-7e41-a25b-d6d6cacb7103\n--------\nuser\n--- 8313 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7d617076, c5249c9e, 49ded1c7 (`jit:b6917d8f`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci: passed (exit 0, 2026-07-27T23:21:35Z); code-review: failed (prior run, exit 1, 2026-07-27T22:55:32Z)\nTruncation recovery: partitioned tagged patches by commit/path and reread current enum, helper, and tests\n\n1. [blocking][issue-impact] `json_error_exit_code` explicitly converts `JsonError::exit_code()` failures back to `ExitCode::GenericError` without reporting the unresolved code at `crates/jit/src/main.rs:341-345`. Existing text codes such as `GATE_ERROR` continue through this helper, and the new test at line 354 locks that fallback in. This leaves REQ-05 unmet: unknown text is still silently classified as generic at the process boundary.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Unregistered JSON error codes are still silently classified as generic at the process boundary.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"json_error_exit_code converts unresolved JSON error-code text to GenericError without reporting it, leaving REQ-05 unmet.\",\"file\":\"crates/jit/src/main.rs\",\"line\":341,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
