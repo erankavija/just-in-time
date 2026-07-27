@@ -1,11 +1,27 @@
 {
-  "id": "bac2a42b-160b-45bc-8ba0-357822d0a1ae",
-  "title": "Consolidate configuration into single source of truth",
-  "description": "Eliminate configuration fragmentation by consolidating .jit/labels.json into .jit/config.toml, removing misleading namespace strategic flags, and enabling API-driven configuration for web UI. Add missing validation settings (default_type, require_type_label, label_regex) and provide migration tooling for existing repos. This refactoring eliminates duplicate hierarchy data, clarifies that strategic classification is type-based only, and ensures single source of truth for all configuration.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-cli",
+  "claimed_at": "2025-12-26T20:08:39.837116893Z",
+  "context": {},
+  "created_at": "2025-12-26T21:11:43.700164870Z",
   "dependencies": [],
+  "description": "Eliminate configuration fragmentation by consolidating .jit/labels.json into .jit/config.toml, removing misleading namespace strategic flags, and enabling API-driven configuration for web UI. Add missing validation settings (default_type, require_type_label, label_regex) and provide migration tooling for existing repos. This refactoring eliminates duplicate hierarchy data, clarifies that strategic classification is type-based only, and ensures single source of truth for all configuration.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/5fe00921-production-stability/dev/active/config-consolidation-plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-26-config-consolidation.md"
+    }
+  ],
+  "done_at": "2025-12-26T21:11:58.006408103Z",
   "gates_required": [
     "code-review",
     "tests",
@@ -16,54 +32,38 @@
   "gates_status": {
     "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-26T21:11:29.794321988Z"
+      "updated_at": "2025-12-26T21:11:29.794321988Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2025-12-26T21:11:51.527342442Z"
+      "updated_at": "2025-12-26T21:11:51.527342442Z",
+      "updated_by": null
     },
     "fmt": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-26T21:11:43.095026427Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-26T21:11:19.875950110Z"
+      "updated_at": "2025-12-26T21:11:43.095026427Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2025-12-26T20:08:34.797914110Z"
+      "updated_at": "2025-12-26T20:08:34.797914110Z",
+      "updated_by": null
+    },
+    "tests": {
+      "status": "passed",
+      "updated_at": "2025-12-26T21:11:19.875950110Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/config-consolidation-plan.md",
-      "commit": null,
-      "label": null,
-      "doc_type": null,
-      "format": "markdown"
-    },
-    {
-      "path": "dev/sessions/session-2025-12-26-config-consolidation.md",
-      "commit": null,
-      "label": null,
-      "doc_type": null,
-      "format": "markdown"
-    }
-  ],
+  "id": "bac2a42b-160b-45bc-8ba0-357822d0a1ae",
   "labels": [
     "type:story",
     "epic:production-stability",
     "story:config-consolidation"
   ],
-  "created_at": "2025-12-26T21:11:43.700164870Z",
-  "updated_at": "2026-07-05T19:51:13.073623959Z",
-  "claimed_at": "2025-12-26T20:08:39.837116893Z",
-  "done_at": "2025-12-26T21:11:58.006408103Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Consolidate configuration into single source of truth",
+  "updated_at": "2026-07-27T10:04:51.021439431Z"
 }

@@ -1,11 +1,18 @@
 {
-  "id": "0587a73a-be52-465c-a2f2-dcac1cb4ebe6",
-  "title": "Implement comprehensive error recovery",
-  "description": "Conduct systematic audit and improvement of error handling across all I/O operations to ensure graceful recovery from all common failure modes. Implement detection and recovery for partial writes, corrupted JSON, lock timeouts, missing file references, and network errors. Add comprehensive validation command (jit validate) with auto-fix capability for common issues like orphaned locks, broken references, and schema violations. Implement failure injection tests for each error category to verify recovery mechanisms. Add detailed error logging with context and create operator runbook for error recovery procedures. This work is critical for production stability and ensuring no data loss or corruption under adverse conditions.",
-  "state": "rejected",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2025-12-19T23:03:19.319199080Z",
   "dependencies": [],
+  "description": "Conduct systematic audit and improvement of error handling across all I/O operations to ensure graceful recovery from all common failure modes. Implement detection and recovery for partial writes, corrupted JSON, lock timeouts, missing file references, and network errors. Add comprehensive validation command (jit validate) with auto-fix capability for common issues like orphaned locks, broken references, and schema violations. Implement failure injection tests for each error category to verify recovery mechanisms. Add detailed error logging with context and create operator runbook for error recovery procedures. This work is critical for production stability and ensuring no data loss or corruption under adverse conditions.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "implementation-plan",
+      "format": "markdown",
+      "label": "Implementation Plan",
+      "path": "dev/archive/5fe00921-production-stability/dev/plans/error-recovery-0587a73a.md"
+    }
+  ],
   "gates_required": [
     "tests",
     "clippy",
@@ -15,41 +22,34 @@
   "gates_status": {
     "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-10T00:24:02.938816768Z"
+      "updated_at": "2026-04-10T00:24:02.938816768Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-10T00:24:19.155300740Z"
+      "updated_at": "2026-04-10T00:24:19.155300740Z",
+      "updated_by": "auto:executor"
     },
     "fmt": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-10T00:24:10.609024515Z"
+      "updated_at": "2026-04-10T00:24:10.609024515Z",
+      "updated_by": "auto:executor"
     },
     "tests": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-10T00:23:18.852440069Z"
+      "updated_at": "2026-04-10T00:23:18.852440069Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/plans/error-recovery-0587a73a.md",
-      "commit": null,
-      "label": "Implementation Plan",
-      "doc_type": "implementation-plan",
-      "format": "markdown"
-    }
-  ],
+  "id": "0587a73a-be52-465c-a2f2-dcac1cb4ebe6",
   "labels": [
     "type:task",
     "epic:production-stability",
     "milestone:v1.0",
     "component:core"
   ],
-  "created_at": "2025-12-19T23:03:19.319199080Z",
-  "updated_at": "2026-06-01T21:53:01.399737076+00:00"
+  "priority": "high",
+  "state": "rejected",
+  "title": "Implement comprehensive error recovery",
+  "updated_at": "2026-07-27T10:04:51.021439431Z"
 }

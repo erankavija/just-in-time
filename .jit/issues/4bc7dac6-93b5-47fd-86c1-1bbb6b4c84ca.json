@@ -1,11 +1,19 @@
 {
-  "id": "4bc7dac6-93b5-47fd-86c1-1bbb6b4c84ca",
-  "title": "Add validation for transitive reduction in dependency DAG",
-  "description": "Ensure dependency DAG maintains transitive reduction invariant - no redundant edges that are already reachable via other paths. Found actual redundancy in Epic 4a00b2b0 with edge to 241b7002 (also reachable via 4cb2682e→14303b30). Implement validation check in 'jit validate', add --fix flag to auto-clean, and add comprehensive tests.",
-  "state": "done",
-  "priority": "critical",
   "assignee": "agent:copilot-cli",
+  "claimed_at": "2025-12-21T21:57:57.405674385Z",
+  "context": {},
+  "created_at": "2025-12-21T21:56:52.190908512Z",
   "dependencies": [],
+  "description": "Ensure dependency DAG maintains transitive reduction invariant - no redundant edges that are already reachable via other paths. Found actual redundancy in Epic 4a00b2b0 with edge to 241b7002 (also reachable via 4cb2682e→14303b30). Implement validation check in 'jit validate', add --fix flag to auto-clean, and add comprehensive tests.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "label": "Implementation Plan",
+      "path": "dev/archive/5fe00921-production-stability/dev/active/transitive-reduction-validation-plan.md"
+    }
+  ],
+  "done_at": "2025-12-21T22:04:26.238863407Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,48 +22,40 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-21T22:04:20.681792838Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2025-12-21T21:56:52.190747162Z"
-    },
     "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-21T22:04:17.819486462Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-21T22:04:16.543674920Z"
+      "updated_at": "2025-12-21T22:04:17.819486462Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2025-12-21T22:04:26.235711418Z"
+      "updated_at": "2025-12-21T22:04:26.235711418Z",
+      "updated_by": null
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_at": "2025-12-21T22:04:16.543674920Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_at": "2025-12-21T21:56:52.190747162Z",
+      "updated_by": null
+    },
+    "tests": {
+      "status": "passed",
+      "updated_at": "2025-12-21T22:04:20.681792838Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/transitive-reduction-validation-plan.md",
-      "commit": null,
-      "label": "Implementation Plan",
-      "doc_type": "design"
-    }
-  ],
+  "id": "4bc7dac6-93b5-47fd-86c1-1bbb6b4c84ca",
   "labels": [
     "type:task",
     "epic:production-stability",
     "milestone:v1.0"
   ],
-  "created_at": "2025-12-21T21:56:52.190908512Z",
-  "updated_at": "2026-07-05T19:51:12.964100989Z",
-  "claimed_at": "2025-12-21T21:57:57.405674385Z",
-  "done_at": "2025-12-21T22:04:26.238863407Z"
+  "priority": "critical",
+  "state": "done",
+  "title": "Add validation for transitive reduction in dependency DAG",
+  "updated_at": "2026-07-27T10:04:51.021439431Z"
 }

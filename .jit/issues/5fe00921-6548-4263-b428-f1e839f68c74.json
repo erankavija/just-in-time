@@ -1,10 +1,8 @@
 {
-  "id": "5fe00921-6548-4263-b428-f1e839f68c74",
-  "title": "Epic: Production Stability",
-  "description": "Ensure production-grade reliability and performance for v1.0 release through bulk operations support, comprehensive error recovery mechanisms, and performance benchmarking. This epic addresses critical requirements for handling real-world workloads at scale (1000+ issues) and ensuring graceful recovery from all common failure modes without data loss or corruption. These capabilities are essential for stable production deployments.",
-  "state": "done",
-  "priority": "high",
+  "archived_from": "done",
   "assignee": null,
+  "context": {},
+  "created_at": "2025-12-19T23:02:42.961146227Z",
   "dependencies": [
     "44d6f247-8ae1-48f2-9ebd-8f5af86fb4ce",
     "40f594a7-1a1a-4ff2-88cb-b91008c04c89",
@@ -19,24 +17,27 @@
     "ba97487f-9936-4f6b-aad1-ca61c33eb840",
     "bac2a42b-160b-45bc-8ba0-357822d0a1ae"
   ],
-  "gates_required": [],
-  "gates_status": {},
-  "context": {},
+  "description": "Ensure production-grade reliability and performance for v1.0 release through bulk operations support, comprehensive error recovery mechanisms, and performance benchmarking. This epic addresses critical requirements for handling real-world workloads at scale (1000+ issues) and ensuring graceful recovery from all common failure modes without data loss or corruption. These capabilities are essential for stable production deployments.",
   "documents": [
     {
-      "path": "dev/active/production-stability-design.md",
       "commit": null,
+      "doc_type": "design",
       "label": "Design Document",
-      "doc_type": "design"
+      "path": "dev/archive/5fe00921-production-stability/dev/active/production-stability-design.md"
     }
   ],
+  "done_at": "2026-06-01T23:00:20.819367502Z",
+  "first_ready_at": "2026-06-01T23:00:12.001001930Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "5fe00921-6548-4263-b428-f1e839f68c74",
   "labels": [
     "type:epic",
     "epic:production-stability",
     "milestone:v1.0"
   ],
-  "created_at": "2025-12-19T23:02:42.961146227Z",
-  "updated_at": "2026-07-05T21:44:30.582019485Z",
-  "first_ready_at": "2026-06-01T23:00:12.001001930Z",
-  "done_at": "2026-06-01T23:00:20.819367502Z"
+  "priority": "high",
+  "state": "archived",
+  "title": "Epic: Production Stability",
+  "updated_at": "2026-07-27T10:04:51.021439431Z"
 }

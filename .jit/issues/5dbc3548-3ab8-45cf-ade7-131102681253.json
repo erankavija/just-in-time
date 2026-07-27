@@ -1,29 +1,29 @@
 {
-  "id": "5dbc3548-3ab8-45cf-ade7-131102681253",
-  "title": "Bug: Issue deletions not immediately reflected in query/validate operations",
-  "description": "When deleting issues with `jit issue delete`, the changes are not immediately reflected in `jit query` and `jit validate` commands until the deletions are committed to git.\n\n## Steps to Reproduce\n1. Create test issues: `jit issue create -t \"Test Issue\"`\n2. Delete the issue: `jit issue delete <id>`\n3. Run validation: `jit validate`\n4. Run query: `jit query all`\n\n## Expected Behavior\n- Deleted issues should immediately disappear from all query operations\n- Validation should not see deleted issues\n- JIT should operate on current filesystem state\n\n## Actual Behavior\n- Deleted issue files are removed from `.jit/issues/`\n- BUT `jit query all` still returns the deleted issues\n- AND `jit validate` still validates against deleted issues\n- Issues only disappear after committing the deletions to git\n\n## Root Cause\nThe storage layer appears to be reading from git's index/tree rather than the actual filesystem state.\n\n## Why This is a Problem\n1. JIT should work independently of git (git integration is optional)\n2. Users expect immediate consistency - delete should mean deleted everywhere\n3. Creates confusion when validation fails on issues that were just deleted\n4. Violates principle of least surprise\n\n## Impact\n- **Severity**: Medium\n- **Frequency**: Every time issues are deleted\n- **User Experience**: Confusing and frustrating\n\n## Suggested Fix\nThe storage layer should always read from the filesystem first, not from git. Git should only be used for optional version tracking, not as the primary data source.",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
-  "dependencies": [],
-  "gates_required": [],
-  "gates_status": {},
   "context": {},
+  "created_at": "2026-02-12T23:40:34.514647Z",
+  "dependencies": [],
+  "description": "When deleting issues with `jit issue delete`, the changes are not immediately reflected in `jit query` and `jit validate` commands until the deletions are committed to git.\n\n## Steps to Reproduce\n1. Create test issues: `jit issue create -t \"Test Issue\"`\n2. Delete the issue: `jit issue delete <id>`\n3. Run validation: `jit validate`\n4. Run query: `jit query all`\n\n## Expected Behavior\n- Deleted issues should immediately disappear from all query operations\n- Validation should not see deleted issues\n- JIT should operate on current filesystem state\n\n## Actual Behavior\n- Deleted issue files are removed from `.jit/issues/`\n- BUT `jit query all` still returns the deleted issues\n- AND `jit validate` still validates against deleted issues\n- Issues only disappear after committing the deletions to git\n\n## Root Cause\nThe storage layer appears to be reading from git's index/tree rather than the actual filesystem state.\n\n## Why This is a Problem\n1. JIT should work independently of git (git integration is optional)\n2. Users expect immediate consistency - delete should mean deleted everywhere\n3. Creates confusion when validation fails on issues that were just deleted\n4. Violates principle of least surprise\n\n## Impact\n- **Severity**: Medium\n- **Frequency**: Every time issues are deleted\n- **User Experience**: Confusing and frustrating\n\n## Suggested Fix\nThe storage layer should always read from the filesystem first, not from git. Git should only be used for optional version tracking, not as the primary data source.",
   "documents": [
     {
-      "path": "dev/plans/5dbc3548-deletion-tracking.md",
       "commit": null,
-      "label": "Implementation plan",
       "doc_type": "plan",
-      "format": "markdown"
+      "format": "markdown",
+      "label": "Implementation plan",
+      "path": "dev/archive/5fe00921-production-stability/dev/plans/5dbc3548-deletion-tracking.md"
     }
   ],
+  "done_at": "2026-02-14T19:21:53.196433823Z",
+  "first_ready_at": "2026-02-12T23:42:14.243163703Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "5dbc3548-3ab8-45cf-ade7-131102681253",
   "labels": [
     "type:bug",
     "epic:prod-stability"
   ],
-  "created_at": "2026-02-12T23:40:34.514647Z",
-  "updated_at": "2026-07-05T19:51:12.980358821Z",
-  "first_ready_at": "2026-02-12T23:42:14.243163703Z",
-  "done_at": "2026-02-14T19:21:53.196433823Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Bug: Issue deletions not immediately reflected in query/validate operations",
+  "updated_at": "2026-07-27T10:04:51.021439431Z"
 }

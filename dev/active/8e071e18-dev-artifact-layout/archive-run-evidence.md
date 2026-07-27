@@ -849,3 +849,76 @@ Issue `f2f05554`. Plan eligible with no blockers. 13 relocated, 0 mirrored, 2 re
 | `dev/design/phase2-collapse-expand.md:248:43` | `dev/design/subgraph-clustering-layout.md` |
 | `dev/design/phase3-advanced-features.md:297:43` | `dev/design/subgraph-clustering-layout.md` |
 | `dev/design/phase3-advanced-features.md:298:43` | `dev/design/phase2-collapse-expand.md` |
+
+## `5fe00921` — dev/archive/5fe00921-production-stability
+Issue `edf71346`. Plan eligible with no blockers. 14 relocated, 0 mirrored, 0 retained, 0 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/config-consolidation-documentation-requirements.md` | `dev/archive/5fe00921-production-stability/dev/active/config-consolidation-documentation-requirements.md` | 44d6f247 |
+| move | `dev/active/config-consolidation-plan.md` | `dev/archive/5fe00921-production-stability/dev/active/config-consolidation-plan.md` | bac2a42b |
+| move | `dev/active/multi-issue-bulk-operations-plan.md` | `dev/archive/5fe00921-production-stability/dev/active/multi-issue-bulk-operations-plan.md` | f5ce80bc |
+| move | `dev/active/production-stability-design.md` | `dev/archive/5fe00921-production-stability/dev/active/production-stability-design.md` | 5fe00921 |
+| move | `dev/active/transitive-reduction-validation-plan.md` | `dev/archive/5fe00921-production-stability/dev/active/transitive-reduction-validation-plan.md` | 4bc7dac6 |
+| move | `dev/plans/5dbc3548-deletion-tracking.md` | `dev/archive/5fe00921-production-stability/dev/plans/5dbc3548-deletion-tracking.md` | 5dbc3548 |
+| move | `dev/plans/benchmarks-8d80b5dd.md` | `dev/archive/5fe00921-production-stability/dev/plans/benchmarks-8d80b5dd.md` | 8d80b5dd |
+| move | `dev/plans/error-recovery-0587a73a.md` | `dev/archive/5fe00921-production-stability/dev/plans/error-recovery-0587a73a.md` | 0587a73a |
+| move | `dev/sessions/session-2025-12-26-config-consolidation.md` | `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-26-config-consolidation.md` | bac2a42b |
+| move | `dev/sessions/session-2025-12-30-bulk-cli-integration.md` | `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-cli-integration.md` | f5ce80bc |
+| move | `dev/sessions/session-2025-12-30-bulk-operations-progress.md` | `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-operations-progress.md` | f5ce80bc |
+| move | `dev/sessions/session-2025-12-30-bulk-phase5-docs.md` | `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-phase5-docs.md` | f5ce80bc |
+| move | `dev/sessions/session-2025-12-30-bulk-state-decision.md` | `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-state-decision.md` | 40f594a7 |
+| move | `dev/sessions/session-2025-12-30-bulk-validation.md` | `dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-validation.md` | d1c51bbd |
+
+### In-content citation warnings (46)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:2306:14` | `dev/active/config-consolidation-documentation-requirements.md` |
+| `dev/active/8e071e18-breakdown.json:2307:14` | `dev/active/config-consolidation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2308:14` | `dev/active/multi-issue-bulk-operations-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2309:14` | `dev/active/production-stability-design.md` |
+| `dev/active/8e071e18-breakdown.json:2310:14` | `dev/active/transitive-reduction-validation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2311:14` | `dev/plans/5dbc3548-deletion-tracking.md` |
+| `dev/active/8e071e18-breakdown.json:2312:14` | `dev/plans/benchmarks-8d80b5dd.md` |
+| `dev/active/8e071e18-breakdown.json:2313:14` | `dev/plans/error-recovery-0587a73a.md` |
+| `dev/active/8e071e18-breakdown.json:2314:14` | `dev/sessions/session-2025-12-26-config-consolidation.md` |
+| `dev/active/8e071e18-breakdown.json:2315:14` | `dev/sessions/session-2025-12-30-bulk-cli-integration.md` |
+| `dev/active/8e071e18-breakdown.json:2316:14` | `dev/sessions/session-2025-12-30-bulk-operations-progress.md` |
+| `dev/active/8e071e18-breakdown.json:2317:14` | `dev/sessions/session-2025-12-30-bulk-phase5-docs.md` |
+| `dev/active/8e071e18-breakdown.json:2318:14` | `dev/sessions/session-2025-12-30-bulk-state-decision.md` |
+| `dev/active/8e071e18-breakdown.json:2319:14` | `dev/sessions/session-2025-12-30-bulk-validation.md` |
+| `dev/active/8e071e18-breakdown.json:3605:2921` | `dev/active/production-stability-design.md` |
+| `dev/active/8e071e18-breakdown.json:3605:3027` | `dev/active/production-stability-design.md` |
+| `dev/active/8e071e18-breakdown.json:3648:1309` | `dev/active/config-consolidation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:1413` | `dev/active/config-consolidation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:2302` | `dev/active/multi-issue-bulk-operations-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:2413` | `dev/active/multi-issue-bulk-operations-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:2745` | `dev/active/transitive-reduction-validation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:2860` | `dev/active/transitive-reduction-validation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3691:1111` | `dev/active/config-consolidation-documentation-requirements.md` |
+| `dev/active/8e071e18-breakdown.json:3691:1237` | `dev/active/config-consolidation-documentation-requirements.md` |
+| `dev/active/8e071e18-breakdown.json:3734:1763` | `dev/sessions/session-2025-12-26-config-consolidation.md` |
+| `dev/active/8e071e18-breakdown.json:3734:1883` | `dev/sessions/session-2025-12-26-config-consolidation.md` |
+| `dev/active/8e071e18-breakdown.json:3734:2280` | `dev/sessions/session-2025-12-30-bulk-cli-integration.md` |
+| `dev/active/8e071e18-breakdown.json:3734:2400` | `dev/sessions/session-2025-12-30-bulk-cli-integration.md` |
+| `dev/active/8e071e18-breakdown.json:3734:2461` | `dev/sessions/session-2025-12-30-bulk-operations-progress.md` |
+| `dev/active/8e071e18-breakdown.json:3734:2585` | `dev/sessions/session-2025-12-30-bulk-operations-progress.md` |
+| `dev/active/8e071e18-breakdown.json:3734:2650` | `dev/sessions/session-2025-12-30-bulk-phase5-docs.md` |
+| `dev/active/8e071e18-breakdown.json:3734:2766` | `dev/sessions/session-2025-12-30-bulk-phase5-docs.md` |
+| `dev/active/8e071e18-breakdown.json:3734:2823` | `dev/sessions/session-2025-12-30-bulk-state-decision.md` |
+| `dev/active/8e071e18-breakdown.json:3734:2942` | `dev/sessions/session-2025-12-30-bulk-state-decision.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3002` | `dev/sessions/session-2025-12-30-bulk-validation.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3117` | `dev/sessions/session-2025-12-30-bulk-validation.md` |
+| `dev/active/8e071e18-investigation.md:648:59` | `dev/active/config-consolidation-plan.md` |
+| `dev/plans/5dbc3548-deletion-tracking.md:150:1` | `dev/plans/5dbc3548-deletion-tracking.md` |
+| `dev/sessions/session-2025-12-26-config-consolidation.md:391:10` | `dev/active/config-consolidation-plan.md` |
+| `dev/sessions/session-2025-12-30-bulk-cli-integration.md:238:4` | `dev/sessions/session-2025-12-30-bulk-validation.md` |
+| `dev/sessions/session-2025-12-30-bulk-cli-integration.md:239:4` | `dev/sessions/session-2025-12-30-bulk-state-decision.md` |
+| `dev/sessions/session-2025-12-30-bulk-cli-integration.md:51:29` | `dev/sessions/session-2025-12-30-bulk-validation.md` |
+| `dev/sessions/session-2025-12-30-bulk-cli-integration.md:88:29` | `dev/sessions/session-2025-12-30-bulk-state-decision.md` |
+| `dev/sessions/session-2025-12-30-bulk-operations-progress.md:330:4` | `dev/active/multi-issue-bulk-operations-plan.md` |
+| `dev/sessions/session-2025-12-30-bulk-operations-progress.md:331:4` | `dev/active/production-stability-design.md` |
+| `dev/sessions/session-2025-12-30-bulk-phase5-docs.md:85:4` | `dev/sessions/session-2025-12-30-bulk-phase5-docs.md` |
