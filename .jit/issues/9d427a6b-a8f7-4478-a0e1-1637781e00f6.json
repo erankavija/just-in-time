@@ -1,10 +1,8 @@
 {
-  "id": "9d427a6b-a8f7-4478-a0e1-1637781e00f6",
-  "title": "Epic: Production Polish",
-  "description": "Improve user experience and reduce friction through gate templates/presets and web UI state transition buttons. Gate templates encode best practices for common workflows (Rust/Python/JavaScript TDD, security audits) and reduce setup time from minutes to seconds. Web UI enhancements enable direct state transitions and gate execution from the browser, eliminating constant context switching to CLI. While not strictly required for functionality, these quality-of-life improvements significantly enhance usability for both human users and AI agents.\n\n## Outcome\n\nGate templates/presets delivered. CLI ergonomics, DAG layout, domain consolidation, and web UI visual enhancements completed. Interactive web UI (state transition buttons, claim/unclaim, gate execution from browser) deferred to epic 13c69884.",
-  "state": "done",
-  "priority": "normal",
+  "archived_from": "done",
   "assignee": null,
+  "context": {},
+  "created_at": "2025-12-19T23:02:42.963353048Z",
   "dependencies": [
     "f65b5b9c-521c-4aab-bb36-0fc99a0efecf",
     "12ef7efb-956e-4456-bd89-237ebfe22937",
@@ -20,39 +18,42 @@
     "cbf75d46-2bea-46ce-8b70-80ae2f8e003d",
     "11682766-316e-4fd7-9bbf-eaddf7c01b04"
   ],
+  "description": "Improve user experience and reduce friction through gate templates/presets and web UI state transition buttons. Gate templates encode best practices for common workflows (Rust/Python/JavaScript TDD, security audits) and reduce setup time from minutes to seconds. Web UI enhancements enable direct state transitions and gate execution from the browser, eliminating constant context switching to CLI. While not strictly required for functionality, these quality-of-life improvements significantly enhance usability for both human users and AI agents.\n\n## Outcome\n\nGate templates/presets delivered. CLI ergonomics, DAG layout, domain consolidation, and web UI visual enhancements completed. Interactive web UI (state transition buttons, claim/unclaim, gate execution from browser) deferred to epic 13c69884.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "label": "Design Document",
+      "path": "dev/archive/9d427a6b-production-polish/dev/active/production-polish-design.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "study",
+      "format": "markdown",
+      "label": "Agent UX Observations",
+      "path": "dev/archive/9d427a6b-production-polish/dev/studies/agent-ux-observations.md"
+    }
+  ],
+  "done_at": "2026-03-14T19:37:51.524399732Z",
+  "first_ready_at": "2026-02-19T18:34:20.027109908Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-03-14T19:32:37.604724799Z"
+      "updated_at": "2026-03-14T19:32:37.604724799Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/production-polish-design.md",
-      "commit": null,
-      "label": "Design Document",
-      "doc_type": "design"
-    },
-    {
-      "path": "dev/studies/agent-ux-observations.md",
-      "commit": null,
-      "label": "Agent UX Observations",
-      "doc_type": "study",
-      "format": "markdown"
-    }
-  ],
+  "id": "9d427a6b-a8f7-4478-a0e1-1637781e00f6",
   "labels": [
     "type:epic",
     "epic:production-polish",
     "milestone:v1.0"
   ],
-  "created_at": "2025-12-19T23:02:42.963353048Z",
-  "updated_at": "2026-07-05T19:51:13.046442859Z",
-  "first_ready_at": "2026-02-19T18:34:20.027109908Z",
-  "done_at": "2026-03-14T19:37:51.524399732Z"
+  "priority": "normal",
+  "state": "archived",
+  "title": "Epic: Production Polish",
+  "updated_at": "2026-07-27T10:04:33.396388636Z"
 }

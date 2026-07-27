@@ -1,11 +1,20 @@
 {
-  "id": "56b7e503-c4c8-4509-96c5-ae40e37d3132",
-  "title": "Implement gate templates and presets",
-  "description": "Implement gate templates and presets system to reduce setup time and encode best practices for common workflows. Add 'jit gate preset' commands: list (show available presets), show (display preset details), apply (create gates from preset on issue), and create (save custom presets). Include built-in presets for rust-tdd, python-tdd, js-tdd, security-audit, and minimal workflows, embedding proven gate configurations directly in binary. Support custom user-defined presets in .jit/config/gate-presets/. Enable customization via parameters when applying presets (timeout overrides, skip prechecks/postchecks, include/exclude specific gates). This feature dramatically improves onboarding and reduces boilerplate, enabling users and agents to set up quality gates in seconds rather than minutes by leveraging battle-tested configurations.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:copilot2",
+  "claimed_at": "2026-02-10T18:10:22.818796092Z",
+  "context": {},
+  "created_at": "2025-12-19T23:04:04.505233827Z",
   "dependencies": [],
+  "description": "Implement gate templates and presets system to reduce setup time and encode best practices for common workflows. Add 'jit gate preset' commands: list (show available presets), show (display preset details), apply (create gates from preset on issue), and create (save custom presets). Include built-in presets for rust-tdd, python-tdd, js-tdd, security-audit, and minimal workflows, embedding proven gate configurations directly in binary. Support custom user-defined presets in .jit/config/gate-presets/. Enable customization via parameters when applying presets (timeout overrides, skip prechecks/postchecks, include/exclude specific gates). This feature dramatically improves onboarding and reduces boilerplate, enabling users and agents to set up quality gates in seconds rather than minutes by leveraging battle-tested configurations.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "implementation",
+      "format": "markdown",
+      "label": "Implementation Plan",
+      "path": "dev/archive/9d427a6b-production-polish/dev/active/gate-presets-implementation-plan.md"
+    }
+  ],
+  "done_at": "2026-02-10T20:30:48.008001358Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,50 +23,41 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot2",
-      "updated_at": "2026-02-10T18:10:22.809236279Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-10T20:30:29.572256633Z"
-    },
     "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-10T20:30:23.560990253Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-10T20:30:04.845198519Z"
+      "updated_at": "2026-02-10T20:30:23.560990253Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "agent:copilot2",
-      "updated_at": "2026-02-10T20:30:35.365498730Z"
+      "updated_at": "2026-02-10T20:30:35.365498730Z",
+      "updated_by": "agent:copilot2"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_at": "2026-02-10T20:30:29.572256633Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_at": "2026-02-10T18:10:22.809236279Z",
+      "updated_by": "agent:copilot2"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_at": "2026-02-10T20:30:04.845198519Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/gate-presets-implementation-plan.md",
-      "commit": null,
-      "label": "Implementation Plan",
-      "doc_type": "implementation",
-      "format": "markdown"
-    }
-  ],
+  "id": "56b7e503-c4c8-4509-96c5-ae40e37d3132",
   "labels": [
     "type:task",
     "epic:production-polish",
     "milestone:v1.0",
     "component:cli"
   ],
-  "created_at": "2025-12-19T23:04:04.505233827Z",
-  "updated_at": "2026-07-05T19:51:12.972555585Z",
-  "claimed_at": "2026-02-10T18:10:22.818796092Z",
-  "done_at": "2026-02-10T20:30:48.008001358Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Implement gate templates and presets",
+  "updated_at": "2026-07-27T10:04:33.396388636Z"
 }

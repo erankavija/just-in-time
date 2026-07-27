@@ -1,31 +1,31 @@
 {
-  "id": "f527996e-3073-4c31-9f19-dba1e05f3909",
-  "title": "Add search result focus navigation to DAG",
-  "description": "Enhance issue search to automatically focus on search results in the DAG visualization. When a search result is clicked:\n\n1. **Center the DAG** on the found issue node\n2. **Expand all collapsed clusters** in the path to make the issue visible\n\nAlso added a 'Focus in Graph' button to the issue detail panel for quick navigation.\n\nImplementation:\n- Search result click handler extracts issue ID and triggers focus\n- Graph expansion logic recursively expands parent clusters (handles nested hierarchies)\n- ReactFlow viewport centering using fitView\n- Generic focusNodeId API enables reuse from multiple UI components (search, detail panel)\n\nImproves UX by eliminating manual navigation after search or when viewing issue details.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:copilot-session",
-  "dependencies": [],
-  "gates_required": [],
-  "gates_status": {},
+  "claimed_at": "2026-02-08T18:28:44.363571017Z",
   "context": {},
+  "created_at": "2026-02-07T22:59:02.366947033Z",
+  "dependencies": [],
+  "description": "Enhance issue search to automatically focus on search results in the DAG visualization. When a search result is clicked:\n\n1. **Center the DAG** on the found issue node\n2. **Expand all collapsed clusters** in the path to make the issue visible\n\nAlso added a 'Focus in Graph' button to the issue detail panel for quick navigation.\n\nImplementation:\n- Search result click handler extracts issue ID and triggers focus\n- Graph expansion logic recursively expands parent clusters (handles nested hierarchies)\n- ReactFlow viewport centering using fitView\n- Generic focusNodeId API enables reuse from multiple UI components (search, detail panel)\n\nImproves UX by eliminating manual navigation after search or when viewing issue details.",
   "documents": [
     {
-      "path": "dev/design/search-focus-navigation.md",
       "commit": null,
-      "label": "Search Focus Navigation Implementation Plan",
       "doc_type": "design",
-      "format": "markdown"
+      "format": "markdown",
+      "label": "Search Focus Navigation Implementation Plan",
+      "path": "dev/archive/9d427a6b-production-polish/dev/design/search-focus-navigation.md"
     }
   ],
+  "done_at": "2026-02-08T19:26:31.881750541Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "f527996e-3073-4c31-9f19-dba1e05f3909",
   "labels": [
     "type:task",
     "epic:production-polish",
     "milestone:v1.0",
     "component:web"
   ],
-  "created_at": "2026-02-07T22:59:02.366947033Z",
-  "updated_at": "2026-07-05T19:51:13.117684811Z",
-  "claimed_at": "2026-02-08T18:28:44.363571017Z",
-  "done_at": "2026-02-08T19:26:31.881750541Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Add search result focus navigation to DAG",
+  "updated_at": "2026-07-27T10:04:33.396388636Z"
 }

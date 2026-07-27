@@ -1,41 +1,41 @@
 {
-  "id": "d4290046-9f21-430e-b7e3-3c13d7ff51fe",
-  "title": "Improve DAG layout for large graphs in web UI",
-  "description": "## Objective\n\nImplement a hierarchy-aware DAG visualization system with clustering and progressive disclosure that makes large dependency graphs (100+ issues) readable and navigable in the web UI.\n\n## Problem\n\nThe current web UI DAG layout uses a simple hierarchical (dagre) layout that becomes unreadable with large graphs. Epic/story/task hierarchies are not visually distinct, making it difficult to understand strategic vs tactical relationships.\n\n## Solution\n\nA three-phase implementation:\n\n### Phase 1: Subgraph Clustering Infrastructure ✅ COMPLETE\n- Cluster nodes by hierarchy level (epic containers hold stories/tasks)\n- Hierarchical layout with nested positioning\n- Virtual edge routing for cross-cluster dependencies\n- Domain-agnostic cluster detection (no hardcoded type names)\n- Comprehensive test coverage for clustering algorithms\n\n**Status:** Implemented with TDD, all tests passing\n\n### Phase 2: Collapse/Expand Interactivity ✅ COMPLETE\n- Interactive cluster headers toggle expanded/collapsed state\n- Collapsed clusters show badge with hidden node count\n- Virtual edges aggregate child dependencies at cluster boundaries\n- Story-level collapse within expanded epic clusters\n- Expansion state persistence via localStorage\n- \"Expand All\" / \"Collapse All\" toolbar controls\n- Hierarchy type icons (⭐📦📝☑️) with configurable presets\n- Visual polish: colored headers, capitalized type names, proper alignment\n\n**Status:** All core features delivered, 145 tests passing\n\n### Phase 3: Advanced Features & Polish\n- URL parameter persistence for shareable links\n- Advanced animations and transitions\n- Keyboard navigation shortcuts\n- Search result focus with auto-expansion\n- Minimap showing cluster overview\n- Performance optimizations for very large graphs (1000+ nodes)\n\n**Status:** Ready to begin\n\n## Technical Architecture\n\n- **Clustering:** Nested hierarchical algorithm (N and N+1 levels only)\n- **Layout:** Extended Dagre with cluster-aware positioning\n- **State:** React hooks with ExpansionState management\n- **Edges:** Virtual edge aggregation for collapsed clusters\n- **Configuration:** Hierarchy icons via config.toml with preset support\n\n## Benefits Delivered\n\n- ✅ Large graphs (100+ issues) now navigable\n- ✅ Strategic vs tactical hierarchy visually clear\n- ✅ Progressive disclosure reduces cognitive load\n- ✅ Domain-agnostic design works with any hierarchy configuration\n- ✅ Excellent test coverage ensures reliability",
-  "state": "done",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-02-04T12:38:23.007932176Z",
   "dependencies": [
     "6f678db0-aef5-4986-95d4-71fa63548fd2",
     "783a8086-2933-4b6a-9d4a-b5c5f1d3ddc0",
     "402d1a8f-3eec-42ef-aecc-a5c1c783405b"
   ],
-  "gates_required": [],
-  "gates_status": {},
-  "context": {},
+  "description": "## Objective\n\nImplement a hierarchy-aware DAG visualization system with clustering and progressive disclosure that makes large dependency graphs (100+ issues) readable and navigable in the web UI.\n\n## Problem\n\nThe current web UI DAG layout uses a simple hierarchical (dagre) layout that becomes unreadable with large graphs. Epic/story/task hierarchies are not visually distinct, making it difficult to understand strategic vs tactical relationships.\n\n## Solution\n\nA three-phase implementation:\n\n### Phase 1: Subgraph Clustering Infrastructure ✅ COMPLETE\n- Cluster nodes by hierarchy level (epic containers hold stories/tasks)\n- Hierarchical layout with nested positioning\n- Virtual edge routing for cross-cluster dependencies\n- Domain-agnostic cluster detection (no hardcoded type names)\n- Comprehensive test coverage for clustering algorithms\n\n**Status:** Implemented with TDD, all tests passing\n\n### Phase 2: Collapse/Expand Interactivity ✅ COMPLETE\n- Interactive cluster headers toggle expanded/collapsed state\n- Collapsed clusters show badge with hidden node count\n- Virtual edges aggregate child dependencies at cluster boundaries\n- Story-level collapse within expanded epic clusters\n- Expansion state persistence via localStorage\n- \"Expand All\" / \"Collapse All\" toolbar controls\n- Hierarchy type icons (⭐📦📝☑️) with configurable presets\n- Visual polish: colored headers, capitalized type names, proper alignment\n\n**Status:** All core features delivered, 145 tests passing\n\n### Phase 3: Advanced Features & Polish\n- URL parameter persistence for shareable links\n- Advanced animations and transitions\n- Keyboard navigation shortcuts\n- Search result focus with auto-expansion\n- Minimap showing cluster overview\n- Performance optimizations for very large graphs (1000+ nodes)\n\n**Status:** Ready to begin\n\n## Technical Architecture\n\n- **Clustering:** Nested hierarchical algorithm (N and N+1 levels only)\n- **Layout:** Extended Dagre with cluster-aware positioning\n- **State:** React hooks with ExpansionState management\n- **Edges:** Virtual edge aggregation for collapsed clusters\n- **Configuration:** Hierarchy icons via config.toml with preset support\n\n## Benefits Delivered\n\n- ✅ Large graphs (100+ issues) now navigable\n- ✅ Strategic vs tactical hierarchy visually clear\n- ✅ Progressive disclosure reduces cognitive load\n- ✅ Domain-agnostic design works with any hierarchy configuration\n- ✅ Excellent test coverage ensures reliability",
   "documents": [
     {
-      "path": "dev/design/exploration-dag.md",
       "commit": null,
-      "label": "DAG exploration plan",
       "doc_type": "design",
-      "format": "markdown"
+      "format": "markdown",
+      "label": "DAG exploration plan",
+      "path": "dev/archive/9d427a6b-production-polish/dev/design/exploration-dag.md"
     },
     {
-      "path": "dev/design/subgraph-clustering-layout.md",
       "commit": null,
+      "doc_type": "design",
       "label": "Subgraph Clustering Layout Implementation Plan",
-      "doc_type": "design"
+      "path": "dev/archive/9d427a6b-production-polish/dev/design/subgraph-clustering-layout.md"
     }
   ],
+  "done_at": "2026-02-08T19:43:31.269743341Z",
+  "first_ready_at": "2026-02-08T19:41:28.688220670Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "d4290046-9f21-430e-b7e3-3c13d7ff51fe",
   "labels": [
     "epic:production-polish",
     "component:web",
     "type:story",
     "story:dag-layout"
   ],
-  "created_at": "2026-02-04T12:38:23.007932176Z",
-  "updated_at": "2026-07-05T19:51:13.095608075Z",
-  "first_ready_at": "2026-02-08T19:41:28.688220670Z",
-  "done_at": "2026-02-08T19:43:31.269743341Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Improve DAG layout for large graphs in web UI",
+  "updated_at": "2026-07-27T10:04:33.396388636Z"
 }

@@ -1,26 +1,26 @@
 {
-  "id": "91e3a165-7e3f-443a-ab4f-2c8282a42681",
-  "title": "Story: Web UI Visual Enhancements",
-  "description": "Improve web UI readability and visual design with hierarchy type icons, capitalized type names, and improved node header formatting. Builds on state transition buttons foundation to create a polished, production-ready graph visualization experience.\n\nCompleted improvements:\n- Hierarchy type icons (⭐📦📝☑️) configurable via config.toml\n- Capitalized type names in node headers (Epic, Story, Task)\n- Improved header format: (icon) (Type) #shortid\n- Better visual alignment and spacing\n\nFuture improvements tracked separately.",
-  "state": "done",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-02-07T22:54:44.903922532Z",
   "dependencies": [
     "d8de0f33-c5e3-4231-8474-98846f588e7b",
     "f527996e-3073-4c31-9f19-dba1e05f3909"
   ],
-  "gates_required": [],
-  "gates_status": {},
-  "context": {},
+  "description": "Improve web UI readability and visual design with hierarchy type icons, capitalized type names, and improved node header formatting. Builds on state transition buttons foundation to create a polished, production-ready graph visualization experience.\n\nCompleted improvements:\n- Hierarchy type icons (⭐📦📝☑️) configurable via config.toml\n- Capitalized type names in node headers (Epic, Story, Task)\n- Improved header format: (icon) (Type) #shortid\n- Better visual alignment and spacing\n\nFuture improvements tracked separately.",
   "documents": [
     {
-      "path": "dev/design/hierarchy-icons-config.md",
       "commit": null,
-      "label": "Hierarchy Icons Configuration Plan",
       "doc_type": "design",
-      "format": "markdown"
+      "format": "markdown",
+      "label": "Hierarchy Icons Configuration Plan",
+      "path": "dev/archive/9d427a6b-production-polish/dev/design/hierarchy-icons-config.md"
     }
   ],
+  "done_at": "2026-02-14T23:37:43.504404181Z",
+  "first_ready_at": "2026-02-14T23:33:22.929652770Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "91e3a165-7e3f-443a-ab4f-2c8282a42681",
   "labels": [
     "type:story",
     "epic:production-polish",
@@ -28,8 +28,8 @@
     "component:web",
     "story:web-visual-enhancements"
   ],
-  "created_at": "2026-02-07T22:54:44.903922532Z",
-  "updated_at": "2026-07-05T19:51:13.034776140Z",
-  "first_ready_at": "2026-02-14T23:33:22.929652770Z",
-  "done_at": "2026-02-14T23:37:43.504404181Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Story: Web UI Visual Enhancements",
+  "updated_at": "2026-07-27T10:04:33.396388636Z"
 }

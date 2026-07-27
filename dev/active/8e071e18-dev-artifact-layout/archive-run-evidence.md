@@ -773,3 +773,79 @@ Issue `deb50576`. Plan eligible with no blockers. 4 relocated, 0 mirrored, 3 ret
 ### Other plan warnings (1)
 
 - `external-edge` at `dev/active/planning-bracket-showcase/talk.html`
+
+## `9d427a6b` — dev/archive/9d427a6b-production-polish
+Issue `f2f05554`. Plan eligible with no blockers. 13 relocated, 0 mirrored, 2 retained, 2 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| move | `dev/active/dependency-display-improvements-plan.md` | `dev/archive/9d427a6b-production-polish/dev/active/dependency-display-improvements-plan.md` | 32f804f1 |
+| move | `dev/active/gate-presets-implementation-plan.md` | `dev/archive/9d427a6b-production-polish/dev/active/gate-presets-implementation-plan.md` | 56b7e503 |
+| move | `dev/active/json-output-standardization-plan.md` | `dev/archive/9d427a6b-production-polish/dev/active/json-output-standardization-plan.md` | 32f804f1 |
+| move | `dev/active/production-polish-design.md` | `dev/archive/9d427a6b-production-polish/dev/active/production-polish-design.md` | 9d427a6b |
+| move | `dev/design/exploration-dag.md` | `dev/archive/9d427a6b-production-polish/dev/design/exploration-dag.md` | d4290046 |
+| move | `dev/design/hierarchy-icons-config.md` | `dev/archive/9d427a6b-production-polish/dev/design/hierarchy-icons-config.md` | 6f678db0 91e3a165 |
+| move | `dev/design/phase2-collapse-expand.md` | `dev/archive/9d427a6b-production-polish/dev/design/phase2-collapse-expand.md` | 6f678db0 |
+| move | `dev/design/phase3-advanced-features.md` | `dev/archive/9d427a6b-production-polish/dev/design/phase3-advanced-features.md` | 402d1a8f |
+| move | `dev/design/search-focus-navigation.md` | `dev/archive/9d427a6b-production-polish/dev/design/search-focus-navigation.md` | f527996e |
+| move | `dev/design/subgraph-clustering-layout.md` | `dev/archive/9d427a6b-production-polish/dev/design/subgraph-clustering-layout.md` | d4290046 |
+| move | `dev/plans/7004d5b6-reorganize-commands.md` | `dev/archive/9d427a6b-production-polish/dev/plans/7004d5b6-reorganize-commands.md` | 7004d5b6 |
+| move | `dev/sessions/session-20260109-query-consolidation.md` | `dev/archive/9d427a6b-production-polish/dev/sessions/session-20260109-query-consolidation.md` | 11682766 |
+| move | `dev/studies/agent-ux-observations.md` | `dev/archive/9d427a6b-production-polish/dev/studies/agent-ux-observations.md` | 9d427a6b |
+| retain | `dev/archive/features/d0b85bff-archive-json-plan.md` | already under the archive root | d0b85bff |
+| retain | `dev/archive/refactorings/f766b092-remove-printing-plan.md` | already under the archive root | f766b092 |
+
+### In-content citation warnings (48)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8b05a612-investigation.md:61:45` | `dev/active/production-polish-design.md` |
+| `dev/active/8e071e18-breakdown.json:1607:1021` | `dev/design/subgraph-clustering-layout.md` |
+| `dev/active/8e071e18-breakdown.json:1607:1067` | `dev/design/phase3-advanced-features.md` |
+| `dev/active/8e071e18-breakdown.json:1607:1116` | `dev/design/subgraph-clustering-layout.md` |
+| `dev/active/8e071e18-breakdown.json:1607:1160` | `dev/design/phase2-collapse-expand.md` |
+| `dev/active/8e071e18-breakdown.json:1607:974` | `dev/design/phase2-collapse-expand.md` |
+| `dev/active/8e071e18-breakdown.json:1643:14` | `dev/design/phase2-collapse-expand.md` |
+| `dev/active/8e071e18-breakdown.json:1644:14` | `dev/design/phase3-advanced-features.md` |
+| `dev/active/8e071e18-breakdown.json:2142:1512` | `dev/active/json-output-standardization-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2441:1642` | `dev/active/json-output-standardization-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2487:14` | `dev/active/dependency-display-improvements-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2488:14` | `dev/active/gate-presets-implementation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:2489:14` | `dev/active/production-polish-design.md` |
+| `dev/active/8e071e18-breakdown.json:2490:14` | `dev/design/exploration-dag.md` |
+| `dev/active/8e071e18-breakdown.json:2491:14` | `dev/design/hierarchy-icons-config.md` |
+| `dev/active/8e071e18-breakdown.json:2492:14` | `dev/design/phase2-collapse-expand.md` |
+| `dev/active/8e071e18-breakdown.json:2493:14` | `dev/design/phase3-advanced-features.md` |
+| `dev/active/8e071e18-breakdown.json:2494:14` | `dev/design/search-focus-navigation.md` |
+| `dev/active/8e071e18-breakdown.json:2495:14` | `dev/design/subgraph-clustering-layout.md` |
+| `dev/active/8e071e18-breakdown.json:2496:14` | `dev/plans/7004d5b6-reorganize-commands.md` |
+| `dev/active/8e071e18-breakdown.json:2497:14` | `dev/sessions/session-20260109-query-consolidation.md` |
+| `dev/active/8e071e18-breakdown.json:2498:14` | `dev/studies/agent-ux-observations.md` |
+| `dev/active/8e071e18-breakdown.json:3605:2777` | `dev/active/production-polish-design.md` |
+| `dev/active/8e071e18-breakdown.json:3605:2877` | `dev/active/production-polish-design.md` |
+| `dev/active/8e071e18-breakdown.json:3648:1458` | `dev/active/dependency-display-improvements-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:1570` | `dev/active/dependency-display-improvements-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:1769` | `dev/active/gate-presets-implementation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:1877` | `dev/active/gate-presets-implementation-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:1929` | `dev/active/json-output-standardization-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:2022` | `dev/active/json-output-standardization-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:2111` | `dev/active/json-output-standardization-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3648:2189` | `dev/active/json-output-standardization-plan.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3522` | `dev/sessions/session-20260109-query-consolidation.md` |
+| `dev/active/8e071e18-breakdown.json:3734:3636` | `dev/sessions/session-20260109-query-consolidation.md` |
+| `dev/active/8e071e18-breakdown.json:3777:1961` | `dev/studies/agent-ux-observations.md` |
+| `dev/active/8e071e18-breakdown.json:3777:2059` | `dev/studies/agent-ux-observations.md` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:14:11` | `dev/active/json-output-standardization-plan.md` |
+| `dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md:14:92` | `dev/active/json-output-standardization-plan.md` |
+| `dev/active/8e071e18-investigation.md:1312:4` | `dev/design/phase2-collapse-expand.md` |
+| `dev/active/8e071e18-investigation.md:1312:53` | `dev/design/subgraph-clustering-layout.md` |
+| `dev/active/8e071e18-investigation.md:1313:4` | `dev/design/phase3-advanced-features.md` |
+| `dev/active/8e071e18-investigation.md:1313:55` | `dev/design/subgraph-clustering-layout.md` |
+| `dev/active/8e071e18-investigation.md:1314:4` | `dev/design/phase3-advanced-features.md` |
+| `dev/active/8e071e18-investigation.md:1314:55` | `dev/design/phase2-collapse-expand.md` |
+| `dev/active/8e071e18-progress.json:1720:221` | `dev/active/json-output-standardization-plan.md` |
+| `dev/design/phase2-collapse-expand.md:248:43` | `dev/design/subgraph-clustering-layout.md` |
+| `dev/design/phase3-advanced-features.md:297:43` | `dev/design/subgraph-clustering-layout.md` |
+| `dev/design/phase3-advanced-features.md:298:43` | `dev/design/phase2-collapse-expand.md` |
