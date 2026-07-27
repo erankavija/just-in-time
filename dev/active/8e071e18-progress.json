@@ -524,7 +524,7 @@
       "cargo-ci",
       "code-review"
      ],
-     "status": "dispatched",
+     "status": "dispatched (round 2 after a server error killed the first worker before it wrote anything)",
      "note": "Filed session 6 from the wave-8 rehearsal. Wired ahead of all 24 sweeps and 35499d1e with --reduce."
     },
     {
@@ -833,6 +833,31 @@
       "repo-validate"
      ],
      "status": "ready"
+    },
+    {
+     "short_id": "334bcd6f",
+     "title": "Correct the command reference's archive naming, directory-target and citation-warning facts",
+     "classification": "documentation",
+     "gates": [
+      "doc-review",
+      "docs-mechanical"
+     ],
+     "status": "dispatched",
+     "note": "E14 remediation for 89b5899a's doc-review findings F1-F3."
+    },
+    {
+     "short_id": "89b5899a",
+     "title": "Archive directory naming and citation breakage warnings",
+     "classification": "checkpoint",
+     "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical",
+      "repo-validate"
+     ],
+     "status": "4 of 5 gates passed; doc-review failed on F1-F3, blocked on 334bcd6f",
+     "note": "Lead-verified, not dispatched. REQ-01 evidenced by 8cd6eb73 + b4d1a2c8 (dev/archive/a9b5dd08 renamed, marker resolves); REQ-02 by the named tests covering code comments, shell scripts, and both inside and outside version control; REQ-03 by 3be32cad's four whole-tree content tests with a totality assertion."
     }
    ],
    "status": "in progress",
@@ -1294,6 +1319,24 @@
    "situation": "code-review F2 required the discovery closure to be bounded at evidence acquisition rather than at plan derivation. The worker had already implemented and measured that reading: bounding the walks flips 8 artifacts from Copy to Move, because their outside-owner evidence derives from ownership chains that run through an out-of-root artifact. A Copy-to-Move flip DELETES a live file another issue's document still reaches - the traceability loss D-14 rejected unlinking for. REQ-04's letter permits it, since it forbids only LOSING relocations, not gaining them. Separately, retention leaves 12 archive-side citations unresolved across 4 containers; the worker exempted those edges from the layout validator, without which --execute refuses outright.",
    "lead_analysis": "Two owner-level calls, neither visible when D+A was approved. On F2: the reviewer's reading is defensible but its cost exceeds the defect's. No-argue discipline forbids softening the criterion by argument, so the choice was amend or comply. On the citations: lead recount gives 12, not the worker's 10 - the worker's replica models relative references only and missed a root-relative edge in 14303b30. The split that decides it: 9 sit on COPIED parents whose live originals keep resolving, so only the frozen snapshot is affected; 3 sit on RELOCATED parents across 2 documents and are dead everywhere. (Lead first reported this split as 4/8 in the escalation and corrected it to 3/9 on recount.)",
    "resolution": "Owner decided both. (1) REQ-03 amended to the observable property - 'a retained out-of-root artifact contributes no descendants to the plan' - which is what the 684->20 reduction actually delivers and keeps moves at 175 with no Copy-to-Move flips. The amendment and its reasoning are recorded in 0e5dff57's Notes. (2) The validator exemption is accepted and D-14 now records the citation consequence; the 3 permanent citations are repointed before their containers archive, filed as 84c4e956 wired ahead of e536ea5a and 8ea5b13d. The 9 snapshot-only ones are accepted as what an archived snapshot is."
+  },
+  {
+   "id": "E13",
+   "wave": "8 / 12",
+   "issue": "35499d1e, 4a6fb8c1",
+   "category": "3 - epic-adjacent success-criteria modification; 4 - issue scope change",
+   "situation": "Two open criteria still described an out-of-root artifact as 'classified permanent' and 'archived by copy', which is the mechanism escalation E9's option D+A replaced with retention. 35499d1e REQ-03 read 'classified permanent rather than blocked'; 4a6fb8c1 REQ-02 read 'classified permanent, archived by copy, and left in place'. Verified against the shipped code: is_permanent (artifact_classifier.rs:133-137) now matches only configured permanent_paths, and retains_outside_development_root (:155-157) is a separate predicate whose sources earn no destination. Both clauses of 4a6fb8c1 REQ-02 are false and one clause of 35499d1e REQ-03 is.",
+   "lead_analysis": "35499d1e is a wave-8 checkpoint due for closure, so this was blocking rather than deferrable. Audited every other open issue's criteria for the same staleness: five name mirroring, but all five are conditional ('every file recorded as mirrored...', 'a citation whose cited artifact the runs mirrored...') and 19 copies remain, so none is false. Epic REQ-14 needed no change - it states the requirement as reporting no unmanaged-selected-root blocker and relocating no file, never as copying.",
+   "resolution": "Owner chose amending both to name retention. 35499d1e REQ-03 now reads 'retained rather than blocked - the plan schedules no destination for it and leaves its source untouched'. 4a6fb8c1 REQ-02 now reads 'retained: no destination is scheduled for it, its source is left in place, and no unmanaged-selected-root blocker is reported for it'. Reasoning recorded in each issue's Notes, including E9's measurement, so a reviewer meets the reason rather than only the change."
+  },
+  {
+   "id": "E14",
+   "wave": 8,
+   "issue": "89b5899a",
+   "category": "7 - blocker outside the issue's scope",
+   "situation": "89b5899a's doc-review failed with three blocking issue-impact findings, all in docs/reference/cli-commands.md: F1 (high, :304-307) the title-slug fallback and `container` placeholder that 8cd6eb73 removed; F2 (medium, :250-251) the unsupported-edge-target warning for a directory link target that 7d6d2783 removed; F3 (medium, ~:210) the in-content citation warning, which 2ac35e8e added and the reference documents nowhere - the word 'citation' does not appear in the file. Its other four gates passed, code-review with zero findings.",
+   "lead_analysis": "The three facts are exactly 4a6fb8c1's REQ-01, REQ-03 and REQ-04. 4a6fb8c1 is four waves downstream and depends on 58c56743, because its REQ-07 must cite the canonical adopter home that 58c56743 creates - so it cannot simply move earlier without splitting its criteria. Identical structure to E4 in wave 3, where two review rounds were lost to adopter documentation owned by a later wave. Pitfalls P4 and P5 both predicted these two findings and both recorded the disposition 'covered by 4a6fb8c1, VERIFY at wave 12'; this is the third time on this epic that a 'covered by a later issue' pitfall has blocked an earlier review, after P2 blocked b3fc1a92.",
+   "resolution": "Owner chose a new remediation task. Filed 334bcd6f (task, story:archive-naming-and-warnings, doc-review + docs-mechanical, 4 [hard] criteria) scoped to exactly those three subjects and explicitly forbidden from restructuring the document, which stays 4a6fb8c1's. Wired 89b5899a -> 334bcd6f: the story checkpoint is not complete while the adopter reference contradicts its own criteria, and unlike fd88adda this creates no deadlock because 89b5899a is already claimed and in_progress and the dependency is satisfied before it needs to close. 334bcd6f depends on 3be32cad, --reduce having dropped the transitively implied edges to 8cd6eb73, 7d6d2783 and 2ac35e8e."
   }
  ],
  "rework_counts": {
@@ -1623,6 +1666,13 @@
    "subject": "a dispatch prompt asked for more than the criterion, and the worker caught it",
    "detail": "The dispatch prompt told the worker REQ-05 meant byte-level agreement of the whole quoted TOML block. The guide's excerpt is a trimmed teaching quote: it omits the template and node description strings and carries its own explanatory comments. Whole-block byte identity would mean pasting two long description strings into the guide and deleting its teaching comments - which the same prompt's scope boundary forbade. The worker made the plan-document declaration byte-identical, additionally proved value-level agreement for every key the excerpt declares (zero mismatches across template keys, anchors, anchor_edges, transforms and both nodes), and asked for the call rather than silently choosing.",
    "decision": "Accepted the worker's reading. The criterion says 'the declaration quoted in the guide matches the example registry it quotes' - what is quoted matches; omitted keys are not mismatches. The prompt was stricter than the contract, and the contract governs. This is not the no-argue discipline: that binds the lead when a REVIEWER cites a contract, not when the lead's own prompt overshoots one. Generally: when writing a dispatch prompt, quote the criterion rather than paraphrasing it into something tighter."
+  },
+  {
+   "id": "N22",
+   "raised_at": "session 6, 89b5899a doc-review",
+   "subject": "a pitfall recorded as 'covered by a later issue' has now blocked an earlier review three times",
+   "detail": "P2 blocked b3fc1a92 in wave 2 (E2). P4 and P5 were both recorded in waves 2 and 3 with the disposition 'covered by 4a6fb8c1 in wave 12, VERIFY there', and both came back as blocking doc-review findings on 89b5899a in wave 8 (E14). In every case the pitfall was correctly attributed - the later issue really does own the file - and in every case the attribution did not stop the finding.",
+   "decision": "When a pitfall is a live adopter-facing falsehood rather than a missing improvement, 'covered by a later issue' is not a disposition, it is a scheduled review failure. On this epic the remaining ones to treat this way are P6 (issue_scoped_areas absent from the configuration reference, owned by 58c56743) and P17 (four adopter sites teaching the flat plan-doc pattern, owned by 8ff4cff3 - now landed on main). Check each against the surface of any issue about to be gated, and remediate ahead of the gate rather than after it."
   }
  ],
  "handoffs": [
