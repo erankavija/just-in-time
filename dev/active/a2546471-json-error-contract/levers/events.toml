@@ -1,0 +1,20 @@
+schema = "failure-lever-registry/v1"
+namespace = "events"
+
+[[arms]]
+path = "events query"
+argv = ["events", "query", "--json"]
+setup = ["init", "malformed-events-log"]
+setup_notes = "Replace .jit/events.jsonl with exactly one malformed JSON line."
+expected_failure = "Failed to deserialize event log"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "events tail"
+argv = ["events", "tail", "--json"]
+setup = ["init", "malformed-events-log"]
+setup_notes = "Replace .jit/events.jsonl with exactly one malformed JSON line."
+expected_failure = "Failed to deserialize event log"
+expected_exit = 1
+confirmation = "invoked"
