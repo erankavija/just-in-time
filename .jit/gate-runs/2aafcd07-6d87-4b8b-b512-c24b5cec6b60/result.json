@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "d45184a23dc3d02a30b1bf077abdffb43409016b",
+  "completed_at": "2026-07-27T13:28:40.579614418Z",
+  "duration_ms": 203275,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The combined delivered documentation contract is accurate, canonical, and discoverable.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "af264b06-10bc-4176-a98c-16956c8a5372",
+  "message": null,
+  "run_id": "2aafcd07-6d87-4b8b-b512-c24b5cec6b60",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T13:25:17.304068742Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution covered the story plus its three delivered DAG children (`4a6fb8c1`, `58c56743`, `5e9305ec`). All had reachable `jit:<short-id>` commits, inspected individually with rename and merge detection. The resulting contract is accurate and discoverable in the [configuration reference](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:90) and [command reference](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2655); scoped link and citation checks pass.\n\n1. No findings identified.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The combined delivered documentation contract is accurate, canonical, and discoverable.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
