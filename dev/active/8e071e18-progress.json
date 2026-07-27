@@ -1374,6 +1374,15 @@
       "situation": "0b3840f1's doc-review AND code-review independently failed on the same two blocking findings: docs/reference/cli-commands.md documents neither `jit doc dir` nor `jit doc conformance` (4a6fb8c1 REQ-05 and REQ-06), and docs/reference/configuration.md's template section carries no doc_area/{container.dir} field contract. Both are owned two waves downstream, and 58c56743 depended on 0b3840f1, so the content 0b3840f1 needed could not be written until 0b3840f1 closed.",
       "lead_analysis": "Fourth occurrence of one root cause: E2 on b3fc1a92 (wave 2), E4 on f88a16d9 (wave 3), E14 on 89b5899a (wave 8), this one (wave 9). MAX_SAME_FINDING_REPEATS is 3, so policy 5a applies independent of any rework counter. The cause is the plan's sequencing: every documentation issue sits after the checkpoint stories, while each checkpoint's criteria are about the delivered surface INCLUDING its documentation. Patching it a third time with a remediation task would have left 58c56743 and 4a6fb8c1 pending when 143388dc - five gates, still ahead - gates, and 143388dc carries doc-review.",
       "resolution": "Owner chose reordering over a third remediation task. Dropped 58c56743 -> 0b3840f1; the epic now depends on 0b3840f1 directly so its membership stays backed by the DAG. Both documentation tasks run now, since every implementation prerequisite they have is Done, and 0b3840f1 re-gates last against a documented surface. 4a6fb8c1 -> 58c56743 is preserved, because 4a6fb8c1's REQ-07 must cite the canonical home 58c56743 creates. Validate and divergence both clean after the rewire."
+    },
+    {
+      "id": "E19",
+      "raised_at": "session 7, after the epic's holistic-review failed",
+      "category": "3 - epic success criteria / 7 - blocker outside the epic's scope",
+      "situation": "holistic-review F1 (high, blocking) found REQ-09 unmet: dev/active/fdb039ee-modular-document-rendering.md, owned by terminal story fdb039ee of terminal container 41d07c6b outside this epic's subtree, was never archived. The container previewed eligible but its only action was retain, because the document reference carried a commit pin written by fe7667ed when that issue structure was created - no recorded purpose, and no committed script reads the path. REQ-09 states no commit-pin exception.",
+      "options": "1) unpin then execute, relocating the artifact; 2) execute as-is, which runs the mechanism but moves nothing and would likely re-raise the finding; 3) amend REQ-09 to except a pinned reference.",
+      "recommendation": "1 - the pin is incidental rather than deliberate, it is the only reading under which the artifact is genuinely archived, and it leaves the criterion unamended.",
+      "resolution": "Owner chose 1. Filed d8d7f317 inside the epic, unpinned, executed. Artifact at dev/archive/41d07c6b-usability/dev/active/fdb039ee-modular-document-rendering.md with an identical blob, reference relinked, 41d07c6b retired to archived, jit validate passes. The REQ-09 population re-derived after the run is 0."
     }
   ],
   "rework_counts": {
@@ -1843,6 +1852,13 @@
       "subject": "the pitfall reconciliation is recorded as an artifact, not held in the lead's head",
       "detail": "lead-review-protocol requires a container gate to reconcile surfaced_pitfalls against the container's own criteria, and records that an earlier epic failed its independent holistic review on exactly this step, with the reviewer drawing all three findings from a list the lead had read and classified as future work.",
       "decision": "Wrote dev/active/8e071e18-dev-artifact-layout/pitfall-criterion-reconciliation.md: all 30 pitfalls tested against the 15 [hard] criteria, with the six open ones argued individually and the five carrying an explicit 'verify at wave N' instruction (P2, P3, P4, P5, P6) re-verified at HEAD with file:line evidence. No open pitfall is a criterion violation. Recording it makes the reasoning reviewable instead of asserted."
+    },
+    {
+      "id": "N36",
+      "raised_at": "session 7, epic holistic-review F2",
+      "subject": "an advisory review finding measured the right file at the wrong commit",
+      "detail": "F2 (medium, advisory) claimed archive-completeness-record.md's snapshot is false: 49 active / 138 managed reported against 50 / 139 actual, with handoff-4.md omitted from the enumeration. Verified directly: the record declares its snapshot as 'the commit that adds this record', which is 88752ab8, where git ls-tree gives exactly 138 managed and 49 dev/active files and handoff-4.md does not exist. The reviewer measured ed55bafe, a later aa38b236 commit, where the counts are 139 and 50 and handoff-4.md is present. The record is accurate at the snapshot it names.",
+      "decision": "No change to the record. Recorded here and in the completion report so a later review that re-raises it finds the measurement rather than repeating it. This is a measurement error about which commit the record names, not a contract the reviewer cited - the no-argue discipline does not apply, but verifying rather than asserting does."
     }
   ],
   "handoffs": [
