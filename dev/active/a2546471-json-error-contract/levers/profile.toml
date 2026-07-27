@@ -3,7 +3,7 @@ namespace = "profile"
 
 [[arms]]
 path = "profile list"
-argv = ["--json"]
+argv = ["profile", "list", "--json"]
 setup = ["init", "malformed-profile-record"]
 setup_notes = "Create .jit/profiles/jit-dogfood.json with malformed JSON after initialization."
 expected_failure = "PROFILE_CONFLICT because the installed profile record is malformed"
@@ -12,7 +12,7 @@ confirmation = "invoked"
 
 [[arms]]
 path = "profile show"
-argv = ["absent-profile", "--json"]
+argv = ["profile", "show", "absent-profile", "--json"]
 setup = ["init"]
 expected_failure = "PROFILE_NOT_FOUND for an unknown embedded profile ID"
 expected_exit = 3
@@ -20,7 +20,7 @@ confirmation = "invoked"
 
 [[arms]]
 path = "profile apply"
-argv = ["absent-profile", "--json"]
+argv = ["profile", "apply", "absent-profile", "--json"]
 setup = ["init"]
 expected_failure = "PROFILE_NOT_FOUND for an unknown embedded profile ID"
 expected_exit = 3
