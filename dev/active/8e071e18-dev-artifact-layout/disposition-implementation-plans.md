@@ -61,17 +61,20 @@ correction was established from the tree and cross-read against the `copy` and `
 |---|---|---|---|
 | `dev/active/json-output-standardization-plan.md` | mirrored to `14303b30` and `9d427a6b`, source retained | `14303b30` mirrored it and retained the source; `9d427a6b`, later in the run order, relocated it | archived location |
 
-The plan is owned by two issues. `14303b30`'s run mirrored it because one owner, `32f804f1`, sat
-outside that container's subtree and still needed the source. By the time `9d427a6b` ran, that owner
-had been relinked to the mirrored copy and only the inside owner remained, so its run relocated
-rather than mirrored. Both archived copies exist and the live source is gone.
+The plan is owned by two issues, `0db719b1` and `32f804f1`, which sit in different containers.
+`14303b30`'s run mirrored rather than relocated because `32f804f1` lay outside its subtree and still
+named the live source; the run wrote the mirror, retained the source, and repointed `0db719b1` to the
+mirrored copy. When `9d427a6b` ran, the only owner still naming the live source was `32f804f1`, and
+that owner lies inside `9d427a6b`'s subtree — so no reference from outside stood in the way and the
+run relocated. Both archived copies exist, the live source is gone, and each owner now names the copy
+under its own container: `0db719b1` the `14303b30` one, `32f804f1` the `9d427a6b` one.
 
-Which disposition binds, and why the file carries only one: two runs acted on it, so it could be
-read as matching both kinds, but a mirror's defining assertion is a retained source and this source
-is not retained. The archived-location kind is the only one true of the tree. The binding location is
-`9d427a6b`'s, the run that removed the source; `14303b30`'s copy is an archived copy the later
-relocation left standing, and it is recorded because REQ-02 asserts presence at a recorded location
-and both are present.
+Which disposition binds, and why the file carries only one: two runs acted on it, so it could be read
+as matching both kinds, but a mirror's defining assertion is a retained source and this source is not
+retained. The archived-location kind is the only one true of the tree. The location that binds is
+`9d427a6b`'s, because that is where the source path's own bytes went. `14303b30`'s copy is a second
+archived copy the earlier mirror wrote and the later relocation left standing; it is recorded because
+REQ-02 asserts presence at a recorded location and both are present.
 
 The bearing on the criteria is direct. Recorded as mirrored, REQ-03 would be false for this file — it
 asserts a retained source, and there is none. Recorded as an archived location, REQ-02 holds at both
