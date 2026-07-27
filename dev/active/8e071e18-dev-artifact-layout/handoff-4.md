@@ -7,36 +7,49 @@
 ## Current state
 
 - Epic: `8e071e18` — in_progress, claimed `agent:jit-execution-lead`
-- Wave 9 of 13. **Waves 1–8 complete**, including all 24 archival executions.
-- Children summary: **70 done**, 12 in_progress, 6 backlog/ready, 0 rejected (88 total incl. the epic)
-- Active claims: the 12 in_progress are `58c56743`, `aa5db9a1`, the five dispositions (`5a19fffb`, `66c467c1`, `93aaa2b2`, `2d7ae27e`, `079ea42e`), the five verification-only citation issues (`4790367e`, `c7e3ac1b`, `6e963a7f`, `560c2adb`, `d52bd541`) — plus `0b3840f1`, whose two reviews failed and which re-gates last. **`jit issue list --assignee agent:worker` is useless for this** — it returns ~135 issues, most of them long-closed.
-- Open escalations: **none open.** E13–E17 were all raised and resolved this session.
-- Progress file: `dev/active/8e071e18-progress.json` (waves, per-issue status, E1–E17, P1–P26, N1–N31)
+- **81 of 88 children done.** Waves 1–11 complete. 7 remain: the epic itself plus 6 children.
+- Active claims: none outstanding. `4a6fb8c1` was set up and then released unstarted when the session was asked to wind down; its worktree is removed.
+- Open escalations: **none.** E13–E17 were all raised and resolved this session.
+- Progress file: `dev/active/8e071e18-progress.json` — waves, per-issue status, E1–E18, P1–P28, N1–N32
 
-**Three workers were in flight when this was written.** Check them before anything else: `w-58c56743`, `w-aa5db9a1`, `w-dispositions` (worktree `agent-5a19fffb`, covers all five disposition issues).
+The six remaining children and exactly what each needs:
+
+| issue | state | blocked on | what it needs |
+|---|---|---|---|
+| `4a6fb8c1` | ready, no unmet deps | nothing | **the unblocker.** Owns `docs/reference/cli-commands.md`. Must absorb three reviews' findings — see below |
+| `58c56743` | ready, `doc-review` **failed** | `4a6fb8c1`'s edit | re-run `doc-review` only; `docs-mechanical` already passed |
+| `0b3840f1` | in_progress, `code-review` and `doc-review` **failed** | `4a6fb8c1`'s edit | re-run those two only; its other four gates passed |
+| `143388dc` | ready, no unmet deps | nothing | **can run now, independently.** 5 gates |
+| `5e9305ec` | backlog | `58c56743` | dispatch after `58c56743` closes |
+| `af264b06` | backlog | `4a6fb8c1`, `5e9305ec` | final checkpoint, 2 gates |
+
+**`4a6fb8c1` must absorb findings from three separate reviews, all in its own file:**
+
+1. `0b3840f1` doc-review F1 **and** code-review F1, raised independently: `docs/reference/cli-commands.md` documents neither `jit doc dir` nor `jit doc conformance`. Add entries under Document Commands covering arguments, output, JSON shape, no-write behaviour, and conformance's advisory/non-blocking semantics. These are its own REQ-05 and REQ-06.
+2. `58c56743` doc-review F1 (blocking, cites `@/invariant/single-source-prose`): `cli-commands.md:316` still independently specifies the short-id/slug derivation. Replace the shared derivation with a link to `configuration.md#issue-artifact-directories`, retaining only archive-specific behaviour — archive root, markers, fallback handling. That is its REQ-07.
+3. Its REQ-02 was amended under E13 and now names **retention**, not archival by copy. Read its Notes.
 
 ## What just happened
 
-- **The 24 archival executions ran and are all closed.** Sequential on main, one commit pair per issue, each verified before its commit and gated with `repo-validate`. Totals: 176 relocated, 19 mirrored, 83 retained, 0 blockers, 24 recorded execution events. Then re-verified under one uniform assertion set including byte-for-byte hash comparison of 214 files against the plan that moved them. `jit validate` clean. Evidence: `archive-run-evidence.md` (linked to the epic).
-- **`ca832358` filed and landed — a criterion blocker the rehearsal caught.** A retained artifact was still relinked to a destination the run never writes: 33 across 8 containers, making `jit validate` fail after the runs. Root cause: `select_direct_owners` set `selected_for_relink` before the action was chosen, and `reference_changes` never tested the action. Fixed by re-gating both on the finalized action. A/B over one unchanged state: actions identical, retained-with-reference-change 33 → 0.
-- `84c4e956` closed: two out-of-root citations rewritten root-relative; asset scan refreshed.
-- `334bcd6f` filed and closed (E14): three false/absent facts in `docs/reference/cli-commands.md` that blocked `89b5899a`'s doc-review.
-- `89b5899a`, `35499d1e`, `8ff4cff3`, `aa38b236` closed. `aa38b236` produced the completeness record (138 files remain under the managed areas, per-reason 9/3/4/122) and the consolidated warning list (641 occurrences, 105 citing files).
-- `623e4c46` and `834a78a8` **pulled forward** and closed — 7 stale citations that were failing `docs-mechanical` for the whole epic.
-- Five citation issues verified as needing **no edit** and gated: their cited artifacts were mirrored, not relocated.
-- Owner decisions: **E13** (two criteria named the pre-E9 copy mechanism → amended to retention), **E15** (epic REQ-09 scoped to terminal issues outside the epic's own subtree), **E16** (two product bugs filed: `f9e42a43`, `f289ff18`), **E17** (reorder: documentation before checkpoints).
-- Confirmed the previously-unverified half of N8: the stale-binary guard tolerates a moved HEAD when no build input changed.
+- **All 24 archival executions ran and closed** — the epic's central repair. 176 relocated, 19 mirrored, 83 retained, 0 blockers, 24 recorded execution events, then re-verified under one uniform assertion set including byte-for-byte hash comparison of 214 files against the plan that moved them.
+- **`ca832358`** filed from the rehearsal and landed: a retained artifact was still relinked to a destination the run never writes (33 across 8 containers), which made `jit validate` fail after the runs. A/B over one unchanged state: actions identical, retained-with-reference-change 33 → 0.
+- Closed this session: `84c4e956`, `334bcd6f`, `89b5899a`, `8ff4cff3`, `35499d1e`, `ca832358`, the 24 sweeps, `aa38b236`, `623e4c46`, `834a78a8`, the five verification-only citation issues, `aa5db9a1`, and the five disposition records.
+- **`aa38b236`** produced the completeness record (138 files remain under the managed areas; per-reason 9 live owner / 3 commit-pinned / 4 owner outside every archived subtree / 122 no document reference) and the consolidated warning list (641 occurrences, 105 citing files, cited set exactly equal to the relocated set).
+- **The five disposition records found six mismatches** against their own planning-time enumerations, all on mirrored rows — 22 named mirror destinations of which 20 hold no copy. See N32.
+- **`623e4c46` and `834a78a8` pulled forward** out of turn: 7 stale citations were failing `docs-mechanical` for the whole epic. Rewired onto the sweeps that moved their targets.
+- Five citation issues needed **no edit**: their cited artifacts were mirrored, so the sources stayed and the citations still resolve. Each verification is recorded in its claim commit.
+- **The showcase alternate theme** (`gruvbox.css`) was reached through the mechanism per the owner's decision — reference added to `2fbd2a82`, that container's archival re-run, one artifact relocated into the existing destination and the reference relinked. Recorded in `disposition-showcase-theme.md`; it closes the last REQ-10 gap.
+- Owner decisions: **E13** (two criteria still named the pre-E9 copy mechanism), **E15** (epic REQ-09 scoped to terminal issues outside the epic's own subtree), **E16** (`f9e42a43`, `f289ff18` filed), **E17** (reorder: documentation before checkpoints, after the fourth recurrence crossed MAX_SAME_FINDING_REPEATS).
+- Confirmed the previously unverified half of N8: the stale-binary guard tolerates a moved HEAD when no build input changed.
 
 ## What to do next
 
-- [ ] **Check the three in-flight workers first** (`w-58c56743`, `w-aa5db9a1`, `w-dispositions`). Merge, gate, close each. `aa5db9a1`'s worktree is `agent-aa5db9a1` at base `1d9d7f43`; the dispositions worktree is `agent-5a19fffb` at base `2741cc38`.
-- [ ] Close the five verification-only citation issues once their gate batch finishes: `4790367e` (cargo-ci + code-review), `c7e3ac1b` (code-review), `6e963a7f`/`560c2adb`/`d52bd541` (doc-review + docs-mechanical). Their verification is recorded in their claim commits — read those before writing a verdict.
-- [ ] Then `4a6fb8c1` (needs `58c56743` done). It owns `docs/reference/cli-commands.md` outright and must add `jit doc dir` and `jit doc conformance` entries — that is the finding two reviewers raised on `0b3840f1`. Its REQ-02 was amended under E13; read its Notes.
-- [ ] Then `5e9305ec` (needs `58c56743`).
-- [ ] **Re-run `0b3840f1`'s doc-review and code-review last**, after `4a6fb8c1` lands. Both failed on the same two findings; nothing else on it is outstanding (repo-validate, docs-mechanical, mcp-ci, cargo-ci all passed).
-- [ ] Then `143388dc` (5 gates, needs all 13 cleanup issues) and `af264b06` (needs `4a6fb8c1` + `5e9305ec`).
-- [ ] Before the epic's own gates, reconcile `surfaced_pitfalls` P1–P26 against the 15 `[hard]` criteria per `lead-review-protocol.md`. Still needing a disposition call: **P18** (an eligible plan can still refuse at execution — general case, not just fragments), **P19** (backslash separators in the proposed-layout check), **P23** (closed this session), **P26** (adjudicated as a non-defect).
-- [ ] Epic gates are `repo-validate` + `holistic-review`. Then the completion report.
+- [ ] **Dispatch `4a6fb8c1` first** — it unblocks three issues. It is `ready` with no unmet dependencies; a worktree was created and removed, so make a fresh one. Give it all three findings listed in Current state above, plus the P28 worktree warning: a `MISSING:` line naming a `dev/` directory is that class, not its defect.
+- [ ] **`143388dc` can run in parallel right now** — ready, no unmet dependencies, 5 gates. Nothing about it waits on `4a6fb8c1`.
+- [ ] After `4a6fb8c1` lands: re-run `58c56743`'s `doc-review` and `0b3840f1`'s `code-review` + `doc-review`. Nothing else on either is outstanding.
+- [ ] Then `5e9305ec`, then `af264b06`.
+- [ ] **Before the epic's gates, reconcile P1–P28 against the 15 `[hard]` criteria** per `lead-review-protocol.md`. Still needing a disposition call: **P18** (an eligible plan can still refuse at execution — general case), **P19** (backslash separators in the proposed-layout check), **P27** (empty directories left by archival), **P28** (worktree vantage point). None is believed to be a criterion violation, but say so explicitly rather than skipping them — an earlier epic failed its holistic review on exactly this step.
+- [ ] Epic gates are `repo-validate` + `holistic-review`, then the completion report per `completion-report-template.md`, then archive it and link it back.
 
 ## Traps — do not repeat these
 
@@ -57,6 +70,10 @@ All prior traps remain in force. New or newly sharpened:
 - **Quote the criterion in a dispatch prompt; do not paraphrase it tighter.** I told `8ff4cff3`'s worker REQ-05 meant byte-identity of a whole quoted TOML block. It meant the declaration. The stricter reading would have forced two long `description` strings into a teaching excerpt, which the same prompt's scope boundary forbade. The worker asked instead of guessing. Separately, my own wording directive to `334bcd6f` introduced the inaccuracy its next doc-review caught ("the suffixed preferred root" where the preferred root is bare without a membership label).
 
 - **When a batched gate fails, check the remaining entries for a shared surface before letting the batch continue.** A stale citation failing `docs-mechanical` fails it for every issue carrying that gate. I stopped a batch twice for this; each stop cost about a minute and saved review rounds.
+
+- **Do NOT trust a worker's path-resolution claim made from its worktree.** `git worktree add` materialises only tracked paths and git tracks no empty directory, so a worktree lacks the eight directories archival emptied on `main`. Two workers reached wrong conclusions through this in one session: one ran `docs-mechanical` in its worktree, saw `MISSING: dev/plans` on unmodified docs and reported a pre-existing defect at HEAD (the checker resolves against cwd; on `main` it passes); the other walked its worktree for empty directories and wrote "no empty directory is left behind", true of the tree it inspected and false of the repository. My own first correction of the first case was also wrong. Every remaining issue is a documentation issue dispatched into a worktree and gated on `main`, so warn each worker: a `MISSING:` line naming a `dev/` directory is this class, not their defect, and the fix is a placeholder rather than a real area name.
+
+- **Do NOT transcribe an enumeration decided at planning time.** Six of the five disposition issues' 72 enumerated assertions were false, all on mirrored rows — 22 named mirror destinations of which 20 hold no copy, two files never planned by any run at all, two enumerated as mirrored when the run had moved them. Recording any as enumerated would have falsified a REQ-03. `@/issue/8e071e18/decision/D-20` calls these outcomes "decided at planning time and executed without judgement", which describes the *command*, not the record. Dispatch such an issue with verification as the primary instruction and name one known mismatch so the worker has the shape.
 
 - **`jit issue create` has no `--description-file`.** Use `--description "$(cat file)"`. `jit issue update` *does* have `--description-file`.
 

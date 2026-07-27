@@ -1,7 +1,7 @@
 {
  "epic_id": "8e071e18-d786-43ff-b424-a283fecb11f8",
  "epic_short_id": "8e071e18",
- "current_wave": 9,
+ "current_wave": 12,
  "waves": [
   {
    "wave_number": 1,
@@ -1567,6 +1567,20 @@
    "subject": "'legacy archived record' as a term of art in both the reference and the type's doc comment",
    "detail": "docs/reference/cli-commands.md:244, :1174 and :2656 each describe 'a legacy Archived record with no recorded origin', and crates/jit/src/domain/types.rs:106-110 uses the same phrase for the same shape. The shape is representable today: archived_from is Option<State>, so an Archived issue can genuinely carry no origin.",
    "disposition": "CLOSED as a non-defect, lead decision. The no-legacy-narration rule bans describing superseded BEHAVIOUR in shipped text; this names a data shape that still exists, and the reference uses the term the code uses, which is @/invariant/single-source-prose working as intended. Renaming it in the reference alone would be the defect. Also a different subject from this epic - the Archived state's origin tracking has nothing to do with artifact layout - so any rename wants its own issue covering the type doc comment and all three reference sites together."
+  },
+  {
+   "id": "P27",
+   "raised_by": "aa38b236 (worker) and 58c56743 (worker), verified by the lead",
+   "subject": "archival leaves empty source directories, and a worktree does not reproduce them",
+   "detail": "The runs drained eight directories under the managed areas: dev/sessions, dev/plans, dev/design, dev/experiments, dev/presentations/cdc840ad, dev/presentations/1cc809de/vendor/fonts, dev/presentations/1cc809de/vendor/reveal.js/plugin/highlight, and dev/active/planning-bracket-showcase/themes. Git records no empty directory, so no git listing reports them and a checkout built from the committed tree does not reproduce them, while in the repository the paths resolve. Under version control the litter is invisible and vanishes on clone; jit is git-optional (@/charter/D-4), so in a repository without version control the emptied directories would persist and be visible.",
+   "disposition": "OPEN as a product observation. No criterion is affected: REQ-01, REQ-03 and REQ-10 all range over artifacts, and an empty directory is none. Current count recorded in disposition-showcase-theme.md, which supersedes the seven in archive-completeness-record.md. Not filed - filing outside the epic has been an owner call every time on this epic. Raise it in the completion report."
+  },
+  {
+   "id": "P28",
+   "raised_by": "lead, from two workers' independent errors",
+   "subject": "a worktree is the wrong vantage point for any claim about path resolution",
+   "detail": "`git worktree add` materialises only tracked paths and git tracks no empty directory, so a worktree lacks the directories archival emptied on main. Two workers reached wrong conclusions through this in one session. 58c56743's worker ran ./scripts/docs-mechanical.sh in its worktree, saw MISSING: dev/plans on unmodified docs, and reported a pre-existing defect at HEAD; the checker resolves cited paths against cwd, and on main it passes. aa38b236's worker walked its worktree for empty directories, found the areas absent, and wrote 'no empty directory is left behind' - true of the tree it inspected, false of the repository. The lead's own first correction of the first case was also wrong, blaming the git archive extraction rather than the worktree.",
+   "disposition": "OPEN as a standing hazard for the remaining dispatches, all of which are documentation issues in worktrees gated on main. A worker can see a MISSING: line the lead cannot reproduce, and the lead can pass a mechanical check a worker cannot. Tell each worker: a MISSING: line naming a dev/ directory is this class, not their defect, and the fix is a placeholder rather than a real area name. Every other claim in either record derived from git ls-files, the issue store or blob ids, none of which vary between checkouts."
   }
  ],
  "started_at": "2026-07-25T14:24:30.011076+00:00",
@@ -1787,6 +1801,13 @@
    "subject": "a stale in-content citation is a shared surface, so the issue that owns it should not wait its turn",
    "detail": "docs-mechanical's M3 citation check failed on 35499d1e because two adopter guides cited dev/design/worktree-parallel-work.md, which a sweep had relocated. That gate is carried by many issues, so the stale citation was failing a check for the whole remaining epic rather than for one issue. 623e4c46 owned exactly those two citations and 834a78a8 owned five more in Rust sources; both were blocked behind aa38b236, whose consolidated warning list they do not actually need because each enumerates its own citations.",
    "decision": "Rewired both onto the sweeps that moved their targets - 60c398d3 and deb50576, both Done - rather than onto aa38b236, and ran them immediately. That is reordering, not rescoping: no criterion changed, and both issues are written to be satisfied by the citation RESOLVING rather than by that issue having edited it. Both passed every gate first try. Generally: when a gate fails on repository state that a later issue owns, check whether that issue's stated dependency is a real prerequisite or a convenience before creating a remediation task."
+  },
+  {
+   "id": "N32",
+   "raised_at": "session 6, the disposition records",
+   "subject": "an enumeration decided at planning time is a hypothesis, not evidence",
+   "detail": "The five disposition issues each enumerated their files with the disposition decided at planning time, and D-20 calls those outcomes 'decided at planning time and executed without judgement'. Verified against the tree, SIX of 72 assertions were false, all on mirrored rows: two files enumerated as mirrored to seven directories each were never planned by any run and no copy exists; two more named 8 destinations and had 2 and 1; two were enumerated as mirrored with the source retained when the run had moved them. Across those rows the enumerations named 22 mirror destinations of which 20 hold no copy. Recording any of them as enumerated would have falsified 66c467c1 REQ-03 or 93aaa2b2 REQ-03.",
+   "decision": "Dispatch an enumeration-driven issue with verification as the primary instruction and transcription as the failure mode, naming one known mismatch so the worker has the shape. 'Executed without judgement' describes the command, not the record: the plan's own numbers drifted between planning and execution, and only the tree settles it. The same caution applies to the two issue descriptions whose background prose still states pre-run counts; no criterion asserts a count, so they were left as written."
   }
  ],
  "handoffs": [
