@@ -1,10 +1,8 @@
 {
-  "id": "14303b30-75b2-4b21-8963-bc6563b95b91",
-  "title": "Epic: Agent-Friendly Additions",
-  "description": "Enhance gate system with preview, history, and improved error messages for better agent experience",
-  "state": "done",
-  "priority": "high",
+  "archived_from": "done",
   "assignee": null,
+  "context": {},
+  "created_at": "2025-12-18T20:36:11.605950735Z",
   "dependencies": [
     "dc2a9d91-499b-4c9b-8474-7cd1ea6ee4ba",
     "3977f5da-0025-4785-b1e5-453a61ea1fcd",
@@ -16,38 +14,41 @@
     "772cbbc5-fc22-4bb0-8655-a6997716809f",
     "8507f8e7-300a-45b6-95a4-44b66c7d9663"
   ],
+  "description": "Enhance gate system with preview, history, and improved error messages for better agent experience",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "label": "Design Document",
+      "path": "dev/archive/14303b30-phase5-2/dev/active/ci-gate-integration-design.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "label": "Examples",
+      "path": "dev/archive/14303b30-phase5-2/dev/active/gate-examples.md"
+    }
+  ],
+  "done_at": "2026-02-19T19:07:20.759244149Z",
+  "first_ready_at": "2025-12-28T21:33:57.000913180Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
       "status": "passed",
-      "updated_by": "agent:claude",
-      "updated_at": "2026-02-19T19:07:18.207764525Z"
+      "updated_at": "2026-02-19T19:07:18.207764525Z",
+      "updated_by": "agent:claude"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/ci-gate-integration-design.md",
-      "commit": null,
-      "label": "Design Document",
-      "doc_type": null
-    },
-    {
-      "path": "dev/active/gate-examples.md",
-      "commit": null,
-      "label": "Examples",
-      "doc_type": null
-    }
-  ],
+  "id": "14303b30-75b2-4b21-8963-bc6563b95b91",
   "labels": [
     "type:epic",
     "epic:phase5.2",
     "milestone:v1.0"
   ],
-  "created_at": "2025-12-18T20:36:11.605950735Z",
-  "updated_at": "2026-07-05T21:45:52.097898111Z",
-  "first_ready_at": "2025-12-28T21:33:57.000913180Z",
-  "done_at": "2026-02-19T19:07:20.759244149Z"
+  "priority": "high",
+  "state": "archived",
+  "title": "Epic: Agent-Friendly Additions",
+  "updated_at": "2026-07-27T09:56:48.136684363Z"
 }
