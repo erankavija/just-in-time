@@ -70,8 +70,11 @@ and `dev/studies/perf/session-cost-c488ef85.json`, which REQ-09 does not range o
 | `archive-completeness-record.md:150` | the `dev/active` enumeration row for that path | removed from the population |
 | `remaining-artifacts-addendum.md` | the population total of 145 | see below |
 
-The managed areas now hold 145 files: the addendum's 145, plus
-`pitfall-criterion-reconciliation.md` and this record and its directory's entry written after it,
-less this artifact. The completeness record's per-reason counts for `dev/active` lose one
-`commit-pinned reference`, leaving the three `owner outside every archived subtree` rows and the
-`live owner` rows unchanged.
+The managed areas hold **146** files at the commit that adds this record, measured with `git
+ls-files` over the eight areas rather than carried forward by arithmetic. The addendum's 145 gained
+`pitfall-criterion-reconciliation.md` and this record, and lost the artifact archived above:
+145 + 2 − 1 = 146. Both added files carry a live owner — `8e071e18`, in progress, and `d8d7f317` —
+and this record counts itself for the reason the addendum states.
+
+The completeness record's per-reason counts for `dev/active` lose one `commit-pinned reference`,
+leaving its `owner outside every archived subtree` and `live owner` rows unchanged.
