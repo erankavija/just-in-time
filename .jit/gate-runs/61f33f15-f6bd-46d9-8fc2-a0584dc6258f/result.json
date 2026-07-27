@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "9d48ee138d72a12d3ac982e2820e29a64e6ba371",
+  "completed_at": "2026-07-27T09:44:40.436564469Z",
+  "duration_ms": 144248,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/artifact_classifier.rs",
+        "id": "F1",
+        "line": 2470,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/ca832358/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "REQ-05 remains materially unverified: no attributable evidence executes every terminal-container plan in a throwaway worktree and validates all document references."
+      }
+    ],
+    "summary": "REQ-05 lacks the required end-to-end archival execution and whole-repository validation evidence.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ca832358-e27e-4511-9a7b-a2ff2fb5be66",
+  "message": null,
+  "run_id": "61f33f15-f6bd-46d9-8fc2-a0584dc6258f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T09:42:16.188358047Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3703 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa2f4-2274-7e72-ae68-a6c490630f6a\n--------\nuser\n--- 3690 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 01871b6f, ac2acee0, 66d5da56, 9d48ee13 (`jit:ca832358`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/ca832358/requirement/REQ-01–REQ-05 (issue Markdown), @/issue/8e071e18/decision/D-14 (issue Markdown), @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-27T09:36:31Z); code-review pending\nTruncation recovery: Narrowed reads of classifier, archive executor, configuration, gate records, and issue evidence after broad searches truncated.\n\n1. **F1 — blocking, issue-impact:** REQ-05 remains materially unverified. The tagged changes add focused classifier tests at `crates/jit/src/domain/artifact_classifier.rs:2470`, which adequately cover Retain/Block suppression and Copy preservation, and the executor applies only planned `reference_changes` (`crates/jit/src/repository_state/archive.rs:170`). But no attributable test or recorded gate evidence executes all terminal-container plans in a throwaway worktree and validates the resulting repository. `cargo-ci` does not establish that required end-to-end archival outcome. Reference: `@/issue/ca832358/requirement/REQ-05`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-05 lacks the required end-to-end archival execution and whole-repository validation evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-05 remains materially unverified: no attributable evidence executes every terminal-container plan in a throwaway worktree and validates all document references.\",\"file\":\"crates/jit/src/domain/artifact_classifier.rs\",\"line\":2470,\"references\":[\"@/issue/ca832358/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

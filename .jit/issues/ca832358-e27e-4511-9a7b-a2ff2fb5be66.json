@@ -7,13 +7,32 @@
     "0e5dff57-44c1-4fc3-ac2c-f60cf118dabf"
   ],
   "description": "A retained artifact's document references keep naming its retained source, so an archival run leaves no document reference pointing at a path it never wrote.\n\n## Background\n\nAn artifact outside the development root is retained where it is: the plan schedules no destination for it and execution leaves its source untouched (`@/issue/8e071e18/decision/D-14`).\n\nRelink selection does not know that. `select_direct_owners` (`crates/jit/src/domain/artifact_classifier.rs:1154-1175`) marks an owner `selected_for_relink` from ownership facts alone — unpinned, not an already-archived source, inside the subtree, terminal — and runs before the action is chosen. The action is decided afterwards from `(wants_destination, needs_source)` at `:817-821`, where a source outside the development root always selects `Retain`. `reference_changes` is then built at `:901-913` from the selected owners and unconditionally maps `source` to `mirror`, the destination path, with no test of the action.\n\nSo a retained artifact carries a reference change to a destination the run never creates. Execution applies it, the owning issue's document reference names a path with no file behind it, and `jit validate` fails on an invalid document reference. The `already_archived && explicit` retain case is already exempt at `:901`; the out-of-root retain case is not.\n\nMeasured over this repository's 24 terminal containers, executed at HEAD `389ca71f` in a throwaway worktree: 83 artifacts are retained, of which **33 across 8 containers carry a reference change**. The first one alone hard-fails whole-repository validation:\n\n```\nInvalid document reference in issue 'c8355d70': file\n'dev/archive/cfb3ba94-docs/docs/concepts/design-philosophy.md' not found\n```\n\nThe 33 span `docs/`, `crates/jit/tests/`, `scripts/`, `.agents/skills/`, and `CHANGELOG.md`; 22 of them sit in one container. Every one of the 24 plans previews eligible with zero blockers, and every execution exits 0, so neither preview nor exit status reveals it.\n\n`Copy` is a different case and stays as it is: a copy writes the destination, so relinking a terminal owner's reference to the frozen snapshot names a file that exists. Only an action that writes no destination must not relink.\n\n## Success Criteria\n\n- [hard] REQ-01: An artifact whose plan action is `Retain` carries no reference change, and its owners report no relink selection, so the plan's reported selection and its reference changes agree with the action.\n- [hard] REQ-02: Executing a plan containing a retained artifact whose owner is terminal and inside the archived subtree leaves that owner's document reference naming the retained source path.\n- [hard] REQ-03: An artifact whose plan action is `Copy` still carries a reference change to its destination.\n- [hard] REQ-04: A regression test fails if reference-change derivation stops consulting the artifact's action.\n- [hard] REQ-05: Whole-repository validation passes after executing every one of this repository's terminal container plans, with every document reference resolving.\n\n## Notes\n\nREQ-05 is the criterion the defect actually blocks: epic REQ-09 requires `jit validate` to pass with every document reference resolving after the archival runs, and it does not. Verify it the way the defect was found — execute all 24 container plans in a throwaway detached worktree and run `jit validate` there, rather than executing on `main`.\n\nREQ-01 covers both halves deliberately. The `selected_for_relink` field is the plan's own account of what it will do; leaving it true while suppressing the reference change would make the JSON plan lie about the execution.\n\nREQ-04 exists because the defect is invisible to any check that reads only the resulting plan's action counts or the run's exit status. Pin the reason with a test rather than with a comment (`@/issue/8e071e18/decision/D-14` records the retention contract this enforces).",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "REQ-05 archival execution evidence",
+      "path": "dev/active/ca832358/req05-archival-execution-evidence.md"
+    }
+  ],
   "first_ready_at": "2026-07-27T08:31:02.326134893Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-27T09:42:15.264484690Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-27T09:44:40.695856446Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ca832358-e27e-4511-9a7b-a2ff2fb5be66",
   "labels": [
     "epic:dev-artifact-layout",
@@ -24,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Suppress the relink for an artifact the plan retains",
-  "updated_at": "2026-07-27T09:30:53.716917030Z"
+  "updated_at": "2026-07-27T09:50:40.879227348Z"
 }
