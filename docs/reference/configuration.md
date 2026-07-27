@@ -13,6 +13,7 @@ or customize individual settings.
 **Quick links:**
 - [Example config.toml](example-config.toml) - Full annotated example with all options
 - [Schema Configuration](#schema-configuration) - Issue types, validation, namespaces
+- [`[documentation]`](#documentation) - Development-area classification and issue artifact directories
 - [Runtime Configuration](#runtime-configuration) - Lease enforcement and compatibility fields
 
 ## Configuration Files
@@ -74,12 +75,30 @@ issue_scoped_areas = [
 ]
 ```
 
-Controls document lifecycle management. `jit init` scaffolds the table above
-into a new repository from the `SHIPPED_DOCUMENTATION_POLICY` declaration in
-`crates/jit/src/config.rs`, the single source of that classification. Selected
-documents in `managed_paths` may move to the archive mirror. Selected documents
-in `permanent_paths` are copied to the mirror while their source remains in
-place; “permanent” prevents source deletion, not mirror publication.
+Controls document lifecycle management. The table above is the one `jit init`
+scaffolds into a new repository, rendered from the `SHIPPED_DOCUMENTATION_POLICY`
+declaration in `crates/jit/src/config.rs`, the single source of that
+classification; `jit config get documentation` reports the table a repository is
+running under.
+
+Path vocabulary is repository policy: an adopter reclassifies any area, adds
+areas of their own, or drops a convention entirely, and every command reads the
+table in front of it. This repository's `.jit/config.toml` is the dogfood policy
+under which jit itself is developed and must not be read as the shipped
+declaration.
+
+#### Development-area classification
+
+An area's class states what archival does to the artifacts inside it, and it
+follows from what the area holds. A managed area holds revision-specific work
+products of one issue, so archiving that issue takes them with it: selected
+documents in `managed_paths` move to the archive mirror. A permanent area holds
+living documentation, a configured item-kind source, or a documented invocation
+path, so its source stays where readers and configuration already point:
+selected documents in `permanent_paths` are copied to the mirror while their
+source remains in place; “permanent” prevents source deletion, not mirror
+publication. The table above assigns each shipped area to one of the two
+classes.
 
 `development_root` is the outer boundary of both. A document it does not
 contain is retained exactly where it is — the plan schedules no destination for
@@ -94,6 +113,8 @@ directory entry classifies every artifact beneath it; a file entry classifies
 exactly that one path. Development-root documents that belong to no area are
 therefore listed one file at a time, since an entry for the root itself would
 classify every area under it and collapse the managed/permanent split.
+
+#### Archival policy completeness
 
 Dependency-aware `jit archive document` and `jit archive container` planning
 and `--execute` classify this table by authored completeness. The read-only
@@ -119,17 +140,50 @@ The `DocumentationConfig` accessors retain fallback values for display callers,
 but archive planning and execution never use those fallbacks to claim
 eligibility. This prevents a partial policy from silently authorizing mutation.
 
+#### Issue artifact directories
+
 `issue_scoped_areas` declares which areas organize their artifacts one directory
 per issue; every other area keeps its artifacts flat. An area is named whole:
-membership is exact-area equality under lexical path normalization, so
-`dev/plans`, `./dev/plans`, and `dev/plans/` name the same area while a path
-*inside* a declared area is not itself one. An absent key resolves to the
-shipped declaration shown above; an authored list replaces that declaration
-whole, so an empty list opts every area out of the convention. Adoption is
-independent of the archival classification — an area may be managed and
-issue-scoped, managed and flat, permanent and issue-scoped, or neither — and an
-issue-scoped area archives its artifacts exactly as a flat one does. The key is
-not part of the three-key completeness that authorizes archival mutation.
+membership is exact-area equality under lexical path normalization, so `<area>`,
+`./<area>`, and `<area>/` name the same area while a path *inside* a declared
+area is not itself one. An absent key resolves to the shipped declaration shown
+above; an authored list replaces that declaration whole, so an empty list opts
+every area out of the convention. Adoption is independent of the archival
+classification — an area may be managed and issue-scoped, managed and flat,
+permanent and issue-scoped, or neither — and an issue-scoped area archives its
+artifacts exactly as a flat one does. The key is not part of the three-key
+completeness that authorizes archival mutation.
+
+The directory an issue owns inside a declared area is `<area>/<short-id>-<slug>`
+when the issue resolves a single membership value, and `<area>/<short-id>`
+otherwise. The membership value resolves in three steps: the issue's single
+`type:` label, that type's membership namespace from
+[`[type_hierarchy].label_associations`](#type_hierarchy), then a single value of
+that namespace on the issue; the slug is that value normalized, the same suffix
+form an archive destination directory carries. Every other shape — no type label,
+several of them, a type the mapping does not name, no membership value, several
+of them, or a value that normalizes to nothing — names the bare short-id
+directory. The name comes from labels and the short id alone, so renaming an
+issue leaves its directory where it is. Filenames carry no short-id prefix:
+the directory already names the issue, so each file names its own artifact
+(`plan.md`, `breakdown.json`).
+
+`jit doc dir <id> <area>` prints that directory, which is how a caller obtains
+the path instead of composing the name itself; it substitutes straight into a
+command, as in `mkdir -p "$(jit doc dir <id> <area>)"`. The answer is a name
+rather than a reading of the tree, so it resolves the same before anything is
+written there, and an area the repository does not declare is rejected rather
+than resolved.
+
+The convention governs artifacts as they are created. Artifacts already sitting
+flat in a declared area stay resolvable and are never restructured in place;
+`jit doc conformance` lists them as advice, mutating nothing and blocking no
+state transition.
+
+A template node names its document inside its container's directory by declaring
+an area — see [Node document fields](#node-document-fields).
+
+#### Citation scan roots
 
 `citation_scan_roots` names the repository-relative roots an in-content
 citation scan reads: it matches a moving artifact's path anywhere in a scanned
@@ -145,12 +199,6 @@ the development root, since a citation a move can break may live wherever the
 repository writes it. Like `issue_scoped_areas`, the key is not part of the
 three-key completeness that authorizes archival mutation, so omitting it
 leaves archive eligibility unchanged.
-
-Path vocabulary is repository policy: an adopter reclassifies any area, adds
-areas of their own, or drops a convention entirely, and every command reads the
-table in front of it. This repository's `.jit/config.toml` is the dogfood policy
-under which jit itself is developed and must not be read as the shipped
-declaration.
 
 ### `[type_hierarchy]`
 
@@ -324,6 +372,21 @@ Everything else a template refers to by role names it in place: a
 `[[template.transforms]]` entry carries its own `role` field naming the node it
 targets, so `move-upstream-to-role` moves the container's pre-apply upstream
 dependencies onto whichever declared role that entry names.
+
+#### Node document fields
+
+A `[[template.nodes]]` entry's `doc` names the document the created node carries,
+and `doc_area` names the issue-scoped area that document belongs in. With an area
+declared, the `{container.dir}` token inside `doc` interpolates to the canonical
+artifact directory the container owns in that area
+([Issue artifact directories](#issue-artifact-directories)), so
+`doc = "{container.dir}/plan.md"` writes the plan into the container's own
+directory with the filename naming the artifact alone. The declared area is
+matched against `issue_scoped_areas`, and an area the registry does not declare
+fails the apply rather than producing a path outside the convention. A node that
+declares no `doc_area` leaves `{container.dir}` out of scope: the token stays
+verbatim in the interpolated path, so such a node's `doc` names its own location.
+`jit doc dir <container> <area>` prints the directory the token resolves to.
 
 ### Rule selectors (`.jit/rules.toml` `when`)
 

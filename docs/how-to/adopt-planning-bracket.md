@@ -105,13 +105,13 @@ The research example is identical in shape, with `goal` substituted for `epic`
 The engine hardcodes **none** of these names — `epic`/`goal`, `planning`,
 `breakdown`, and the preset names are all read from the template.
 
-`doc_area` is the node's area declaration: it names one of the issue-scoped areas
-your [`[documentation]` table](../reference/configuration.md#documentation)
-declares, and an undeclared area fails the apply. Inside a
-`doc` path, `{container.dir}` interpolates to the canonical artifact directory
-`C` owns in that area — the directory `jit doc dir <C> dev/active` prints — so
-the filename beside it is the artifact's own name, `plan.md`. To make `P`'s plan
-an inline body rather than an external file, omit the `doc` field.
+`doc_area` and `doc` place `P`'s plan in the canonical artifact directory `C` owns
+in `dev/active` — the directory `jit doc dir <C> dev/active` prints — so the
+filename beside it is the artifact's own name, `plan.md`. Both fields are
+specified under
+[Node document fields](../reference/configuration.md#node-document-fields).
+To make `P`'s plan an inline body rather than an external file, omit the `doc`
+field.
 
 The `planning` / `breakdown` node `role`s and the `container` anchor `name` above
 are the defaults the bracket tooling assumes. To use your own vocabulary, name
