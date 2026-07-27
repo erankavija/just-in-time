@@ -503,13 +503,16 @@ impl JsonError {
         serde_json::to_string_pretty(self)
     }
 
-    /// Get the appropriate exit code for this error
-    pub fn exit_code(&self) -> ExitCode {
+    /// Resolve the registered code and return its process exit status.
+    ///
+    /// Text codes that are not members of [`ErrorCode`] remain unresolved;
+    /// callers must report or otherwise handle [`UnknownErrorCode`] explicitly
+    /// rather than silently treating it as a generic failure.
+    pub fn exit_code(&self) -> Result<ExitCode, UnknownErrorCode> {
         self.error
             .code
             .parse::<ErrorCode>()
             .map(ErrorCode::exit_code)
-            .unwrap_or(ExitCode::GenericError)
     }
 }
 
@@ -2985,6 +2988,17 @@ mod tests {
     }
 
     #[test]
+    fn test_json_error_exit_code_reports_unknown_text_as_unresolved() {
+        let error = JsonError::new("UNREGISTERED_ERROR", "unregistered failure");
+
+        let unresolved = error
+            .exit_code()
+            .expect_err("an unregistered JsonError code must remain unresolved");
+
+        assert_eq!(unresolved.as_str(), "UNREGISTERED_ERROR");
+    }
+
+    #[test]
     fn test_gate_failed_error_code_is_validation_failure() {
         assert_eq!(
             ErrorCode::GateFailed.exit_code(),
@@ -3124,6 +3138,7 @@ mod tests {
             assert_eq!(code, listed);
             assert_eq!(code.as_str(), wire);
             assert_eq!(code.exit_code(), status);
+            assert_eq!(JsonError::new(code, "failure").exit_code(), Ok(status));
         }
     }
 

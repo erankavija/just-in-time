@@ -75,7 +75,7 @@ macro_rules! handle_json_error {
             // their distinguishing code and exit 2 at every call site.
             let json_error = jit::output::refine_id_error(&$err, $json_error);
             println!("{}", json_error.to_json_string()?);
-            std::process::exit(json_error.exit_code().code());
+            std::process::exit(json_error_exit_code(&json_error).code());
         } else {
             return Err($err);
         }
