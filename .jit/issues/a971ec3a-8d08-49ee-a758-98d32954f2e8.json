@@ -7,7 +7,14 @@
     "059e13e2-0970-4cc8-8a4e-21cc8b3d83ab"
   ],
   "description": "The six standalone commands acting on repository state as a whole — initialisation, status, validation, recovery, the timestamp migration, and snapshot export — are surveyed one arm at a time: each is driven into a failure raised inside the arm's own body, and the invocation is recorded in a machine-readable registry fragment.\n\n## Background\n\nWhether an arm can be driven into a failure raised inside its own body is unresolved for most of the command surface, and the checks over the machine-readable failure contract rest on the answer. An arm that rejects a malformed identifier fails inside its own body, which is the class the failure contract covers. Running outside a repository instead fails during repository discovery, before any arm body runs, and that path already renders an envelope today — so an arm resolved that way passes against an unmodified binary and proves nothing about the arm. Unreadable stored records are the candidate lever for arms that accept no rejectable argument, because they fail inside the body.\n\nNone of these takes an identifier that can be made invalid, so their levers come from repository state rather than from arguments: an already-initialised repository, an unreadable record, a destination that cannot be written. Three were rejected during argument parsing in the census probe, which is outside the contract's scope and needs a different lever, and the validation command reports findings through its exit status rather than through a failure.\n\nThe fragment is machine-readable rather than prose, because the probes that consume it are code. Each entry carries the command path as the argument parser spells it, the argument vector of the invocation, the setup that invocation needs, and the failure it is expected to produce; an arm with no constructible in-body failure carries an exemption reason in place of an invocation.\n\nThe deliverable is the record rather than coverage. Where no in-body failure is constructible, that is the finding, stated with its reason, so that a coverage requirement written later rests on a measured universe.\n\n## Success Criteria\n\n- [hard] REQ-01: The fragment states, for each arm of the repository-lifecycle commands that the command definitions declare with the machine-readable flag, the invocation that drives it into a failure raised after dispatch inside the arm's own body.\n- [hard] REQ-02: Each entry states the setup its invocation needs, so the failure is reproducible from the fragment alone.\n- [hard] REQ-03: Each entry states the failure its invocation is expected to produce.\n- [hard] REQ-04: An arm with no constructible in-body failure carries an exemption reason in place of an invocation rather than being omitted.\n- [hard] REQ-05: Re-running a recorded invocation under its recorded setup reproduces the recorded failure.\n- [hard] REQ-06: The fragment parses as the shared registry shape and carries no entry outside the arms of the repository-lifecycle commands.\n- [hard] REQ-07: The fragment distinguishes a lever confirmed by invocation from one read out of the source alone.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "research",
+      "label": "Failure Lever Registry Fragment",
+      "path": "dev/active/a2546471-json-error-contract/levers/repository-lifecycle.toml"
+    }
+  ],
   "first_ready_at": "2026-07-27T21:43:44.885062384Z",
   "gates_required": [
     "code-review"
@@ -24,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Failure-lever survey for the repository-lifecycle commands",
-  "updated_at": "2026-07-27T22:15:35.303643795Z"
+  "updated_at": "2026-07-27T22:57:44.596881494Z"
 }
