@@ -13,7 +13,18 @@
     "repo-validate",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-27T08:21:28.880393654Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-27T08:19:22.399772706Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "84c4e956-5ccd-468a-8db8-ecc6958af538",
   "labels": [
     "epic:dev-artifact-layout",
@@ -24,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Repoint citations that do not survive their document's relocation",
-  "updated_at": "2026-07-27T08:18:57.290214296Z"
+  "updated_at": "2026-07-27T08:21:28.880393654Z"
 }

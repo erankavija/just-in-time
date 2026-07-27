@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "389ca71fa3d8358aa8795e2d3ee27d1e89fc5f86",
+  "completed_at": "2026-07-27T08:21:28.614583996Z",
+  "duration_ms": 112788,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The two links are root-relative, resolve from the repository root regardless of the citing document's location, and recorded whole-repository validation passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "84c4e956-5ccd-468a-8db8-ecc6958af538",
+  "message": null,
+  "run_id": "abbf83ec-8879-4909-b77f-c13edb34d448",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T08:19:35.826226013Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 389ca71f (`jit:84c4e956`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-14 (issue decision Markdown); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: repo-validate passed (exit 0, 2026-07-27T08:19:20Z); code-review pending\nTruncation recovery: narrowed resolver, classifier-test, gate, and link reads after broad-search truncation; archival preview was blocked by an existing `.jit/.index.lock`\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The two links are root-relative, resolve from the repository root regardless of the citing document's location, and recorded whole-repository validation passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
