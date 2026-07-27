@@ -19,7 +19,13 @@
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-27T22:30:00.805623057Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2b4b5ddb-a769-4b2d-9b9e-04f7b844da41",
   "labels": [
     "type:task",
@@ -31,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Failure-lever survey for the issue namespace",
-  "updated_at": "2026-07-27T22:22:59.239870501Z"
+  "updated_at": "2026-07-27T22:30:00.805623057Z"
 }

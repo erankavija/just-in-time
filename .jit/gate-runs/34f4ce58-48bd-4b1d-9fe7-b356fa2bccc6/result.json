@@ -1,0 +1,39 @@
+{
+  "branch": "worktree-agent-2b4b5ddb",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "26dc711e144c0b73582317d335c1df50eb492577",
+  "completed_at": "2026-07-27T22:30:00.469700996Z",
+  "duration_ms": 284750,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/a2546471-json-error-contract/levers/issue.toml",
+        "id": "F1",
+        "line": 71,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/2b4b5ddb/requirement/REQ-02",
+          "@/issue/2b4b5ddb/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "The issue delete setup allows a secondary worktree, which fails before the recorded deletion-confirmation refusal and exit code."
+      }
+    ],
+    "summary": "The delete failure lever omits a setup condition required to reach its recorded failure.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2b4b5ddb-a769-4b2d-9b9e-04f7b844da41",
+  "message": null,
+  "run_id": "34f4ce58-48bd-4b1d-9fe7-b356fa2bccc6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T22:25:15.719138221Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10674 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-2b4b5ddb\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa5ae-accd-71e2-89f2-a1d22c3ee23e\n--------\nuser\n--- 10661 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 26dc711e144c0b73582317d335c1df50eb492577 (jit:2b4b5ddb)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2b4b5ddb/requirement/REQ-01–REQ-07 (markdown-first issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: code-review pending (exit code none)\nTruncation recovery: narrowed CLI dispatch, registry, plan, and schema reads after truncated broad searches\n\n1. **F1 — blocking, issue-impact:** The `issue delete` setup is incomplete. [issue.toml](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-2b4b5ddb/dev/active/a2546471-json-error-contract/levers/issue.toml:71) permits a secondary Git worktree, where `main.rs` rejects deletion before the recorded `JIT_ALLOW_DELETION` refusal. The entry therefore does not reproducibly reach its stated failure/exit 2 from its recorded setup; require a primary/non-secondary worktree condition. References: @/issue/2b4b5ddb/requirement/REQ-02, @/issue/2b4b5ddb/requirement/REQ-05.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The delete failure lever omits a setup condition required to reach its recorded failure.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The issue delete setup allows a secondary worktree, which fails before the recorded deletion-confirmation refusal and exit code.\",\"file\":\"dev/active/a2546471-json-error-contract/levers/issue.toml\",\"line\":71,\"references\":[\"@/issue/2b4b5ddb/requirement/REQ-02\",\"@/issue/2b4b5ddb/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
