@@ -14,7 +14,7 @@ commits and the re-verification of all of them.
 |---|---|
 | managed development areas, archive root | `[documentation].managed_paths` and `archive_root` in `.jit/config.toml` |
 | what each run planned and did | the per-run tables in `archive-run-evidence.md`, parsed row by row |
-| what remains under a managed area | `git ls-files` over each managed area, plus a working-tree walk for untracked files and empty directories |
+| what remains under a managed area | `git ls-files` over each managed area for the tracked files, and a walk of the repository checkout for untracked files and empty directories, which no git listing reports |
 | who owns an artifact, and in what state | every `documents` entry of every record in `.jit/issues/`, indexed path → (issue, state, commit pin) |
 | whether an owner sits inside an archived container | transitive dependency closure of each of the 24 container ids over the issue graph |
 | whether relocated bytes changed | git blob identity of each destination at `HEAD` against the same path's source blob in the parent of the commit that wrote that container's marker |
@@ -99,8 +99,16 @@ not.
 
 ## REQ-03 — every file remaining under a managed area, and why
 
-The eight managed areas hold 138 files. Four of them hold none: those directories are absent from
-the working tree. Every remaining file is tracked, and no empty directory is left behind.
+The eight managed areas hold 138 files. Four hold none and stand as empty directories in the
+repository checkout — `dev/sessions`, `dev/plans`, `dev/design`, `dev/experiments` — alongside three
+nested ones the runs also drained: `dev/presentations/cdc840ad`,
+`dev/presentations/1cc809de/vendor/fonts` and
+`dev/presentations/1cc809de/vendor/reveal.js/plugin/highlight`. Git records no empty directory, so
+`git ls-files` reports nothing under those seven paths and a checkout built from the committed tree
+does not reproduce them, while in the repository the paths resolve. Every remaining file is tracked.
+REQ-01 and REQ-03 range over artifacts — a file a document reference names, or a file remaining
+under a managed area — and an empty directory is neither, so the enumeration below stands as
+counted.
 
 | area | files | live owner | commit-pinned reference | owner outside every archived subtree | no document reference |
 |---|---|---|---|---|---|
