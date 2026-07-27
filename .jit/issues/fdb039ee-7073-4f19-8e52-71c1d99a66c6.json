@@ -15,7 +15,7 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Modular document rendering design",
-      "path": "dev/active/fdb039ee-modular-document-rendering.md"
+      "path": "dev/archive/41d07c6b-usability/dev/active/fdb039ee-modular-document-rendering.md"
     }
   ],
   "done_at": "2026-05-06T15:27:27.795574303Z",
@@ -41,5 +41,5 @@
   "priority": "high",
   "state": "done",
   "title": "Modular document rendering for CSV and source files in Web UI",
-  "updated_at": "2026-07-27T13:40:50.673826055Z"
+  "updated_at": "2026-07-27T13:41:34.514717129Z"
 }
