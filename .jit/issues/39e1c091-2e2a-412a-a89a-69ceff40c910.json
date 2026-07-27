@@ -13,7 +13,7 @@
       "doc_type": "notes",
       "format": "markdown",
       "label": "Repository-state architecture",
-      "path": "dev/architecture/repository-state-materialization.md"
+      "path": "dev/archive/1cc809de-repository-state-quality/dev/architecture/repository-state-materialization.md"
     }
   ],
   "done_at": "2026-07-24T19:34:13.984356042Z",
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Write the repository-state architecture doc and sweep the stale storage pointer",
-  "updated_at": "2026-07-24T19:34:13.984356042Z"
+  "updated_at": "2026-07-27T10:06:01.714046008Z"
 }

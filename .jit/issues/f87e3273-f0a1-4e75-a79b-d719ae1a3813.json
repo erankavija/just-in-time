@@ -11,69 +11,11 @@
   "description": "Build a corrected successor presentation of the repository-materialization story at `dev/presentations/1cc809de/`, in which every falsifiable claim traces to a repository artifact and all assets are vendored so the deck presents with no network access.\n\n## Background\n\nAn adversarial audit (`dev/studies/cdc840ad-audit-2026-07-23.md`) of the predecessor showcase deck (`dev/presentations/cdc840ad/talk.html`) found nine falsifiable errors plus asset-portability defects. This deck is a corrected retelling of that same repository-materialization story, not a deck about the current quality-hardening work. Reuse the predecessor's structure and theme as a starting point, but every corrected claim must trace to a repository artifact.\n\nThe deck carries an explicit correction inventory section keyed by audit finding id, mapping each finding to its corrected claim and the evidence for the correction. It must cover all six A1 findings, every A2 finding whose slide content the successor retells, and A4-1..A4-3. The A2 corrections are tabulated in the audit's section A2 (`dev/studies/cdc840ad-audit-2026-07-23.md`); apply each row's correction to any slide that retells that claim.\n\n**A1 corrections (must-fix falsifiable errors):**\n\n- **A1-1** The predecessor's `fn derive(...)` signature is fabricated; no `derive` function exists. The real closed entry point is `pub fn derive_materialization(image: &RepositoryImage, request: MaterializationRequest<'_>) -> Result<MaterializationPlan, RepositoryStateError>` (`crates/jit/src/repository_state/mod.rs:422-425`). `MaterializationRequest` is a closed 5-variant enum (`SemanticMutation`, `RenderConfiguredProjections`, `RepairDerivedState`, `Initialize`, `ApplyProfile`); the return is fallible.\n- **A1-2** The slide titled inspectable shows a plan JSON document that does not exist. `MaterializationPlan` does not derive `Serialize` (`repository_state/mod.rs:285-286`); no command emits it; `plan_hash` is bare hex with no `sha256:` prefix (`image.rs:1404`); the real action vocabulary is a 4-variant enum `CreateDirectory | WriteFile | SetMode | DeleteFile` (`image.rs:1139-1167`) whose write variant is `{ path, owner, expected, bytes, mode }` with a structured `VirtualPath`, not a `write` string field. The only genuinely inspectable JSON is `jit profile apply --dry-run`, which emits `ProfilePlanResult { id, version, status, plan_hash, targets }` (`crates/jit/src/profile/application.rs:139-151`). Either drop the JSON block or relabel it as the real profile-apply dry-run shape.\n- **A1-3** The current-repository-produced-130-session-opens figure is false: 130 is a prediction from a 65-issue in-memory model, not a measurement of this repository, and it is never shown in a table headed as measured. State it as prediction, e.g. a 65-issue deterministic model predicts 130 session opens for the old path; the corrected path opens 2. The post-fix 2 is genuinely measured by `test_check_auto_transitions_opens_sessions_only_for_eligible_backlog_issues` (`crates/jit/src/commands/issue.rs`).\n- **A1-4** Independent holistic PASS was written by the same building agent and no `holistic` gate existed for the predecessor. Do not describe the predecessor self-review as independent. If an independence claim is made, it must cite the actually-independent holistic review performed for the current hardening epic by a reviewer distinct from the building agent.\n- **A1-5** The `RepositoryImage` struct shown has a field it does not have (`evidence: RepositoryRootEvidence`). The real fields are `layout`, `spec`, `entries`, `listings`, `pinned`, `linked_worktree` (`crates/jit/src/repository_state/image.rs:599-607`); `RepositoryRootEvidence` lives two levels down inside `RepositoryLayout`.\n- **A1-6** The Product-plus-public-docs +48,974 / -23,996 diffstat row reproduces under no stated path filter. Either recompute under a stated, reproducible filter or drop the row and keep only the two rows that reproduce exactly: `git diff --shortstat 82a8cf3f^..46ed1b94 -- crates/jit` gives 48806 insertions / 23843 deletions, and `-- crates/jit/src` gives 44799 / 21690. Also fix the first-implementation-commit footnote: `82a8cf3f` is a claim commit touching zero code; the first code commit is `aef6dd26`.\n\n**Timing-citation rule.** Every timing figure in the deck cites its source as artifact path + command name + statistic, for example `dev/studies/perf/session-cost-<commit>.json > issue_update_mutation > median_ms`. Performance artifacts live at `dev/studies/perf/session-cost-<jit-commit>.json` and carry per-command stats under `commands[]{name, min_ms, median_ms, p95_ms, max_ms}`. An uncited timing is a defect.\n\n**Asset vendoring (A4).** The predecessor loads reveal.js, KaTeX, and three font families from CDNs and cannot present air-gapped. For the successor: vendor reveal.js and all fonts locally under `dev/presentations/1cc809de/` (A4-2); remove KaTeX and all math-rendering code entirely, since no slide contains math (A4-1); and render a single slide-number chrome per slide rather than the predecessor's duplicated reveal counter plus manual counter (A4-3).\n\n## Success Criteria\n\n- [hard] REQ-01: A successor deck exists at `dev/presentations/1cc809de/`, comprising the HTML deck and its vendored assets.\n- [hard] REQ-02: Each of the six A1 findings above is corrected in the deck exactly as specified, with the corrected claim tracing to the named repository artifact.\n- [hard] REQ-03: Every timing figure in the deck is cited as artifact path + command name + statistic; no timing appears uncited.\n- [hard] REQ-04: The deck contains a correction-inventory section keyed by audit finding id covering A1-1..A1-6, every A2 finding whose content the deck retells, and A4-1..A4-3, mapping each to its corrected claim and its evidence.\n- [hard] REQ-05: The deck loads no external resource: reveal.js and all fonts are vendored under the deck folder, and it renders correctly with no network access.\n- [hard] REQ-06: The deck contains no KaTeX or other math-rendering code and no slide contains mathematical notation.\n- [hard] REQ-07: Exactly one slide-number chrome is shown per slide.\n- [hard] REQ-08: The deck passes the presentation fit checker on every slide with no overflow.\n\n## Notes\n\nThis is a corrected retelling of the predecessor story, not a deck about the current epic's own work. Asset vendoring is pinned: reveal.js and fonts are vendored locally and KaTeX is dropped so rendering is reproducible from the repository alone. The audit `dev/studies/cdc840ad-audit-2026-07-23.md` is the evidence source for finding-level detail and for the A2 correction table.",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "1aa8e84c9cabcbfe4d95b19879fe48b9c2c5e6d54574cbe679bc22edb9fe12b6",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "vendor/reveal.js/reset.css",
-          "resolved_path": "dev/presentations/1cc809de/vendor/reveal.js/reset.css"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "9cbc5082797d938f0ee780328790a131ae3d7bc5c09c176e77927c174f29e60a",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "vendor/reveal.js/reveal.css",
-          "resolved_path": "dev/presentations/1cc809de/vendor/reveal.js/reveal.css"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "fcfd6ebfd05700d24f7509bb7b6075b5e322b8f503c65ea29999920c0f079132",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "vendor/fonts/fonts.css",
-          "resolved_path": "dev/presentations/1cc809de/vendor/fonts/fonts.css"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "7ba057c88a30dc41c8564b549d0b76bb6fa98413c3a50b66fd6a3f80a4783cbe",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "themes/rust.css",
-          "resolved_path": "dev/presentations/1cc809de/themes/rust.css"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "529500693d999617ca6e1eeae1160e689512ea53723b2a323a577e4789a0edba",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "base.css",
-          "resolved_path": "dev/presentations/1cc809de/base.css"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "3d58fbfb3fb64e4c2c1c0288347ab4174847b281538fe93f056e90b9b5a608ca",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "vendor/reveal.js/plugin/highlight/highlight.js",
-          "resolved_path": "dev/presentations/1cc809de/vendor/reveal.js/plugin/highlight/highlight.js"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "9736bf3d8918e391e8c07c85c53773800d4004dc25f948916e319ca371ca881a",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "vendor/reveal.js/reveal.js",
-          "resolved_path": "dev/presentations/1cc809de/vendor/reveal.js/reveal.js"
-        }
-      ],
       "commit": null,
       "doc_type": "notes",
       "format": "html",
       "label": "Corrected successor deck (reveal.js, vendored assets)",
-      "path": "dev/presentations/1cc809de/talk.html"
+      "path": "dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/talk.html"
     }
   ],
   "done_at": "2026-07-25T05:02:21.663281301Z",
@@ -104,5 +46,5 @@
   "priority": "high",
   "state": "done",
   "title": "Corrected successor deck for the repository-materialization story",
-  "updated_at": "2026-07-25T05:02:21.663281301Z"
+  "updated_at": "2026-07-27T10:06:01.714046008Z"
 }

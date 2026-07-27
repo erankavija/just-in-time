@@ -1150,3 +1150,106 @@ Issue `f3ddbf55`. Plan eligible with no blockers. 10 relocated, 0 mirrored, 1 re
 - `external-edge` at `dev/active/8b05a612-research.md`
 - `external-edge` at `dev/active/9b7b5f9c-research.md`
 - `external-edge` at `dev/presentations/9b7b5f9c/talk.html`
+
+## `1cc809de` — dev/archive/1cc809de-repository-state-quality
+Issue `3ef329f3`. Plan eligible with no blockers. 18 relocated, 4 mirrored, 5 retained, 3 already archived.
+
+### Artifacts
+
+| action | source | destination | owners |
+|---|---|---|---|
+| copy | `dev/architecture/repository-state-materialization.md` | `dev/archive/1cc809de-repository-state-quality/dev/architecture/repository-state-materialization.md` | 39e1c091 |
+| copy | `dev/archive/features/cdc840ad/showcase/base.css` | `dev/archive/1cc809de-repository-state-quality/dev/archive/features/cdc840ad/showcase/base.css` | — |
+| copy | `dev/archive/features/cdc840ad/showcase/talk.html` | `dev/archive/1cc809de-repository-state-quality/dev/archive/features/cdc840ad/showcase/talk.html` | — |
+| copy | `dev/archive/features/cdc840ad/showcase/themes/rust.css` | `dev/archive/1cc809de-repository-state-quality/dev/archive/features/cdc840ad/showcase/themes/rust.css` | — |
+| move | `dev/presentations/1cc809de/base.css` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/base.css` | — |
+| move | `dev/presentations/1cc809de/talk.html` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/talk.html` | f87e3273 |
+| move | `dev/presentations/1cc809de/themes/rust.css` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/themes/rust.css` | — |
+| move | `dev/presentations/1cc809de/vendor/fonts/fonts.css` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/fonts/fonts.css` | — |
+| move | `dev/presentations/1cc809de/vendor/fonts/jetbrains-mono-latin-400-normal.woff2` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/fonts/jetbrains-mono-latin-400-normal.woff2` | — |
+| move | `dev/presentations/1cc809de/vendor/fonts/jetbrains-mono-latin-500-normal.woff2` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/fonts/jetbrains-mono-latin-500-normal.woff2` | — |
+| move | `dev/presentations/1cc809de/vendor/fonts/open-sans-latin-400-italic.woff2` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/fonts/open-sans-latin-400-italic.woff2` | — |
+| move | `dev/presentations/1cc809de/vendor/fonts/open-sans-latin-400-normal.woff2` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/fonts/open-sans-latin-400-normal.woff2` | — |
+| move | `dev/presentations/1cc809de/vendor/fonts/open-sans-latin-600-normal.woff2` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/fonts/open-sans-latin-600-normal.woff2` | — |
+| move | `dev/presentations/1cc809de/vendor/fonts/open-sans-latin-700-normal.woff2` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/fonts/open-sans-latin-700-normal.woff2` | — |
+| move | `dev/presentations/1cc809de/vendor/fonts/source-code-pro-latin-400-normal.woff2` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/fonts/source-code-pro-latin-400-normal.woff2` | — |
+| move | `dev/presentations/1cc809de/vendor/fonts/source-code-pro-latin-500-normal.woff2` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/fonts/source-code-pro-latin-500-normal.woff2` | — |
+| move | `dev/presentations/1cc809de/vendor/reveal.js/plugin/highlight/highlight.js` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/reveal.js/plugin/highlight/highlight.js` | — |
+| move | `dev/presentations/1cc809de/vendor/reveal.js/reset.css` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/reveal.js/reset.css` | — |
+| move | `dev/presentations/1cc809de/vendor/reveal.js/reveal.css` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/reveal.js/reveal.css` | — |
+| move | `dev/presentations/1cc809de/vendor/reveal.js/reveal.js` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/vendor/reveal.js/reveal.js` | — |
+| move | `dev/presentations/cdc840ad/README.md` | `dev/archive/1cc809de-repository-state-quality/dev/presentations/cdc840ad/README.md` | cba48167 |
+| move | `dev/studies/cdc840ad-audit-2026-07-23.md` | `dev/archive/1cc809de-repository-state-quality/dev/studies/cdc840ad-audit-2026-07-23.md` | 1cc809de |
+| retain | `dev/archive/1cc809de-breakdown.json` | already under the archive root | 02dc4bac |
+| retain | `dev/archive/1cc809de-completion-report.md` | already under the archive root | 1cc809de |
+| retain | `dev/archive/1cc809de-plan.md` | already under the archive root | 02dc4bac |
+| retain | `dev/studies/perf/session-cost-27ffbd2d.json` | retained in place | 73981310(pinned) |
+| retain | `dev/studies/perf/session-cost-c488ef85.json` | retained in place | a4b0fadf(pinned) |
+
+### In-content citation warnings (58)
+
+| citing site | moving artifact |
+|---|---|
+| `dev/active/8e071e18-breakdown.json:3024:1656` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/active/8e071e18-breakdown.json:3070:14` | `dev/presentations/1cc809de/base.css` |
+| `dev/active/8e071e18-breakdown.json:3071:14` | `dev/presentations/1cc809de/talk.html` |
+| `dev/active/8e071e18-breakdown.json:3072:14` | `dev/presentations/1cc809de/themes/rust.css` |
+| `dev/active/8e071e18-breakdown.json:3073:14` | `dev/presentations/1cc809de/vendor/fonts/fonts.css` |
+| `dev/active/8e071e18-breakdown.json:3074:14` | `dev/presentations/1cc809de/vendor/fonts/jetbrains-mono-latin-400-normal.woff2` |
+| `dev/active/8e071e18-breakdown.json:3075:14` | `dev/presentations/1cc809de/vendor/fonts/jetbrains-mono-latin-500-normal.woff2` |
+| `dev/active/8e071e18-breakdown.json:3076:14` | `dev/presentations/1cc809de/vendor/fonts/open-sans-latin-400-italic.woff2` |
+| `dev/active/8e071e18-breakdown.json:3077:14` | `dev/presentations/1cc809de/vendor/fonts/open-sans-latin-400-normal.woff2` |
+| `dev/active/8e071e18-breakdown.json:3078:14` | `dev/presentations/1cc809de/vendor/fonts/open-sans-latin-600-normal.woff2` |
+| `dev/active/8e071e18-breakdown.json:3079:14` | `dev/presentations/1cc809de/vendor/fonts/open-sans-latin-700-normal.woff2` |
+| `dev/active/8e071e18-breakdown.json:3080:14` | `dev/presentations/1cc809de/vendor/fonts/source-code-pro-latin-400-normal.woff2` |
+| `dev/active/8e071e18-breakdown.json:3081:14` | `dev/presentations/1cc809de/vendor/fonts/source-code-pro-latin-500-normal.woff2` |
+| `dev/active/8e071e18-breakdown.json:3082:14` | `dev/presentations/1cc809de/vendor/reveal.js/plugin/highlight/highlight.js` |
+| `dev/active/8e071e18-breakdown.json:3083:14` | `dev/presentations/1cc809de/vendor/reveal.js/reset.css` |
+| `dev/active/8e071e18-breakdown.json:3084:14` | `dev/presentations/1cc809de/vendor/reveal.js/reveal.css` |
+| `dev/active/8e071e18-breakdown.json:3085:14` | `dev/presentations/1cc809de/vendor/reveal.js/reveal.js` |
+| `dev/active/8e071e18-breakdown.json:3086:14` | `dev/presentations/cdc840ad/README.md` |
+| `dev/active/8e071e18-breakdown.json:3777:2982` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/active/8e071e18-breakdown.json:3777:3085` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/active/8e071e18-breakdown.json:3777:3157` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/active/8e071e18-investigation.md:120:45` | `dev/presentations/1cc809de/talk.html` |
+| `dev/active/8e071e18-investigation.md:121:45` | `dev/presentations/cdc840ad/README.md` |
+| `dev/active/8e071e18-investigation.md:129:2` | `dev/presentations/1cc809de/vendor/reveal.js/reveal.css` |
+| `dev/archive/1cc809de-breakdown.json:1013:6` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:103:289` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:1173:6` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:1213:6` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:1251:6` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:1288:6` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:1305:1098` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:1305:315` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:1305:6568` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:1343:1278` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:143:256` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:31:6` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:38:309` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:448:6` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:5:394` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-breakdown.json:73:248` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-completion-report.md:98:91` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-completion-report.md:9:217` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-handoff-2.md:60:11` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-handoff-3.md:67:11` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-handoff-4.md:59:29` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-handoff.md:64:43` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-plan.md:10:170` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-plan.md:192:250` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-plan.md:203:244` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-plan.md:217:222` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-plan.md:221:211` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-plan.md:222:221` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-plan.md:223:231` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/archive/1cc809de-plan.md:224:220` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/presentations/1cc809de/talk.html:30:12` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/presentations/1cc809de/talk.html:635:55` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/presentations/cdc840ad/README.md:5:3` | `dev/studies/cdc840ad-audit-2026-07-23.md` |
+| `dev/presentations/cdc840ad/README.md:9:3` | `dev/presentations/1cc809de/talk.html` |
+
+### Other plan warnings (2)
+
+- `dynamic-loading-suspected` at `dev/presentations/1cc809de/vendor/reveal.js/reveal.css`
+- `external-edge` at `dev/archive/features/cdc840ad/showcase/talk.html`

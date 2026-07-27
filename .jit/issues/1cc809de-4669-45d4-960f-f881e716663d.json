@@ -1,4 +1,5 @@
 {
+  "archived_from": "done",
   "assignee": null,
   "context": {},
   "created_at": "2026-07-23T18:11:23.137409473Z",
@@ -13,7 +14,7 @@
       "doc_type": "notes",
       "format": "markdown",
       "label": "Adversarial audit (evidence source)",
-      "path": "dev/studies/cdc840ad-audit-2026-07-23.md"
+      "path": "dev/archive/1cc809de-repository-state-quality/dev/studies/cdc840ad-audit-2026-07-23.md"
     },
     {
       "commit": null,
@@ -48,7 +49,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "done",
+  "state": "archived",
   "title": "Repository-state quality hardening",
-  "updated_at": "2026-07-25T06:33:47.907795760Z"
+  "updated_at": "2026-07-27T10:06:01.714046008Z"
 }
