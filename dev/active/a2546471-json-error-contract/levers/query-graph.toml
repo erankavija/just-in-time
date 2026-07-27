@@ -1,0 +1,99 @@
+schema = "failure-lever-registry/v1"
+namespace = "query-graph"
+
+[[arms]]
+path = "query all"
+argv = ["query", "all", "--json"]
+setup = ["init", "malformed-index"]
+setup_notes = "Replace the initial .jit/index.json contents with `not-json`."
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "query available"
+argv = ["query", "available", "--json"]
+setup = ["init", "malformed-index"]
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "query blocked"
+argv = ["query", "blocked", "--json"]
+setup = ["init", "malformed-index"]
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "query strategic"
+argv = ["query", "strategic", "--json"]
+setup = ["init", "malformed-index"]
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "query closed"
+argv = ["query", "closed", "--json"]
+setup = ["init", "malformed-index"]
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "query count"
+argv = ["query", "count", "--by", "state", "--json"]
+setup = ["init", "malformed-index"]
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "query divergence"
+argv = ["query", "divergence", "--json"]
+setup = ["init", "malformed-index"]
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "graph deps"
+argv = ["graph", "deps", "deadbeef", "--json"]
+setup = ["init", "malformed-index"]
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "graph rdeps"
+argv = ["graph", "rdeps", "deadbeef", "--json"]
+setup = ["init", "malformed-index"]
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "graph roots"
+argv = ["graph", "roots", "--json"]
+setup = ["init", "malformed-index"]
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "graph tree"
+argv = ["graph", "tree", "deadbeef", "--json"]
+setup = ["init", "malformed-index"]
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "graph export"
+argv = ["graph", "export", "--json"]
+setup = ["init", "malformed-index"]
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_exit = 1
+confirmation = "invoked"
