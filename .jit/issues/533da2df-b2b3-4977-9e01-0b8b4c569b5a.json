@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Adding a blocking dependency to a Ready issue leaves it Ready, and creating an issue that already carries an unmet dependency yields a Ready issue. Stored state then contradicts the dependency graph.\n\n## Background\n\nReadiness is a stored field on the issue and is also derivable from the dependency graph. The two disagree after a graph mutation that introduces a blocking edge.\n\nThe auto-transition helper in the domain layer is one-directional: it promotes a Backlog issue to Ready once nothing blocks it, and has no inverse for an issue that becomes blocked. Both callers that consult it — the direct dependency-mutation path and the graph-template application path — invoke it only on dependency *removal*.\n\nThe template application path does carry a demotion branch, but it sits behind a guard that skips the remainder of the loop body whenever the transitive reduction leaves the dependency set unchanged. Adding a single edge that introduces no redundancy takes that early exit, so both the demotion and the dependency-add event are skipped.\n\nConsumers disagree as a result. The available-work query filters on the live blocked predicate and correctly withholds a blocked issue, so no agent is offered work it cannot start. The issue-status projection reports the stored state, so it presents an issue as Ready while simultaneously listing the dependencies that block it. An agent reading status to decide whether to begin is told it may.\n\nReproduction in this repository: applying the planning-bracket template to a container produced a breakdown node in Ready whose planning-node dependency was not met, and left the container in Ready after it gained a dependency on that breakdown node. The event log for that application records no dependency-add event for either edge and no state change for the container.\n\n## Success Criteria\n\n- [hard] REQ-01: An issue that gains a dependency on a non-terminal issue leaves Ready for Backlog, and the transition appends a state-change event.\n- [hard] REQ-02: An issue created while carrying an unmet dependency starts in Backlog.\n- [hard] REQ-03: Every dependency addition appends a dependency-add event, including an addition that introduces no transitive redundancy.\n- [hard] REQ-04: No issue in a repository reports Ready while its unmet-dependency list is non-empty, and a whole-repository check reports any such issue as a violation.\n- [hard] REQ-05: The graph-template application path and the direct dependency-mutation path derive readiness through one shared helper, so neither can drift from the other.\n- [hard] REQ-06: Readiness derivation is covered by a property-based test asserting that stored state and the graph-derived blocked predicate agree for every issue after an arbitrary sequence of dependency additions and removals.\n\n## Notes\n\nEnforces `@/inv/derived-state-coherence` and `@/inv/event-log`.",
   "documents": [],
+  "done_at": "2026-07-27T20:40:03.400033191Z",
   "first_ready_at": "2026-07-25T09:08:01.479980685Z",
   "gates_required": [
     "cargo-ci",
@@ -31,7 +32,7 @@
     "enforces:@/invariant/event-log"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Blocking dependency addition does not demote the dependent out of Ready",
-  "updated_at": "2026-07-27T20:37:41.863635604Z"
+  "updated_at": "2026-07-27T20:40:03.400033191Z"
 }
