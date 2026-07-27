@@ -11,8 +11,10 @@ schema = 2
 # DOCUMENTATION LIFECYCLE
 # =============================================================================
 # Configure how JIT manages development documentation (design docs, session notes).
-# What each key means, how its entries are matched, and what an absent key
-# resolves to: docs/reference/configuration.md
+# `jit init` writes this whole table from the shipped development-area
+# classification, so author it only to reclassify. The classification, what each
+# key means, how its entries are matched, and what an absent key resolves to:
+# docs/reference/configuration.md, section `[documentation]`.
 
 [documentation]
 # Root directory for development documentation
@@ -22,35 +24,25 @@ development_root = "dev"
 archive_root = "dev/archive"
 
 # Areas whose selected artifacts `jit archive` may move to the mirror (archival
-# is always explicit; nothing archives automatically)
+# is always explicit; nothing archives automatically). These entries illustrate
+# the authoring forms rather than the shipped classification: a directory entry
+# classifies everything beneath it.
 managed_paths = [
   "dev/active",
-  "dev/studies",
-  "dev/sessions",
-  "dev/plans",
-  "dev/presentations",
-  "dev/design",
-  "dev/benchmarks",
   "dev/experiments",
 ]
 
-# Areas and files copied to the archive mirror while their source stays in place
+# Areas and files copied to the archive mirror while their source stays in place.
+# A file entry classifies exactly that one path.
 permanent_paths = [
   "dev/architecture",
-  "dev/eval",
-  "dev/vision",
   "dev/index.md",
-  "dev/TESTING.md",
-  "dev/authoring-conventions.md",
 ]
 
 # Areas organizing their artifacts one directory per issue; every other area
 # keeps its artifacts flat
 issue_scoped_areas = [
   "dev/active",
-  "dev/studies",
-  "dev/plans",
-  "dev/presentations",
 ]
 
 # =============================================================================

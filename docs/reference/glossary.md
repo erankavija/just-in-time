@@ -75,3 +75,7 @@ by C
 **Assignee Type**: Kind prefix of an assignee (e.g. `agent:`, `human:`, `ci:`); any non-empty kind is accepted
 
 **Event Log**: Append-only audit trail of issue state changes and related lifecycle events (not every repository mutation)
+
+**Development area**: A component root under the development root, classified managed or permanent by the [`[documentation]` table](configuration.md#development-area-classification), which decides whether archiving moves its artifacts or copies them
+
+**Issue artifact directory**: The directory an issue owns inside a [declared issue-scoped area](configuration.md#issue-artifact-directories), named from the issue's short id and printed by `jit doc dir`
