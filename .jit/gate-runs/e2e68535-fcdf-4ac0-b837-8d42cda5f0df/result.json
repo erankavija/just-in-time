@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "7bc3633f1e29e9aad0b5831df84757d18c03be8f",
+  "completed_at": "2026-07-27T08:46:09.695146623Z",
+  "duration_ms": 194178,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 300,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Archive naming documentation still claims a title-slug fallback and `container` placeholder, but the current planner falls back to the bare short ID."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F2",
+        "line": 245,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Archive documentation says directory link targets block plans, but current discovery skips them as navigation unless directly selected."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F3",
+        "line": 210,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The archive reference omits the moving-path-citation warning's per-occurrence location, non-blocking behavior, and no-content-rewrite guarantee."
+      }
+    ],
+    "summary": "The archive reference remains inaccurate for naming and directory links, and omits the new citation-warning behavior.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "89b5899a-ae6e-4bae-82eb-460fb5fccaf7",
+  "message": null,
+  "run_id": "e2e68535-fcdf-4ac0-b837-8d42cda5f0df",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T08:42:55.516267726Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.5GF6nYTS2C: binary file matches\n--- agent stderr (first 12 of 37467 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa2bd-cd8e-7b22-a7bd-a3ad3e103fc7\n--------\n--- 37455 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: reviewed the container’s tag plus all seven delivered DAG-resolved children’s individually inspected tagged commits (with rename detection). Uncommitted changes were excluded. The combined footprint changes archive naming, directory-link handling, citation warnings, and configuration documentation.\n\n1. **F1 — high, blocking, issue-impact:** [docs/reference/cli-commands.md:300](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:300) still says containers without an unambiguous membership label use a title-derived slug (or `container`). The current planner uses the bare short ID in every such case. Replace the fallback description and examples; retain marker-backed reuse semantics.\n\n2. **F2 — medium, blocking, issue-impact:** [docs/reference/cli-commands.md:245](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:245) says a directory reached through a local reference produces an `unsupported-edge-target` warning and blocks the plan. Current behavior skips directory link targets as navigation; only an explicitly selected directory remains a blocking artifact. Update the distinction.\n\n3. **F3 — medium, blocking, issue-impact:** [docs/reference/cli-commands.md:210](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:210) documents generic warnings but not the new citation-warning contract. Add concise archive-reference coverage that each scanned occurrence of a relocating path produces `moving-path-citation` with `citing-file:line:column`, does not make the plan ineligible, and is not rewritten during execution. Link to [the configuration option](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:134) rather than duplicating scan-root configuration.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The archive reference remains inaccurate for naming and directory links, and omits the new citation-warning behavior.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Archive naming documentation still claims a title-slug fallback and `container` placeholder, but the current planner falls back to the bare short ID.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":300},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Archive documentation says directory link targets block plans, but current discovery skips them as navigation unless directly selected.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":245},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The archive reference omits the moving-path-citation warning's per-occurrence location, non-blocking behavior, and no-content-rewrite guarantee.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":210}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

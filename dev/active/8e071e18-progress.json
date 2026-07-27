@@ -1459,6 +1459,20 @@
    "subject": "reference-change derivation ignores the artifact's action, so a retained artifact is relinked to a destination that is never written",
    "detail": "select_direct_owners (crates/jit/src/domain/artifact_classifier.rs:1154-1175) sets selected_for_relink from ownership facts before the action is chosen at :817-821, and reference_changes (:901-913) maps source to mirror with no test of the action. It exempts only archived_source && explicit. Measured at 51d1977f over the 24 terminal containers: 83 retained artifacts, 33 of them across 8 containers carrying a reference change; jit validate then fails on issue c8355d70's reference to dev/archive/cfb3ba94-docs/docs/concepts/design-philosophy.md. 22 of the 33 sit in container f2532a2d.",
    "disposition": "FILED as ca832358 inside this epic and dispatched. This is a criterion blocker, not a follow-up: epic REQ-09 requires jit validate to pass with every document reference resolving after the archival runs. Copy is deliberately out of scope - a copy writes its destination, so its relink names a file that exists."
+  },
+  {
+   "id": "P23",
+   "raised_by": "8ff4cff3 (worker), verified by the lead",
+   "subject": "the doc field's own Rust doc comment uses the flat plan-doc path as its example",
+   "detail": "crates/jit/src/templates.rs:333-336 documents `doc` with `(e.g. \"dev/active/{container.id}-plan.md\")` and then gives the `{container.dir}/plan.md` form for a node that declares doc_area. The comment is not false - `doc` genuinely accepts an arbitrary path when no area is declared - but its first example is exactly the flat plan-doc pattern the convention replaces.",
+   "disposition": "OPEN, to be closed as a lead remediation inside 0b3840f1 (wave 10), whose REQ-03 requires tooling and documentation to obtain the path from the resolver rather than composing it from a spelled-out pattern. Deliberately not folded into 8ff4cff3, whose footprint is docs/ only, and deliberately not added to the in-flight ca832358 dispatch (lead note N14: do not send a worker a superseding directive mid-task). The file is a declared binary build input, so the fix forces a reinstall; ca832358 touches crates/jit/src/ anyway, so the marginal cost is zero if both land in the same wave."
+  },
+  {
+   "id": "P24",
+   "raised_by": "8ff4cff3 (worker)",
+   "subject": "docs-mechanical.sh's header comment states a derived default footprint that no longer matches the live configuration",
+   "detail": "The script's header claims its no-argument derived default is 'currently docs/'. resolve_footprint derives it from [documentation].permanent_paths, which after f2cac2bd is six dev/ entries and no docs/ at all. Run bare, the script exits 1 on pre-existing findings in dev/eval and dev/architecture files. The gate itself never reaches the fallback - DOCS_FOOTPRINT is pinned ahead of it in the resolution order (escalation E6).",
+   "disposition": "Belongs to eeee8a1a (bug, milestone:v1.0, component:tooling), already filed outside this epic for the same mechanism under P8. This is the stale header comment, a second symptom of it; recorded so eeee8a1a's scope covers the comment as well as the derivation."
   }
  ],
  "started_at": "2026-07-25T14:24:30.011076+00:00",
@@ -1602,6 +1616,13 @@
    "subject": "a rehearsal must end in validation, not in exit codes",
    "detail": "N11's probe-worktree rehearsal was run as prescribed and all 48 commands (24 previews + 24 executions) exited 0 with empty stderr, which reads as a clean wave. Running `jit validate` inside the probe afterwards failed immediately on a dangling document reference. The defect is invisible to eligibility (all 24 eligible, zero blockers), to exit status (all 0), and to the plan's action counts (moves and copies are correct); only the post-state reveals it.",
    "decision": "Extend N11: after rehearsing a wave in the probe, run the project's own whole-repository validation inside the probe and diff the result against the pre-run state. For an archival wave also run `jit doc conformance` there. Exit codes describe the command, not the repository it left behind."
+  },
+  {
+   "id": "N21",
+   "raised_at": "session 6, 8ff4cff3 review",
+   "subject": "a dispatch prompt asked for more than the criterion, and the worker caught it",
+   "detail": "The dispatch prompt told the worker REQ-05 meant byte-level agreement of the whole quoted TOML block. The guide's excerpt is a trimmed teaching quote: it omits the template and node description strings and carries its own explanatory comments. Whole-block byte identity would mean pasting two long description strings into the guide and deleting its teaching comments - which the same prompt's scope boundary forbade. The worker made the plan-document declaration byte-identical, additionally proved value-level agreement for every key the excerpt declares (zero mismatches across template keys, anchors, anchor_edges, transforms and both nodes), and asked for the call rather than silently choosing.",
+   "decision": "Accepted the worker's reading. The criterion says 'the declaration quoted in the guide matches the example registry it quotes' - what is quoted matches; omitted keys are not mismatches. The prompt was stricter than the contract, and the contract governs. This is not the no-argue discipline: that binds the lead when a REVIEWER cites a contract, not when the lead's own prompt overshoots one. Generally: when writing a dispatch prompt, quote the criterion rather than paraphrasing it into something tighter."
   }
  ],
  "handoffs": [
