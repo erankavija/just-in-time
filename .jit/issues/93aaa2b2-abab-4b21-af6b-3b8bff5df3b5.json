@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-27T11:33:56.064228300Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
   "dependencies": [
@@ -22,7 +23,7 @@
     "per:@/issue/8e071e18/decision/D-15"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Record the decided disposition of the unprefixed active-area design documents",
-  "updated_at": "2026-07-27T11:27:52.590244563Z"
+  "updated_at": "2026-07-27T11:33:56.064228300Z"
 }

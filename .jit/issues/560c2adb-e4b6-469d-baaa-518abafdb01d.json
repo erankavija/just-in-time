@@ -13,7 +13,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-27T11:31:54.315347147Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "560c2adb-e4b6-469d-baaa-518abafdb01d",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Resolve the testing guide's citations of relocated artifacts",
-  "updated_at": "2026-07-27T11:31:15.569194292Z"
+  "updated_at": "2026-07-27T11:31:54.315347147Z"
 }
