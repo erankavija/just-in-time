@@ -1,144 +1,106 @@
 # JIT Development Documentation
 
-Welcome to the **development documentation** for Just-In-Time (JIT). This documentation is for contributors working on JIT itself.
+Development documentation for Just-In-Time (JIT), written for contributors working on JIT itself.
 
 ## Documentation Domains
 
-### 📘 Product Documentation
-**User-facing, permanent reference** → See [docs/index.md](../docs/index.md)
+**Product documentation** — [docs/index.md](../docs/index.md). What JIT is and how to use it, for adopters.
 
-Product docs explain *what JIT is* and *how to use it* - for end users, not contributors.
-
-### 🔨 Development Documentation (You Are Here)
-**Contributor-facing, lifecycle-managed** → This directory (`dev/`)
-
-Development docs explain *how we build JIT* - design decisions, architecture, investigations, and active work.
+**Development documentation** — this directory (`dev/`). How JIT is built: architecture, investigations, and the working artifacts of open issues.
 
 ---
 
-## Directory Structure
+## Areas Inside the Development Root
 
-### 🚧 [active/](active/) - Active Development
-Design documents for **features currently in progress**, linked to open issues in `.jit/`.
+`dev/` is this repository's development root. Which areas it holds, which of them
+organize their artifacts one directory per issue, and what archival does to the
+artifacts in each are declared in the `[documentation]` table of this
+repository's `.jit/config.toml` — this project's own policy rather than a
+shipped default. `jit config get documentation` prints the table in force, and
+the configuration reference defines what its declarations mean:
 
-**Lifecycle:** Moved here when work starts → Archived to `archive/` when issue completes
+- [Development-area classification](../docs/reference/configuration.md#development-area-classification) — what an area's managed or permanent class states about archival.
+- [Issue artifact directories](../docs/reference/configuration.md#issue-artifact-directories) — how the directory an issue owns inside an issue-scoped area is derived.
 
-**Examples:** Feature designs, implementation plans for open issues
+## Adding a Document
 
-### 🎨 [design/](design/) - Design Explorations
-Feature and interface design proposals: web UI interaction models and CLI quality explorations.
+1. Pick the area from the configured table.
+2. In an issue-scoped area, let the tool name the issue's directory instead of
+   composing it ([`jit doc dir`](../docs/reference/cli-commands.md#jit-doc-dir)):
 
-### 🗂️ [plans/](plans/) - Implementation Plans
-Implementation plans for scoped work items, each keyed to its issue id.
+   ```bash
+   mkdir -p "$(jit doc dir <issue-id> <area>)"
+   ```
 
-### 🏗️ [architecture/](architecture/) - System Architecture
-**Permanent internal reference** for core system design and architecture.
+3. Link the document to its issue, which is what puts it in reach of archival:
 
-**Lifecycle:** Permanent (does not archive)
+   ```bash
+   jit doc add <issue-id> <path>
+   ```
 
-**Contents:**
-- [core-system-design.md](architecture/core-system-design.md) - Foundational system design
-- [web-ui-architecture.md](architecture/web-ui-architecture.md) - Web UI design
-- [graph-filtering-architecture.md](architecture/graph-filtering-architecture.md) - Graph query design
-- [cli-and-mcp-strategy.md](architecture/cli-and-mcp-strategy.md) - CLI and MCP integration
+4. Keep assets and links portable — [authoring-conventions.md](authoring-conventions.md)
+   gives the patterns, and `jit doc check-links` validates them.
 
-### 🔮 [vision/](vision/) - Vision & Charter
-**Forward-looking explorations** and vision documents for future features, plus the v1.0 [charter](vision/9db27a3a-charter.md).
+[`jit doc conformance`](../docs/reference/cli-commands.md#jit-doc-conformance)
+reports artifacts sitting outside the directory their owning issue owns. It is
+advice: it writes nothing, blocks no transition, and a listed artifact stays
+resolvable where it is.
 
-**Lifecycle:** May archive if abandoned, otherwise permanent
+## Archival
 
-**Examples:** Future feature proposals, strategic planning documents, the product charter
+A document is archived with the container that owns it.
+`jit archive container <id>` plans every artifact linked to a container and its
+hierarchy descendants; `jit archive document <path>` targets one document and
+the bundle it reaches. Both are read-only previews until `--execute`, which
+recomputes the plan under the repository write guard and refuses an ineligible
+one. A container must be effectively terminal, and a successful execution
+retires it into the `Archived` state.
 
-### 🔬 [studies/](studies/) - Investigations & Reference
-**Completed investigations, analyses**, and active reference guides.
+A container's artifacts land in one directory under the configured archive root,
+named from the container's short id and the slug its membership label resolves
+to. Beneath that directory each artifact keeps its repository-relative source
+path, so a document archived out of an area is found again under the same area
+name inside the container's directory.
+[Archive planning and execution](../docs/reference/cli-commands.md#archive-planning-and-execution)
+specifies the planner's decisions, the destination rule, and what execution
+guarantees.
 
-**Lifecycle:** Active reference stays; completed studies may archive after 1-2 releases
-
-**Examples:** Performance analyses, design explorations, coding conventions, quick references
-
-### 🧪 [eval/](eval/) - Skill Evaluations
-Evaluation records and harnesses for the project's agent skills: baselines, adjudications, and the trigger and steering eval runners.
-
-### ⚗️ [experiments/](experiments/) - Coordination Experiments
-Records of process and coordination experiments, such as manual worktree parallel-work trials.
-
-### 📝 [sessions/](sessions/) - Session Notes
-**Development session notes** documenting work-in-progress.
-
-**Lifecycle:** Archived to `archive/sessions/` after 1-2 releases
-
-**Naming:** `session-YYYY-MM-DD-topic.md`
-
-### 🎞️ [presentations/](presentations/) - Talk Decks
-Reveal.js presentation decks and their assets.
-
-### 📦 [archive/](archive/) - Completed Work
-**Archived documentation** from completed work, organized by category.
-
-**Structure:**
-- `archive/features/` - Completed features (from `active/`)
-- `archive/bug-fixes/` - Completed bug fixes (from `active/`)
-- `archive/refactorings/` - Completed refactorings (from `active/`)
-- `archive/studies/` - Completed investigations (from `studies/`)
-- `archive/sessions/` - Old session notes (from `sessions/`)
-
-**Retention:** 1-2 releases after completion
-
----
-
-## Documentation Lifecycle
-
-```
-active/         → Work starts (linked to issue)
-                ↓
-                Work completes (issue Done)
-                ↓
-archive/        → After 1-2 releases
-```
-
-**What never archives:**
-- `architecture/` - Permanent internal reference
-- `vision/` - Unless abandoned
-- `docs/` - Product documentation (different domain)
+The archive root also holds directories filed by hand. They stay as they are;
+planned destinations are named from the container.
 
 ---
 
 ## Key Documents
 
-### Architecture & Design
-- [core-system-design.md](architecture/core-system-design.md) - Start here for system overview
-- [web-ui-architecture.md](architecture/web-ui-architecture.md) - Web UI design
+### Architecture
+- [core-system-design.md](architecture/core-system-design.md) — start here for the system overview
+- [web-ui-architecture.md](architecture/web-ui-architecture.md) — web UI design
+- [graph-filtering-architecture.md](architecture/graph-filtering-architecture.md) — graph query design
+- [cli-and-mcp-strategy.md](architecture/cli-and-mcp-strategy.md) — CLI and MCP integration
 
-### Development Guides
-- See [docs/tutorials/quickstart.md](../docs/tutorials/quickstart.md) - Getting started (10 min)
-- See [docs/reference/cli-commands.md](../docs/reference/cli-commands.md#mcp-tools-reference) - MCP tools for agents
-- See [../AGENTS.md](../AGENTS.md) - Contributor and agent guidance for this repository
+### Vision
+- [9db27a3a-charter.md](vision/9db27a3a-charter.md) — the v1.0 charter and its decision log
+- [knowledge-management-vision.md](vision/knowledge-management-vision.md) — knowledge management direction
 
 ### Reference
-- [studies/architecture-pitfalls.md](studies/architecture-pitfalls.md) - Common pitfalls
-- [studies/clippy-suppressions.md](studies/clippy-suppressions.md) - Documented suppressions
-
-### Strategy
-- [studies/documentation-organization-strategy.md](studies/documentation-organization-strategy.md) - This reorganization
-- [vision/knowledge-management-vision.md](vision/knowledge-management-vision.md) - Future vision
+- [TESTING.md](TESTING.md) — testing strategy and focused test commands
+- [authoring-conventions.md](authoring-conventions.md) — asset and link patterns that survive archival
+- [architecture-pitfalls.md](studies/architecture-pitfalls.md) — common pitfalls
+- [clippy-suppressions.md](studies/clippy-suppressions.md) — documented suppressions
 
 ---
 
 ## For Contributors
 
-**Getting Started:**
-1. Read [../AGENTS.md](../AGENTS.md)
-2. Review [architecture/core-system-design.md](architecture/core-system-design.md)
-3. Use `jit query available` to find tasks
+**Getting started:**
+1. Read [../AGENTS.md](../AGENTS.md).
+2. Review [architecture/core-system-design.md](architecture/core-system-design.md).
+3. Use `jit query available` to find work.
 
-**Adding Documentation:**
-- **Active work?** → Add design doc to `active/` and link to issue
-- **Architectural decision?** → Add to `architecture/`
-- **Investigation/analysis?** → Add to `studies/`
-- **Session notes?** → Add to `sessions/` (use `session-YYYY-MM-DD-topic.md`)
-- **User guide?** → Add to `docs/` (product documentation)
-
-**Authoring guidelines:** See [authoring-conventions.md](authoring-conventions.md) for asset management and link patterns that ensure documents remain portable during archival.
+**Agent surfaces:** [docs/tutorials/quickstart.md](../docs/tutorials/quickstart.md)
+is the ten-minute introduction;
+[docs/reference/cli-commands.md](../docs/reference/cli-commands.md#mcp-tools-reference)
+covers the MCP tool surface for agents.
 
 **Review policy ownership:** Treat applicable `AGENTS.md` files as canonical
 engineering prose and configured addressable-item sources as canonical for
@@ -151,11 +113,3 @@ parses and persists the structured findings block. When a qualified item
 governs a finding, record its resolved ID in the finding's optional
 `references` array so the review remains traceable. See [Custom Gates](../docs/how-to/custom-gates.md#ground-a-repository-review-in-canonical-policy)
 for the integration pattern.
-
-**See also:**
-- [docs/index.md](../docs/index.md) - Product documentation
-- [TESTING.md](TESTING.md) - Testing strategy
-
----
-
-*This structure was established in Issue 165cf162-1cb1-491d-8c92-b2fb571e7f4c*

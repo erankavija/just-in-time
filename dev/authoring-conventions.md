@@ -2,13 +2,18 @@
 
 ## Overview
 
-This guide provides conventions for writing **development documentation** that is safe to archive and move without breaking links or losing assets. These conventions apply to lifecycle-managed documentation in the `dev/` directory.
+This guide gives the conventions that keep a development document archivable:
+assets and links laid out so the document still resolves after the archive
+planner relocates it.
 
-**Important distinction:**
-- **User-facing docs** (`docs/`) - Permanent product documentation, not lifecycle-managed
-- **Development docs** (`dev/`) - Contributor documentation with lifecycle management via jit
-
-This document focuses on authoring **development documentation** that will be managed by jit's document lifecycle system.
+The conventions apply to documents under this repository's development root,
+`dev/`. What archival does with an artifact follows from the class of the area
+holding it, which the configuration reference defines under
+[Development-area classification](../docs/reference/configuration.md#development-area-classification);
+the [development documentation index](index.md) covers where a new document
+goes. Product documentation under `docs/` lies outside the development root, so
+a plan retains it where it is rather than scheduling a destination for it, even
+when a development document links it.
 
 ## Link Validation
 
@@ -43,8 +48,8 @@ jit doc check-links --json
 Store assets in a directory named after the document for easy co-movement:
 
 ```
-dev/
-  active/
+<area>/
+  <issue-directory>/
     authentication-design.md
     authentication-design/
       auth-flow-diagram.png
@@ -57,17 +62,19 @@ dev/
 ```
 
 **Benefits:**
-- Assets move with their document during archival
+- Assets are scheduled in the same plan as their document
 - Easy to validate and archive together
 - Clear ownership and organization
 - Relative links remain valid after moving
 
-**On archival:**
+**On archival:** the planner discovers the assets a document references and
+carries them in the same plan, and the mirror preserves their arrangement
+relative to the document, so the links still resolve at the destination. Preview
+the plan, then execute it:
+
 ```bash
-# Both document and assets move together
-mv dev/active/authentication-design.md dev/archive/features/
-mv dev/active/authentication-design/ dev/archive/features/
-# Links still work - relative paths preserved
+jit archive document <area>/<issue-directory>/authentication-design.md
+jit archive document <area>/<issue-directory>/authentication-design.md --execute
 ```
 
 ### Pattern 2: Shared Assets (Use Sparingly)
@@ -75,17 +82,18 @@ mv dev/active/authentication-design/ dev/archive/features/
 Only use shared assets when truly needed by multiple documents:
 
 ```
-dev/
-  diagrams/
-    system-architecture.png
-  active/
+<shared-asset-area>/
+  system-architecture.png
+<area>/
+  <issue-directory>/
     feature-a-design.md
+  <other-issue-directory>/
     feature-b-design.md
 ```
 
 **Link with root-relative paths:**
 ```markdown
-![System Architecture](/dev/diagrams/system-architecture.png)
+![System Architecture](/<shared-asset-area>/system-architecture.png)
 ```
 
 **Warning:** Shared assets require careful coordination during archival. Use for:
@@ -120,13 +128,13 @@ See [implementation](implementation.md) for details.
 
 **3. Single-level parent reference:**
 ```markdown
-See [design doc](../active/auth-design.md).
+See [design doc](../<sibling-issue-directory>/design.md).
 ```
 
-**4. Root-relative links (for shared assets):**
+**4. Root-relative links (for shared assets and cross-area references):**
 ```markdown
 See [architecture](/dev/architecture/core-system-design.md) for context.
-![Shared Diagram](/dev/diagrams/system-overview.png)
+![Shared Diagram](/<shared-asset-area>/system-overview.png)
 ```
 
 ### ⚠️ Risky Patterns
@@ -138,9 +146,10 @@ See [architecture](/dev/architecture/core-system-design.md) for context.
 
 **Why risky:** Moving the document breaks the link. The validator will warn about these.
 
-**Better approach:** 
+**Better approach:**
 - Use per-doc assets pattern instead, OR
-- Use root-relative paths for intentionally shared assets
+- Use root-relative paths for intentionally shared assets and for anything
+  outside the issue's own directory
 
 ### ❌ Avoid
 
@@ -242,7 +251,7 @@ For automation and scripting:
     "warnings": [
       {
         "issue_id": "abc123...",
-        "document": "dev/active/design.md",
+        "document": "<area>/<issue-directory>/design.md",
         "type": "risky_asset_path",
         "asset": "../../diagrams/diagram.png",
         "message": "Deep relative path '../../diagrams/diagram.png' may break if document is moved"
@@ -265,40 +274,43 @@ mutates the repository:
 
 ```bash
 # Preview one document and its statically reachable bundle
-jit archive document dev/active/feature-x.md
+jit archive document <area>/<issue-directory>/feature.md
 
 # Execute only when the recomputed plan is eligible
-jit archive document dev/active/feature-x.md --execute
+jit archive document <area>/<issue-directory>/feature.md --execute
 
 # Evaluate all artifacts owned by a terminal container
 jit archive container <container-id>
 ```
 
 The planner discovers supported Markdown, HTML, and CSS dependencies, classifies
-move/copy/retain decisions from reference ownership, and reports blockers and
-warnings. Destinations always mirror repository-relative source paths below the
-configured `archive_root`; archival has no category input. Execution rechecks
-the plan under the repository write guard, publishes without overwriting,
-updates exact issue references, records the durable archive event, and only then
-attempts identity-guarded source deletion. Permanent-path artifacts are copied
-to the mirror and retained at their source.
+each artifact from reference ownership and the class of the area holding it, and
+reports blockers and warnings. Destinations mirror repository-relative source
+paths beneath the plan's destination root, which is what carries an author's
+relative links through the move intact. Execution rechecks the plan under the
+repository write guard, publishes without overwriting, updates exact issue
+references, records the durable archive event, and only then attempts
+identity-guarded source deletion.
+[Archive planning and execution](../docs/reference/cli-commands.md#archive-planning-and-execution)
+is the reference for the whole family, including how a container's destination
+root is named.
 
 ## Examples
 
 ### Example 1: Clean Document
 
-**File:** `dev/active/auth-design.md`
+**File:** `<area>/<issue-directory>/auth-design.md`
 ```markdown
 # Authentication Design
 
 ![Auth Flow](auth-design/auth-flow.png)
 
-See [implementation notes](../studies/auth-impl-strategy.md).
+See [implementation notes](implementation-notes.md).
 ```
 
 **Validation:**
 ```bash
-$ jit doc check-links --scope issue:auth-123
+$ jit doc check-links --scope issue:<issue-id>
 ✅ All documents valid!
 Summary: 1 document(s) checked, 0 error(s), 0 warning(s)
 ```
@@ -307,7 +319,7 @@ Summary: 1 document(s) checked, 0 error(s), 0 warning(s)
 
 ### Example 2: Document with Warnings
 
-**File:** `dev/active/feature-x.md`
+**File:** `<area>/<issue-directory>/feature.md`
 ```markdown
 # Feature X Design
 
@@ -317,10 +329,10 @@ Summary: 1 document(s) checked, 0 error(s), 0 warning(s)
 
 **Validation:**
 ```bash
-$ jit doc check-links --scope issue:feature-x
+$ jit doc check-links --scope issue:<issue-id>
 ⚠️  Warnings (2):
-  dev/active/feature-x.md (risky_asset_path): Deep relative path '../../old-diagrams/diagram.png' may break if document is moved
-  dev/active/feature-x.md (external_asset): External URL (not validated): https://example.com/reference.png
+  <area>/<issue-directory>/feature.md (risky_asset_path): Deep relative path '../../old-diagrams/diagram.png' may break if document is moved
+  <area>/<issue-directory>/feature.md (external_asset): External URL (not validated): https://example.com/reference.png
 
 Summary: 1 document(s) checked, 0 error(s), 2 warning(s)
 ```
@@ -329,7 +341,7 @@ Summary: 1 document(s) checked, 0 error(s), 2 warning(s)
 
 ### Example 3: Document with Errors
 
-**File:** `dev/active/broken.md`
+**File:** `<area>/<issue-directory>/broken.md`
 ```markdown
 # Broken Document
 
@@ -339,10 +351,10 @@ See [nonexistent](missing.md).
 
 **Validation:**
 ```bash
-$ jit doc check-links --scope issue:broken
+$ jit doc check-links --scope issue:<issue-id>
 ❌ Errors found (2):
-  dev/active/broken.md (missing_asset): Asset not found: broken/gone.png
-  dev/active/broken.md (broken_link): Document 'missing.md' not found (resolved to dev/active/missing.md)
+  <area>/<issue-directory>/broken.md (missing_asset): Asset not found: broken/gone.png
+  <area>/<issue-directory>/broken.md (broken_link): Document 'missing.md' not found (resolved to <area>/<issue-directory>/missing.md)
 
 Summary: 1 document(s) checked, 2 error(s), 0 warning(s)
 ```
@@ -377,11 +389,12 @@ Use issue-scoped validation when archiving specific features or epics.
 
 ### During Development
 
-1. **Follow per-doc assets pattern** for new documents
-2. **Name asset directory after document** (e.g., `my-design.md` → `my-design/`)
-3. **Use relative links** for per-doc assets
-4. **Use root-relative links** for intentionally shared assets
-5. **Avoid deep relative traversal** (2+ `../`)
+1. **Create the document where its issue owns it** — `mkdir -p "$(jit doc dir <issue-id> <area>)"`, then `jit doc add <issue-id> <path>`
+2. **Follow per-doc assets pattern** for new documents
+3. **Name asset directory after document** (e.g., `my-design.md` → `my-design/`)
+4. **Use relative links** for per-doc assets
+5. **Use root-relative links** for intentionally shared assets
+6. **Avoid deep relative traversal** (2+ `../`)
 
 ### Before Archival
 
@@ -408,6 +421,7 @@ fi
 
 ## See Also
 
-- [Development Documentation Index](index.md) - Organization and lifecycle
-- [Documentation Lifecycle Design](active/documentation-lifecycle-design.md) - System design
+- [Development Documentation Index](index.md) - Areas, lifecycle, and where a new document goes
+- [Documentation configuration](../docs/reference/configuration.md#documentation) - Area classification and issue artifact directories
+- [Archive planning and execution](../docs/reference/cli-commands.md#archive-planning-and-execution) - The archive command family
 - [Product Documentation](../docs/index.md) - User-facing documentation
