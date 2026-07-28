@@ -7185,17 +7185,18 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            println!(
-                                "{}",
-                                serde_json::to_string_pretty(&json!({
-                                    "status": "error",
-                                    "error": e.to_string()
-                                }))?
+                            let json_error = jit::output::JsonError::new(
+                                jit::output::ErrorCode::GenericError,
+                                e.to_string(),
                             );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             eprintln!("Error stopping server: {e}");
+                            std::process::exit(
+                                jit::output::ErrorCode::GenericError.exit_code().code(),
+                            );
                         }
-                        std::process::exit(1);
                     }
                 }
             } else if status {
@@ -7233,17 +7234,18 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            println!(
-                                "{}",
-                                serde_json::to_string_pretty(&json!({
-                                    "status": "error",
-                                    "error": e.to_string()
-                                }))?
+                            let json_error = jit::output::JsonError::new(
+                                jit::output::ErrorCode::GenericError,
+                                e.to_string(),
                             );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
                         } else {
                             eprintln!("Error checking server status: {e}");
+                            std::process::exit(
+                                jit::output::ErrorCode::GenericError.exit_code().code(),
+                            );
                         }
-                        std::process::exit(1);
                     }
                 }
             } else {
@@ -7409,17 +7411,18 @@ fn run() -> Result<()> {
                         }
                         Err(e) => {
                             if json {
-                                println!(
-                                    "{}",
-                                    serde_json::to_string_pretty(&json!({
-                                        "status": "error",
-                                        "error": e.to_string()
-                                    }))?
+                                let json_error = jit::output::JsonError::new(
+                                    jit::output::ErrorCode::GenericError,
+                                    e.to_string(),
                                 );
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(json_error.exit_code().code());
                             } else {
                                 eprintln!("Error starting server: {e}");
+                                std::process::exit(
+                                    jit::output::ErrorCode::GenericError.exit_code().code(),
+                                );
                             }
-                            std::process::exit(1);
                         }
                     }
                 }
