@@ -28,4 +28,5 @@ mod search_exit_status_tests;
 mod serve_failure_envelope_tests;
 mod snapshot_export_tests;
 mod stored_record_classification_tests;
+mod top_level_failure_envelope_tests;
 mod verb_hint_tests;

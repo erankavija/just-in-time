@@ -25,7 +25,7 @@ use jit::cli::{
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate};
 use jit::domain::{GateRunResult, Priority, State};
-use jit::output::{ExitCode, InitResponse, JsonOutput, OutputContext};
+use jit::output::{ErrorCode, ExitCode, InitResponse, JsonError, JsonOutput, OutputContext};
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
 use std::path::{Component, Path, PathBuf};
@@ -45,21 +45,26 @@ fn normalize_absolute_path(path: &Path) -> PathBuf {
         })
 }
 
-/// Helper to determine exit code from error message
-fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
+/// Classify a propagated failure by its typed cause.
+///
+/// This is the single classifier for both machine-readable error codes and
+/// process status. [`error_to_exit_code`] projects the returned registered code
+/// to its declared status, so the two observable values cannot drift. Human
+/// message text is deliberately absent from this cascade.
+fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
     // A rejected `jit dep add` batch (jit:c8518f2a) wraps every rejected edge's
     // own typed error; classify by the batch's dominant edge rather than this
     // wrapper itself, so a mixed batch still maps to the right exit code.
     if let Some(batch) = error.downcast_ref::<jit::errors::DependencyBatchRejectedError>() {
-        return dependency_batch_exit_code(batch);
+        return dependency_batch_error_code(batch);
     }
     // A `gate evaluate` checker that ran but did not pass: split checker-failure
     // (verdict `fail`, validation error) from runner/infra error (verdict
     // `error`, external error). `Passed` never produces this error.
     if let Some(gate_failure) = error.downcast_ref::<jit::commands::GatePassFailed>() {
         return match gate_failure.status {
-            jit::domain::GateRunStatus::Error => ExitCode::ExternalError,
-            _ => ExitCode::ValidationFailed,
+            jit::domain::GateRunStatus::Error => ErrorCode::IoError,
+            _ => ErrorCode::GateFailed,
         };
     }
     // Targeting a gate the issue does not require is an argument/lookup error,
@@ -68,7 +73,7 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         .downcast_ref::<jit::commands::GateNotRequiredError>()
         .is_some()
     {
-        return ExitCode::InvalidArgument;
+        return ErrorCode::InvalidArgument;
     }
     // A manual gate evaluated without --by (jit:1d59070d REQ-03): a usage
     // error, raised before any write, in the same family as gate define's
@@ -77,14 +82,17 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         .downcast_ref::<jit::commands::ManualGateAttestationRequiredError>()
         .is_some()
     {
-        return ExitCode::InvalidArgument;
+        return ErrorCode::InvalidArgument;
     }
     if error
         .downcast_ref::<jit::errors::TransitionBlockedError>()
         .is_some()
-        || error
-            .downcast_ref::<jit::errors::ValidationFailedError>()
-            .is_some()
+    {
+        return ErrorCode::Blocked;
+    }
+    if error
+        .downcast_ref::<jit::errors::ValidationFailedError>()
+        .is_some()
         || error
             .downcast_ref::<jit::errors::RedundantDependencyError>()
             .is_some()
@@ -94,14 +102,17 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         || error
             .downcast_ref::<jit::repository_state::ManagedDocumentError>()
             .is_some()
-        || error
-            .downcast_ref::<jit::profile::ProfileClaimError>()
-            .is_some()
+    {
+        return ErrorCode::ValidationFailed;
+    }
+    if error
+        .downcast_ref::<jit::profile::ProfileClaimError>()
+        .is_some()
         || error
             .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()
     {
-        return ExitCode::ValidationFailed;
+        return ErrorCode::ProfileConflict;
     }
 
     // The repository-state derivation error is classified by an exhaustive match
@@ -123,13 +134,13 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(_))
             | RepositoryStateError::AmbiguousOwnership(_)
             | RepositoryStateError::GateRegistryEdit(_)
-            | RepositoryStateError::ArchiveExecution(_) => ExitCode::ValidationFailed,
-            RepositoryStateError::Layout(_) => ExitCode::InvalidArgument,
+            | RepositoryStateError::ArchiveExecution(_) => ErrorCode::ValidationFailed,
+            RepositoryStateError::Layout(_) => ErrorCode::InvalidArgument,
             RepositoryStateError::Producer(_)
             | RepositoryStateError::Initialization(_)
             | RepositoryStateError::Delta(_)
             | RepositoryStateError::PlanHash(_)
-            | RepositoryStateError::Overlay(_) => ExitCode::GenericError,
+            | RepositoryStateError::Overlay(_) => ErrorCode::GenericError,
         };
     }
     // A failed batch-create pre-validation is an argument error (exit 2): no
@@ -138,7 +149,7 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         .downcast_ref::<jit::commands::BatchValidationError>()
         .is_some()
     {
-        return ExitCode::InvalidArgument;
+        return ErrorCode::InvalidArgument;
     }
     // Claim/lease commands require git; running them outside a git repository is
     // an external-dependency failure (exit 10).
@@ -146,7 +157,7 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         .downcast_ref::<jit::errors::ClaimRequiresGitError>()
         .is_some()
     {
-        return ExitCode::ExternalError;
+        return ErrorCode::ClaimRequiresGit;
     }
 
     // A repository whose on-disk format is newer than this binary supports is an
@@ -158,7 +169,7 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         .downcast_ref::<jit::storage::RepositoryFormatTooNewError>()
         .is_some()
     {
-        return ExitCode::ExternalError;
+        return ErrorCode::RepositoryFormatTooNew;
     }
 
     // A gate checker refused to run because the binary predates the tree
@@ -169,7 +180,30 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         .downcast_ref::<jit::errors::StaleBinaryError>()
         .is_some()
     {
-        return ExitCode::ExternalError;
+        return ErrorCode::StaleBinary;
+    }
+
+    // Stored-record decoding stays typed across the library/binary boundary.
+    // Structural membership defects are validation failures; malformed JSON is
+    // a parse failure and a future schema remains an external compatibility
+    // failure.
+    if let Some(index_error) = error.downcast_ref::<jit::repository_state::RepositoryIndexError>() {
+        use jit::repository_state::RepositoryIndexError;
+        return match index_error {
+            RepositoryIndexError::Parse(_) => ErrorCode::ParseError,
+            RepositoryIndexError::UnsupportedVersion { .. } => ErrorCode::RepositoryFormatTooNew,
+            RepositoryIndexError::DuplicateActive(_)
+            | RepositoryIndexError::DuplicateDeleted(_)
+            | RepositoryIndexError::ActiveDeletedOverlap(_) => ErrorCode::ValidationFailed,
+        };
+    }
+
+    // Configuration parsing is a typed parser failure even when command
+    // orchestration adds anyhow context around it.
+    if error.downcast_ref::<toml::de::Error>().is_some()
+        || error.downcast_ref::<serde_json::Error>().is_some()
+    {
+        return ErrorCode::ParseError;
     }
 
     // Check the complete source chain for I/O errors. Transaction/session
@@ -179,9 +213,9 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         .find_map(|cause| cause.downcast_ref::<std::io::Error>())
     {
         return match io_error.kind() {
-            std::io::ErrorKind::NotFound => ExitCode::NotFound,
-            std::io::ErrorKind::PermissionDenied => ExitCode::PermissionDenied,
-            _ => ExitCode::ExternalError,
+            std::io::ErrorKind::NotFound => ErrorCode::RepositoryNotFound,
+            std::io::ErrorKind::PermissionDenied => ErrorCode::PermissionDenied,
+            _ => ErrorCode::IoError,
         };
     }
 
@@ -189,8 +223,8 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     // a not-found condition. Classified by downcast, not by message text.
     if let Some(graph_error) = error.downcast_ref::<jit::GraphError>() {
         return match graph_error {
-            jit::GraphError::CycleDetected => ExitCode::ValidationFailed,
-            jit::GraphError::NodeNotFound { .. } => ExitCode::NotFound,
+            jit::GraphError::CycleDetected => ErrorCode::CycleDetected,
+            jit::GraphError::NodeNotFound { .. } => ErrorCode::IssueNotFound,
         };
     }
 
@@ -200,24 +234,36 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     if error
         .downcast_ref::<jit::storage::IssueNotFoundError>()
         .is_some()
-        || error
-            .downcast_ref::<jit::storage::GateNotFoundError>()
-            .is_some()
+        || error.downcast_ref::<jit::errors::NotFoundError>().is_some()
+    {
+        return ErrorCode::IssueNotFound;
+    }
+    if error
+        .downcast_ref::<jit::storage::GateNotFoundError>()
+        .is_some()
         || error
             .downcast_ref::<jit::storage::GateRunNotFoundError>()
             .is_some()
-        || error
-            .downcast_ref::<jit::storage::PresetNotFoundError>()
-            .is_some()
-        || error
-            .downcast_ref::<jit::storage::RepositoryNotFoundError>()
-            .is_some()
-        || error
-            .downcast_ref::<jit::errors::LeaseNotFoundError>()
-            .is_some()
-        || error.downcast_ref::<jit::errors::NotFoundError>().is_some()
     {
-        return ExitCode::NotFound;
+        return ErrorCode::GateNotFound;
+    }
+    if error
+        .downcast_ref::<jit::storage::PresetNotFoundError>()
+        .is_some()
+    {
+        return ErrorCode::PresetError;
+    }
+    if error
+        .downcast_ref::<jit::storage::RepositoryNotFoundError>()
+        .is_some()
+    {
+        return ErrorCode::RepositoryNotFound;
+    }
+    if error
+        .downcast_ref::<jit::errors::LeaseNotFoundError>()
+        .is_some()
+    {
+        return ErrorCode::IssueNotFound;
     }
 
     // An already-exists condition is typed: the gate-registry case plus the shared
@@ -229,7 +275,7 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             .downcast_ref::<jit::errors::AlreadyExistsError>()
             .is_some()
     {
-        return ExitCode::AlreadyExists;
+        return ErrorCode::AlreadyExists;
     }
 
     // Invalid-argument conditions are typed: the shared InvalidArgumentError, the
@@ -247,7 +293,14 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             .downcast_ref::<jit::storage::InvalidIdPrefixError>()
             .is_some()
     {
-        return ExitCode::InvalidArgument;
+        return if error
+            .downcast_ref::<jit::storage::AmbiguousIdError>()
+            .is_some()
+        {
+            ErrorCode::AmbiguousId
+        } else {
+            ErrorCode::InvalidIdPrefix
+        };
     }
     if error
         .downcast_ref::<jit::errors::InvalidArgumentError>()
@@ -264,7 +317,7 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         || error.downcast_ref::<std::string::FromUtf8Error>().is_some()
         || error.downcast_ref::<std::str::Utf8Error>().is_some()
     {
-        return ExitCode::InvalidArgument;
+        return ErrorCode::InvalidArgument;
     }
 
     // A `jit issue delete` refused for missing operator confirmation
@@ -275,7 +328,7 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         .downcast_ref::<jit::errors::DeletionNotConfirmedError>()
         .is_some()
     {
-        return ExitCode::InvalidArgument;
+        return ErrorCode::DeletionNotConfirmed;
     }
 
     // Path-based storage errors are typed via PathReadError; classify by variant.
@@ -285,10 +338,10 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     if let Some(path_error) = error.downcast_ref::<jit::storage::PathReadError>() {
         return match path_error {
             jit::storage::PathReadError::NotFound(_)
-            | jit::storage::PathReadError::CommitNotFound(_) => ExitCode::NotFound,
-            jit::storage::PathReadError::InvalidPath(_) => ExitCode::InvalidArgument,
-            jit::storage::PathReadError::OutsideRepoRoot(_) => ExitCode::GenericError,
-            jit::storage::PathReadError::Other(inner) => error_to_exit_code(inner),
+            | jit::storage::PathReadError::CommitNotFound(_) => ErrorCode::RepositoryNotFound,
+            jit::storage::PathReadError::InvalidPath(_) => ErrorCode::InvalidArgument,
+            jit::storage::PathReadError::OutsideRepoRoot(_) => ErrorCode::GenericError,
+            jit::storage::PathReadError::Other(inner) => error_to_error_code(inner),
         };
     }
 
@@ -296,8 +349,8 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     // content-parser cargo feature is a generic failure.
     if let Some(plan_error) = error.downcast_ref::<jit::commands::plan_doc::PlanDocError>() {
         return match plan_error {
-            jit::commands::plan_doc::PlanDocError::Read { .. } => ExitCode::NotFound,
-            jit::commands::plan_doc::PlanDocError::ContentParser(_) => ExitCode::GenericError,
+            jit::commands::plan_doc::PlanDocError::Read { .. } => ErrorCode::RepositoryNotFound,
+            jit::commands::plan_doc::PlanDocError::ContentParser(_) => ErrorCode::GenericError,
         };
     }
 
@@ -306,9 +359,9 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     if let Some(template_error) = error.downcast_ref::<jit::templates::TemplateConfigError>() {
         return match template_error {
             jit::templates::TemplateConfigError::CyclicDependsOn { .. } => {
-                ExitCode::ValidationFailed
+                ErrorCode::ValidationFailed
             }
-            _ => ExitCode::GenericError,
+            _ => ErrorCode::GenericError,
         };
     }
 
@@ -321,14 +374,19 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         .downcast_ref::<jit::commands::MutationSessionExhausted>()
         .is_some()
     {
-        return ExitCode::GenericError;
+        return ErrorCode::GenericError;
     }
 
     // No typed classifier matched: a genuinely-unknown error keeps the historical
     // default exit code. Every condition the CLI deliberately distinguishes is
     // classified by a typed downcast above; classification is never driven by
     // matching against a human-readable error string.
-    ExitCode::GenericError
+    ErrorCode::GenericError
+}
+
+/// Project the typed machine-readable classification to its declared status.
+fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
+    error_to_error_code(error).exit_code()
 }
 
 /// Pick the dominant exit code across every rejected edge of a `jit dep add`
@@ -341,13 +399,13 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
 /// offending edge wins). Each rejected edge is classified by recursing
 /// through [`error_to_exit_code`], so this stays in lockstep with every other
 /// typed classification above.
-fn dependency_batch_exit_code(batch: &jit::errors::DependencyBatchRejectedError) -> ExitCode {
+fn dependency_batch_error_code(batch: &jit::errors::DependencyBatchRejectedError) -> ErrorCode {
     batch
         .rejected()
         .iter()
-        .map(|(_, e)| error_to_exit_code(e))
-        .find(|code| *code != ExitCode::ValidationFailed)
-        .unwrap_or(ExitCode::ValidationFailed)
+        .map(|(_, error)| error_to_error_code(error))
+        .find(|code| code.exit_code() != ExitCode::ValidationFailed)
+        .unwrap_or(ErrorCode::ValidationFailed)
 }
 
 /// Build the `--json` error envelope for a rejected `jit dep add` batch
@@ -355,7 +413,7 @@ fn dependency_batch_exit_code(batch: &jit::errors::DependencyBatchRejectedError)
 /// (REQ-02), each carrying its own classified `code` — the same per-edge
 /// classification the single-edge path used before the batch was made atomic
 /// (jit:a05b87ae). The top-level `code`/`message` mirror the batch's dominant
-/// edge, matching [`dependency_batch_exit_code`]'s tiering exactly (both walk
+/// edge, matching [`dependency_batch_error_code`]'s tiering exactly (both walk
 /// the same rejected list and stop at the first non-`ValidationFailed`
 /// classification), so the JSON and non-JSON paths always agree on exit code.
 fn dep_add_batch_json_error(
@@ -429,7 +487,7 @@ fn dep_add_batch_json_error(
         })
         .collect();
 
-    // The dominant edge — the same tiering `dependency_batch_exit_code` uses
+    // The dominant edge — the same tiering `dependency_batch_error_code` uses
     // (a resolution failure always wins over a graph-validation failure) —
     // drives the top-level `code`/`message`/`suggestions`. Built via the SAME
     // per-kind constructor the single-edge path used (`cycle_detected`,
@@ -642,7 +700,7 @@ fn render_gate_pass_error(
 /// ([`StaleBinaryError`](jit::errors::StaleBinaryError), jit:7446af34).
 ///
 /// Shared by [`render_gate_pass_error`] (the evaluator's own refusal, REQ-01)
-/// and [`emit_startup_json_error`] (a checker-spawned `jit` child's own
+/// and [`emit_top_level_json_error`] (a checker-spawned `jit` child's own
 /// self-refusal, REQ-02), so both carry the identical `STALE_BINARY` code,
 /// `details` (issue id, gate key, reason, build commit), and reinstall
 /// suggestion — one envelope shape regardless of which process in the gate
@@ -1755,8 +1813,7 @@ fn main() {
         Ok(()) => ExitCode::Success,
         Err(e) => {
             eprintln!("Error: {}", e);
-            emit_startup_json_error(&e);
-            error_to_exit_code(&e)
+            emit_top_level_json_error(&e).unwrap_or_else(|| error_to_exit_code(&e))
         }
     });
 
@@ -1778,51 +1835,30 @@ fn main() {
     }
 }
 
-/// Under `--json`, emit a structured error envelope on stdout for the startup
-/// failures that abort before any command handler runs: repository-not-found
-/// (exit 3), a stored index that cannot be decoded (exit 1),
-/// repository-format-too-new (exit 10), and — when this process is itself a
-/// child spawned inside a gate checker's process tree (jit:7446af34 REQ-02) —
-/// a stale-binary self-refusal (exit 10).
+/// Under `--json`, emit one structured envelope for every failure propagated to
+/// the top-level boundary.
 ///
-/// The human-readable line always goes to stderr (via `main`) and the exit code
-/// is unchanged; this only ADDS the machine-readable object so `--json` callers
-/// can branch on the error class instead of parsing an empty stdout. The `--json`
-/// flag is read from argv because these failures occur during repository
-/// discovery/validation, before a parsed command-level `json` field exists. A
-/// no-op unless the error is one of these startup conditions AND `--json` was
-/// requested, so command handlers (which already render their own JSON) never
-/// double-print.
-fn emit_startup_json_error(error: &anyhow::Error) {
+/// Handler-owned JSON failures print and terminate before reaching this
+/// function, preserving their tailored code, details, and suggestions without a
+/// second document. Propagated failures arrive here with stdout untouched. The
+/// flag is read from argv because startup failures can precede parsed command
+/// dispatch. The returned status is derived from the exact rendered code.
+fn emit_top_level_json_error(error: &anyhow::Error) -> Option<ExitCode> {
     if !std::env::args().any(|arg| arg == "--json") {
-        return;
+        return None;
     }
 
-    use jit::output::{ErrorCode, JsonError};
-    let json_error = if error
-        .downcast_ref::<jit::storage::RepositoryNotFoundError>()
-        .is_some()
-    {
-        JsonError::new(ErrorCode::RepositoryNotFound, error.to_string())
-    } else if matches!(
-        error.downcast_ref::<jit::repository_state::RepositoryIndexError>(),
-        Some(jit::repository_state::RepositoryIndexError::Parse(_))
-    ) {
-        JsonError::new(ErrorCode::ParseError, error.to_string())
-    } else if error
-        .downcast_ref::<jit::storage::RepositoryFormatTooNewError>()
-        .is_some()
-    {
-        JsonError::new(ErrorCode::RepositoryFormatTooNew, error.to_string())
-    } else if let Some(stale) = error.downcast_ref::<jit::errors::StaleBinaryError>() {
+    let json_error = if let Some(stale) = error.downcast_ref::<jit::errors::StaleBinaryError>() {
         stale_binary_json_error(stale)
     } else {
-        return;
+        JsonError::new(error_to_error_code(error), error.to_string())
     };
+    let exit_code = json_error.exit_code();
 
     if let Ok(rendered) = json_error.to_json_string() {
         println!("{}", rendered);
     }
+    Some(exit_code)
 }
 
 /// REQ-02 (jit:7446af34): self-check this process's own build provenance
@@ -4801,7 +4837,7 @@ fn run() -> Result<()> {
                             for (id, error) in &errors {
                                 eprintln!("  {} - {}", id, error);
                             }
-                            std::process::exit(1);
+                            std::process::exit(ErrorCode::PresetError.exit_code().code());
                         }
                     }
                 }
@@ -7992,9 +8028,10 @@ mod exit_code_projection_tests {
     //! projection stops documenting a code the classifier still emits, this test
     //! fails — so the projection cannot silently drift from runtime behavior.
 
-    use super::error_to_exit_code;
+    use super::{error_to_error_code, error_to_exit_code};
     use jit::declarations::GateStage;
     use jit::domain::{GateRunResult, GateRunStatus};
+    use jit::output::ErrorCode;
     use jit::schema::CommandSchema;
 
     /// Build a `gate evaluate` checker failure carrying `status`, so the
@@ -8177,6 +8214,25 @@ mod exit_code_projection_tests {
                 expected,
                 "classifier produced the wrong code for `{error}`"
             );
+        }
+    }
+
+    #[test]
+    fn test_error_code_classifier_is_the_exit_classifier_authority() {
+        for (index, (error, _expected, _row)) in classifier_cases().into_iter().enumerate() {
+            let error_code = error_to_error_code(&error);
+            assert_eq!(
+                error_to_exit_code(&error),
+                error_code.exit_code(),
+                "reported code and process status diverged for `{error}`"
+            );
+            if index != 2 {
+                assert_ne!(
+                    error_code,
+                    ErrorCode::GenericError,
+                    "typed failure fell through to the generic code: `{error}`"
+                );
+            }
         }
     }
 

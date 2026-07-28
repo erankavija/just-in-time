@@ -1,6 +1,7 @@
 //! JSON preset application reports a partial batch as an error envelope.
 
 use assert_cmd::prelude::*;
+use jit::output::ErrorCode;
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -86,6 +87,29 @@ fn test_gate_preset_apply_json_partial_batch_emits_error_envelope() {
             })),
         "failing target detail should remain readable: {response}"
     );
+}
+
+#[test]
+fn test_gate_preset_apply_plain_partial_batch_matches_registered_json_status() {
+    let temp = setup_repo();
+
+    let output = jit(&temp)
+        .args([
+            "gate",
+            "preset",
+            "apply",
+            "plan-review",
+            "00000000-0000-0000-0000-000000000000",
+        ])
+        .output()
+        .expect("preset application should run");
+
+    assert_eq!(
+        output.status.code(),
+        Some(ErrorCode::PresetError.exit_code().code())
+    );
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Errors (1)"));
 }
 
 #[test]

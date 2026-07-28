@@ -708,6 +708,8 @@ pub enum ErrorCode {
     GateFailed,
     /// An input/output or external-system operation failed.
     IoError,
+    /// An operation was denied by filesystem or operating-system permissions.
+    PermissionDenied,
     /// Input data could not be parsed.
     ParseError,
     /// A claim or lease command requires a Git repository.
@@ -782,7 +784,7 @@ impl ErrorCode {
     ///
     /// A conformance test compares this list with the variants schemars derives
     /// from [`ErrorCode`], so omitting a newly added member fails the suite.
-    pub const ALL: [ErrorCode; 43] = [
+    pub const ALL: [ErrorCode; 44] = [
         ErrorCode::IssueNotFound,
         ErrorCode::GateNotFound,
         ErrorCode::CycleDetected,
@@ -793,6 +795,7 @@ impl ErrorCode {
         ErrorCode::Blocked,
         ErrorCode::GateFailed,
         ErrorCode::IoError,
+        ErrorCode::PermissionDenied,
         ErrorCode::ParseError,
         ErrorCode::ClaimRequiresGit,
         ErrorCode::AmbiguousId,
@@ -841,6 +844,7 @@ impl ErrorCode {
             ErrorCode::Blocked => "BLOCKED",
             ErrorCode::GateFailed => "GATE_FAILED",
             ErrorCode::IoError => "IO_ERROR",
+            ErrorCode::PermissionDenied => "PERMISSION_DENIED",
             ErrorCode::ParseError => "PARSE_ERROR",
             ErrorCode::ClaimRequiresGit => "CLAIM_REQUIRES_GIT",
             ErrorCode::AmbiguousId => "AMBIGUOUS_ID",
@@ -909,6 +913,7 @@ impl ErrorCode {
             | ErrorCode::ClaimRequiresGit
             | ErrorCode::RepositoryFormatTooNew
             | ErrorCode::StaleBinary => ExitCode::ExternalError,
+            ErrorCode::PermissionDenied => ExitCode::PermissionDenied,
             ErrorCode::ParseError
             | ErrorCode::ItemNotFound
             | ErrorCode::ItemCommandFailed
@@ -942,6 +947,9 @@ impl ErrorCode {
             ErrorCode::Blocked => "Unfinished dependencies block the operation.",
             ErrorCode::GateFailed => "A quality-gate checker did not pass.",
             ErrorCode::IoError => "An input/output or external-system operation failed.",
+            ErrorCode::PermissionDenied => {
+                "The operation was denied by filesystem or operating-system permissions."
+            }
             ErrorCode::ParseError => "Input data could not be parsed.",
             ErrorCode::ClaimRequiresGit => "The claim or lease operation requires Git.",
             ErrorCode::AmbiguousId => "The ID prefix matches more than one candidate.",
@@ -1070,6 +1078,7 @@ impl std::str::FromStr for ErrorCode {
             "BLOCKED" => Ok(ErrorCode::Blocked),
             "GATE_FAILED" => Ok(ErrorCode::GateFailed),
             "IO_ERROR" => Ok(ErrorCode::IoError),
+            "PERMISSION_DENIED" => Ok(ErrorCode::PermissionDenied),
             "PARSE_ERROR" => Ok(ErrorCode::ParseError),
             "CLAIM_REQUIRES_GIT" => Ok(ErrorCode::ClaimRequiresGit),
             "AMBIGUOUS_ID" => Ok(ErrorCode::AmbiguousId),
@@ -3361,6 +3370,11 @@ mod tests {
                 ExitCode::ValidationFailed,
             ),
             (ErrorCode::IoError, "IO_ERROR", ExitCode::ExternalError),
+            (
+                ErrorCode::PermissionDenied,
+                "PERMISSION_DENIED",
+                ExitCode::PermissionDenied,
+            ),
             (ErrorCode::ParseError, "PARSE_ERROR", ExitCode::GenericError),
             (
                 ErrorCode::ClaimRequiresGit,
