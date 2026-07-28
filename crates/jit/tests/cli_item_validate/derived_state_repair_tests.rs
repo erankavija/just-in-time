@@ -303,7 +303,15 @@ fn test_cli_validate_fix_preserves_permission_error_classification() {
         assert_eq!(output.status.code(), Some(5));
         if json_mode {
             let error = json(&output);
-            assert_eq!(error["error"]["code"], "IO_ERROR");
+            assert_eq!(error.as_object().map(|object| object.len()), Some(1));
+            assert!(output.stderr.is_empty(), "JSON failure stays stream-pure");
+            let code = error["error"]["code"]
+                .as_str()
+                .unwrap()
+                .parse::<jit::output::ErrorCode>()
+                .expect("validate --fix reports a registered error code");
+            assert_eq!(code, jit::output::ErrorCode::PermissionDenied);
+            assert_eq!(output.status.code(), Some(code.exit_code().code()));
             assert!(error["error"]["message"]
                 .as_str()
                 .unwrap()

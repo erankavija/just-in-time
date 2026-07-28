@@ -3112,11 +3112,13 @@ status.
 advisory and never change the exit status; resolve them with `jit query
 divergence` when a membership label claims what the DAG does not back.
 
-`validate --fix --json` returns the standard error envelope with code
-`VALIDATION_FAILED` when a repair is unsafe. Its `error.message` retains the
-complete actionable cause chain, including ambiguous managed-region delimiters
-or mismatched profile provenance. The human error reports the same cause, and no
-repair target is written.
+`validate --fix --json` returns the standard error envelope and retains the
+failure's typed classification: an unsafe repair uses `VALIDATION_FAILED`, a
+permission failure uses `PERMISSION_DENIED`, and other failures keep the
+registered code selected by the shared classifier. That code determines the
+process status. Its `error.message` retains the complete actionable cause chain,
+including ambiguous managed-region delimiters or mismatched profile provenance.
+The human error reports the same cause, and no repair target is written.
 
 ### `jit recover`
 

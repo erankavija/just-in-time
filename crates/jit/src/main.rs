@@ -576,20 +576,11 @@ fn claim_json_error(error: &anyhow::Error, fallback_code: &str) -> jit::output::
     }
 }
 
-/// Preserve a `validate --fix` failure's complete cause chain while selecting
-/// the standard JSON code for its typed exit class.
-fn validate_fix_json_error(error: &anyhow::Error, exit_code: ExitCode) -> jit::output::JsonError {
-    use jit::output::ErrorCode;
-
-    let code = match exit_code {
-        ExitCode::ValidationFailed => ErrorCode::ValidationFailed,
-        ExitCode::InvalidArgument => ErrorCode::InvalidArgument,
-        ExitCode::NotFound => ErrorCode::RepositoryNotFound,
-        ExitCode::AlreadyExists => ErrorCode::AlreadyExists,
-        ExitCode::PermissionDenied | ExitCode::ExternalError => ErrorCode::IoError,
-        ExitCode::Success | ExitCode::GenericError | ExitCode::BrokenPipe => ErrorCode::IoError,
-    };
-    jit::output::JsonError::new(code, format!("{error:#}"))
+/// Preserve a `validate --fix` failure's complete cause chain and its exact
+/// typed classification. The envelope's registered code owns the process
+/// status; callers must not retain a parallel exit-code projection.
+fn validate_fix_json_error(error: &anyhow::Error) -> jit::output::JsonError {
+    jit::output::JsonError::new(error_to_error_code(error), format!("{error:#}"))
 }
 
 /// Render a validation result under the machine-readable contract.
@@ -6939,10 +6930,9 @@ fn run() -> Result<()> {
                 let (fixes_applied, messages) = match executor.validate_with_fix(true, dry_run) {
                     Ok(result) => result,
                     Err(error) if json => {
-                        let exit_code = error_to_exit_code(&error);
-                        let json_error = validate_fix_json_error(&error, exit_code);
+                        let json_error = validate_fix_json_error(&error);
                         println!("{}", json_error.to_json_string()?);
-                        std::process::exit(exit_code.code());
+                        std::process::exit(json_error.exit_code().code());
                     }
                     Err(error) if error_to_exit_code(&error) == ExitCode::ValidationFailed => {
                         return Err(anyhow::Error::new(jit::errors::ValidationFailedError::new(
@@ -8081,7 +8071,7 @@ mod exit_code_projection_tests {
     //! projection stops documenting a code the classifier still emits, this test
     //! fails — so the projection cannot silently drift from runtime behavior.
 
-    use super::{error_to_error_code, error_to_exit_code};
+    use super::{error_to_error_code, error_to_exit_code, validate_fix_json_error};
     use jit::declarations::GateStage;
     use jit::domain::{GateRunResult, GateRunStatus};
     use jit::output::ErrorCode;
@@ -8286,6 +8276,49 @@ mod exit_code_projection_tests {
                     "typed failure fell through to the generic code: `{error}`"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn test_validate_fix_json_error_uses_typed_code_as_status_authority() {
+        use std::io::{Error as IoError, ErrorKind};
+
+        let cases = [
+            (
+                jit::errors::ValidationFailedError::new("invalid repository").into(),
+                ErrorCode::ValidationFailed,
+            ),
+            (
+                jit::errors::InvalidArgumentError::new("bad repair option").into(),
+                ErrorCode::InvalidArgument,
+            ),
+            (
+                jit::errors::AlreadyExistsError::new("occupied repair target").into(),
+                ErrorCode::AlreadyExists,
+            ),
+            (
+                IoError::new(ErrorKind::PermissionDenied, "denied").into(),
+                ErrorCode::PermissionDenied,
+            ),
+            (
+                jit::storage::RepositoryFormatTooNewError::new(9999, 1).into(),
+                ErrorCode::RepositoryFormatTooNew,
+            ),
+            (
+                anyhow::anyhow!("untyped repair failure"),
+                ErrorCode::GenericError,
+            ),
+            (
+                IoError::new(ErrorKind::BrokenPipe, "closed repair output").into(),
+                ErrorCode::IoError,
+            ),
+        ];
+
+        for (error, expected_code) in cases {
+            let envelope = validate_fix_json_error(&error);
+            assert_eq!(envelope.error.code, expected_code.as_str());
+            assert_eq!(envelope.exit_code(), expected_code.exit_code());
+            assert_eq!(envelope.exit_code(), error_to_exit_code(&error));
         }
     }
 
