@@ -1,7 +1,7 @@
 {
   "epic_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
   "epic_short_id": "a2546471",
-  "current_wave": 8,
+  "current_wave": 9,
   "waves": [
     {
       "wave_number": 1,
@@ -80,6 +80,12 @@
       "issues": [
         {"id":"9eadd135-d27b-471c-b481-46bbf15084d7","short_id":"9eadd135","title":"One canonical adopter home for the machine-readable failure contract","classification":"implementation","status":"done"}
       ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {"id":"8f5e5921-6746-4a43-a8d0-92e52e8023bf","short_id":"8f5e5921","title":"Envelope machine-readable parser failures","classification":"implementation","status":"in_progress"}
+      ]
     }
   ],
   "created_during_execution": [
@@ -97,6 +103,11 @@
       "id": "4437d897-465e-470d-99af-6c9683927af0",
       "short_id": "4437d897",
       "reason": "Story 7491da4a lead review found that the per-arm census existed only in failing assertion diagnostics; this leaf publishes the derived passing census as a build artifact to satisfy hard REQ-06."
+    },
+    {
+      "id": "8f5e5921-6746-4a43-a8d0-92e52e8023bf",
+      "short_id": "8f5e5921",
+      "reason": "Epic holistic review found that Clap parser failures bypassed the JSON envelope before dispatch, violating hard REQ-02 and making the canonical REQ-07 documentation overbroad; this leaf closes the parser boundary and adds definition-derived coverage."
     }
   ],
   "escalations": [

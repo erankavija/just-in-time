@@ -1,0 +1,29 @@
+{
+  "assignee": "agent:epic-parser-rework",
+  "claimed_at": "2026-07-28T18:47:03.338145245Z",
+  "context": {},
+  "created_at": "2026-07-28T18:46:44.742608698Z",
+  "dependencies": [],
+  "description": "Machine-readable invocations that fail during argument parsing emit the standard structured error envelope, so parser diagnostics cannot bypass the failure contract before command dispatch.\n\n## Background\n\nThe top-level parser currently exits directly on a Clap error. When an invocation selects `--json` and also contains an invalid option or value, Clap prints plain usage and diagnostic text before the shared failure renderer can run. The existing conformance registry intentionally exercises failures inside command dispatch, so it does not cover this pre-dispatch path. The parser boundary needs an explicit machine-readable route and definition-derived regression coverage without changing human-mode parsing behaviour.\n\n## Success Criteria\n\n- [hard] REQ-01: A failing parse with an effective `--json` flag emits exactly one standard error envelope on stdout and no plain-text byte on that payload stream.\n- [hard] REQ-02: The envelope reports a registered argument-error code whose process exit status matches the code classification.\n- [hard] REQ-03: Definition-derived regression coverage provokes a parser failure for every reflected command arm that accepts `--json`, so a newly added arm cannot bypass this check.\n- [hard] REQ-04: Human-mode parser failures retain the existing Clap diagnostic and exit behaviour.\n- [hard] REQ-05: Successful help and version requests retain their existing non-failure behaviour, including when global output flags are present.\n\n## Notes\n\nThe machine-readable path must distinguish an effective option from a `--json` token occurring after the argument delimiter. The fix belongs at the top-level parsing and output boundary; domain and command layers remain unchanged.",
+  "documents": [],
+  "first_ready_at": "2026-07-28T18:46:44.742608698Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "8f5e5921-6746-4a43-a8d0-92e52e8023bf",
+  "labels": [
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:parser-envelope",
+    "satisfies:REQ-02",
+    "satisfies:REQ-07",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Envelope machine-readable parser failures",
+  "updated_at": "2026-07-28T18:47:03.338145245Z"
+}
