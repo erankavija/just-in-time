@@ -4,12 +4,22 @@ use serde::{de::Error as _, Deserialize, Deserializer};
 use std::collections::{BTreeSet, HashMap};
 
 const REGISTRY_TOML: &str = include_str!("failure_lever_registry.toml");
+const CLAIM_FRAGMENT_TOML: &str =
+    include_str!("../../../../dev/active/a2546471-json-error-contract/levers/claim.toml");
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FailureLeverRegistry {
     pub(crate) schema: FailureLeverSchema,
     pub(crate) arms: Vec<FailureLever>,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct FailureLeverFragment {
+    schema: FailureLeverSchema,
+    namespace: String,
+    arms: Vec<FailureLever>,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -171,6 +181,22 @@ fn test_failure_lever_registry_deserializes_typed_committed_input() {
             assert!(!lever.exemption_reason.is_empty());
         }
     });
+}
+
+#[test]
+fn test_failure_lever_registry_claim_fragment_matches_assembled_rows() {
+    let fragment: FailureLeverFragment =
+        toml::from_str(CLAIM_FRAGMENT_TOML).expect("claim survey fragment must be valid");
+    assert_eq!(fragment.schema, FailureLeverSchema::V1);
+    assert_eq!(fragment.namespace, "claim");
+
+    let assembled_claim_arms = failure_lever_registry()
+        .arms
+        .into_iter()
+        .filter(|arm| arm.path().starts_with("claim "))
+        .collect::<Vec<_>>();
+
+    assert_eq!(fragment.arms, assembled_claim_arms);
 }
 
 #[test]
