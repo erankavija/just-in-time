@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-28T10:13:38.980276619Z",
   "context": {},
   "created_at": "2026-07-27T21:43:44.885062384Z",
   "dependencies": [
@@ -25,7 +26,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Bind the exit-status projection to the machine-readable invocation form",
-  "updated_at": "2026-07-28T09:56:02.207087139Z"
+  "updated_at": "2026-07-28T10:13:38.980276619Z"
 }
