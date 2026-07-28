@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "154856aa6169000fe5778e0b8f2b8e3950661969",
+  "completed_at": "2026-07-28T11:35:22.632569268Z",
+  "duration_ms": 256632,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Top-level JSON failure rendering, typed classification, exit-status parity, handler-owned output preservation, and dependency integration satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dbe2f2a8-87c0-47a1-94c6-2bca4b6d3b07",
+  "message": null,
+  "run_id": "dac35d6d-79e1-492c-b4ab-55d283e054de",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T11:31:06.000198044Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:dbe2f2a8` commits 561bd861, aa47bd6e, 5b212911, 2b955ad9, 8c3462e0, 5545a1b3, 176b06a4, 717429f4, b9315715, 745016d1, fe8fbb1e, 154856aa  \nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md  \nResolved items: @/issue/dbe2f2a8/requirement/REQ-02 and @/issue/f6c95115/requirement/REQ-04 (issue Markdown); @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/gate-semantics, @/invariant/dag-acyclic, @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml); @/charter/D-1, @/charter/D-3, @/charter/D-4, @/charter/D-6 (dev/vision/9db27a3a-charter.md)  \nGate evidence: cargo-ci passed, exit 0, 2026-07-28T11:31:05Z; code-review pending  \nTruncation recovery: Re-read truncated metadata, policy, test, and validate evidence in narrower per-commit/path/range calls; abandoned unrelated issue records and pre-existing handlers outside the changed impact cone.  \n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Top-level JSON failure rendering, typed classification, exit-status parity, handler-owned output preservation, and dependency integration satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -12,6 +12,7 @@
   ],
   "description": "One shared fixture drives a named command arm into the failure the registry records for it and returns its streams with its exit status, so the checks over the machine-readable failure contract share one way of provoking a failure instead of each inventing its own.\n\n## Background\n\nNo shared subprocess runner exists in this crate's test tree. Sixty test files resolve the binary and set up a temporary repository themselves, in two competing idioms. Several checks over the failure contract need the same thing — a named arm driven into a failure, with its streams and status captured — so that setup belongs in one fixture rather than repeated in each of them.\n\nWhich failure is provoked decides whether a probe proves anything, and that question is settled before this work rather than inside it. A committed registry beside the probes states, per arm, the invocation that reaches a failure raised after dispatch inside the arm's own body, the setup that invocation needs, the failure it is expected to produce, and — for an arm where no such failure is constructible — an exemption reason in its place. The fixture deserializes that registry and drives what it says. It decides no reachability of its own and widens the recorded universe by nothing.\n\nAn arm the registry marks as exempt is carried as a declared exemption with the recorded reason, so it stays visible rather than becoming silently absent.\n\nFailures the argument parser rejects are out of scope: the parser reports and exits before dispatch, so the fixture forces failures occurring after dispatch, which is the class the failure contract covers.\n\nThe fixture is a module inside the existing issue CLI integration target. That target already aggregates the machine-contract suites, and the build-footprint budget leaves a single integration-target slot, so a dedicated target would spend it on one file.\n\n## Success Criteria\n\n- [hard] REQ-01: A caller names a command arm and receives its payload stream, its diagnostic stream, and its exit status from one forced failure.\n- [hard] REQ-02: The invocation an arm is driven through, and the setup it runs under, are the ones the registry records for that arm.\n- [hard] REQ-03: The forced failure occurs after command dispatch rather than during argument parsing.\n- [hard] REQ-04: An arm the registry marks as exempt is carried as a declared exemption stating the recorded reason.\n- [hard] REQ-05: The fixture's arm set comes from the registry rather than from a list written into the fixture.\n- [hard] REQ-06: The fixture is a module inside an existing integration target, adding no Cargo test target.\n- [hard] REQ-07: Self-assertions confirm the fixture reports a non-zero exit status for a representative arm of each recorded setup class.\n",
   "documents": [],
+  "first_ready_at": "2026-07-28T11:36:53.945810941Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -28,7 +29,7 @@
     "enforces:@/invariant/bounded-rust-build-footprint"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "A shared fixture that drives one recorded failure per command arm",
-  "updated_at": "2026-07-27T21:43:44.885062384Z"
+  "updated_at": "2026-07-28T11:36:53.945810941Z"
 }
