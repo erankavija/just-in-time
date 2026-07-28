@@ -198,8 +198,9 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
         };
     }
 
-    // Configuration parsing is a typed parser failure even when command
-    // orchestration adds anyhow context around it.
+    // TOML and JSON decoding are typed parser failures even when command
+    // orchestration adds anyhow context around them (configuration, event-log,
+    // migration, and server PID readers all retain their parser source).
     if error.chain().any(|cause| {
         cause.downcast_ref::<toml::de::Error>().is_some()
             || cause.downcast_ref::<serde_json::Error>().is_some()
