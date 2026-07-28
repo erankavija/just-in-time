@@ -6,6 +6,7 @@ argv = ["archive", "candidates", "--json"]
 setup = ["init", "malformed-index"]
 setup_notes = "Initialize a repository, then replace .jit/index.json with malformed JSON before invoking the arm."
 expected_failure = "failed to parse index"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -15,6 +16,7 @@ argv = ["archive", "document", "docs/missing.md", "--json"]
 setup = ["init", "malformed-index"]
 setup_notes = "Initialize a repository, then replace .jit/index.json with malformed JSON before invoking the arm."
 expected_failure = "failed to parse index"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -23,6 +25,7 @@ path = "archive container"
 argv = ["archive", "container", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Issue not found: deadbeef"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -31,6 +34,7 @@ path = "claim acquire"
 argv = ["claim", "acquire", "deadbeef", "--agent-id", "agent:probe", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "ISSUE_NOT_FOUND: Issue not found: deadbeef"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -39,6 +43,7 @@ path = "claim release"
 argv = ["claim", "release", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "ISSUE_NOT_FOUND: Failed to resolve issue id deadbeef"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -48,6 +53,7 @@ argv = ["claim", "renew", "00000000-0000-0000-0000-000000000000", "--json"]
 setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:index-with-active-lease"]
 setup_notes = "claim:index-with-active-lease seeds one valid issue and acquires a finite lease for it, creating .git/jit/claims.index.json and its locks before the missing lease lookup."
 expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -57,6 +63,7 @@ argv = ["claim", "heartbeat", "00000000-0000-0000-0000-000000000000", "--json"]
 setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:index-with-active-lease"]
 setup_notes = "claim:index-with-active-lease seeds one valid issue and acquires a finite lease for it, creating .git/jit/claims.index.json and its locks before the missing lease lookup."
 expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -66,6 +73,7 @@ argv = ["claim", "status", "--json"]
 setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:index-with-active-lease", "malformed-claim-index"]
 setup_notes = "malformed-claim-index replaces .git/jit/claims.index.json with invalid JSON after claim:index-with-active-lease has created it."
 expected_failure = "PARSE_ERROR: Failed to parse claims index"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -75,6 +83,7 @@ argv = ["claim", "list", "--json"]
 setup = ["init", "git:repository-with-head", "claim:index-with-active-lease", "malformed-claim-index"]
 setup_notes = "malformed-claim-index replaces .git/jit/claims.index.json with invalid JSON after claim:index-with-active-lease has created it."
 expected_failure = "PARSE_ERROR: Failed to parse claims index"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -84,6 +93,7 @@ argv = ["claim", "force-evict", "00000000-0000-0000-0000-000000000000", "--reaso
 setup = ["init", "git:repository-with-head", "claim:index-with-active-lease"]
 setup_notes = "claim:index-with-active-lease seeds one valid issue and acquires a finite lease for it, creating .git/jit/claims.index.json and its locks before the missing lease lookup."
 expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -93,6 +103,7 @@ argv = ["config", "show", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Replace the [version] table header in .jit/config.toml with the malformed `[version` after initialization."
 expected_failure = "Failed to parse config.toml"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -101,6 +112,7 @@ path = "config get"
 argv = ["config", "get", "version.unknown", "--json"]
 setup = ["init"]
 expected_failure = "INVALID_ARGUMENT: unknown config key 'version.unknown': no 'unknown' under 'version'"
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -109,6 +121,7 @@ path = "config set"
 argv = ["config", "set", "validation.strictness", "banana", "--json"]
 setup = ["init"]
 expected_failure = "invalid [validation].strictness in .jit/config.toml: 'banana' (expected strict, loose, or permissive)"
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -123,6 +136,7 @@ argv = ["config", "show-hierarchy", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Replace the [version] table header in .jit/config.toml with the malformed `[version` after initialization."
 expected_failure = "Failed to parse config.toml"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -136,7 +150,8 @@ path = "dep add"
 argv = ["dep", "add", "missing-from", "missing-to", "--json"]
 setup = ["init", "no-issue:missing-from"]
 expected_failure = "DEPENDENCY_ERROR: Issue not found: missing-from"
-expected_exit = 1
+expected_code = "DEPENDENCY_ERROR"
+expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
@@ -144,7 +159,8 @@ path = "dep rm"
 argv = ["dep", "rm", "missing-from", "missing-to", "--json"]
 setup = ["init", "no-issue:missing-from"]
 expected_failure = "DEPENDENCY_ERROR: Issue not found: missing-from"
-expected_exit = 1
+expected_code = "DEPENDENCY_ERROR"
+expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
@@ -153,6 +169,7 @@ argv = ["worktree", "info", "--json"]
 setup = ["init", "git:repository-with-head", "malformed-worktree-identity"]
 setup_notes = "Create the worktree identity with one successful `worktree info` invocation, then replace .jit/worktree.json with `{ invalid json` before invoking."
 expected_failure = "WORKTREE_INFO_ERROR: Failed to parse worktree.json"
+expected_code = "WORKTREE_INFO_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -162,6 +179,7 @@ argv = ["worktree", "list", "--json"]
 setup = ["init", "git:repository-with-head", "malformed-worktree-identity"]
 setup_notes = "Create the worktree identity with one successful `worktree info` invocation, then replace .jit/worktree.json with `{ invalid json` before invoking."
 expected_failure = "WORKTREE_LIST_ERROR: Failed to load worktree identity from <repository>/.jit"
+expected_code = "WORKTREE_LIST_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -170,6 +188,7 @@ path = "doc add"
 argv = ["doc", "add", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -178,6 +197,7 @@ path = "doc assets list"
 argv = ["doc", "assets", "list", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -186,6 +206,7 @@ path = "doc check-links"
 argv = ["doc", "check-links", "--scope", "issue:deadbeef", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -194,6 +215,7 @@ path = "doc conformance"
 argv = ["doc", "conformance", "--json"]
 setup = ["init", "malformed-config-toml"]
 expected_failure = "PARSE_ERROR"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 setup_notes = "Replace the [version] table header in .jit/config.toml with the malformed `[version` before invoking."
@@ -203,6 +225,7 @@ path = "doc diff"
 argv = ["doc", "diff", "deadbeef", ".jit/config.toml", "--from", "HEAD", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -211,6 +234,7 @@ path = "doc dir"
 argv = ["doc", "dir", "deadbeef", "dev", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -219,6 +243,7 @@ path = "doc history"
 argv = ["doc", "history", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -227,6 +252,7 @@ path = "doc list"
 argv = ["doc", "list", "deadbeef", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -235,6 +261,7 @@ path = "doc remove"
 argv = ["doc", "remove", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -243,6 +270,7 @@ path = "doc show"
 argv = ["doc", "show", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -252,6 +280,7 @@ argv = ["events", "query", "--json"]
 setup = ["init", "malformed-events-log"]
 setup_notes = "Replace .jit/events.jsonl with exactly one malformed JSON line."
 expected_failure = "Failed to deserialize event log"
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -261,6 +290,7 @@ argv = ["events", "tail", "--json"]
 setup = ["init", "malformed-events-log"]
 setup_notes = "Replace .jit/events.jsonl with exactly one malformed JSON line."
 expected_failure = "Failed to deserialize event log"
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -269,7 +299,8 @@ path = "gate define"
 argv = ["gate", "define", "survey-gate", "--title", "Duplicate Gate", "--description", "Duplicate definition probe", "--json"]
 setup = ["init", "duplicate-gate:survey-gate"]
 expected_failure = "GATE_ERROR: Gate 'survey-gate' already exists"
-expected_exit = 1
+expected_code = "GATE_ERROR"
+expected_exit = 6
 confirmation = "invoked"
 
 [[arms]]
@@ -277,6 +308,7 @@ path = "gate update"
 argv = ["gate", "update", "no-such-gate", "--title", "Missing gate update", "--json"]
 setup = ["init", "unknown-gate:no-such-gate"]
 expected_failure = "GATE_NOT_FOUND: Gate not found: no-such-gate"
+expected_code = "GATE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -285,6 +317,7 @@ path = "gate remove"
 argv = ["gate", "remove", "no-such-gate", "--json"]
 setup = ["init", "unknown-gate:no-such-gate"]
 expected_failure = "GATE_NOT_FOUND: Gate not found: no-such-gate"
+expected_code = "GATE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -293,6 +326,7 @@ path = "gate add"
 argv = ["gate", "add", "00000000-0000-0000-0000-000000000000", "missing-gate", "--json"]
 setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
 expected_failure = "ISSUE_NOT_FOUND: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -301,6 +335,7 @@ path = "gate evaluate"
 argv = ["gate", "evaluate", "00000000-0000-0000-0000-000000000000", "missing-gate", "--by", "agent:survey", "--json"]
 setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
 expected_failure = "ISSUE_NOT_FOUND: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -309,6 +344,7 @@ path = "gate evaluate-all"
 argv = ["gate", "evaluate-all", "00000000-0000-0000-0000-000000000000", "--by", "agent:survey", "--json"]
 setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
 expected_failure = "ISSUE_NOT_FOUND: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -317,7 +353,8 @@ path = "gate fail"
 argv = ["gate", "fail", "00000000-0000-0000-0000-000000000000", "missing-gate", "--json"]
 setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
 expected_failure = "GATE_ERROR: Issue not found: 00000000-0000-0000-0000-000000000000"
-expected_exit = 1
+expected_code = "GATE_ERROR"
+expected_exit = 6
 confirmation = "invoked"
 
 [[arms]]
@@ -326,7 +363,8 @@ argv = ["gate", "list", "--json"]
 setup = ["init", "malformed-gate-registry"]
 setup_notes = "Replace .jit/gates.toml with the malformed TOML `[[gates]` after initialization."
 expected_failure = "GATE_ERROR: Failed to deserialize gate registry"
-expected_exit = 1
+expected_code = "GATE_ERROR"
+expected_exit = 6
 confirmation = "invoked"
 
 [[arms]]
@@ -334,6 +372,7 @@ path = "gate show"
 argv = ["gate", "show", "no-such-gate", "--json"]
 setup = ["init", "unknown-gate:no-such-gate"]
 expected_failure = "GATE_NOT_FOUND: Gate not found: no-such-gate"
+expected_code = "GATE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -342,7 +381,8 @@ path = "gate status"
 argv = ["gate", "status", "00000000-0000-0000-0000-000000000000", "--all", "--json"]
 setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
 expected_failure = "GATE_CHECK_ERROR: Issue not found: 00000000-0000-0000-0000-000000000000"
-expected_exit = 1
+expected_code = "GATE_CHECK_ERROR"
+expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
@@ -350,6 +390,7 @@ path = "gate status-all"
 argv = ["gate", "status-all", "00000000-0000-0000-0000-000000000000", "--json"]
 setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
 expected_failure = "Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -359,7 +400,8 @@ argv = ["gate", "preset", "list", "--json"]
 setup = ["init", "malformed-preset:survey-preset"]
 setup_notes = "Create .jit/config/gate-presets/survey-preset.json containing only `{` after initialization."
 expected_failure = "PRESET_ERROR: Failed to parse custom gate preset file 'survey-preset.json'"
-expected_exit = 1
+expected_code = "PRESET_ERROR"
+expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
@@ -367,7 +409,8 @@ path = "gate preset show"
 argv = ["gate", "preset", "show", "no-such-preset", "--json"]
 setup = ["init", "unknown-preset:no-such-preset"]
 expected_failure = "PRESET_ERROR: Preset not found: no-such-preset"
-expected_exit = 1
+expected_code = "PRESET_ERROR"
+expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
@@ -375,7 +418,8 @@ path = "gate preset apply"
 argv = ["gate", "preset", "apply", "plan-review", "00000000-0000-0000-0000-000000000000", "--json"]
 setup = ["init", "builtin-preset:plan-review", "no-issue:00000000-0000-0000-0000-000000000000"]
 expected_failure = "errors[0].error: Issue not found: 00000000-0000-0000-0000-000000000000"
-expected_exit = 0
+expected_code = "PRESET_ERROR"
+expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
@@ -383,7 +427,8 @@ path = "gate preset create"
 argv = ["gate", "preset", "create", "00000000-0000-0000-0000-000000000000", "survey-preset", "--json"]
 setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
 expected_failure = "PRESET_ERROR: Issue not found: 00000000-0000-0000-0000-000000000000"
-expected_exit = 1
+expected_code = "PRESET_ERROR"
+expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
@@ -391,6 +436,7 @@ path = "issue create"
 argv = ["issue", "create", "--title", "probe", "--priority", "impossible", "--json"]
 setup = ["init"]
 expected_failure = "Priority parsing rejects `impossible` after the create arm has dispatched."
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -399,6 +445,7 @@ path = "issue batch-create"
 argv = ["issue", "batch-create", "--from-json", "missing-batch.json", "--json"]
 setup = ["init", "file-absent:missing-batch.json"]
 expected_failure = "The batch-create arm cannot read the named batch file."
+expected_code = "REPOSITORY_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -407,6 +454,7 @@ path = "issue search"
 argv = ["issue", "search", "--json"]
 setup = ["init"]
 expected_failure = "The search arm rejects an invocation with neither a query nor a filter."
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -415,6 +463,7 @@ path = "issue show"
 argv = ["issue", "show", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Issue resolution reports that `deadbeef` is not found."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -423,6 +472,7 @@ path = "issue status"
 argv = ["issue", "status", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Issue resolution reports that `deadbeef` is not found."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -431,6 +481,7 @@ path = "issue children"
 argv = ["issue", "children", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Container resolution reports that `deadbeef` is not found."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -439,6 +490,7 @@ path = "issue progress"
 argv = ["issue", "progress", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Container resolution reports that `deadbeef` is not found."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -447,6 +499,7 @@ path = "issue update"
 argv = ["issue", "update", "deadbeef", "--state", "ready", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The update arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -455,6 +508,7 @@ path = "issue delete"
 argv = ["issue", "delete", "deadbeef", "--json"]
 setup = ["worktree:primary", "init", "env-unset:JIT_ALLOW_DELETION"]
 expected_failure = "The delete arm refuses deletion without explicit confirmation."
+expected_code = "DELETION_NOT_CONFIRMED"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -463,6 +517,7 @@ path = "issue assign"
 argv = ["issue", "assign", "deadbeef", "agent:probe", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The assign arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -471,6 +526,7 @@ path = "issue claim"
 argv = ["issue", "claim", "deadbeef", "agent:probe", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The claim arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -479,6 +535,7 @@ path = "issue unassign"
 argv = ["issue", "unassign", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The unassign arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -487,6 +544,7 @@ path = "issue reject"
 argv = ["issue", "reject", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The reject arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -495,6 +553,7 @@ path = "issue release"
 argv = ["issue", "release", "deadbeef", "probe", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The release arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -503,6 +562,7 @@ path = "issue claim-next"
 argv = ["issue", "claim-next", "agent:probe", "--json"]
 setup = ["init", "no-ready-issue"]
 expected_failure = "The claim-next arm finds no ready issue to claim."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -511,6 +571,7 @@ path = "issue list"
 argv = ["issue", "list", "--state", "impossible", "--json"]
 setup = ["init"]
 expected_failure = "State parsing rejects `impossible` after the list arm has dispatched."
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -520,6 +581,7 @@ argv = ["item", "list", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Replace .jit/config.toml with `not = valid = toml` after initialization."
 expected_failure = "ITEM_COMMAND_FAILED: invalid .jit/config.toml: Failed to parse config.toml"
+expected_code = "ITEM_COMMAND_FAILED"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -529,6 +591,7 @@ argv = ["item", "search", "survey", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Replace .jit/config.toml with `not = valid = toml` after initialization."
 expected_failure = "ITEM_COMMAND_FAILED: invalid .jit/config.toml: Failed to parse config.toml"
+expected_code = "ITEM_COMMAND_FAILED"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -537,6 +600,7 @@ path = "item show"
 argv = ["item", "show", "not-a-qualified-address", "--json"]
 setup = ["init"]
 expected_failure = "ITEM_COMMAND_FAILED: 'not-a-qualified-address' is not a qualified id; expected '<short-id>/<self-id>'"
+expected_code = "ITEM_COMMAND_FAILED"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -545,6 +609,7 @@ path = "item resolve"
 argv = ["item", "resolve", "not-a-qualified-address", "--json"]
 setup = ["init"]
 expected_failure = "ITEM_COMMAND_FAILED: 'not-a-qualified-address' is not a qualified id; expected '<short-id>/<self-id>'"
+expected_code = "ITEM_COMMAND_FAILED"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -554,6 +619,7 @@ argv = ["invariant", "check", "--json"]
 setup = ["init", "dangling-invariant-enforcement:survey-invariant"]
 setup_notes = "After initialization, create .jit/invariants.toml with one [[invariants]] entry: id = \"survey-invariant\", statement = \"Survey invariant used to reproduce missing enforcement drift.\", kind = \"enforced\", and enforced-by = \"@/rule/missing-survey-rule\"."
 expected_failure = "Exit 4 with message `Enforcement drift: 1 finding(s)` and one finding whose invariant_id is `survey-invariant`, subject is `@/rule/missing-survey-rule`, and unloadable is false."
+expected_code = "VALIDATION_FAILED"
 expected_exit = 4
 confirmation = "invoked"
 
@@ -562,6 +628,7 @@ path = "project render"
 argv = ["project", "render", "--name", "no-such-projection", "--json"]
 setup = ["init", "no-projection:no-such-projection"]
 expected_failure = "PROJECT_COMMAND_FAILED: unknown projection 'no-such-projection'"
+expected_code = "PROJECT_COMMAND_FAILED"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -571,6 +638,7 @@ argv = ["label", "namespaces", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Initialize a repository, then replace .jit/config.toml with malformed TOML before invoking the arm."
 expected_failure = "Failed to parse config.toml"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -580,6 +648,7 @@ argv = ["label", "values", "epic", "--json"]
 setup = ["init", "malformed-index"]
 setup_notes = "Initialize a repository, then replace .jit/index.json with malformed JSON before invoking the arm."
 expected_failure = "failed to parse index"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -589,6 +658,7 @@ argv = ["profile", "list", "--json"]
 setup = ["init", "malformed-profile-record"]
 setup_notes = "Create .jit/profiles/jit-dogfood.json with malformed JSON after initialization."
 expected_failure = "PROFILE_CONFLICT because the installed profile record is malformed"
+expected_code = "PROFILE_CONFLICT"
 expected_exit = 4
 confirmation = "invoked"
 
@@ -597,6 +667,7 @@ path = "profile show"
 argv = ["profile", "show", "absent-profile", "--json"]
 setup = ["init"]
 expected_failure = "PROFILE_NOT_FOUND for an unknown embedded profile ID"
+expected_code = "PROFILE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -605,6 +676,7 @@ path = "profile apply"
 argv = ["profile", "apply", "absent-profile", "--json"]
 setup = ["init"]
 expected_failure = "PROFILE_NOT_FOUND for an unknown embedded profile ID"
+expected_code = "PROFILE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -614,6 +686,7 @@ argv = ["query", "all", "--json"]
 setup = ["init", "malformed-index"]
 setup_notes = "Replace the initial .jit/index.json contents with `not-json`."
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -622,6 +695,7 @@ path = "query available"
 argv = ["query", "available", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -630,6 +704,7 @@ path = "query blocked"
 argv = ["query", "blocked", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -638,6 +713,7 @@ path = "query strategic"
 argv = ["query", "strategic", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -646,6 +722,7 @@ path = "query closed"
 argv = ["query", "closed", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -654,6 +731,7 @@ path = "query count"
 argv = ["query", "count", "--by", "state", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -662,6 +740,7 @@ path = "query divergence"
 argv = ["query", "divergence", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -670,6 +749,7 @@ path = "graph deps"
 argv = ["graph", "deps", "deadbeef", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -678,6 +758,7 @@ path = "graph rdeps"
 argv = ["graph", "rdeps", "deadbeef", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -686,6 +767,7 @@ path = "graph roots"
 argv = ["graph", "roots", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -694,6 +776,7 @@ path = "graph tree"
 argv = ["graph", "tree", "deadbeef", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -702,6 +785,7 @@ path = "graph export"
 argv = ["graph", "export", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -710,6 +794,7 @@ path = "init"
 argv = ["init", "--profile", "no-such-profile", "--json"]
 setup = ["init", "no-profile:no-such-profile"]
 expected_failure = "Profile lookup reports that the requested embedded profile is absent."
+expected_code = "PROFILE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -719,6 +804,7 @@ argv = ["status", "--json"]
 setup = ["init", "index-lock-directory"]
 setup_notes = "After initialization, replace .jit/.index.lock with an empty directory before invoking the arm."
 expected_failure = "Opening the status read lock fails because .jit/.index.lock is a directory."
+expected_code = "IO_ERROR"
 expected_exit = 10
 confirmation = "invoked"
 
@@ -727,6 +813,7 @@ path = "validate"
 argv = ["validate", "--dry-run", "--json"]
 setup = ["init"]
 expected_failure = "The validate arm rejects --dry-run without --fix after dispatch."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -735,6 +822,7 @@ path = "recover"
 argv = ["recover", "--json"]
 setup = ["init", "git:repository-without-head"]
 expected_failure = "Recovery cannot resolve a current branch in a Git repository with no commits."
+expected_code = "recovery_failed"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -744,6 +832,7 @@ argv = ["migrate", "lifecycle-timestamps", "--json"]
 setup = ["init", "malformed-events-log"]
 setup_notes = "Replace .jit/events.jsonl with exactly one malformed JSON line after initialization."
 expected_failure = "Lifecycle timestamp migration rejects the malformed event log."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -752,6 +841,7 @@ path = "snapshot export"
 argv = ["snapshot", "export", "--format", "zip", "--json"]
 setup = ["init"]
 expected_failure = "Snapshot export rejects unsupported format zip after dispatch."
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -760,6 +850,7 @@ path = "apply"
 argv = ["apply", "definitely-missing-template", "00000000-0000-0000-0000-000000000000", "--json"]
 setup = ["init", "no-template:definitely-missing-template"]
 expected_failure = "Template lookup reports that `definitely-missing-template` is not declared."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -768,6 +859,7 @@ path = "list"
 argv = ["list", "--state", "impossible", "--json"]
 setup = ["init"]
 expected_failure = "State parsing rejects `impossible` after the list arm has dispatched."
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -776,6 +868,7 @@ path = "rdeps"
 argv = ["rdeps", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Reverse-dependency lookup reports that issue `deadbeef` is not found."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -784,6 +877,7 @@ path = "hooks install"
 argv = ["hooks", "install", "--json"]
 setup = ["init", "git:absent"]
 expected_failure = "HOOKS_INSTALL_ERROR: Not in a git repository (no .git directory found)"
+expected_code = "HOOKS_INSTALL_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -792,6 +886,7 @@ path = "search"
 argv = ["search", "[", "--regex", "--json"]
 setup = ["init", "regex:unclosed-character-class"]
 expected_failure = "SEARCH_FAILED: ripgrep rejects the unclosed character class."
+expected_code = "SEARCH_FAILED"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -801,6 +896,7 @@ argv = ["serve", "--json"]
 setup = ["init", "malformed-server-pid-file"]
 setup_notes = "Create .jit/server.pid.json containing only `{` after initialization."
 expected_failure = "Server start reports that the PID file is malformed."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -810,6 +906,7 @@ argv = ["serve", "--stop", "--json"]
 setup = ["init", "malformed-server-pid-file"]
 setup_notes = "Create .jit/server.pid.json containing only `{` after initialization."
 expected_failure = "Server stop reports that the PID file is malformed."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -819,6 +916,7 @@ argv = ["serve", "--status", "--json"]
 setup = ["init", "malformed-server-pid-file"]
 setup_notes = "Create .jit/server.pid.json containing only `{` after initialization."
 expected_failure = "Server status reports that the PID file is malformed."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 

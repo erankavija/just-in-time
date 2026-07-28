@@ -6,6 +6,7 @@ path = "init"
 argv = ["init", "--profile", "no-such-profile", "--json"]
 setup = ["init", "no-profile:no-such-profile"]
 expected_failure = "Profile lookup reports that the requested embedded profile is absent."
+expected_code = "PROFILE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -15,6 +16,7 @@ argv = ["status", "--json"]
 setup = ["init", "index-lock-directory"]
 setup_notes = "After initialization, replace .jit/.index.lock with an empty directory before invoking the arm."
 expected_failure = "Opening the status read lock fails because .jit/.index.lock is a directory."
+expected_code = "IO_ERROR"
 expected_exit = 10
 confirmation = "invoked"
 
@@ -23,6 +25,7 @@ path = "validate"
 argv = ["validate", "--dry-run", "--json"]
 setup = ["init"]
 expected_failure = "The validate arm rejects --dry-run without --fix after dispatch."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -31,6 +34,7 @@ path = "recover"
 argv = ["recover", "--json"]
 setup = ["init", "git:repository-without-head"]
 expected_failure = "Recovery cannot resolve a current branch in a Git repository with no commits."
+expected_code = "recovery_failed"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -40,6 +44,7 @@ argv = ["migrate", "lifecycle-timestamps", "--json"]
 setup = ["init", "malformed-events-log"]
 setup_notes = "Replace .jit/events.jsonl with exactly one malformed JSON line after initialization."
 expected_failure = "Lifecycle timestamp migration rejects the malformed event log."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -48,5 +53,6 @@ path = "snapshot export"
 argv = ["snapshot", "export", "--format", "zip", "--json"]
 setup = ["init"]
 expected_failure = "Snapshot export rejects unsupported format zip after dispatch."
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"

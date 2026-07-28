@@ -6,6 +6,7 @@ path = "apply"
 argv = ["apply", "definitely-missing-template", "00000000-0000-0000-0000-000000000000", "--json"]
 setup = ["init", "no-template:definitely-missing-template"]
 expected_failure = "Template lookup reports that `definitely-missing-template` is not declared."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -14,6 +15,7 @@ path = "list"
 argv = ["list", "--state", "impossible", "--json"]
 setup = ["init"]
 expected_failure = "State parsing rejects `impossible` after the list arm has dispatched."
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -22,6 +24,7 @@ path = "rdeps"
 argv = ["rdeps", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Reverse-dependency lookup reports that issue `deadbeef` is not found."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -30,6 +33,7 @@ path = "hooks install"
 argv = ["hooks", "install", "--json"]
 setup = ["init", "git:absent"]
 expected_failure = "HOOKS_INSTALL_ERROR: Not in a git repository (no .git directory found)"
+expected_code = "HOOKS_INSTALL_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -38,7 +42,8 @@ path = "search"
 argv = ["search", "[", "--regex", "--json"]
 setup = ["init", "regex:unclosed-character-class"]
 expected_failure = "SEARCH_FAILED: ripgrep rejects the unclosed character class."
-expected_exit = 10
+expected_code = "SEARCH_FAILED"
+expected_exit = 1
 confirmation = "invoked"
 
 [[arms]]
@@ -47,6 +52,7 @@ argv = ["serve", "--json"]
 setup = ["init", "malformed-server-pid-file"]
 setup_notes = "Create .jit/server.pid.json containing only `{` after initialization."
 expected_failure = "Server start reports that the PID file is malformed."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -56,6 +62,7 @@ argv = ["serve", "--stop", "--json"]
 setup = ["init", "malformed-server-pid-file"]
 setup_notes = "Create .jit/server.pid.json containing only `{` after initialization."
 expected_failure = "Server stop reports that the PID file is malformed."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -65,6 +72,7 @@ argv = ["serve", "--status", "--json"]
 setup = ["init", "malformed-server-pid-file"]
 setup_notes = "Create .jit/server.pid.json containing only `{` after initialization."
 expected_failure = "Server status reports that the PID file is malformed."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 

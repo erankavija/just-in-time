@@ -7,6 +7,7 @@ argv = ["query", "all", "--json"]
 setup = ["init", "malformed-index"]
 setup_notes = "Replace the initial .jit/index.json contents with `not-json`."
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -15,6 +16,7 @@ path = "query available"
 argv = ["query", "available", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -23,6 +25,7 @@ path = "query blocked"
 argv = ["query", "blocked", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -31,6 +34,7 @@ path = "query strategic"
 argv = ["query", "strategic", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -39,6 +43,7 @@ path = "query closed"
 argv = ["query", "closed", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -47,6 +52,7 @@ path = "query count"
 argv = ["query", "count", "--by", "state", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -55,6 +61,7 @@ path = "query divergence"
 argv = ["query", "divergence", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -63,6 +70,7 @@ path = "graph deps"
 argv = ["graph", "deps", "deadbeef", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -71,6 +79,7 @@ path = "graph rdeps"
 argv = ["graph", "rdeps", "deadbeef", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -79,6 +88,7 @@ path = "graph roots"
 argv = ["graph", "roots", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -87,6 +97,7 @@ path = "graph tree"
 argv = ["graph", "tree", "deadbeef", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -95,5 +106,6 @@ path = "graph export"
 argv = ["graph", "export", "--json"]
 setup = ["init", "malformed-index"]
 expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"

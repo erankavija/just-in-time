@@ -71,9 +71,18 @@ fn assert_canonical_failure_envelope(failure: &ForcedFailure) {
     let code = ErrorCode::from_str(code_text)
         .unwrap_or_else(|error| panic!("error.code must be registered: {error}; {context}"));
     assert_eq!(
+        code, failure.expected_code,
+        "the observed error classification must match the registry contract: {context}"
+    );
+    assert_eq!(
         failure.status.code(),
         Some(code.exit_code().code()),
         "the process status must be determined by the registered error classification: {context}"
+    );
+    assert_eq!(
+        failure.status.code(),
+        Some(failure.expected_exit),
+        "the observed status must match the registry contract: {context}"
     );
     assert!(
         error["message"]
