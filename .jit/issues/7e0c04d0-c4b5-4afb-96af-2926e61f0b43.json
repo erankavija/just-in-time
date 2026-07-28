@@ -9,6 +9,7 @@
   ],
   "description": "The error codes the machine-readable surface reports become an enumerable, closed vocabulary in which each member carries an explicit exit status, so the status a caller observes matches the failure class the envelope names.\n\n## Background\n\nThe vocabulary is declared as string constants that cannot be iterated, and the map from code to exit status ends in a wildcard. Roughly twenty code strings the surface actually emits are absent from it, so each exits on the generic status whatever its real class.\n\nMeasured against the plain invocation of the identical failure, nine arms disagree: unresolvable identifiers, a duplicate gate key, and a missing preset all report one status without the flag and the generic status with it. One command exits on a literal its own reported code does not map to, and one reports failure inside a success payload with a zero status.\n\nThe generated exit-status reference documents the plain values and binds each row to runtime through the plain invocation alone, so the projection is accurate for one invocation form and silently wrong for the other.\n\nOne emitted failure class cannot be registered inside the output layer at all: an unreadable stored record is raised as a crate-private type the binary cannot name, so it reports the generic code however the classifier is written.\n\nCode strings stay byte-identical throughout. Nothing is renamed and nothing is collapsed, because a machine consumer reads the code string; only the exit status moves, toward the class the plain path already reports.\n\n## Success Criteria\n\n- [hard] REQ-01: The error-code vocabulary is enumerable and maps each member to an exit status with no fallback arm.\n- [hard] REQ-02: Each code string the command surface emits is a registered member, unchanged in spelling.\n- [hard] REQ-03: For a failure reachable in both invocation forms, the two exit statuses are equal.\n- [hard] REQ-04: No command's failure path exits on a literal status its reported code does not determine.\n- [hard] REQ-05: The generated exit-status reference is bound to runtime through both invocation forms.\n- [hard] REQ-06: A failure raised as a crate-private type is reported under a registered code rather than the generic fallback.\n- [hard] REQ-07: Each vocabulary member carries a description of the failure it names, stated once in the vocabulary.\n",
   "documents": [],
+  "done_at": "2026-07-28T15:17:37.769973169Z",
   "first_ready_at": "2026-07-28T13:35:00.471916689Z",
   "gates_required": [
     "cargo-ci",
@@ -17,12 +18,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-28T13:58:43.154277084Z",
+      "updated_at": "2026-07-28T15:14:53.503285741Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-28T14:02:36.647405670Z",
+      "status": "passed",
+      "updated_at": "2026-07-28T15:17:15.698053138Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,7 +36,7 @@
     "story:code-vocabulary"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "An enumerable error-code vocabulary with class-correct exit status",
-  "updated_at": "2026-07-28T14:56:47.951843488Z"
+  "updated_at": "2026-07-28T15:17:37.769973169Z"
 }
