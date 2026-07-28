@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "8963210bd1560e771a41306e231fb58c5a30d8d2",
+  "completed_at": "2026-07-28T20:43:05.070446739Z",
+  "duration_ms": 12860,
+  "exit_code": 1,
+  "gate_key": "holistic-review",
+  "issue_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
+  "message": null,
+  "run_id": "ea92a2d4-a989-49fd-b465-d9b0b2a7c6db",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T20:42:52.209694732Z",
+  "status": "failed",
+  "stderr": "---\nERROR: Agent produced no output.\n--- agent stderr (first 13 of 879 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faa77-4a8d-72d1-8dac-d5c2927769a1\n--------\nuser\n--- 866 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "",
+  "tree_dirty": false
+}

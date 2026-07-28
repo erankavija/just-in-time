@@ -22,7 +22,7 @@
   "gates_status": {
     "holistic-review": {
       "status": "failed",
-      "updated_at": "2026-07-28T20:39:57.835877488Z",
+      "updated_at": "2026-07-28T20:43:05.344115620Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
@@ -41,5 +41,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-28T20:41:37.896658909Z"
+  "updated_at": "2026-07-28T20:43:05.344115620Z"
 }

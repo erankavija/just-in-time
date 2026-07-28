@@ -11107,3 +11107,4 @@
 {"gate_key":"holistic-review","id":"2528a957-9405-4a69-a54a-96a0d0a95b36","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T20:39:31.266337579Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"9bb78b3f-9e0d-4890-837a-59e00fe50c8e","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T20:39:57.835877488Z","type":"gate_failed","updated_by":"auto:executor"}
 {"fields":["description"],"id":"fb05cede-306b-43ee-a1ba-1c966f335c92","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T20:41:37.896658909Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"holistic-review","id":"dfcfae08-65e6-415c-b04b-e1d28e3568cf","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T20:43:05.344115620Z","type":"gate_failed","updated_by":"auto:executor"}
