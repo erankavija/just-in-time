@@ -27,7 +27,7 @@ impl Default for RepositoryIndex {
 
 /// Failure to decode or validate one captured membership index.
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum RepositoryIndexError {
+pub enum RepositoryIndexError {
     /// The index is not valid JSON or does not match the index schema.
     #[error("failed to parse index: {0}")]
     Parse(#[from] serde_json::Error),

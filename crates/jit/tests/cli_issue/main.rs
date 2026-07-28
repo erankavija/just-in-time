@@ -25,4 +25,5 @@ mod list_envelope_tests;
 mod quiet_mode_tests;
 mod recover_command_tests;
 mod snapshot_export_tests;
+mod stored_record_classification_tests;
 mod verb_hint_tests;

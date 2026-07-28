@@ -1780,9 +1780,10 @@ fn main() {
 
 /// Under `--json`, emit a structured error envelope on stdout for the startup
 /// failures that abort before any command handler runs: repository-not-found
-/// (exit 3), repository-format-too-new (exit 10), and — when this process is
-/// itself a child spawned inside a gate checker's process tree (jit:7446af34
-/// REQ-02) — a stale-binary self-refusal (exit 10).
+/// (exit 3), a stored index that cannot be decoded (exit 1),
+/// repository-format-too-new (exit 10), and — when this process is itself a
+/// child spawned inside a gate checker's process tree (jit:7446af34 REQ-02) —
+/// a stale-binary self-refusal (exit 10).
 ///
 /// The human-readable line always goes to stderr (via `main`) and the exit code
 /// is unchanged; this only ADDS the machine-readable object so `--json` callers
@@ -1803,6 +1804,11 @@ fn emit_startup_json_error(error: &anyhow::Error) {
         .is_some()
     {
         JsonError::new(ErrorCode::RepositoryNotFound, error.to_string())
+    } else if matches!(
+        error.downcast_ref::<jit::repository_state::RepositoryIndexError>(),
+        Some(jit::repository_state::RepositoryIndexError::Parse(_))
+    ) {
+        JsonError::new(ErrorCode::ParseError, error.to_string())
     } else if error
         .downcast_ref::<jit::storage::RepositoryFormatTooNewError>()
         .is_some()
