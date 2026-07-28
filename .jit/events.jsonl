@@ -10850,3 +10850,14 @@
 {"from":"in_progress","id":"3f25f41a-15dc-4f29-be20-60c369ff3883","issue_id":"e3a11002-7469-438e-b3d0-1b5f6251a1cf","timestamp":"2026-07-28T09:55:57.539246317Z","to":"done","type":"issue_state_changed"}
 {"id":"84ab410a-9c09-4c9b-8f7b-66a567b56ea2","issue_id":"e3a11002-7469-438e-b3d0-1b5f6251a1cf","timestamp":"2026-07-28T09:55:57.539246317Z","type":"issue_completed"}
 {"from":"backlog","id":"90e518ac-f36a-4cc9-a87e-3e32fdf0520d","issue_id":"a193a7cc-a00b-4551-bb30-922a8e015b38","timestamp":"2026-07-28T09:56:02.207087139Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"0b3d5723-f579-4eb8-85a4-e13e30325379","issue_id":"f6c95115-2eca-4046-9372-9f2ef7cf8bf9","timestamp":"2026-07-28T10:03:57.203408912Z","type":"gate_passed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"a80cdf23-f252-4ac5-a582-ab37ee0269b6","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-07-28T10:05:59.676737011Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"31307428-5902-4abc-a12d-d6d1955794e4","issue_id":"237b15be-df98-4dbb-9fd5-171882314024","priority":"normal","timestamp":"2026-07-28T10:06:09.509935886Z","title":"breakdown: Derived profile assets and projected policy documentation","type":"issue_created"}
+{"id":"57c99545-4b16-4176-89bc-820f0a0bed65","issue_id":"7eecace8-fae3-49f8-8907-2d6180ae40a3","priority":"normal","timestamp":"2026-07-28T10:06:09.509935886Z","title":"planning: Derived profile assets and projected policy documentation","type":"issue_created"}
+{"gate_key":"breakdown-review","id":"26cc1ea7-e81d-41c0-9669-77516284ed35","issue_id":"237b15be-df98-4dbb-9fd5-171882314024","timestamp":"2026-07-28T10:06:09.509935886Z","type":"gate_added"}
+{"gate_key":"coverage-preview","id":"c2b2c3fc-b2ec-4883-9b86-2a2ebcf31ca3","issue_id":"237b15be-df98-4dbb-9fd5-171882314024","timestamp":"2026-07-28T10:06:09.509935886Z","type":"gate_added"}
+{"gate_key":"plan-review","id":"808a90c2-0091-4430-a1b2-873a1ddd6534","issue_id":"7eecace8-fae3-49f8-8907-2d6180ae40a3","timestamp":"2026-07-28T10:06:09.509935886Z","type":"gate_added"}
+{"from":"ready","id":"e3659d19-8eff-4d9a-9dc4-7fbdb09a5ccb","issue_id":"237b15be-df98-4dbb-9fd5-171882314024","timestamp":"2026-07-28T10:06:09.509935886Z","to":"backlog","type":"issue_state_changed"}
+{"from":"ready","id":"ef856bb4-5191-4dbd-805b-bd681a760ef4","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-07-28T10:06:09.509935886Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"58c0ad6c-4e34-4bb7-b43e-c88762455c00","issue_id":"237b15be-df98-4dbb-9fd5-171882314024","timestamp":"2026-07-28T10:06:09.509935886Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"2d4d88d3-ca01-4ba4-8dcc-817b560a7fa8","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-07-28T10:06:09.509935886Z","type":"issue_updated","updated_by":"dependency-add"}

@@ -1,0 +1,38 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-28T10:06:09.509935886Z",
+  "dependencies": [
+    "7eecace8-fae3-49f8-8907-2d6180ae40a3"
+  ],
+  "description": "Breakdown node bracketing Derived profile assets and projected policy documentation (e204e63d). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria.",
+  "documents": [],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-07-28T10:06:09.509935886Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-07-28T10:06:09.509935886Z",
+      "updated_by": null
+    }
+  },
+  "id": "237b15be-df98-4dbb-9fd5-171882314024",
+  "labels": [
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "type:breakdown",
+    "brackets:e204e63d"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "breakdown: Derived profile assets and projected policy documentation",
+  "updated_at": "2026-07-28T10:06:09.509935886Z"
+}
