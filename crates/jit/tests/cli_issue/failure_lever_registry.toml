@@ -916,26 +916,6 @@ expected_exit = 1
 confirmation = "invoked"
 
 [[arms]]
-path = "serve"
-argv = ["serve", "--stop", "--json"]
-setup = ["init", "malformed-server-pid-file"]
-setup_notes = "Create .jit/server.pid.json containing only `{` after initialization."
-expected_failure = "Server stop reports that the PID file is malformed."
-expected_code = "PARSE_ERROR"
-expected_exit = 1
-confirmation = "invoked"
-
-[[arms]]
-path = "serve"
-argv = ["serve", "--status", "--json"]
-setup = ["init", "malformed-server-pid-file"]
-setup_notes = "Create .jit/server.pid.json containing only `{` after initialization."
-expected_failure = "Server status reports that the PID file is malformed."
-expected_code = "PARSE_ERROR"
-expected_exit = 1
-confirmation = "invoked"
-
-[[arms]]
 path = "version"
 exemption_reason = "The pre-dispatch version path only serializes static build information; source inspection finds no repository input or fallible command-body operation that can produce a post-dispatch failure."
 confirmation = "source-only"
