@@ -2564,7 +2564,7 @@ pub enum ConfigCommands {
     ///
     /// Exit codes (see docs/reference/exit-codes.md, the generated reference):
     ///   0 - Valid configuration
-    ///   1 - Errors found (invalid configuration)
+    ///   4 - Errors found (invalid configuration)
     Validate {
         #[arg(long)]
         json: bool,

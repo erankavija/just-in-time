@@ -483,13 +483,12 @@ fn test_command_exit_codes_invariant_check_emits_4() {
     });
 }
 
-/// `jit config validate` exits 1 for an invalid configuration value.
+/// `jit config validate` classifies an invalid configuration as validation failed.
 #[test]
-fn test_command_exit_codes_config_validate_invalid_value_emits_1() {
+fn test_command_exit_codes_config_validate_invalid_value_emits_4() {
     let temp = setup();
 
-    // Invalid environment-variable value -> 1.
-    assert_projected_exit_status_in_both_forms("config validate", 1, true, |json| {
+    assert_projected_exit_status_in_both_forms("config validate", 4, false, |json| {
         let mut command = Command::new(jit_binary());
         command
             .current_dir(&temp)
@@ -1130,7 +1129,7 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("validate --leases", Some(1)),
         ("gate status-all", Some(4)),
         ("invariant check", Some(4)),
-        ("config validate", Some(1)),
+        ("config validate", Some(4)),
         ("doc check-links", Some(1)),
         ("doc check-links", Some(2)),
         ("gate preset apply", Some(3)),

@@ -4,6 +4,7 @@
 //! directory's basename, idempotency of an already-declared name, and
 //! `jit config validate` rejecting an invalid `[project] name`.
 
+use jit::output::ErrorCode;
 use std::fs;
 use std::process::Command;
 use tempfile::TempDir;
@@ -125,12 +126,20 @@ fn test_config_validate_reports_invalid_project_name() {
     let out = Command::new(jit_binary())
         .args(["config", "validate"])
         .current_dir(temp.path())
+        .env("HOME", temp.path().join("isolated-home"))
+        .env_remove("JIT_WORKTREE_MODE")
+        .env_remove("JIT_ENFORCE_LEASES")
         .output()
         .expect("failed to run jit config validate");
 
     assert!(
         !out.status.success(),
         "config validate must fail on an invalid [project] name"
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(ErrorCode::ValidationFailed.exit_code().code()),
+        "human validation failures must use the registered validation-failed status"
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
@@ -140,7 +149,7 @@ fn test_config_validate_reports_invalid_project_name() {
 }
 
 #[test]
-fn test_config_validate_json_reports_invalid_project_name() {
+fn test_config_validate_json_envelopes_every_invalid_configuration_finding() {
     let temp = TempDir::new().unwrap();
     let out = jit_init(temp.path());
     assert!(out.status.success());
@@ -151,20 +160,68 @@ fn test_config_validate_json_reports_invalid_project_name() {
     let out = Command::new(jit_binary())
         .args(["config", "validate", "--json"])
         .current_dir(temp.path())
+        .env("HOME", temp.path().join("isolated-home"))
+        .env("JIT_WORKTREE_MODE", "not-a-worktree-mode")
+        .env("JIT_ENFORCE_LEASES", "not-an-enforcement-mode")
         .output()
         .expect("failed to run jit config validate --json");
 
     assert!(!out.status.success());
+    assert_eq!(
+        out.status.code(),
+        Some(ErrorCode::ValidationFailed.exit_code().code())
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON output");
-    assert_eq!(parsed["valid"], false);
-    let errors = parsed["errors"].as_array().unwrap();
-    assert!(
-        errors
-            .iter()
-            .any(|e| e.as_str().unwrap().contains("repo config")),
-        "errors should report the invalid [project] name as a repo-config error, got: {errors:?}"
+    assert_eq!(parsed["error"]["code"], "VALIDATION_FAILED");
+    assert_eq!(parsed["error"]["details"]["valid"], false);
+    let errors = parsed["error"]["details"]["errors"]
+        .as_array()
+        .expect("validation details carry an errors array");
+    assert_eq!(errors.len(), 3, "every actionable finding is retained");
+    for source in ["repo config", "JIT_WORKTREE_MODE", "JIT_ENFORCE_LEASES"] {
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.as_str().is_some_and(|error| error.contains(source))),
+            "details must retain the {source} finding, got: {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn test_config_validate_valid_configuration_keeps_existing_success_output() {
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path()).status.success());
+
+    let human = Command::new(jit_binary())
+        .args(["config", "validate"])
+        .current_dir(temp.path())
+        .env("HOME", temp.path().join("isolated-home"))
+        .env_remove("JIT_WORKTREE_MODE")
+        .env_remove("JIT_ENFORCE_LEASES")
+        .output()
+        .expect("run valid human config validation");
+    assert_eq!(human.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&human.stdout),
+        "✓ Configuration is valid\n"
     );
+
+    let json = Command::new(jit_binary())
+        .args(["config", "validate", "--json"])
+        .current_dir(temp.path())
+        .env("HOME", temp.path().join("isolated-home"))
+        .env_remove("JIT_WORKTREE_MODE")
+        .env_remove("JIT_ENFORCE_LEASES")
+        .output()
+        .expect("run valid machine-readable config validation");
+    assert_eq!(json.status.code(), Some(0));
+    let output: serde_json::Value =
+        serde_json::from_slice(&json.stdout).expect("valid JSON success report");
+    assert_eq!(output["valid"], true);
+    assert_eq!(output["errors"], serde_json::json!([]));
+    assert_eq!(output["message"], "Configuration is valid");
 }
 
 // ---------------------------------------------------------------------------

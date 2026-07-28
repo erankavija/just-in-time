@@ -127,8 +127,13 @@ confirmation = "invoked"
 
 [[arms]]
 path = "config validate"
-exemption_reason = "A malformed repository config is caught into ValidationResult and emitted as a valid JSON validation report with valid=false and exit 1, rather than propagating a command-body failure."
-confirmation = "source-only"
+argv = ["config", "validate", "--json"]
+setup = ["init", "env:JIT_WORKTREE_MODE=definitely-not-a-mode"]
+setup_notes = "Set JIT_WORKTREE_MODE to an invalid value after initialization so validation reaches a reproducible post-dispatch finding."
+expected_failure = "Validation failed: 1 error(s)"
+expected_code = "VALIDATION_FAILED"
+expected_exit = 4
+confirmation = "invoked"
 
 [[arms]]
 path = "config show-hierarchy"

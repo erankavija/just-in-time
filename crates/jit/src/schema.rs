@@ -1003,10 +1003,10 @@ impl CommandSchema {
             ),
             row(
                 "config validate",
-                1,
+                4,
                 "The repo, user, or environment-variable configuration failed to \
                  load or carried an invalid value.",
-                true,
+                false,
             ),
             row(
                 "doc check-links",
