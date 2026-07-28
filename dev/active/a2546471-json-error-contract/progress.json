@@ -1,7 +1,7 @@
 {
   "epic_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
   "epic_short_id": "a2546471",
-  "current_wave": 6,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -64,7 +64,7 @@
       "issues": [
         {"id":"37e3edf3-57fa-4fc4-9a9b-81ec0e9a804b","short_id":"37e3edf3","title":"The canonical conformance suite for the machine-readable failure envelope","classification":"implementation","status":"done"},
         {"id":"60aeaa49-0ee3-4c8d-ac61-f5316bae3932","short_id":"60aeaa49","title":"Pin payload-stream purity on the machine-readable failure path","classification":"implementation","status":"done"},
-        {"id":"a1322bee-21c1-4f14-af96-ffa8c7204926","short_id":"a1322bee","title":"A coverage guard that fails when a command arm has neither a probe nor an exemption","classification":"implementation","status":"in_progress"}
+        {"id":"a1322bee-21c1-4f14-af96-ffa8c7204926","short_id":"a1322bee","title":"A coverage guard that fails when a command arm has neither a probe nor an exemption","classification":"implementation","status":"done"}
       ]
     },
     {

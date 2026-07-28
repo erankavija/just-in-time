@@ -9,6 +9,7 @@
   ],
   "description": "Regression coverage drives each command arm accepting the machine-readable flag into a real failure and asserts the envelope contract, and a guard derived from the command definitions fails when an arm has no such coverage, so a newly added arm cannot ship without the failure contract.\n\n## Background\n\nThe success side of the machine-readable contract has canonical suites; the failure side has none. The nearest file covers five arms, and two of its five tests are non-binding — one discards its parsed payload, the other accepts a match on either stream — so both pass against the defect this work repairs.\n\nWhether an arm renders the envelope cannot be decided from the source text. Dispatch bodies mix propagation, inline classification, and helpers that exit internally, and three namespaces already use a wrapper that classifies centrally while its inner function propagates freely, so a scan of a dispatch arm sees a classified call it cannot distinguish from an unclassified one. The property is observable only by running the command.\n\nProvoking a failure is not uniform either: a substantial minority of arms take no argument that can be made invalid and are reached instead through unreadable stored records, which still fails inside the arm body. Whether each arm has such a lever is measured first, namespace by namespace, and merged into one machine-readable registry reconciled against the reflected arm universe, so the coverage requirement is written against a measured surface; one shared fixture then drives what the registry states, and the conformance checks consume it.\n\nCoverage completeness comes from the command definitions themselves, through the introspection the command schema already performs, so no hand-maintained arm list exists to drift.\n\n## Success Criteria\n\n- [hard] REQ-01: One canonical suite asserts the failure envelope's structure with its classification for each probed arm, semantically rather than against copied message text.\n- [hard] REQ-02: The arm set the checks cover is derived from the command definitions, with no visibility predicate applied.\n- [hard] REQ-03: An arm declaring the machine-readable flag with neither a failure probe nor a declared exemption fails the check.\n- [hard] REQ-04: A failing invocation's payload stream carries exactly one JSON document and no plain-text byte.\n- [hard] REQ-05: The two non-binding tests assert the envelope contract instead of passing vacuously.\n- [hard] REQ-06: The checks report, per arm, whether its failure rendered the envelope and under which code.\n- [hard] REQ-07: An arm with no constructible in-body failure is covered by a declared exemption stating its reason rather than by an absent probe.\n- [hard] REQ-08: The probes read one registry whose arm set is reconciled against the command definitions.\n",
   "documents": [],
+  "first_ready_at": "2026-07-28T17:05:48.665775036Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +24,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Per-arm failure conformance and the guard that keeps it",
-  "updated_at": "2026-07-27T21:43:44.885062384Z"
+  "updated_at": "2026-07-28T17:05:48.665775036Z"
 }

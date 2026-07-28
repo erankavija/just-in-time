@@ -8,6 +8,7 @@
   ],
   "description": "The command reference states the machine-readable failure contract once — the envelope on the payload stream, its error code, and the exit status that code determines — so an adopter finds the whole contract in the place that already defines the success side.\n\n## Background\n\nThe command reference's machine-readable contracts section is the canonical home for the envelope's shape, and the generated exit-status page is the canonical home for exit statuses. Between them the failure contract is stated only in fragments: the envelope's fields appear with a worked example, but nothing states that a failing invocation under the flag always produces one, that the reported code determines the exit status, or where the code vocabulary can be looked up.\n\nEach adopter-facing fact gets one home. The section states the contract and cites the generated pages for the code vocabulary and the exit-status taxonomy rather than copying either table. Pages that mention a code in their own context keep doing so and gain no second copy of the contract.\n\n## Success Criteria\n\n- [hard] REQ-01: The machine-readable contracts section states that a failing invocation under the flag emits the error envelope on the payload stream.\n- [hard] REQ-02: It states that the reported error code determines the process exit status.\n- [hard] REQ-03: It cites the generated code reference and the exit-status reference rather than reproducing their tables.\n- [hard] REQ-04: Adopter pages that mention an error code cite the contract's home rather than restating it.\n- [hard] REQ-05: The statement describes current behaviour without narrating what the surface did before.\n",
   "documents": [],
+  "first_ready_at": "2026-07-28T17:05:53.371082588Z",
   "gates_required": [
     "docs-mechanical",
     "doc-review"
@@ -24,7 +25,7 @@
     "per:@/charter/D-13"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "One canonical statement of the machine-readable failure contract",
-  "updated_at": "2026-07-27T21:43:44.885062384Z"
+  "updated_at": "2026-07-28T17:05:53.371082588Z"
 }
