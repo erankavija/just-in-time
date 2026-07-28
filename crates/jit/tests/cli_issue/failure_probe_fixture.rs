@@ -109,9 +109,17 @@ struct FailureFixture {
 
 impl FailureFixture {
     fn new() -> Self {
+        let repository = TempDir::new().expect("create failure-probe repository");
+        let git_ceiling = repository.path().display().to_string();
         Self {
-            repository: TempDir::new().expect("create failure-probe repository"),
-            environment: BTreeMap::new(),
+            repository,
+            // Git may discover a repository inherited from the host's `/tmp`.
+            // Stop discovery at the temporary repository so `git:absent`
+            // observes only the fixture it was asked to inspect.
+            environment: BTreeMap::from([(
+                "GIT_CEILING_DIRECTORIES".to_owned(),
+                Some(git_ceiling),
+            )]),
         }
     }
 
@@ -593,5 +601,18 @@ fn test_failure_probe_fixture_names_arms_from_registry() {
             assert!(!reason.is_empty());
         }
         RecordedFailure::Invoked(_) => panic!("version is a declared exemption"),
+    }
+}
+
+#[test]
+fn test_failure_probe_fixture_keeps_git_absent_from_inheriting_tmp_ancestor() {
+    match drive_named_failure("hooks install") {
+        RecordedFailure::Invoked(result) => {
+            assert_eq!(result.status.code(), Some(1));
+            let envelope: serde_json::Value = serde_json::from_slice(&result.stdout)
+                .expect("git-absent hook probe emits a JSON error envelope");
+            assert_eq!(envelope["error"]["code"], "HOOKS_INSTALL_ERROR");
+        }
+        RecordedFailure::Exempt { .. } => panic!("hooks install has a recorded invocation"),
     }
 }
