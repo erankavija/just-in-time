@@ -144,6 +144,14 @@
       "recorded_at": "2026-07-28T22:06:00+03:00",
       "resolution": "The invoker reaffirmed that the reviewed plan is authoritative. Parser behavior remains unchanged; the overbroad canonical adopter sentence is narrowed to the planned post-dispatch contract.",
       "resolved_at": "2026-07-28T22:07:00+03:00"
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
+      "status": "open",
+      "summary": "After two epic rework cycles, holistic review found that config validate --json exits nonzero with a valid=false success-shaped report and is exempted from envelope coverage despite occurring after dispatch, conflicting with hard REQ-02, REQ-04, REQ-05, and REQ-07.",
+      "recorded_at": "2026-07-28T22:28:00+03:00",
+      "handoff": "handoff-4.md"
     }
   ],
   "rework_counts": {

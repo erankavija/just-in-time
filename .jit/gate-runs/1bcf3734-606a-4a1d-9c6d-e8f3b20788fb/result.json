@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "5510e0fa557d7dea0b5ff68641954eb7e67e9d03",
+  "completed_at": "2026-07-28T19:27:10.767960586Z",
+  "duration_ms": 128043,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 6355,
+        "origin": "issue-impact",
+        "references": [
+          "REQ-02",
+          "REQ-04",
+          "REQ-05",
+          "REQ-07"
+        ],
+        "severity": "high",
+        "summary": "config validate --json emits a valid=false report and exits 1 for invalid configuration rather than a classified error envelope; its registry exemption and test preserve that uncovered post-dispatch failure path."
+      }
+    ],
+    "summary": "config validate --json retains a non-envelope post-dispatch failure path and is exempted from the required conformance coverage.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
+  "message": null,
+  "run_id": "1bcf3734-606a-4a1d-9c6d-e8f3b20788fb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T19:25:02.724609183Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6038 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faa30-0a67-7850-9e92-a0bdaf74f9b0\n--------\nuser\n--- 6025 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. [high, blocking] `config validate --json` violates the post-dispatch failure contract. On an invalid config, it emits a `{valid:false, errors:[...]}` success-shaped report and exits 1, rather than an `error` envelope with a registered code and mapped exit status. The dedicated test asserts that non-envelope behavior, while the failure-probe registry exempts the arm, so the required envelope/classification coverage does not exercise it. This contradicts the canonical CLI contract’s all-post-dispatch-failures statement.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"config validate --json retains a non-envelope post-dispatch failure path and is exempted from the required conformance coverage.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"config validate --json emits a valid=false report and exits 1 for invalid configuration rather than a classified error envelope; its registry exemption and test preserve that uncovered post-dispatch failure path.\",\"file\":\"crates/jit/src/main.rs\",\"line\":6355,\"references\":[\"REQ-02\",\"REQ-04\",\"REQ-05\",\"REQ-07\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
