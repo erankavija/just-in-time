@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "cf62d893294e7665e467f5c0f0f41136eb2f4678",
+  "completed_at": "2026-07-28T10:07:05.354273817Z",
+  "duration_ms": 187293,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are met by the attributable implementation and its focused CLI coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f6c95115-2eca-4046-9372-9f2ef7cf8bf9",
+  "message": null,
+  "run_id": "b21985fc-6592-4fdf-9adc-7e15c32553fd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T10:03:58.060932692Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4115279b (claim metadata), 75613ee (implementation), 2cbc54e (merge integration)\nPolicy sources: AGENTS.md; docs/reference/storage-format.md\nResolved items: @/issue/f6c95115/requirement/REQ-04 (issue description); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml); @/invariant/bounded-rust-build-footprint, @/invariant/semantic-test-assertions, and @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-28T09:57:52Z); code-review pending (current judgment gate)\nTruncation recovery: narrowed the merge to its relevant `cli_issue/main.rs` resolution and re-read current classifier, propagation, registry, and focused test ranges\n1. No findings identified. The public typed error, type-based classifier, registered `PARSE_ERROR` envelope, and malformed/valid-index CLI coverage satisfy all hard criteria.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are met by the attributable implementation and its focused CLI coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

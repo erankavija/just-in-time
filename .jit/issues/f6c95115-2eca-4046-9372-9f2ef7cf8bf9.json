@@ -8,12 +8,24 @@
   ],
   "description": "A stored-record decode failure is raised as a crate-private type the binary target cannot name, so no downcast reaches it and the failure is reported under the generic code however the classifier is written. Giving that failure a publicly nameable typed form is what lets it carry a registered code.\n\n## Background\n\nThe failure occurs when a record on disk cannot be decoded into its in-memory form. The type that raises it is private to the storage layer, so the top level cannot name it in a downcast even though the raising type survives the opaque wrapper it travels in.\n\nTwo sites can deliver the change: widening the raising type's visibility, or converting it at the boundary the way one sibling variant is already converted. Widening visibility alone suffices, because the raising type survives the wrapper. Both routes are disclosed, and the criterion states the outcome rather than picking one.\n\nThis matters beyond tidiness. Arms that accept no rejectable argument are reached instead through unreadable stored records, so a failure class left unclassifiable keeps those arms unclassifiable with it.\n\n## Success Criteria\n\n- [hard] REQ-01: A stored-record decode failure is reported under a registered error code rather than the generic fallback.\n- [hard] REQ-02: The failure's typed form is nameable from the binary target, so a classifier distinguishes it by type rather than by message text.\n- [hard] REQ-03: A repository holding an undecodable stored record produces that code under the machine-readable flag.\n- [hard] REQ-04: A record that decodes successfully keeps its current behaviour.\n",
   "documents": [],
+  "done_at": "2026-07-28T10:07:29.075223572Z",
   "first_ready_at": "2026-07-28T08:05:39.702714982Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T10:03:57.203408912Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T10:07:05.620224535Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f6c95115-2eca-4046-9372-9f2ef7cf8bf9",
   "labels": [
     "type:task",
@@ -24,7 +36,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Expose the stored-record decode failure as a classifiable typed error",
-  "updated_at": "2026-07-28T08:22:53.898303327Z"
+  "updated_at": "2026-07-28T10:07:29.075223572Z"
 }
