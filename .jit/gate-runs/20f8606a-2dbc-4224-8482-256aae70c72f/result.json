@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "381fe1e0655dd2f30d0cd07b51a9220bd043ef50",
+  "completed_at": "2026-07-28T10:50:15.487634438Z",
+  "duration_ms": 310883,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "dbe2f2a8-87c0-47a1-94c6-2bca4b6d3b07",
+  "message": null,
+  "run_id": "20f8606a-2dbc-4224-8482-256aae70c72f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T10:45:04.604264836Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest item_cli_tests::test_validate_no_finding_for_resolvable_item_link ... FAILED\ntest item_cli_tests::test_validate_reports_dangling_item_link ... FAILED\ntest validate_cli_rule_tests::test_validate_retains_rule_findings_with_integrity_failure_and_exit_four ... FAILED\ntest derived_state_repair_tests::test_cli_validate_fix_repairs_each_owned_class_and_preserves_authored_bytes ... FAILED\ntest result: FAILED. 107 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 25.64s\n---- item_cli_tests::test_validate_no_finding_for_resolvable_item_link stdout ----\n\nthread 'item_cli_tests::test_validate_no_finding_for_resolvable_item_link' (3956292) panicked at crates/jit/tests/cli_item_validate/item_cli_tests.rs:810:62:\ncalled `Result::unwrap()` on an `Err` value: Error(\"trailing characters\", line: 38, column: 1)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n---- item_cli_tests::test_validate_reports_dangling_item_link stdout ----\n\n---- validate_cli_rule_tests::test_validate_retains_rule_findings_with_integrity_failure_and_exit_four stdout ----\n\n---- derived_state_repair_tests::test_cli_validate_fix_repairs_each_owned_class_and_preserves_authored_bytes stdout ----\n\n--- incremental-state output ---\nnon-empty incremental directories under /home/vkaskivuo/Projects/just-in-time/target:\n/home/vkaskivuo/Projects/just-in-time/target/debug/incremental\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1361 bytes=26642213)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1316948496/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✗ incremental-state: FAILED (exit 1)\n\n",
+  "tree_dirty": false
+}
