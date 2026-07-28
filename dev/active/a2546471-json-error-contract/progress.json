@@ -1,7 +1,7 @@
 {
   "epic_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
   "epic_short_id": "a2546471",
-  "current_wave": 12,
+  "current_wave": 13,
   "waves": [
     {
       "wave_number": 1,
@@ -104,7 +104,7 @@
     {
       "wave_number": 12,
       "issues": [
-        {"id":"ab126109-887b-475b-98b0-229a08930866","short_id":"ab126109","title":"Enforce one failure-lever registration per command path","classification":"implementation","status":"in_progress"}
+        {"id":"ab126109-887b-475b-98b0-229a08930866","short_id":"ab126109","title":"Enforce one failure-lever registration per command path","classification":"implementation","status":"done"}
       ]
     }
   ],
