@@ -71,7 +71,7 @@
       "wave_number": 7,
       "issues": [
         {"id":"7491da4a-f008-4188-9b1b-251fbe56ec77","short_id":"7491da4a","title":"Per-arm failure conformance and the guard that keeps it","classification":"implementation","status":"pending"},
-        {"id":"ec029993-2e68-41dd-b2bd-b3018a35d0d5","short_id":"ec029993","title":"One canonical statement of the machine-readable failure contract","classification":"documentation","status":"pending"}
+        {"id":"ec029993-2e68-41dd-b2bd-b3018a35d0d5","short_id":"ec029993","title":"One canonical statement of the machine-readable failure contract","classification":"documentation","status":"in_progress"}
       ]
     },
     {
