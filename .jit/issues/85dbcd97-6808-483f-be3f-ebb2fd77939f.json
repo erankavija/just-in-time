@@ -26,6 +26,7 @@
       "path": "docs/reference/error-codes.md"
     }
   ],
+  "done_at": "2026-07-28T09:45:44.682224123Z",
   "first_ready_at": "2026-07-28T08:05:30.820897528Z",
   "gates_required": [
     "cargo-ci",
@@ -33,7 +34,28 @@
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T09:40:23.745467322Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T09:43:36.563398278Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T09:45:07.066599477Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-28T09:43:45.184851693Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "85dbcd97-6808-483f-be3f-ebb2fd77939f",
   "labels": [
     "type:task",
@@ -45,7 +67,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "A generated adopter reference for the error-code vocabulary",
-  "updated_at": "2026-07-28T08:32:34.015070862Z"
+  "updated_at": "2026-07-28T09:45:44.682224123Z"
 }

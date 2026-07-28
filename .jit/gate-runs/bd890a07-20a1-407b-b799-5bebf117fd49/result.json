@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "e48d30a55016f1cbc4b5288658cea3cc7a1bb1ea",
+  "completed_at": "2026-07-28T09:43:36.269440485Z",
+  "duration_ms": 191527,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-impact success criteria are met; no unresolved findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "85dbcd97-6808-483f-be3f-ebb2fd77939f",
+  "message": null,
+  "run_id": "bd890a07-20a1-407b-b799-5bebf117fd49",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T09:40:24.742238916Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4115279b, 8543ca96, 84422861, 83f1c9cf (`jit:85dbcd97`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/85dbcd97/requirement/REQ-01 through REQ-08 (issue description, markdown-first); @/issue/6ebd3d03/requirement/REQ-04 (dependency issue description, markdown-first); @/invariant/single-source-prose (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0); code-review pending; docs-mechanical pending; doc-review pending\nTruncation recovery: bounded rereads of AGENTS.md, merge-parent diffs, output.rs vocabulary/tests, and generated-document metadata\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-impact success criteria are met; no unresolved findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
