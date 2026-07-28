@@ -24,7 +24,7 @@ use jit::commands::serve::foreground_exit_code;
 use jit::schema::CommandSchema;
 use std::fs;
 use std::io::Read;
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
 use tempfile::TempDir;
 
 fn jit_binary() -> &'static str {
@@ -55,10 +55,9 @@ fn create_issue(temp: &TempDir, title: &str, extra: &[&str]) -> String {
     json["id"].as_str().unwrap().to_string()
 }
 
-/// Assert the projection carries a row for `command` at `code` (`None` =
-/// pass-through) with the expected `exception` flag, and return its condition so
-/// callers can assert on the documented text.
-fn documented_row(command: &str, code: Option<i32>, exception: bool) -> String {
+/// Return the projection's exit status for `command` and assert its documented
+/// exception classification. `None` denotes a pass-through row.
+fn documented_exit_code(command: &str, code: Option<i32>, exception: bool) -> Option<i32> {
     let schema = CommandSchema::generate();
     let row = schema
         .command_exit_codes
@@ -71,7 +70,45 @@ fn documented_row(command: &str, code: Option<i32>, exception: bool) -> String {
         row.exception, exception,
         "row for `{command}` code {code:?} has wrong exception flag"
     );
-    row.condition.clone()
+    row.code
+}
+
+/// Bind a subprocess-reachable projection row to both public invocation forms.
+///
+/// The expected status comes from the generated projection, not a second
+/// hand-authored numeric assertion. Running the same documented condition with
+/// and without `--json` also makes a disagreement between the two forms fail.
+fn assert_projected_exit_status_in_both_forms<F>(
+    command: &str,
+    code: i32,
+    exception: bool,
+    invoke: F,
+) where
+    F: Fn(bool) -> Output,
+{
+    let expected = documented_exit_code(command, Some(code), exception)
+        .expect("subprocess bindings must name a fixed-code projection row");
+    let plain = invoke(false);
+    let json = invoke(true);
+    let plain_status = plain.status.code();
+    let json_status = json.status.code();
+
+    assert_eq!(
+        plain_status,
+        Some(expected),
+        "plain `{command}` status must match its projected row; stderr: {}",
+        String::from_utf8_lossy(&plain.stderr)
+    );
+    assert_eq!(
+        json_status,
+        Some(expected),
+        "machine-readable `{command}` status must match its projected row; stderr: {}",
+        String::from_utf8_lossy(&json.stderr)
+    );
+    assert_eq!(
+        plain_status, json_status,
+        "plain and machine-readable `{command}` statuses must agree"
+    );
 }
 
 /// `jit validate` exits 4 on repository-integrity findings — matching `validate`/4.
@@ -90,14 +127,14 @@ fn test_command_exit_codes_validate_integrity_emits_4() {
     issue["dependencies"] = serde_json::json!(["nonexistent"]);
     fs::write(&issue_path, serde_json::to_string_pretty(&issue).unwrap()).unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .arg("validate")
-        .output()
-        .unwrap();
-
-    assert_eq!(output.status.code(), Some(4));
-    documented_row("validate", Some(4), true);
+    assert_projected_exit_status_in_both_forms("validate", 4, true, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).arg("validate");
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// Whole-repo `jit validate` exits 1 on an error-severity rule finding —
@@ -122,19 +159,14 @@ fn test_command_exit_codes_validate_rule_findings_emits_1() {
         &["--label", "type:epic", "--label", "epic:auth"],
     );
 
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .arg("validate")
-        .output()
-        .unwrap();
-
-    assert_eq!(
-        output.status.code(),
-        Some(1),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    documented_row("validate", Some(1), true);
+    assert_projected_exit_status_in_both_forms("validate", 1, true, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).arg("validate");
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// `jit gate status-all` exits 4 while any required gate is unpassed —
@@ -159,14 +191,14 @@ fn test_command_exit_codes_gate_status_all_emits_4() {
 
     let id = create_issue(&temp, "Gated", &["--gate", "tests"]);
 
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["gate", "status-all", &id])
-        .output()
-        .unwrap();
-
-    assert_eq!(output.status.code(), Some(4));
-    documented_row("gate status-all", Some(4), true);
+    assert_projected_exit_status_in_both_forms("gate status-all", 4, true, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args(["gate", "status-all", &id]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// `jit invariant check` exits 4 on enforcement drift (an `enforced-by` naming a
@@ -187,56 +219,33 @@ fn test_command_exit_codes_invariant_check_emits_4() {
     )
     .unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["invariant", "check"])
-        .output()
-        .unwrap();
-
-    assert_eq!(output.status.code(), Some(4));
-    documented_row("invariant check", Some(4), true);
+    assert_projected_exit_status_in_both_forms("invariant check", 4, true, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args(["invariant", "check"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
-/// `jit config validate` emits only {0, 1}: 0 on a valid config, 1 when a source
-/// carries an invalid value. There is no warning outcome. This test drives both
-/// live outcomes and asserts neither is `2`.
+/// `jit config validate` exits 1 for an invalid configuration value.
 #[test]
-fn test_command_exit_codes_config_validate_emits_only_0_and_1() {
+fn test_command_exit_codes_config_validate_invalid_value_emits_1() {
     let temp = setup();
 
-    // Valid configuration -> 0.
-    let valid = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["config", "validate"])
-        .output()
-        .unwrap();
-    assert_eq!(
-        valid.status.code(),
-        Some(0),
-        "stderr: {}",
-        String::from_utf8_lossy(&valid.stderr)
-    );
-
     // Invalid environment-variable value -> 1.
-    let invalid = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["config", "validate"])
-        .env("JIT_WORKTREE_MODE", "definitely-not-a-mode")
-        .output()
-        .unwrap();
-    assert_eq!(
-        invalid.status.code(),
-        Some(1),
-        "stderr: {}",
-        String::from_utf8_lossy(&invalid.stderr)
-    );
-
-    // Neither live outcome is 2.
-    assert_ne!(valid.status.code(), Some(2));
-    assert_ne!(invalid.status.code(), Some(2));
-
-    // 1 is the only documented config-validate failure code.
-    documented_row("config validate", Some(1), true);
+    assert_projected_exit_status_in_both_forms("config validate", 1, true, |json| {
+        let mut command = Command::new(jit_binary());
+        command
+            .current_dir(&temp)
+            .args(["config", "validate"])
+            .env("JIT_WORKTREE_MODE", "definitely-not-a-mode");
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// `jit doc check-links` exits 1 on a broken link and 2 on a risky-link warning
@@ -258,13 +267,16 @@ fn test_command_exit_codes_doc_check_links_emits_1_and_2() {
         .status()
         .unwrap()
         .success());
-    let broken = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["doc", "check-links", "--scope", "all"])
-        .output()
-        .unwrap();
-    assert_eq!(broken.status.code(), Some(1));
-    documented_row("doc check-links", Some(1), true);
+    assert_projected_exit_status_in_both_forms("doc check-links", 1, true, |json| {
+        let mut command = Command::new(jit_binary());
+        command
+            .current_dir(&temp)
+            .args(["doc", "check-links", "--scope", "all"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 
     // Risky (deep relative) but valid link -> exit 2.
     let temp = setup();
@@ -283,13 +295,16 @@ fn test_command_exit_codes_doc_check_links_emits_1_and_2() {
         .status()
         .unwrap()
         .success());
-    let risky = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["doc", "check-links", "--scope", "all"])
-        .output()
-        .unwrap();
-    assert_eq!(risky.status.code(), Some(2));
-    documented_row("doc check-links", Some(2), true);
+    assert_projected_exit_status_in_both_forms("doc check-links", 2, true, |json| {
+        let mut command = Command::new(jit_binary());
+        command
+            .current_dir(&temp)
+            .args(["doc", "check-links", "--scope", "all"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// `jit gate preset apply` exits 1 when an issue fails to apply (a partial
@@ -298,19 +313,20 @@ fn test_command_exit_codes_doc_check_links_emits_1_and_2() {
 #[test]
 fn test_command_exit_codes_gate_preset_apply_emits_1() {
     let temp = setup();
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["gate", "preset", "apply", "plan-review", "0000000000000000"])
-        .output()
-        .unwrap();
-
-    assert_eq!(
-        output.status.code(),
-        Some(1),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    documented_row("gate preset apply", Some(1), true);
+    assert_projected_exit_status_in_both_forms("gate preset apply", 1, true, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args([
+            "gate",
+            "preset",
+            "apply",
+            "plan-review",
+            "0000000000000000",
+        ]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// `jit serve --status` (like the daemon start and `--stop`) exits 1 on an
@@ -323,19 +339,19 @@ fn test_command_exit_codes_serve_daemon_error_emits_1() {
     // the `--status` arm hits its `exit(1)` site.
     fs::write(temp.path().join(".jit/server.pid.json"), "not json").unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["serve", "--status"])
-        .output()
-        .unwrap();
-
-    assert_eq!(
-        output.status.code(),
-        Some(1),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
+    assert_projected_exit_status_in_both_forms(
+        "serve, serve --stop, serve --status",
+        1,
+        false,
+        |json| {
+            let mut command = Command::new(jit_binary());
+            command.current_dir(&temp).args(["serve", "--status"]);
+            if json {
+                command.arg("--json");
+            }
+            command.output().unwrap()
+        },
     );
-    documented_row("serve, serve --stop, serve --status", Some(1), false);
 }
 
 /// `jit serve --fg` passes the inline dev-server child's own exit code through,
@@ -348,7 +364,7 @@ fn test_command_exit_codes_serve_daemon_error_emits_1() {
 /// signal-terminated child (no code) reports `1`.
 #[test]
 fn test_command_exit_codes_serve_foreground_is_passthrough() {
-    documented_row("serve --fg", None, true);
+    assert_eq!(documented_exit_code("serve --fg", None, true), None);
 
     for child_code in [0, 1, 2, 3, 4, 10, 101, 127] {
         assert_eq!(
@@ -370,18 +386,16 @@ fn test_command_exit_codes_serve_foreground_is_passthrough() {
 fn test_command_exit_codes_validate_branch_drift_emits_1() {
     let temp = setup();
     // No git upstream here, so the branch-drift check cannot succeed.
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["validate", "--branch-drift"])
-        .output()
-        .unwrap();
-    assert_eq!(
-        output.status.code(),
-        Some(1),
-        "validate --branch-drift must exit 1 when the check fails; stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    documented_row("validate --branch-drift", Some(1), true);
+    assert_projected_exit_status_in_both_forms("validate --branch-drift", 1, true, |json| {
+        let mut command = Command::new(jit_binary());
+        command
+            .current_dir(&temp)
+            .args(["validate", "--branch-drift"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// `jit validate --leases` exits 1 when lease validation finds invalid leases or
@@ -394,60 +408,58 @@ fn test_command_exit_codes_validate_leases_emits_1() {
     fs::create_dir_all(&shared).unwrap();
     fs::write(shared.join("claims.index.json"), "not json").unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["validate", "--leases"])
-        .output()
-        .unwrap();
-    assert_eq!(
-        output.status.code(),
-        Some(1),
-        "validate --leases must exit 1 when lease validation fails; stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    documented_row("validate --leases", Some(1), true);
+    assert_projected_exit_status_in_both_forms("validate --leases", 1, true, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args(["validate", "--leases"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// `jit issue list` on a healthy repository exits 0 — the universal `*`/0 row.
 #[test]
 fn test_command_exit_codes_success_emits_0() {
     let temp = setup();
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["issue", "list"])
-        .output()
-        .unwrap();
-
-    assert_eq!(output.status.code(), Some(0));
-    documented_row("*", Some(0), false);
+    assert_projected_exit_status_in_both_forms("*", 0, false, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args(["issue", "list"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// A too-short id prefix is a usage error — the universal `*`/2 row.
 #[test]
 fn test_command_exit_codes_invalid_argument_emits_2() {
     let temp = setup();
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["issue", "show", "ab"])
-        .output()
-        .unwrap();
-
-    assert_eq!(output.status.code(), Some(2));
-    documented_row("*", Some(2), false);
+    assert_projected_exit_status_in_both_forms("*", 2, false, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args(["issue", "show", "ab"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// An unresolvable issue id is a not-found error — the universal `*`/3 row.
 #[test]
 fn test_command_exit_codes_not_found_emits_3() {
     let temp = setup();
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["issue", "show", "0123456789abcdef"])
-        .output()
-        .unwrap();
-
-    assert_eq!(output.status.code(), Some(3));
-    documented_row("*", Some(3), false);
+    assert_projected_exit_status_in_both_forms("*", 3, false, |json| {
+        let mut command = Command::new(jit_binary());
+        command
+            .current_dir(&temp)
+            .args(["issue", "show", "0123456789abcdef"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// `jit dep add` exits 4 when the edge would close a cycle — matching `dep add`/4.
@@ -466,19 +478,16 @@ fn test_command_exit_codes_dep_add_cycle_emits_4() {
         .success());
 
     // first -> second closes the cycle.
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["dep", "add", &first, &second])
-        .output()
-        .unwrap();
-
-    assert_eq!(
-        output.status.code(),
-        Some(4),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    documented_row("dep add", Some(4), false);
+    assert_projected_exit_status_in_both_forms("dep add", 4, false, |json| {
+        let mut command = Command::new(jit_binary());
+        command
+            .current_dir(&temp)
+            .args(["dep", "add", &first, &second]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// Build a dependency-blocked pair: `(dependency, dependent)`, where `dependent`
@@ -504,29 +513,37 @@ fn test_command_exit_codes_blocked_transition_emits_4() {
     // must reach a terminal state before its dependent becomes ready).
     let temp = setup();
     let (_dependency, dependent) = blocked_pair(&temp);
-    let update = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["issue", "update", &dependent, "--state", "ready"])
-        .output()
-        .unwrap();
-    assert_eq!(
-        update.status.code(),
-        Some(4),
-        "stderr: {}",
-        String::from_utf8_lossy(&update.stderr)
+    assert_projected_exit_status_in_both_forms(
+        "issue update, issue claim, issue claim-next",
+        4,
+        false,
+        |json| {
+            let mut command = Command::new(jit_binary());
+            command
+                .current_dir(&temp)
+                .args(["issue", "update", &dependent, "--state", "ready"]);
+            if json {
+                command.arg("--json");
+            }
+            command.output().unwrap()
+        },
     );
 
     // `issue claim` on the same blocked issue.
-    let claim = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["issue", "claim", &dependent, "agent:test"])
-        .output()
-        .unwrap();
-    assert_eq!(
-        claim.status.code(),
-        Some(4),
-        "stderr: {}",
-        String::from_utf8_lossy(&claim.stderr)
+    assert_projected_exit_status_in_both_forms(
+        "issue update, issue claim, issue claim-next",
+        4,
+        false,
+        |json| {
+            let mut command = Command::new(jit_binary());
+            command
+                .current_dir(&temp)
+                .args(["issue", "claim", &dependent, "agent:test"]);
+            if json {
+                command.arg("--json");
+            }
+            command.output().unwrap()
+        },
     );
 
     // `issue claim-next` picking up an issue whose precheck gate has not passed.
@@ -550,22 +567,20 @@ fn test_command_exit_codes_blocked_transition_emits_4() {
         .unwrap()
         .success());
     create_issue(&temp, "Precheck work", &["--gate", "precheck-gate"]);
-    let claim_next = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["issue", "claim-next", "agent:test"])
-        .output()
-        .unwrap();
-    assert_eq!(
-        claim_next.status.code(),
-        Some(4),
-        "stderr: {}",
-        String::from_utf8_lossy(&claim_next.stderr)
-    );
-
-    documented_row(
+    assert_projected_exit_status_in_both_forms(
         "issue update, issue claim, issue claim-next",
-        Some(4),
+        4,
         false,
+        |json| {
+            let mut command = Command::new(jit_binary());
+            command
+                .current_dir(&temp)
+                .args(["issue", "claim-next", "agent:test"]);
+            if json {
+                command.arg("--json");
+            }
+            command.output().unwrap()
+        },
     );
 }
 
@@ -574,31 +589,24 @@ fn test_command_exit_codes_blocked_transition_emits_4() {
 #[test]
 fn test_command_exit_codes_gate_define_duplicate_emits_6() {
     let temp = setup();
-    let define = || {
-        Command::new(jit_binary())
-            .current_dir(&temp)
-            .args([
-                "gate",
-                "define",
-                "--title",
-                "Tests",
-                "--description",
-                "Tests",
-                "tests",
-            ])
-            .output()
-            .unwrap()
+    let define = |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args([
+            "gate",
+            "define",
+            "--title",
+            "Tests",
+            "--description",
+            "Tests",
+            "tests",
+        ]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
     };
-    assert!(define().status.success());
-
-    let duplicate = define();
-    assert_eq!(
-        duplicate.status.code(),
-        Some(6),
-        "stderr: {}",
-        String::from_utf8_lossy(&duplicate.stderr)
-    );
-    documented_row("gate define", Some(6), false);
+    assert!(define(false).status.success());
+    assert_projected_exit_status_in_both_forms("gate define", 6, false, define);
 }
 
 /// `jit issue delete` exits 2 when refused for missing operator confirmation
@@ -608,20 +616,17 @@ fn test_command_exit_codes_issue_delete_unconfirmed_emits_2() {
     let temp = setup();
     let id = create_issue(&temp, "Doomed", &[]);
 
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .env_remove("JIT_ALLOW_DELETION")
-        .args(["issue", "delete", &id])
-        .output()
-        .unwrap();
-
-    assert_eq!(
-        output.status.code(),
-        Some(2),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    documented_row("issue delete", Some(2), false);
+    assert_projected_exit_status_in_both_forms("issue delete", 2, false, |json| {
+        let mut command = Command::new(jit_binary());
+        command
+            .current_dir(&temp)
+            .env_remove("JIT_ALLOW_DELETION")
+            .args(["issue", "delete", &id]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// `jit issue batch-create` exits 2 when pre-validation rejects the file (here an
@@ -637,24 +642,19 @@ fn test_command_exit_codes_batch_create_prevalidation_emits_2() {
     )
     .unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args([
+    assert_projected_exit_status_in_both_forms("issue batch-create", 2, false, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args([
             "issue",
             "batch-create",
             "--from-json",
             batch.to_str().unwrap(),
-        ])
-        .output()
-        .unwrap();
-
-    assert_eq!(
-        output.status.code(),
-        Some(2),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    documented_row("issue batch-create", Some(2), false);
+        ]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// `jit snapshot export` exits 6 when the output path is already occupied —
@@ -665,19 +665,16 @@ fn test_command_exit_codes_snapshot_export_occupied_emits_6() {
     create_issue(&temp, "Snapshot me", &[]);
     fs::create_dir(temp.path().join("taken")).unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["snapshot", "export", "--out", "taken", "--working-tree"])
-        .output()
-        .unwrap();
-
-    assert_eq!(
-        output.status.code(),
-        Some(6),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    documented_row("snapshot export", Some(6), false);
+    assert_projected_exit_status_in_both_forms("snapshot export", 6, false, |json| {
+        let mut command = Command::new(jit_binary());
+        command
+            .current_dir(&temp)
+            .args(["snapshot", "export", "--out", "taken", "--working-tree"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// A lease subcommand run outside a git repository exits 10 — matching `claim`/10.
@@ -685,68 +682,91 @@ fn test_command_exit_codes_snapshot_export_occupied_emits_6() {
 #[test]
 fn test_command_exit_codes_claim_without_git_emits_10() {
     let temp = setup();
-    let output = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["claim", "status"])
-        .output()
-        .unwrap();
-
-    assert_eq!(
-        output.status.code(),
-        Some(10),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    documented_row("claim", Some(10), false);
+    assert_projected_exit_status_in_both_forms("claim", 10, false, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args(["claim", "status"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// A downstream reader that closes the pipe mid-write (e.g. `| head`) makes jit
 /// exit quietly with the SIGPIPE exit-status convention (`128 + 13 = 141`)
 /// instead of panicking through std's `print!`/`println!` machinery — matching
-/// `*`/141 (jit:6f881a85). Mirrors `jit --schema | head -c1`: `--schema` dumps
-/// several hundred KB of JSON well past a pipe's kernel buffer (64KiB on
-/// Linux), so the write reliably blocks and then fails once the read end
-/// closes — reading only the first line, as `query all` with a handful of
-/// issues does, races the child's own (near-instant, sub-buffer-size) exit
-/// and does not reproduce reliably.
+/// `*`/141 (jit:6f881a85). A shown issue with a 2 MiB description exceeds the
+/// maximum pipe capacity in both its plain and `--json` forms, so the writer is
+/// still active after the reader closes. The file-based update avoids argv's
+/// per-argument size limit.
 #[test]
 fn test_command_exit_codes_broken_pipe_emits_141() {
     let temp = setup();
-
-    let mut child = Command::new(jit_binary())
+    let id = create_issue(&temp, "Pipe payload", &[]);
+    let description_path = temp.path().join("large-description.txt");
+    fs::write(&description_path, "x".repeat(2 * 1024 * 1024)).unwrap();
+    assert!(Command::new(jit_binary())
         .current_dir(&temp)
-        .arg("--schema")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-
-    let mut stdout = child.stdout.take().unwrap();
-    let mut first_byte = [0u8; 1];
-    stdout
-        .read_exact(&mut first_byte)
-        .expect("child should write at least one byte before the pipe closes");
-    drop(stdout);
-
-    let mut stderr = String::new();
-    child
-        .stderr
-        .take()
+        .args([
+            "issue",
+            "update",
+            &id,
+            "--description-file",
+            description_path.to_str().unwrap(),
+        ])
+        .status()
         .unwrap()
-        .read_to_string(&mut stderr)
-        .unwrap();
-    let status = child.wait().unwrap();
+        .success());
+    let expected = documented_exit_code("*", Some(141), true)
+        .expect("broken-pipe row must have a fixed status");
+    let broken_pipe_status = |json| {
+        let mut command = Command::new(jit_binary());
+        command
+            .current_dir(&temp)
+            .args(["issue", "show", &id])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if json {
+            command.arg("--json");
+        }
+        let mut child = command.spawn().unwrap();
+        let mut stdout = child.stdout.take().unwrap();
+        let mut first_byte = [0u8; 1];
+        stdout
+            .read_exact(&mut first_byte)
+            .expect("child should write at least one byte before the pipe closes");
+        drop(stdout);
 
+        let mut stderr = String::new();
+        child
+            .stderr
+            .take()
+            .unwrap()
+            .read_to_string(&mut stderr)
+            .unwrap();
+        (child.wait().unwrap().code(), stderr)
+    };
+
+    let (plain_status, plain_stderr) = broken_pipe_status(false);
+    let (json_status, json_stderr) = broken_pipe_status(true);
+    for (form, status, stderr) in [
+        ("plain", plain_status, plain_stderr),
+        ("machine-readable", json_status, json_stderr),
+    ] {
+        assert_eq!(
+            status,
+            Some(expected),
+            "{form} broken-pipe exit must match its projected row; stderr: {stderr}"
+        );
+        assert!(
+            !stderr.contains("panicked") && !stderr.contains("RUST_BACKTRACE"),
+            "{form} broken-pipe exit must not print a panic banner; stderr: {stderr}"
+        );
+    }
     assert_eq!(
-        status.code(),
-        Some(141),
-        "broken-pipe exit must use the SIGPIPE convention (128 + 13); stderr: {stderr}"
+        plain_status, json_status,
+        "plain and machine-readable broken-pipe statuses must agree"
     );
-    assert!(
-        !stderr.contains("panicked") && !stderr.contains("RUST_BACKTRACE"),
-        "broken-pipe exit must not print a panic banner; stderr: {stderr}"
-    );
-    documented_row("*", Some(141), true);
 }
 
 /// Guard: **every** row in the projection — exception and standard alike — must be
