@@ -27,7 +27,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Render the shipped area classification into the adopter configuration reference",
-  "updated_at": "2026-07-28T12:18:22.833530074Z"
+  "updated_at": "2026-07-28T12:26:22.911036584Z"
 }

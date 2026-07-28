@@ -22,7 +22,7 @@
     "story:package-derivation"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Seed the provenance fixture with the repository sources the package draws from",
-  "updated_at": "2026-07-28T12:18:31.817680873Z"
+  "updated_at": "2026-07-28T12:26:32.028183437Z"
 }

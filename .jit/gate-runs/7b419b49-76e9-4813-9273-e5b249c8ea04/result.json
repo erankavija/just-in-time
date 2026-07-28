@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "4788f3b959f2a145342d163b140e2eee54886d65",
+  "completed_at": "2026-07-28T12:25:45.623099226Z",
+  "duration_ms": 325416,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Manifest fidelity, graph wiring, content standards, assignment sizing, contract reachability, footprint review, and all required validations passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "237b15be-df98-4dbb-9fd5-171882314024",
+  "message": null,
+  "run_id": "7b419b49-76e9-4813-9273-e5b249c8ea04",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T12:20:20.206582006Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Manifest fidelity, graph wiring, content standards, assignment sizing, contract reachability, footprint review, and all required validations passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

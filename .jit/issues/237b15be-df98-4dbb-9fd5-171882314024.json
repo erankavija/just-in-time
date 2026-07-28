@@ -7,6 +7,7 @@
   ],
   "description": "Breakdown node bracketing Derived profile assets and projected policy documentation (e204e63d). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria.",
   "documents": [],
+  "done_at": "2026-07-28T12:26:07.226515673Z",
   "first_ready_at": "2026-07-28T12:16:51.615387415Z",
   "gates_required": [
     "coverage-preview",
@@ -14,14 +15,14 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-07-28T10:06:09.509935886Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-28T12:25:45.892168269Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-07-28T10:06:09.509935886Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-28T12:20:13.723058401Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "237b15be-df98-4dbb-9fd5-171882314024",
@@ -33,7 +34,7 @@
     "brackets:e204e63d"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "breakdown: Derived profile assets and projected policy documentation",
-  "updated_at": "2026-07-28T12:16:51.615387415Z"
+  "updated_at": "2026-07-28T12:26:07.226515673Z"
 }

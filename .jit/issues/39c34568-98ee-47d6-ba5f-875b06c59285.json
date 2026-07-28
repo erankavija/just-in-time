@@ -26,7 +26,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Declare the repository roots the packaged live assets are drawn from",
-  "updated_at": "2026-07-28T12:18:45.198080846Z"
+  "updated_at": "2026-07-28T12:26:13.214695980Z"
 }

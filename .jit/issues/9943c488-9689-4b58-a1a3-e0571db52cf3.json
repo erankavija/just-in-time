@@ -23,7 +23,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Give the executable-mode contract a guard of its own",
-  "updated_at": "2026-07-28T12:18:40.732900110Z"
+  "updated_at": "2026-07-28T12:26:27.456418289Z"
 }
