@@ -13,9 +13,10 @@
 //!   are impractical to provoke through the binary (a mid-batch write failure) and
 //!   the gate-evaluation verdict rows.
 //!
-//! One row has no fixed code to observe: `serve --fg` is a pass-through, so it
-//! is verified against the production function its dispatch calls
-//! (`serve::foreground_exit_code`).
+//! One row has no fixed projected code: `serve --fg` is a pass-through. Its
+//! public plain and JSON forms are exercised with a deterministic child exit,
+//! while `serve::foreground_exit_code` separately covers the full helper-level
+//! pass-through range and signal-termination fallback.
 //!
 //! `test_command_exit_codes_every_row_is_verified` keeps the set complete: adding
 //! a row without a binding fails the build.
@@ -359,9 +360,9 @@ fn test_command_exit_codes_serve_daemon_error_emits_1() {
 ///
 /// The mapping is owned by `serve::foreground_exit_code`, which the `serve --fg`
 /// dispatch in `crates/jit/src/main.rs` calls to compute the code it exits with.
-/// Exercising that production function verifies the documented pass-through
-/// against the runtime path: the child's code is returned verbatim, and a
-/// signal-terminated child (no code) reports `1`.
+/// This helper-level check complements the public dual-form test below: the
+/// child's code is returned verbatim, and a signal-terminated child (no code)
+/// reports `1`.
 #[test]
 fn test_command_exit_codes_serve_foreground_is_passthrough() {
     assert_eq!(documented_exit_code("serve --fg", None, true), None);
