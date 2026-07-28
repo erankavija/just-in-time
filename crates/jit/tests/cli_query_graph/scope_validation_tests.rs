@@ -1140,6 +1140,25 @@ assert = { label-coverage = { } }
     }
 
     #[test]
+    fn test_cli_scope_json_failure_emits_one_validation_envelope() {
+        let (dir, c) = setup_spine(false);
+        let out = run(&dir, &["validate", "--scope", &c, "--json"]);
+        assert_eq!(out.status.code(), Some(4));
+        assert!(out.stderr.is_empty(), "JSON failure stays stream-pure");
+        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(json.as_object().map(|object| object.len()), Some(1));
+        assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+        assert!(json["error"]["details"]["findings"]
+            .as_array()
+            .is_some_and(|findings| findings.iter().any(|finding| {
+                finding["rule"] == "breakdown-coverage-preview"
+                    && finding["message"]
+                        .as_str()
+                        .is_some_and(|message| message.contains("REQ-01"))
+            })));
+    }
+
+    #[test]
     fn test_cli_scope_exits_0_when_clean() {
         let (dir, c) = setup_spine(true);
         let out = run(&dir, &["validate", "--scope", &c]);
@@ -1149,6 +1168,19 @@ assert = { label-coverage = { } }
             "a clean scope must exit 0; stderr: {}",
             String::from_utf8_lossy(&out.stderr)
         );
+    }
+
+    #[test]
+    fn test_cli_scope_json_success_keeps_the_scope_report() {
+        let (dir, c) = setup_spine(true);
+        let out = run(&dir, &["validate", "--scope", &c, "--json"]);
+        assert_eq!(out.status.code(), Some(0));
+        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert!(
+            json["findings"].is_array(),
+            "successful report stays direct: {json}"
+        );
+        assert!(json.get("error").is_none());
     }
 
     #[test]

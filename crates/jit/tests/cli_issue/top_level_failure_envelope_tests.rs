@@ -99,7 +99,28 @@ fn test_command_specific_error_keeps_one_envelope_and_its_details() {
 }
 
 #[test]
-fn test_handler_owned_validation_report_is_not_followed_by_top_level_envelope() {
+fn test_validate_json_success_keeps_the_validation_report() {
+    let repository = setup_repository();
+
+    let output = Command::new(jit_binary())
+        .current_dir(repository.path())
+        .args(["validate", "--json"])
+        .output()
+        .expect("run successful validation fixture");
+
+    assert!(output.status.success(), "validation failed: {output:?}");
+    assert!(
+        output.stderr.is_empty(),
+        "successful JSON stays stream-pure"
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .expect("stdout contains exactly one validation report document");
+    assert_eq!(report["valid"], true);
+    assert!(report.get("error").is_none());
+}
+
+#[test]
+fn test_validate_json_integrity_failure_emits_one_registered_envelope() {
     let repository = setup_repository();
     let created = Command::new(jit_binary())
         .current_dir(repository.path())
@@ -134,14 +155,87 @@ fn test_handler_owned_validation_report_is_not_followed_by_top_level_envelope() 
         output.status.code(),
         Some(jit::output::ExitCode::ValidationFailed.code())
     );
-    let report: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .expect("stdout contains exactly one validation report document");
-    assert_eq!(report["valid"], false);
-    assert!(report["integrity_error"]
+    let (envelope, code) = parse_single_error(&output);
+    assert_eq!(code, ErrorCode::ValidationFailed);
+    assert_eq!(output.status.code(), Some(code.exit_code().code()));
+    assert_eq!(envelope["error"]["details"]["valid"], false);
+    assert!(envelope["error"]["details"]["integrity_error"]
         .as_str()
         .is_some_and(|message| message.contains("missing-dependency")));
     assert!(
-        String::from_utf8_lossy(&output.stderr).starts_with("Error: "),
-        "existing human diagnostic remains on stderr"
+        output.stderr.is_empty(),
+        "machine-readable validation failure has no diagnostic pollution: {:?}",
+        String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[test]
+fn test_validate_json_rule_failure_emits_one_registered_envelope() {
+    let repository = setup_repository();
+    let rules_path = repository.path().join(".jit/rules.toml");
+    let mut rules = fs::read_to_string(&rules_path).expect("read default rules");
+    rules.push_str(
+        "\n[[rules]]\nname = \"epic-needs-req\"\nwhen = { type = \"epic\" }\n\
+         severity = \"error\"\nenforce = false\n\
+         assert = { require-label = { label = \"req:*\", min = 1 } }\n",
+    );
+    fs::write(rules_path, rules).expect("install rule fixture");
+    let created = Command::new(jit_binary())
+        .current_dir(repository.path())
+        .args([
+            "issue",
+            "create",
+            "--title",
+            "An epic",
+            "--label",
+            "type:epic",
+            "--label",
+            "epic:validation-envelope",
+        ])
+        .output()
+        .expect("create rule failure fixture");
+    assert!(created.status.success(), "issue create failed: {created:?}");
+
+    let output = Command::new(jit_binary())
+        .current_dir(repository.path())
+        .args(["validate", "--json"])
+        .output()
+        .expect("run rule failure fixture");
+
+    let (envelope, code) = parse_single_error(&output);
+    assert_eq!(code, ErrorCode::GenericError);
+    assert_eq!(output.status.code(), Some(code.exit_code().code()));
+    assert_eq!(envelope["error"]["details"]["valid"], false);
+    assert!(envelope["error"]["details"]["integrity_error"].is_null());
+    assert!(envelope["error"]["details"]["rule_findings"]
+        .as_array()
+        .is_some_and(|findings| findings.iter().any(|finding| {
+            finding["rule"] == "epic-needs-req" && finding["severity"] == "error"
+        })));
+    assert!(
+        output.stderr.is_empty(),
+        "machine-readable validation failure has no diagnostic pollution: {:?}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn test_validate_json_branch_drift_failure_emits_one_registered_envelope() {
+    let repository = setup_repository();
+
+    let output = Command::new(jit_binary())
+        .current_dir(repository.path())
+        .args(["validate", "--branch-drift", "--json"])
+        .output()
+        .expect("run branch-drift failure fixture");
+
+    let (envelope, code) = parse_single_error(&output);
+    assert_eq!(code, ErrorCode::GenericError);
+    assert_eq!(output.status.code(), Some(code.exit_code().code()));
+    assert_eq!(envelope["error"]["details"]["valid"], false);
+    assert_eq!(
+        envelope["error"]["details"]["validations"][0]["validation"],
+        "branch_drift"
+    );
+    assert!(output.stderr.is_empty());
 }

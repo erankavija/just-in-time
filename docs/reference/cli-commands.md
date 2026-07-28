@@ -3072,35 +3072,53 @@ about the work graph: a membership label the DAG does not back, reported by
 [`jit query divergence`](#membership-divergence-jit-query-divergence) and
 mirrored in this command's advisory `divergence_count`.
 
-Whole-repository JSON reports both the integrity verdict and the rule findings in
-one object:
+Every successful JSON validation mode emits its normal mode-specific report. A
+failing invocation emits the canonical error envelope and retains that same
+report under `error.details`. This applies to whole-repository, per-issue,
+`--explain`, `--scope`, `--branch-drift`, and `--leases` validation. For example,
+a whole-repository rule failure reports:
 
 ```json
 {
-  "valid": false,
-  "integrity_error": null,
-  "warnings": [
-    { "type": "rule_warning", "issue_id": "...", "rule": "orphan-leaf", "message": "..." }
-  ],
-  "warning_count": 1,
-  "membership_divergences": [],
-  "divergence_count": 0,
-  "rule_findings": [ { "issue_id": "...", "rule": "...", "message": "...", "severity": "error" } ],
-  "error_count": 1,
-  "message": "Repository validation failed with 1 rule error(s)"
+  "error": {
+    "code": "GENERIC_ERROR",
+    "message": "Repository validation failed with 1 rule error(s)",
+    "details": {
+      "valid": false,
+      "integrity_error": null,
+      "warnings": [
+        { "type": "rule_warning", "issue_id": "...", "rule": "orphan-leaf", "message": "..." }
+      ],
+      "warning_count": 1,
+      "membership_divergences": [],
+      "divergence_count": 0,
+      "rule_findings": [ { "issue_id": "...", "rule": "...", "message": "...", "severity": "error" } ],
+      "error_count": 1,
+      "message": "Repository validation failed with 1 rule error(s)"
+    }
+  }
 }
 ```
+
+Whole-repository, per-issue, and `--explain` rule failures keep their established
+exit `1` through the registered `GENERIC_ERROR` mapping, as do failed
+`--branch-drift` and `--leases` checks. A repository-integrity failure or failed
+`--scope` gate check uses `VALIDATION_FAILED` and exits `4`. In every case the
+code's registered mapping, not a separate literal, determines the process
+status.
 
 `divergence_count` and `membership_divergences` mirror
 [`jit query divergence`](#membership-divergence-jit-query-divergence). They are
 advisory and never change the exit status; resolve them with `jit query
 divergence` when a membership label claims what the DAG does not back.
 
-`validate --fix --json` returns the standard error envelope with code
-`VALIDATION_FAILED` when a repair is unsafe. Its `error.message` retains the
-complete actionable cause chain, including ambiguous managed-region delimiters
-or mismatched profile provenance. The human error reports the same cause, and no
-repair target is written.
+`validate --fix --json` returns the standard error envelope and retains the
+failure's typed classification: an unsafe repair uses `VALIDATION_FAILED`, a
+permission failure uses `PERMISSION_DENIED`, and other failures keep the
+registered code selected by the shared classifier. That code determines the
+process status. Its `error.message` retains the complete actionable cause chain,
+including ambiguous managed-region delimiters or mismatched profile provenance.
+The human error reports the same cause, and no repair target is written.
 
 ### `jit recover`
 

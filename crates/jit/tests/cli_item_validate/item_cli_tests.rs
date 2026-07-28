@@ -748,7 +748,7 @@ fn test_validate_reports_dangling_item_link() {
         "validate must fail on a dangling item link"
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let findings = json["rule_findings"]
+    let findings = json["error"]["details"]["rule_findings"]
         .as_array()
         .expect("rule_findings array");
     let dangling: Vec<&Value> = findings

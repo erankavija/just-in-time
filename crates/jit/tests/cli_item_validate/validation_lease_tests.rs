@@ -460,11 +460,14 @@ fn test_validate_leases_json_output_on_failure() {
     );
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    // Note: "success" field is always true (command executed), but "valid" is false
-    assert_eq!(json["valid"], false, "Validation should report invalid");
+    assert_eq!(json.as_object().map(|object| object.len()), Some(1));
+    assert_eq!(json["error"]["code"], "GENERIC_ERROR");
+    assert!(output.stderr.is_empty(), "JSON failure stays stream-pure");
+    let details = &json["error"]["details"];
+    assert_eq!(details["valid"], false, "Validation should report invalid");
 
     // Check that validations array contains lease validation result
-    let validations = json["validations"].as_array().unwrap();
+    let validations = details["validations"].as_array().unwrap();
     assert!(!validations.is_empty());
 
     let lease_validation = &validations[0];

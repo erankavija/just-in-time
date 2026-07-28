@@ -576,20 +576,34 @@ fn claim_json_error(error: &anyhow::Error, fallback_code: &str) -> jit::output::
     }
 }
 
-/// Preserve a `validate --fix` failure's complete cause chain while selecting
-/// the standard JSON code for its typed exit class.
-fn validate_fix_json_error(error: &anyhow::Error, exit_code: ExitCode) -> jit::output::JsonError {
-    use jit::output::ErrorCode;
+/// Preserve a `validate --fix` failure's complete cause chain and its exact
+/// typed classification. The envelope's registered code owns the process
+/// status; callers must not retain a parallel exit-code projection.
+fn validate_fix_json_error(error: &anyhow::Error) -> jit::output::JsonError {
+    jit::output::JsonError::new(error_to_error_code(error), format!("{error:#}"))
+}
 
-    let code = match exit_code {
-        ExitCode::ValidationFailed => ErrorCode::ValidationFailed,
-        ExitCode::InvalidArgument => ErrorCode::InvalidArgument,
-        ExitCode::NotFound => ErrorCode::RepositoryNotFound,
-        ExitCode::AlreadyExists => ErrorCode::AlreadyExists,
-        ExitCode::PermissionDenied | ExitCode::ExternalError => ErrorCode::IoError,
-        ExitCode::Success | ExitCode::GenericError | ExitCode::BrokenPipe => ErrorCode::IoError,
-    };
-    jit::output::JsonError::new(code, format!("{error:#}"))
+/// Render a validation result under the machine-readable contract.
+///
+/// Successful validation keeps its command-specific report shape. A failing
+/// validation moves that same report under the canonical envelope's
+/// `error.details`; the registered code is the sole authority for the process
+/// status. Handler-owned validation paths terminate here after writing exactly
+/// one payload, so the top-level renderer cannot append a second document.
+fn render_validation_json(
+    details: serde_json::Value,
+    message: String,
+    failure_code: Option<ErrorCode>,
+) -> Result<()> {
+    if let Some(code) = failure_code {
+        let output = JsonError::new(code, message).with_details(details);
+        println!("{}", output.to_json_string()?);
+        std::process::exit(output.exit_code().code());
+    }
+
+    let output = JsonOutput::success(details).with_message(message);
+    println!("{}", output.to_json_string()?);
+    Ok(())
 }
 
 /// Render a failed `gate evaluate` / `gate evaluate-all` outcome and terminate appropriately.
@@ -6672,17 +6686,20 @@ fn run() -> Result<()> {
                 let report = executor.validate_scope(container)?;
                 let exit_nonzero = report.has_errors();
                 if json {
-                    use jit::output::JsonOutput;
                     let value = serde_json::to_value(&report)?;
-                    let output = JsonOutput::success(value).with_message(if exit_nonzero {
+                    let message = if exit_nonzero {
                         format!(
                             "Scope validation failed with {} error(s)",
                             report.error_count()
                         )
                     } else {
                         "Scope validation passed".to_string()
-                    });
-                    println!("{}", output.to_json_string()?);
+                    };
+                    render_validation_json(
+                        value,
+                        message,
+                        exit_nonzero.then_some(ErrorCode::ValidationFailed),
+                    )?;
                 } else if report.findings.is_empty() {
                     println!("✓ Scope validation passed");
                 } else {
@@ -6720,14 +6737,17 @@ fn run() -> Result<()> {
                 let report = executor.explain_rules(issue_id)?;
                 let exit_nonzero = report.has_errors();
                 if json {
-                    use jit::output::JsonOutput;
                     let value = serde_json::to_value(&report)?;
-                    let output = JsonOutput::success(value).with_message(if exit_nonzero {
+                    let message = if exit_nonzero {
                         "Validation found error-severity rule failures".to_string()
                     } else {
                         "Validation passed".to_string()
-                    });
-                    println!("{}", output.to_json_string()?);
+                    };
+                    render_validation_json(
+                        value,
+                        message,
+                        exit_nonzero.then_some(ErrorCode::GenericError),
+                    )?;
                 } else {
                     println!("Rule explanation for issue {}", report.issue_id);
                     if report.outcomes.is_empty() {
@@ -6783,14 +6803,17 @@ fn run() -> Result<()> {
                 let report = executor.run_rules(id.as_deref())?;
                 let exit_nonzero = report.has_errors();
                 if json {
-                    use jit::output::JsonOutput;
                     let value = serde_json::to_value(&report)?;
-                    let output = JsonOutput::success(value).with_message(if exit_nonzero {
+                    let message = if exit_nonzero {
                         format!("Validation failed with {} error(s)", report.error_count())
                     } else {
                         "Validation passed".to_string()
-                    });
-                    println!("{}", output.to_json_string()?);
+                    };
+                    render_validation_json(
+                        value,
+                        message,
+                        exit_nonzero.then_some(ErrorCode::GenericError),
+                    )?;
                 } else if report.findings.is_empty() {
                     println!("✓ Issue validation passed");
                 } else {
@@ -6869,7 +6892,6 @@ fn run() -> Result<()> {
                 }
 
                 if json {
-                    use jit::output::JsonOutput;
                     use serde_json::json;
 
                     let all_valid = validation_results.iter().all(|(_, valid, _)| *valid);
@@ -6889,16 +6911,14 @@ fn run() -> Result<()> {
                     } else {
                         "Validation failed".to_string()
                     };
-                    let output = JsonOutput::success(json!({
-                        "valid": all_valid,
-                        "validations": results_json
-                    }))
-                    .with_message(msg);
-                    println!("{}", output.to_json_string()?);
-
-                    if !all_valid {
-                        std::process::exit(1);
-                    }
+                    render_validation_json(
+                        json!({
+                            "valid": all_valid,
+                            "validations": results_json
+                        }),
+                        msg,
+                        (!all_valid).then_some(ErrorCode::GenericError),
+                    )?;
                 }
 
                 return Ok(());
@@ -6910,10 +6930,9 @@ fn run() -> Result<()> {
                 let (fixes_applied, messages) = match executor.validate_with_fix(true, dry_run) {
                     Ok(result) => result,
                     Err(error) if json => {
-                        let exit_code = error_to_exit_code(&error);
-                        let json_error = validate_fix_json_error(&error, exit_code);
+                        let json_error = validate_fix_json_error(&error);
                         println!("{}", json_error.to_json_string()?);
-                        std::process::exit(exit_code.code());
+                        std::process::exit(json_error.exit_code().code());
                     }
                     Err(error) if error_to_exit_code(&error) == ExitCode::ValidationFailed => {
                         return Err(anyhow::Error::new(jit::errors::ValidationFailedError::new(
@@ -6931,7 +6950,6 @@ fn run() -> Result<()> {
                 }
 
                 if json {
-                    use jit::output::JsonOutput;
                     use serde_json::json;
 
                     let output = JsonOutput::success(json!({
@@ -6988,7 +7006,6 @@ fn run() -> Result<()> {
                     .collect();
 
                 if json {
-                    use jit::output::JsonOutput;
                     use serde_json::json;
 
                     let warnings_json: Vec<_> = warning_findings
@@ -7024,7 +7041,7 @@ fn run() -> Result<()> {
                         "Repository validation passed".to_string()
                     };
                     let divergences_json = serde_json::to_value(&divergence_report.divergences)?;
-                    let output = JsonOutput::success(json!({
+                    let details = json!({
                         "valid": !validation_failed,
                         "integrity_error": integrity_message,
                         "warnings": warnings_json,
@@ -7034,8 +7051,16 @@ fn run() -> Result<()> {
                         "rule_findings": findings_json,
                         "error_count": rule_report.error_count(),
                         "message": message
-                    }));
-                    println!("{}", output.to_json_string()?);
+                    });
+
+                    let failure_code = validation_failed.then(|| {
+                        if integrity_error.is_some() {
+                            ErrorCode::ValidationFailed
+                        } else {
+                            ErrorCode::GenericError
+                        }
+                    });
+                    render_validation_json(details, message, failure_code)?;
                 } else {
                     if validation_failed {
                         if rules_failed {
@@ -7081,18 +7106,12 @@ fn run() -> Result<()> {
                 // above, so finding #1 is fixed regardless of how we exit.
                 //
                 // A repository-integrity error keeps its specific exit code
-                // (e.g. a broken dependency maps to `ExitCode::ValidationFailed`)
-                // and is surfaced on stderr — it is never lost. In JSON mode the
-                // handler has already rendered the complete validation report, so
-                // terminate here rather than propagating into the general
-                // top-level envelope renderer and appending a second document.
-                // Otherwise, an error-severity rule finding (local OR graph)
-                // exits non-zero.
+                // (e.g. a broken dependency maps to `ExitCode::ValidationFailed`).
+                // Machine-readable failures have already terminated after their
+                // single canonical envelope; plain failures continue through the
+                // established human diagnostic path below. Otherwise, an
+                // error-severity rule finding (local OR graph) exits non-zero.
                 if let Some(err) = integrity_error {
-                    if json {
-                        eprintln!("Error: {}", err);
-                        std::process::exit(error_to_exit_code(&err).code());
-                    }
                     return Err(err);
                 }
                 if rules_failed {
@@ -8052,7 +8071,7 @@ mod exit_code_projection_tests {
     //! projection stops documenting a code the classifier still emits, this test
     //! fails — so the projection cannot silently drift from runtime behavior.
 
-    use super::{error_to_error_code, error_to_exit_code};
+    use super::{error_to_error_code, error_to_exit_code, validate_fix_json_error};
     use jit::declarations::GateStage;
     use jit::domain::{GateRunResult, GateRunStatus};
     use jit::output::ErrorCode;
@@ -8257,6 +8276,49 @@ mod exit_code_projection_tests {
                     "typed failure fell through to the generic code: `{error}`"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn test_validate_fix_json_error_uses_typed_code_as_status_authority() {
+        use std::io::{Error as IoError, ErrorKind};
+
+        let cases = [
+            (
+                jit::errors::ValidationFailedError::new("invalid repository").into(),
+                ErrorCode::ValidationFailed,
+            ),
+            (
+                jit::errors::InvalidArgumentError::new("bad repair option").into(),
+                ErrorCode::InvalidArgument,
+            ),
+            (
+                jit::errors::AlreadyExistsError::new("occupied repair target").into(),
+                ErrorCode::AlreadyExists,
+            ),
+            (
+                IoError::new(ErrorKind::PermissionDenied, "denied").into(),
+                ErrorCode::PermissionDenied,
+            ),
+            (
+                jit::storage::RepositoryFormatTooNewError::new(9999, 1).into(),
+                ErrorCode::RepositoryFormatTooNew,
+            ),
+            (
+                anyhow::anyhow!("untyped repair failure"),
+                ErrorCode::GenericError,
+            ),
+            (
+                IoError::new(ErrorKind::BrokenPipe, "closed repair output").into(),
+                ErrorCode::IoError,
+            ),
+        ];
+
+        for (error, expected_code) in cases {
+            let envelope = validate_fix_json_error(&error);
+            assert_eq!(envelope.error.code, expected_code.as_str());
+            assert_eq!(envelope.exit_code(), expected_code.exit_code());
+            assert_eq!(envelope.exit_code(), error_to_exit_code(&error));
         }
     }
 
