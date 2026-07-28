@@ -11129,3 +11129,8 @@
 {"from":"backlog","id":"d91e14a1-345f-4ef1-99ca-10748c4a0f5f","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T21:57:04.256124282Z","to":"ready","type":"issue_state_changed"}
 {"gate_key":"repo-validate","id":"c3fd73ca-3475-4693-83ac-37ca90fe64d3","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T21:59:23.093108886Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"c8c738ba-5aec-492b-aa0e-cc28b4a5322e","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T22:03:12.360447011Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"44b97cd5-f7d6-40c7-80a9-2156e88e1a81","issue_id":"ab126109-887b-475b-98b0-229a08930866","priority":"high","timestamp":"2026-07-28T22:06:03.782485284Z","title":"Enforce one failure-lever registration per command path","type":"issue_created"}
+{"from":"ready","id":"b710ac3c-16c7-490c-aed2-1aef7c1c620e","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T22:06:20.506832389Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"ac036584-1ee7-413d-809c-4b150ba2e903","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T22:06:20.506832389Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"e121344d-3172-4ca5-8e8b-6d8727bb2f1a","issue_id":"ab126109-887b-475b-98b0-229a08930866","timestamp":"2026-07-28T22:06:25.212090231Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"444776af-701f-4cc2-ac4a-43feca2b18fe","issue_id":"ab126109-887b-475b-98b0-229a08930866","timestamp":"2026-07-28T22:06:25.212090231Z","type":"issue_claimed"}

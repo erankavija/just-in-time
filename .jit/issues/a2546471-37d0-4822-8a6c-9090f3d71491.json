@@ -10,6 +10,7 @@
     "7e0c04d0-c4b5-4afb-96af-2926e61f0b43",
     "8f5e5921-6746-4a43-a8d0-92e52e8023bf",
     "9eadd135-d27b-471c-b481-46bbf15084d7",
+    "ab126109-887b-475b-98b0-229a08930866",
     "b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8",
     "ced03648-c487-417c-b5e8-a447ec2dc4eb",
     "d780dfc1-9e01-4036-b637-7f6deb17b423"
@@ -41,7 +42,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-28T22:03:12.360447011Z"
+  "updated_at": "2026-07-28T22:06:20.506832389Z"
 }

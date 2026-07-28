@@ -100,6 +100,12 @@
         {"id":"ced03648-c487-417c-b5e8-a447ec2dc4eb","short_id":"ced03648","title":"Make the failure registry independent of planning artifacts","classification":"implementation","status":"done"},
         {"id":"002e9479-c893-457d-b4ef-1c50b1c43c9f","short_id":"002e9479","title":"Complete the typed error-envelope constructor cutover","classification":"implementation","status":"done"}
       ]
+    },
+    {
+      "wave_number": 12,
+      "issues": [
+        {"id":"ab126109-887b-475b-98b0-229a08930866","short_id":"ab126109","title":"Enforce one failure-lever registration per command path","classification":"implementation","status":"in_progress"}
+      ]
     }
   ],
   "created_during_execution": [
@@ -142,6 +148,11 @@
       "id": "002e9479-c893-457d-b4ef-1c50b1c43c9f",
       "short_id": "002e9479",
       "reason": "Final holistic review found that production raw-string envelope constructors can still bypass the closed typed vocabulary and independently select an exit status."
+    },
+    {
+      "id": "ab126109-887b-475b-98b0-229a08930866",
+      "short_id": "ab126109",
+      "reason": "Final holistic review found that the archive-safe registry leaf promised duplicate command-path rejection while the committed fixture retained three registrations for the single reflected serve arm."
     }
   ],
   "escalations": [
@@ -185,7 +196,7 @@
     }
   ],
   "rework_counts": {
-    "a2546471": 1,
+    "a2546471": 2,
     "b2295bbb": 1,
     "9eadd135": 1,
     "7491da4a": 1,
