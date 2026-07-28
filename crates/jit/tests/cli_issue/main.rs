@@ -24,6 +24,7 @@ mod issue_update_lean_response_test;
 mod list_envelope_tests;
 mod quiet_mode_tests;
 mod recover_command_tests;
+mod search_exit_status_tests;
 mod serve_failure_envelope_tests;
 mod snapshot_export_tests;
 mod verb_hint_tests;

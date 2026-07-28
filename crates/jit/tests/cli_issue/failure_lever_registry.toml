@@ -792,7 +792,7 @@ path = "search"
 argv = ["search", "[", "--regex", "--json"]
 setup = ["init", "regex:unclosed-character-class"]
 expected_failure = "SEARCH_FAILED: ripgrep rejects the unclosed character class."
-expected_exit = 10
+expected_exit = 1
 confirmation = "invoked"
 
 [[arms]]
