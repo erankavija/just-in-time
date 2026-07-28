@@ -26,7 +26,7 @@
     {
       "wave_number": 2,
       "issues": [
-        {"id":"6ebd3d03-6cb2-458a-bb61-dad7604340fc","short_id":"6ebd3d03","title":"Register the emitted error codes that carry no exit classification","classification":"implementation","status":"in_progress"},
+        {"id":"6ebd3d03-6cb2-458a-bb61-dad7604340fc","short_id":"6ebd3d03","title":"Register the emitted error codes that carry no exit classification","classification":"implementation","status":"done"},
         {"id":"8cfe8699-95f2-4535-8158-35eb05158266","short_id":"8cfe8699","title":"The canonical failure-lever registry the probes read","classification":"implementation","status":"in_progress"}
       ]
     },
@@ -84,9 +84,11 @@
     {
       "category": "blocker-outside-epic-scope",
       "issue_id": "6ebd3d03-6cb2-458a-bb61-dad7604340fc",
-      "status": "awaiting-invoker",
+      "status": "resolved",
       "summary": "Configured code-review gate requires explicit authorization to send repository code and issue context to its external model service; approval layer rejected the first attempt before execution.",
-      "recorded_at": "2026-07-28T10:46:02+03:00"
+      "recorded_at": "2026-07-28T10:46:02+03:00",
+      "resolution": "Invoker explicitly authorized the configured code-review gate; 6ebd3d03 code-review passed with zero findings.",
+      "resolved_at": "2026-07-28T11:05:58+03:00"
     }
   ],
   "rework_counts": {

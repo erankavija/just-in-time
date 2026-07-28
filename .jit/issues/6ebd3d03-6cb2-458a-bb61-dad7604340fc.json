@@ -8,6 +8,7 @@
   ],
   "description": "Error code strings the command surface already prints are absent from the registered vocabulary and fall through to the generic exit status. Registering each one with an explicit exit status is what lets the reported code determine the process exit status.\n\n## Background\n\nRoughly twenty code strings reach machine consumers without a registered exit mapping: namespace-scoped fallbacks across the dependency, gate, preset, item, invariant, project, profile, search, worktree, and hooks namespaces, the claim fallbacks, the generic code itself, and the recovery code. Because none is a registered member, each maps to the generic status whatever its real class.\n\nThe status a member takes is the class the plain invocation of the same failure already reports: an unresolvable identifier is a not-found failure, a duplicate gate key is an already-exists failure, a missing preset is a not-found failure. A code whose failure class is genuinely generic keeps the generic status.\n\nCode strings stay byte-identical. Nothing is renamed and nothing is collapsed onto an existing member, because a machine consumer reads the code string and a rename would break it. Only the exit status moves.\n\nThe emission sites keep handing the same string literals to the envelope builder; resolving a code from its text into its member is what makes those literals classify, so this work is confined to the vocabulary rather than spread across the dispatch arms.\n\nA parse code is already declared in the vocabulary and carries no exit status yet, so the status it maps to is settled here rather than invented later.\n\n## Success Criteria\n\n- [hard] REQ-01: Each error code string the command surface emits is a registered member of the vocabulary carrying an explicitly stated exit status.\n- [hard] REQ-02: No emitted code string changes its spelling, and no emitted code is collapsed onto a different member.\n- [hard] REQ-03: A registered member's exit status is the class the plain invocation of the same failure reports.\n- [hard] REQ-04: A code whose failure class is genuinely generic is registered with the generic status rather than left unregistered.\n- [hard] REQ-05: The parse code already declared in the vocabulary carries an explicitly stated exit status.\n- [hard] REQ-06: Each newly registered member carries a description of the failure its code names.\n",
   "documents": [],
+  "done_at": "2026-07-28T08:05:13.110979067Z",
   "first_ready_at": "2026-07-27T23:58:16.012733604Z",
   "gates_required": [
     "cargo-ci",
@@ -17,6 +18,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-07-28T07:44:40.960626660Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T08:04:22.928741588Z",
       "updated_by": "auto:executor"
     }
   },
@@ -30,7 +36,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Register the emitted error codes that carry no exit classification",
-  "updated_at": "2026-07-28T07:44:40.960626660Z"
+  "updated_at": "2026-07-28T08:05:13.110979067Z"
 }

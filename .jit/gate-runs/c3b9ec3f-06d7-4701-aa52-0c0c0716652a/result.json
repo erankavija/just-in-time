@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "5acc8ca7ca58e8f8e2f591cd65cf89336622e40d",
+  "completed_at": "2026-07-28T08:04:22.657749252Z",
+  "duration_ms": 225139,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six success criteria are satisfied by the attributable error-vocabulary registration change.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6ebd3d03-6cb2-458a-bb61-dad7604340fc",
+  "message": null,
+  "run_id": "c3b9ec3f-06d7-4701-aa52-0c0c0716652a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T08:00:37.518443030Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:6ebd3d03 commits 8ad24987, 151edc1e, 51867d37, 2c8f1340, a5291a98, 0c89aabb\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/6ebd3d03/requirement/REQ-04 (issue description); @/invariant/single-source-prose, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci — passed, exit 0, 2026-07-28T07:38:55Z\nTruncation recovery: recovered the merge patch through per-hunk diff headers and bounded reads of output.rs\n1. No blocking or advisory findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six success criteria are satisfied by the attributable error-vocabulary registration change.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
