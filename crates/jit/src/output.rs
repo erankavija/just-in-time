@@ -486,19 +486,24 @@ impl JsonError {
         }
     }
 
-    /// Create an envelope for a code that is not yet in [`ErrorCode`].
+    /// Create an envelope from a textual code and an explicit fallback status.
     ///
-    /// The caller must supply the historical status explicitly. This boundary
-    /// preserves legacy wire codes without silently inventing a default status
-    /// for arbitrary text. New registered codes should use [`JsonError::new`].
+    /// Registered text is resolved through [`ErrorCode`] and therefore uses the
+    /// member's declared status. Unknown text preserves the caller-supplied
+    /// historical status rather than silently acquiring a default class. New
+    /// typed call sites should use [`JsonError::new`].
     pub fn legacy_unregistered(
         code: impl Into<String>,
         exit_code: ExitCode,
         message: impl Into<String>,
     ) -> Self {
+        let code = code.into();
+        let exit_code = code
+            .parse::<ErrorCode>()
+            .map_or(exit_code, ErrorCode::exit_code);
         Self {
             error: ErrorDetail {
-                code: code.into(),
+                code,
                 message: message.into(),
                 details: None,
                 suggestions: Vec::new(),
@@ -723,6 +728,53 @@ pub enum ErrorCode {
     ProfileNotFound,
     /// Profile planning or final-state validation rejected the operation.
     ProfileConflict,
+    /// A dependency command failed.
+    DependencyError,
+    /// A gate command failed.
+    GateError,
+    /// A gate-status check failed.
+    GateCheckError,
+    /// A gate-preset command failed.
+    PresetError,
+    /// An issue item-address lookup failed before resolving an item.
+    ItemNotFound,
+    /// An item command failed without a more specific public classification.
+    ItemCommandFailed,
+    /// An invariant command failed without a more specific public classification.
+    InvariantCommandFailed,
+    /// A project command failed without a more specific public classification.
+    ProjectCommandFailed,
+    /// A profile command failed without a more specific public classification.
+    ProfileError,
+    /// The search backend failed while executing a query.
+    SearchFailed,
+    /// The external ripgrep search tool could not be found.
+    RipgrepNotFound,
+    /// Worktree identity inspection failed.
+    WorktreeInfoError,
+    /// Worktree enumeration failed.
+    WorktreeListError,
+    /// Repository hook installation failed.
+    HooksInstallError,
+    /// A command failed without a more specific public classification.
+    GenericError,
+    /// Repository recovery failed.
+    #[serde(rename = "recovery_failed")]
+    RecoveryFailed,
+    /// Claim acquisition failed.
+    ClaimAcquireError,
+    /// Claim release failed.
+    ClaimReleaseError,
+    /// Claim renewal failed.
+    ClaimRenewError,
+    /// Claim heartbeat failed.
+    ClaimHeartbeatError,
+    /// Claim status inspection failed without a more specific classification.
+    ClaimStatusError,
+    /// Claim enumeration failed without a more specific classification.
+    ClaimListError,
+    /// Forced claim eviction failed.
+    ClaimForceEvictError,
 }
 
 impl ErrorCode {
@@ -730,7 +782,7 @@ impl ErrorCode {
     ///
     /// A conformance test compares this list with the variants schemars derives
     /// from [`ErrorCode`], so omitting a newly added member fails the suite.
-    pub const ALL: [ErrorCode; 20] = [
+    pub const ALL: [ErrorCode; 43] = [
         ErrorCode::IssueNotFound,
         ErrorCode::GateNotFound,
         ErrorCode::CycleDetected,
@@ -751,6 +803,29 @@ impl ErrorCode {
         ErrorCode::DeletionNotConfirmed,
         ErrorCode::ProfileNotFound,
         ErrorCode::ProfileConflict,
+        ErrorCode::DependencyError,
+        ErrorCode::GateError,
+        ErrorCode::GateCheckError,
+        ErrorCode::PresetError,
+        ErrorCode::ItemNotFound,
+        ErrorCode::ItemCommandFailed,
+        ErrorCode::InvariantCommandFailed,
+        ErrorCode::ProjectCommandFailed,
+        ErrorCode::ProfileError,
+        ErrorCode::SearchFailed,
+        ErrorCode::RipgrepNotFound,
+        ErrorCode::WorktreeInfoError,
+        ErrorCode::WorktreeListError,
+        ErrorCode::HooksInstallError,
+        ErrorCode::GenericError,
+        ErrorCode::RecoveryFailed,
+        ErrorCode::ClaimAcquireError,
+        ErrorCode::ClaimReleaseError,
+        ErrorCode::ClaimRenewError,
+        ErrorCode::ClaimHeartbeatError,
+        ErrorCode::ClaimStatusError,
+        ErrorCode::ClaimListError,
+        ErrorCode::ClaimForceEvictError,
     ];
 
     /// Return the byte-exact code written to a JSON error envelope.
@@ -776,6 +851,29 @@ impl ErrorCode {
             ErrorCode::DeletionNotConfirmed => "DELETION_NOT_CONFIRMED",
             ErrorCode::ProfileNotFound => "PROFILE_NOT_FOUND",
             ErrorCode::ProfileConflict => "PROFILE_CONFLICT",
+            ErrorCode::DependencyError => "DEPENDENCY_ERROR",
+            ErrorCode::GateError => "GATE_ERROR",
+            ErrorCode::GateCheckError => "GATE_CHECK_ERROR",
+            ErrorCode::PresetError => "PRESET_ERROR",
+            ErrorCode::ItemNotFound => "ITEM_NOT_FOUND",
+            ErrorCode::ItemCommandFailed => "ITEM_COMMAND_FAILED",
+            ErrorCode::InvariantCommandFailed => "INVARIANT_COMMAND_FAILED",
+            ErrorCode::ProjectCommandFailed => "PROJECT_COMMAND_FAILED",
+            ErrorCode::ProfileError => "PROFILE_ERROR",
+            ErrorCode::SearchFailed => "SEARCH_FAILED",
+            ErrorCode::RipgrepNotFound => "RIPGREP_NOT_FOUND",
+            ErrorCode::WorktreeInfoError => "WORKTREE_INFO_ERROR",
+            ErrorCode::WorktreeListError => "WORKTREE_LIST_ERROR",
+            ErrorCode::HooksInstallError => "HOOKS_INSTALL_ERROR",
+            ErrorCode::GenericError => "GENERIC_ERROR",
+            ErrorCode::RecoveryFailed => "recovery_failed",
+            ErrorCode::ClaimAcquireError => "CLAIM_ACQUIRE_ERROR",
+            ErrorCode::ClaimReleaseError => "CLAIM_RELEASE_ERROR",
+            ErrorCode::ClaimRenewError => "CLAIM_RENEW_ERROR",
+            ErrorCode::ClaimHeartbeatError => "CLAIM_HEARTBEAT_ERROR",
+            ErrorCode::ClaimStatusError => "CLAIM_STATUS_ERROR",
+            ErrorCode::ClaimListError => "CLAIM_LIST_ERROR",
+            ErrorCode::ClaimForceEvictError => "CLAIM_FORCE_EVICT_ERROR",
         }
     }
 
@@ -787,7 +885,15 @@ impl ErrorCode {
             ErrorCode::IssueNotFound
             | ErrorCode::GateNotFound
             | ErrorCode::ProfileNotFound
-            | ErrorCode::RepositoryNotFound => ExitCode::NotFound,
+            | ErrorCode::RepositoryNotFound
+            | ErrorCode::DependencyError
+            | ErrorCode::GateCheckError
+            | ErrorCode::PresetError
+            | ErrorCode::ClaimAcquireError
+            | ErrorCode::ClaimReleaseError
+            | ErrorCode::ClaimRenewError
+            | ErrorCode::ClaimHeartbeatError
+            | ErrorCode::ClaimForceEvictError => ExitCode::NotFound,
             ErrorCode::CycleDetected
             | ErrorCode::ValidationFailed
             | ErrorCode::Blocked
@@ -798,12 +904,26 @@ impl ErrorCode {
             | ErrorCode::AmbiguousId
             | ErrorCode::InvalidIdPrefix
             | ErrorCode::DeletionNotConfirmed => ExitCode::InvalidArgument,
-            ErrorCode::AlreadyExists => ExitCode::AlreadyExists,
+            ErrorCode::AlreadyExists | ErrorCode::GateError => ExitCode::AlreadyExists,
             ErrorCode::IoError
             | ErrorCode::ClaimRequiresGit
             | ErrorCode::RepositoryFormatTooNew
             | ErrorCode::StaleBinary => ExitCode::ExternalError,
-            ErrorCode::ParseError => ExitCode::GenericError,
+            ErrorCode::ParseError
+            | ErrorCode::ItemNotFound
+            | ErrorCode::ItemCommandFailed
+            | ErrorCode::InvariantCommandFailed
+            | ErrorCode::ProjectCommandFailed
+            | ErrorCode::ProfileError
+            | ErrorCode::SearchFailed
+            | ErrorCode::RipgrepNotFound
+            | ErrorCode::WorktreeInfoError
+            | ErrorCode::WorktreeListError
+            | ErrorCode::HooksInstallError
+            | ErrorCode::GenericError
+            | ErrorCode::RecoveryFailed
+            | ErrorCode::ClaimStatusError
+            | ErrorCode::ClaimListError => ExitCode::GenericError,
         }
     }
 
@@ -836,6 +956,43 @@ impl ErrorCode {
             }
             ErrorCode::ProfileNotFound => "The requested embedded profile does not exist.",
             ErrorCode::ProfileConflict => "Profile planning or validation found a conflict.",
+            ErrorCode::DependencyError => "A dependency command failed.",
+            ErrorCode::GateError => "A gate command failed.",
+            ErrorCode::GateCheckError => "A gate-status check failed.",
+            ErrorCode::PresetError => "A gate-preset command failed.",
+            ErrorCode::ItemNotFound => "An issue item-address lookup did not resolve an item.",
+            ErrorCode::ItemCommandFailed => {
+                "An item command failed without a more specific classification."
+            }
+            ErrorCode::InvariantCommandFailed => {
+                "An invariant command failed without a more specific classification."
+            }
+            ErrorCode::ProjectCommandFailed => {
+                "A project command failed without a more specific classification."
+            }
+            ErrorCode::ProfileError => {
+                "A profile command failed without a more specific classification."
+            }
+            ErrorCode::SearchFailed => "The search backend failed while executing a query.",
+            ErrorCode::RipgrepNotFound => "The external ripgrep search tool was not found.",
+            ErrorCode::WorktreeInfoError => "Worktree identity inspection failed.",
+            ErrorCode::WorktreeListError => "Worktree enumeration failed.",
+            ErrorCode::HooksInstallError => "Repository hook installation failed.",
+            ErrorCode::GenericError => {
+                "A command failed without a more specific public classification."
+            }
+            ErrorCode::RecoveryFailed => "Repository recovery failed.",
+            ErrorCode::ClaimAcquireError => "Claim acquisition failed.",
+            ErrorCode::ClaimReleaseError => "Claim release failed.",
+            ErrorCode::ClaimRenewError => "Claim renewal failed.",
+            ErrorCode::ClaimHeartbeatError => "Claim heartbeat failed.",
+            ErrorCode::ClaimStatusError => {
+                "Claim status inspection failed without a more specific classification."
+            }
+            ErrorCode::ClaimListError => {
+                "Claim enumeration failed without a more specific classification."
+            }
+            ErrorCode::ClaimForceEvictError => "Forced claim eviction failed.",
         }
     }
 }
@@ -879,6 +1036,29 @@ impl std::str::FromStr for ErrorCode {
             "DELETION_NOT_CONFIRMED" => Ok(ErrorCode::DeletionNotConfirmed),
             "PROFILE_NOT_FOUND" => Ok(ErrorCode::ProfileNotFound),
             "PROFILE_CONFLICT" => Ok(ErrorCode::ProfileConflict),
+            "DEPENDENCY_ERROR" => Ok(ErrorCode::DependencyError),
+            "GATE_ERROR" => Ok(ErrorCode::GateError),
+            "GATE_CHECK_ERROR" => Ok(ErrorCode::GateCheckError),
+            "PRESET_ERROR" => Ok(ErrorCode::PresetError),
+            "ITEM_NOT_FOUND" => Ok(ErrorCode::ItemNotFound),
+            "ITEM_COMMAND_FAILED" => Ok(ErrorCode::ItemCommandFailed),
+            "INVARIANT_COMMAND_FAILED" => Ok(ErrorCode::InvariantCommandFailed),
+            "PROJECT_COMMAND_FAILED" => Ok(ErrorCode::ProjectCommandFailed),
+            "PROFILE_ERROR" => Ok(ErrorCode::ProfileError),
+            "SEARCH_FAILED" => Ok(ErrorCode::SearchFailed),
+            "RIPGREP_NOT_FOUND" => Ok(ErrorCode::RipgrepNotFound),
+            "WORKTREE_INFO_ERROR" => Ok(ErrorCode::WorktreeInfoError),
+            "WORKTREE_LIST_ERROR" => Ok(ErrorCode::WorktreeListError),
+            "HOOKS_INSTALL_ERROR" => Ok(ErrorCode::HooksInstallError),
+            "GENERIC_ERROR" => Ok(ErrorCode::GenericError),
+            "recovery_failed" => Ok(ErrorCode::RecoveryFailed),
+            "CLAIM_ACQUIRE_ERROR" => Ok(ErrorCode::ClaimAcquireError),
+            "CLAIM_RELEASE_ERROR" => Ok(ErrorCode::ClaimReleaseError),
+            "CLAIM_RENEW_ERROR" => Ok(ErrorCode::ClaimRenewError),
+            "CLAIM_HEARTBEAT_ERROR" => Ok(ErrorCode::ClaimHeartbeatError),
+            "CLAIM_STATUS_ERROR" => Ok(ErrorCode::ClaimStatusError),
+            "CLAIM_LIST_ERROR" => Ok(ErrorCode::ClaimListError),
+            "CLAIM_FORCE_EVICT_ERROR" => Ok(ErrorCode::ClaimForceEvictError),
             code => Err(UnknownErrorCode {
                 code: code.to_string(),
             }),
@@ -3183,6 +3363,113 @@ mod tests {
                 "PROFILE_CONFLICT",
                 ExitCode::ValidationFailed,
             ),
+            (
+                ErrorCode::DependencyError,
+                "DEPENDENCY_ERROR",
+                ExitCode::NotFound,
+            ),
+            (ErrorCode::GateError, "GATE_ERROR", ExitCode::AlreadyExists),
+            (
+                ErrorCode::GateCheckError,
+                "GATE_CHECK_ERROR",
+                ExitCode::NotFound,
+            ),
+            (ErrorCode::PresetError, "PRESET_ERROR", ExitCode::NotFound),
+            (
+                ErrorCode::ItemNotFound,
+                "ITEM_NOT_FOUND",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::ItemCommandFailed,
+                "ITEM_COMMAND_FAILED",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::InvariantCommandFailed,
+                "INVARIANT_COMMAND_FAILED",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::ProjectCommandFailed,
+                "PROJECT_COMMAND_FAILED",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::ProfileError,
+                "PROFILE_ERROR",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::SearchFailed,
+                "SEARCH_FAILED",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::RipgrepNotFound,
+                "RIPGREP_NOT_FOUND",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::WorktreeInfoError,
+                "WORKTREE_INFO_ERROR",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::WorktreeListError,
+                "WORKTREE_LIST_ERROR",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::HooksInstallError,
+                "HOOKS_INSTALL_ERROR",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::GenericError,
+                "GENERIC_ERROR",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::RecoveryFailed,
+                "recovery_failed",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::ClaimAcquireError,
+                "CLAIM_ACQUIRE_ERROR",
+                ExitCode::NotFound,
+            ),
+            (
+                ErrorCode::ClaimReleaseError,
+                "CLAIM_RELEASE_ERROR",
+                ExitCode::NotFound,
+            ),
+            (
+                ErrorCode::ClaimRenewError,
+                "CLAIM_RENEW_ERROR",
+                ExitCode::NotFound,
+            ),
+            (
+                ErrorCode::ClaimHeartbeatError,
+                "CLAIM_HEARTBEAT_ERROR",
+                ExitCode::NotFound,
+            ),
+            (
+                ErrorCode::ClaimStatusError,
+                "CLAIM_STATUS_ERROR",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::ClaimListError,
+                "CLAIM_LIST_ERROR",
+                ExitCode::GenericError,
+            ),
+            (
+                ErrorCode::ClaimForceEvictError,
+                "CLAIM_FORCE_EVICT_ERROR",
+                ExitCode::NotFound,
+            ),
         ];
 
         assert_eq!(expected.len(), ErrorCode::ALL.len());
@@ -3225,6 +3512,86 @@ mod tests {
                 code.as_str()
             );
         }
+    }
+
+    fn emitted_text_error_codes() -> BTreeSet<&'static str> {
+        regex::Regex::new(r#""([A-Za-z_]+)""#)
+            .expect("error-code literal regex should compile")
+            .captures_iter(include_str!("main.rs"))
+            .filter_map(|captures| captures.get(1).map(|capture| capture.as_str()))
+            .filter(|text| {
+                *text == "recovery_failed"
+                    || (text
+                        .bytes()
+                        .all(|byte| byte == b'_' || byte.is_ascii_uppercase())
+                        && ["ERROR", "FAILED", "NOT_FOUND"]
+                            .iter()
+                            .any(|suffix| text.ends_with(suffix)))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_emitted_text_error_codes_resolve_without_changing_spelling() {
+        let emitted = emitted_text_error_codes();
+        assert!(
+            !emitted.is_empty(),
+            "the source-derived emitted-code set must not be vacuous"
+        );
+
+        for text in emitted {
+            let code = text
+                .parse::<ErrorCode>()
+                .unwrap_or_else(|_| panic!("emitted code {text} must be registered"));
+            assert_eq!(code.as_str(), text);
+
+            let error =
+                JsonError::legacy_unregistered(text, ExitCode::Success, "classification probe");
+            assert_eq!(error.error.code, text);
+            assert_eq!(error.exit_code(), code.exit_code());
+        }
+    }
+
+    #[test]
+    fn test_new_error_code_members_match_plain_failure_classes() {
+        for code in [
+            ErrorCode::DependencyError,
+            ErrorCode::GateCheckError,
+            ErrorCode::PresetError,
+            ErrorCode::ClaimAcquireError,
+            ErrorCode::ClaimReleaseError,
+            ErrorCode::ClaimRenewError,
+            ErrorCode::ClaimHeartbeatError,
+            ErrorCode::ClaimForceEvictError,
+        ] {
+            assert_eq!(code.exit_code(), ExitCode::NotFound, "{code}");
+        }
+
+        assert_eq!(ErrorCode::GateError.exit_code(), ExitCode::AlreadyExists);
+
+        for code in [
+            ErrorCode::ItemNotFound,
+            ErrorCode::ItemCommandFailed,
+            ErrorCode::InvariantCommandFailed,
+            ErrorCode::ProjectCommandFailed,
+            ErrorCode::ProfileError,
+            ErrorCode::SearchFailed,
+            ErrorCode::RipgrepNotFound,
+            ErrorCode::WorktreeInfoError,
+            ErrorCode::WorktreeListError,
+            ErrorCode::HooksInstallError,
+            ErrorCode::GenericError,
+            ErrorCode::RecoveryFailed,
+            ErrorCode::ClaimStatusError,
+            ErrorCode::ClaimListError,
+        ] {
+            assert_eq!(code.exit_code(), ExitCode::GenericError, "{code}");
+        }
+    }
+
+    #[test]
+    fn test_parse_error_has_explicit_generic_status() {
+        assert_eq!(ErrorCode::ParseError.exit_code(), ExitCode::GenericError);
     }
 
     // ========================================================================
