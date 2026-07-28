@@ -7,14 +7,16 @@ The epic has one architectural move and three consequences. The move is to stop
 treating envelope emission as per-arm work: the top-level failure printer becomes
 the envelope renderer, so presence is structural rather than conventional (D-1).
 What remains is then small and bounded — a vocabulary that can carry an exit class,
-four individually broken emission sites, a conformance layer that observes the
-property at runtime because no static reading of the source can decide it, and one
-adopter home for the resulting contract.
+the individually broken emission sites exposed by conformance and holistic review,
+a conformance layer that observes the property at runtime because no static reading
+of the source can decide it, and one adopter home for the resulting contract.
 
 Sizing follows from that. There is no "51 arms to convert" workstream, because the
-central renderer covers every propagating arm at once. The residual per-arm work is
-exactly four arms whose own emission is wrong, plus classification coverage inside
-one classifier. The conformance layer is the one place sizing is not yet decidable:
+central renderer covers every propagating arm at once. The planning baseline found
+four arms whose own emission was wrong; execution also repaired `config validate`
+when holistic review exposed its constructible post-dispatch invalid-result path.
+Classification coverage remains inside one classifier. The conformance layer is the
+one place sizing is not yet decidable:
 whether an arm can be driven into a failure raised inside its own body is unmeasured,
 so that universe is surveyed namespace by namespace, merged into one machine-readable
 registry, and reconciled against the reflected arm set before any check is written

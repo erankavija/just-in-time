@@ -1,7 +1,7 @@
 {
   "epic_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
   "epic_short_id": "a2546471",
-  "current_wave": 10,
+  "current_wave": 11,
   "waves": [
     {
       "wave_number": 1,
@@ -93,6 +93,13 @@
       "issues": [
         {"id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","short_id":"b2295bbb","title":"Envelope invalid configuration validation results","classification":"implementation","status":"done"}
       ]
+    },
+    {
+      "wave_number": 11,
+      "issues": [
+        {"id":"ced03648-c487-417c-b5e8-a447ec2dc4eb","short_id":"ced03648","title":"Make the failure registry independent of planning artifacts","classification":"implementation","status":"in_progress"},
+        {"id":"002e9479-c893-457d-b4ef-1c50b1c43c9f","short_id":"002e9479","title":"Complete the typed error-envelope constructor cutover","classification":"implementation","status":"in_progress"}
+      ]
     }
   ],
   "created_during_execution": [
@@ -125,6 +132,16 @@
       "id": "b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8",
       "short_id": "b2295bbb",
       "reason": "Epic holistic review found that config validate --json emits a non-envelope valid=false report and exits 1 after dispatch while its registry exemption hides the path; the invoker authorized one extra narrow rework to restore the authoritative post-dispatch contract."
+    },
+    {
+      "id": "ced03648-c487-417c-b5e8-a447ec2dc4eb",
+      "short_id": "ced03648",
+      "reason": "Final holistic review found that the conformance fixture still compile-time includes archivable planning fragments, contradicting the authoritative plan's test-tree registry landing and making archival break the guard."
+    },
+    {
+      "id": "002e9479-c893-457d-b4ef-1c50b1c43c9f",
+      "short_id": "002e9479",
+      "reason": "Final holistic review found that production raw-string envelope constructors can still bypass the closed typed vocabulary and independently select an exit status."
     }
   ],
   "escalations": [
@@ -168,7 +185,7 @@
     }
   ],
   "rework_counts": {
-    "a2546471": 0,
+    "a2546471": 1,
     "b2295bbb": 1,
     "9eadd135": 1,
     "7491da4a": 1,

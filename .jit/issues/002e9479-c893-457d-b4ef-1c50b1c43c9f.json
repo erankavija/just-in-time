@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:typed-envelope-cutover",
+  "claimed_at": "2026-07-28T20:51:50.266958940Z",
+  "context": {},
+  "created_at": "2026-07-28T20:49:58.078912793Z",
+  "dependencies": [],
+  "description": "Finish the closed error-code vocabulary cutover so production envelope construction cannot accept a raw code string or caller-selected status.\n\n## Success Criteria\n\n- [hard] REQ-01: Every production `JsonError` construction site uses a typed `ErrorCode`; no production path calls `legacy_unregistered` or an equivalent raw-code/status constructor.\n- [hard] REQ-02: The legacy raw-string constructor is removed from the production API, along with compatibility-only tests that preserve unregistered code emission.\n- [hard] REQ-03: Every existing emitted code keeps its byte spelling and class-correct `ErrorCode::exit_code()` status, including the lowercase recovery code.\n- [hard] REQ-04: Regression coverage fails if a production envelope code can bypass the enum or select a status independently of its code.\n- [hard] REQ-05: The full Rust gate and independent code review pass with no scope drift into parser diagnostics or human output.\n\n## Notes\n\nThis is a greenfield canonical cutover. There is no backward-compatibility requirement for an internal constructor that contradicts the typed vocabulary.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-28T20:49:58.078912793Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "002e9479-c893-457d-b4ef-1c50b1c43c9f",
+  "labels": [
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:typed-envelope-cutover",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Complete the typed error-envelope constructor cutover",
+  "updated_at": "2026-07-28T20:51:50.266958940Z"
+}
