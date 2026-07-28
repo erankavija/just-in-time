@@ -10974,3 +10974,10 @@
 {"from":"backlog","id":"4e6c23c3-a168-4c8e-82e0-2cb62f00dcce","issue_id":"7e0c04d0-c4b5-4afb-96af-2926e61f0b43","timestamp":"2026-07-28T13:35:00.471916689Z","to":"ready","type":"issue_state_changed"}
 {"assignee":"agent:wave5-fixture","id":"daeff902-7900-4fe9-9d7a-b58d83ebd3c0","issue_id":"f4346059-afd1-459d-8028-3227787061dd","timestamp":"2026-07-28T13:36:52.031973355Z","type":"issue_claimed"}
 {"from":"ready","id":"fe8ef65e-eeba-4e96-9262-69f467b7e906","issue_id":"f4346059-afd1-459d-8028-3227787061dd","timestamp":"2026-07-28T13:36:55.254044320Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"8cb8a48d-a596-4625-aa2b-d5dc977a68f6","issue_id":"4087cd55-0c6e-4e16-8c1f-f468b66e8b37","timestamp":"2026-07-28T13:45:37.855849505Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"f2ff33ff-6034-4d6e-b083-1f64fe4223a0","issue_id":"4087cd55-0c6e-4e16-8c1f-f468b66e8b37","timestamp":"2026-07-28T13:48:15.837566279Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"fecf3cbc-d940-4885-906f-ba5aeb4d55fa","issue_id":"cc2fd90d-c6bb-4c51-b70b-c7eb929a39c1","priority":"high","timestamp":"2026-07-28T13:49:12.354941884Z","title":"Envelope failing validation reports","type":"issue_created"}
+{"from":"ready","id":"36b25c89-61f3-4a16-b48d-86b780b9e695","issue_id":"4087cd55-0c6e-4e16-8c1f-f468b66e8b37","timestamp":"2026-07-28T13:49:26.453049952Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"8865a7c5-c8c0-4288-bbe6-5bfb09648458","issue_id":"4087cd55-0c6e-4e16-8c1f-f468b66e8b37","timestamp":"2026-07-28T13:49:26.453049952Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:wave5-validate-envelope","id":"6374609a-a889-4cfe-a078-6dd8432021c2","issue_id":"cc2fd90d-c6bb-4c51-b70b-c7eb929a39c1","timestamp":"2026-07-28T13:49:40.894024662Z","type":"issue_claimed"}
+{"from":"ready","id":"1b47d1bd-fc9f-4e3c-8414-fd58be7abe0c","issue_id":"cc2fd90d-c6bb-4c51-b70b-c7eb929a39c1","timestamp":"2026-07-28T13:49:44.146624167Z","to":"in_progress","type":"issue_state_changed"}

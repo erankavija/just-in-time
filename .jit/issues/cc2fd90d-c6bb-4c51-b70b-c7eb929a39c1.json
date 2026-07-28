@@ -1,0 +1,28 @@
+{
+  "assignee": "agent:wave5-validate-envelope",
+  "claimed_at": "2026-07-28T13:49:40.894024662Z",
+  "context": {},
+  "created_at": "2026-07-28T13:49:12.354941884Z",
+  "dependencies": [],
+  "description": "Make `validate --json` use the canonical error envelope whenever validation ends with a nonzero process status, so validation obeys the same machine-readable failure contract as every other dispatched command.\n\n## Background\n\nThe validation handler currently serializes its normal report shape with `valid: false` and then exits nonzero. That is useful result data, but it is not the canonical error-envelope shape required for failing machine-readable invocations. Successful validation remains a normal validation report; only failing outcomes move onto the shared error contract, with useful findings retained as structured detail.\n\n## Success Criteria\n\n- [hard] REQ-01: An integrity or rule failure from `validate --json` emits exactly one canonical error envelope on the payload stream instead of a raw `valid: false` report.\n- [hard] REQ-02: The envelope reports a registered error code whose mapping determines the process exit status.\n- [hard] REQ-03: The envelope retains the validation findings and integrity context needed by machine consumers as structured detail.\n- [hard] REQ-04: A successful `validate --json` invocation still emits the normal successful validation report, and plain validation behavior remains unchanged.\n- [hard] REQ-05: Integration coverage exercises successful JSON validation plus integrity-failure and rule-failure JSON validation, asserting payload shape, stream purity, and exit status.",
+  "documents": [],
+  "first_ready_at": "2026-07-28T13:49:12.354941884Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "cc2fd90d-c6bb-4c51-b70b-c7eb929a39c1",
+  "labels": [
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:structural-envelope",
+    "satisfies:REQ-06",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Envelope failing validation reports",
+  "updated_at": "2026-07-28T13:49:44.146624167Z"
+}

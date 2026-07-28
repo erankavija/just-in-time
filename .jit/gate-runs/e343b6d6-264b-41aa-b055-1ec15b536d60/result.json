@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "4202d7ca84c7fd41e4ff106cc384c3694b4bd9f6",
+  "completed_at": "2026-07-28T13:48:15.562824367Z",
+  "duration_ms": 156801,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 7027,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "`jit validate --json` emits a valid=false report and exits nonzero rather than the error envelope."
+      }
+    ],
+    "summary": "A nonzero JSON validation path still emits a non-envelope report, violating REQ-06.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4087cd55-0c6e-4e16-8c1f-f468b66e8b37",
+  "message": null,
+  "run_id": "e343b6d6-264b-41aa-b055-1ec15b536d60",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T13:45:38.760862162Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9839 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa8f9-4fc5-7702-a270-ad56cc059fba\n--------\nuser\n--- 9826 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: fallback—no reachable `jit:4087cd55` commits; reviewed issue intent and current CLI paths\nPolicy sources: AGENTS.md\nResolved items: none\nGate evidence: cargo-ci passed (exit 0, 2026-07-28T13:39:02Z); code-review pending\nTruncation recovery: narrowed reads of main.rs, output.rs, targeted tests, and failure-lever registry after broad searches truncated\n\n1. **[blocking][issue-impact]** `jit validate --json` emits a successful-result report (`{\"valid\": false, ...}`) and exits nonzero instead of emitting the error envelope. The handler deliberately exits before the top-level renderer, and its focused test preserves that behavior. This violates hard REQ-06’s requirement that every failing machine-readable invocation use the error-envelope shape. [crates/jit/src/main.rs:7027](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:7027)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A nonzero JSON validation path still emits a non-envelope report, violating REQ-06.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"`jit validate --json` emits a valid=false report and exits nonzero rather than the error envelope.\",\"file\":\"crates/jit/src/main.rs\",\"line\":7027,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
