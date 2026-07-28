@@ -11,6 +11,7 @@ use jit::storage::{
     TransactionFailurePoint,
 };
 use predicates::prelude::*;
+use serde_json::Value;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -134,6 +135,46 @@ fn test_recover_with_json_output() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"success\""));
+}
+
+#[test]
+fn test_recover_json_failure_writes_registered_pretty_envelope_to_stdout() {
+    let temp = TempDir::new().unwrap();
+
+    jit_cmd()
+        .current_dir(temp.path())
+        .args(["init"])
+        .assert()
+        .success();
+    std::process::Command::new("git")
+        .current_dir(temp.path())
+        .args(["init"])
+        .output()
+        .expect("Failed to initialize headless git repository");
+
+    let assert = jit_cmd()
+        .current_dir(temp.path())
+        .args(["recover", "--json"])
+        .assert()
+        .code(jit::output::ErrorCode::RecoveryFailed.exit_code().code());
+    let output = assert.get_output();
+    let stdout = std::str::from_utf8(&output.stdout).unwrap();
+    let stderr = std::str::from_utf8(&output.stderr).unwrap();
+    let envelope: Value = serde_json::from_str(stdout).expect("stdout must be one JSON document");
+
+    assert!(
+        stdout.contains("\n  \"error\":"),
+        "stdout must be pretty JSON: {stdout}"
+    );
+    assert!(
+        stdout.ends_with('\n'),
+        "stdout must end with one newline: {stdout}"
+    );
+    assert_eq!(envelope["error"]["code"], "recovery_failed");
+    assert!(
+        !stderr.contains('{'),
+        "stderr must not contain JSON: {stderr}"
+    );
 }
 
 #[test]

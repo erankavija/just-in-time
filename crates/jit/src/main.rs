@@ -7103,12 +7103,11 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        let output = jit::output::JsonError::legacy_unregistered(
-                            "recovery_failed",
-                            jit::output::ExitCode::GenericError,
+                        let output = jit::output::JsonError::new(
+                            jit::output::ErrorCode::RecoveryFailed,
                             e.to_string(),
                         );
-                        eprintln!("{}", serde_json::to_string(&output)?);
+                        println!("{}", output.to_json_string()?);
                         std::process::exit(output.exit_code().code());
                     } else {
                         eprintln!("Recovery failed: {}", e);
