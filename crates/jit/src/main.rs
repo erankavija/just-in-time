@@ -6481,7 +6481,7 @@ fn run() -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        use jit::output::JsonError;
+                        use jit::output::{ErrorCode, JsonError};
 
                         // Classify by downcast against the typed SearchError, not by
                         // scanning the message text. RipgrepNotInstalled -> the
@@ -6491,12 +6491,12 @@ fn run() -> Result<()> {
                             e.downcast_ref::<jit::search::SearchError>(),
                             Some(jit::search::SearchError::RipgrepNotInstalled)
                         ) {
-                            "RIPGREP_NOT_FOUND"
+                            ErrorCode::RipgrepNotFound
                         } else {
-                            "SEARCH_FAILED"
+                            ErrorCode::SearchFailed
                         };
 
-                        let suggestion = if error_code == "RIPGREP_NOT_FOUND" {
+                        let suggestion = if error_code == ErrorCode::RipgrepNotFound {
                             Some(
                                 "Install ripgrep from https://github.com/BurntSushi/ripgrep"
                                     .to_string(),
@@ -6505,11 +6505,7 @@ fn run() -> Result<()> {
                             None
                         };
 
-                        let mut json_error = JsonError::legacy_unregistered(
-                            error_code,
-                            jit::output::ExitCode::ExternalError,
-                            e.to_string(),
-                        );
+                        let mut json_error = JsonError::new(error_code, e.to_string());
                         if let Some(sug) = suggestion {
                             json_error = json_error.with_suggestion(sug);
                         }
