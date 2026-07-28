@@ -6,6 +6,7 @@ path = "claim acquire"
 argv = ["claim", "acquire", "deadbeef", "--agent-id", "agent:probe", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "ISSUE_NOT_FOUND: Issue not found: deadbeef"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -14,6 +15,7 @@ path = "claim release"
 argv = ["claim", "release", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "ISSUE_NOT_FOUND: Failed to resolve issue id deadbeef"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -23,6 +25,7 @@ argv = ["claim", "renew", "00000000-0000-0000-0000-000000000000", "--json"]
 setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:index-with-active-lease"]
 setup_notes = "claim:index-with-active-lease seeds one valid issue and acquires a finite lease for it, creating .git/jit/claims.index.json and its locks before the missing lease lookup."
 expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -32,6 +35,7 @@ argv = ["claim", "heartbeat", "00000000-0000-0000-0000-000000000000", "--json"]
 setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:index-with-active-lease"]
 setup_notes = "claim:index-with-active-lease seeds one valid issue and acquires a finite lease for it, creating .git/jit/claims.index.json and its locks before the missing lease lookup."
 expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -41,6 +45,7 @@ argv = ["claim", "status", "--json"]
 setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:index-with-active-lease", "malformed-claim-index"]
 setup_notes = "malformed-claim-index replaces .git/jit/claims.index.json with invalid JSON after claim:index-with-active-lease has created it."
 expected_failure = "PARSE_ERROR: Failed to parse claims index"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -50,6 +55,7 @@ argv = ["claim", "list", "--json"]
 setup = ["init", "git:repository-with-head", "claim:index-with-active-lease", "malformed-claim-index"]
 setup_notes = "malformed-claim-index replaces .git/jit/claims.index.json with invalid JSON after claim:index-with-active-lease has created it."
 expected_failure = "PARSE_ERROR: Failed to parse claims index"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -59,5 +65,6 @@ argv = ["claim", "force-evict", "00000000-0000-0000-0000-000000000000", "--reaso
 setup = ["init", "git:repository-with-head", "claim:index-with-active-lease"]
 setup_notes = "claim:index-with-active-lease seeds one valid issue and acquires a finite lease for it, creating .git/jit/claims.index.json and its locks before the missing lease lookup."
 expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"

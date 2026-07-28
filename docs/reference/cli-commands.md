@@ -3294,8 +3294,9 @@ Reports enforcement drift in the declared-but-unenforced direction: an invariant
 whose `enforced-by` names a rule or gate that does not load. Bindings are
 declarations, and this check never executes them. Exits `4` when any drift is
 present (see the [exit-code reference](exit-codes.md#command-specific-mappings)).
-JSON uses the list envelope `{"count": N, "findings": [...]}`. A failing command
-under `--json` returns the error envelope with code `INVARIANT_COMMAND_FAILED`.
+With no drift, JSON uses the list envelope `{"count": 0, "findings": []}`. Drift
+under `--json` returns the `VALIDATION_FAILED` error envelope and preserves the
+report as `error.details`, including its `count` and `findings` fields.
 
 ## Repository Search
 
@@ -3710,7 +3711,7 @@ The collection key is command-specific:
 | `gate status --all`/`--limit` | `results` |
 | `gate status-all` | `gates` |
 | `query divergence` | `divergences` |
-| `invariant check` | `findings` |
+| `invariant check` (when no drift is found) | `findings` |
 
 Some envelopes carry additional metadata keys alongside `count` and the
 collection (for example `query`/`namespace` context, `issue_id`, or a `warnings`

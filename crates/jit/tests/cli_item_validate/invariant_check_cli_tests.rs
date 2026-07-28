@@ -6,7 +6,8 @@
 //! rule/gate is NOT drift (the enforced-but-undeclared direction was removed in
 //! REQ-05). Asserts the command exits non-zero on a dangling binding, exits zero
 //! when every binding resolves (even with unclaimed rules/gates present), and
-//! that `--json` produces a valid machine-readable payload.
+//! that `--json` preserves successful reports and wraps drift reports in the
+//! canonical machine-readable failure envelope.
 
 use serde_json::Value;
 use std::process::Command;
@@ -62,7 +63,8 @@ fn test_check_reports_declared_but_unenforced_and_exits_nonzero() {
     assert_eq!(output.status.code(), Some(4), "expected exit 4 on drift");
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let findings = json["findings"].as_array().unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED", "{json}");
+    let findings = json["error"]["details"]["findings"].as_array().unwrap();
     // The dangling binding sample-invariant -> ghost-rule is the sole finding.
     assert_eq!(findings.len(), 1, "{json}");
     assert!(
@@ -209,7 +211,8 @@ fn test_check_reports_unloadable_rule_source_not_a_parse_error() {
             String::from_utf8_lossy(&output.stdout)
         )
     });
-    let findings = json["findings"].as_array().unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED", "{json}");
+    let findings = json["error"]["details"]["findings"].as_array().unwrap();
     assert!(
         findings
             .iter()
@@ -242,8 +245,9 @@ fn test_check_reports_unloadable_gate_registry() {
 
     assert_eq!(output.status.code(), Some(4));
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED", "{json}");
     assert!(
-        json["findings"]
+        json["error"]["details"]["findings"]
             .as_array()
             .unwrap()
             .iter()

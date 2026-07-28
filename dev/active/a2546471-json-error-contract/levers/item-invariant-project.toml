@@ -7,6 +7,7 @@ argv = ["item", "list", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Replace .jit/config.toml with `not = valid = toml` after initialization."
 expected_failure = "ITEM_COMMAND_FAILED: invalid .jit/config.toml: Failed to parse config.toml"
+expected_code = "ITEM_COMMAND_FAILED"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -16,6 +17,7 @@ argv = ["item", "search", "survey", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Replace .jit/config.toml with `not = valid = toml` after initialization."
 expected_failure = "ITEM_COMMAND_FAILED: invalid .jit/config.toml: Failed to parse config.toml"
+expected_code = "ITEM_COMMAND_FAILED"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -24,6 +26,7 @@ path = "item show"
 argv = ["item", "show", "not-a-qualified-address", "--json"]
 setup = ["init"]
 expected_failure = "ITEM_COMMAND_FAILED: 'not-a-qualified-address' is not a qualified id; expected '<short-id>/<self-id>'"
+expected_code = "ITEM_COMMAND_FAILED"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -32,6 +35,7 @@ path = "item resolve"
 argv = ["item", "resolve", "not-a-qualified-address", "--json"]
 setup = ["init"]
 expected_failure = "ITEM_COMMAND_FAILED: 'not-a-qualified-address' is not a qualified id; expected '<short-id>/<self-id>'"
+expected_code = "ITEM_COMMAND_FAILED"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -41,6 +45,7 @@ argv = ["invariant", "check", "--json"]
 setup = ["init", "dangling-invariant-enforcement:survey-invariant"]
 setup_notes = "After initialization, create .jit/invariants.toml with one [[invariants]] entry: id = \"survey-invariant\", statement = \"Survey invariant used to reproduce missing enforcement drift.\", kind = \"enforced\", and enforced-by = \"@/rule/missing-survey-rule\"."
 expected_failure = "Exit 4 with message `Enforcement drift: 1 finding(s)` and one finding whose invariant_id is `survey-invariant`, subject is `@/rule/missing-survey-rule`, and unloadable is false."
+expected_code = "VALIDATION_FAILED"
 expected_exit = 4
 confirmation = "invoked"
 
@@ -49,5 +54,6 @@ path = "project render"
 argv = ["project", "render", "--name", "no-such-projection", "--json"]
 setup = ["init", "no-projection:no-such-projection"]
 expected_failure = "PROJECT_COMMAND_FAILED: unknown projection 'no-such-projection'"
+expected_code = "PROJECT_COMMAND_FAILED"
 expected_exit = 1
 confirmation = "invoked"

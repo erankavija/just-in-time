@@ -570,7 +570,9 @@ pub enum InvariantCommands {
     ///   jit invariant check           # Human-readable drift report
     ///   jit invariant check --json    # Machine-readable result
     ///
-    /// JSON output uses the list envelope `{"count": N, "findings": [...]}`.
+    /// Successful JSON output uses the list envelope `{"count": N, "findings": [...]}`.
+    /// Enforcement drift is a failing JSON error envelope with the report under
+    /// `error.details`.
     Check {
         /// Output as JSON
         #[arg(long)]

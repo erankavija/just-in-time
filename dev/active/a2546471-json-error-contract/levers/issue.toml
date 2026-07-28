@@ -6,6 +6,7 @@ path = "issue create"
 argv = ["issue", "create", "--title", "probe", "--priority", "impossible", "--json"]
 setup = ["init"]
 expected_failure = "Priority parsing rejects `impossible` after the create arm has dispatched."
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -14,6 +15,7 @@ path = "issue batch-create"
 argv = ["issue", "batch-create", "--from-json", "missing-batch.json", "--json"]
 setup = ["init", "file-absent:missing-batch.json"]
 expected_failure = "The batch-create arm cannot read the named batch file."
+expected_code = "REPOSITORY_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -22,6 +24,7 @@ path = "issue search"
 argv = ["issue", "search", "--json"]
 setup = ["init"]
 expected_failure = "The search arm rejects an invocation with neither a query nor a filter."
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -30,6 +33,7 @@ path = "issue show"
 argv = ["issue", "show", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Issue resolution reports that `deadbeef` is not found."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -38,6 +42,7 @@ path = "issue status"
 argv = ["issue", "status", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Issue resolution reports that `deadbeef` is not found."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -46,6 +51,7 @@ path = "issue children"
 argv = ["issue", "children", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Container resolution reports that `deadbeef` is not found."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -54,6 +60,7 @@ path = "issue progress"
 argv = ["issue", "progress", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Container resolution reports that `deadbeef` is not found."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -62,6 +69,7 @@ path = "issue update"
 argv = ["issue", "update", "deadbeef", "--state", "ready", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The update arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -70,6 +78,7 @@ path = "issue delete"
 argv = ["issue", "delete", "deadbeef", "--json"]
 setup = ["worktree:primary", "init", "env-unset:JIT_ALLOW_DELETION"]
 expected_failure = "The delete arm refuses deletion without explicit confirmation."
+expected_code = "DELETION_NOT_CONFIRMED"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -78,6 +87,7 @@ path = "issue assign"
 argv = ["issue", "assign", "deadbeef", "agent:probe", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The assign arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -86,6 +96,7 @@ path = "issue claim"
 argv = ["issue", "claim", "deadbeef", "agent:probe", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The claim arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -94,6 +105,7 @@ path = "issue unassign"
 argv = ["issue", "unassign", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The unassign arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -102,6 +114,7 @@ path = "issue reject"
 argv = ["issue", "reject", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The reject arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -110,6 +123,7 @@ path = "issue release"
 argv = ["issue", "release", "deadbeef", "probe", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "The release arm cannot resolve issue `deadbeef`."
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -118,6 +132,7 @@ path = "issue claim-next"
 argv = ["issue", "claim-next", "agent:probe", "--json"]
 setup = ["init", "no-ready-issue"]
 expected_failure = "The claim-next arm finds no ready issue to claim."
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -126,5 +141,6 @@ path = "issue list"
 argv = ["issue", "list", "--state", "impossible", "--json"]
 setup = ["init"]
 expected_failure = "State parsing rejects `impossible` after the list arm has dispatched."
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"

@@ -6,6 +6,7 @@ path = "doc add"
 argv = ["doc", "add", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -14,6 +15,7 @@ path = "doc assets list"
 argv = ["doc", "assets", "list", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -22,6 +24,7 @@ path = "doc check-links"
 argv = ["doc", "check-links", "--scope", "issue:deadbeef", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -30,6 +33,7 @@ path = "doc conformance"
 argv = ["doc", "conformance", "--json"]
 setup = ["init", "malformed-config-toml"]
 expected_failure = "PARSE_ERROR"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 setup_notes = "Replace the [version] table header in .jit/config.toml with the malformed `[version` before invoking."
@@ -39,6 +43,7 @@ path = "doc diff"
 argv = ["doc", "diff", "deadbeef", ".jit/config.toml", "--from", "HEAD", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -47,6 +52,7 @@ path = "doc dir"
 argv = ["doc", "dir", "deadbeef", "dev", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -55,6 +61,7 @@ path = "doc history"
 argv = ["doc", "history", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -63,6 +70,7 @@ path = "doc list"
 argv = ["doc", "list", "deadbeef", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -71,6 +79,7 @@ path = "doc remove"
 argv = ["doc", "remove", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
@@ -79,5 +88,6 @@ path = "doc show"
 argv = ["doc", "show", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]
 expected_failure = "ISSUE_NOT_FOUND"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"

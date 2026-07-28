@@ -1507,6 +1507,12 @@ fn run_invariant_inner<S: IssueStore>(
                 } else {
                     "No enforcement drift".to_string()
                 };
+                if exit_nonzero {
+                    let error = JsonError::new(ErrorCode::ValidationFailed, msg)
+                        .with_details(serde_json::to_value(&result)?);
+                    println!("{}", error.to_json_string()?);
+                    std::process::exit(error.exit_code().code());
+                }
                 let output = JsonOutput::success(&result).with_message(msg);
                 println!("{}", output.to_json_string()?);
             } else if result.findings.is_empty() {
