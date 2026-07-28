@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "53073d4dd6978cf2ebbf4d9177d03c47ab4a6a83",
+  "completed_at": "2026-07-28T13:23:26.195846664Z",
+  "duration_ms": 349832,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "a193a7cc-a00b-4551-bb30-922a8e015b38",
+  "message": null,
+  "run_id": "bcd841d0-e48f-4024-8826-3abbbd1120db",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T13:17:36.363797122Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- incremental-state output ---\nnon-empty incremental directories under /home/vkaskivuo/Projects/just-in-time/target:\n/home/vkaskivuo/Projects/just-in-time/target/debug/incremental\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✓ test: 4032 passed, 0 failed, 15 ignored\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1364 bytes=26785515)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1317205728/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✗ incremental-state: FAILED (exit 1)\n\n",
+  "tree_dirty": false
+}

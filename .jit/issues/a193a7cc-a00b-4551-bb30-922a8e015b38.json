@@ -16,8 +16,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "passed",
-      "updated_at": "2026-07-28T13:01:07.673724530Z",
+      "status": "failed",
+      "updated_at": "2026-07-28T13:23:26.210863129Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -39,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bind the exit-status projection to the machine-readable invocation form",
-  "updated_at": "2026-07-28T13:04:11.263798376Z"
+  "updated_at": "2026-07-28T13:23:26.210863129Z"
 }
