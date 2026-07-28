@@ -10988,3 +10988,10 @@
 {"fields":["dependencies"],"id":"39f86c4d-7e15-42c3-a9d1-8b6ae6a25571","issue_id":"7e0c04d0-c4b5-4afb-96af-2926e61f0b43","timestamp":"2026-07-28T14:04:03.245496474Z","type":"issue_updated","updated_by":"dependency-add"}
 {"assignee":"agent:wave5-claim-parity","id":"c5e237b1-198b-434c-934e-bdc623c7bca2","issue_id":"4359178b-87d7-4e8d-b410-a3f0704ecab4","timestamp":"2026-07-28T14:04:12.792405178Z","type":"issue_claimed"}
 {"from":"ready","id":"8b71a603-ce75-49d1-8007-c1886c1d05df","issue_id":"4359178b-87d7-4e8d-b410-a3f0704ecab4","timestamp":"2026-07-28T14:04:16.182143023Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"b8373612-57f3-49cf-99fa-ad964d3f9bc1","issue_id":"f4346059-afd1-459d-8028-3227787061dd","timestamp":"2026-07-28T14:18:32.817033825Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"331224e8-d6ce-4fcf-b270-c6c2db3e9d75","issue_id":"f4346059-afd1-459d-8028-3227787061dd","timestamp":"2026-07-28T14:21:07.209941783Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"d86a461a-2130-447c-abe5-7d50c0f72c65","issue_id":"f4346059-afd1-459d-8028-3227787061dd","timestamp":"2026-07-28T14:21:33.954811435Z","to":"done","type":"issue_state_changed"}
+{"id":"05677a0c-9737-4f01-adf1-bd2d769722f7","issue_id":"f4346059-afd1-459d-8028-3227787061dd","timestamp":"2026-07-28T14:21:33.954811435Z","type":"issue_completed"}
+{"from":"backlog","id":"9490f2ba-b1c3-4420-942d-6242f58ba3e4","issue_id":"37e3edf3-57fa-4fc4-9a9b-81ec0e9a804b","timestamp":"2026-07-28T14:21:38.576680413Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"b26695fc-43c7-45f4-9f22-8653756f4ce1","issue_id":"60aeaa49-0ee3-4c8d-ac61-f5316bae3932","timestamp":"2026-07-28T14:21:43.267153951Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"aceb66b6-bf8e-4e6b-9e8e-dc45f2824afe","issue_id":"a1322bee-21c1-4f14-af96-ffa8c7204926","timestamp":"2026-07-28T14:21:47.919088468Z","to":"ready","type":"issue_state_changed"}

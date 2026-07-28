@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "27b090264104dd4194cfc449d7c3e9024f2f62db",
+  "completed_at": "2026-07-28T14:21:06.931489125Z",
+  "duration_ms": 151265,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The registry-driven fixture meets all issue-scoped success criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f4346059-afd1-459d-8028-3227787061dd",
+  "message": null,
+  "run_id": "5ecd414f-9828-43e1-aaea-5d4334f7c255",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T14:18:35.665511349Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:f4346059 commits 4202d7c, a9613d2, 5a51b5a, 0b15586\nPolicy sources: AGENTS.md\nResolved items: @/invariant/shared-test-contracts (.jit/invariants.toml); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-28T14:09:47Z)\nTruncation recovery: recovered the truncated aggregate merge patch through bounded reads of failure_probe_fixture.rs:1-597, main.rs:1-34, and the individual 5a51b5a patch.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The registry-driven fixture meets all issue-scoped success criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

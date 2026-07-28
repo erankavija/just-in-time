@@ -7,6 +7,7 @@
   ],
   "description": "The set of command arms accepting the machine-readable flag is derived from the command definitions and compared against the set the failure probes cover, so an arm added later cannot ship without a probe or a declared exemption behind it.\n\n## Background\n\nA census of which arms render the envelope goes stale the moment a new arm is added, so the durable half of this work is the check rather than the census. The command schema already reflects the command definitions through the argument parser's own introspection: it walks the command tree and records each arm together with the flags declared on it. Deriving the arm set from that reflection leaves no hand-maintained list to drift.\n\nScope is each arm whose definition declares the flag, with no visibility predicate applied. A hidden arm still runs and still accepts the flag, so filtering to visible arms would turn a later promotion into a silent coverage gap. An arm carried as a declared exemption, recorded with the reason no in-body failure is constructible for it, is covered by that exemption, which the check reports rather than hides.\n\nCompleteness is a set equality, following the pattern the exit-status projection already uses: a derived set on one side, the registered set on the other, an inequality failing the build. Beside it, each probe's observed code is asserted to be a registered member other than the generic fallback, so an arm producing an envelope with no real classification is a failure rather than a pass. Where a probe exposes a typed error the central classifier does not distinguish, the classifier gains that arm.\n\nThe per-arm result is what satisfies the census obligation: it is derived at check time from the definitions rather than committed as a table that would go stale.\n\n## Success Criteria\n\n- [hard] REQ-01: The arm set is derived from the command definitions rather than from a hand-written list.\n- [hard] REQ-02: Derivation selects each arm whose definition declares the machine-readable flag, applying no visibility predicate.\n- [hard] REQ-03: A newly declared arm with neither a registered failure probe nor a declared exemption fails the check.\n- [hard] REQ-04: A registered probe naming an arm the definitions no longer declare fails the check.\n- [hard] REQ-05: Each probed arm's forced failure reports a registered error code other than the generic fallback.\n- [hard] REQ-06: The check reports, per arm, whether its failure rendered the envelope and under which code.\n- [hard] REQ-07: The check runs inside the standard test invocation rather than behind an opt-in step.\n- [hard] REQ-08: An arm carried as a declared exemption satisfies the check through that exemption, and the check reports the exemption with its stated reason.\n",
   "documents": [],
+  "first_ready_at": "2026-07-28T14:21:47.919088468Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "A coverage guard that fails when a command arm has neither a probe nor an exemption",
-  "updated_at": "2026-07-27T21:43:44.885062384Z"
+  "updated_at": "2026-07-28T14:21:47.919088468Z"
 }
