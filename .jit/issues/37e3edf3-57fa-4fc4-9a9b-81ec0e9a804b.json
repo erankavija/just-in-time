@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T16:23:58.720372923Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-28T16:27:31.333961707Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "37e3edf3-57fa-4fc4-9a9b-81ec0e9a804b",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "The canonical conformance suite for the machine-readable failure envelope",
-  "updated_at": "2026-07-28T15:19:22.741784053Z"
+  "updated_at": "2026-07-28T16:27:31.333961707Z"
 }

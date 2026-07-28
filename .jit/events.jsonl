@@ -11019,3 +11019,5 @@
 {"from":"ready","id":"391bc1cd-d0dc-451c-8904-4e1c01c97a82","issue_id":"60aeaa49-0ee3-4c8d-ac61-f5316bae3932","timestamp":"2026-07-28T15:19:27.770669356Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:wave6-coverage-guard","id":"37b93f95-2961-406c-b37d-dfc20dcda7bb","issue_id":"a1322bee-21c1-4f14-af96-ffa8c7204926","timestamp":"2026-07-28T15:19:29.571185943Z","type":"issue_claimed"}
 {"from":"ready","id":"86a810d7-06b0-43c3-b6a0-fa446daded9e","issue_id":"a1322bee-21c1-4f14-af96-ffa8c7204926","timestamp":"2026-07-28T15:19:32.796708474Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"6aa3769a-0a35-42f2-8637-181d8f165f20","issue_id":"37e3edf3-57fa-4fc4-9a9b-81ec0e9a804b","timestamp":"2026-07-28T16:23:58.720372923Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"80e18642-ed5c-4b1e-8134-c6cd42372038","issue_id":"37e3edf3-57fa-4fc4-9a9b-81ec0e9a804b","timestamp":"2026-07-28T16:27:31.333961707Z","type":"gate_failed","updated_by":"auto:executor"}

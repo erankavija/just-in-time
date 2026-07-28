@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "cdf5c3265002faae65c8b5b926d91ec9415ab62d",
+  "completed_at": "2026-07-28T16:27:31.057938333Z",
+  "duration_ms": 210689,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/failure_envelope_contract_tests.rs",
+        "id": "F1",
+        "line": 114,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/cargo-ci",
+          "@/invariant/bounded-rust-build-footprint"
+        ],
+        "severity": "high",
+        "summary": "The passing Cargo CI run predates every attributed implementation commit, so the current canonical failure-envelope suite is not runtime-verified."
+      }
+    ],
+    "summary": "Cargo CI evidence predates all attributed implementation commits, leaving the current failure-envelope suite unverified.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "37e3edf3-57fa-4fc4-9a9b-81ec0e9a804b",
+  "message": null,
+  "run_id": "421f81f9-d6d8-41e1-a995-73917c836057",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T16:24:00.368838976Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8043 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa98a-4daf-7880-b516-40bddcdefd18\n--------\nuser\n--- 8030 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: ce4f9073, f6c7cb07, 879ff45f, 20bf2782, 642e0a1b, bbb2f7aa, 9427f410\nPolicy sources: AGENTS.md\nResolved items: @/issue/37e3edf3/requirement/REQ-01..REQ-06 (issue); @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, but ran at cdf5c326 before all attributed implementation commits; code-review pending\nTruncation recovery: narrowed registry/config reads and per-path diffs after broad search and patch output truncated\n\n1. **[blocking][issue-impact]** The sole recorded Cargo CI run validated commit `cdf5c326`, before the attributed implementation began at `bbb2f7aa` and before the canonical suite and its expected-code registry were added. Consequently, the runtime behavior required by REQ-02 and REQ-06 remains materially unverified for the current tree; the recorded passing status cannot validate [failure_envelope_contract_tests.rs:114](crates/jit/tests/cli_issue/failure_envelope_contract_tests.rs:114). References: @/gate/cargo-ci, @/invariant/bounded-rust-build-footprint.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Cargo CI evidence predates all attributed implementation commits, leaving the current failure-envelope suite unverified.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The passing Cargo CI run predates every attributed implementation commit, so the current canonical failure-envelope suite is not runtime-verified.\",\"file\":\"crates/jit/tests/cli_issue/failure_envelope_contract_tests.rs\",\"line\":114,\"references\":[\"@/gate/cargo-ci\",\"@/invariant/bounded-rust-build-footprint\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
