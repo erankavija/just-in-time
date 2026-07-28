@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T09:15:45.664787083Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "777d00da-22d5-49e7-a005-f2da47d5f4b6",
   "labels": [
     "type:task",
@@ -27,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Report the server control's failures as the error envelope",
-  "updated_at": "2026-07-28T08:17:25.399023805Z"
+  "updated_at": "2026-07-28T09:15:45.664787083Z"
 }
