@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "b1c7d73c8cdcb3cb983bda25b4cb135993918c49",
+  "completed_at": "2026-07-28T18:29:11.586731101Z",
+  "duration_ms": 94521,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The current documentation and generation/test surface satisfies all issue criteria; commit attribution was unavailable.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9eadd135-d27b-471c-b481-46bbf15084d7",
+  "message": null,
+  "run_id": "ea428bf9-e2f3-4f93-b748-529aa846ba27",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T18:27:37.065479875Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: no reachable commits tagged `jit:9eadd135`; fallback: issue intent, completed dependency `ec029993`, and current documentation/code impact cone\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-13` (markdown-first: `dev/vision/9db27a3a-charter.md`); `@/gate/cargo-ci`, `@/gate/docs-mechanical`, `@/gate/doc-review` (registry-first: `.jit/gates.toml`)\nGate evidence: cargo-ci passed (exit 0, 2026-07-28T18:20:27Z); docs-mechanical pending; doc-review pending\nTruncation recovery: narrowed the truncated configuration and broad search reads to the charter declaration, error-code reference, CLI contract, index, generator, and freshness tests; abandoned unrelated search matches outside this impact cone\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current documentation and generation/test surface satisfies all issue criteria; commit attribution was unavailable.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
