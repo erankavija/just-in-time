@@ -8,12 +8,24 @@
   ],
   "description": "A failing invocation under the machine-readable flag writes exactly one JSON document on the payload stream and nothing else, asserted across the probed command arms rather than held by convention.\n\n## Background\n\nThe stream split is deliberate: the envelope goes to the payload stream and the human diagnostic to the diagnostic stream, a division existing coverage already pins. Measurement across the arms that could be driven into a failure found payload-stream purity already holding, with one emission site as the exception.\n\nIt holds by construction, though, not by assertion. The human output helpers are suppressed under the flag and progress output sits behind flag guards, but nothing fails if a future arm prints an unguarded line ahead of a fallible call.\n\nSuppressing the diagnostic line is not the intent. The contract is that the payload stream carries the envelope alone, which is what a parser reading that stream depends on.\n\n## Success Criteria\n\n- [hard] REQ-01: For a probed arm's forced failure, the payload stream parses as exactly one JSON document.\n- [hard] REQ-02: A non-JSON byte on the payload stream fails the check.\n- [hard] REQ-03: Output preceding the envelope on the payload stream fails the check.\n- [hard] REQ-04: The human diagnostic on the diagnostic stream stays present and is not asserted away.\n",
   "documents": [],
+  "done_at": "2026-07-28T16:53:18.686398307Z",
   "first_ready_at": "2026-07-28T14:21:43.267153951Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T16:50:19.412981988Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T16:52:54.340030646Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "60aeaa49-0ee3-4c8d-ac61-f5316bae3932",
   "labels": [
     "type:task",
@@ -24,7 +36,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Pin payload-stream purity on the machine-readable failure path",
-  "updated_at": "2026-07-28T15:19:27.770669356Z"
+  "updated_at": "2026-07-28T16:53:18.686398307Z"
 }
