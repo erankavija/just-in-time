@@ -26,7 +26,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T08:11:17.620801451Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8cfe8699-95f2-4535-8158-35eb05158266",
   "labels": [
     "type:task",
@@ -39,5 +45,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "The canonical failure-lever registry the probes read",
-  "updated_at": "2026-07-28T07:04:51.240454868Z"
+  "updated_at": "2026-07-28T08:11:17.620801451Z"
 }
