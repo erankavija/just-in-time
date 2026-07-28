@@ -1,6 +1,7 @@
 //! Shared subprocess fixture for failures recorded in the canonical lever registry.
 
 use super::failure_lever_registry::{failure_lever_registry, FailureLever};
+use clap::Parser;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -66,6 +67,7 @@ pub(crate) fn drive_failure_lever(lever: &FailureLever) -> RecordedFailure {
 pub(crate) fn drive_recorded_failure(
     invocation: &super::failure_lever_registry::FailureLeverInvocation,
 ) -> ForcedFailure {
+    assert_recorded_invocation_parses(&invocation.path, &invocation.argv);
     let mut fixture = FailureFixture::new();
     invocation.setup.iter().for_each(|step| {
         fixture.apply(
@@ -75,12 +77,6 @@ pub(crate) fn drive_recorded_failure(
     });
 
     let output = fixture.run_jit(&invocation.argv);
-    let parser_diagnostic = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        !(parser_diagnostic.starts_with("error:") && parser_diagnostic.contains("Usage:")),
-        "{} failed in argument parsing instead of after dispatch: {parser_diagnostic}",
-        invocation.path
-    );
 
     ForcedFailure {
         path: invocation.path.clone(),
@@ -90,6 +86,19 @@ pub(crate) fn drive_recorded_failure(
         stdout: output.stdout,
         stderr: output.stderr,
         status: output.status,
+    }
+}
+
+fn assert_recorded_invocation_parses(path: &str, argv: &[String]) {
+    let parsed = jit::cli::Cli::try_parse_from(
+        std::iter::once("jit").chain(argv.iter().map(String::as_str)),
+    );
+    require_parser_acceptance(path, parsed);
+}
+
+fn require_parser_acceptance<T>(path: &str, parsed: Result<T, clap::Error>) {
+    if let Err(error) = parsed {
+        panic!("recorded invocation for `{path}` is rejected before dispatch: {error}");
     }
 }
 
@@ -447,6 +456,35 @@ fn test_failure_probe_fixture_accepts_every_recorded_setup_step() {
         .for_each(|step| {
             SetupStep::parse(step).unwrap_or_else(|error| panic!("{step}: {error}"));
         });
+}
+
+#[test]
+fn test_failure_probe_fixture_parser_accepts_every_recorded_invocation() {
+    failure_lever_registry()
+        .arms
+        .iter()
+        .filter_map(|lever| match lever {
+            FailureLever::Invocation(invocation) => Some(invocation),
+            FailureLever::Exemption(_) => None,
+        })
+        .for_each(|invocation| {
+            assert_recorded_invocation_parses(&invocation.path, &invocation.argv);
+        });
+}
+
+#[test]
+fn test_failure_probe_fixture_rejects_parser_error_without_usage_text() {
+    assert!(
+        std::panic::catch_unwind(|| {
+            let parser_error = clap::Error::raw(
+                clap::error::ErrorKind::InvalidValue,
+                "synthetic parser rejection without a usage block",
+            );
+            require_parser_acceptance::<()>("synthetic arm", Err(parser_error));
+        })
+        .is_err(),
+        "any structural parser error must reject the recorded invocation"
+    );
 }
 
 #[test]
