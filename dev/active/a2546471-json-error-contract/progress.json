@@ -1,7 +1,7 @@
 {
   "epic_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
   "epic_short_id": "a2546471",
-  "current_wave": 11,
+  "current_wave": 12,
   "waves": [
     {
       "wave_number": 1,
@@ -97,8 +97,8 @@
     {
       "wave_number": 11,
       "issues": [
-        {"id":"ced03648-c487-417c-b5e8-a447ec2dc4eb","short_id":"ced03648","title":"Make the failure registry independent of planning artifacts","classification":"implementation","status":"in_progress"},
-        {"id":"002e9479-c893-457d-b4ef-1c50b1c43c9f","short_id":"002e9479","title":"Complete the typed error-envelope constructor cutover","classification":"implementation","status":"in_progress"}
+        {"id":"ced03648-c487-417c-b5e8-a447ec2dc4eb","short_id":"ced03648","title":"Make the failure registry independent of planning artifacts","classification":"implementation","status":"done"},
+        {"id":"002e9479-c893-457d-b4ef-1c50b1c43c9f","short_id":"002e9479","title":"Complete the typed error-envelope constructor cutover","classification":"implementation","status":"done"}
       ]
     }
   ],
