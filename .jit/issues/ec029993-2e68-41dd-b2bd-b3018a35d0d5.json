@@ -14,7 +14,13 @@
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-28T17:30:55.480169157Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ec029993-2e68-41dd-b2bd-b3018a35d0d5",
   "labels": [
     "type:task",
@@ -28,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "One canonical statement of the machine-readable failure contract",
-  "updated_at": "2026-07-28T17:07:45.054780763Z"
+  "updated_at": "2026-07-28T17:30:55.480169157Z"
 }

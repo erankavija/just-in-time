@@ -11044,3 +11044,4 @@
 {"fields":["dependencies"],"id":"58dd1419-5297-49fd-b6c6-d250a4d974d2","issue_id":"7491da4a-f008-4188-9b1b-251fbe56ec77","timestamp":"2026-07-28T17:24:20.349154003Z","type":"issue_updated","updated_by":"dependency-add"}
 {"assignee":"agent:wave7-census","id":"78f4db8d-8df8-4ef8-9774-7b24ea85e05e","issue_id":"4437d897-465e-470d-99af-6c9683927af0","timestamp":"2026-07-28T17:24:22.185876109Z","type":"issue_claimed"}
 {"from":"ready","id":"a6d032ac-4a6f-46f0-9e1d-a9552f8d1fe9","issue_id":"4437d897-465e-470d-99af-6c9683927af0","timestamp":"2026-07-28T17:24:25.478163447Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"docs-mechanical","id":"6b2f5a2e-1a44-4437-9044-6fe275587633","issue_id":"ec029993-2e68-41dd-b2bd-b3018a35d0d5","timestamp":"2026-07-28T17:30:55.480169157Z","type":"gate_passed","updated_by":"auto:executor"}
